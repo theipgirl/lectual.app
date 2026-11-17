@@ -163,14 +163,14 @@ describe("read-only wording", () => {
 
 describe("paths, targets and copy", () => {
   const dashboard = "src/app/dashboard";
-  const pageFor = (path: string) => join(dashboard, ...path.replace(/^\/dashboard\/?/, "").split("/").filter(Boolean), "page.tsx");
+  const pageFor = (path: string) => join(dashboard, ...path.split("?")[0].replace(/^\/dashboard\/?/, "").split("/").filter(Boolean), "page.tsx");
 
   it("every step path is a page on disk", () => {
     for (const s of allHubSteps()) expect(existsSync(pageFor(s.path)), `${s.id}: ${s.path}`).toBe(true);
   });
 
   it("every step ends in a trailing slash like the rest of the app", () => {
-    for (const s of allHubSteps()) expect(s.path.endsWith("/"), s.path).toBe(true);
+    for (const s of allHubSteps()) expect(s.path.split("?")[0].endsWith("/"), s.path).toBe(true);
   });
 
   function sources(dir: string): string[] {

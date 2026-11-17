@@ -9,7 +9,8 @@ import { memberLabel, stageLabelFor } from "@/lib/intake/views";
 import { addManualTimeAction, startTimerAction, stopTimerAction } from "../time-actions";
 import TimeEntryDialog, { type TimeEntrySubmit } from "@/components/intake/TimeEntryDialog";
 import Popover, { PopoverItem } from "./Popover";
-import { LEADS_ADD_TIME, LEADS_ROW_MENU, LEADS_START_TIMER, LEADS_STOP_TIMER } from "@/lib/ui/words";
+import { LEADS_ADD_TIME, LEADS_ROW_MENU, LEADS_START_TIMER, LEADS_STOP_TIMER, OWNER_COLUMN, TEAMMATE, UNASSIGNED } from "@/lib/ui/words";
+import { Icon } from "@/components/ui/Icon";
 
 /**
  * The "…" on a list row and a board card: the ONE place the small per-lead actions live, with words (no unlabeled mini
@@ -75,12 +76,8 @@ export default function RowMenu({
         align="right"
         width={220}
         trigger={({ onClick, ref, ...aria }) => (
-          <button {...aria} ref={ref} type="button" onClick={onClick} className="ix-icon-btn" disabled={pending}>
-            <svg aria-hidden width="16" height="4" viewBox="0 0 16 4" fill="currentColor" style={{ display: "block" }}>
-              <circle cx="2" cy="2" r="1.6" />
-              <circle cx="8" cy="2" r="1.6" />
-              <circle cx="14" cy="2" r="1.6" />
-            </svg>
+          <button {...aria} ref={ref} type="button" onClick={onClick} className="lx-board-menu" disabled={pending}>
+            <Icon name="more" />
           </button>
         )}
       >
@@ -88,7 +85,7 @@ export default function RowMenu({
           <div className="ix-menu-scroll">
             {showMove && (
               <>
-                <span className="ix-menu-h">Move to stage</span>
+                <span className="ix-menu-h lx-label">Move to stage</span>
                 {stages.map((stage) => (
                   <PopoverItem
                     key={stage.id}
@@ -103,7 +100,7 @@ export default function RowMenu({
                 ))}
               </>
             )}
-            <span className="ix-menu-h">Assign to</span>
+            <span className="ix-menu-h lx-label">{OWNER_COLUMN}</span>
             <PopoverItem
               muted
               checked={lead.assigned_to == null}
@@ -112,11 +109,11 @@ export default function RowMenu({
                 if (lead.assigned_to != null) onAssign(lead.id, null);
               }}
             >
-              Unassigned
+              {UNASSIGNED}
             </PopoverItem>
             {unknownAssignee && (
               <PopoverItem checked onSelect={close}>
-                Unknown teammate
+                {TEAMMATE}
               </PopoverItem>
             )}
             {members.map((member) => (
@@ -131,7 +128,7 @@ export default function RowMenu({
                 {memberLabel(member)}
               </PopoverItem>
             ))}
-            <span className="ix-menu-h">Time</span>
+            <span className="ix-menu-h lx-label">Time</span>
             {runningHere ? (
               <PopoverItem
                 onSelect={() => {
@@ -142,7 +139,7 @@ export default function RowMenu({
                 {LEADS_STOP_TIMER}
               </PopoverItem>
             ) : runningElsewhere ? (
-              <span className="ix-sub" style={{ padding: "4px 8px", whiteSpace: "normal" }}>
+              <span className="ix-sub ix-menu-note">
                 A timer is already running on {running?.leadName ?? "another lead"}. Stop it first.
               </span>
             ) : (
@@ -167,7 +164,7 @@ export default function RowMenu({
         )}
       </Popover>
       {error && !dialog && (
-        <span role="status" className="ix-sub" style={{ color: "var(--crit)", marginLeft: 6 }} title={error}>
+        <span role="status" className="ix-sub ix-err-inline" title={error}>
           {error}
         </span>
       )}

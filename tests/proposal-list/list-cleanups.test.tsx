@@ -5,7 +5,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ROWS, STRIP_OK, item, renderListPage } from "../proposals/list-page-harness";
 import type { ConsultsStripData } from "@/lib/proposals/consults-load";
-import { consultsCapNote, emptySegmentSentence, OPEN_OFFERS_LABEL, TRANSCRIPT_PROCESSING } from "@/lib/proposals/list-copy";
+import { emptySegmentSentence, OPEN_OFFERS_LABEL, TRANSCRIPT_PROCESSING } from "@/lib/proposals/list-copy";
 import { FEE_SENTENCE, PROPOSALS_NAME, PROPOSALS_SUBLINE } from "@/lib/ui/words";
 
 const root = path.resolve(__dirname, "../..");
@@ -67,11 +67,11 @@ describe("Proposals list (F11)", () => {
     expect(readFileSync(path.join(root, "src/lib/proposals/lead-options.ts"), "utf8")).toContain("getScopedClient");
   });
 
-  it("the left column is headed Show and becomes a chip row under 760px", async () => {
+  it("the segments are the shared filter chips (a nav named Show), not a private left column", async () => {
     const html = text(await renderListPage());
-    expect(html).toContain('<div class="lx-label pq-segs-label">Show</div>');
-    expect(css).toMatch(/@media \(max-width: 760px\) \{\s*\.pq-segs \{ display: flex; flex-wrap: wrap;/);
-    expect(css).toMatch(/\.pq-seg \{ border-radius: 999px;/);
+    expect(html).toContain('<nav aria-label="Show" class="lp-chips pq-segs">');
+    expect(html).toContain('class="lp-chip lp-chip-on"');
+    expect(css).not.toMatch(/\.pq-seg\b|\.pq-layout|\.pq-main/);
   });
 
   it("says the fee sentence once, and uses the new subtitle", async () => {
@@ -88,7 +88,7 @@ describe("Proposals list (F11)", () => {
     expect(html).toContain(">Open offers<");
     // A small tile like the weekly review's KPI tiles: a card, the amount, the one-line explanation.
     expect(html).toContain('class="lx-card lx-kpi pq-out"');
-    expect(css).toMatch(/\.pq-out-figure \{[^}]*font-family: var\(--sans\); font-variant-numeric: tabular-nums; font-size: 24px/);
+    expect(css).toMatch(/\.pq-out-figure \{[^}]*font-family: var\(--sans\); font-variant-numeric: tabular-nums; font-size: var\(--fs-6\)/);
     expect(html).toContain("counted at the cheapest package offered");
   });
 
@@ -106,10 +106,6 @@ describe("Proposals list (F11)", () => {
     expect(html).toMatch(/<a href="\/dashboard\/proposals\/?">Show all<\/a>/);
     expect(emptySegmentSentence("accepted")).toBe("No accepted proposals yet.");
     expect(ROWS.length).toBeGreaterThan(0);
-  });
-
-  it("the cap note says how many are shown", () => {
-    expect(consultsCapNote(30)).toBe("Showing the newest 30.");
   });
 
   it("h1, title and back links use one name", async () => {

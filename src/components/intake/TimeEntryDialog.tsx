@@ -1,6 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { Dialog } from "@/components/ui/Dialog";
+import { Field } from "@/components/ui/Field";
+import { Notice } from "@/components/ui/Notice";
+import { CANCEL } from "@/lib/ui/words";
 
 /**
  * The two prompts behind the ⏱ (blueprint §13.1): the one-line note asked for
@@ -33,18 +37,6 @@ export type TimeEntrySubmit = {
   note: string | null;
   /** When the work ENDED, ISO. Manual entries only. */
   atIso: string | null;
-};
-
-const fieldStyle: React.CSSProperties = {
-  fontSize: 13,
-  fontFamily: "inherit",
-  padding: "8px 10px",
-  borderRadius: 8,
-  border: "1px solid var(--line)",
-  background: "var(--surface)",
-  color: "var(--ink)",
-  width: "100%",
-  boxSizing: "border-box",
 };
 
 /** `YYYY-MM-DDTHH:mm` in the reader's own zone — what datetime-local wants. */
@@ -80,13 +72,8 @@ export default function TimeEntryDialog({
   const [endedAt, setEndedAt] = useState(() => localInputValue(new Date()));
   const [localError, setLocalError] = useState<string | null>(null);
 
-  useEffect(() => {
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") onCancel();
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onCancel]);
+  const hoursRef = useRef<HTMLInputElement>(null);
+  const noteRef = useRef<HTMLInputElement>(null);
 
   const seconds = useMemo(() => {
     const h = Number.parseInt(hours, 10);
@@ -125,193 +112,74 @@ export default function TimeEntryDialog({
   }
 
   return (
-    <div
-      role="presentation"
-      // The chip lives inside a table row (and a draggable card) whose own
-      // click handler navigates to the lead. Without this, dismissing the
-      // dialog by clicking its backdrop would also open the record behind it.
-      onClick={(event) => {
-        event.stopPropagation();
-        if (event.target === event.currentTarget) onCancel();
-      }}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 70,
-        background: "rgba(20,4,8,.34)",
-        display: "flex",
-        alignItems: "flex-start",
-        justifyContent: "center",
-        padding: "12vh 16px 16px",
-        overflowY: "auto",
-        cursor: "default",
-      }}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={`${title} — ${leadName}`}
-        style={{
-          width: "min(420px, 100%)",
-          background: "var(--surface)",
-          border: "1px solid var(--line)",
-          borderRadius: 14,
-          boxShadow: "var(--shadow)",
-          padding: 18,
-          display: "flex",
-          flexDirection: "column",
-          gap: 13,
-          textAlign: "left",
-        }}
-      >
-        <div>
-          <h2 className="intake-serif" style={{ margin: 0, fontSize: 23, lineHeight: 1.1 }}>
-            {title}
-          </h2>
-          <p style={{ margin: "5px 0 0", fontSize: 12, color: "var(--ink2)", lineHeight: 1.5 }}>
-            {mode === "stop"
-              ? `What were you doing on ${leadName}? One line, for the team — it stays inside the firm.`
-              : `Time already spent on ${leadName}. Internal effort only — this is never a client invoice.`}
-          </p>
-        </div>
-
-        {mode === "manual" && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <label style={{ display: "grid", gap: 5, minWidth: 0 }}>
-              <span className="intake-eyebrow">Hours</span>
-              <input
-                type="number"
-                min={0}
-                max={12}
-                step={1}
-                value={hours}
-                autoFocus
-                onChange={(event) => setHours(event.target.value)}
-                style={fieldStyle}
-              />
-            </label>
-            <label style={{ display: "grid", gap: 5, minWidth: 0 }}>
-              <span className="intake-eyebrow">Minutes</span>
-              <input
-                type="number"
-                min={0}
-                max={59}
-                step={5}
-                value={minutes}
-                onChange={(event) => setMinutes(event.target.value)}
-                style={fieldStyle}
-              />
-            </label>
-            <label style={{ display: "grid", gap: 5, minWidth: 0, gridColumn: "1 / -1" }}>
-              <span className="intake-eyebrow">Finished at</span>
-              <input
-                type="datetime-local"
-                value={endedAt}
-                onChange={(event) => setEndedAt(event.target.value)}
-                style={fieldStyle}
-              />
-            </label>
-          </div>
-        )}
-
-        <label style={{ display: "grid", gap: 5, minWidth: 0 }}>
-          <span className="intake-eyebrow">Note{mode === "stop" ? "" : " (optional)"}</span>
-          <input
-            type="text"
-            value={note}
-            maxLength={200}
-            autoFocus={mode === "stop"}
-            placeholder="Reviewed the search results"
-            onChange={(event) => setNote(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                submit(true);
-              }
-            }}
-            style={fieldStyle}
-          />
-        </label>
-
-        {(localError || error) && (
-          <p
-            role="status"
-            style={{
-              margin: 0,
-              fontSize: 11.5,
-              lineHeight: 1.45,
-              color: "var(--crit)",
-              background: "var(--critbg)",
-              borderRadius: 8,
-              padding: "7px 9px",
-            }}
-          >
-            {localError || error}
-          </p>
-        )}
-
-        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
-          <button
-            type="button"
-            onClick={onCancel}
-            style={{
-              height: 34,
-              padding: "0 12px",
-              borderRadius: 9,
-              border: "1px solid var(--line)",
-              background: "var(--surface)",
-              color: "var(--ink2)",
-              fontSize: 12.5,
-              fontFamily: "inherit",
-              cursor: "pointer",
-            }}
-          >
-            Cancel
+    <Dialog
+      size="sm"
+      title={title}
+      onClose={onCancel}
+      initialFocus={mode === "stop" ? noteRef : hoursRef}
+      footer={
+        <>
+          <button type="button" className="lx-btn lx-btn-sec" onClick={onCancel}>
+            {CANCEL}
           </button>
           {mode === "stop" && (
             // A note is asked for, never demanded: a timer that cannot be
             // stopped without typing something is a timer people stop lying to.
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => submit(false)}
-              style={{
-                height: 34,
-                padding: "0 12px",
-                borderRadius: 9,
-                border: "1px solid var(--line)",
-                background: "var(--surface)",
-                color: "var(--ink2)",
-                fontSize: 12.5,
-                fontFamily: "inherit",
-                cursor: pending ? "progress" : "pointer",
-              }}
-            >
+            <button type="button" className="lx-btn lx-btn-sec" disabled={pending} onClick={() => submit(false)}>
               Stop without a note
             </button>
           )}
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => submit(true)}
-            style={{
-              height: 34,
-              padding: "0 14px",
-              borderRadius: 9,
-              border: "1px solid var(--ox)",
-              background: "var(--ox)",
-              color: "var(--cream)",
-              fontSize: 12.5,
-              fontWeight: 500,
-              fontFamily: "inherit",
-              cursor: pending ? "progress" : "pointer",
-              opacity: pending ? 0.7 : 1,
-            }}
-          >
+          <button type="button" className="lx-btn lx-btn-pri" disabled={pending} onClick={() => submit(true)}>
             {mode === "stop" ? "Stop timer" : "Log time"}
           </button>
+        </>
+      }
+    >
+      <p className="lx-note">
+        {mode === "stop"
+          ? `What were you doing on ${leadName}? One line, for the team — it stays inside the firm.`
+          : `Time already spent on ${leadName}. Internal effort only — this is never a client invoice.`}
+      </p>
+
+      {mode === "manual" && (
+        <div className="ix-time-grid">
+          <Field label="Hours">
+            <input ref={hoursRef} type="number" className="lx-input" min={0} max={12} step={1} value={hours} onChange={(event) => setHours(event.target.value)} />
+          </Field>
+          <Field label="Minutes">
+            <input type="number" className="lx-input" min={0} max={59} step={5} value={minutes} onChange={(event) => setMinutes(event.target.value)} />
+          </Field>
+          <div className="ix-time-wide">
+            <Field label="Finished at">
+              <input type="datetime-local" className="lx-input" value={endedAt} onChange={(event) => setEndedAt(event.target.value)} />
+            </Field>
+          </div>
         </div>
-      </div>
-    </div>
+      )}
+
+      <Field label="Note" optional={mode !== "stop"}>
+        <input
+          ref={noteRef}
+          type="text"
+          className="lx-input"
+          value={note}
+          maxLength={200}
+          placeholder="Reviewed the search results"
+          onChange={(event) => setNote(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              submit(true);
+            }
+          }}
+        />
+      </Field>
+
+      {(localError || error) && (
+        <Notice tone="risk" role="status">
+          {localError || error}
+        </Notice>
+      )}
+    </Dialog>
   );
 }

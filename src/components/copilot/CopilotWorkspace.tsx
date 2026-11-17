@@ -26,6 +26,8 @@ export function CopilotWorkspace(props: {
   openNote?: string | null;
   /** The server's clock, so relative dates render the same on both sides. */
   now: number;
+  /** The firm's time zone, for the dates in the list. */
+  timeZone: string;
 }) {
   const router = useRouter();
   // Bumped only by New chat on a chat with no `?c=`: remounting the chat empties it and forgets its saved id.
@@ -40,7 +42,7 @@ export function CopilotWorkspace(props: {
 
   return (
     <div className="cpw">
-      <ChatHistoryList history={props.history} openId={props.openId} now={props.now} onNewChat={newChat} />
+      <ChatHistoryList history={props.history} openId={props.openId} now={props.now} tz={props.timeZone} onNewChat={newChat} />
       <div className="cpw-main">
         {props.openNote && <p className="cpl-status cpw-open-note">{props.openNote}</p>}
         <CopilotChat

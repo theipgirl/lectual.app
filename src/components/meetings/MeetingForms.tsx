@@ -1,7 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
+import { InlineConfirm } from "@/components/ui/InlineConfirm";
+import { SavedNote } from "@/components/ui/SavedNote";
+import { SAVING } from "@/lib/ui/words";
+import "./meetings.css";
 import { draftFollowUpAction, draftProposalAction, linkMeetingAction, type ActionState } from "@/app/dashboard/meetings/actions";
 import {
   connectFathomAction,
@@ -13,15 +17,15 @@ import {
 function Result({ state }: { state: ActionState | MeetingsSettingsState }) {
   if (state.error) {
     return (
-      <p role="alert" className="lx-note" style={{ margin: 0, color: "var(--wine)" }}>
+      <p role="alert" className="lx-note lx-meet-error">
         {state.error}
       </p>
     );
   }
   if (state.notice) {
     return (
-      <p role="status" className="lx-note" style={{ margin: 0, color: "var(--ok)" }}>
-        {state.notice}
+      <p>
+        <SavedNote show>{state.notice}</SavedNote>
       </p>
     );
   }
@@ -80,11 +84,11 @@ export function LinkMeetingForm(props: {
   }
 
   return (
-    <form action={action} style={{ display: "grid", gap: 10 }} data-link-form={linked ? "linked" : hasSuggestion ? "suggested" : "unlinked"}>
+    <form action={action} className="lx-meet-form" data-link-form={linked ? "linked" : hasSuggestion ? "suggested" : "unlinked"}>
       <input type="hidden" name="meetingId" value={props.meetingId} />
 
       {linked && (
-        <p style={{ margin: 0 }} data-linked-text>
+        <p data-linked-text>
           {"Linked to "}
           {props.leadId && <Link href={`/dashboard/leads/${props.leadId}/`}>{props.leadLabel ?? "Lead"}</Link>}
           {props.leadId && props.matterId && " · "}
@@ -92,12 +96,12 @@ export function LinkMeetingForm(props: {
         </p>
       )}
       {linked && props.note && (
-        <p className="lx-note" style={{ margin: 0 }}>
+        <p className="lx-note">
           {props.note}
         </p>
       )}
       {hasSuggestion && !choosing && (
-        <p className="lx-note" style={{ margin: 0 }}>
+        <p className="lx-note">
           More than one client shares an attendee&apos;s email, so this meeting was not filed on its own.
         </p>
       )}
@@ -134,7 +138,7 @@ export function LinkMeetingForm(props: {
         </>
       )}
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+      <div className="lx-meet-form-actions">
         {hasSuggestion && !showSelects && (
           <span data-suggested-text>
             {"Suggested: "}
@@ -145,7 +149,7 @@ export function LinkMeetingForm(props: {
         {showSelects ? (
           <>
             <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={pending}>
-              {pending ? "Saving…" : linked ? "Update link" : "Link"}
+              {pending ? SAVING : linked ? "Update link" : "Link"}
             </button>
             {choosing && (
               <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" disabled={pending} onClick={() => setChoosing(false)}>
@@ -160,7 +164,7 @@ export function LinkMeetingForm(props: {
         ) : (
           <>
             <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={pending}>
-              {pending ? "Saving…" : "Link"}
+              {pending ? SAVING : "Link"}
             </button>
             <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={() => setChoosing(true)}>
               Choose another
@@ -182,12 +186,12 @@ export function LinkMeetingForm(props: {
 export function DraftFollowUpButton({ meetingId }: { meetingId: string }) {
   const [state, action, pending] = useActionState<ActionState, FormData>(draftFollowUpAction, {});
   return (
-    <form action={action} style={{ display: "grid", gap: 8 }}>
+    <form action={action} className="lx-meet-form-tight">
       <input type="hidden" name="meetingId" value={meetingId} />
       <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending || state.ok}>
         {pending ? "Drafting…" : state.ok ? "Drafted" : "Draft follow-up"}
       </button>
-      <p className="lx-note" style={{ margin: 0 }}>
+      <p className="lx-note">
         Written from this meeting into the approval queue. Nothing is sent until an attorney edits and approves it.
       </p>
       <Result state={state} />
@@ -199,17 +203,17 @@ export function DraftFollowUpButton({ meetingId }: { meetingId: string }) {
 export function DraftProposalButton({ meetingId }: { meetingId: string }) {
   const [state, action, pending] = useActionState<ActionState, FormData>(draftProposalAction, {});
   return (
-    <form action={action} style={{ display: "grid", gap: 8 }}>
+    <form action={action} className="lx-meet-form-tight">
       <input type="hidden" name="meetingId" value={meetingId} />
       <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending || state.ok}>
         {pending ? "Drafting…" : state.ok ? "Drafted" : "Draft proposal + email"}
       </button>
-      <p className="lx-note" style={{ margin: 0 }}>
+      <p className="lx-note">
         Reads the call and drafts the client proposal from what was recommended, plus the email with its link. The proposal needs a named approver, then the email waits in the approval queue. Nothing is sent.
       </p>
       <Result state={state} />
       {state.ok && state.href && (
-        <p className="lx-note" style={{ margin: 0 }}>
+        <p className="lx-note">
           <Link href={state.href}>Open the proposal</Link>
         </p>
       )}
@@ -220,12 +224,12 @@ export function DraftProposalButton({ meetingId }: { meetingId: string }) {
 export function ConnectFathomForm({ reconnect }: { reconnect: boolean }) {
   const [state, action, pending] = useActionState<MeetingsSettingsState, FormData>(connectFathomAction, {});
   return (
-    <form action={action} style={{ display: "grid", gap: 10 }}>
+    <form action={action} className="lx-meet-form">
       <label className="lx-field">
         <span className="lx-label">Fathom API key</span>
         <input className="lx-input" name="key" type="password" autoComplete="off" spellCheck={false} placeholder="Paste the key from Fathom → Settings → API Access" required />
       </label>
-      <p className="lx-note" style={{ margin: 0 }}>
+      <p className="lx-note">
         We check the key with one read-only request, then store it encrypted. Nobody at your firm can see it again. Lectual only reads from Fathom.
       </p>
       <div>
@@ -241,7 +245,7 @@ export function ConnectFathomForm({ reconnect }: { reconnect: boolean }) {
 export function ImportNowButton({ provider }: { provider: "fathom" | "zoom" }) {
   const [state, action, pending] = useActionState<MeetingsSettingsState, FormData>(importNowAction, {});
   return (
-    <form action={action} style={{ display: "grid", gap: 6 }}>
+    <form action={action} className="lx-meet-form-tight">
       <input type="hidden" name="provider" value={provider} />
       <div>
         <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
@@ -255,18 +259,17 @@ export function ImportNowButton({ provider }: { provider: "fathom" | "zoom" }) {
 
 export function DisconnectSourceButton({ provider, label }: { provider: "fathom" | "zoom"; label: string }) {
   const [state, action, pending] = useActionState<MeetingsSettingsState, FormData>(disconnectMeetingSourceAction, {});
+  const formRef = useRef<HTMLFormElement>(null);
   return (
-    <form
-      action={action}
-      className="lx-inline-form"
-      onSubmit={(e) => {
-        if (!confirm(`Disconnect ${label}? The stored credential is deleted. Meetings already imported stay.`)) e.preventDefault();
-      }}
-    >
+    <form ref={formRef} action={action} className="lx-inline-form">
       <input type="hidden" name="provider" value={provider} />
-      <button type="submit" className="lx-btn lx-btn-danger lx-btn-sm" disabled={pending}>
-        {pending ? "…" : "Disconnect"}
-      </button>
+      <InlineConfirm
+        label="Disconnect"
+        question={`Disconnect ${label}? The stored credential is deleted. Meetings already imported stay.`}
+        pending={pending}
+        className="lx-btn lx-btn-danger lx-btn-sm"
+        onConfirm={() => formRef.current?.requestSubmit()}
+      />
       <Result state={state} />
     </form>
   );

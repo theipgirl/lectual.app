@@ -108,13 +108,14 @@ describe("item 5: Team", () => {
     expect(inviteFormOpen(3, false)).toBe(false);
     expect(inviteFormOpen(9, false)).toBe(false);
     expect(inviteFormOpen(0, true)).toBe(false);
-    expect(read("src/app/dashboard/settings/team/page.tsx")).toContain("open={inviteFormOpen(members.length, loadError) || undefined}");
+    expect(read("src/app/dashboard/settings/team/page.tsx")).toContain("defaultOpen={inviteFormOpen(members.length, loadError)}");
   });
 
-  it("person cards stack under 700px", () => {
-    const css = media(read("src/app/globals.css"), "max-width: 700px");
-    expect(css).toMatch(/\.lx-team-tbl td\[data-label\]::before/);
-    expect(css).toMatch(/\.lx-team-tbl tr\s*\{[^}]*display:\s*block|\.lx-team-tbl tr\s*\{ display: block/);
+  it("person cards stack under 900px", () => {
+    // The Team table rides the sheet table kit: each person becomes a stacked card through `.lx-stack` + `data-label`.
+    const page = read("src/app/dashboard/settings/team/page.tsx");
+    expect(page).toContain("<SheetTable");
+    expect(page).toContain('data-label="Role"');
   });
 
   it("Confirm acts; Cancel and asking do nothing", () => {
@@ -128,7 +129,7 @@ describe("item 5: Team", () => {
     const { InlineConfirm } = await import("@/components/ui/InlineConfirm");
     const asking = renderToStaticMarkup(createElement(InlineConfirm, { label: "Remove", question: "Remove Sam from the firm?", onConfirm: vi.fn(), initial: "asking" }));
     expect(asking).toContain("Remove Sam from the firm?");
-    expect(asking).toMatch(/>Confirm</);
+    expect(asking).toMatch(/>Yes, remove</);
     expect(asking).toMatch(/>Cancel</);
     expect(renderToStaticMarkup(createElement(InlineConfirm, { label: "Archive", question: "q", onConfirm: vi.fn() }))).toMatch(/>Archive</);
     for (const f of ["src/components/settings/TeamForms.tsx", "src/app/dashboard/forms/_components/IntakeList.tsx"]) {

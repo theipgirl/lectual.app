@@ -75,7 +75,7 @@ describe("the rail is built from the glossary", () => {
 describe("one place for each name", () => {
   const files = [...walk("src/app"), ...walk("src/components"), ...walk("src/lib")].filter((f) => f !== "src/lib/ui/words.ts");
   // Names that are also ordinary words are only held to it when the whole literal is the name.
-  const EXACT = [W.MOVED_AUTOMATICALLY, W.NOT_RATED, W.COPY_VIEW_LINK, W.OUR_TURN, W.FROM_THEIR_EMAILS, W.AUTOMATIC_STAGE_MOVES, W.FIRST_READ, W.ASSISTANTS_PAUSED, W.AI_TOOLS_GROUP, W.FIRM_NOTES_NAME, W.SHORTCUTS_NAME, W.FEATURES_NAME];
+  const EXACT = [W.MOVED_AUTOMATICALLY, W.NOT_RATED, W.COPY_VIEW_LINK, W.OUR_TURN, W.FROM_THEIR_EMAILS, W.AUTOMATIC_STAGE_MOVES, W.FIRST_READ, W.ASSISTANTS_PAUSED, W.AI_TOOLS_GROUP, W.FIRM_NOTES_NAME, W.SHORTCUTS_NAME, W.FEATURES_NAME, W.LAST_CONTACT, W.ADD_A_LEAD, W.ADD_TO_TIMELINE, W.PROPOSAL_SETTINGS_NAME];
 
   it("no second whole-string copy of a glossary name outside words.ts", () => {
     const hits: string[] = [];

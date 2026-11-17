@@ -68,10 +68,11 @@ describe("the merged lead-page card", () => {
     expect(html).not.toContain("dashed currentColor");
   });
 
-  it("shows a derived temperature as a dashed chip that says Suggested, with its reason", () => {
+  it("shows a derived temperature as the shared pill that says suggested (no dashes), with its reason", () => {
     const html = card({ last_inbound_at: daysBefore(1) });
-    expect(html).toContain("Suggested: Hot");
-    expect(html).toContain("dashed currentColor");
+    expect(html).toContain("Hot · suggested");
+    expect(html).toContain("data-suggested");
+    expect(html).not.toContain("lx-pill-suggested");
     expect(html).toContain("Replied 1 day ago — waiting on us");
     expect(html).not.toContain("set by");
   });

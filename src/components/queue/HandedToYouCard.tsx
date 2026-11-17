@@ -1,4 +1,5 @@
 import "./handed.css";
+import { Notice } from "@/components/ui/Notice";
 import { SendBackForm } from "@/components/queue/SendBackForm";
 import { HANDED_NOTE_LABEL, handedToYouAt } from "@/lib/ui/words";
 
@@ -11,15 +12,17 @@ export function HandedToYouCard({ id, byName, when, note, cantApprove }: { id: s
     <section className="lx-card lx-handed" data-handed-to-you aria-label="Handed to you">
       <p className="lx-handed-by">{handedToYouAt(byName, when)}</p>
       {note && (
-        <div className="lx-handed-note">
+        <Notice tone="mute">
           <span className="lx-label">{HANDED_NOTE_LABEL}</span>
-          <p style={{ margin: 0 }}>{note}</p>
-        </div>
+          <p className="lx-handed-text">{note}</p>
+        </Notice>
       )}
       {cantApprove && (
-        <p role="status" className="lx-note" data-handed-cant-approve style={{ margin: 0 }}>
-          {cantApprove}
-        </p>
+        <div data-handed-cant-approve>
+          <Notice tone="mute" role="status">
+            {cantApprove}
+          </Notice>
+        </div>
       )}
       <SendBackForm id={id} name={byName} />
     </section>

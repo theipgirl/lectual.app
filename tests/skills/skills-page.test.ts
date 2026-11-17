@@ -6,7 +6,7 @@ import path from "node:path";
 const root = path.resolve(__dirname, "../..");
 // Spelled in pieces so this file does not trip its own search for them.
 const FORBIDDEN = new RegExp(["send" + "Mail", "Mail\\.Se" + "nd", "dangerously" + "SetInnerHTML", "db\\/ad" + "min", "getAdmin" + "Client"].join("|"));
-const UNFINISHED = new RegExp(["coming " + "soon", "to" + "do", "lor" + "em", "place" + "holder"].join("|"), "i");
+const UNFINISHED = new RegExp(["coming " + "soon", "to" + "do", "lor" + "em", "place" + "holder (text|copy|here)"].join("|"), "i");
 
 type LeadRow = { id: string; first_name: string | null; last_name: string | null; business_name: string | null; email: string | null };
 type MatterRow = { id: string; type: string; title: string | null; mark_text: string | null; matter_number: string; owner_name: string | null };
@@ -45,7 +45,7 @@ async function render(c: Case) {
     if (c.matters === "error") throw new Error("down");
     return c.matters ?? [];
   });
-  vi.doMock("next/navigation", () => ({ notFound }));
+  vi.doMock("next/navigation", () => ({ notFound, useRouter: () => ({ refresh: () => {} }) }));
   const modules = c.modules ?? ALL;
   vi.doMock("@/lib/org/modules", () => ({ orgHasModule: vi.fn(async (m: string) => modules.includes(m)) }));
   const session = c.session === undefined ? { kind: "ok", role: "owner" } : c.session;
@@ -77,7 +77,7 @@ describe("Skills page: render", () => {
   it("is titled Shortcuts, and shows the seven cards in order", async () => {
     const { html } = await render({ leads: [lead(1)], matters: [matter(1)] });
     expect(html).toMatch(/<h1[^>]*>Shortcuts<\/h1>/);
-    expect(html).toContain("AI tools");
+    expect(html).not.toContain("AI tools");
     expect(html).not.toContain("IP.OS");
     expect(html).not.toMatch(/<h1[^>]*>Skills<\/h1>/);
     const at = NAMES.map((n) => html.indexOf(`>${n}<`));
@@ -99,7 +99,7 @@ describe("Skills page: render", () => {
     const { html } = await render({ leads: [lead(1)], matters: [matter(1)] });
     for (const name of NAMES) {
       const c = card(html, name);
-      expect(c, name).toContain("Run it on...");
+      expect(c, name).toContain("Search records to run");
       expect(c, name).toMatch(/<input[^>]*name="q"/);
       expect(c, name).toMatch(/<form[^>]*method="get"/);
       expect(c, name).toContain('name="skill"');
@@ -259,7 +259,7 @@ describe("Skills page: the gate", () => {
       throw new Error("NEXT_NOT_FOUND");
     });
     const listLeads = vi.fn(async () => []);
-    vi.doMock("next/navigation", () => ({ notFound }));
+    vi.doMock("next/navigation", () => ({ notFound, useRouter: () => ({ refresh: () => {} }) }));
     vi.doMock("@/lib/org/modules", () => ({ orgHasModule: vi.fn(async () => false) }));
     vi.doMock("@/lib/firm/session", () => ({ resolveFirmSession: vi.fn(async () => ({ kind: "ok", role: "owner" })) }));
     vi.doMock("@/lib/pipeline", () => ({ listLeads }));

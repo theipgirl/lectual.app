@@ -88,7 +88,7 @@ describe("taskHref", () => {
     expect(taskHref(task({ matter_id: null, lead_id: "l-9" }))).toBe("/dashboard/leads/l-9");
   });
   it("falls back to the matters list when neither is set", () => {
-    expect(taskHref(task({ matter_id: null, lead_id: null }))).toBe("/dashboard/matters");
+    expect(taskHref(task({ matter_id: null, lead_id: null }))).toBe("/dashboard/matters/?view=table");
   });
 });
 

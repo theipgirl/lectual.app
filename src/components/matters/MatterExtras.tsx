@@ -10,6 +10,9 @@ import {
   type FollowUpActionState,
   type WelcomeEmailState,
 } from "@/app/dashboard/matters/[id]/actions";
+import { Field as UiField, Notice } from "@/components/ui";
+import { SAVING } from "@/lib/ui/words";
+import "./matter-page.css";
 import type { FollowUpStatus } from "@/lib/matters/filing-followup";
 
 /** Litigation facts as the form edits them (court-local datetime already formatted). */
@@ -33,10 +36,11 @@ export type LitigationValues = {
 
 function Field(props: { name: string; label: string; value: string | null; type?: string; wide?: boolean }) {
   return (
-    <label className="lx-field" style={props.wide ? { gridColumn: "1 / -1" } : undefined}>
-      <span className="lx-label">{props.label}</span>
-      <input className="lx-input" name={props.name} type={props.type ?? "text"} defaultValue={props.value ?? ""} />
-    </label>
+    <div className={props.wide ? "mx-span" : undefined}>
+      <UiField label={props.label}>
+        <input className="lx-input" name={props.name} type={props.type ?? "text"} defaultValue={props.value ?? ""} />
+      </UiField>
+    </div>
   );
 }
 
@@ -59,15 +63,20 @@ export function LitigationForm({ matterId, values: v }: { matterId: string; valu
       <Field name="motionToDismiss" label="Motion to dismiss" value={v.motionToDismiss} />
       <Field name="missedHearing" label="Missed hearing" value={v.missedHearing} />
       <Field name="defaultStatus" label="Default" value={v.defaultStatus} />
-      <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
-        <span className="lx-label">Case notes</span>
-        <textarea className="lx-input" name="notes" rows={3} defaultValue={v.notes ?? ""} />
-      </label>
-      <div style={{ gridColumn: "1 / -1", display: "flex", gap: 10, alignItems: "center" }}>
+      <div className="mx-span">
+        <UiField label="Case notes">
+          <textarea className="lx-input" name="notes" rows={3} defaultValue={v.notes ?? ""} />
+        </UiField>
+      </div>
+      <div className="mx-actions">
         <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
-          {pending ? "Saving…" : "Save case details"}
+          {pending ? SAVING : "Save case details"}
         </button>
-        {state.error && <span role="alert" className="lx-note" style={{ color: "var(--wine)" }}>{state.error}</span>}
+        {state.error && (
+        <Notice tone="risk" role="alert">
+          {state.error}
+        </Notice>
+      )}
       </div>
     </form>
   );
@@ -75,9 +84,9 @@ export function LitigationForm({ matterId, values: v }: { matterId: string; valu
 
 function Queued({ id, label }: { id: string; label: string }) {
   return (
-    <p className="lx-banner lx-banner-ok" style={{ margin: 0 }}>
+    <Notice tone="ok">
       {label} <Link href={`/dashboard/queue/${id}/`}>Review it in the queue →</Link>
-    </p>
+    </Notice>
   );
 }
 
@@ -89,21 +98,25 @@ export function WelcomeEmailCard({ matterId, sentQueueItemId, alreadySent }: { m
     return sentQueueItemId ? (
       <Queued id={sentQueueItemId} label="A welcome email was already drafted for this matter." />
     ) : (
-      <p className="lx-note" style={{ margin: 0 }}>A welcome email was already drafted for this matter.</p>
+      <p className="lx-note">A welcome email was already drafted for this matter.</p>
     );
   }
   return (
-    <form action={action} style={{ display: "grid", gap: 8 }}>
+    <form action={action} className="mx-grid">
       <input type="hidden" name="matterId" value={matterId} />
-      <p className="lx-note" style={{ margin: 0 }}>
+      <p className="lx-note">
         Drafts the client welcome email with the trademark questionnaire. It waits in the approval queue; nothing is sent.
       </p>
       <div>
         <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
-          {pending ? "Drafting…" : "Draft welcome email"}
+          {pending ? SAVING : "Draft welcome email"}
         </button>
       </div>
-      {state.error && <span role="alert" className="lx-note" style={{ color: "var(--wine)" }}>{state.error}</span>}
+      {state.error && (
+        <Notice tone="risk" role="alert">
+          {state.error}
+        </Notice>
+      )}
     </form>
   );
 }
@@ -122,20 +135,24 @@ export function FilingFollowUpCard({ matterId, status }: { matterId: string; sta
   const [state, action, pending] = useActionState<FollowUpActionState, FormData>(queueMonthlyStatusUpdateAction, {});
   if (state.queueItemId) return <Queued id={state.queueItemId} label="Status update drafted." />;
   if (status.kind !== "due") {
-    return <p className={`lx-note${status.kind === "queue_unknown" || status.kind === "stale" ? " lx-warn-text" : ""}`} style={{ margin: 0 }}>{FOLLOW_UP_COPY[status.kind]}</p>;
+    return <p className={`lx-note${status.kind === "queue_unknown" || status.kind === "stale" ? " lx-warn-text" : ""}`}>{FOLLOW_UP_COPY[status.kind]}</p>;
   }
   return (
-    <form action={action} style={{ display: "grid", gap: 8 }}>
+    <form action={action} className="mx-grid">
       <input type="hidden" name="matterId" value={matterId} />
-      <p className="lx-note" style={{ margin: 0 }}>
+      <p className="lx-note">
         Month {status.monthNumber} update is due. It drafts into the approval queue; nothing is sent.
       </p>
       <div>
         <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
-          {pending ? "Drafting…" : `Draft month ${status.monthNumber} update`}
+          {pending ? SAVING : `Draft month ${status.monthNumber} update`}
         </button>
       </div>
-      {state.error && <span role="alert" className="lx-note" style={{ color: "var(--wine)" }}>{state.error}</span>}
+      {state.error && (
+        <Notice tone="risk" role="alert">
+          {state.error}
+        </Notice>
+      )}
     </form>
   );
 }

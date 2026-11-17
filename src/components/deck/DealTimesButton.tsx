@@ -8,7 +8,7 @@ import { DEAL_TIMES_OPEN } from "@/lib/ui/words";
 export function DealTimesButton() {
   const ref = useRef<HTMLButtonElement>(null);
   return (
-    <button ref={ref} type="button" className="dk-linkbtn" onClick={() => requestDealTimesDialog(window, ref.current)}>
+    <button ref={ref} type="button" className="lx-link dk-linkbtn" onClick={() => requestDealTimesDialog(window, ref.current)}>
       {DEAL_TIMES_OPEN}
     </button>
   );

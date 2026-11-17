@@ -1,9 +1,9 @@
 import Link from "next/link";
-import "./view-toggle.css";
+import { VIEW_BOARD, VIEW_LIST } from "@/lib/ui/words";
 
 /**
- * THE view-style switch of the app (D1, Taylor's choice, the Approvals deck's look): one cream pill holding the options, the chosen one
- * filled dark burgundy (`--view-switch-on`) with light text, the others plain dark text. Every page that switches how the SAME records are
+ * THE view-style switch of the app (and, through the same `.vs-switch` look, every other pick-one switch) (D1, Taylor's choice, the Approvals deck's look): one cream pill holding the options, the chosen one
+ * filled with the standard burgundy (`--ox`) with light text, the others plain dark text. Every page that switches how the SAME records are
  * drawn (Approvals and the deck, Weekly review, Intake, Matters, Calendar) uses this and nothing else; a test fails on a second one.
  *
  * Two modes, picked by which prop is passed:
@@ -18,15 +18,15 @@ import "./view-toggle.css";
 export type ViewOption<V extends string = string> = { value: V; label: string; /** Link mode only: where this option goes, when it needs more than `hrefFor(value)`. */ href?: string };
 
 export const TABLE_BOARD_VIEWS: ReadonlyArray<ViewOption<ViewToggleValue>> = [
-  { value: "table", label: "Table" },
-  { value: "board", label: "Board" },
+  { value: "board", label: VIEW_BOARD },
+  { value: "table", label: VIEW_LIST },
 ];
 
 export type ViewToggleValue = "table" | "board";
 
 type Common<V extends string> = {
   value: V;
-  /** The options, in order. Defaults to Table | Board. */
+  /** The options, in order. Defaults to Board | List. */
   views?: ReadonlyArray<ViewOption<V>>;
   /** The group's accessible name. */
   label?: string;

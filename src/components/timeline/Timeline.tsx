@@ -2,6 +2,8 @@ import { relativeTime } from "@/lib/relative-time";
 import { describeActivity } from "@/components/leads/describe";
 import { UndoAgentMoveButton } from "@/components/leads/StageKeeperControls";
 import { isAgentMoveRow, undoStateFor } from "@/lib/stage-keeper/moves";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { noneYet } from "@/lib/ui/words";
 
 /** `lead_id` (optional): on a kept lead the timeline also holds the rows of leads merged into it (lectual 0107); those offer no Undo. */
 type Row = { id: string; type: string; actor_type: string | null; created_at: string; payload: unknown; lead_id?: string | null };
@@ -36,7 +38,7 @@ export function Timeline({
   timeZone?: string;
   undo?: TimelineUndo;
 }) {
-  if (rows.length === 0) return <p className="lx-note">Nothing yet.</p>;
+  if (rows.length === 0) return <EmptyState variant="line">{noneYet("timeline entries")}</EmptyState>;
   // Undo reads only the lead's OWN rows: a merged lead's rows (M5) are history, never acted on.
   const ownRows = undo ? rows.filter((r) => !r.lead_id || r.lead_id === undo.leadId) : rows;
   return (
@@ -50,7 +52,7 @@ export function Timeline({
           <li key={r.id} data-tone={d.tone}>
             <div className="lx-timeline-head">
               <span>{d.title}</span>
-              <span className="lx-note">{relativeTime(r.created_at)}</span>
+              <span className="lx-note">{relativeTime(r.created_at, undefined, timeZone)}</span>
             </div>
             {audio && <audio controls preload="none" src={audio} aria-label="Voice note" style={{ width: "100%", height: 34, marginTop: 6 }} />}
             {d.detail && <p>{d.detail}</p>}

@@ -49,7 +49,7 @@ describe("/dashboard/quotes/ list", () => {
     const { Page, redirect } = await load({ proposals: false, role: "attorney" });
     const html = renderToStaticMarkup(createElement("div", null, await Page({ searchParams: Promise.resolve({}) })));
     expect(redirect).not.toHaveBeenCalled();
-    expect(html).toContain("Quotes &amp; proposals");
+    expect(html).toContain(">Proposals</h1>");
     expect(html).toContain("No quotes yet");
   });
 

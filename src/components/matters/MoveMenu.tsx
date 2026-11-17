@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Popover, { PopoverItem } from "@/components/list-page/Popover";
 import { updateMatterStageAction } from "@/app/dashboard/matters/[id]/actions";
 import { MOVED_CARD_KEY, MOVED_GROUP_EVENT, stageDisplayName } from "@/lib/matters/list-view";
+import { Icon, Notice } from "@/components/ui";
 import { phaseGroupOf } from "@/lib/matters/phase-group";
 
 /**
@@ -14,12 +15,15 @@ import { phaseGroupOf } from "@/lib/matters/phase-group";
  */
 export function MoveMenu({
   matterId,
+  title,
   stageId,
   stages,
   type,
   announceGroup,
 }: {
   matterId: string;
+  /** The matter's name, for the trigger's accessible name ("Move <title>"). */
+  title: string;
   stageId: string | null;
   stages: { id: string; label: string; phase?: string | null }[];
   type?: string;
@@ -63,8 +67,8 @@ export function MoveMenu({
         label="Move to a stage"
         width={200}
         trigger={({ onClick, ref, ...aria }) => (
-          <button {...aria} ref={ref} type="button" onClick={onClick} className="lp-btn" disabled={pending}>
-            {pending ? "Moving…" : "Move"}
+          <button {...aria} ref={ref} type="button" onClick={onClick} className="lx-board-menu" disabled={pending} aria-busy={pending} aria-label={`Move ${title}`}>
+            <Icon name="more" />
           </button>
         )}
       >
@@ -77,9 +81,9 @@ export function MoveMenu({
         }
       </Popover>
       {error && (
-        <p role="alert" className="lx-note" style={{ color: "var(--wine)", margin: "4px 0 0" }}>
+        <Notice tone="risk" role="alert">
           {error}
-        </p>
+        </Notice>
       )}
     </div>
   );

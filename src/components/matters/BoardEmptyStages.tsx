@@ -26,7 +26,7 @@ export function BoardEmptyStages({
         {shown && empty}
       </div>
       <div className="lx-board-empty-row">
-        <button type="button" className="lp-link-button" aria-expanded={shown} onClick={() => setShown((v) => !v)}>
+        <button type="button" className="lx-link" aria-expanded={shown} onClick={() => setShown((v) => !v)}>
           {shown ? labelShown : labelHidden}
         </button>
       </div>

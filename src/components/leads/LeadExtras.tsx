@@ -9,6 +9,7 @@ import {
   type ActionState,
   type PrepConsultActionState,
 } from "@/app/dashboard/leads/[id]/actions";
+import { Icon } from "@/components/ui/Icon";
 import { PREP_CONSULT_PRACTICE_AREAS } from "@/lib/prep-consult/prep-consult";
 
 type TagRef = { id: string; label: string; color: string | null };
@@ -22,7 +23,7 @@ function RemoveTag({ leadId, tag }: { leadId: string; tag: TagRef }) {
       {tag.color && <span className="lx-tag-dot" style={{ background: tag.color }} aria-hidden="true" />}
       {tag.label}
       <button type="submit" aria-label={`Remove ${tag.label}`} disabled={pending}>
-        ×
+        <Icon name="close" size={14} />
       </button>
     </form>
   );

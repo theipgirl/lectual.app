@@ -1,9 +1,15 @@
 import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
+import {  } from "@/lib/ui/words";
 // The glossary: ONE name per thing, as a firm sees it. Every firm-facing string that
 // names one of these things imports it from here (tests/ui/words.test.ts and
 // tests/ui/no-build-words.test.ts hold that line). Pure: no imports from components.
 // URLs, slugs, data-tour tokens, anchors, DB values and agent ids keep their old names;
 // only the words a person reads change.
+
+/** The names of the views every pick-one switch uses (Board first; the table / sheet view is always "List"). */
+export const VIEW_BOARD = "Board";
+export const VIEW_LIST = "List";
+export const VIEW_CARDS = "Cards";
 
 /** Ask questions of the firm's own data (the floating button and the page). */
 export const COPILOT_NAME = "Copilot";
@@ -21,17 +27,49 @@ export const AI_TOOLS_GROUP = "AI tools";
 export const APPROVALS_NAME = "Approvals";
 /** The one page that replaces the Monday spreadsheet walk-through. */
 export const REVIEW_NAME = "Weekly review";
+/** Section and page names said once (item 22): the mailbox section, the proposal settings page, the forms list. */
+export const MAIL_NAME = "Mail";
+export const PROPOSAL_SETTINGS_NAME = "Proposal settings";
+export const FORMS_NAME = "Forms";
 /** The Weekly review's three views. */
-export const REVIEW_BOARD_VIEW = "Board";
-export const REVIEW_SHEET_VIEW = "Sheet";
+export const REVIEW_BOARD_VIEW = VIEW_BOARD;
+export const REVIEW_SHEET_VIEW = VIEW_LIST;
 /** The Weekly review view that deals one person's records as cue cards. */
-export const REVIEW_CARDS_VIEW = "Cards";
+export const REVIEW_CARDS_VIEW = VIEW_CARDS;
 /** The section where new work arrives: the page, tab title, rail group, phone bar and More sheet (Nov 12: was "Leads"). */
 export const INTAKE_NAME = "Intake";
 /** The rail's list row under Intake: the people who have asked about work. */
 export const INTAKE_LEADS_ROW = "Leads";
 /** Matters whose next step is the firm's (was "Our move"). */
 export const OUR_TURN = "Our turn";
+/** Column and field words shared by every list (Owner, Last contact, Next step). */
+export const OWNER_COLUMN = "Owner";
+export const LAST_CONTACT = "Last contact";
+export function lastContactAgo(days: number): string {
+  return days <= 0 ? "Last contact today" : `Last contact ${days} ${days === 1 ? "day" : "days"} ago`;
+}
+export const NEXT_STEP = "Next step";
+export const NEXT_STEPS = "Next steps";
+export const ADD_NEXT_STEP = "Add a next step";
+/** Buttons and short states, said once. */
+export const ADD_A_LEAD = "Add a lead";
+export const addLeadFor = (name: string) => `Add a lead for ${name}`;
+export const ADD_TO_TIMELINE = "Add to timeline";
+export const DELETE = "Delete";
+export const SAVING = "Saving…";
+export const LOADING = "Loading…";
+export const SAVED = "Saved.";
+export const CANCEL = "Cancel";
+export const yesVerb = (verb: string) => `Yes, ${verb.trim().toLowerCase()}`;
+/** Blank cell, no owner, a person the directory doesn't know. */
+export const BLANK = "—";
+export const UNASSIGNED = "Unassigned";
+export const TEAMMATE = "Teammate";
+export const SHOW_MORE = "Show more";
+/** A search box's placeholder. */
+export const searchPlaceholder = (what: string) => `Search ${what}`;
+/** "Showing 40 of 112" (re-exported by lib/ui/format.ts). */
+export const showingOf = (shown: number, total: number): string => "Showing " + shown + " of " + total;
 /** Hot, warm or cold (was "lane"). */
 export const TEMPERATURE_NAME = "Temperature";
 /** No hot/warm/cold level set or suggested (was "Not routed"). */
@@ -66,6 +104,19 @@ export function notReadyYet(feature?: string): string {
 
 /** A read that failed. The state logic stays: a failed read is never drawn as empty or zero. */
 export const CANT_SHOW = "Can't show this right now. Refresh to try again.";
+export const cantShowTitle = (what: string) => `Can't show ${what} right now`;
+export const REFRESH_TO_TRY_AGAIN = "Refresh to try again.";
+export const REFRESH = "Refresh";
+/** An empty list that was READ successfully: "No proposals yet. Start one from a lead." */
+export const noneYet = (what: string, how?: string) => `No ${what} yet.${how ? ` ${how}` : ""}`;
+export const columnEmpty = (noun: string) => `No ${noun} here yet.`;
+export const OPTIONAL = "(optional)";
+export const TEAM_NAME = "Team";
+export const APPROVAL_SETTINGS_NAME = "Approval settings";
+export const LAWMATICS_NAME = "Lawmatics";
+export const MEETINGS_INTEGRATION_NAME = "Meetings integration";
+export const EMAIL_TEMPLATES_NAME = "Email templates";
+export const NEW_LETTER_NAMES = { loe: "New engagement letter", opinion: "New opinion letter", clearance: "New trademark clearance" } as const;
 export function cantShow(what: string): string {
   return `Can't show ${what} right now. Refresh to try again.`;
 }
@@ -197,9 +248,9 @@ export const DECK_TITLE = "Needs you";
 export const dealHeader = (label: string) => `Today's deal · ${label}`;
 export const nextDealHeader = (label: string) => `Next deal · ${label}`;
 export const DECK_DEALT_NOW = "Dealt just now";
-export const DECK_VIEW_CARDS = "Cards";
-export const DECK_VIEW_LIST = "List";
-export const DECK_VIEW_BOARD = "Board";
+export const DECK_VIEW_CARDS = VIEW_CARDS;
+export const DECK_VIEW_LIST = VIEW_LIST;
+export const DECK_VIEW_BOARD = VIEW_BOARD;
 export const DECK_DEAL_NOW = "Deal them now";
 export const deckLaterArrivals = (n: number, label: string) => `${n} more at ${label}`;
 export const deckAllDecided = (label: string) => `All decided. Next deal ${label}.`;
@@ -268,7 +319,9 @@ export const DECK_COL_LATER = "Later";
 export const DECK_COL_DECIDED = "Decided today";
 export const DECK_DECIDED_UNREAD = "Decided today couldn't be loaded. Refresh to try again.";
 export const DECK_EVENTS_UNREAD = "Hand-offs and Later couldn't be loaded, so every card is shown.";
-export const DECK_NOTHING_HERE = "Nothing here.";
+/** An empty Approvals board column or list: the shared empty-state sentences ("No approvals here yet." / "No approvals yet."). */
+export const DECK_BOARD_EMPTY = columnEmpty("approvals");
+export const DECK_LIST_EMPTY = noneYet("approvals");
 /** Lectual staff viewing a firm have no membership, so a hand-off or send-back would be dropped by the fold: refuse it plainly. */
 export const DECK_PREVIEW_ONLY = "Preview only: hand-offs aren't saved while you're viewing as the firm.";
 export const DECK_NOT_YOURS = "This card isn't on your deck any more. Refresh to see what's left.";
@@ -276,7 +329,7 @@ export const DECK_FAILED = "That didn't go through. Nothing was sent. Refresh to
 export const DECK_PICK_PERSON = "Choose who to hand it to.";
 export const DECK_BAD_PERSON = "That person can't take approvals. Choose someone else on your team.";
 /* Deck page, card, side list, list and board (owner view fidelity rebuild). */
-export const DECK_PAGE_TITLE = "Your deal";
+export const DECK_PAGE_TITLE = APPROVALS_NAME;
 /** Shared by the deck intro and the welcome deal's card 2. */
 export const DECK_APPROVING_NEVER_SENDS = "Approving never sends.";
 export const DECK_PAGE_SUB = `${DECK_APPROVING_NEVER_SENDS} A client email becomes a draft; a person presses Send.`;
@@ -313,7 +366,7 @@ export const DECK_FIRST_STEP = "First step:";
 export const DECK_REVIEW_HEAD = "Open to review.";
 export const DECK_REJECT_EYEBROW = "Reject this draft";
 export const DECK_REJECT_HELP = "The note is kept with the item. Nothing is sent.";
-export const DECK_CANCEL = "Cancel";
+export const DECK_CANCEL = CANCEL;
 export const DECK_REJECT_DRAFT = "Reject draft";
 export const DECK_HAND_EYEBROW = "Hand off";
 export const DECK_HAND_WHY = "Anything client-facing comes back to an approver for the yes.";
@@ -461,7 +514,7 @@ export const DECK_FOR = "for";
 
 /* ── Owner view: the weekly review's editable Sheet ── */
 export const SHEET_YOU_TYPE = "You type these";
-export const SHEET_YOU_TYPE_BODY = "Status (moves the stage), Next step (text and due date), Whose court (a person), Source. Each change saves on its own and is logged on the record.";
+export const SHEET_YOU_TYPE_BODY = `Status (moves the stage), Next step (text and due date), ${OWNER_COLUMN} (a person), Source. Each change saves on its own and is logged on the record.`;
 export const SHEET_WORKED_OUT = "Lectual works these out";
 export const SHEET_WORKED_OUT_BODY = "Waiting on and Last contact come from next steps, mail and calls. They can't be edited here; log what happened with + Note instead.";
 export const SHEET_LEGEND_LABEL = "Which columns you can edit";
@@ -472,15 +525,15 @@ export const SHEET_MOVE_TO_STAGE = "Move to stage";
 export const sheetMoveLogged = (firstName: string) => `The move is logged on ${firstName}'s timeline.`;
 export const SHEET_FIND_PERSON = "Find a person";
 export const SHEET_NO_ONE_FOUND = "No one matches.";
-export const SHEET_NEXT_STEP = "Next step";
+export const SHEET_NEXT_STEP = NEXT_STEP;
 export const SHEET_DUE = "Due";
 export const SHEET_ENTER_ESC = "Enter to save · Esc to cancel";
 export const SHEET_NOTE_BUTTON = "+ Note";
 export const sheetNoteFor = (client: string) => `Add a note for ${client}`;
 export const SHEET_WHAT_HAPPENED = "What happened?";
 export const sheetNoteHint = (firstName: string) => `Goes on ${firstName}'s timeline as a note and counts as last contact.`;
-export const SHEET_ADD_NOTE = "Add note";
-export const SHEET_CANCEL = "Cancel";
+export const SHEET_ADD_NOTE = ADD_TO_TIMELINE;
+export const SHEET_CANCEL = CANCEL;
 export const SHEET_NO_SOURCE = "No source";
 export const SHEET_SOURCE_LABEL = "Source";
 export const SHEET_OVERDUE = "(overdue)";
@@ -495,7 +548,7 @@ export const SHEET_WRITE_NOTE = "Write what happened.";
 export const SHEET_STAGES_UNREADABLE = "The stage list couldn't load, so Status can't be changed here right now. Refresh to try again.";
 export const sheetResizeColumn = (name: string) => `Resize ${name} column`;
 export const SHEET_RESIZE_ROW = "Resize row";
-export const SHEET_EMPTY_SECTION = "Nothing here for this view.";
+export const SHEET_EMPTY_SECTION = noneYet("records in this view");
 export const SHEET_SAVE_FAILED = "Couldn't save this change.";
 
 /* Needs review (Today, both views): old hand-entered dates nobody confirmed. */
@@ -530,7 +583,7 @@ export const LETTER_READ_ONLY_NOTE = "You can read the letters. An owner, admin 
 export const LETTER_FIELDS_HEADING = "Merge fields you can use";
 export const LETTER_FIELDS_NOTE = "Write a field in double braces, for example {{client_name}}. Anything else in braces is refused.";
 export const LETTER_APPROVAL_NOTE = "Approving makes this the letter new proposals attach. An approved version can't be edited; a change is a new draft.";
-export const LETTER_NO_APPROVERS = "No one is named yet. Name approvers under Client proposals, or no letter can be approved.";
+export const LETTER_NO_APPROVERS = `No one is named yet. Name approvers under ${PROPOSAL_SETTINGS_NAME}, or no letter can be approved.`;
 export function letterApproversLine(names: string): string {
   return `Can approve: ${names}.`;
 }
@@ -685,7 +738,7 @@ export const welcomeCardOf = (n: number, total: number) => `Card ${n} of ${total
 export const LEADS_SELECT = "Select";
 export const LEADS_SELECT_DONE = "Done selecting";
 export const LEADS_SHOW_MORE = (step: number, left: number) => `Show ${step} more (${left} left)`;
-export const LEADS_SHOWING = (shown: number, total: number) => "Showing " + shown + " of " + total;
+export const LEADS_SHOWING = showingOf;
 export const LEADS_STAGE_FILTER = "Stage";
 export const LEADS_ANY_STAGE = "Every stage";
 export const LEADS_SUGGESTIONS = "Suggestions";
@@ -700,7 +753,7 @@ export const LEADS_ASSIGNED_TO = (name: string, who: string) => `Assigned ${name
 export const LEADS_ROW_MENU = (name: string) => `Actions for ${name}`;
 export const LEADS_NO_MATCH_IN_SET = (set: string) => `No lead matches these filters in ${set}.`;
 export const LEADS_SET_EMPTY = (set: string) => `Nobody is in ${set} right now.`;
-export const LEADS_LOST_CUT = (shown: number, total: number) => "Showing the first " + shown + " of " + total + " lost leads.";
+export const LEADS_LOST_CUT = (shown: number, total: number) => `${showingOf(shown, total)} lost leads.`;
 export const LEADS_DUPLICATE = "Possible duplicate";
 export const LEADS_DUPLICATES = "Possible duplicates";
 export const LEADS_DUPLICATES_TITLE = "Leads with the same email or the same name as another open lead. Nothing is merged; open each to compare.";
@@ -710,7 +763,7 @@ export const LEADS_ASSISTANT_COLUMN = "Assistant activity";
 export const LEADS_ASSISTANT_SUGGESTS_LTN = "Suggests Long-Term Nurture";
 export const LEADS_ASSISTANT_SUGGESTS_LTN_TITLE = "Unbooked by day 10. Moving the lead is your call; nothing changes by itself.";
 /** The one column that says whose turn it is. Sorted newest first. */
-export const LEADS_CONTACT_COLUMN = "Last contact";
+export const LEADS_CONTACT_COLUMN = LAST_CONTACT;
 export const LEADS_TOUCH_OUR_TURN = (date: string) => `${OUR_TURN} · ${date}`;
 export const LEADS_TOUCH_WAITING_ON_THEM = (date: string) => `Waiting on them · ${date}`;
 export const LEADS_TOUCH_NO_CONTACT = "No contact yet";
@@ -744,7 +797,7 @@ export const LEADS_COMPARE_FIELDS = {
   source: "Source",
   created: "Created",
   timeline: "Timeline entries",
-  tasks: "Tasks",
+  tasks: NEXT_STEPS,
   proposals: "Proposals",
 } as const;
 export const LEADS_MOVED_MARK = "Moved";
@@ -803,7 +856,7 @@ export const MERGE_FIELD_LABELS = {
   referral_source: "Source",
   referral_detail: "Source detail",
   practice_area: "Practice area",
-  assigned_to: "Assigned to",
+  assigned_to: OWNER_COLUMN,
   temperature: "Suggested temperature",
   lane: "Temperature",
 } as const;
@@ -814,7 +867,7 @@ export const MERGE_STAYS_HEADING = "Stays on the merged lead, shown on the kept 
 export const MERGE_COUNT_UNAVAILABLE = "Couldn't load";
 export const MERGE_COUNTS_NOTE = "Counts are for the lead being merged. Tags are added to the kept lead's tags. A campaign the kept lead is already in is stopped on the merged lead instead of moved.";
 export const MERGE_COUNT_LABELS = {
-  tasks: "Tasks",
+  tasks: NEXT_STEPS,
   time: "Time entries",
   matters: "Matters",
   meetings: "Meetings",
@@ -879,6 +932,25 @@ export const MERGE_OWN_ROWS_UNAVAILABLE = "Suggestions and proposals from email 
 /** An assessment that is scored (the booth card or the firm's assessment page), on the Forms list, its results page and the lead's Answers card. */
 export const SCORED_ASSESSMENT = "Scored assessment";
 export const SCORED_ASSESSMENTS = "Scored assessments";
+
+// Area G
+/** The workspace's own error page (a page's server work failed): the line under "Can't show this page right now". */
+export const PAGE_DIDNT_ANSWER = "Nothing is missing. The page just didn't answer. Refresh to try again, or go back to the page you were on.";
+/** The shell's 404 and no-firm pages. */
+export const NOT_FOUND_TITLE = "This page doesn't exist";
+export const NOT_FOUND_BODY = "The link may be out of date, or the page may have moved.";
+export const GO_BACK = "Go back";
+export const NO_FIRM_ACCESS_TITLE = "No firm access yet";
+export const REFRESH_MY_ACCESS = "Refresh my access";
+export const WRONG_ACCOUNT_SIGN_OUT = "Wrong account? Sign out";
+export const NO_FIRM_JUST_INVITED = "Just been invited? Your sign-in predates the invite. Refresh to pick up your firm.";
+/** The bar across the top while Lectual staff are inside a firm they are not a member of. */
+export const staffInsideFirm = (firmName: string) => `Lectual staff · you are inside ${firmName}, a firm you are not a member of. This visit is logged.`;
+
+// Area B (Matters, Pipeline, Documents, Files)
+export const MATTERS_NAME = "Matters";
+export const DOCUMENTS_NAME = "Documents";
+export const NEW_LETTER = "New letter";
 
 // Review documents
 /** The weekly review's detail panel and Cards deck: a record's documents, and the way to comment on one. */
@@ -1088,3 +1160,12 @@ export const recordCardDeadline = (when: string) => `USPTO deadline ${when}`;
 export const RECORD_CARD_NO_DEADLINE = "No open USPTO deadline";
 export const RECORD_CARD_CALL = "Call";
 export const RECORD_CARD_EMAIL = "Email";
+
+// Review fixes (2026-11-17)
+/** The busy word on a search button (a search is not a save). */
+export const SEARCHING = "Searching…";
+/** A list cut off at its cap where the real total is not known: "Showing 200 of 200+". */
+export const showingAtLeast = (shown: number): string => showingOf(shown, shown) + "+";
+/** The Forms results table heading. */
+export const ALL_FORMS = `All ${FORMS_NAME.toLowerCase()}`;
+export const ADD_ANOTHER_NEXT_STEP = "Add another next step";

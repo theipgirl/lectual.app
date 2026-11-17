@@ -78,7 +78,7 @@ describe("TemperatureCard (lead page)", () => {
 
   it("shows the temperature, its reason and the suggestion", () => {
     const html = card({ firstTouchAt: daysBefore(11) });
-    expect(html).toContain("Suggested: Cold");
+    expect(html).toContain("Cold · suggested");
     expect(html).toContain("Unbooked by day 10");
     expect(html).toContain("Long-Term Nurture suggested");
     // Said once, not twice.

@@ -1,18 +1,17 @@
 import { addDays, daysBetween } from "./buckets";
-import { contactWords, type ContactType } from "./contact";
+import { formatDay } from "@/lib/ui/dates";
+import { contactWords, type ContactKind } from "./contact";
 
-/** "Oct 30" (with the year when it isn't this year). `date` and `today` are YYYY-MM-DD. Pure. */
+/** "Oct 30" (with the year when it isn't this year). `date` and `today` are YYYY-MM-DD. Pure; the shared day formatter draws it. */
 export function shortDate(date: string, today: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
-  if (!m) return date;
-  const names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const label = `${names[Number(m[2]) - 1]} ${Number(m[3])}`;
-  return m[1] === today.slice(0, 4) ? label : `${label}, ${m[1]}`;
+  // A civil date is never shifted by a zone; `today` only says which year is "this year".
+  const now = new Date(`${today}T12:00:00Z`);
+  return formatDay(date, { tz: "UTC", now: Number.isNaN(now.getTime()) ? undefined : now }) ?? date;
 }
 
 /** "Oct 30 · we emailed", or the fixed sentences for no contact / unknown. */
 export function lastContactText(
-  row: { contactKnown: boolean; lastContact: { date: string; type: ContactType } | null },
+  row: { contactKnown: boolean; lastContact: { date: string; type: ContactKind } | null },
   today: string,
 ): string {
   if (!row.contactKnown) return "Couldn't load";

@@ -39,9 +39,15 @@ import { AddNameLink } from "@/components/account/AddNameLink";
 import { TodayConsults } from "@/components/calendar/TodayConsults";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
-import { ASSISTANTS_NAME, OUR_TURN } from "@/lib/ui/words";
+import { ASSISTANTS_NAME, BLANK, OUR_TURN } from "@/lib/ui/words";
+import { LoadFailedLine } from "@/components/ui/LoadFailed";
+import { Notice } from "@/components/ui/Notice";
+import { PageHeader } from "@/components/ui/PageHeader";
+import "@/components/today/today.css";
 import { OwnerToday } from "@/components/today/OwnerToday";
 import { NO_PREVIEW, previewFor, viewFor } from "@/lib/views";
+import { intakeListHref } from "@/lib/intake/list-href";
+import { mattersListHref } from "@/lib/matters/list-href";
 
 export const metadata: Metadata = { title: pageTitle("Today") };
 
@@ -56,7 +62,7 @@ function Kpi({ label, value, sub, href, failed }: { label: string; value: number
   return (
     <Link href={href} className="lx-card lx-kpi">
       <span className="lx-label">{label}</span>
-      <span className="lx-kpi-value">{value === null ? "—" : value}</span>
+      <span className="lx-kpi-value">{value === null ? BLANK : value}</span>
       <span className="lx-note">{value === null ? failed ?? "Couldn't load" : sub}</span>
     </Link>
   );
@@ -201,27 +207,25 @@ export default async function TodayPage() {
 
   return (
     <>
-      <div className="lx-page-head lx-page-head-list">
-        <div style={{ flex: 1, minWidth: 260 }}>
-          <h1 className="lx-h1">
+      <PageHeader
+        title={
+          <>
             Good {greeting(hourInZone(now, tz))}
             {greetingSuffix(firstName)}.
-          </h1>
-          {!firstName && <AddNameLink />}
-        </div>
-      </div>
+          </>
+        }
+        sub={!firstName ? <AddNameLink /> : undefined}
+      />
 
       <div className="lx-kpis">
         <Kpi label="Waiting on you" value={queueValue} sub="drafts to approve" href="/dashboard/queue/" failed={queueFailed} />
         <Kpi label="Overdue" value={deadlines === null && tasks === null ? null : overdue} sub="deadlines and tasks past due" href="/dashboard/calendar/" />
-        <Kpi label={OUR_TURN} value={docket ? docket.waitingOn.firm : null} sub={docket ? `of ${docket.open} open matters` : ""} href="/dashboard/matters/?group=all&seg=firm" />
-        <Kpi label="New leads" value={newLeads ? newLeads.length : null} sub="in the last 7 days" href="/dashboard/intake/" />
+        <Kpi label={OUR_TURN} value={docket ? docket.waitingOn.firm : null} sub={docket ? `of ${docket.open} open matters` : ""} href={mattersListHref("group=all&seg=firm")} />
+        <Kpi label="New leads" value={newLeads ? newLeads.length : null} sub="in the last 7 days" href={intakeListHref()} />
       </div>
 
       {queue.status === "unavailable" && (
-        <p className="lx-banner lx-banner-risk" style={{ margin: 0 }}>
-          We couldn&apos;t reach the approval queue, so we don&apos;t know what&apos;s waiting. Refresh to try again.
-        </p>
+        <Notice tone="risk">We couldn&apos;t reach the approval queue, so we don&apos;t know what&apos;s waiting. Refresh to try again.</Notice>
       )}
 
       <GetSetUpCard role={session.role} />
@@ -238,27 +242,27 @@ export default async function TodayPage() {
         <aside className="lx-col lx-col-aside">
           <section className="lx-card lx-aside">
             <div className="lx-label">This month</div>
-            <div className="lx-task" style={{ padding: "2px 0" }}>
-              <Link href="/dashboard/matters/?group=all">Matters opened</Link>
-              <span className="lx-num">{opened ?? "—"}</span>
+            <div className="lx-task td-row">
+              <Link href={mattersListHref("group=all")}>Matters opened</Link>
+              <span className="lx-num">{opened ?? BLANK}</span>
             </div>
-            <div className="lx-task" style={{ padding: "2px 0" }}>
+            <div className="lx-task td-row">
               <Link href="/dashboard/calendar/" title="Deadlines closed as satisfied this month, on or before their due date">
                 Deadlines met
               </Link>
-              <span className="lx-num">{met ? `${met.met} of ${met.closed}` : "—"}</span>
+              <span className="lx-num">{met ? `${met.met} of ${met.closed}` : BLANK}</span>
             </div>
             {hasAgents && (
-              <div className="lx-task" style={{ padding: "2px 0" }}>
+              <div className="lx-task td-row">
                 <Link href="/dashboard/agents/" title={`est. using ${estimateAssumption(minutes)}`}>
                   Hours saved (est.)*
                 </Link>
-                <span className="lx-num">{estimate ? estimate.hours : "—"}</span>
+                <span className="lx-num">{estimate ? estimate.hours : BLANK}</span>
               </div>
             )}
-            {(opened === null || met === null) && <p className="lx-note" style={{ margin: 0 }}>A figure shown as — couldn&apos;t be read just now.</p>}
+            {(opened === null || met === null) && <p className="lx-note td-foot">A figure shown as — couldn&apos;t be read just now.</p>}
             {hasAgents && (
-              <p className="lx-note" style={{ margin: 0, fontSize: 12 }}>
+              <p className="lx-note td-foot">
                 * An estimate, not a measurement: completed agent tasks × your firm&apos;s minutes per task ({estimateAssumption(minutes)}).{" "}
                 <Link href="/dashboard/agents/">Change the minutes</Link>
               </p>
@@ -278,9 +282,9 @@ export default async function TodayPage() {
                   canResume={canResumeAutopilot(session.role)}
                 />
               ) : autopilot?.status === "unavailable" ? (
-                <p className="lx-note" role="alert" style={{ margin: 0, color: "var(--warn)" }}>
+                <Notice tone="warn" role="alert">
                   We couldn&apos;t read whether assistants are paused. Until we can, none of them run.
-                </p>
+                </Notice>
               ) : null}
               <RunDigestList digest={digest} paused={paused} />
               <Link href="/dashboard/agents/" className="lx-note">
@@ -294,13 +298,13 @@ export default async function TodayPage() {
             {docket ? (
               <>
                 {(["firm", "client", "uspto", "court"] as const).filter((w) => w !== "court" || docket.waitingOn.court > 0).map((w) => (
-                  <div key={w} className="lx-task" style={{ padding: "2px 0" }}>
-                    <Link href={`/dashboard/matters/?group=all&seg=${w}`}>{BAND_COPY[w].label}</Link>
+                  <div key={w} className="lx-task td-row">
+                    <Link href={mattersListHref(`group=all&seg=${w}`)}>{BAND_COPY[w].label}</Link>
                     <span className="lx-num">{docket.waitingOn[w]}</span>
                   </div>
                 ))}
                 {docket.stalled.length > 0 && (
-                  <Link href="/dashboard/matters/?group=all&seg=stalled" className="lx-note">
+                  <Link href={mattersListHref("group=all&seg=stalled")} className="lx-note">
                     {docket.stalled.length} gone quiet →
                   </Link>
                 )}
@@ -309,14 +313,14 @@ export default async function TodayPage() {
                 </Link>
               </>
             ) : (
-              <p className="lx-note" style={{ margin: 0 }}>Matters couldn&apos;t be loaded.</p>
+              <LoadFailedLine role="alert" refresh={false}>Matters couldn&apos;t be loaded.</LoadFailedLine>
             )}
           </section>
 
-          <div className="lx-upl">
+          <div className="lx-upl td-rule">
             <span aria-hidden="true">§</span>
             <div>
-              <b style={{ color: "var(--ox)" }}>The one rule.</b> Nothing reaches a client without a person approving it. Assistants draft;
+              <b>The one rule.</b> Nothing reaches a client without a person approving it. Assistants draft;
               Approvals is the only way out of the firm.
             </div>
           </div>

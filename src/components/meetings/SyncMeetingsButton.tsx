@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState } from "react";
 import { syncNewMeetingsAction, type SyncMeetingsState } from "@/app/dashboard/meetings/sync-action";
 import type { SyncSummary } from "@/lib/meetings/sync-result";
+import "@/components/meetings/meetings.css";
 import type { SyncControl } from "@/lib/meetings/sync-access";
 
 const MEETINGS_SETUP = "/dashboard/settings/integrations/meetings/";
@@ -12,7 +13,7 @@ export const SYNC_LABEL = "Sync new meetings";
 /** The result line: an alert only for an error, a quiet status otherwise. */
 export function SyncResult({ summary }: { summary: SyncSummary }) {
   return (
-    <p role={summary.tone === "error" ? "alert" : "status"} className="lx-note lx-sync-result" style={{ margin: 0, color: summary.tone === "error" ? "var(--wine)" : "var(--ok)" }}>
+    <p role={summary.tone === "error" ? "alert" : "status"} className={`lx-note lx-sync-result ${summary.tone === "error" ? "lx-meet-sync-error" : "lx-saved"}`}>
       {summary.text}
       {summary.reconnect && (
         <>

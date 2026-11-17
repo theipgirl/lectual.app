@@ -20,6 +20,7 @@ describe("links into /dashboard/matters/ (the list)", () => {
   it("any href with seg= or view= carries group=", () => {
     const bad: string[] = [];
     for (const f of files) {
+      if (f === join("src", "lib", "matters", "list-href.ts")) continue; // the one helper that writes the list value
       if (f === join("src", "app", "dashboard", "matters", "page.tsx")) continue; // builds its own hrefs from the resolved group
       const src = readFileSync(f, "utf8");
       for (const m of src.matchAll(/\/dashboard\/matters\/?\?[^"'`\s)]*/g)) {

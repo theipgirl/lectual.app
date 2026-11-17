@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CANCEL, SAVING, yesVerb } from "@/lib/ui/words";
 import { nextConfirm, type ConfirmEvent, type ConfirmState } from "@/lib/ui/inline-confirm";
 
 /**
@@ -12,7 +13,8 @@ export function InlineConfirm({
   label,
   question,
   onConfirm,
-  confirmLabel = "Confirm",
+  confirmLabel,
+  tone = "danger",
   pending = false,
   className = "lx-btn lx-btn-ghost lx-btn-sm",
   initial = "idle",
@@ -20,7 +22,10 @@ export function InlineConfirm({
   label: string;
   question: string;
   onConfirm: () => void;
+  /** Default: "Yes, <label>" ("Remove" -> "Yes, remove"). */
   confirmLabel?: string;
+  /** danger for a removal (default); primary for a confirm that removes nothing (a role change). */
+  tone?: "danger" | "primary";
   pending?: boolean;
   /** The class of the button that asks. */
   className?: string;
@@ -37,18 +42,18 @@ export function InlineConfirm({
   if (state === "idle") {
     return (
       <button type="button" className={className} disabled={pending} onClick={() => send("ask")}>
-        {pending ? "…" : label}
+        {pending ? SAVING : label}
       </button>
     );
   }
   return (
     <span role="alert" className="lx-note lx-inline-confirm">
       {question}
-      <button type="button" className="lx-btn lx-btn-pri lx-btn-sm" onClick={() => send("confirm")}>
-        {confirmLabel}
+      <button type="button" className={`lx-btn ${tone === "primary" ? "lx-btn-pri" : "lx-btn-danger"} lx-btn-sm`} onClick={() => send("confirm")}>
+        {confirmLabel ?? yesVerb(label)}
       </button>
       <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={() => send("cancel")}>
-        Cancel
+        {CANCEL}
       </button>
     </span>
   );

@@ -135,12 +135,12 @@ describe("lead page placement", () => {
     world.db.fail("crm_file", "select");
     const html = await leadPage(world);
     expect(html).toContain("Files couldn't be loaded. Refresh to try again.");
-    expect(html).not.toContain("Nothing here yet");
+    expect(html).not.toContain("No files yet.");
     expect(html).not.toContain("boom");
     expect(html).toContain(">Timeline<");
   });
 
-  it("still renders when the member directory cannot be read: entries say 'A teammate'", async () => {
+  it("still renders when the member directory cannot be read: entries say 'Teammate'", async () => {
     const world = leadWorld({ tables: { crm_file: [fileRow()] } });
     const html = await leadPage(world, {
       members: () => {
@@ -149,7 +149,7 @@ describe("lead page placement", () => {
     });
     // The page already treats a failed directory as an empty one.
     expect(html).toContain("Signed LOE.pdf");
-    expect(html).toContain("A teammate");
+    expect(html).toContain("Teammate");
   });
 
   it("shows the uploader's directory name", async () => {
@@ -214,7 +214,7 @@ describe("a just-uploaded file, end to end (request, direct upload, confirm, lis
     const after = await leadPage(world, { role: "admin" });
     const afterCard = after.slice(after.indexOf('aria-label="Documents & files"'), after.indexOf("<aside"));
     expect(afterCard).not.toContain("Specimen photo.PNG");
-    expect(afterCard).toContain("Nothing here yet");
+    expect(afterCard).toContain("No files yet.");
     // The timeline keeps its record (the activity table is append-only) and still names the file.
     expect(after).toContain("File added: Specimen photo.PNG");
   });
@@ -295,7 +295,7 @@ describe("matter page placement", () => {
     const htmlA = await matterPage(a);
     expect(htmlA).toContain("Files couldn't be loaded");
     expect(htmlA).toContain("Engagement letter.docx");
-    expect(htmlA).not.toContain("Nothing here yet");
+    expect(htmlA).not.toContain("No files yet.");
 
     const b = matterDb();
     b.fail("crm_document_draft", "select");
@@ -304,9 +304,9 @@ describe("matter page placement", () => {
     expect(htmlB).toContain("Specimen.png");
   });
 
-  it("says the uploader is 'A teammate' when the directory could not be read, and still renders", async () => {
+  it("says the uploader is 'Teammate' when the directory could not be read, and still renders", async () => {
     const html = await matterPage(matterDb(), { members: () => { throw new Error("boom"); } });
-    expect(html).toContain("A teammate");
+    expect(html).toContain("Teammate");
     expect(html).toContain("Specimen.png");
   });
 
@@ -327,6 +327,6 @@ describe("matter page placement", () => {
 
   it("says nothing here yet for a matter with no files and no letters", async () => {
     const html = await matterPage(matterDb(matterTables({ crm_file: [], crm_document_draft: [] })));
-    expect(html).toContain("Nothing here yet");
+    expect(html).toContain("No files yet.");
   });
 });

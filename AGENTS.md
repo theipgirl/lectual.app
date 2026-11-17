@@ -996,7 +996,7 @@ No migration, no dependency, nothing sends. The Stage Keeper's rules from Sprint
   new-enquiry stage, flags a person Lawmatics gave a stage (or "Hired") with the Lawmatics text as read-only evidence (`lawmatics_stage_unmapped` on the `lead_created` row), and
   never moves an existing lead: the "move existing leads" option, the divergence report and `stage-map` use in the planner are gone. Reconcile's Lawmatics source is always
   "unmapped" text (a `needs_matter` pointer for "Hired" only) and its stage-name milestones are undated, so they are cited and never acted on. `stage-map.ts` itself is untouched
-  (the matters importer still uses it; that importer is update-only and never creates a matter. Matters are CREATED from Lawmatics only by the separate hired-matter sync, see "Hired-matter sync" below). **The ON HOLD new RPB intake board is NOT built**: no new aliases ("Discovery Call Scheduled" and "Strategy Session Scheduled" stay as
+  (the matters importer still uses it; that importer is update-only and never creates a matter. Matters are CREATED from Lawmatics only by the separate hired-matter sync, see "Hired-matter sync" below). **(Superseded 2026-11-17: Taylor took the board off hold. RPB now has "Consult Held – Proposal in Progress" after Consultation Scheduled, and "Post Consultation Email Sent" is renamed "Proposal Sent" (same stage id). Both names lead the Stage Keeper and milestone name lists; the old names stay for other firms. Discovery Call and No Show stages were NOT added.)** Originally: the ON HOLD new RPB intake board is NOT built: no new aliases ("Discovery Call Scheduled" and "Strategy Session Scheduled" stay as
   they were), no "Consult Held - Proposal in Progress" or "Proposal Sent" names, no milestone-order change, no Lost / Nurture change.
 - **The new-enquiry stage** (`src/lib/pipeline/new-enquiry.ts`, the ONE rule): the open stage named like "Potential New Client", "New Lead", "New Inquiry" / "New Enquiry" (one alias
   list), else the first open stage in pipeline order; never `won`, `lost` or `nurture`, and never "Follow-Up" just because it sorts first. Used by the importer, Reconcile's Create
@@ -2178,3 +2178,17 @@ any update or delete of a merged lead and any direct write of the merged columns
   link) at 1440 / 1280 / 375 with no sideways overflow.
 - **NOT verified:** a real database with 0107 (the payload keys of `lead_merged`, the counts jsonb, the refusal texts beyond their prefixes)
   and a real browser (the harness is static markup in headless Chromium).
+
+## Trademark mail filed on matters by their own facts (no schema)
+A firm with no `crm_contact` emails and no `crm_matter_contact` links (RPB) never had mail filed on a matter. `matchMessageToMatter`
+(`src/lib/mailbox/matter-match.ts`) keeps the contact route first; when it finds nothing, `matchMatterEvidence` (pure, exported for a
+backfill) tries the firm's OPEN matters (open / on hold, loaded in `loadOrgContext`: id, mark, serial, owner, linked lead's email; never notes
+or goods): (a) an 8-digit USPTO serial in the subject or preview equal to `serial_number`; (b) the mark name, decorations stripped, as a
+whole phrase (4+ letters, not a generic word, a shorter mark inside a longer one that also appears loses); several matters -> "logo"/"design"
+vs "word", then the owner's full name alongside the mark, else none; (c) a participant equal to the linked lead's email, one matter only.
+Exactly one matter or none; the owner's name alone never matches.
+- **USPTO mail** (`isUsptoSender`, `firm-sender.ts`: any @uspto.gov) is stored `email_received` with `payload.party = "uspto"`
+  (`activityPayloadForMessage`) and is left out of the LEAD evidence (no cadence, no reply bell, no sequence stop); it can still file on a matter.
+- **Weekly review** reads `payload->>from` and `payload->>party` only (`readContactActivity`) and the firm's mailbox addresses through the
+  scoped client (`readFirmSenders`; failure = none known): an `email_received` from a firm address is ours, a USPTO one is a "USPTO notice"
+  (last contact, no direction). `contactKindOf` / `summarizeContact` in `src/lib/review/contact.ts` are the rule.

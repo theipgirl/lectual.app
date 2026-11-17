@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { CANCEL, SAVING } from "@/lib/ui/words";
 import { linkMeetingAction, type ActionState } from "@/app/dashboard/meetings/actions";
 
 /**
@@ -38,11 +39,11 @@ export function LinkLeadPicker({
     >
       <summary className="lx-btn lx-btn-sec">Link to a lead</summary>
       {leads === null ? (
-        <p role="alert" className="lx-note" style={{ color: "var(--wine)", margin: "6px 0 0" }}>
+        <p role="alert" className="pe-msg pe-msg-err pq-pick-note">
           Can&apos;t show your leads right now. Refresh to try again.
         </p>
       ) : leads.length === 0 ? (
-        <p className="lx-note" style={{ margin: "6px 0 0" }}>
+        <p className="lx-note pq-pick-note">
           You have no leads yet. Add one in Intake first.
         </p>
       ) : (
@@ -60,13 +61,13 @@ export function LinkLeadPicker({
             ))}
           </select>
           <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={pending}>
-            {pending ? "Linking…" : "Link"}
+            {pending ? SAVING : "Link"}
           </button>
           <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={() => ref.current && (ref.current.open = false)}>
-            Cancel
+            {CANCEL}
           </button>
           {state.error && (
-            <p role="alert" className="lx-note" style={{ color: "var(--wine)", margin: 0, flexBasis: "100%" }}>
+            <p role="alert" className="pe-msg pe-msg-err pq-link-err">
               {state.error}
             </p>
           )}

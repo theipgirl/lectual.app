@@ -7,6 +7,7 @@ const listMemberDirectory = vi.fn();
 vi.mock("@/lib/notifications", () => ({ loadBell: (...a: unknown[]) => loadBell(...a), markRead: vi.fn(), markAllRead: vi.fn() }));
 vi.mock("@/lib/members/directory", () => ({ listMemberDirectory: (...a: unknown[]) => listMemberDirectory(...a) }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
 
 const LEAD = "11111111-1111-4111-8111-111111111111";
 const NOW = Date.now();

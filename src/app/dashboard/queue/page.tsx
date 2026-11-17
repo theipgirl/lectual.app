@@ -12,10 +12,16 @@ import { DismissFollowups } from "@/components/queue/DismissFollowups";
 import { agentLabel, statusPill, fmtWhen, parseQueueStatus, preview, typeLabel, type QueueStatus } from "@/components/queue/format";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
-import { APPROVALS_NAME, HANDED_TO_YOU_MARKER } from "@/lib/ui/words";
+import { APPROVALS_NAME, HANDED_TO_YOU_MARKER, noneYet } from "@/lib/ui/words";
 import { loadCardState } from "@/lib/queue/card-state";
 import { handedToViewer, showHandedPill } from "@/lib/queue/handed";
 import { viewEventTrust } from "@/lib/queue/deck";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Pill } from "@/components/ui/Pill";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Notice } from "@/components/ui/Notice";
+import { SheetCard, SheetScroll, SheetTable } from "@/components/ui/SheetTable";
+import { BLANK } from "@/lib/ui/words";
 import "@/components/queue/handed.css";
 
 export const metadata: Metadata = { title: pageTitle(APPROVALS_NAME) };
@@ -27,9 +33,9 @@ const TABS: { status: QueueStatus; label: string }[] = [
 ];
 
 const EMPTY: Record<QueueStatus, { title: string; body: string }> = {
-  pending: { title: "All caught up", body: "Nothing is waiting for review. New drafts from the assistants land here." },
-  approved: { title: "Nothing approved yet", body: "Approved drafts show up here once something has been reviewed." },
-  rejected: { title: "Nothing rejected", body: "Rejected drafts and their notes show up here." },
+  pending: { title: noneYet("approvals waiting"), body: "New drafts from the assistants land here." },
+  approved: { title: noneYet("approved drafts"), body: "Approved drafts show up here once something has been reviewed." },
+  rejected: { title: noneYet("rejected drafts"), body: "Rejected drafts and their notes show up here." },
 };
 
 /**
@@ -67,59 +73,46 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
 
   return (
     <>
-      <div className="lx-page-head lx-page-head-list">
-        <div style={{ flex: 1, minWidth: 260 }}>
-          <h1 className="lx-h1" data-tour="queue-head">{APPROVALS_NAME}</h1>
-          <p className="lx-sub">
-            Everything an assistant drafted for a client, newest first. Approving puts the message in a mail client for a
-            person to send — nothing reaches a client on its own.
-          </p>
-        </div>
-        <nav aria-label="Approval status" className="lx-segs">
-          {TABS.map((t) => (
-            <Link key={t.status} href={`/dashboard/queue/?status=${t.status}`} aria-current={t.status === status ? "page" : undefined}>
-              {t.label}
-            </Link>
-          ))}
-        </nav>
-      </div>
+      <PageHeader
+        title={APPROVALS_NAME}
+        tour="queue-head"
+        sub="Everything an assistant drafted for a client, newest first. Approving puts the message in a mail client for a person to send — nothing reaches a client on its own."
+        actions={
+          <nav aria-label="Approval status" className="vs-switch">
+            {TABS.map((t) => (
+              <Link key={t.status} href={`/dashboard/queue/?status=${t.status}`} aria-current={t.status === status ? "page" : undefined}>
+                {t.label}
+              </Link>
+            ))}
+          </nav>
+        }
+      />
 
       {load.status === "ok" && (
-        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <div className="lx-queue-filters">
           <PersonSwitch status={status} who={who} counts={counts} mineEnabled={mineEnabled} handed={handedPill ? { count: handed.size, active: handedActive } : undefined} />
           {dismissable > 0 && <DismissFollowups count={dismissable} />}
         </div>
       )}
       {view.routingFailed && load.status === "ok" && (
-        <p role="status" className="lx-note" style={{ margin: 0 }}>
+        <Notice tone="warn" role="status">
           Assignments couldn&apos;t be loaded. Showing everything to the usual approvers.
-        </p>
+        </Notice>
       )}
 
       {load.status !== "ok" ? (
         <QueueUnavailable status={load.status} reason={load.reason} />
       ) : allItems.length === 0 ? (
-        <div className="lx-card lx-empty-card">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            {EMPTY[status].title}
-          </h2>
-          <p className="lx-note" style={{ margin: 0 }}>
-            {EMPTY[status].body}
-          </p>
-        </div>
+        <EmptyState title={EMPTY[status].title}>{EMPTY[status].body}</EmptyState>
       ) : shown.length === 0 ? (
-        <div className="lx-card lx-empty-card">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            {who.kind === "me" ? "Nothing for you right now" : "Nothing here"}
-          </h2>
-          <p className="lx-note" style={{ margin: 0 }}>
-            {who.kind === "me" ? `Nothing is waiting on you. ${waitingOnOthers} ${waitingOnOthers === 1 ? "is" : "are"} waiting on others.` : "Nothing is assigned to this person."}{" "}
-            <Link href={`/dashboard/queue/?status=${status}&who=all`}>Show everyone</Link>
-          </p>
-        </div>
+        <EmptyState title={who.kind === "me" ? noneYet("approvals for you") : noneYet("approvals for this person")}>
+          {who.kind === "me" ? `Nothing is waiting on you. ${waitingOnOthers} ${waitingOnOthers === 1 ? "is" : "are"} waiting on others.` : "Nothing is assigned to this person."}{" "}
+          <Link href={`/dashboard/queue/?status=${status}&who=all`}>Show everyone</Link>
+        </EmptyState>
       ) : (
-        <div className="lx-card" style={{ overflow: "auto" }}>
-          <table className="lx-tbl lx-stack">
+        <SheetCard>
+          <SheetScroll>
+          <SheetTable>
             <thead>
               <tr>
                 <th>Draft</th>
@@ -132,35 +125,38 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
             <tbody>
               {shown.map((item) => (
                 <tr key={item.id}>
-                  <td className="wrap pri">
+                  <td className="pri">
                     <Link href={`/dashboard/queue/${item.id}/`} className="lx-rowlink">
                       {item.headline}
                     </Link>
                     {handed.has(item.id) && (
-                      <span className="lx-pill lx-pill-ox lx-handed-pill" data-handed-marker>
-                        {HANDED_TO_YOU_MARKER}
+                      <span className="lx-handed-pill" data-handed-marker>
+                        <Pill tone="ox">{HANDED_TO_YOU_MARKER}</Pill>
                       </span>
                     )}
                     {possibleDuplicates.has(item.id) && (
-                      <span className="lx-pill lx-pill-warn" style={{ marginLeft: 8 }} title="Nearly identical to a draft that was queued minutes earlier">
-                        Possible duplicate
+                      <span className="lx-handed-pill">
+                        <Pill tone="warn" title="Nearly identical to a draft that was queued minutes earlier">
+                          Possible duplicate
+                        </Pill>
                       </span>
                     )}
                     <div className="lx-note">
                       {kindLabel(classifyQueueItem(item))} · {ownerText(item, routing, members)} · {typeLabel(item.type)} · {preview(item, 90)}
                     </div>
                   </td>
-                  <td data-label="Client">{item.client_name ?? "—"}</td>
+                  <td data-label="Client">{item.client_name ?? BLANK}</td>
                   <td data-label="From">{agentLabel(item.agent)}</td>
                   <td data-label="Status">
-                    <span className={`lx-pill ${statusPill(item).tone}`}>{statusPill(item).label}</span>
+                    <Pill tone={statusPill(item).tone}>{statusPill(item).label}</Pill>
                   </td>
-                  <td className="lx-num" data-label="Queued">{fmtWhen(item.created_at, tz)}</td>
+                  <td data-label="Queued">{fmtWhen(item.created_at, tz)}</td>
                 </tr>
               ))}
             </tbody>
-          </table>
-        </div>
+          </SheetTable>
+          </SheetScroll>
+        </SheetCard>
       )}
     </>
   );

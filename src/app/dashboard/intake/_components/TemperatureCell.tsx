@@ -43,7 +43,6 @@ export default function TemperatureCell({
           className={`ix-temp${pill ? "" : " ix-temp-empty"}`}
           data-tone={pill?.tone}
           data-suggested={pill?.suggested ? "" : undefined}
-          style={{ cursor: pending ? "progress" : "pointer", opacity: pending ? 0.6 : undefined }}
         >
           {pill ? pill.text : "Set"}
         </button>

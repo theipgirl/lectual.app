@@ -1,6 +1,9 @@
 import "server-only";
 
 import { getScopedClient } from "@/lib/db/scoped-client";
+import { formatDayTime } from "@/lib/ui/dates";
+import { BLANK } from "@/lib/ui/words";
+import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
 import type { Attendee, MeetingProvider, TranscriptSegment } from "./types";
 
 /**
@@ -174,14 +177,11 @@ export async function linkLabels(leadIds: string[], matterIds: string[]): Promis
 }
 
 export function formatDuration(seconds: number | null): string {
-  if (!seconds) return "—";
+  if (!seconds) return BLANK;
   const m = Math.round(seconds / 60);
   return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`;
 }
 
-export function formatWhen(iso: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+export function formatWhen(iso: string | null, tz: string = DEFAULT_TIME_ZONE): string {
+  return formatDayTime(iso, { tz }) ?? BLANK;
 }

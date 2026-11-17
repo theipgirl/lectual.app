@@ -1,5 +1,7 @@
 import type { QueueItem } from "@/lib/queue/api";
-import { DECK_CHIP_DONE, DONE_OUTCOME_TEXT, FROM_THEIR_EMAILS } from "@/lib/ui/words";
+import { BLANK, DECK_CHIP_DONE, DONE_OUTCOME_TEXT, FROM_THEIR_EMAILS } from "@/lib/ui/words";
+import { formatDayTime } from "@/lib/ui/dates";
+import type { PillTone } from "@/lib/ui/tones";
 import { isDoneItem } from "@/lib/queue/done";
 import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
 import { markdownToPlainText } from "@/lib/markdown";
@@ -17,10 +19,8 @@ export function parseQueueStatus(value: string | string[] | undefined): QueueSta
 /** An instant on the FIRM's clock (`getFirmTimeZone()`); the default zone only
  * when the caller has none to give. */
 export function fmtWhen(iso: string | null, tz: string = DEFAULT_TIME_ZONE): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: tz });
+  if (!iso) return BLANK;
+  return formatDayTime(iso, { tz }) ?? iso;
 }
 
 /** One line of the body for the list: Markdown marks removed, so it reads as sentences. */
@@ -44,6 +44,7 @@ const AGENT_LABEL: Record<string, string> = {
   "inbox-summary": "Inbox summary",
   "document-center": "Document Center",
   "welcome-client": "Welcome",
+  welcome: "Welcome",
   "filing-followup": "Filing follow-up",
 };
 export const agentLabel = (agent: string) => AGENT_LABEL[agent] ?? agent;
@@ -51,14 +52,14 @@ export const typeLabel = (type: string) =>
   type === "CLIENT_EMAIL" ? "Client email" : type === "BRIEFING" ? "Briefing" : type.replaceAll("_", " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
 
 /** The status pill of a queue item: Done (a reject carrying the Done marker) reads Done, never Rejected. */
-export function statusPill(item: Pick<QueueItem, "status" | "resolution_note">): { label: string; tone: string } {
-  return isDoneItem(item) ? { label: DECK_CHIP_DONE, tone: "lx-pill-ok" } : STATUS_PILL[item.status];
+export function statusPill(item: Pick<QueueItem, "status" | "resolution_note">): { label: string; tone: PillTone } {
+  return isDoneItem(item) ? { label: DECK_CHIP_DONE, tone: "ok" } : STATUS_PILL[item.status];
 }
 
-export const STATUS_PILL: Record<QueueStatus, { label: string; tone: string }> = {
-  pending: { label: "Waiting on you", tone: "lx-pill-warn" },
-  approved: { label: "Approved", tone: "lx-pill-ok" },
-  rejected: { label: "Rejected", tone: "lx-pill-risk" },
+export const STATUS_PILL: Record<QueueStatus, { label: string; tone: PillTone }> = {
+  pending: { label: "Waiting on you", tone: "warn" },
+  approved: { label: "Approved", tone: "ok" },
+  rejected: { label: "Rejected", tone: "risk" },
 };
 
 /**

@@ -50,7 +50,7 @@ describe("Today: Consults card", () => {
     const html = await render({ read: { status: "ok", consults: [consult()] } });
     expect(html).toContain(">Consults<");
     expect(html).toContain("Strategy Session: Amara Nwosu");
-    expect(html).toContain("Thu, Oct 22, 2:00 PM");
+    expect(html).toContain("Oct 22, 2:00 PM");
     expect(html).toMatch(/<a href="\/dashboard\/leads\/lead-amara\/">Amara Nwosu<\/a>/);
     expect(html).toMatch(/<a [^>]*href="https:\/\/teams\.microsoft\.com\/l\/meetup-join\/strategy-1"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*>Join<\/a>/);
     expect(loadConsultsForToday).toHaveBeenCalledTimes(1);

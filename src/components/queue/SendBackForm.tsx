@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { sendBackAction, type SendBackState } from "@/app/dashboard/queue/actions";
+import { Notice } from "@/components/ui/Notice";
 import { SEND_BACK_NOTE_LABEL, SEND_BACK_NOTE_HINT, sendBackTo } from "@/lib/ui/words";
 import { SEND_BACK_NOTE_MAX } from "@/lib/queue/handed";
 
@@ -13,15 +14,15 @@ export function SendBackForm({ id, name }: { id: string; name: string }) {
       <input type="hidden" name="id" value={id} />
       <label className="lx-sendback-label">
         <span>{SEND_BACK_NOTE_LABEL}</span>
-        <textarea name="note" rows={2} maxLength={SEND_BACK_NOTE_MAX} className="lx-sendback-note" aria-describedby={`sb-hint-${id}`} />
+        <textarea name="note" rows={2} maxLength={SEND_BACK_NOTE_MAX} className="lx-input lx-sendback-note" aria-describedby={`sb-hint-${id}`} />
       </label>
-      <p id={`sb-hint-${id}`} className="lx-note" style={{ margin: 0 }}>
+      <p id={`sb-hint-${id}`} className="lx-note lx-sendback-hint">
         {SEND_BACK_NOTE_HINT}
       </p>
       {state.error && (
-        <p role="alert" className="lx-banner lx-banner-risk" style={{ margin: 0 }}>
+        <Notice tone="risk" role="alert">
           {state.error}
-        </p>
+        </Notice>
       )}
       <button type="submit" className="lx-btn lx-btn-sec" disabled={pending}>
         {sendBackTo(name)}

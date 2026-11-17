@@ -195,14 +195,12 @@ describe("the page: the Accepted segment", () => {
 describe("mobile, wording and no new paid logic", () => {
   const css = readFileSync("src/app/dashboard/proposals/proposals.css", "utf8");
 
-  it("under 760px a row stacks: the proposal, the client, then Client response (Accepted, Opened, Paid), then Status and Fees", () => {
-    const block = css.slice(css.indexOf("Under 760px a row is a stack"));
-    expect(block).toContain("@media (max-width: 760px)");
-    expect(block).toContain('"proposal proposal" "client client" "response response" "status fees"');
-    expect(block).toMatch(/td\.pq-c-response\s*\{\s*grid-area: response/);
-    expect(block).toMatch(/td\.pq-c-fees\s*\{\s*grid-area: fees/);
-    expect(block).toContain("content: attr(data-label)");
-    expect(block).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(/);
+  it("under 640px a row is a card from the shared table kit: no private phone grid, every cell labelled", () => {
+    expect(css).not.toMatch(/grid-template-areas|pq-tbl td\[data-label\]/);
+    const src = readFileSync("src/components/proposal-list/ProposalsTable.tsx", "utf8");
+    expect(src).toContain("SheetTable");
+    for (const label of ["Client", "Status", "Client response", "Fees"]) expect(src).toContain(`data-label="${label}"`);
+    expect(readFileSync("src/app/globals.css", "utf8")).toContain(".lx-stack td[data-label]::before");
   });
 
   it("the stopgap is said in the code and in AGENTS.md", () => {

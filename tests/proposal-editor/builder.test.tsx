@@ -138,13 +138,13 @@ describe("the editor header: whose proposal this is", () => {
 
   it("with a lead: 'Open lead' linking to the lead's page", async () => {
     const html = await renderEditor(row());
-    expect(html).toMatch(/href="\/dashboard\/leads\/lead-9"[^>]*>Open lead →<\/a>/);
+    expect(html).toMatch(/href="\/dashboard\/leads\/lead-9"[^>]*>Open lead <svg/);
   });
 
   it("with a matter as well: a link to the matter", async () => {
     const html = await renderEditor(row({ matter_id: "matter-3" }));
     expect(html).toContain('href="/dashboard/matters/matter-3"');
-    expect(html).toContain("Open matter →");
+    expect(html).toContain("Open matter <svg");
   });
 
   it("a lead that could not be read says so, and is not 'not linked'", async () => {

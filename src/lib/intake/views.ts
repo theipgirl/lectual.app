@@ -6,8 +6,8 @@ import { inPipelineOrder } from "@/lib/pipeline/stage-order";
 import type { MemberIdentity } from "@/lib/members/directory";
 import { intakeStages } from "./scope";
 import type { IntakeRow } from "./rows";
-import { shortDate } from "@/lib/review/format";
-import { DEFAULT_ZONE, civilDay, clockTime } from "@/lib/stage-keeper/format";
+import { DEFAULT_ZONE } from "@/lib/stage-keeper/format";
+import { civilDay, formatDay, formatTime } from "@/lib/ui/dates";
 import {
   LEADS_NOTE_UNAVAILABLE,
   LEADS_NO_ACTIVITY_YET,
@@ -24,6 +24,9 @@ import {
   LEADS_TOUCH_OUR_TURN_TITLE,
   LEADS_TOUCH_WAITING_ON_THEM,
   LEADS_TOUCH_WAITING_TITLE,
+  TEAMMATE,
+  UNASSIGNED,
+  BLANK,
 } from "@/lib/ui/words";
 
 /**
@@ -177,28 +180,18 @@ export function ownerColumns(rows: IntakeRow[], members: MemberIdentity[]): Owne
   );
 
   return [
-    build(null, "Unassigned", "—"),
+    build(null, UNASSIGNED, BLANK),
     ...members.map((member) => build(member.userId, memberLabel(member), initialsOf(member))),
-    ...strays.map((id) => build(id, "Unknown teammate", "?")),
+    ...strays.map((id) => build(id, TEAMMATE, "?")),
   ];
 }
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
 /**
- * "12 Sep" — the stamp the canvas puts in Last touch.
- *
- * Spelled out rather than handed to `toLocaleDateString`: that returns "Sept"
- * for September under newer ICU and "Sep" under older, so the same row renders
- * differently on the server and in the browser, which React reports as a
- * hydration mismatch. A twelve-entry table is not worth a locale.
+ * "Sep 12": the day a stamp falls on in the firm's zone (`formatDay`, the one date formatter; the year only when it is not this year).
+ * Null for no date or one that doesn't parse.
  */
-export function touchDate(iso: string | null): string | null {
-  if (!iso) return null;
-  const at = new Date(iso);
-  const ms = at.getTime();
-  if (Number.isNaN(ms)) return null;
-  return `${at.getUTCDate()} ${MONTHS[at.getUTCMonth()]}`;
+export function touchDate(iso: string | null, timeZone: string = DEFAULT_ZONE): string | null {
+  return formatDay(iso, { tz: timeZone });
 }
 
 export type TouchState = "consult" | "consult-held" | "our-turn" | "waiting" | "activity-only" | "none";
@@ -226,9 +219,8 @@ export function sheetDay(iso: string | null | undefined, now: Date, timeZone: st
   // A date in the future is never shown ("Our turn · Dec 3" before Dec 3): it is treated as missing, like one that doesn't parse.
   const usable = usableTime(iso, now);
   if (!usable) return null;
-  const civil = civilDay(usable, timeZone);
-  const today = civilDay(now.toISOString(), timeZone);
-  return civil && today ? shortDate(civil, today).replace(" ", "\u00a0") : null;
+  const day = formatDay(usable, { tz: timeZone, now });
+  return day ? day.replace(" ", "\u00a0") : null;
 }
 
 /** The stamp itself when it parses and is not after `now`; else null. The ONE "is this a date we may show" rule: the cell and the sort both use it. */
@@ -273,13 +265,14 @@ function heldWithin30Days(iso: string, now: Date): boolean {
 /** "Consult today · 12:30 PM" / "Consult · Nov 19" in the firm's zone, or null for an unusable time. */
 function consultWhen(iso: string, now: Date, timeZone: string): string | null {
   const civil = civilDay(iso, timeZone);
-  const today = civilDay(now.toISOString(), timeZone);
+  const today = civilDay(now, timeZone);
   if (!civil || !today) return null;
   if (civil === today) {
-    const time = clockTime(iso, timeZone);
+    const time = formatTime(iso, { tz: timeZone });
     return time ? LEADS_TOUCH_CONSULT_TODAY(time.replace(" ", "\u00a0")) : null;
   }
-  return LEADS_TOUCH_CONSULT_LATER(shortDate(civil, today).replace(" ", "\u00a0"));
+  const day = formatDay(iso, { tz: timeZone, now });
+  return day ? LEADS_TOUCH_CONSULT_LATER(day.replace(" ", "\u00a0")) : null;
 }
 
 export function touchStampFor(row: IntakeRow, opts: { now: Date; timeZone?: string }): TouchStamp {

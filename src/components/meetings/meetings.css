@@ -1,0 +1,9 @@
+/* Meetings: the few rules the shared classes do not cover. Tokens only. */
+.lx-meet-card { display: grid; gap: 10px; }
+.lx-meet-links { display: grid; gap: 4px; }
+.lx-meet-attendee { color: var(--ink); }
+.lx-meet-form { display: grid; gap: 10px; }
+.lx-meet-form-tight { display: grid; gap: 8px; }
+.lx-meet-form-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.lx-meet-error { color: var(--wine); }
+.lx-meet-sync-error { color: var(--wine); }

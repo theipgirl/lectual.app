@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { NotInLectualItem } from "@/lib/reconcile/types";
 import { EvidenceBlock } from "./EvidenceBlock";
+import { ADD_A_LEAD, SAVING, addLeadFor } from "@/lib/ui/words";
+import { Notice } from "@/components/ui/Notice";
 
 export type CreatedLead = { leadId: string } | { error: string };
 
@@ -26,13 +28,13 @@ export function NotInLectual({
   if (items.length === 0) return null;
   const hidden = Math.max(0, total - items.length);
   return (
-    <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }} aria-label="Not in Lectual yet">
+    <section className="lx-card rc-panel" aria-label="Not in Lectual yet">
       <div>
         <div className="lx-label">{`${total} ${total === 1 ? "person" : "people"}`}</div>
-        <h2 className="lx-h2" style={{ fontSize: 23 }}>
+        <h2 className="lx-h2">
           Not in Lectual yet
         </h2>
-        <p className="lx-note">These people appear in the sheet or in Lawmatics but have no lead here. Nothing is created until you press Create lead.</p>
+        <p className="lx-note">These people appear in the sheet or in Lawmatics but have no lead here. Nothing is created until you press Add a lead.</p>
       </div>
       <ul className="rc-people">
         {items.map((item) => {
@@ -40,7 +42,7 @@ export function NotInLectual({
           const made = result && "leadId" in result ? result : null;
           return (
             <li key={item.key} className="rc-person" data-found={item.found}>
-              <div style={{ minWidth: 220, flex: 1 }}>
+              <div className="rc-person-main">
                 <b>{item.name}</b>
                 <div>
                   <small className="lx-note">{item.detail}</small>
@@ -56,15 +58,15 @@ export function NotInLectual({
                   <button
                     type="button"
                     className="lx-btn lx-btn-sec lx-btn-sm"
-                    aria-label={`Create lead for ${item.name}`}
+                    aria-label={addLeadFor(item.name)}
                     disabled={busyKey !== null}
                     onClick={() => onCreate?.(item)}
                   >
-                    {busyKey === item.key ? "Creating…" : "Create lead"}
+                    {busyKey === item.key ? SAVING : ADD_A_LEAD}
                   </button>
                 )}
                 {made ? <span role="status" className="lx-note">{"Created. Upload the sheet again to reconcile this lead."}</span> : null}
-                {result && "error" in result ? <span role="alert" className="rc-warn">{result.error}</span> : null}
+                {result && "error" in result ? <Notice tone="warn" role="alert">{result.error}</Notice> : null}
               </div>
             </li>
           );

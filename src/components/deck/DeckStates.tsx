@@ -1,3 +1,6 @@
+import { Notice } from "@/components/ui/Notice";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Icon } from "@/components/ui/Icon";
 import { queueUnavailableCopy, type QueueUnavailableState } from "@/components/queue/QueueUnavailable";
 import { DECK_COULDNT_LOAD, DECK_NOT_CONNECTED, DECK_TRY_AGAIN, deckClean } from "@/lib/ui/words";
 
@@ -9,9 +12,7 @@ export function DeckClean({ headline, approved, rejected, done, waiting }: { hea
   return (
     <section className="dk-clean" role="status" aria-label="Clean slate">
       <span className="dk-clean-mark" aria-hidden="true">
-        <svg width="28" height="28" viewBox="0 0 24 24">
-          <path d="M5 12l5 5 9-10" />
-        </svg>
+        <Icon name="check" size={28} />
       </span>
       <p className="dk-clean-title">
         {first}
@@ -32,30 +33,22 @@ export function DeckUnavailable(props: QueueUnavailableState) {
   const copy = queueUnavailableCopy(props);
   if (props.status === "unavailable") {
     return (
-      <div role="alert" className="dk-state dk-state--risk">
-        <span className="dk-eyebrow">{DECK_COULDNT_LOAD}</span>
-        <p className="dk-state-lead">{copy.title}</p>
-        <p className="dk-state-body">{copy.body}</p>
-        <a className="dk-state-btn" href="">
-          {DECK_TRY_AGAIN}
-        </a>
-      </div>
+      <Notice tone="risk" role="alert" title={DECK_COULDNT_LOAD} action={<a className="lx-btn lx-btn-sec lx-btn-sm" href="">{DECK_TRY_AGAIN}</a>}>
+        <span className="dk-state-lead">{copy.title}</span> <span>{copy.body}</span>
+      </Notice>
     );
   }
   return (
-    <div role="status" className="dk-state dk-state--mute">
-      <span className="dk-eyebrow">{DECK_NOT_CONNECTED}</span>
-      <p className="dk-state-lead">{copy.title}</p>
-      <p className="dk-state-body">{copy.body}</p>
-    </div>
+    <Notice tone="mute" role="status" title={DECK_NOT_CONNECTED}>
+      <span className="dk-state-lead">{copy.title}</span> <span>{copy.body}</span>
+    </Notice>
   );
 }
 
 export function DeckEmpty({ headline, details }: { headline: string; details: string[] }) {
   return (
-    <div className="dk-empty" role="status">
-      <h2>{headline}</h2>
-      {details.length > 0 && <p>{details.join(" ")}</p>}
+    <div role="status">
+      <EmptyState title={headline}>{details.join(" ")}</EmptyState>
     </div>
   );
 }

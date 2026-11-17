@@ -29,7 +29,7 @@ export async function GettingStartedCard() {
   return (
     <section className="lx-card gs-card" aria-labelledby="getting-started-h">
       <div className="gs-card-main">
-        <h2 id="getting-started-h" className="lx-h2" style={{ margin: 0 }}>
+        <h2 id="getting-started-h" className="lx-h3">
           {heading}
         </h2>
         <p className="lx-sub" style={{ margin: 0 }}>

@@ -1,6 +1,8 @@
 import type { HubFlow, HubRecordKind, HubStep } from "./hub";
 import { HUB_CENTERED } from "./hub";
 import type { TourStep } from "./tour";
+import { INTAKE_LIST_PATH } from "@/lib/intake/list-href";
+import { MATTERS_LIST_PATH } from "@/lib/matters/list-href";
 
 /**
  * The flow runner's decisions, pure so cross-page resume, Back, Skip and Finish
@@ -75,7 +77,7 @@ export function recordIdFor(records: HubRecords, kind: HubRecordKind): string | 
 }
 
 /** Where a record step falls back to when there is nothing to open: the list it would be opened from. */
-const LIST_PATH: Record<HubRecordKind, string> = { lead: "/dashboard/intake/", matter: "/dashboard/matters/" };
+const LIST_PATH: Record<HubRecordKind, string> = { lead: INTAKE_LIST_PATH, matter: MATTERS_LIST_PATH };
 
 export type StepView = {
   stepId: string;

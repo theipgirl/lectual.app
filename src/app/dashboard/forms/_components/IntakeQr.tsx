@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
+import { Dialog } from "@/components/ui/Dialog";
 
 /**
  * A QR code for an intake's link, made in the browser (nothing is uploaded):
@@ -55,13 +56,6 @@ export function IntakeQrButton({
     };
   }, [open, url]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
-
   if (!shareable) {
     return (
       <button type="button" className={compact ? "lx-btn lx-btn-sm lx-btn-ghost" : "lx-btn lx-btn-sec"} disabled aria-describedby={describedBy}>
@@ -85,40 +79,35 @@ export function IntakeQrButton({
         QR code
       </button>
       {open && (
-        <div className="ifq-backdrop" role="presentation" onMouseDown={(e) => e.target === e.currentTarget && setOpen(false)}>
-          <div className="ifq-dialog lx-card" role="dialog" aria-modal="true" aria-labelledby="ifq-title">
-            <div className="ifq-head">
-              <h2 id="ifq-title" className="ifm-title" style={{ flex: 1 }}>
-                QR code · {name}
-              </h2>
-              <button type="button" className="ifq-close" onClick={() => setOpen(false)} aria-label="Close">
-                ×
-              </button>
-            </div>
-            <div className="ifq-code">
-              {failed ? (
-                <p className="ifm-help">Couldn&apos;t make the code. Reload the page and try again.</p>
-              ) : png ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={png} alt={`QR code for ${url}`} width={240} height={240} />
-              ) : (
-                <span className="ifm-spin" aria-label="Making the code" />
-              )}
-            </div>
-            <p className="ifq-url">{url.replace(/^https?:\/\//, "")}</p>
-            <p className="ifm-help" style={{ margin: 0 }}>
-              Test it with your phone camera before you print. If you rename the link later, this code keeps working.
-            </p>
-            <div className="ifq-actions">
+        <Dialog
+          size="sm"
+          title={`QR code · ${name}`}
+          titleId="ifq-title"
+          onClose={() => setOpen(false)}
+          footer={
+            <>
               <a className="lx-btn lx-btn-sec" href={svgHref} download={`${fileBase(slug)}.svg`} aria-disabled={!svgHref}>
                 Download SVG (print)
               </a>
               <a className="lx-btn lx-btn-pri" href={png ?? undefined} download={`${fileBase(slug)}.png`} aria-disabled={!png}>
                 Download PNG
               </a>
-            </div>
+            </>
+          }
+        >
+          <div className="ifq-code">
+            {failed ? (
+              <p className="ifm-help">Couldn&apos;t make the code. Reload the page and try again.</p>
+            ) : png ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={png} alt={`QR code for ${url}`} width={240} height={240} />
+            ) : (
+              <span className="ifm-spin" aria-label="Making the code" />
+            )}
           </div>
-        </div>
+          <p className="ifq-url">{url.replace(/^https?:\/\//, "")}</p>
+          <p className="ifm-help">Test it with your phone camera before you print. If you rename the link later, this code keeps working.</p>
+        </Dialog>
       )}
     </>
   );

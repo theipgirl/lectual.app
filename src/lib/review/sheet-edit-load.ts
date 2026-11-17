@@ -1,6 +1,7 @@
 import "server-only";
 import { listMatterStages } from "@/lib/matters/stages";
 import { listStages } from "@/lib/pipeline/stages";
+import { stageDisplayName } from "@/lib/matters/list-view";
 import { sheetLeadStages, type StageChoice } from "./sheet-edit";
 
 /**
@@ -11,7 +12,8 @@ import { sheetLeadStages, type StageChoice } from "./sheet-edit";
 export async function loadSheetStages(): Promise<{ matter: StageChoice[] | null; lead: StageChoice[] | null }> {
   const [matterS, leadS] = await Promise.allSettled([listMatterStages(), listStages()]);
   return {
-    matter: matterS.status === "fulfilled" ? matterS.value.map((s) => ({ id: s.id, name: s.label })) : null,
-    lead: leadS.status === "fulfilled" ? sheetLeadStages(leadS.value) : null,
+    matter: matterS.status === "fulfilled" ? matterS.value.map((s) => ({ id: s.id, name: stageDisplayName(s.label) })) : null,
+    // Names as a person reads them (no "3." code), the same words the Status cells show.
+    lead: leadS.status === "fulfilled" ? sheetLeadStages(leadS.value).map((s) => ({ ...s, name: stageDisplayName(s.name) })) : null,
   };
 }

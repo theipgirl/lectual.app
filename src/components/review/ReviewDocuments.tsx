@@ -101,11 +101,11 @@ export function ReviewDocuments({
       {canUpload && !view.filesNotSetUp && <ReviewUpload parent={{ kind: open.kind, id: open.id }} />}
       <p style={{ margin: 0, display: "flex", gap: 12, flexWrap: "wrap" }}>
         {/* A plain anchor: the href reaches the page exactly as built (the trailing slash and the #documents anchor). */}
-        <a href={documentsCardHref(open.kind, open.id)} className="rv-panel-full">
+        <a href={documentsCardHref(open.kind, open.id)} className="rv-panel-full lx-link">
           {REVIEW_DOCS_OPEN_ALL}
         </a>
         {canWrite && (
-          <a href="#rv-sec-note" className="rv-panel-full" title={REVIEW_DOCS_COMMENT_HINT}>
+          <a href="#rv-sec-note" className="rv-panel-full lx-link" title={REVIEW_DOCS_COMMENT_HINT}>
             {REVIEW_DOCS_COMMENT}
           </a>
         )}

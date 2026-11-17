@@ -1,8 +1,10 @@
 "use client";
 
+import { stageDisplayName } from "@/lib/matters/list-view";
 import { useActionState, useState } from "react";
 import { closeLeadAction, type ReviewActionState } from "@/app/dashboard/review/actions";
 import { InlineConfirm } from "@/components/ui/InlineConfirm";
+import { yesVerb } from "@/lib/ui/words";
 import { CLOSE_REASON_MAX } from "@/lib/review/input";
 import type { CloseStage } from "@/lib/review/close-stage";
 import "./review.css";
@@ -33,19 +35,19 @@ export function LostNurture({ id, stages }: { id: string; stages: CloseStage[] }
           <select className="lx-input" aria-label="Move this lead to" value={chosen.id} onChange={(e) => setStageId(e.target.value)}>
             {stages.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.name}
+                {stageDisplayName(s.name)}
               </option>
             ))}
           </select>
           <input className="lx-input" aria-label="Reason (optional)" placeholder="Reason (optional)" maxLength={CLOSE_REASON_MAX} value={reason} onChange={(e) => setReason(e.target.value)} />
-          <InlineConfirm label="Move lead" question={`Move this lead to ${chosen.name}?`} confirmLabel="Move" pending={pending} onConfirm={send} />
+          <InlineConfirm label="Move lead" question={`Move this lead to ${chosen.name}?`} tone="primary" confirmLabel={yesVerb("move")} pending={pending} onConfirm={send} />
           <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={() => setOpen(false)}>
             Close
           </button>
         </>
       )}
       {state.error && (
-        <p role="alert" className="lx-note" style={{ color: "var(--wine)", margin: 0 }}>
+        <p role="alert" className="rv-err">
           {state.error}
         </p>
       )}

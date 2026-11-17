@@ -36,6 +36,7 @@ const conn = (provider: string, status: string, extra: Record<string, unknown> =
 
 function mockWorld(w: World) {
   vi.resetModules();
+  vi.doMock("next/navigation", async (orig) => ({ ...(await orig<typeof import("next/navigation")>()), useRouter: () => ({ refresh: () => {} }) }));
   vi.doMock("@/lib/firm/session", () => ({ resolveFirmSession: vi.fn(async () => ({ kind: "ok", role: w.role ?? "owner" })) }));
   vi.doMock("@/lib/org/modules", () => ({ orgHasModule: vi.fn(async (m: string) => (m === "mailbox" ? (w.mailboxModule ?? true) : false)) }));
   vi.doMock("@/lib/mailbox/connections", () => ({ listConnections: vi.fn(async () => w.mailboxes ?? { ok: true, connections: [] }) }));
@@ -250,7 +251,7 @@ describe("Meetings page: Fathom and failed reads", () => {
     expect(pillIn(html, "fathom-title")).toBe("Couldn't check");
     expect(pillIn(html, "zoom-title")).toBe("Couldn't check");
     expect(html).not.toContain("Not connected");
-    expect(html).toContain("We couldn't check your firm's meeting connections.");
+    expect(html).toContain("Can't show your meeting connections right now");
   });
 
   it("keeps the back link, the encryption-key note and the Fathom key form", async () => {

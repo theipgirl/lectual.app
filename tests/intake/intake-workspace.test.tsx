@@ -91,7 +91,7 @@ function render(leads: Lead[], params: IntakeSearchParams = {}, extra: { viewSta
       intakeStages={intakeStages(STAGES)}
       members={MEMBERS}
       initialFilters={parseIntakeFilters(params)}
-      initialViewState={extra.viewState ?? parseIntakeViewState(params)}
+      initialViewState={extra.viewState ?? parseIntakeViewState({ view: "table", ...params })}
       time={null}
       now={NOW.toISOString()}
     />,
@@ -154,10 +154,10 @@ describe("default last-touch sort, rendered", () => {
 
 describe("the page header and toolbar (shared list-page components)", () => {
   const html = render(THREE);
-  const head = html.slice(html.indexOf('class="lp-header"'), html.indexOf('aria-label="Filter by stage"'));
+  const head = html.slice(html.indexOf('class="lx-page-head lx-head lp-header"'), html.indexOf('aria-label="Filter by stage"'));
 
   it("uses the shared header: one h1, one sub-line, no eyebrow label", () => {
-    expect(html).toContain('class="lp-header"');
+    expect(html).toContain('class="lx-page-head lx-head lp-header"');
     expect(head).toContain('<h1 class="lx-h1">Intake</h1>');
     expect(head).toContain('class="lx-sub lp-sub"');
     expect(head).not.toContain("lx-label");
@@ -213,11 +213,11 @@ describe("the page header and toolbar (shared list-page components)", () => {
 
   it("has no separate status strip above the header", () => {
     expect(html).not.toContain("intake-statusline");
-    expect(html.startsWith('<div class="lp-root ix-leads"><header class="lp-header">')).toBe(true);
+    expect(html.startsWith('<div class="lp-root ix-leads"><header class="lx-page-head lx-head lp-header">')).toBe(true);
   });
 
   it("marks the current view on the controlled toggle", () => {
-    expect(head).toMatch(/<button type="button" aria-current="true">Table<\/button>/);
+    expect(head).toMatch(/<button type="button" aria-current="true">List<\/button>/);
     expect(head).toMatch(/<button type="button">Board<\/button>/);
     const board = render(THREE, { view: "board" });
     expect(board).toMatch(/<button type="button" aria-current="true">Board<\/button>/);
@@ -227,7 +227,7 @@ describe("the page header and toolbar (shared list-page components)", () => {
     expect(render(THREE)).not.toContain("Group by");
     const board = render(THREE, { view: "board" });
     expect(board).toContain("Group by");
-    expect(board.indexOf("Group by")).toBeGreaterThan(board.indexOf('class="lp-header"'));
+    expect(board.indexOf("Group by")).toBeGreaterThan(board.indexOf('class="lx-page-head lx-head lp-header"'));
     expect(board.indexOf("Group by")).toBeGreaterThan(board.indexOf("Add a lead"));
   });
 });
@@ -384,7 +384,7 @@ describe("the board card's one temperature line", () => {
       const html = card(l);
       expect(html).not.toContain("Lane:");
       // The name row is the link and nothing else: no dot beside the name.
-      expect(html).toMatch(/^<div[^>]*><div class="ix-card-top"><a [^>]*>[^<]*<\/a><\/div>/);
+      expect(html).toMatch(/^<li[^>]*><div class="lx-board-card-top ix-card-top"><span class="lx-board-card-title"><a [^>]*>[^<]*<\/a><\/span><\/div>/);
       expect(html).not.toMatch(/width:7px;height:7px/);
       const lines = html.match(/>(Hot|Warm|Cold)( · suggested)?</g) ?? [];
       expect(lines).toHaveLength(l.id === "c" ? 0 : 1);

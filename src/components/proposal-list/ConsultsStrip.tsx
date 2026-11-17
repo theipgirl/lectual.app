@@ -3,9 +3,13 @@ import type { ReactNode } from "react";
 import { CONSULT_STATE_PILL, meetingRowHref } from "@/lib/proposals/consult-row";
 import type { ConsultsStripData, ConsultRowView } from "@/lib/proposals/consults-load";
 import { PROVIDER_LABEL } from "@/lib/meetings/types";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { LoadFailedLine } from "@/components/ui/LoadFailed";
+import { Pill } from "@/components/ui/Pill";
+import { ShowingCount } from "@/components/ui/ShowingCount";
 import { DraftMeetingButton } from "./DraftMeetingButton";
 import { LinkLeadPicker } from "./LinkLeadPicker";
-import { CONSULTS_EMPTY, CONSULTS_SECTION_TITLE, CONSULTS_UNAVAILABLE, consultsCapNote } from "@/lib/proposals/list-copy";
+import { CONSULTS_EMPTY, CONSULTS_SECTION_TITLE, CONSULTS_UNAVAILABLE } from "@/lib/proposals/list-copy";
 
 const MEETINGS_SETUP = "/dashboard/settings/integrations/meetings/";
 
@@ -65,13 +69,9 @@ export function ConsultRows({
   return (
     <>
       {meetings.status === "unavailable" ? (
-        <div className="pq-consults-empty" role="status">
-          <b>{CONSULTS_UNAVAILABLE}</b>
-        </div>
+        <LoadFailedLine>{CONSULTS_UNAVAILABLE}</LoadFailedLine>
       ) : meetings.rows.length === 0 ? (
-        <div className="pq-consults-empty">
-          <b>{CONSULTS_EMPTY}</b>
-        </div>
+        <EmptyState variant="line">{CONSULTS_EMPTY}</EmptyState>
       ) : (
         <ul className="pq-rows pq-rows-scroll">
           {meetings.rows.map((row) => {
@@ -81,11 +81,11 @@ export function ConsultRows({
                 <a href={meetingRowHref(row.id)} className="pq-row-link">
                   <span className="pq-row-main">
                     <span className="pq-name">{row.title}</span>
-                    <span className="pq-mono">
+                    <span className="pq-meta">
                       {row.whenLabel} · {PROVIDER_LABEL[row.provider]} · {row.linkedTo ? `Linked to ${row.linkedTo}` : "Not linked"}
                     </span>
                   </span>
-                  <span className={`lx-pill lx-pill-${pill.tone}`}>{pill.label}</span>
+                  <Pill tone={pill.tone}>{pill.label}</Pill>
                 </a>
                 <div className="pq-row-actions">
                   <Cta row={row} canDraft={canDraft} draftNote={draftNote} leads={leads} />
@@ -96,10 +96,7 @@ export function ConsultRows({
         </ul>
       )}
       {meetings.status === "ok" && meetings.more > 0 && (
-        <div className="pq-more">
-          {consultsCapNote(meetings.rows.length)}{" "}
-          <Link href="/dashboard/meetings/">See all in Meetings</Link>
-        </div>
+        <ShowingCount shown={meetings.rows.length} total={meetings.rows.length + meetings.more} moreHref="/dashboard/meetings/" />
       )}
     </>
   );
@@ -139,16 +136,16 @@ export function ConsultsStrip({
   const head = (
     <>
       <span className="pq-dot" data-kind={header.status.kind} aria-hidden="true" />
-      <span className="pq-mono" data-status={header.status.kind}>
+      <span className="pq-meta" data-status={header.status.kind}>
         {header.title} · {header.status.text}
       </span>
       {header.status.kind === "none" && (
-        <Link href={MEETINGS_SETUP} className="pq-mono">
+        <Link href={MEETINGS_SETUP} className="pq-meta">
           Connect Zoom or Fathom
         </Link>
       )}
       {header.status.kind === "reauth" && (
-        <Link href={MEETINGS_SETUP} className="pq-mono">
+        <Link href={MEETINGS_SETUP} className="pq-meta">
           Reconnect
         </Link>
       )}
@@ -157,7 +154,7 @@ export function ConsultsStrip({
 
   return (
     <section className="lx-card pq-consults" aria-labelledby="pq-consults-title">
-      <h2 id="pq-consults-title" className="lx-h2 pq-consults-h">
+      <h2 id="pq-consults-title" className="lx-h2">
         {CONSULTS_SECTION_TITLE}
       </h2>
       {sync && <div className="pq-sync">{sync}</div>}

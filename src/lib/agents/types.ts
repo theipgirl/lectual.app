@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { AUTOMATIC_STAGE_MOVES, FROM_THEIR_EMAILS } from "@/lib/ui/words";
+import { AUTOMATIC_STAGE_MOVES, FROM_THEIR_EMAILS, SHORTCUTS_NAME } from "@/lib/ui/words";
 import type { StructuredCall } from "@/lib/ai/claude";
 import type { NewQueueDraft, QueueItem } from "@/lib/queue/api";
 
@@ -57,7 +57,7 @@ export const AGENT_DEFS: Record<AgentId, { name: string; reads: string; descript
     name: "Consult prep",
     reads: "Outlook consults and the lead record",
     description:
-      "For each consult in the next 24 hours that is linked to a lead, drafts an internal heads-up with the facts on file and, for firms with the Agent toolkit, a short client email about what to have ready. It never picks classes, a package or a price: that stays with the attorney. It only drafts: an attorney reviews and sends everything.",
+      `For each consult in the next 24 hours that is linked to a lead, drafts an internal heads-up with the facts on file and, for firms with ${SHORTCUTS_NAME} switched on, a short client email about what to have ready. It never picks classes, a package or a price: that stays with the attorney. It only drafts: an attorney reviews and sends everything.`,
     defaultAutonomy: "draft",
   },
   "inbox-summary": {
@@ -96,8 +96,8 @@ const AGENT_AUTONOMY_HINT: Partial<Record<AgentId, Record<Autonomy, string>>> = 
   },
   "consult-prep": {
     suggest: "Writes only the internal heads-up. No client email is drafted.",
-    draft: "Writes the internal heads-up and, if the Agent toolkit is on for this firm, a client email about what to have ready. Both wait in Approvals; nothing is sent.",
-    act: "Writes the internal heads-up and, if the Agent toolkit is on for this firm, a client email about what to have ready. Both wait in Approvals; nothing is sent.",
+    draft: `Writes the internal heads-up and, if ${SHORTCUTS_NAME} is on for this firm, a client email about what to have ready. Both wait in Approvals; nothing is sent.`,
+    act: `Writes the internal heads-up and, if ${SHORTCUTS_NAME} is on for this firm, a client email about what to have ready. Both wait in Approvals; nothing is sent.`,
   },
   "inbox-summary": {
     suggest: "Writes only the digest. No reply is left in Outlook.",

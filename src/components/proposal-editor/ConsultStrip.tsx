@@ -4,6 +4,7 @@ import Link from "next/link";
 import { CONSULT_BASIS_LABEL, MARK_TYPE_LABEL, formatClassLines } from "@/lib/consult/vocab";
 import type { ConsultStripState } from "@/lib/proposals/consult-strip";
 import { formatFirmStamp } from "@/lib/quotes/labels";
+import { Pill } from "@/components/ui/Pill";
 
 /**
  * The linked lead's latest consult, above a proposal, so the approver can check
@@ -61,9 +62,9 @@ export function ConsultStrip({ state, leadId, tz }: { state: ConsultStripState; 
           {formatFirmStamp(state.createdAt, tz)} · {sourceName(state.source)}
         </span>
         {state.reviewed ? (
-          <span className="lx-pill lx-pill-ok">Reviewed</span>
+          <Pill tone="ok">Reviewed</Pill>
         ) : (
-          <span className="lx-pill lx-pill-warn">not yet reviewed</span>
+          <Pill tone="warn">not yet reviewed</Pill>
         )}
         {lead}
       </div>

@@ -1,5 +1,5 @@
 import type { Direction, Waiting } from "./waiting";
-import type { ContactType } from "./contact";
+import type { ContactKind } from "./contact";
 import type { ProposalExpiryTag } from "./proposal-expiry";
 
 /**
@@ -48,7 +48,7 @@ export type ReviewRow = {
   /** false when the activity read failed: last contact is unknown, not "none". */
   contactKnown: boolean;
   /** YYYY-MM-DD in the firm's zone, and the timeline type it came from. */
-  lastContact: { date: string; type: ContactType } | null;
+  lastContact: { date: string; type: ContactKind } | null;
   waiting: Waiting | null;
   lastDirection: Direction | null;
   /** YYYY-MM-DD in the firm's zone of the newest OUTBOUND contact (we emailed / called). Null = none recorded or unreadable (see `contactKnown`). */

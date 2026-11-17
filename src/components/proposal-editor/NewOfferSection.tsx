@@ -20,7 +20,7 @@ export function NewOfferSection({ packageNames, offer }: { packageNames: string[
   return (
     <section className="lx-card pe-card" aria-labelledby="new-offer-h" data-new-offer>
       <header className="pe-card-head">
-        <h2 className="pe-h" id="new-offer-h">
+        <h2 className="lx-h3" id="new-offer-h">
           {NEW_OFFER_WORDS.heading}
         </h2>
         <p className="lx-note pe-hint">{NEW_OFFER_WORDS.hint}</p>

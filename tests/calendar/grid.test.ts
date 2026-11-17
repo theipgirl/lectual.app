@@ -65,8 +65,10 @@ describe("calendar grid", () => {
 
   it("titles views", () => {
     expect(viewTitle("month", "2026-09-15")).toBe("September 2026");
-    expect(viewTitle("week", "2026-09-09")).toBe("Sep 6 – 12, 2026");
-    expect(viewTitle("week", "2026-09-29")).toBe("Sep 27 – Oct 3, 2026");
+    const now = new Date("2026-11-17T12:00:00Z");
+    expect(viewTitle("week", "2026-09-09", now)).toBe("Sep 6 – 12");
+    expect(viewTitle("week", "2026-09-29", now)).toBe("Sep 27 – Oct 3");
+    expect(viewTitle("week", "2025-09-09", now)).toBe("Sep 7 – 13, 2025");
   });
 
   it("reads events in the firm's time zone, not the server's", () => {

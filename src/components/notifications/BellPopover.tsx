@@ -1,10 +1,12 @@
 "use client";
 
+import { LoadFailedLine } from "@/components/ui/LoadFailed";
 import Link from "next/link";
 import { useRef } from "react";
 import { MarkAllReadButton } from "./MarkAllReadButton";
 import { NotificationRow } from "./NotificationRow";
 import type { NotificationRowView } from "./view";
+import "./notifications.css";
 
 export type BellCount = { status: "ok"; unread: number } | { status: "unavailable" };
 export type BellList = { status: "ok"; rows: NotificationRowView[] } | { status: "unavailable" };
@@ -22,18 +24,16 @@ function triggerLabel(count: BellCount): string {
 function Panel({ count, list, close }: { count: BellCount; list: BellList; close: () => void }) {
   if (list.status === "unavailable") {
     return (
-      <p role="alert" className="lx-note" style={{ margin: 0, padding: "14px 16px" }}>
-        Couldn&apos;t load your notifications. This isn&apos;t the same as having none. Try refreshing in a moment.
-      </p>
+      <LoadFailedLine role="alert">Couldn&apos;t load your notifications. This isn&apos;t the same as having none.</LoadFailedLine>
     );
   }
   if (list.rows.length === 0) {
     return count.status === "ok" ? (
-      <p className="lx-note" style={{ margin: 0, padding: "14px 16px" }}>
+      <p className="lx-note lx-bell-msg">
         You&apos;re all caught up
       </p>
     ) : (
-      <p className="lx-note" style={{ margin: 0, padding: "14px 16px" }}>
+      <p className="lx-note lx-bell-msg">
         Nothing to show, but the unread count couldn&apos;t be loaded.
       </p>
     );
@@ -73,7 +73,7 @@ export function BellPopover({ count, list }: { count: BellCount; list: BellList 
       </summary>
       <div className="lx-card lx-bell-panel">
         <div className="lx-bell-head">
-          <span className="lx-label" style={{ fontSize: 11 }}>
+          <span className="lx-label">
             Notifications
           </span>
           {anyUnread && <MarkAllReadButton />}

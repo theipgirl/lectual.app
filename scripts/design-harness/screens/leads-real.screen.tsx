@@ -44,7 +44,7 @@ async function withRealData<T>(label: string, fn: () => Promise<T>): Promise<T> 
 
 const RELEASE = "<style>.lx-app{height:auto!important;min-height:0!important;overflow:visible!important}.lx-main,.lx-content,.lx-page{overflow:visible!important;height:auto!important}</style>";
 const VPS = [["d", "desktop"], ["m", "desktop"], ["p", "phone"]] as const;
-const VIEWS = [["list", {}], ["board", { view: "board" }]] as const;
+const VIEWS = [["list", { view: "table" }], ["board", { view: "board" }]] as const;
 
 const mk = (id: string, view: string, shell: "tech" | "owner", vp: string, viewport: "desktop" | "phone", search: Record<string, string>): Screen => ({
   id,
@@ -66,7 +66,7 @@ const mk = (id: string, view: string, shell: "tech" | "owner", vp: string, viewp
 
 export const screens: Screen[] = [
   ...VIEWS.flatMap(([view, search]) => (["tech", "owner"] as const).flatMap((shell) => VPS.map(([vp, viewport]) => mk(`mono-leadsreal-${view}-${shell}-${vp}`, view, shell, vp, viewport, search)))),
-  mk("mono-leadsreal-list-tech-d-open", "list", "tech", "d", "desktop", { set: "open" }),
-  mk("mono-leadsreal-list-tech-d-lost", "list", "tech", "d", "desktop", { set: "lost" }),
+  mk("mono-leadsreal-list-tech-d-open", "list", "tech", "d", "desktop", { view: "table", set: "open" }),
+  mk("mono-leadsreal-list-tech-d-lost", "list", "tech", "d", "desktop", { view: "table", set: "lost" }),
   mk("mono-leadsreal-board-tech-d-open", "board", "tech", "d", "desktop", { view: "board", set: "open" }),
 ];

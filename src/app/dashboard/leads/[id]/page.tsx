@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { stageDisplayName } from "@/lib/matters/list-view";
 import { notFound, redirect } from "next/navigation";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { resolveFirmSession } from "@/lib/firm/session";
@@ -20,6 +20,7 @@ import { ComposerTabs } from "@/components/leads/ComposerTabs";
 import { CollapsibleAside } from "@/components/leads/CollapsibleAside";
 import { needsAttention } from "@/lib/leads/needs-attention";
 import { LANE_LABEL } from "@/lib/leads/lane";
+import { temperaturePill } from "@/lib/intake/temperature-pill";
 import { AssignSelect, EditLeadForm, NoteComposer, ProposalCard, StageSelect } from "@/components/leads/LeadForms";
 import { LeadTags, PrepConsult } from "@/components/leads/LeadExtras";
 import { LeadMattersLine } from "@/components/leads/LeadMatters";
@@ -49,7 +50,7 @@ import { TemperatureCard } from "@/components/leads/TemperatureCard";
 import { WaitingOnRebecca } from "@/components/leads/WaitingOnRebecca";
 import { ConsultBookedView } from "@/components/calendar/ConsultBookedLine";
 import { recordPageTitle } from "@/lib/ui/page-title";
-import { AUTOMATIC_STAGE_MOVES, FIRST_READ, FROM_THEIR_EMAILS, INTAKE_NAME, LEAD_MERGED_INTO, MERGE_DONE, MERGE_HISTORY_PARTIAL, MERGE_OWN_ROWS_UNAVAILABLE } from "@/lib/ui/words";
+import { AUTOMATIC_STAGE_MOVES, BLANK, FIRST_READ, LAST_CONTACT, FROM_THEIR_EMAILS, INTAKE_NAME, LEAD_MERGED_INTO, MERGE_DONE, MERGE_HISTORY_PARTIAL, MERGE_OWN_ROWS_UNAVAILABLE } from "@/lib/ui/words";
 import { mergedSetFor, resolveLeadId } from "@/lib/leads/live";
 import { mergeNotice, mergedFromRedirect } from "@/lib/leads/merge-links";
 import { loadBookedConsult } from "@/lib/calendar/outlook-read";
@@ -62,6 +63,10 @@ import { listLeadEnrollments } from "@/lib/automation/drips";
 import { AUTOMATION_STAFF_ROLES } from "@/lib/automation/rules";
 import { enrollmentStatusLabel, enrollmentStatusTone } from "@/lib/campaigns/steps";
 import { shortDate, stopLine } from "@/lib/campaigns/stops";
+import { intakeListHref } from "@/lib/intake/list-href";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Notice } from "@/components/ui/Notice";
+import { LoadFailedLine } from "@/components/ui/LoadFailed";
 
 /** Tab title: the lead's name through the scoped getter; "Lead" when the read fails or finds nothing. */
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -73,6 +78,19 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       return [lead.first_name, lead.last_name].filter(Boolean).join(" ").trim() || lead.business_name;
     }, "Lead"),
   };
+}
+
+/** The one plain line of record facts under the name: each fact once (a business name that is also the mark is shown once). */
+function leadDetailsLine(lead: { business_name?: string | null; email?: string | null; phone?: string | null; mark_text?: string | null }): string {
+  const seen = new Set<string>();
+  const parts: string[] = [];
+  for (const raw of [lead.business_name, lead.email, lead.phone, lead.mark_text]) {
+    const part = raw?.trim();
+    if (!part || seen.has(part.toLowerCase())) continue;
+    seen.add(part.toLowerCase());
+    parts.push(part);
+  }
+  return parts.join(" · ");
 }
 
 export default async function LeadPage({
@@ -200,7 +218,8 @@ export default async function LeadPage({
     practice_area: lead.practice_area,
   };
 
-  const stageName = stages.find((s) => s.id === lead.current_stage_id)?.name ?? null;
+  const stageRaw = stages.find((s) => s.id === lead.current_stage_id)?.name ?? null;
+  const stageName = stageRaw === null ? null : stageDisplayName(stageRaw);
   const owner = lead.assigned_to ? members.find((m) => m.userId === lead.assigned_to) : undefined;
   const ownerName = owner ? (owner.displayName ?? owner.email ?? null) : null;
   const showAttention = needsAttention({
@@ -213,47 +232,39 @@ export default async function LeadPage({
 
   return (
     <>
-      <Link href="/dashboard/intake/" className="lx-back">
-        ← {INTAKE_NAME}
-      </Link>
-      <div className="lx-page-head">
-        <div style={{ flex: 1, minWidth: 260 }}>
-          <div className="lx-label">{lead.business_name ?? "Lead"}</div>
-          <h1 className="lx-h1" data-tour="lead-head">{name}</h1>
-          <p className="lx-note" style={{ margin: "6px 0 0" }}>
-            {lead.email}
-            {lead.phone ? ` · ${lead.phone}` : ""}
-            {lead.mark_text ? ` · ${lead.mark_text}` : ""}
-          </p>
-          <ContactActions phone={lead.phone} email={lead.email} />
-        </div>
-        {canWrite && (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <StageSelect leadId={lead.id} stageId={lead.current_stage_id} stages={stages.map((s) => ({ id: s.id, name: s.name }))} />
-            <AssignSelect leadId={lead.id} assignedTo={lead.assigned_to} members={members.map((m) => ({ userId: m.userId, name: m.displayName ?? m.email ?? "Teammate" }))} />
-          </div>
-        )}
-      </div>
+      <PageHeader
+        back={{ href: intakeListHref(), label: INTAKE_NAME }}
+        title={name}
+        tour="lead-head"
+        details={leadDetailsLine(lead)}
+        actions={
+          <>
+            <ContactActions phone={lead.phone} email={lead.email} />
+            {canWrite && (
+              <div className="lx-head-selects">
+                <StageSelect leadId={lead.id} stageId={lead.current_stage_id} stages={stages.map((s) => ({ id: s.id, name: s.name }))} />
+                <AssignSelect leadId={lead.id} assignedTo={lead.assigned_to} members={members.map((m) => ({ userId: m.userId, name: m.displayName ?? m.email ?? "Teammate" }))} />
+              </div>
+            )}
+          </>
+        }
+      />
 
       {notice && (
-        <p className="lx-note" role="status">
+        <Notice tone={notice === "merged" ? "ok" : "mute"} role="status">
           {notice === "merged" ? MERGE_DONE : LEAD_MERGED_INTO(name)}
-        </p>
+        </Notice>
       )}
       {ownRowsFailed && (
-        <p className="lx-note" role="status">
-          {MERGE_OWN_ROWS_UNAVAILABLE}
-        </p>
+        <LoadFailedLine>{MERGE_OWN_ROWS_UNAVAILABLE}</LoadFailedLine>
       )}
       {mergedSet.status === "unavailable" && (
-        <p className="lx-note" role="status">
-          {MERGE_HISTORY_PARTIAL}
-        </p>
+        <LoadFailedLine>{MERGE_HISTORY_PARTIAL}</LoadFailedLine>
       )}
 
       <LeadStatusRow
         stageName={stageName}
-        temperatureLabel={temperature.value ? LANE_LABEL[temperature.value] : null}
+        temperatureLabel={temperature.value ? (temperaturePill(temperature)?.text ?? LANE_LABEL[temperature.value]) : null}
         ownerName={ownerName}
         lastInboundAt={lead.last_inbound_at}
         now={renderedAt}
@@ -265,13 +276,13 @@ export default async function LeadPage({
             <NeedsAttentionCard>
               {consultRead && <ConsultBookedView read={consultRead} timeZone={tz} bare />}
 
-              <WaitingOnRebecca leadId={lead.id} approvals={approvals} now={renderedAt} bare />
+              <WaitingOnRebecca leadId={lead.id} approvals={approvals} now={renderedAt} timeZone={tz} bare />
 
               {proposals.length > 0 && (
-                <div style={{ display: "grid", gap: 12 }}>
+                <div className="lx-grid-12">
                   <div>
                     <div className="lx-label">{FROM_THEIR_EMAILS} · waiting on you</div>
-                    <h3 className="lx-h2" style={{ fontSize: 18, margin: 0 }}>
+                    <h3 className="lx-h3">
                       {proposals.length} proposal{proposals.length === 1 ? "" : "s"} from client email
                     </h3>
                   </div>
@@ -282,10 +293,10 @@ export default async function LeadPage({
               )}
 
               {stageSuggestions.length > 0 && (
-                <div style={{ display: "grid", gap: 12 }}>
+                <div className="lx-grid-12">
                   <div>
                     <div className="lx-label">{AUTOMATIC_STAGE_MOVES} · waiting on you</div>
-                    <h3 className="lx-h2" style={{ fontSize: 18, margin: 0 }}>
+                    <h3 className="lx-h3">
                       {stageSuggestions.length} stage suggestion{stageSuggestions.length === 1 ? "" : "s"}
                     </h3>
                   </div>
@@ -305,7 +316,7 @@ export default async function LeadPage({
           )}
 
           {canWrite && (
-            <section className="lx-card" style={{ padding: 18 }} aria-label="Add to the timeline">
+            <section className="lx-card lx-pad" aria-label="Add to the timeline">
               <ComposerTabs
                 text={<NoteComposer leadId={lead.id} />}
                 voice={<VoiceNoteRecorder target={{ kind: "lead", id: lead.id }} action={addVoiceNoteAction} />}
@@ -313,8 +324,8 @@ export default async function LeadPage({
             </section>
           )}
 
-          <section className="lx-card" style={{ padding: 18 }} data-tour="lead-timeline">
-            <h2 className="lx-h2" style={{ fontSize: 23, marginBottom: 10 }}>
+          <section className="lx-card lx-pad" data-tour="lead-timeline">
+            <h2 className="lx-h2" style={{ marginBottom: 10 }}>
               Timeline
             </h2>
             <Timeline rows={rows} mediaUrls={voiceUrls} timeZone={tz} undo={{ leadId: lead.id, canMove, currentStageId: lead.current_stage_id }} />
@@ -323,13 +334,13 @@ export default async function LeadPage({
           {canWrite && hasAgentToolkit && (
             <details id="prep-consult" className="lx-card lx-disclosure" data-tour="lead-prep">
               <summary>Prep this consult</summary>
-              <div style={{ padding: "0 18px 18px" }}>
+              <div className="lx-disclosure-body">
                 <PrepConsult leadId={lead.id} practiceArea={lead.practice_area} />
               </div>
             </details>
           )}
 
-          <ConsultDetailsSection leadId={lead.id} canWrite={canWrite} />
+          <ConsultDetailsSection leadId={lead.id} canWrite={canWrite} timeZone={tz} />
 
           <LinkedMeetings read={meetings} />
 
@@ -346,7 +357,7 @@ export default async function LeadPage({
           {canWrite && (
             <details className="lx-card lx-disclosure" id="log-consult-outcome">
               <summary>Log a consult outcome</summary>
-              <div style={{ padding: "0 18px 18px" }}>
+              <div className="lx-disclosure-body">
                 <ConsultOutcomeForm leadId={lead.id} />
               </div>
             </details>
@@ -379,16 +390,16 @@ export default async function LeadPage({
           />
           {lead.ai_summary && !lane.suggested && (
             // A first-read summary that carries no temperature (an older format) is still shown, as the assistant's words.
-            <section className="lx-card" style={{ padding: 18 }}>
+            <section className="lx-card lx-pad">
               <div className="lx-label" style={{ marginBottom: 6 }}>
                 {FIRST_READ}
               </div>
-              <p style={{ margin: 0, color: "var(--body)", lineHeight: 1.55 }}>{lead.ai_summary}</p>
+              <p className="lx-note">{lead.ai_summary}</p>
             </section>
           )}
         </div>
 
-        <aside className="lx-card lx-aside" style={{ width: 340 }}>
+        <aside className="lx-card lx-aside">
           <CollapsibleAside>
             <div className="lx-label">Tags</div>
             <LeadTags
@@ -407,16 +418,16 @@ export default async function LeadPage({
               <p className="lx-note">Your role can view this lead but not change it.</p>
             )}
             <div className="lx-meta">
-              <span>Last heard from</span>
-              <span>{lead.last_inbound_at ? relativeTime(lead.last_inbound_at) : "—"}</span>
+              <span>{LAST_CONTACT}</span>
+              <span>{lead.last_inbound_at ? relativeTime(lead.last_inbound_at, undefined, tz) : BLANK}</span>
             </div>
             <div className="lx-meta">
               <span>Last reached out</span>
-              <span>{lead.last_outbound_at ? relativeTime(lead.last_outbound_at) : "—"}</span>
+              <span>{lead.last_outbound_at ? relativeTime(lead.last_outbound_at, undefined, tz) : BLANK}</span>
             </div>
             <div className="lx-meta">
               <span>Came from</span>
-              <span>{[lead.referral_source, lead.referral_detail].filter(Boolean).join(" — ") || "—"}</span>
+              <span>{[lead.referral_source, lead.referral_detail].filter(Boolean).join(" — ") || BLANK}</span>
             </div>
             <MailingAddressCard read={mailingRead} />
             <LeadMattersLine read={mattersRead} />

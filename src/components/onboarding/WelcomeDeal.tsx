@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { Icon } from "@/components/ui/Icon";
 import { FOCUSABLE_SELECTOR } from "@/lib/copilot/launcher";
 import { markWelcomeSeenAction } from "@/lib/onboarding/actions";
 import { closeTour, focusRestoreTarget, hasVisibleModal, readGuard, shouldOpenOnLoad, tourKeyAction } from "@/lib/onboarding/engine";
@@ -59,14 +60,14 @@ export function WelcomeDealView({ cards, index, onNext, onBack, onSkip, popRef, 
                 <span className="dk-why">{`${DECK_FIRST_STEP} ${card.step}`}</span>
                 <nav className="dk-pos wd-pos" aria-label={WELCOME_STEPS_NAV}>
                   <button type="button" className="dk-arrow" aria-label={WELCOME_BACK} title={WELCOME_BACK} disabled={index === 0} onClick={onBack}>
-                    ‹
+                    <Icon name="chevron-left" size={16} />
                   </button>
                   <span>
                     <span aria-hidden="true">{deckPosition(index + 1, cards.length)}</span>
                     <span className="wd-sr">{welcomeCardOf(index + 1, cards.length)}</span>
                   </span>
                   <button type="button" className="dk-arrow" aria-label={WELCOME_FORWARD} title={WELCOME_FORWARD} disabled={last} onClick={onNext}>
-                    ›
+                    <Icon name="chevron-right" size={16} />
                   </button>
                 </nav>
               </div>

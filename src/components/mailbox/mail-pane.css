@@ -7,10 +7,12 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
   align-items: start;
 }
-.lx-mail-tabs {
-  display: flex;
-  gap: 6px;
-}
+.lx-mail-nav { display: grid; gap: 2px; }
+.lx-mail-side-gap { margin-top: 8px; }
+.lx-mail-reauth { color: var(--wine); }
+.lx-mail-live-note { margin: 10px 0 0; }
+.lx-connect-title { text-align: center; }
+.lx-connect-sub { text-align: center; max-width: 480px; margin: 0; }
 .lx-mail-pane {
   padding: 18px;
   display: grid;
@@ -22,7 +24,7 @@
   grid-template-columns: auto 1fr;
   gap: 4px 12px;
   margin: 0;
-  font-size: 14px;
+  font-size: var(--fs-2);
 }
 .lx-mail-head dt {
   color: var(--muted);
@@ -34,8 +36,6 @@
 }
 .lx-mail-subject {
   margin: 0;
-  font-size: 20px;
-  font-weight: 500;
   overflow-wrap: anywhere;
 }
 /* Plain text only: it wraps, so nothing scrolls sideways even at 375px. */
@@ -44,7 +44,7 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font-family: inherit;
-  font-size: 14.5px;
+  font-size: var(--fs-3);
   line-height: 1.5;
   color: var(--body);
   border-top: 1px solid var(--line);
@@ -68,7 +68,7 @@
   display: grid;
   gap: 2px;
   padding: 11px 0;
-  font-size: 14.5px;
+  font-size: var(--fs-3);
 }
 .lx-mail-live-top {
   display: flex;
@@ -77,7 +77,7 @@
 }
 .lx-mail-preview {
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--fs-1);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -107,3 +107,8 @@
   }
   .lx-mail-select select { width: 100%; }
 }
+
+/* The disconnect confirm (a native dialog). */
+.lx-mail-disconnect-error { color: var(--wine); }
+.lx-mail-disconnect-body { padding: 20px; display: grid; gap: 10px; }
+.lx-mail-disconnect-text { margin: 0; color: var(--body); line-height: 1.55; }

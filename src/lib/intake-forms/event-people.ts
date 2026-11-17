@@ -1,3 +1,4 @@
+import { formatDayTime } from "@/lib/ui/dates";
 import { ROLES, type Role } from "@/lib/auth/roles";
 import { NOT_RATED } from "@/lib/ui/words";
 
@@ -76,17 +77,9 @@ export function buildEventPeople(cards: readonly EventCardRow[], leads: readonly
     });
 }
 
-/** "Nov 15, 2026, 7:42 PM EST" in the firm's zone; UTC when the zone is not one Intl knows. */
+/** "Nov 15, 7:42 PM" in the firm's zone ("Nov 15, 2025, 7:42 PM" for another year). */
 export function takenAtText(iso: string, timeZone: string): string {
-  const t = Date.parse(iso);
-  if (Number.isNaN(t)) return "";
-  const fmt = (tz: string) =>
-    new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short", timeZone: tz }).format(new Date(t));
-  try {
-    return fmt(timeZone);
-  } catch {
-    return fmt("UTC");
-  }
+  return formatDayTime(iso, { tz: timeZone }) ?? formatDayTime(iso, { tz: "UTC" }) ?? "";
 }
 
 export const BAND_LABEL: Record<string, string> = { exposed: "Exposed", partial: "Partly protected", protected: "Protected" };

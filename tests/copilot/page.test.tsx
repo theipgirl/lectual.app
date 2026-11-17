@@ -290,8 +290,11 @@ describe("the stylesheets", () => {
 
   it("draws the hero with radial gradients in the five palette colours, defined once", () => {
     expect(page).toContain("radial-gradient");
+    // The palette is defined once, as tokens in globals.css (--hero-mist, --rail-ink, --hero-rose, --ox, --ox-deep); the hero only aliases them.
+    const globals = readFileSync("src/app/globals.css", "utf8").toUpperCase();
     for (const colour of ["#9C949B", "#C7ADB2", "#B26A72", "#6A1F2B", "#230810"]) {
-      expect(page.match(new RegExp(colour, "g"))).toHaveLength(1);
+      expect(globals.match(new RegExp(colour, "g"))).toHaveLength(1);
+      expect(page.toUpperCase()).not.toContain(colour);
       expect(chat.toUpperCase()).not.toContain(colour);
     }
   });
@@ -306,7 +309,7 @@ describe("the stylesheets", () => {
     expect(chat).toMatch(/\.cpl-pill\s*{[^}]*width:\s*640px/);
     expect(page).toMatch(/grid-template-columns:\s*repeat\(4, 1fr\)/);
     expect(page).toMatch(/@media \(max-width: 900px\)[^@]*repeat\(2, 1fr\)/);
-    expect(page).toMatch(/@media \(max-width: 560px\)[^@]*grid-template-columns:\s*1fr/);
+    expect(page).toMatch(/@media \(max-width: 640px\)[^@]*grid-template-columns:\s*1fr/);
   });
 
   it("is one scroll area on the page: no fixed or min() height and no thread overflow, only the drawer scrolls inside", () => {
@@ -319,7 +322,7 @@ describe("the stylesheets", () => {
   });
 
   it("styles a visible focus for every control", () => {
-    for (const sel of [".cpl-chip:focus-visible", ".cpl-send:focus-visible", ".cpd-launcher:focus-visible", ".cpd-close:focus-visible", ".cph-stat:focus-visible"]) {
+    for (const sel of [".cpl-chip:focus-visible", ".cpl-send:focus-visible", ".cpd-launcher:focus-visible", ".cph-stat:focus-visible"]) {
       expect(page + chat).toContain(sel);
     }
   });

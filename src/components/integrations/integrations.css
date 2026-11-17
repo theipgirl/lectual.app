@@ -22,14 +22,6 @@
 }
 
 .lxi-title {
-  font-size: 27px;
-}
-
-.lxi-title-row-size {
-  margin: 0;
-  font-family: var(--sans);
-  font-size: 16px;
-  font-weight: 500;
   color: var(--ink);
 }
 
@@ -49,15 +41,37 @@
 }
 
 .lxi-card {
-  padding: 18px;
+  padding: var(--pad-card);
   display: grid;
   gap: 12px;
 }
 
-.lxi-card .lxi-title {
-  font-size: 23px;
-}
-
 .lxi-card .lxi-help {
   margin: 0;
+}
+
+/* A mailbox row on the Integrations page. */
+.lx-mbx-email {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lx-mbx-problem {
+  color: var(--wine);
+}
+
+.lx-mbx-caution {
+  color: var(--warn);
+}
+
+/* On a phone the action goes under the row's own text (left-aligned), never on top of it; the chevron stays beside the title. */
+@media (max-width: 640px) {
+  .lx-int-row > summary,
+  .lx-int-row > .lx-int-summary { flex-wrap: wrap; align-items: flex-start; gap: 10px 12px; }
+  .lx-int-row .lxi-head { flex: 1 1 calc(100% - 40px); min-width: 0; }
+  .lx-int-row .lxi-main { flex: 1 1 calc(100% - 60px); min-width: 0; }
+  .lx-int-row > summary > .lx-int-chev { order: 1; }
+  .lx-int-row > summary > .lxi-actions,
+  .lx-int-row > .lx-int-summary > .lxi-actions { order: 2; flex: 1 1 100%; justify-content: flex-start; }
 }

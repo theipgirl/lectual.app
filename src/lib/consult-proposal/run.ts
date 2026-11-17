@@ -19,6 +19,7 @@ import { renderProposalEmail } from "./email";
 import { describeConsultFailure, logConsultFailure, type ConsultStage } from "./failure";
 import { CONSULT_PROPOSAL_SOURCE, firmSignatureName, firmTeamSignOff, pasteHash } from "./shared";
 import { MAX_PASTED_TRANSCRIPT_CHARS, type ConsultLead, type ConsultSource } from "./types";
+import { PROPOSAL_SETTINGS_NAME } from "@/lib/ui/words";
 
 /**
  * One consult -> one DRAFT proposal + one approval-queue email, tied together.
@@ -223,10 +224,10 @@ async function runStages(input: ConsultProposalRunInput, progress: Progress): Pr
     .maybeSingle();
   if (settingErr) logDbError("settings", settingErr);
   if (settingErr) return refuse("unavailable", "Couldn't read the proposal settings. Nothing was drafted. Try again shortly.");
-  if (!setting) return refuse("no_settings", "Your firm hasn't set up its proposal prices yet (Settings, then Client proposals), so nothing was drafted.");
+  if (!setting) return refuse("no_settings", `Your firm hasn't set up its proposal prices yet (Settings, then ${PROPOSAL_SETTINGS_NAME}), so nothing was drafted.`);
   const approvers = (setting as Row).approver_user_ids;
   if (!Array.isArray(approvers) || approvers.length === 0) {
-    return refuse("no_approvers", "Your firm hasn't named a proposal approver yet (Settings, then Client proposals), so nothing was drafted.");
+    return refuse("no_approvers", `Your firm hasn't named a proposal approver yet (Settings, then ${PROPOSAL_SETTINGS_NAME}), so nothing was drafted.`);
   }
 
   const [{ data: org }, { data: profile }] = await Promise.all([

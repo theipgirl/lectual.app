@@ -1,4 +1,5 @@
-import { SCORED_ASSESSMENT } from "@/lib/ui/words";
+import { FORMS_NAME, SCORED_ASSESSMENT } from "@/lib/ui/words";
+import { PageHeader } from "@/components/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -39,28 +40,25 @@ export async function EventPage({ code, range, role, now = new Date() }: { code:
   if (read.status === "ok" && read.value.rows.length === 0) notFound();
 
   const header = (
-    <>
-      <Link href="/dashboard/forms/" className="ifm-back">
-        ← All intakes
-      </Link>
-      <div className="lx-page-head">
-        <div style={{ flex: 1, minWidth: 240 }}>
-          <div className="lx-label">{SCORED_ASSESSMENT}</div>
-          <h1 className="lx-h1">
-            {eventDisplayName(code)}{" "}
-            <span className="ev-name-code">{code}</span>
-          </h1>
-          <p className="lx-sub">Read-only: nothing here changes a card or a lead.</p>
-        </div>
-        <nav className="ifm-seg" aria-label="Date range">
+    <PageHeader
+      back={{ href: "/dashboard/forms/", label: FORMS_NAME }}
+      title={
+        <>
+          {eventDisplayName(code)} <span className="ev-name-code">{code}</span>
+        </>
+      }
+      details={SCORED_ASSESSMENT}
+      sub="Read-only: nothing here changes a card or a lead."
+      actions={
+        <nav className="vs-switch" aria-label="Date range">
           {EVENT_RANGES.map((r) => (
-            <Link key={r} href={eventHref(code, String(r))} scroll={false} className={range === r ? "on" : ""} aria-current={range === r ? "page" : undefined}>
+            <Link key={r} href={eventHref(code, String(r))} scroll={false} aria-current={range === r ? "page" : undefined}>
               {RANGE_LABEL(r)}
             </Link>
           ))}
         </nav>
-      </div>
-    </>
+      }
+    />
   );
 
   if (read.status !== "ok") {

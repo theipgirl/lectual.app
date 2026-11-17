@@ -188,7 +188,7 @@ describe("history and the list", () => {
   });
 
   it("a payload with no readable snapshot still reads as a reset, never an exception", () => {
-    expect(describeResetEvent({}, "A teammate", formatDollars).text).toBe("Acceptance reset by A teammate");
+    expect(describeResetEvent({}, "Teammate", formatDollars).text).toBe("Acceptance reset by Teammate");
     expect(describeResetEvent({ previous_snapshot: "x" }, "Taylor", formatDollars).details[1]).toBe("The earlier acceptance is kept in this record.");
   });
 
@@ -204,7 +204,7 @@ describe("history and the list", () => {
       names,
       now: Date.parse(T) + 3_600_000,
     });
-    expect(line).toBe("Acceptance reset 1h ago · Taylor");
+    expect(line).toBe("Acceptance reset 1 h ago · Taylor");
   });
 });
 
@@ -223,9 +223,9 @@ describe("Lifecycle: Reset acceptance in More", () => {
     );
 
   it("an accepted version shows the Reset menu only when the page allows a reset", () => {
-    expect(render({ canReset: true })).toContain(">Reset<");
-    expect(render({ canReset: false })).not.toContain(">Reset<");
-    expect(render({ canReset: true, canWrite: false })).not.toContain(">Reset<");
+    expect(render({ canReset: true })).toContain('data-more-items="reset"');
+    expect(render({ canReset: false })).not.toContain(">More<");
+    expect(render({ canReset: true, canWrite: false })).not.toContain(">More<");
   });
 
   it("the confirm is not drawn until asked for, and Withdraw is never offered on an accepted version", () => {

@@ -76,7 +76,7 @@ describe("F5: the three doors", () => {
   it("with every feature on there are exactly three doors, in order, each with a title and one sentence", async () => {
     const html = await render();
     expect(doors(html)).toEqual(["consult", "copilot", "scratch"]);
-    expect(html.match(/<h2[^>]*class="pe-h"/g)).toHaveLength(3);
+    expect(html.match(/<h2[^>]*class="lx-h3"/g)).toHaveLength(3);
     for (const door of ["consult", "copilot", "scratch"] as const) expect(text(html)).toContain(START_DOORS[door].title);
     expect(text(html)).toContain(START_DOORS.copilot.body);
     expect(text(html)).toContain(START_DOORS.scratch.body);

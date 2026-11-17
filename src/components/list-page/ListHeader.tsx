@@ -18,11 +18,13 @@ export function ListHeader({
   tour?: string;
 }) {
   return (
-    <header className="lp-header">
-      <h1 className="lx-h1" data-tour={tour}>
-        {title}
-      </h1>
-      {count !== undefined && count !== null ? <span className="lp-count">{count}</span> : null}
+    <header className="lx-page-head lx-head lp-header">
+      <div className="lx-head-title">
+        <h1 className="lx-h1" data-tour={tour}>
+          {title}
+        </h1>
+        {count !== undefined && count !== null ? <span className="lp-count lx-head-count">{count}</span> : null}
+      </div>
       <p className="lx-sub lp-sub">{sub}</p>
     </header>
   );

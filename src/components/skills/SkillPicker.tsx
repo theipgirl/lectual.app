@@ -1,3 +1,8 @@
+import "@/components/list-page/list-page.css";
+import { LoadFailedLine } from "@/components/ui/LoadFailed";
+import { ListSearch } from "@/components/list-page/ListToolbar";
+import { searchPlaceholder } from "@/lib/ui/words";
+import { showingOf } from "@/lib/ui/format";
 import { PICK_LIMIT, SEARCH_MAX, type PickRecord } from "@/lib/skills/pick";
 import type { RecordKind, Skill } from "@/lib/skills/catalog";
 
@@ -20,35 +25,22 @@ export function SkillPicker({ skill, term, groups }: { skill: Skill; term: strin
   const showHeadings = groups.length > 1;
   return (
     <div style={{ display: "grid", gap: 10 }}>
-      <form method="get" action={`#skill-${skill.slug}`} className="lx-search-form" role="search" style={{ flex: "none", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
-        <input type="hidden" name="skill" value={skill.slug} />
-        <label htmlFor={inputId} className="lx-label" style={{ whiteSpace: "nowrap" }}>
-          Run it on...
-        </label>
-        <input
-          id={inputId}
-          className="lx-input"
-          style={{ flex: 1, minWidth: 140, width: "auto" }}
-          name="q"
-          type="search"
-          maxLength={SEARCH_MAX}
-          defaultValue={term}
-          aria-label={`Search records to run ${skill.name} on`}
-        />
-        <button type="submit" className="lx-btn lx-btn-ghost lx-btn-sm">
-          Search
-        </button>
-      </form>
-      <p className="lx-note" style={{ margin: 0 }}>
-        Search {skill.picks.length > 1 ? "by name, mark or number" : skill.picks[0] === "lead" ? "by name, business or email" : "by mark, matter number or client"}.
-      </p>
+      {/* The shared search (placeholder, Search, Clear); a plain GET form so it works without JavaScript and returns to the card. */}
+      <ListSearch
+        id={inputId}
+        label={`Search records to run ${skill.name} on`}
+        placeholder={searchPlaceholder(skill.picks.length > 1 ? "by name, mark or number" : skill.picks[0] === "lead" ? "by name, business or email" : "by mark, matter number or client")}
+        maxLength={SEARCH_MAX}
+        defaultValue={term}
+        action={`#skill-${skill.slug}`}
+        hidden={{ skill: skill.slug }}
+        clearHref={`?skill=${encodeURIComponent(skill.slug)}#skill-${skill.slug}`}
+      />
       {groups.map((g) => (
         <div key={g.kind} style={{ display: "grid", gap: 4 }}>
           {showHeadings && <div className="lx-label">{KIND_HEADING[g.kind]}</div>}
           {g.read.status === "failed" ? (
-            <p className="lx-note" role="alert" style={{ margin: 0, color: "var(--warn)" }}>
-              We couldn&apos;t load your {KIND_PLURAL[g.kind]}.
-            </p>
+            <LoadFailedLine role="alert">We couldn&apos;t load your {KIND_PLURAL[g.kind]}.</LoadFailedLine>
           ) : g.read.shown.length === 0 ? (
             <p className="lx-note" style={{ margin: 0 }}>
               {term ? `No matches for "${term}".` : `No ${KIND_PLURAL[g.kind]} on file yet.`}
@@ -66,8 +58,8 @@ export function SkillPicker({ skill, term, groups }: { skill: Skill; term: strin
               </ul>
               <p className="lx-note" style={{ margin: 0 }}>
                 {g.read.total > g.read.shown.length
-                  ? `Showing ${g.read.shown.length} of ${g.read.total}. Type a narrower search to find the one you want.`
-                  : `Showing ${g.read.shown.length} of ${g.read.total}.`}
+                  ? `${showingOf(g.read.shown.length, g.read.total)}. Type a narrower search to find the one you want.`
+                  : `${showingOf(g.read.shown.length, g.read.total)}.`}
               </p>
             </>
           )}

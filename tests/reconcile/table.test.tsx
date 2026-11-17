@@ -89,7 +89,7 @@ describe("the table", () => {
       expect(h).toContain("Needs a matter");
       expect(h).not.toContain(">Accept<");
       expect(h).not.toContain("Pick another stage");
-      expect(h).toMatch(/<a[^>]*href="\/dashboard\/matters\/?"[^>]*>Open a matter<\/a>/);
+      expect(h).toMatch(/<a[^>]*href="\/dashboard\/matters\/?\?view=table"[^>]*>Open a matter<\/a>/);
       expect(h).toMatch(new RegExp(`href="/dashboard/leads/${r.leadId}/?"[^>]*>Open lead<`));
       expect(strip(h)).toContain(`Pick ${r.leadName} in the Open a matter form.`);
     }

@@ -5,7 +5,7 @@ import { getScopedClient } from "@/lib/db/scoped-client";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { listStages } from "@/lib/pipeline";
 import { listMemberDirectory } from "@/lib/members/directory";
-import { ListHeader } from "@/components/list-page";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { canMergeLeads } from "@/lib/leads/merge";
 import { mergeAvailable } from "@/lib/leads/live";
 import { COUNT_SOURCES, MOVE_COUNTS, STAY_COUNTS, leadName, loadMergeView, type Count, type MergeLeadRow } from "@/lib/leads/merge-load";
@@ -13,7 +13,6 @@ import { mergeHref } from "@/lib/leads/merge-links";
 import { matterDisplayTitle } from "@/lib/matters/display-title";
 import { pageTitle } from "@/lib/ui/page-title";
 import {
-  MERGE_BACK,
   MERGE_COUNTS_NOTE,
   MERGE_COUNT_LABELS,
   MERGE_COUNT_UNAVAILABLE,
@@ -35,10 +34,12 @@ import {
   MERGE_READ_FAILED,
   MERGE_STAGE_LABEL,
   MERGE_STAYS_HEADING,
+  INTAKE_NAME,
 } from "@/lib/ui/words";
 import { MergeForm } from "./MergeForm";
 import "../leads.css";
 import "./merge.css";
+import { intakeListHref } from "@/lib/intake/list-href";
 
 export const metadata: Metadata = { title: pageTitle(MERGE_LEADS_TITLE) };
 export const dynamic = "force-dynamic";
@@ -103,15 +104,9 @@ export default async function MergeLeadsPage({ searchParams }: { searchParams: P
     },
   });
 
-  const header = <ListHeader title={MERGE_LEADS_TITLE} sub={MERGE_LEADS_SUB} />;
-  const back = (
-    <Link href="/dashboard/intake/" className="lx-back">
-      ← {MERGE_BACK}
-    </Link>
-  );
+  const header = <PageHeader title={MERGE_LEADS_TITLE} sub={MERGE_LEADS_SUB} back={{ href: intakeListHref(), label: INTAKE_NAME }} />;
   const message = (text: string, link?: { href: string; label: string }) => (
     <div className="mg-page">
-      {back}
       {header}
       <p className="lx-note" role="status">
         {text}
@@ -173,7 +168,6 @@ export default async function MergeLeadsPage({ searchParams }: { searchParams: P
 
   return (
     <div className="mg-page">
-      {back}
       {header}
       <div className="mg-sides">
         {side(keeper, true)}

@@ -5,6 +5,8 @@ import { canSeeSetup } from "@/lib/setup/roles";
 import { SETUP_PATH } from "@/lib/setup/routes";
 import type { TourSide } from "./tour";
 import { APPROVALS_NAME, ASSISTANTS_NAME, COPILOT_NAME, FEATURES_NAME, INTAKE_NAME } from "@/lib/ui/words";
+import { INTAKE_LIST_PATH } from "@/lib/intake/list-href";
+import { MATTERS_LIST_PATH } from "@/lib/matters/list-href";
 
 /**
  * The Getting started hub: guided flows over the real screens. This file is the
@@ -76,7 +78,7 @@ const FLOWS: readonly CatalogFlow[] = [
     steps: [
       {
         id: "rail",
-        path: "/dashboard/intake/",
+        path: INTAKE_LIST_PATH,
         target: "nav-intake",
         side: "right",
         title: "Intake lives here",
@@ -84,7 +86,7 @@ const FLOWS: readonly CatalogFlow[] = [
       },
       {
         id: "list",
-        path: "/dashboard/intake/",
+        path: INTAKE_LIST_PATH,
         target: "intake-board",
         side: "top",
         title: "Sorted by last touch",
@@ -280,7 +282,7 @@ const FLOWS: readonly CatalogFlow[] = [
     steps: [
       {
         id: "rail",
-        path: "/dashboard/matters/",
+        path: MATTERS_LIST_PATH,
         target: "nav-matters",
         side: "right",
         title: "Matters",
@@ -288,7 +290,7 @@ const FLOWS: readonly CatalogFlow[] = [
       },
       {
         id: "list",
-        path: "/dashboard/matters/",
+        path: MATTERS_LIST_PATH,
         target: "matters-head",
         side: "bottom",
         title: "The matters list",

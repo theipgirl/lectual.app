@@ -11,6 +11,10 @@ import { deckDoneAction, deckHandToAction, deckNoteAction, deckSnoozeAction } fr
 import { DeckKeys } from "./DeckKeys";
 import { Avatar, DocTag, openHref, Tags, type Common } from "./shared";
 import { DeckDocuments } from "./ReviewDocuments";
+import { Chip, FilterChips } from "@/components/list-page/Chips";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Pill } from "@/components/ui/Pill";
+import { ADD_TO_TIMELINE, UNASSIGNED } from "@/lib/ui/words";
 import "./review.css";
 
 const MAX_DOTS = 40;
@@ -18,19 +22,14 @@ const MAX_DOTS = 40;
 /** The people across the top: links, so the URL carries the person. */
 export function PersonChips({ people, personId, params }: { people: DeckPerson[]; personId: string | null; params: Common["params"] }) {
   return (
-    <nav className="rv-people" aria-label="Whose cards">
+    <FilterChips as="nav" label="Whose cards" className="rv-people">
       {people.map((p) => (
-        <Link
-          key={p.userId}
-          href={reviewHref({ ...params, view: "cards", person: p.userId, i: 1, open: null })}
-          className={`rv-person-chip${p.userId === personId ? " on" : ""}`}
-          aria-current={p.userId === personId ? "page" : undefined}
-        >
+        <Chip key={p.userId} href={reviewHref({ ...params, view: "cards", person: p.userId, i: 1, open: null })} active={p.userId === personId}>
           <Avatar name={p.name} />
           {p.name}
-        </Link>
+        </Chip>
       ))}
-    </nav>
+    </FilterChips>
   );
 }
 
@@ -51,12 +50,7 @@ export function CardsDeck({
   const { params, today, members, canWrite } = common;
   if (!card || !pos) {
     return (
-      <div className="lx-card lx-empty-card">
-        <h2 className="lx-h2" style={{ fontSize: 25 }}>
-          Nothing on {personName ?? "this person"}&apos;s cards right now.
-        </h2>
-        <p className="lx-note" style={{ margin: 0 }}>Nothing is overdue, due this week or missing a next step for them.</p>
-      </div>
+      <EmptyState title={`Nothing on ${personName ?? "this person"}'s cards right now.`}>Nothing is overdue, due this week or missing a next step for them.</EmptyState>
     );
   }
   const { row, bucket } = card;
@@ -95,8 +89,8 @@ export function CardsDeck({
         ))}
       </div>
 
-      <article className={`lx-card rv-big rv-card-${bucket}`}>
-        <h2 className="rv-big-title">
+      <article className={`lx-card rv-big rv-card-${bucket}`} data-tone={bucket === "overdue" ? "risk" : bucket === "week" ? "warn" : "mute"}>
+        <h2 className="lx-h2 rv-big-title">
           <Link href={openHref({ ...here, i: pos.position }, row)} scroll={false}>
             {row.client}
           </Link>
@@ -109,7 +103,7 @@ export function CardsDeck({
         <p className="rv-big-step">{row.nextStep ? row.nextStep.title : "No next step"}</p>
         {due && (
           <p className="rv-big-due">
-            <span className={`rv-chip${due.overdue ? " rv-chip-overdue" : ""}`}>{due.text}</span>
+            <Pill tone={due.overdue ? "risk" : due.text.startsWith("Due") ? "warn" : "mute"}>{due.text}</Pill>
             {stepWho && <span className="lx-note"> · {stepWho}</span>}
           </p>
         )}
@@ -158,7 +152,7 @@ export function CardsDeck({
               {record}
               {row.nextStep && <input type="hidden" name="taskId" value={row.nextStep.id} />}
               <select className="lx-input" name="assigneeId" aria-label="Hand to" defaultValue={row.nextStep?.assigneeId ?? row.assignedTo ?? ""}>
-                <option value="">Unassigned</option>
+                <option value="">{UNASSIGNED}</option>
                 {members.map((m) => (
                   <option key={m.userId} value={m.userId}>
                     {m.name}
@@ -170,13 +164,13 @@ export function CardsDeck({
               </button>
             </form>
             <details className="rv-more rv-note-box">
-              <summary className="lx-btn lx-btn-sec">Add note</summary>
+              <summary className="lx-btn lx-btn-sec">{ADD_TO_TIMELINE}</summary>
               <form action={deckNoteAction} className="rv-form">
                 {view}
                 {record}
                 <textarea className="lx-input" name="body" rows={3} placeholder="A short note for the timeline" aria-label="What happened" required />
                 <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm">
-                  Add to timeline
+                  {ADD_TO_TIMELINE}
                 </button>
               </form>
             </details>

@@ -11,13 +11,15 @@
  * own chip: the move is a person's review.
  */
 
+import { OUR_TURN } from "@/lib/ui/words";
+
 export type Waiting = "uspto" | "approval" | "us" | "client";
 export type Direction = "we" | "they";
 
 export const WAITING_LABEL: Record<Waiting, string> = {
   uspto: "USPTO",
   approval: "Approval",
-  us: "Us",
+  us: OUR_TURN,
   client: "Client",
 };
 

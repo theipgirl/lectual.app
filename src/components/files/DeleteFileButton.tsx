@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { InlineConfirm, Notice } from "@/components/ui";
+import { DELETE } from "@/lib/ui/words";
+import "./files.css";
 import { deleteFileAction } from "@/app/dashboard/files/actions";
 
 /**
@@ -10,17 +13,8 @@ import { deleteFileAction } from "@/app/dashboard/files/actions";
  * straight away (used by the render tests).
  */
 export function DeleteFileButton({ fileId, name, defaultOpen = false }: { fileId: string; name: string; defaultOpen?: boolean }) {
-  const [open, setOpen] = useState(defaultOpen);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
-
-  if (!open) {
-    return (
-      <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={() => setOpen(true)}>
-        Delete
-      </button>
-    );
-  }
 
   function remove() {
     start(async () => {
@@ -28,7 +22,7 @@ export function DeleteFileButton({ fileId, name, defaultOpen = false }: { fileId
       try {
         const result = await deleteFileAction(fileId);
         if (!result.ok) return setError(result.error);
-        setOpen(false); // deleteFileAction revalidates this page, which refreshes the list
+        // deleteFileAction revalidates this page, which refreshes the list
       } catch {
         setError("Couldn't delete that file just now. Try again shortly.");
       }
@@ -36,20 +30,18 @@ export function DeleteFileButton({ fileId, name, defaultOpen = false }: { fileId
   }
 
   return (
-    <span className="lx-inline-form" style={{ flexWrap: "wrap" }}>
-      <span className="lx-note" style={{ color: "var(--ink)" }}>
-        {`Delete ${name}? The stored file is removed for good.`}
-      </span>
-      <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" style={{ color: "var(--wine)" }} disabled={pending} onClick={remove}>
-        {pending ? "Deleting…" : "Yes, delete"}
-      </button>
-      <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" disabled={pending} onClick={() => setOpen(false)}>
-        Cancel
-      </button>
+    <span className="fl-delete">
+      <InlineConfirm
+        label={DELETE}
+        question={`Delete ${name}? The stored file is removed for good.`}
+        pending={pending}
+        initial={defaultOpen ? "asking" : "idle"}
+        onConfirm={remove}
+      />
       {error && (
-        <span role="alert" className="lx-note" style={{ color: "var(--wine)" }}>
+        <Notice tone="risk" role="alert">
           {error}
-        </span>
+        </Notice>
       )}
     </span>
   );

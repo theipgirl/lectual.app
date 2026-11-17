@@ -7,6 +7,8 @@ import {
   type RefreshAccessState,
 } from "@/lib/auth/actions";
 import { NOT_A_LAW_FIRM_DISCLAIMER } from "@/lib/legal/disclaimer";
+import { NO_FIRM_ACCESS_TITLE, NO_FIRM_JUST_INVITED, REFRESH_MY_ACCESS, WRONG_ACCOUNT_SIGN_OUT } from "@/lib/ui/words";
+import "./shell-pages.css";
 
 /**
  * Signed in, but a member of no firm visible under RLS. Fails closed with an
@@ -22,38 +24,31 @@ export function NoFirmAccess({ email }: { email: string | null | undefined }) {
   );
 
   return (
-    <main style={{ minHeight: "100dvh", display: "grid", placeItems: "center", padding: 24 }}>
-      <div className="lx-card" style={{ maxWidth: 440, padding: 30, display: "grid", gap: 14 }}>
-        <div className="lx-label">Lectual</div>
-        <h1 className="lx-h2" style={{ fontSize: 31 }}>
-          No firm access yet
-        </h1>
-        <p style={{ margin: 0, color: "var(--body)", lineHeight: 1.6 }}>
+    <main className="lx-center lx-center-main">
+      <div className="lx-card lx-pad lx-center-card">
+        <h1 className="lx-h1">{NO_FIRM_ACCESS_TITLE}</h1>
+        <p className="lx-sub">
           <strong>{email ?? "This account"}</strong>{"\u00a0"}is signed in, but isn&apos;t a member of a Lectual firm
           workspace. Ask your firm admin to add this email, or sign in with an account that
           already belongs to one.
         </p>
-        <form action={action} style={{ display: "grid", gap: 6 }}>
+        <form action={action} className="lx-center-form">
           <button type="submit" className="lx-btn lx-btn-pri" disabled={pending}>
-            {pending ? "Refreshing…" : "Refresh my access"}
+            {pending ? "Refreshing…" : REFRESH_MY_ACCESS}
           </button>
-          <span className="lx-note">
-            Just been invited? Your sign-in predates the invite — refresh to pick up your firm.
-          </span>
+          <span className="lx-note">{NO_FIRM_JUST_INVITED}</span>
           {state.error && (
-            <p role="alert" className="lx-note" style={{ color: "var(--wine)", margin: 0 }}>
+            <p role="alert" className="lx-center-error">
               {state.error}
             </p>
           )}
         </form>
         <form action={signOutAction}>
           <button type="submit" className="lx-btn lx-btn-ghost lx-btn-sm">
-            Wrong account? Sign out
+            {WRONG_ACCOUNT_SIGN_OUT}
           </button>
         </form>
-        <p className="lx-note" style={{ margin: 0, fontSize: 12 }}>
-          {NOT_A_LAW_FIRM_DISCLAIMER}
-        </p>
+        <p className="lx-note">{NOT_A_LAW_FIRM_DISCLAIMER}</p>
       </div>
     </main>
   );

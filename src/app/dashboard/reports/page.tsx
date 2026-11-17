@@ -5,6 +5,7 @@ import { REPORTS, REPORT_BLURB, visibleNav, visibleReports } from "@/lib/nav";
 import { activeOrgModules } from "@/lib/org/modules";
 import { currentRole } from "@/lib/auth/current-role";
 import { pageTitle } from "@/lib/ui/page-title";
+import { PageHeader } from "@/components/ui";
 
 export const metadata: Metadata = { title: pageTitle("Reports") };
 
@@ -22,17 +23,12 @@ export default async function ReportsIndexPage() {
 
   return (
     <>
-      <div className="lx-page-head">
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <h1 className="lx-h1">Reports</h1>
-          <p className="lx-sub">Numbers for each part of the firm. Pick one to open it.</p>
-        </div>
-      </div>
+      <PageHeader title="Reports" sub={<>Numbers for each part of the firm. Pick one to open it.</>} />
       <ul className="lx-list" aria-label="Reports">
         {keys.map((key) => (
           <li key={key}>
             <Link href={REPORTS[key].href} className="lx-card lx-kpi" style={{ display: "block" }}>
-              <span style={{ display: "block", fontSize: 15, fontWeight: 600, color: "var(--ink)" }}>{REPORTS[key].label}</span>
+              <span className="lx-h3" style={{ display: "block" }}>{REPORTS[key].label}</span>
               <span className="lx-note">{REPORT_BLURB[key]}</span>
             </Link>
           </li>

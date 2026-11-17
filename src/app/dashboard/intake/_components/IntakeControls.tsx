@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Icon } from "@/components/ui/Icon";
 import type { Stage } from "@/lib/pipeline";
 import type { MemberIdentity } from "@/lib/members/directory";
 import { REFERRAL_SOURCES } from "@/lib/intake";
@@ -13,11 +14,11 @@ import type { LeadSet } from "@/lib/intake/working";
 import type { ChipCounts } from "@/lib/intake/leads-view";
 import Popover, { PopoverItem } from "./Popover";
 import { chipClass } from "@/components/list-page/Chips";
-import { LEADS_DUPLICATES, LEADS_DUPLICATES_TITLE, LEADS_ALL_OPEN_MATCHES, LEADS_ANY_STAGE, LEADS_STAGE_FILTER, LEADS_SUGGESTIONS, LEADS_SUGGESTIONS_TITLE, MOVED_AUTOMATICALLY, NOT_RATED, TEMPERATURE_TOOLTIP } from "@/lib/ui/words";
+import { LEADS_DUPLICATES, LEADS_DUPLICATES_TITLE, LEADS_ALL_OPEN_MATCHES, LEADS_ANY_STAGE, LEADS_STAGE_FILTER, LEADS_SUGGESTIONS, LEADS_SUGGESTIONS_TITLE, MOVED_AUTOMATICALLY, NOT_RATED, OUR_TURN, OWNER_COLUMN, TEMPERATURE_TOOLTIP, UNASSIGNED } from "@/lib/ui/words";
 import { COPIED_MS, copyViewLabel, viewUrl } from "@/lib/intake/copy-view";
 
 /** `?reply=` has no chip of its own; the chip below appears ONLY while the filter is active, says what it does, and clears it. */
-const REPLY_LABEL: Record<ReplyState, string> = { replied: "Waiting on us", awaiting: "Waiting on them", unknown: "No reply state" };
+const REPLY_LABEL: Record<ReplyState, string> = { replied: OUR_TURN, awaiting: "Waiting on them", unknown: "No reply state" };
 
 const TEMP_OPTIONS: Array<{ value: TempFilter; label: string }> = [
   { value: "hot", label: "Hot" },
@@ -84,7 +85,7 @@ export default function IntakeControls({
 
   const selectedStage = stages.find((stage) => stage.id === filters.stage) ?? null;
   const selectedOwner =
-    filters.owner === UNASSIGNED_OWNER ? "Unassigned" : (members.find((m) => m.userId === filters.owner)?.displayName ?? (filters.owner ? "Owner" : null));
+    filters.owner === UNASSIGNED_OWNER ? UNASSIGNED : (members.find((m) => m.userId === filters.owner)?.displayName ?? (filters.owner ? OWNER_COLUMN : null));
 
   async function saveView() {
     const url = viewUrl(currentHref, typeof window === "undefined" ? null : window.location.origin);
@@ -162,7 +163,7 @@ export default function IntakeControls({
           width={210}
           trigger={({ onClick, ref, ...aria }) => (
             <button {...aria} ref={ref} type="button" onClick={onClick} className={chipClass(filters.owner !== null)}>
-              {selectedOwner ?? "Owner"}
+              {selectedOwner ?? OWNER_COLUMN}
             </button>
           )}
         >
@@ -290,7 +291,7 @@ export default function IntakeControls({
         )}
 
         {allOpenMatches !== null && allOpenMatches > 0 && (
-          <button type="button" className="lp-link-button" data-all-open-matches onClick={() => onSet("open")}>
+          <button type="button" className="lx-link" data-all-open-matches onClick={() => onSet("open")}>
             {LEADS_ALL_OPEN_MATCHES(allOpenMatches)}
           </button>
         )}
@@ -298,11 +299,11 @@ export default function IntakeControls({
         {filters.reply !== null && (
           <button type="button" className={chipClass(true)} aria-label={`Clear the “${REPLY_LABEL[filters.reply]}” filter`} onClick={() => onFilters({ ...filters, reply: null })}>
             {REPLY_LABEL[filters.reply]}
-            <span aria-hidden>×</span>
+            <Icon name="close" size={14} />
           </button>
         )}
 
-        <button type="button" onClick={saveView} className="lp-link-button lp-chips-end">
+        <button type="button" onClick={saveView} className="lx-link lp-chips-end">
           {copyViewLabel(copied)}
         </button>
       </div>

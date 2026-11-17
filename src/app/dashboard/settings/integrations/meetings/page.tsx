@@ -1,5 +1,6 @@
-import { integrationErrorLine } from "@/lib/ui/words";
-import Link from "next/link";
+import { MEETINGS_INTEGRATION_NAME, integrationErrorLine } from "@/lib/ui/words";
+import { LoadFailedCard, Notice, PageHeader } from "@/components/ui";
+import { getFirmTimeZone } from "@/lib/org/profile";
 import { notFound } from "next/navigation";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { hasRole } from "@/lib/auth/roles";
@@ -15,7 +16,7 @@ import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 
-export const metadata: Metadata = { title: pageTitle("Meetings integration") };
+export const metadata: Metadata = { title: pageTitle(MEETINGS_INTEGRATION_NAME) };
 
 export const dynamic = "force-dynamic";
 
@@ -29,9 +30,9 @@ const ERRORS: Record<string, string> = {
   failed: "Zoom sign-in didn't complete. Try again.",
 };
 
-function statusLine(c: MeetingConnection): string {
-  return `${c.account_hint ?? "Connected"} · connected ${relativeTime(c.created_at)}${
-    c.last_import_at ? ` · last import ${relativeTime(c.last_import_at)}` : " · not imported yet"
+function statusLine(c: MeetingConnection, tz: string): string {
+  return `${c.account_hint ?? "Connected"} · connected ${relativeTime(c.created_at, undefined, tz)}${
+    c.last_import_at ? ` · last import ${relativeTime(c.last_import_at, undefined, tz)}` : " · not imported yet"
   }`;
 }
 
@@ -47,6 +48,7 @@ export default async function MeetingsIntegrationPage({ searchParams }: { search
   const canManage = hasRole(session.role, "senior_admin");
   const { connected, reconnected, error } = await searchParams;
   const read = await listMeetingConnections();
+  const tz = await getFirmTimeZone();
   const conns = read.ok ? read.connections : [];
   const fathom = conns.find((c) => c.provider === "fathom") ?? null;
   const zoom = conns.find((c) => c.provider === "zoom") ?? null;
@@ -58,32 +60,29 @@ export default async function MeetingsIntegrationPage({ searchParams }: { search
 
   return (
     <>
-      <Link href="/dashboard/settings/integrations/" className="lx-back">
-        ← Integrations
-      </Link>
-      <div>
-        <div className="lx-label">Integrations</div>
-        <h1 className="lx-h1">Meetings</h1>
-        <p className="lx-sub">
-          Bring your consult recordings from Fathom or Zoom into Lectual: summary, transcript and who was on the call, filed on the client&apos;s lead or
-          matter. Lectual only reads from these accounts.
-        </p>
-      </div>
+      <PageHeader
+        back={{ href: "/dashboard/settings/integrations/", label: "Integrations" }}
+        title={MEETINGS_INTEGRATION_NAME}
+        sub={
+          <>
+            Bring your consult recordings from Fathom or Zoom into Lectual: summary, transcript and who was on the call, filed on the client&apos;s lead or
+            matter. Lectual only reads from these accounts.
+          </>
+        }
+      />
 
       {connected === "zoom" && (
-        <div role="status" className="lx-banner lx-banner-ok">
+        <Notice tone="ok" role="status">
           Zoom {reconnected ? "reconnected" : "connected"}. Import your recent meetings below.
-        </div>
+        </Notice>
       )}
       {error && ERRORS[error] && (
-        <div role="alert" className="lx-banner lx-banner-risk">
+        <Notice tone="risk" role="alert">
           {ERRORS[error]}
-        </div>
+        </Notice>
       )}
       {!read.ok && (
-        <div role="alert" className="lx-banner lx-banner-risk">
-          We couldn&apos;t check your firm&apos;s meeting connections. Try again shortly.
-        </div>
+        <LoadFailedCard role="alert" what="your meeting connections" />
       )}
 
       <section className="lx-card lxi-card" aria-labelledby="fathom-title">
@@ -91,14 +90,12 @@ export default async function MeetingsIntegrationPage({ searchParams }: { search
           id="fathom-title"
           title="Fathom"
           state={fathomState}
-          help={fathom ? statusLine(fathom) : read.ok ? "Not connected." : "We couldn't check this connection just now."}
+          help={fathom ? statusLine(fathom, tz) : read.ok ? "Not connected." : "We couldn't check this connection just now."}
         >
           {fathom && canManage && <DisconnectSourceButton provider="fathom" label="Fathom" />}
         </IntegrationHeader>
         {fathom?.status === "reauth" && (
-          <p className="lx-banner lx-banner-risk" style={{ margin: 0 }}>
-            Fathom stopped accepting this key. Paste a new one to keep importing.
-          </p>
+          <Notice tone="risk">Fathom stopped accepting this key. Paste a new one to keep importing.</Notice>
         )}
         {fathom?.last_error && fathom.status === "active" && (
           <HelpText tone="problem">{integrationErrorLine(fathom.status, fathom.last_error)}</HelpText>
@@ -131,7 +128,7 @@ export default async function MeetingsIntegrationPage({ searchParams }: { search
           id="zoom-title"
           title="Zoom"
           state={zoomState}
-          help={zoom ? statusLine(zoom) : read.ok ? "Not connected." : "We couldn't check this connection just now."}
+          help={zoom ? statusLine(zoom, tz) : read.ok ? "Not connected." : "We couldn't check this connection just now."}
         >
           {zoom && canManage && <DisconnectSourceButton provider="zoom" label="Zoom" />}
         </IntegrationHeader>

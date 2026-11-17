@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ListHeader } from "@/components/list-page/ListHeader";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { LoadFailedCard } from "@/components/ui/LoadFailed";
+import { Notice } from "@/components/ui/Notice";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { ListSearch, ListToolbar } from "@/components/list-page/ListToolbar";
 import { Chip, FilterChips } from "@/components/list-page/Chips";
 import "@/components/list-page/list-page.css";
@@ -54,10 +58,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
     return (
       <div className="lp-root">
         <ListHeader title={REVIEW_NAME} tour="review-head" sub="Open matters and leads that need a person this week." />
-        <div className="lx-card lx-empty-card" role="alert">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>The weekly review couldn&apos;t be loaded</h2>
-          <p className="lx-note" style={{ margin: 0 }}>{criticalAlert(load.failed)}</p>
-        </div>
+        <LoadFailedCard role="alert" what="the weekly review" body={criticalAlert(load.failed)} />
       </div>
     );
   }
@@ -129,23 +130,25 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const searchHidden = { ...(params.since === "all" ? { since: "all" } : {}), ...(params.view !== DEFAULT_REVIEW_VIEW ? { view: params.view } : {}), ...(params.view === "cards" && params.person ? { person: params.person } : {}), ...(params.who === "mine" ? { who: "mine" } : {}), ...(params.kind !== "both" ? { kind: params.kind === "matter" ? "matters" : "leads" } : {}) };
 
   return (
-    <div className={owner ? "lp-root rv-root rv-owner" : "lp-root"}>
+    <div className={owner ? "lp-root rv-root rv-owner" : "lp-root rv-root"}>
       {owner ? (
         <>
-      <header className="rv-head">
-        <div className="rv-head-text">
-          <h1 className="lx-h1 rv-h1" data-tour="review-head">{REVIEW_NAME}</h1>
-          <p className="lx-sub rv-sub">{buckets.total === 0 ? reviewSubline(buckets) : reviewIntro(buckets.total)}</p>
-        </div>
-        {sheetPerms && sheetPerms !== READ_ONLY_PERMS ? (
-          <div className="rse-head-right">
-            <SheetSaveStatus />
+      <PageHeader
+        title={REVIEW_NAME}
+        tour="review-head"
+        className="rv-head lx-head-split"
+        sub={buckets.total === 0 ? reviewSubline(buckets) : reviewIntro(buckets.total)}
+        actions={
+          sheetPerms && sheetPerms !== READ_ONLY_PERMS ? (
+            <div className="rse-head-right">
+              <SheetSaveStatus />
+              <ViewSwitch params={params} />
+            </div>
+          ) : (
             <ViewSwitch params={params} />
-          </div>
-        ) : (
-          <ViewSwitch params={params} />
-        )}
-      </header>
+          )
+        }
+      />
 
       <div className="rv-filters">
         {sinceOff ? (
@@ -219,23 +222,20 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
       )}
 
       {note && (
-        <p className="lx-banner lx-banner-warn" role="status" style={{ margin: 0 }}>
+        <Notice tone="warn" role="status">
           {note}
-        </p>
+        </Notice>
       )}
       {notice && (
-        <p className="lx-banner lx-banner-warn" role="alert" style={{ margin: 0 }}>
+        <Notice tone="warn" role="alert">
           {notice}
-        </p>
+        </Notice>
       )}
 
       {shown.length === 0 ? (
-        <div className="lx-card lx-empty-card">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>{load.rows.length === 0 ? "Nothing to review" : "Nothing matches"}</h2>
-          <p className="lx-note" style={{ margin: 0 }}>
-            {load.rows.length === 0 ? "Open matters and leads past first contact will show up here." : "Try another filter or search."}
-          </p>
-        </div>
+        <EmptyState title={load.rows.length === 0 ? "Nothing to review" : "Nothing matches"}>
+          {load.rows.length === 0 ? "Open matters and leads past first contact will show up here." : "Try another filter or search."}
+        </EmptyState>
       ) : params.view === "cards" && cards ? (
         <>
           <PersonChips people={cards.people} personId={cards.personId} params={params} />

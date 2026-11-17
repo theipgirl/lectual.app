@@ -1,6 +1,8 @@
 import type { OrgModule } from "@/lib/org/modules";
+import { INTAKE_LIST_PATH } from "@/lib/intake/list-href";
+import { MATTERS_LIST_PATH } from "@/lib/matters/list-href";
 import { hasRole, type Role } from "@/lib/auth/roles";
-import { AI_TOOLS_GROUP, APPROVALS_NAME, ASSISTANTS_NAME, COPILOT_NAME, FIRM_NOTES_NAME, INTAKE_LEADS_ROW, INTAKE_NAME, REVIEW_NAME, SHORTCUTS_NAME } from "@/lib/ui/words";
+import { AI_TOOLS_GROUP, APPROVALS_NAME, ASSISTANTS_NAME, COPILOT_NAME, FIRM_NOTES_NAME, FORMS_NAME, INTAKE_LEADS_ROW, INTAKE_NAME, MAIL_NAME, PROPOSALS_NAME, REVIEW_NAME, SHORTCUTS_NAME } from "@/lib/ui/words";
 
 /**
  * Sections of the workspace. One flat list of PAGES, read by the rail and the
@@ -15,6 +17,11 @@ export type NavItem = {
   /** Shorter name when shown under its parent in the rail ("Leads" under the Intake group). */
   railLabel?: string;
   href: string;
+  /**
+   * Where a LINK to this section goes, when that is not its bare `href`. Intake and Matters open on the Board with no `view`, so their
+   * rail and phone links carry the explicit list value. `href` stays bare: it is what `isNavActive` matches the pathname against.
+   */
+  linkHref?: string;
   /** SVG path data, drawn at 24×24 with a 1.5 stroke (design/Rail.dc.html). */
   icon: string;
   /** Firm must hold this module or the section does not exist for it. */
@@ -47,6 +54,10 @@ export const ICON = {
   cycle: "M3 12a9 9 0 0 1 15.5-6.3L21 8M21 3v5h-5M21 12a9 9 0 0 1-15.5 6.3L3 16M3 21v-5h5",
   globe: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3.5 9h17M3.5 15h17M12 3c3 3.6 3 14.4 0 18M12 3c-3 3.6-3 14.4 0 18",
   bars: "M4 20V11M10 20V4M16 20v-6M21 20H3",
+  // One icon per section: a form (Forms), a price tag (Quotes) and a megaphone (Campaigns).
+  form: "M8 3h8v3H8zM6 5H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-1M8 11h8M8 15h5",
+  tag: "M3 12V4h8l10 10-8 8zM7.5 7.5h.01",
+  megaphone: "M3 10v4h4l6 4V6l-6 4zM16 9a3 3 0 0 1 0 6M19 7a6 6 0 0 1 0 10",
   sliders: "M4 6h12M18 6h2M4 12h2M8 12h12M4 18h12M18 18h2M16 4v4M6 10v4M16 16v4",
   // A camera: a recorded call.
   // A ticked box: the weekly review.
@@ -56,23 +67,23 @@ export const ICON = {
 
 export const NAV: readonly NavItem[] = [
   { slug: "", label: "Today", href: "/dashboard/", icon: ICON.clock, step: 6 },
-  { slug: "mail", label: "My Mail", href: "/dashboard/mail/", icon: ICON.env, module: "mailbox", step: 4 },
+  { slug: "mail", label: MAIL_NAME, href: "/dashboard/mail/", icon: ICON.env, module: "mailbox", step: 4 },
   { slug: "queue", label: APPROVALS_NAME, href: "/dashboard/queue/", icon: ICON.tray, step: 6 },
   // Every open matter and lead past first contact, sorted by what needs a person this week. Reads only the firm's own records.
   { slug: "review", label: REVIEW_NAME, href: "/dashboard/review/", icon: ICON.check, step: 7 },
-  { slug: "campaigns", label: "Campaigns", href: "/dashboard/campaigns/", icon: ICON.send, step: 6 },
+  { slug: "campaigns", label: "Campaigns", href: "/dashboard/campaigns/", icon: ICON.megaphone, step: 6 },
   { slug: "sms", label: "SMS", href: "/dashboard/sms/", icon: ICON.sms, step: 7, built: false },
   // No module: each firm imports only from the Fathom / Zoom account it connected itself (lectual 0081).
   { slug: "meetings", label: "Meetings", href: "/dashboard/meetings/", icon: ICON.video, step: 7 },
   { slug: "calendar", label: "Calendar", href: "/dashboard/calendar/", icon: ICON.cal, step: 6 },
-  { slug: "intake", label: INTAKE_NAME, railLabel: INTAKE_LEADS_ROW, href: "/dashboard/intake/", also: ["/dashboard/leads/"], icon: ICON.users, step: 6 },
-  { slug: "forms", label: "Forms", railLabel: "Forms", href: "/dashboard/forms/", icon: ICON.file, step: 7 },
-  { slug: "quotes", label: "Quotes & proposals", href: "/dashboard/quotes/", icon: ICON.file, step: 7 },
+  { slug: "intake", label: INTAKE_NAME, railLabel: INTAKE_LEADS_ROW, href: "/dashboard/intake/", linkHref: INTAKE_LIST_PATH, also: ["/dashboard/leads/"], icon: ICON.users, step: 6 },
+  { slug: "forms", label: FORMS_NAME, railLabel: FORMS_NAME, href: "/dashboard/forms/", icon: ICON.form, step: 7 },
+  { slug: "quotes", label: PROPOSALS_NAME, href: "/dashboard/quotes/", icon: ICON.tag, step: 7 },
   // The client trademark proposal (brand names x marks x classes, a named approver, a /p/<token> page). Opt-in per firm.
-  { slug: "proposals", label: "Client proposals", railLabel: "Proposals", href: "/dashboard/proposals/", icon: ICON.send, module: "proposals", step: 7 },
+  { slug: "proposals", label: PROPOSALS_NAME, railLabel: PROPOSALS_NAME, href: "/dashboard/proposals/", icon: ICON.send, module: "proposals", step: 7 },
   // One board from referral to registration (src/lib/lifecycle). No module: it reads only the firm's own leads and matters.
   { slug: "pipeline", label: "Pipeline", href: "/dashboard/pipeline/", icon: ICON.bars, step: 7 },
-  { slug: "matters", label: "Matters", railLabel: "All matters", href: "/dashboard/matters/", icon: ICON.case, step: 6 },
+  { slug: "matters", label: "Matters", railLabel: "All matters", href: "/dashboard/matters/", linkHref: MATTERS_LIST_PATH, icon: ICON.case, step: 6 },
   { slug: "documents", label: "Documents", href: "/dashboard/documents/", icon: ICON.file, step: 6 },
   { slug: "portals", label: "Client portals", href: "/dashboard/portals/", icon: ICON.users, step: 6, built: false },
   { slug: "copilot", label: COPILOT_NAME, href: "/dashboard/copilot/", icon: ICON.spark, step: 7 },
@@ -107,7 +118,7 @@ export const RAIL_TREE: readonly (readonly RailNode[])[] = [
     { slug: "calendar" },
   ],
   [
-    { label: INTAKE_NAME, icon: ICON.tray, link: "intake", kids: ["intake", "forms"] },
+    { label: INTAKE_NAME, icon: ICON.users, link: "intake", kids: ["intake", "forms"] },
     { slug: "quotes" },
     { slug: "proposals" },
     { label: "Active matters", icon: ICON.case, link: "matters", kids: ["matters", "pipeline", "documents", "portals"] },
@@ -191,6 +202,11 @@ export function navItemBySlug(slug: string): NavItem | undefined {
   return NAV.find((item) => item.slug === slug);
 }
 
+/** The address a link to this section uses (its list value for Intake and Matters). */
+export function navLinkHref(item: NavItem): string {
+  return item.linkHref ?? item.href;
+}
+
 /** Whether `pathname` is inside `item`'s section. */
 export function isNavActive(pathname: string, item: NavItem): boolean {
   const path = pathname.endsWith("/") ? pathname : `${pathname}/`;
@@ -222,11 +238,11 @@ export function railGroups(visible: readonly NavItem[], pathname: string, tree: 
       if ("slug" in node) {
         const item = bySlug.get(node.slug);
         if (!item) return [];
-        return [{ key: item.slug || "today", label: item.label, icon: item.icon, href: item.href, active: isNavActive(pathname, item), childActive: false, countKey: item.slug, kids: [] }];
+        return [{ key: item.slug || "today", label: item.label, icon: item.icon, href: navLinkHref(item), active: isNavActive(pathname, item), childActive: false, countKey: item.slug, kids: [] }];
       }
       const kids = node.kids.flatMap((slug) => {
         const item = bySlug.get(slug);
-        return item ? [{ key: item.slug, label: item.railLabel ?? item.label, icon: item.icon, href: item.href, active: isNavActive(pathname, item), countKey: item.slug }] : [];
+        return item ? [{ key: item.slug, label: item.railLabel ?? item.label, icon: item.icon, href: navLinkHref(item), active: isNavActive(pathname, item), countKey: item.slug }] : [];
       });
       if (kids.length === 0) return [];
       // The parent opens its list; with no list child of its own, its first visible child.
@@ -271,7 +287,7 @@ export function railCountFor(
 export const MOBILE_BAR = ["", "intake", "queue", "mail", "matters"] as const;
 
 /** Short names for the phone bar, where the rail's longer ones would not fit under an icon. */
-const MOBILE_LABEL: Record<string, string> = { "": "Today", intake: INTAKE_NAME, queue: APPROVALS_NAME, mail: "Mail", matters: "Matters" };
+const MOBILE_LABEL: Record<string, string> = { "": "Today", intake: INTAKE_NAME, queue: APPROVALS_NAME, mail: MAIL_NAME, matters: "Matters" };
 
 export type MobileBarItem = { slug: string; label: string; icon: string; href: string; active: boolean; countKey: string };
 
@@ -288,7 +304,7 @@ export function mobileBarItems(visible: readonly NavItem[], pathname: string, ba
   const labels = bar ? bar.labels : MOBILE_LABEL;
   return slugs.flatMap((slug) => {
     const item = bySlug.get(slug);
-    return item ? [{ slug, label: labels[slug] ?? item.label, icon: item.icon, href: item.href, active: isNavActive(pathname, item), countKey: slug }] : [];
+    return item ? [{ slug, label: labels[slug] ?? item.label, icon: item.icon, href: navLinkHref(item), active: isNavActive(pathname, item), countKey: slug }] : [];
   });
 }
 
@@ -322,7 +338,7 @@ export function moreSections(visible: readonly NavItem[], pathname: string, grou
       label: group.label,
       items: group.slugs.flatMap((slug) => {
         const item = bySlug.get(slug);
-        return item && !inBar.has(slug) ? [{ slug, label: item.label, href: item.href, active: isNavActive(pathname, item) }] : [];
+        return item && !inBar.has(slug) ? [{ slug, label: item.label, href: navLinkHref(item), active: isNavActive(pathname, item) }] : [];
       }),
     }));
   if (groups) return sectionsOf(groups).filter((g) => g.items.length > 0);

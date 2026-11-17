@@ -107,7 +107,7 @@ const ctx = (opens?: OpensRead) => ({ today: "2026-10-29", tz: TZ, now: Date.par
 describe("the list cell, rendered", () => {
   const cell = (over: Partial<ListRowInput>, opens?: OpensRead) => {
     const html = text(renderToStaticMarkup(<ProposalsTable rows={[buildProposalRowView(input(over), ctx(opens))]} footerLeft="" footerRight="" />));
-    const m = /<div class="pq-mono pq-sub pq-opens" data-opens="([a-z_]+)">([^<]*)<\/div>/.exec(html);
+    const m = /<div class="pq-meta pq-sub pq-opens" data-opens="([a-z_]+)">([^<]*)<\/div>/.exec(html);
     return m ? { kind: m[1], text: m[2], html } : { kind: null, text: null, html };
   };
 

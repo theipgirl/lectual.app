@@ -45,15 +45,15 @@ describe("F9 + PR #4: the one client-email button in the editor", () => {
 describe("F10/P2: Withdraw in a More menu with a confirm", () => {
   it("Withdraw is a menu with a confirm, not a main button", () => {
     const html = life({ status: "sent", clientUrl: URL_ });
-    // Sprint 1: the menu is named for what it holds; the confirm stays closed until it is chosen.
-    expect(html).toContain(">Withdraw<");
+    // The menu is the shared "More"; the confirm stays closed until an item is chosen.
+    expect(html).toContain('data-more-items="withdraw"');
     expect(html).not.toContain("Withdraw this version?");
   });
-  it("the menu is the shared Popover (Esc / outside click) and the confirm has an explicit Cancel", () => {
+  it("the menu is the shared More menu (Esc / outside click) and the confirm has an explicit Cancel", () => {
     const src = readFileSync("src/components/proposal-editor/Lifecycle.tsx", "utf8");
-    expect(src).toContain("Popover");
-    expect(src).toMatch(/onClick=\{\(\) => setConfirming\(null\)\}[\s\S]*Cancel/);
-    expect(src).toContain("Yes, withdraw");
+    expect(src).toContain("list-page/MoreMenu");
+    expect(src).toMatch(/onClick=\{\(\) => setConfirming\(null\)\}[\s\S]*CANCEL/);
+    expect(src).toContain('yesVerb("withdraw")');
   });
 });
 
@@ -77,7 +77,7 @@ describe("F10: one totals box, one History card, header links, tab title", () =>
     expect(page).toMatch(/client_name\?\.trim\(\) \|\| null, "Proposal"/);
   });
   it("uses one name for the area", () => {
-    expect(page).toContain("← {PROPOSALS_NAME}");
+    expect(page).toContain("back={{ href: \"/dashboard/proposals/\", label: PROPOSALS_NAME }}");
     expect(page).not.toContain("Client proposals");
   });
 });

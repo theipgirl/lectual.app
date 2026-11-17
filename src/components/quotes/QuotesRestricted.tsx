@@ -1,3 +1,6 @@
+import { EmptyState } from "@/components/ui/EmptyState";
+import { PageHeader } from "@/components/ui/PageHeader";
+
 /**
  * The in-firm refusal for the quotes pages. An explanatory card rather than
  * `notFound()`, on purpose: this gate is a decision INSIDE one firm about who
@@ -7,18 +10,10 @@
 export function QuotesRestricted({ title, detail }: { title: string; detail?: string }) {
   return (
     <>
-      <div>
-        <div className="lx-label">Intake</div>
-        <h1 className="lx-h1">{title}</h1>
-      </div>
-      <div className="lx-card lx-empty-card">
-        <h2 className="lx-h2" style={{ fontSize: 25 }}>
-          Restricted to the firm&apos;s principals
-        </h2>
-        <p className="lx-note" style={{ margin: 0 }}>
-          {detail ?? "Quotes are built by owners, admins, senior admins and attorneys. Ask one of them for access."}
-        </p>
-      </div>
+      <PageHeader title={title} />
+      <EmptyState title="Restricted to the firm's principals">
+        {detail ?? "Quotes are built by owners, admins, senior admins and attorneys. Ask one of them for access."}
+      </EmptyState>
     </>
   );
 }

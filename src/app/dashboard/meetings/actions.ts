@@ -1,5 +1,6 @@
 "use server";
 
+import { REFRESH_TO_TRY_AGAIN } from "@/lib/ui/words";
 import { revalidatePath } from "next/cache";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { stopLeadSequencesAsStaff } from "@/lib/campaigns/stop-staff";
@@ -54,7 +55,7 @@ export async function linkMeetingAction(_prev: ActionState, formData: FormData):
     .update({ lead_id: leadId, matter_id: matterId, link_source: leadId || matterId ? "staff" : null })
     .eq("id", meetingId)
     .select("id, started_at, org_id");
-  if (error) return { error: error.code === "23503" ? "That lead or matter isn't in your firm." : "Couldn't save the link. Try again shortly." };
+  if (error) return { error: error.code === "23503" ? "That lead or matter isn't in your firm." : `Couldn't save the link. ${REFRESH_TO_TRY_AGAIN}` };
   if (!data?.length) return { error: "Meeting not found." };
   // A meeting linked to a lead is a touch on it: the Intake list sorts by the last thing that
   // happened. Best-effort, so a bump that can't land never turns a saved link into an error.
@@ -99,7 +100,7 @@ export async function draftFollowUpAction(_prev: ActionState, formData: FormData
   if (!aiConfigured()) return { error: "Drafting isn't switched on for your firm yet. Lectual will turn it on." };
 
   const read = await getMeeting(meetingId);
-  if (read.status !== "ok") return { error: "Couldn't load the meeting. Try again shortly." };
+  if (read.status !== "ok") return { error: `Couldn't load the meeting. ${REFRESH_TO_TRY_AGAIN}` };
   const meeting = read.meeting;
   if (!meeting) return { error: "Meeting not found." };
   if (!hasMaterial(meeting)) return { error: "This meeting has no summary or transcript yet, so there's nothing to recap." };
@@ -126,7 +127,7 @@ export async function draftFollowUpAction(_prev: ActionState, formData: FormData
     .eq("payload->>source", "post-consult")
     .eq("payload->>meeting_id", meeting.id)
     .limit(1);
-  if (priorErr) return { error: "Couldn't check for an earlier draft. Try again shortly." };
+  if (priorErr) return { error: `Couldn't check for an earlier draft. ${REFRESH_TO_TRY_AGAIN}` };
   if (prior && prior.length > 0) return { error: "A follow-up for this meeting is already in the approval queue." };
 
   const { data: profile } = await supabase.from("crm_org_profile").select("email_signature").maybeSingle();
@@ -166,7 +167,7 @@ export async function draftFollowUpAction(_prev: ActionState, formData: FormData
     subject = output.subject;
     extraction = output.consult_details;
   } catch {
-    return { error: "The draft couldn't be written or queued. Nothing was sent. Try again shortly." };
+    return { error: `The draft couldn't be written or queued. Nothing was sent. ${REFRESH_TO_TRY_AGAIN}` };
   }
 
   await supabase.from("crm_activity").insert({
@@ -224,7 +225,7 @@ export async function draftProposalAction(_prev: ActionState, formData: FormData
   if (!meetingId || meetingId === "bad") return { error: "Meeting not found." };
 
   const read = await getMeeting(meetingId);
-  if (read.status !== "ok") return { error: "Couldn't load the meeting. Try again shortly." };
+  if (read.status !== "ok") return { error: `Couldn't load the meeting. ${REFRESH_TO_TRY_AGAIN}` };
   const meeting = read.meeting;
   if (!meeting) return { error: "Meeting not found." };
   if (!hasMaterial(meeting)) return { error: "This meeting has no summary or transcript yet, so there's nothing to draft from." };

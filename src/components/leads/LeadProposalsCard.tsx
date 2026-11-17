@@ -1,7 +1,8 @@
 import Link from "next/link";
+import { LoadFailedLine } from "@/components/ui/LoadFailed";
 import type { ProposalListItem } from "@/lib/proposals/store";
 import { statusLabel, statusTone } from "@/lib/proposal-editor/labels";
-import { formatCents } from "@/lib/quotes/money";
+import { formatMoney } from "@/lib/ui/format";
 import { DRAFT_BLOCK_NOTE, type DraftBlock } from "@/lib/consult-proposal/draft-availability";
 import { ProposalFromTranscript } from "./ProposalFromTranscript";
 
@@ -27,7 +28,7 @@ export function LeadProposalsCard({
   return (
     <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }} aria-labelledby="lead-proposals-title">
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-        <h2 id="lead-proposals-title" className="lx-h2" style={{ fontSize: 23 }}>
+        <h2 id="lead-proposals-title" className="lx-h2">
           Client proposal
         </h2>
         {canWrite && (
@@ -37,7 +38,7 @@ export function LeadProposalsCard({
         )}
       </div>
       {read.status === "unavailable" ? (
-        <p className="lx-note" style={{ margin: 0 }}>Proposals couldn&apos;t be loaded just now.</p>
+        <LoadFailedLine>Proposals couldn&apos;t be loaded.</LoadFailedLine>
       ) : read.proposals.length === 0 ? (
         <p className="lx-note" style={{ margin: 0 }}>No proposal for this lead yet.</p>
       ) : (
@@ -47,7 +48,7 @@ export function LeadProposalsCard({
               <Link href={`/dashboard/proposals/${p.id}/`}>{p.title}</Link>
               <span className={`lx-pill lx-pill-${statusTone(p.status)}`}>{statusLabel(p.status)}</span>
               <span className="lx-note">
-                v{p.version} · {formatCents(p.legal_total_cents)} legal · {formatCents(p.gov_total_cents)} USPTO
+                v{p.version} · {formatMoney(p.legal_total_cents)} legal · {formatMoney(p.gov_total_cents)} USPTO
                 {p.source === "agent" ? " · drafted by an assistant" : ""}
               </span>
             </li>

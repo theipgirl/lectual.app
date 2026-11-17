@@ -1,5 +1,7 @@
 import type { LeadPendingApproval } from "@/lib/intake/pending-approvals";
 import { needsRebeccaLabel, needsRebeccaTitle } from "@/lib/intake/needs-rebecca";
+import { Pill } from "@/components/ui/Pill";
+import { MEANING_TONE } from "@/lib/ui/tones";
 
 /**
  * "Awaiting approval · N": this lead has drafts sitting in the approval queue for
@@ -12,20 +14,8 @@ import { needsRebeccaLabel, needsRebeccaTitle } from "@/lib/intake/needs-rebecca
 export default function NeedsRebeccaBadge({ pending }: { pending: LeadPendingApproval[] }) {
   if (pending.length === 0) return null;
   return (
-    <span
-      title={needsRebeccaTitle(pending)}
-      style={{
-        flex: "0 0 auto",
-        fontSize: "var(--lp-meta, 13px)",
-        lineHeight: 1.4,
-        padding: "1px 7px",
-        borderRadius: 4,
-        background: "var(--critbg)",
-        color: "var(--crit)",
-        whiteSpace: "nowrap",
-      }}
-    >
+    <Pill tone={MEANING_TONE.needsPerson} wrap title={needsRebeccaTitle(pending)}>
       {needsRebeccaLabel(pending.length)}
-    </span>
+    </Pill>
   );
 }

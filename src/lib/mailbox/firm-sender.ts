@@ -87,3 +87,18 @@ export function relabelFirmSent<T extends { direction: "inbound" | "outbound"; f
     return direction === m.direction ? m : { ...m, direction };
   });
 }
+
+/**
+ * Mail from the USPTO (TMOfficialNotices@uspto.gov, TEAS@uspto.gov, any *.uspto.gov). It is inbound, but it is
+ * never "the client replied": the sync stores it with `party: "uspto"` and readers treat it as contact with no
+ * direction. Sender address only.
+ */
+export function isUsptoSender(from: string | null | undefined): boolean {
+  const address = addressOf(from);
+  if (!address) return false;
+  const domain = address.slice(address.lastIndexOf("@") + 1);
+  return domain === "uspto.gov" || domain.endsWith(".uspto.gov");
+}
+
+/** The `party` value stored on a USPTO message's activity payload. */
+export const USPTO_PARTY = "uspto" as const;

@@ -28,7 +28,7 @@
   align-items: flex-start;
   padding: 12px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--r-md);
   background: var(--well);
 }
 
@@ -36,14 +36,15 @@
   flex: 0 0 auto;
   width: 26px;
   height: 26px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--card);
   border: 1px solid var(--line);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--mono);
-  font-size: 12.5px;
+  font-family: var(--sans);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-1);
   color: var(--body);
 }
 
@@ -77,7 +78,7 @@
   gap: 2px;
 }
 .lx-kpis-compact .lx-kpi-value {
-  font-size: 28px;
+  font-size: var(--fs-6);
 }
 
 /* Starter suggestion on an empty campaign. */
@@ -87,7 +88,7 @@
   margin: 0 18px 14px;
   padding: 14px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--r-md);
 }
 .lx-campaigns-starter-list {
   margin: 0;
@@ -100,3 +101,20 @@
   margin-top: 4px;
   max-width: 420px;
 }
+
+/* Shared small rules (replace inline styles). */
+.lx-campaigns-error { color: var(--wine); margin: 0; }
+.lx-campaigns-wide { grid-column: 1 / -1; }
+.lx-campaigns-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.lx-campaigns-toggle { display: inline-flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+.lx-campaigns-enroll { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+.lx-campaigns-enroll-pick { min-width: 260px; flex: 1; }
+.lx-campaigns-actions-col { display: grid; gap: 6px; justify-items: flex-start; }
+.lx-campaigns-actions-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.lx-campaigns-pad { padding: 0 18px 14px; margin: 0; }
+.lx-campaigns-pad-end { padding: 0 18px 18px; margin: 0; }
+.lx-campaigns-pad-bottom { padding-bottom: 14px; }
+.lx-campaigns-gap { margin: 0 0 8px; }
+.lx-campaigns-gap-top { margin: 8px 0 0; }
+.lx-campaigns-lead { color: var(--ink); font-weight: 500; }
+.lx-campaigns-stopline { margin-top: 4px; }

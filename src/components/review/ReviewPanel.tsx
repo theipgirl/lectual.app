@@ -7,6 +7,7 @@ import { deadlineIsSoon } from "@/lib/review/format";
 import { SNOOZE_CHOICES, SNOOZE_LABEL } from "@/lib/review/snooze";
 import { WAITING_LABEL } from "@/lib/review/waiting";
 import { TASK_TITLE_MAX } from "@/lib/matters/task-edit";
+import { stageDisplayName } from "@/lib/matters/list-view";
 import type { CloseStage } from "@/lib/review/close-stage";
 import type { OpenRef } from "@/lib/review/open";
 import {
@@ -18,6 +19,10 @@ import {
   snoozeNextStepAction,
   updateNextStepAction,
 } from "@/app/dashboard/review/actions";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { LoadFailedLine } from "@/components/ui/LoadFailed";
+import { Pill } from "@/components/ui/Pill";
+import { ADD_TO_TIMELINE, BLANK, LAST_CONTACT, OWNER_COLUMN, TEAMMATE, UNASSIGNED, noneYet, ADD_ANOTHER_NEXT_STEP, ADD_NEXT_STEP } from "@/lib/ui/words";
 import { ActForm } from "./ActForm";
 import { LostNurture } from "./LostNurture";
 import { PanelShell } from "./PanelShell";
@@ -45,18 +50,10 @@ export type PanelProps = {
 
 const TITLE_ID = "rv-panel-title";
 
-function Close({ href }: { href: string }) {
-  return (
-    <Link href={href} data-close className="rv-panel-x lx-btn lx-btn-ghost lx-btn-sm" aria-label="Close" scroll={false}>
-      <span aria-hidden="true">×</span>
-    </Link>
-  );
-}
-
 function MemberOptions({ members }: { members: Member[] }) {
   return (
     <>
-      <option value="">Unassigned</option>
+      <option value="">{UNASSIGNED}</option>
       {members.map((m) => (
         <option key={m.userId} value={m.userId}>
           {m.name}
@@ -83,7 +80,7 @@ function fullPage(open: OpenRef): string {
 export function ReviewPanel(props: PanelProps) {
   const { open, row, detail, today, timeZone, members, canWrite, canMove, closeStages, closeHref, canUpload = false } = props;
   const names = new Map(members.map((m) => [m.userId, m.name]));
-  const who = (id: string | null) => (id ? names.get(id) ?? "Teammate" : null);
+  const who = (id: string | null) => (id ? names.get(id) ?? TEAMMATE : null);
 
   if (detail.status !== "ok" || !row) {
     const text =
@@ -93,16 +90,8 @@ export function ReviewPanel(props: PanelProps) {
           ? "This record couldn't be loaded. Refresh to try again."
           : "This record isn't on the weekly review right now.";
     return (
-      <PanelShell closeHref={closeHref} titleId={TITLE_ID}>
-        <header className="rv-panel-head">
-          <h2 id={TITLE_ID} className="lx-h2">
-            Record
-          </h2>
-          <Close href={closeHref} />
-        </header>
-        <p className="lx-note" role={detail.status === "unavailable" ? "alert" : "status"}>
-          {text}
-        </p>
+      <PanelShell closeHref={closeHref} titleId={TITLE_ID} title="Record">
+        {detail.status === "unavailable" ? <LoadFailedLine refresh={false}>{text}</LoadFailedLine> : <p className="lx-note" role="status">{text}</p>}
         <div className="rv-panel-foot">
           {detail.status === "ok" && (
             <Link href={fullPage(open)} className="lx-btn lx-btn-sec lx-btn-sm">
@@ -131,29 +120,21 @@ export function ReviewPanel(props: PanelProps) {
   );
 
   return (
-    <PanelShell closeHref={closeHref} titleId={TITLE_ID}>
-      <header className="rv-panel-head">
-        <div>
-          <h2 id={TITLE_ID} className="lx-h2">
-            {row.client}
-          </h2>
-          <p className="lx-note" style={{ margin: 0 }}>
-            {open.kind === "lead" ? "Lead" : "Matter"}
-            {row.mark ? ` · ${row.mark}` : ""}
-          </p>
-        </div>
-        <Close href={closeHref} />
-      </header>
+    <PanelShell closeHref={closeHref} titleId={TITLE_ID} title={row.client}>
+      <p className="lx-note rv-panel-kind">
+        {open.kind === "lead" ? "Lead" : "Matter"}
+        {row.mark ? ` · ${row.mark}` : ""}
+      </p>
 
       <dl className="rv-facts rv-panel-facts">
         <Fact label="Stage">
-          {row.stageLabel ?? "—"}
+          {row.stageLabel ?? BLANK}
           <span className="lx-note rv-sub">{row.stageDays !== null ? `${row.stageDays}d in stage` : row.stageNote ?? ""}</span>
         </Fact>
-        <Fact label="Assigned to">{who(detail.assignedTo) ?? "Unassigned"}</Fact>
-        <Fact label="Came from">{detail.cameFrom ?? "—"}</Fact>
-        <Fact label="Last contact">{lastContactText(row, today)}</Fact>
-        <Fact label="Waiting on">{row.waiting ? WAITING_LABEL[row.waiting] : "—"}</Fact>
+        <Fact label={OWNER_COLUMN}>{who(detail.assignedTo) ?? UNASSIGNED}</Fact>
+        <Fact label="Came from">{detail.cameFrom ?? BLANK}</Fact>
+        <Fact label={LAST_CONTACT}>{lastContactText(row, today)}</Fact>
+        <Fact label="Waiting on">{row.waiting ? WAITING_LABEL[row.waiting] : BLANK}</Fact>
         <Fact label="USPTO deadline">
           {row.deadline ? (
             <span className={deadlineIsSoon(row.deadline.dueDate, today) ? "rv-deadline-soon" : undefined}>
@@ -161,17 +142,17 @@ export function ReviewPanel(props: PanelProps) {
               {row.deadline.title ? <span className="lx-note rv-sub">{row.deadline.title}</span> : null}
             </span>
           ) : (
-            "—"
+            BLANK
           )}
         </Fact>
         {row.proposalExpiry && (
           <Fact label="Proposal">
-            <span className={`lp-pill${row.proposalExpiry.expired ? " lp-pill-risk rv-deadline-soon" : ""}`}>{row.proposalExpiry.text}</span>
+            <Pill tone={row.proposalExpiry.expired ? "risk" : "mute"}>{row.proposalExpiry.text}</Pill>
           </Fact>
         )}
       </dl>
       <p>
-        <Link href={fullPage(open)} className="rv-panel-full">
+        <Link href={fullPage(open)} className="rv-panel-full lx-link">
           Open the full {open.kind === "matter" ? "matter" : "lead"} page →
         </Link>
       </p>
@@ -187,7 +168,7 @@ export function ReviewPanel(props: PanelProps) {
                 <input type="hidden" name="taskId" value={next.id} />
                 <input className="lx-input" name="title" maxLength={TASK_TITLE_MAX} defaultValue={next.title} aria-label="Next step" required />
                 <input className="lx-input" type="date" name="dueAt" defaultValue={next.dueDate ?? ""} aria-label="Due date" />
-                <select className="lx-input" name="assigneeId" defaultValue={next.assigneeId ?? ""} aria-label="Assigned to">
+                <select className="lx-input" name="assigneeId" defaultValue={next.assigneeId ?? ""} aria-label={OWNER_COLUMN}>
                   <MemberOptions members={members} />
                 </select>
               </ActForm>
@@ -204,7 +185,7 @@ export function ReviewPanel(props: PanelProps) {
               </div>
             </>
           ) : (
-            <p style={{ margin: 0 }}>
+            <p className="rv-readonly">
               {next.title}
               <span className={`lx-note rv-sub${due.overdue ? " rv-deadline-soon" : ""}`}>
                 {due.text}
@@ -213,13 +194,11 @@ export function ReviewPanel(props: PanelProps) {
             </p>
           )
         ) : (
-          <p className="lx-note" style={{ margin: 0 }}>
-            No next step.
-          </p>
+          <EmptyState variant="line">No next step.</EmptyState>
         )}
         {canWrite && (
           <details className="rv-more" open={!next}>
-            <summary>{next ? "Add another next step" : "Add a next step"}</summary>
+            <summary className="lx-btn lx-btn-sec lx-btn-sm">{next ? ADD_ANOTHER_NEXT_STEP : ADD_NEXT_STEP}</summary>
             <ActForm action={setNextStepAction} submit="Save next step">
               {hidden}
               <input className="lx-input" name="title" maxLength={TASK_TITLE_MAX} placeholder="What happens next" aria-label="New next step" required />
@@ -238,9 +217,7 @@ export function ReviewPanel(props: PanelProps) {
             Other open steps
           </h3>
           {!detail.steps.ok ? (
-            <p className="lx-note" role="status" style={{ margin: 0 }}>
-              Other steps couldn&apos;t load.
-            </p>
+            <LoadFailedLine refresh={false}>Other steps couldn&apos;t load.</LoadFailedLine>
           ) : (
             <ul className="rv-steps">
               {otherSteps.map((s) => {
@@ -272,9 +249,7 @@ export function ReviewPanel(props: PanelProps) {
           Stage and owner
         </h3>
         {!detail.stages.ok ? (
-          <p className="lx-note" role="status" style={{ margin: 0 }}>
-            Stages couldn&apos;t load.
-          </p>
+          <LoadFailedLine refresh={false}>Stages couldn&apos;t load.</LoadFailedLine>
         ) : stageWritable ? (
           <ActForm key={`stage|${detail.currentStageId}`} action={moveStageAction} submit="Move stage">
             {hidden}
@@ -286,7 +261,7 @@ export function ReviewPanel(props: PanelProps) {
               )}
               {detail.stages.options.map((o) => (
                 <option key={o.id} value={o.id}>
-                  {o.name}
+                  {stageDisplayName(o.name)}
                 </option>
               ))}
             </select>
@@ -296,7 +271,7 @@ export function ReviewPanel(props: PanelProps) {
           <ActForm key={`owner|${detail.assignedTo}`} action={assignRecordAction} submit="Assign">
             <input type="hidden" name="kind" value={open.kind} />
             <input type="hidden" name="id" value={open.id} />
-            <select className="lx-input" name="userId" defaultValue={detail.assignedTo ?? ""} aria-label="Assigned to">
+            <select className="lx-input" name="userId" defaultValue={detail.assignedTo ?? ""} aria-label={OWNER_COLUMN}>
               <MemberOptions members={members} />
             </select>
           </ActForm>
@@ -311,7 +286,7 @@ export function ReviewPanel(props: PanelProps) {
           <h3 id="rv-sec-note-h" className="lx-label">
             Log what happened
           </h3>
-          <ActForm action={logWhatHappenedAction} submit="Add to timeline">
+          <ActForm action={logWhatHappenedAction} submit={ADD_TO_TIMELINE}>
             {hidden}
             <textarea className="lx-input" name="body" rows={3} placeholder="A short note for the timeline" aria-label="What happened" required />
           </ActForm>
@@ -323,13 +298,9 @@ export function ReviewPanel(props: PanelProps) {
           Recent activity
         </h3>
         {lines === null ? (
-          <p className="lx-note" role="status" style={{ margin: 0 }}>
-            Recent activity couldn&apos;t load.
-          </p>
+          <LoadFailedLine refresh={false}>Recent activity couldn&apos;t load.</LoadFailedLine>
         ) : lines.length === 0 ? (
-          <p className="lx-note" style={{ margin: 0 }}>
-            Nothing yet.
-          </p>
+          <EmptyState variant="line">{noneYet("activity")}</EmptyState>
         ) : (
           <ol className="rv-activity">
             {lines.map((l) => (

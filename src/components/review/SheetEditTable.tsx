@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import {
   closeLeadAction,
   logWhatHappenedAction,
@@ -14,6 +14,7 @@ import {
   type ReviewActionState,
 } from "@/app/dashboard/review/actions";
 import { shortDate } from "@/lib/review/format";
+import { Icon } from "@/components/ui/Icon";
 import { UNASSIGNED_LANE } from "@/lib/review/lanes";
 import {
   EMPTY_SHEET_STATE,
@@ -55,6 +56,9 @@ import {
   type StageChoice,
 } from "@/lib/review/sheet-edit";
 import {
+  BLANK,
+  OWNER_COLUMN,
+  TEAMMATE,
   SHEET_ADD_NOTE,
   SHEET_CANCEL,
   SHEET_DUE,
@@ -68,6 +72,7 @@ import {
   SHEET_MOVE_TO_STAGE,
   SHEET_NEXT_STEP,
   SHEET_NO_ONE_FOUND,
+  LAST_CONTACT,
   SHEET_NO_SOURCE,
   SHEET_NOTE_BUTTON,
   SHEET_NOTE_NOT_SAVED,
@@ -85,6 +90,7 @@ import {
 } from "@/lib/ui/words";
 import { usePopPlacement } from "./pop-placement";
 import { sheetStatusStore } from "./sheet-status-store";
+import { SheetCard, SheetScroll, SheetTable } from "@/components/ui/SheetTable";
 import "./review-sheet-edit.css";
 
 export type SheetPerson = { userId: string; name: string; /** What the cell shows. */ short: string; roleLabel: string };
@@ -107,10 +113,10 @@ const HEADS: { col: SheetEditColumn; label: string }[] = [
   { col: "mark", label: "Mark" },
   { col: "status", label: "Status" },
   { col: "next", label: "Next step" },
-  { col: "court", label: "Whose court" },
+  { col: "court", label: OWNER_COLUMN },
   { col: "waiting", label: "Waiting on" },
   { col: "source", label: "Source" },
-  { col: "contact", label: "Last contact" },
+  { col: "contact", label: LAST_CONTACT },
 ];
 
 const ACTIONS: Record<SheetActionName, (prev: ReviewActionState, form: FormData) => Promise<ReviewActionState>> = {
@@ -336,7 +342,7 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
     writeSizes(next);
   };
 
-  const courtName = (id: string | null) => (id ? names.get(id) ?? "Teammate" : UNASSIGNED_LANE);
+  const courtName = (id: string | null) => (id ? names.get(id) ?? TEAMMATE : UNASSIGNED_LANE);
   const colCount = HEADS.length + (editing ? 1 : 0);
 
   return (
@@ -346,9 +352,9 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
           <kbd className="rse-key">Enter</kbd> {SHEET_KEYS_EDIT} <kbd className="rse-key">Tab</kbd> {SHEET_KEYS_NEXT} <kbd className="rse-key">Esc</kbd> {SHEET_KEYS_CANCEL}
         </p>
       )}
-      <div className="lx-card rse-card">
-       <div className="rse-scroll">
-        <table className="rse-tbl lx-stack" style={{ "--rse-min": `${sheetMinWidth(sizes, editing)}px` } as CSSProperties}>
+      <SheetCard>
+       <SheetScroll>
+        <SheetTable className="rse-tbl" fixed minWidth={sheetMinWidth(sizes, editing)}>
           <colgroup>
             {HEADS.map((h) => {
               const cw = colWidth(sizes, h.col);
@@ -366,7 +372,12 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                 return (
                   <th key={h.col} className={locked ? "rse-lock-th" : undefined} scope="col">
                     {h.label}
-                    {typed && <span aria-hidden> ✎</span>}
+                    {typed && (
+                      <>
+                        {" "}
+                        <Icon name="pencil" size={13} />
+                      </>
+                    )}
                     {editing && (
                       <span
                         className={`rse-col-grip${active ? " is-active" : ""}`}
@@ -421,18 +432,18 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                   return (
                     <tr key={row.key} style={h ? { height: h } : undefined} data-row={row.key}>
                       <td className="pri" title={row.client}>
-                        <Link href={row.openHref} className="rse-client" scroll={false}>
+                        <Link href={row.openHref} className="sheet-link" scroll={false}>
                           {row.client}
                         </Link>
                         {row.documentsText && <span className="lx-note rv-sub">{row.documentsText}</span>}
                       </td>
-                      <td data-label="Mark">{row.mark ?? <span className="rse-dash">—</span>}</td>
+                      <td data-label="Mark">{row.mark ?? <span className="rse-dash">{BLANK}</span>}</td>
                       <td data-label="Status">
                         {can("status") ? (
                           <>
                             <button type="button" className={`rse-cell rse-edit${isOpen(row.key, "status") ? " rse-on" : ""}${saving("status") ? " is-saving" : ""}`} aria-label={`Status: ${row.stageLabel ?? "none"}`} {...cellProps("status")}>
-                              {row.stageLabel ?? "—"}
-                              {isOpen(row.key, "status") && <span aria-hidden> ▾</span>}
+                              {row.stageLabel ?? BLANK}
+                              {isOpen(row.key, "status") &&  <Icon name="chevron-down" size={14} />}
                             </button>
                             {isOpen(row.key, "status") && (
                               <ChoicePop
@@ -453,7 +464,7 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                             )}
                           </>
                         ) : (
-                          <span>{row.stageLabel ?? "—"}</span>
+                          <span>{row.stageLabel ?? BLANK}</span>
                         )}
                       </td>
                       <td data-label="Next step" className="rse-next-td">
@@ -476,13 +487,13 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                             />
                           ) : (
                             <button type="button" className={`rse-cell rse-edit rse-wrapcell${nt?.overdue ? " rse-overdue" : ""}${saving("next") ? " is-saving" : ""}`} {...cellProps("next")}>
-                              {nt ? nt.text : "—"}
+                              {nt ? nt.text : BLANK}
                               {nt?.overdue && <span className="rse-sr"> {SHEET_OVERDUE}</span>}
                             </button>
                           )
                         ) : (
                           <span className={nt?.overdue ? "rse-overdue" : undefined}>
-                            {nt ? nt.text : "—"}
+                            {nt ? nt.text : BLANK}
                             {nt?.overdue && <span className="rse-sr"> {SHEET_OVERDUE}</span>}
                           </span>
                         )}
@@ -498,12 +509,12 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                           />
                         )}
                       </td>
-                      <td data-label="Whose court">
+                      <td data-label={OWNER_COLUMN}>
                         {can("court") ? (
                           <>
                             <button type="button" className={`rse-cell rse-edit${isOpen(row.key, "court") ? " rse-on" : ""}${saving("court") ? " is-saving" : ""}`} {...cellProps("court")}>
                               {courtName(court)}
-                              {isOpen(row.key, "court") && <span aria-hidden> ▾</span>}
+                              {isOpen(row.key, "court") &&  <Icon name="chevron-down" size={14} />}
                             </button>
                             {isOpen(row.key, "court") && (
                               <PersonPop
@@ -531,8 +542,8 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                         {can("source") ? (
                           <>
                             <button type="button" className={`rse-cell rse-edit${isOpen(row.key, "source") ? " rse-on" : ""}${saving("source") ? " is-saving" : ""}`} {...cellProps("source")}>
-                              {row.source ?? "—"}
-                              {isOpen(row.key, "source") && <span aria-hidden> ▾</span>}
+                              {row.source ?? BLANK}
+                              {isOpen(row.key, "source") &&  <Icon name="chevron-down" size={14} />}
                             </button>
                             {isOpen(row.key, "source") && (
                               <ChoicePop
@@ -550,10 +561,10 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                             )}
                           </>
                         ) : (
-                          <span>{row.source ?? "—"}</span>
+                          <span>{row.source ?? BLANK}</span>
                         )}
                       </td>
-                      <td data-label="Last contact" className={`rse-locked${row.contactIsDate ? " rse-mono" : ""}`} title={row.contactTitle ?? undefined}>
+                      <td data-label={LAST_CONTACT} className="rse-locked" title={row.contactTitle ?? undefined}>
                         {row.contactText}
                       </td>
                       {editing && (
@@ -562,7 +573,7 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                             <>
                               <button
                                 type="button"
-                                className={`rse-btn${isOpen(row.key, "note") ? " rse-btn--on rse-on" : ""}`}
+                                className={`lx-btn lx-btn-sec lx-btn-sm${isOpen(row.key, "note") ? " rse-on" : ""}`}
                                 aria-label={sheetNoteFor(row.client)}
                                 aria-expanded={isOpen(row.key, "note")}
                                 data-rse-cell={`${row.key}|note`}
@@ -592,9 +603,9 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
               </SectionRows>
             ))}
           </tbody>
-        </table>
-       </div>
-      </div>
+        </SheetTable>
+       </SheetScroll>
+      </SheetCard>
     </div>
   );
 }
@@ -602,13 +613,13 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
 function SectionRows({ sec, colCount, children }: { sec: SheetSection; colCount: number; children: React.ReactNode }) {
   return (
     <>
-      <tr className="rse-sec" data-section={sec.id}>
+      <tr className="sheet-sec" data-section={sec.id}>
         <th colSpan={colCount} scope="colgroup">
           {sec.title} · {sec.rows.length}
         </th>
       </tr>
       {sec.rows.length === 0 ? (
-        <tr className="rse-empty">
+        <tr className="sheet-empty">
           <td colSpan={colCount}>{SHEET_EMPTY_SECTION}</td>
         </tr>
       ) : (
@@ -669,7 +680,7 @@ function PersonPop({ people, current, onPick, onCancel, onTab }: { people: Sheet
   const shown = matchPeople(people, term);
   const showUnassigned = !term.trim() || UNASSIGNED_LANE.toLowerCase().includes(term.trim().toLowerCase());
   return (
-    <div className="rse-pop" role="listbox" aria-label="Whose court" ref={ref} onKeyDown={(e) => listKeys(e, onCancel, onTab)}>
+    <div className="rse-pop" role="listbox" aria-label={OWNER_COLUMN} ref={ref} onKeyDown={(e) => listKeys(e, onCancel, onTab)}>
       <input className="rse-in" type="text" aria-label={SHEET_FIND_PERSON} placeholder={SHEET_FIND_PERSON} value={term} onChange={(e) => setTerm(e.target.value)} autoFocus />
       <div className="rse-pop-list">
         {shown.map((p) => (
@@ -684,7 +695,7 @@ function PersonPop({ people, current, onPick, onCancel, onTab }: { people: Sheet
         {showUnassigned && (
           <button type="button" role="option" aria-selected={current === null} className={`rse-opt${current === null ? " sel" : ""}`} onClick={() => onPick(null)}>
             <span className="rse-av soft" aria-hidden>
-              —
+              {BLANK}
             </span>
             {UNASSIGNED_LANE}
           </button>
@@ -800,10 +811,10 @@ function NotePop({ client, draft, onSave, onCancel }: { client: string; draft?: 
         </p>
       )}
       <div className="rse-note-acts">
-        <button type="button" className="rse-btn" onClick={onCancel}>
+        <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={onCancel}>
           {SHEET_CANCEL}
         </button>
-        <button type="submit" className="rse-btn rse-btn--on" disabled={busy}>
+        <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={busy}>
           {SHEET_ADD_NOTE}
         </button>
       </div>
