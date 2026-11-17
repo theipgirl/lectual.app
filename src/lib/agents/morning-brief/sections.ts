@@ -13,6 +13,7 @@ import {
 import type { QueueItem } from "@/lib/queue/api";
 import { IN_CHUNK, addCivilDays, chunk, civilDay, leadLabel, text } from "../shared";
 import type { BriefLead, BriefStage } from "./rules";
+import { leadRead } from "@/lib/leads/live";
 
 /**
  * The six sections of the morning brief, each read on its own so one failing never hides the
@@ -58,13 +59,13 @@ export async function readOpenLeads(admin: SupabaseClient, orgId: string, stages
   if (openIds.length === 0) return [];
   const out: BriefLead[] = [];
   for (let page = 0; page < SECTION_PAGES; page += 1) {
-    const { data, error } = await admin
-      .from("crm_lead")
-      .select(LEAD_COLUMNS)
-      .eq("org_id", orgId)
-      .in("current_stage_id", openIds)
-      .order("id", { ascending: true })
-      .range(page * SECTION_PAGE, page * SECTION_PAGE + SECTION_PAGE - 1);
+    const { data, error } = await leadRead(({ live }) =>
+      live(admin.from("crm_lead").select(LEAD_COLUMNS))
+        .eq("org_id", orgId)
+        .in("current_stage_id", openIds)
+        .order("id", { ascending: true })
+        .range(page * SECTION_PAGE, page * SECTION_PAGE + SECTION_PAGE - 1),
+    );
     if (error) throw new Error("lead read failed");
     const rows = (data ?? []) as BriefLead[];
     out.push(...rows);

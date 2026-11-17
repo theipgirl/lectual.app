@@ -2163,6 +2163,13 @@ export type Database = {
           lane: Database["public"]["Enums"]["crm_lead_temperature"] | null
           lane_set_at: string | null
           lane_set_by: string | null
+          // lectual 0107 (M5): a merged lead points at its keeper. Hand-added, and OPTIONAL on purpose: a
+          // database without 0107 has no such columns (src/lib/leads/live.ts reads them only when present).
+          // Never in Insert/Update: the crm_lead_merge_guard trigger refuses any direct write of them; only
+          // crm_merge_leads() sets them.
+          merged_into_id?: string | null
+          merged_at?: string | null
+          merged_by?: string | null
         }
         Insert: {
           ai_enriched_at?: string | null
@@ -4184,6 +4191,12 @@ export type Database = {
         Returns: string
       }
       seed_org_defaults: { Args: { p_org: string }; Returns: undefined }
+      // lectual 0107 (M5): merge two leads of the active org. SECURITY DEFINER, owner/admin/senior_admin only,
+      // called through the scoped client. Hand-added until the next codegen run.
+      crm_merge_leads: {
+        Args: { p_keeper: string; p_loser: string; p_choices: Json }
+        Returns: Json
+      }
       set_active_org: { Args: { p_org_id: string }; Returns: undefined }
       // 0050_platform_admin.sql — Lectual staff who may enter any firm.
       is_platform_admin: { Args: never; Returns: boolean }

@@ -17,6 +17,7 @@ import { authorizeReconcile } from "@/lib/reconcile/authorize";
 import { MAX_MOVES_PER_APPLY, RECONCILE_MESSAGES as MSG, isUuid } from "@/lib/reconcile/rules";
 import { readLawmatics, readLeads, readStageMapping, readStages, readStoredMail } from "@/lib/reconcile/sources";
 import type { ApplyResult, Confidence, MoveRequest, PlanRow, PreviewResult, RowOutcome } from "@/lib/reconcile/types";
+import { leadRead } from "@/lib/leads/live";
 
 /**
  * The two server actions behind /dashboard/intake/reconcile.
@@ -212,10 +213,13 @@ export async function applyReconcileAction(input: unknown): Promise<ApplyResult>
   }
 
   // (b) Every lead is still where the plan found it, read now through the caller's own client.
-  const { data: current, error: leadError } = await supabase
-    .from("crm_lead")
-    .select("id, current_stage_id, last_activity_at")
-    .in("id", moves.map((m) => m.leadId));
+  // A lead merged since the preview (lectual 0107) reads as missing, so the whole apply is refused below.
+  const { data: current, error: leadError } = await leadRead(({ live }) =>
+    live(supabase.from("crm_lead").select("id, current_stage_id, last_activity_at")).in(
+      "id",
+      moves.map((m) => m.leadId),
+    ),
+  );
   if (leadError) {
     logFailure("re-read leads", leadError);
     return { ok: false, error: MSG.readFailed };

@@ -10,6 +10,7 @@ import { agentEvidenceFor, type AgentEvidence, type StoredMail } from "./email";
 import type { ActivityRow } from "@/lib/stage-keeper/moves";
 import { parseMilestoneMapping, type MilestoneMapping } from "./milestones";
 import type { LeadRow, StageOpt } from "./types";
+import { leadRead } from "@/lib/leads/live";
 
 /**
  * The server-side readers behind the reconciliation screen. Every database read goes through the
@@ -49,12 +50,14 @@ export async function readLeads(supabase: Scoped): Promise<LeadsRead> {
       truncated = true;
       break;
     }
-    const { data, error } = await supabase
-      .from("crm_lead")
-      .select("id, first_name, last_name, email, current_stage_id, sheet_key, lawmatics_id, practice_area, last_activity_at")
-      .order("created_at", { ascending: true })
-      .order("id", { ascending: true })
-      .range(from, from + PAGE - 1);
+    // A merged lead (lectual 0107) is not matched or moved: its sheet key and Lawmatics id moved to the keeper when the
+    // keeper had none; otherwise the row is simply not reconciled (src/lib/leads/live.ts).
+    const { data, error } = await leadRead(({ live }) =>
+      live(supabase.from("crm_lead").select("id, first_name, last_name, email, current_stage_id, sheet_key, lawmatics_id, practice_area, last_activity_at"))
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, from + PAGE - 1),
+    );
     if (error) throw error;
     const page = data ?? [];
     for (const r of page) {

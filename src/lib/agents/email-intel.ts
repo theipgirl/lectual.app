@@ -4,6 +4,7 @@ import type { AgentContext, AgentResult } from "./types";
 import { fetchMessageBody } from "@/lib/mailbox/fetch";
 import { freshAccessToken, type ConnectionRow } from "@/lib/mailbox/sync";
 import type { MailboxProvider } from "@/lib/mailbox/providers";
+import { leadRead } from "@/lib/leads/live";
 
 /**
  * Email → client intel: reads inbound mail the sync has ALREADY filed on a
@@ -156,12 +157,13 @@ export async function runEmailIntel(ctx: AgentContext): Promise<AgentResult> {
     });
     if (!body) continue;
 
-    const { data: lead } = await admin
-      .from("crm_lead")
-      .select("id, first_name, last_name, business_name, phone, website, mark_text, practice_area")
-      .eq("id", act.lead_id as string)
-      .eq("org_id", orgId)
-      .maybeSingle();
+    // The mail row may sit on a merged lead (lectual 0107): that lead is skipped, never written.
+    const { data: lead } = await leadRead(({ live }) =>
+      live(admin.from("crm_lead").select("id, first_name, last_name, business_name, phone, website, mark_text, practice_area"))
+        .eq("id", act.lead_id as string)
+        .eq("org_id", orgId)
+        .maybeSingle(),
+    );
     if (!lead) continue;
     read += 1;
 

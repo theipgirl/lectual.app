@@ -3,6 +3,7 @@ import { AGENT_ACTOR } from "@/lib/stage-keeper/moves";
 import type { MoveEvidence, SignalId } from "@/lib/stage-keeper/signals";
 import { usableEvidenceDate } from "./evidence-date";
 import type { Lead } from "./leads";
+import { leadRead } from "@/lib/leads/live";
 
 /**
  * The one shared place a lead's stage changes, for a person and for the Stage Keeper.
@@ -89,12 +90,13 @@ async function moveAsAgent(actor: AgentActor, move: AgentMove): Promise<AgentMov
   if (!from || !to) return { ok: false, reason: "refused" };
   if (to.category !== "open" || to.order_index <= from.order_index) return { ok: false, reason: "refused" };
 
-  const { data: leadData, error: leadErr } = await admin
-    .from("crm_lead")
-    .select("id, current_stage_id, stage_entered_at")
-    .eq("id", move.leadId)
-    .eq("org_id", orgId)
-    .maybeSingle();
+  // A merged lead (lectual 0107) reads as not found: the agent never moves it (its guard would refuse the write).
+  const { data: leadData, error: leadErr } = await leadRead(({ live }) =>
+    live(admin.from("crm_lead").select("id, current_stage_id, stage_entered_at"))
+      .eq("id", move.leadId)
+      .eq("org_id", orgId)
+      .maybeSingle(),
+  );
   if (leadErr) return { ok: false, reason: "error" };
   const lead = leadData as { id: string; current_stage_id: string; stage_entered_at: string | null } | null;
   if (!lead) return { ok: false, reason: "not-found" };

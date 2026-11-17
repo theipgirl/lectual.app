@@ -3,6 +3,7 @@ import { getScopedClient } from "@/lib/db/scoped-client";
 import type { Lead, Stage } from "@/lib/pipeline";
 import { INTAKE_PRACTICE_AREA_FILTER } from "./counts";
 import type { LostRead } from "./sets";
+import { leadRead } from "@/lib/leads/live";
 
 /**
  * The Lost set's OWN reads. Scoped client only. Lost leads are not in the Leads list (intake scope is open and nurture
@@ -23,7 +24,7 @@ export async function readLostCount(stages: readonly Stage[]): Promise<LostRead>
   if (ids.length === 0) return { status: "none" };
   try {
     const db = await getScopedClient();
-    const { count, error } = await db.from("crm_lead").select("id", { count: "exact", head: true }).in("current_stage_id", ids).or(INTAKE_PRACTICE_AREA_FILTER);
+    const { count, error } = await leadRead(({ live }) => live(db.from("crm_lead").select("id", { count: "exact", head: true })).in("current_stage_id", ids).or(INTAKE_PRACTICE_AREA_FILTER));
     if (error || count === null || count === undefined) return { status: "unavailable" };
     return { status: "ok", count };
   } catch {
@@ -45,13 +46,13 @@ export async function readNurtureExtra(stages: readonly Stage[], loadedIds: Read
   if (ids.length === 0) return { status: "none" };
   try {
     const db = await getScopedClient();
-    const { data, error } = await db
-      .from("crm_lead")
-      .select("*")
-      .in("current_stage_id", ids)
-      .or(INTAKE_PRACTICE_AREA_FILTER)
-      .order("last_activity_at", { ascending: false, nullsFirst: false })
-      .limit(NURTURE_LIST_CAP);
+    const { data, error } = await leadRead(({ live }) =>
+      live(db.from("crm_lead").select("*"))
+        .in("current_stage_id", ids)
+        .or(INTAKE_PRACTICE_AREA_FILTER)
+        .order("last_activity_at", { ascending: false, nullsFirst: false })
+        .limit(NURTURE_LIST_CAP),
+    );
     if (error) return { status: "unavailable" };
     return { status: "ok", leads: (data ?? []).filter((l) => !loadedIds.has(l.id)) };
   } catch {
@@ -66,13 +67,13 @@ export async function listLostLeads(stages: readonly Stage[]): Promise<LostLeads
   if (ids.length === 0) return { status: "ok", leads: [], total: 0 };
   try {
     const db = await getScopedClient();
-    const { data, error, count } = await db
-      .from("crm_lead")
-      .select("*", { count: "exact" })
-      .in("current_stage_id", ids)
-      .or(INTAKE_PRACTICE_AREA_FILTER)
-      .order("last_activity_at", { ascending: false, nullsFirst: false })
-      .limit(LOST_LIST_CAP);
+    const { data, error, count } = await leadRead(({ live }) =>
+      live(db.from("crm_lead").select("*", { count: "exact" }))
+        .in("current_stage_id", ids)
+        .or(INTAKE_PRACTICE_AREA_FILTER)
+        .order("last_activity_at", { ascending: false, nullsFirst: false })
+        .limit(LOST_LIST_CAP),
+    );
     if (error) return { status: "unavailable" };
     return { status: "ok", leads: data ?? [], total: count ?? (data ?? []).length };
   } catch {

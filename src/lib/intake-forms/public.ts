@@ -26,6 +26,7 @@ import { isStepSchemaError } from "./steps";
 import { isMissingTableError } from "./store";
 import type { IntakeAnswer } from "./submission";
 import type { Stage } from "@/lib/pipeline/stages";
+import { leadRead } from "@/lib/leads/live";
 
 /**
  * The `/i/<slug>` and `/r/<token>` read and write path — the only
@@ -607,21 +608,16 @@ export async function completeStartedIntake(
     // What the answers make obvious, only where the lead has nothing yet.
     const practice = inferPracticeArea(handle.config, answers);
     if (practice) {
-      const { error: paErr } = await admin
-        .from("crm_lead")
-        .update({ practice_area: practice })
-        .eq("id", data.lead_id)
-        .eq("org_id", handle.orgId)
-        .is("practice_area", null);
+      // A lead merged meanwhile (lectual 0107) is skipped: the update matches no row instead of tripping its guard.
+      const { error: paErr } = await leadRead(({ live }) =>
+        live(admin.from("crm_lead").update({ practice_area: practice }).eq("id", data.lead_id as string).eq("org_id", handle.orgId).is("practice_area", null)),
+      );
       if (paErr) console.error("[intake] practice area update failed", paErr.code);
       const mark = practice === "Trademark" ? markFromAnswer(answers.find((a) => a.question === PACKS.Trademark[0])?.answer) : null;
       if (mark) {
-        const { error: markErr } = await admin
-          .from("crm_lead")
-          .update({ mark_text: mark })
-          .eq("id", data.lead_id)
-          .eq("org_id", handle.orgId)
-          .is("mark_text", null);
+        const { error: markErr } = await leadRead(({ live }) =>
+          live(admin.from("crm_lead").update({ mark_text: mark }).eq("id", data.lead_id as string).eq("org_id", handle.orgId).is("mark_text", null)),
+        );
         if (markErr) console.error("[intake] mark update failed", markErr.code);
       }
     }

@@ -7,6 +7,7 @@ import { intakeStageIds } from "./scope";
 import { INTAKE_PRACTICE_AREA_FILTER } from "./counts";
 import { suggestedLane, type Lane } from "@/lib/leads/lane";
 import { isReferralSource, type ReferralSource } from "./referral-source";
+import { leadRead } from "@/lib/leads/live";
 
 /**
  * Server-side reads/writes for the intake dashboard (blueprint §7).
@@ -47,16 +48,17 @@ export async function listIntakeLeads(stages?: Stage[]): Promise<Lead[]> {
   if (stageIds.length === 0) return [];
 
   const supabase = await getScopedClient();
-  const { data, error } = await supabase
-    .from("crm_lead")
-    .select("*")
-    .in("current_stage_id", stageIds)
-    // Null practice_area is INCLUDED on purpose: sheet rows arrive before the
-    // importer stamps 'Trademark', and a lead with an unknown practice area
-    // silently vanishing from the Monday view is the failure this page exists
-    // to avoid.
-    .or(INTAKE_PRACTICE_AREA_FILTER)
-    .order("last_activity_at", { ascending: false, nullsFirst: false });
+  // A merged lead (lectual 0107) is never listed: src/lib/leads/live.ts.
+  const { data, error } = await leadRead(({ live }) =>
+    live(supabase.from("crm_lead").select("*"))
+      .in("current_stage_id", stageIds)
+      // Null practice_area is INCLUDED on purpose: sheet rows arrive before the
+      // importer stamps 'Trademark', and a lead with an unknown practice area
+      // silently vanishing from the Monday view is the failure this page exists
+      // to avoid.
+      .or(INTAKE_PRACTICE_AREA_FILTER)
+      .order("last_activity_at", { ascending: false, nullsFirst: false }),
+  );
   if (error) throw error;
   return data ?? [];
 }

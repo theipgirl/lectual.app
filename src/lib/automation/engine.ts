@@ -1,5 +1,7 @@
 import { getScopedClient } from "@/lib/db/scoped-client";
 import type { Database } from "@/lib/db/types";
+import { isLeadMergeGuarded } from "@/lib/leads/merge";
+import { LEAD_MERGED_WRITE } from "@/lib/ui/words";
 // @/lib/matters does NOT import automation or pipeline, so this is cycle-free
 // (pipeline → automation → matters; matters is a leaf).
 import { ensureMatterForLead } from "@/lib/matters";
@@ -159,7 +161,8 @@ async function executeAction(
           .from("crm_lead")
           .update({ current_stage_id: a.stageId, stage_entered_at: now, last_activity_at: now })
           .eq("id", ctx.leadId);
-        if (error) throw error;
+        // A merged lead (lectual 0107) refuses the write: recorded as that fixed sentence, never the raw text.
+        if (error) throw isLeadMergeGuarded(error) ? new ReadableError(LEAD_MERGED_WRITE) : error;
         // Parity with a user-driven move (src/lib/pipeline/leads.ts): a "won"
         // target stage fires the pipeline→matter handoff, so an automated move
         // can't land a lead in "won" with no matter. Best-effort — the stage

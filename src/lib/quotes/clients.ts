@@ -2,6 +2,7 @@ import "server-only";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { contactDisplayName, leadDisplayName } from "@/lib/matters/client-name";
 import { leadPickerLabel } from "./client-labels";
+import { leadRead } from "@/lib/leads/live";
 
 /**
  * Who a quote is FOR, for the quote list and builder — and the options the
@@ -89,11 +90,11 @@ export async function quoteClientOptions(): Promise<QuoteClientOptions> {
   try {
     const supabase = await getScopedClient();
     const [leads, matters, contacts] = await Promise.all([
-      supabase
-        .from("crm_lead")
-        .select("id, business_name, first_name, last_name, email")
-        .order("updated_at", { ascending: false })
-        .limit(300),
+      leadRead(({ live }) =>
+        live(supabase.from("crm_lead").select("id, business_name, first_name, last_name, email"))
+          .order("updated_at", { ascending: false })
+          .limit(300),
+      ),
       supabase
         .from("crm_matter")
         .select("id, mark_text, title, matter_number, status")

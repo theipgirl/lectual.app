@@ -36,13 +36,23 @@ export type ActivityType0047 = (typeof ACTIVITY_TYPES_0047)[number];
 export const ACTIVITY_TYPES_0097 = ["file_uploaded"] as const;
 export type ActivityType0097 = (typeof ACTIVITY_TYPES_0097)[number];
 
+/**
+ * Added by lectual 0107 (M5, merge duplicate leads). `crm_merge_leads` writes one `lead_merged` row on EACH of
+ * the two leads (actor_type user) with the other lead's id, the fields it changed (before / after) and the
+ * counts of what moved. Nothing in this app writes the type: only the database function does. Hand-added like
+ * the others until the next codegen run.
+ */
+export const ACTIVITY_TYPES_0107 = ["lead_merged"] as const;
+export type ActivityType0107 = (typeof ACTIVITY_TYPES_0107)[number];
+
 export type ActivityType =
   | Activity["type"]
   | ActivityType0033
   | ActivityType0036
   | ActivityType0045
   | ActivityType0047
-  | ActivityType0097;
+  | ActivityType0097
+  | ActivityType0107;
 
 export type LogActivityInput = {
   type: ActivityType;

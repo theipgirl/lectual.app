@@ -38,6 +38,9 @@ export const STOP_REASONS = [
   "booked",
   "unsubscribed",
   "manual",
+  // lectual 0107: the lead was merged into another lead that is already in this campaign, so this enrollment
+  // was stopped instead of moved. Only crm_merge_leads writes it; a person never picks it.
+  "merged",
 ] as const;
 export type StopReason = (typeof STOP_REASONS)[number];
 
@@ -55,6 +58,7 @@ export const STOP_REASON_LABEL: Record<StopReason, string> = {
   booked: "had a call",
   unsubscribed: "asked us to stop",
   manual: "stopped by hand",
+  merged: "merged into another lead",
 };
 
 /** The reasons a person can pick on the lead page's "Stop sequence". */
@@ -217,6 +221,7 @@ export function staleHeadline(fact: StopDecision, timeZone?: string): string {
     booked: "Had a call",
     unsubscribed: "Asked us to stop",
     manual: "Stopped",
+    merged: "Merged",
   };
   return `${verb[fact.reason]} ${shortDate(fact.at, timeZone)}`.trim();
 }
@@ -232,6 +237,7 @@ export function enrollRefusal(leadName: string, fact: StopDecision, timeZone?: s
     booked: "had a call",
     unsubscribed: "asked us to stop",
     manual: "was stopped by hand",
+    merged: "was merged into another lead",
   };
   const when = shortDate(fact.at, timeZone);
   return `${leadName} is already a client — ${what[fact.reason]}${when ? ` on ${when}` : ""}. Campaigns are for leads who haven't hired the firm, so nothing was enrolled.`;

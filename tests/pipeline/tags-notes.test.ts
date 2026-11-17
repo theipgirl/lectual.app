@@ -12,6 +12,10 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: unknown }> {
     this.calls.push(["eq", a]);
     return this;
   }
+  is(...a: unknown[]) {
+    this.calls.push(["is", a]);
+    return this;
+  }
   in(...a: unknown[]) {
     this.calls.push(["in", a]);
     return this;

@@ -19,6 +19,7 @@ import { addedClassCount } from "./client-classes";
 import { chosenPackagesText, packageLineTitle } from "./name-package";
 import { RESET_EVENT_TYPE, stepPayload, stepSucceeded, type ProposalStep, type StepEventInput, type StepPayload } from "./paid";
 import { MARK_KIND_LABEL, isGeneralContent, type AcceptedSnapshot } from "./types";
+import { leadRead } from "@/lib/leads/live";
 
 /**
  * What happens after a client accepts on `/p/<token>` (Sprint 19). It runs in `after()`,
@@ -207,12 +208,13 @@ export async function resolveNoteTarget(db: LookupDb, input: NoteTargetInput): P
     }
     const email = text(input.clientEmail).toLowerCase();
     if (!email) return { ok: false, reason: "none" };
-    const { data, error } = await db
-      .from("crm_lead")
-      .select("id, email, lawmatics_id")
-      .eq("org_id", input.orgId)
-      .ilike("email", escapeLike(email))
-      .limit(10);
+    // Live leads only (lectual 0107): a merged lead and its keeper sharing an address is one person, not two.
+    const { data, error } = await leadRead(({ live }) =>
+      live(db.from("crm_lead").select("id, email, lawmatics_id"))
+        .eq("org_id", input.orgId)
+        .ilike("email", escapeLike(email))
+        .limit(10),
+    );
     if (error) return { ok: false, reason: "unreadable" };
     const matches = (Array.isArray(data) ? data : []).filter(
       (r) => isObject(r) && typeof r.email === "string" && r.email.trim().toLowerCase() === email && lawmaticsIdOf(r),

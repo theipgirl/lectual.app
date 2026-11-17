@@ -16,6 +16,7 @@ import { LeadWriteError, forbiddenLeadWrite } from "./errors";
 import { usableEvidenceDate } from "./evidence-date";
 import { newEnquiryStage } from "./new-enquiry";
 import { notifyAssigned } from "@/lib/notifications/producers";
+import { leadRead } from "@/lib/leads/live";
 
 export type Lead = Database["public"]["Tables"]["crm_lead"]["Row"];
 
@@ -109,27 +110,30 @@ function inputError(fieldErrors: LeadFieldErrors): LeadWriteError {
  */
 export async function listLeads(filter: LeadFilter = {}): Promise<Lead[]> {
   const supabase = await getScopedClient();
-  let query = supabase.from("crm_lead").select("*");
+  // A merged lead (lectual 0107) is never listed: src/lib/leads/live.ts.
+  const { data, error } = await leadRead(({ live }) => {
+    let query = live(supabase.from("crm_lead").select("*"));
 
-  if (filter.stageId) {
-    query = query.eq("current_stage_id", filter.stageId);
-  }
-  if (filter.assignedTo) {
-    query = query.eq("assigned_to", filter.assignedTo);
-  }
-  if (filter.search) {
-    const term = filter.search.trim();
-    if (term) {
-      const like = `%${term}%`;
-      query = query.or(
-        `first_name.ilike.${like},last_name.ilike.${like},email.ilike.${like},business_name.ilike.${like}`,
-      );
+    if (filter.stageId) {
+      query = query.eq("current_stage_id", filter.stageId);
     }
-  }
+    if (filter.assignedTo) {
+      query = query.eq("assigned_to", filter.assignedTo);
+    }
+    if (filter.search) {
+      const term = filter.search.trim();
+      if (term) {
+        const like = `%${term}%`;
+        query = query.or(
+          `first_name.ilike.${like},last_name.ilike.${like},email.ilike.${like},business_name.ilike.${like}`,
+        );
+      }
+    }
 
-  const { data, error } = await query.order("last_activity_at", {
-    ascending: false,
-    nullsFirst: false,
+    return query.order("last_activity_at", {
+      ascending: false,
+      nullsFirst: false,
+    });
   });
   if (error) throw error;
   return data ?? [];

@@ -12,6 +12,7 @@ import {
   type MeetingProvider,
   type NormalizedMeeting,
 } from "./types";
+import { foldMergedLeads, leadRead, type MergePointer } from "@/lib/leads/live";
 
 /**
  * The meetings import, for ONE connection: pull what is new from that firm's
@@ -182,13 +183,18 @@ export function adminMeetingStore(admin: SupabaseClient): MeetingStore {
       if (error) throw new Error(`meeting update failed: ${error.message}`);
     },
     async matchContext(orgId) {
-      const leads: { id: string; email: string | null }[] = [];
+      // Merged leads (lectual 0107) are read too and FOLLOWED to their keeper: a meeting with the merged lead's old
+      // address links to the keeper, never to the merged lead (src/lib/leads/live.ts foldMergedLeads).
+      const read: MergePointer[] = [];
       for (let from = 0; from < 20_000; from += 1000) {
-        const { data, error } = await admin.from("crm_lead").select("id, email").eq("org_id", orgId).not("email", "is", null).range(from, from + 999);
+        const { data, error } = await leadRead(({ merged }) =>
+          admin.from("crm_lead").select(merged ? "id, email, merged_into_id" : "id, email").eq("org_id", orgId).not("email", "is", null).range(from, from + 999),
+        );
         if (error) throw new Error(`lead read failed: ${error.message}`);
-        leads.push(...((data ?? []) as { id: string; email: string | null }[]));
+        read.push(...((data ?? []) as unknown as MergePointer[]));
         if (!data || data.length < 1000) break;
       }
+      const leads = foldMergedLeads(read as (MergePointer & { email: string | null })[]).map((l) => ({ id: l.id, email: l.email ?? null }));
       const [c, mc, m] = await Promise.all([
         admin.from("crm_contact").select("id, email").eq("org_id", orgId).not("email", "is", null),
         admin.from("crm_matter_contact").select("contact_id, matter_id").eq("org_id", orgId),

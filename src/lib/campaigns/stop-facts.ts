@@ -1,5 +1,6 @@
 import { clientFact, earliest, latest, type StopDecision, type StopFacts } from "./stops";
 import { rowsOf, str, type StopDb, type StopDbQuery } from "./stop-db";
+import { leadRead } from "@/lib/leads/live";
 
 /**
  * Reads everything recorded about ONE lead that can end a sequence (the
@@ -187,7 +188,7 @@ export async function loadStopFactsForPerson(db: StopDb, input: { leadId: string
     const ids = new Set<string>([input.leadId]);
     const emails = emailVariants(str(lead.email));
     if (emails.length > 0) {
-      const { data: same, error: sameError } = await db.from("crm_lead").select("id").eq("org_id", orgId).in("email", emails);
+      const { data: same, error: sameError } = await leadRead(({ live }) => live(db.from("crm_lead").select("id")).eq("org_id", orgId).in("email", emails));
       if (sameError) return { status: "unavailable", error: "lead read failed" };
       for (const row of rowsOf(same)) if (str(row.id)) ids.add(row.id as string);
     }

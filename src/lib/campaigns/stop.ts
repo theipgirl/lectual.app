@@ -1,5 +1,6 @@
 import { STOP_REASON_LABEL, type StopReason } from "./stops";
 import { rowsOf, str, type StopDb } from "./stop-db";
+import { leadRead } from "@/lib/leads/live";
 
 /**
  * Sequence stops — the write half (the rules are in ./stops.ts).
@@ -171,7 +172,7 @@ export async function leadsForQuote(db: StopDb, ids: { quoteId: string; orgId: s
     emails.push(...emailVariants(str((contact as Record<string, unknown> | null)?.email)));
   }
   if (emails.length > 0) {
-    const { data: same } = await db.from("crm_lead").select("id").eq("org_id", ids.orgId).in("email", [...new Set(emails)]);
+    const { data: same } = await leadRead(({ live }) => live(db.from("crm_lead").select("id")).eq("org_id", ids.orgId).in("email", [...new Set(emails)]));
     for (const row of rowsOf(same)) if (str(row.id)) leadIds.add(row.id as string);
   }
   return [...leadIds];

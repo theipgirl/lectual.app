@@ -11,6 +11,7 @@ import {
   type ClientCredentials,
   type MailboxProvider,
 } from "./providers";
+import { leadRead } from "@/lib/leads/live";
 
 /**
  * The mailbox sync: every active connection, in every firm that holds the
@@ -108,11 +109,13 @@ export type OrgContext = {
 export async function loadOrgContext(admin: SupabaseClient, orgId: string): Promise<OrgContext> {
   const leadRows: Record<string, unknown>[] = [];
   for (let from = 0; from < 20_000; from += 1000) {
-    const { data, error } = await admin
-      .from("crm_lead")
-      .select("id, first_name, last_name, business_name, email, mark_text, assigned_to, last_outbound_at, last_inbound_at")
-      .eq("org_id", orgId)
-      .range(from, from + 999);
+    // A merged lead (lectual 0107) is not matched: mail lands on live leads only (the guard refuses a write to a merged
+    // one). The same list feeds the Outlook calendar's lead link.
+    const { data, error } = await leadRead(({ live }) =>
+      live(admin.from("crm_lead").select("id, first_name, last_name, business_name, email, mark_text, assigned_to, last_outbound_at, last_inbound_at"))
+        .eq("org_id", orgId)
+        .range(from, from + 999),
+    );
     if (error) throw new Error(`lead read failed: ${error.message}`);
     leadRows.push(...(data ?? []));
     if (!data || data.length < 1000) break;

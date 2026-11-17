@@ -110,6 +110,7 @@ describe("pickHubRecordsAction", () => {
     const chain = (result: unknown) => {
       const q: Record<string, unknown> = {};
       q.select = () => q;
+      q.is = () => q;
       q.order = () => q;
       q.limit = () => Promise.resolve(result);
       return q;

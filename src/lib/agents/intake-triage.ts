@@ -2,6 +2,7 @@ import { z } from "zod";
 import { AGENT_POLICY } from "./policy";
 import { budgetNearlySpent, isUnusableModelAnswer } from "./shared";
 import type { AgentContext, AgentResult } from "./types";
+import { leadRead } from "@/lib/leads/live";
 
 /**
  * Intake triage: every lead that hasn't been scored gets a lane (hot / warm /
@@ -168,13 +169,14 @@ export async function runIntakeTriage(ctx: AgentContext): Promise<AgentResult> {
   const LEAD_COLUMNS =
     "id, first_name, last_name, business_name, email, phone, website, practice_area, mark_text, referral_source, referral_detail, qualification_score, temperature, created_at, ai_enriched_at";
 
-  const { data, error } = await admin
-    .from("crm_lead")
-    .select(LEAD_COLUMNS)
-    .eq("org_id", orgId)
-    .is("ai_enriched_at", null)
-    .order("created_at", { ascending: false })
-    .limit(TRIAGE_BATCH);
+  // A merged lead (lectual 0107) is never triaged: the guard refuses any write to it (src/lib/leads/live.ts).
+  const { data, error } = await leadRead(({ live }) =>
+    live(admin.from("crm_lead").select(LEAD_COLUMNS))
+      .eq("org_id", orgId)
+      .is("ai_enriched_at", null)
+      .order("created_at", { ascending: false })
+      .limit(TRIAGE_BATCH),
+  );
   if (error) throw new Error(`lead read failed: ${error.message}`);
   const leads = (data ?? []) as LeadRow[];
 
@@ -198,11 +200,9 @@ export async function runIntakeTriage(ctx: AgentContext): Promise<AgentResult> {
   const queued = new Set(leads.map((l) => l.id));
   const candidates = [...boothByLead.keys()].filter((id) => !queued.has(id));
   if (candidates.length && leads.length < TRIAGE_BATCH) {
-    const { data: again, error: againErr } = await admin
-      .from("crm_lead")
-      .select(LEAD_COLUMNS)
-      .eq("org_id", orgId)
-      .in("id", candidates);
+    const { data: again, error: againErr } = await leadRead(({ live }) =>
+      live(admin.from("crm_lead").select(LEAD_COLUMNS)).eq("org_id", orgId).in("id", candidates),
+    );
     if (againErr) throw new Error(`lead re-score read failed: ${againErr.message}`);
     for (const l of (again ?? []) as LeadRow[]) {
       if (leads.length >= TRIAGE_BATCH) break;

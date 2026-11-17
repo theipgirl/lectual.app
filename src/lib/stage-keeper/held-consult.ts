@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isDatabaseUpdateNeeded } from "@/lib/calendar/outlook-errors";
+import { leadRead } from "@/lib/leads/live";
 
 /**
  * A consult that took place is real contact: it moves the lead's last touch forward to the end
@@ -52,11 +53,12 @@ export async function bumpHeldConsults(admin: SupabaseClient, orgId: string, now
     const ids = [...endByLead.keys()];
     const touched = new Map<string, number | null>();
     for (let i = 0; i < ids.length; i += CHUNK) {
-      const { data: leads, error: leadErr } = await admin
-        .from("crm_lead")
-        .select("id, last_activity_at")
-        .eq("org_id", orgId)
-        .in("id", ids.slice(i, i + CHUNK));
+      // A merged lead (lectual 0107) is left out, so it is never bumped (its guard would refuse the write).
+      const { data: leads, error: leadErr } = await leadRead(({ live }) =>
+        live(admin.from("crm_lead").select("id, last_activity_at"))
+          .eq("org_id", orgId)
+          .in("id", ids.slice(i, i + CHUNK)),
+      );
       if (leadErr) return { orgId, state: "error", bumped: 0 };
       for (const l of (leads ?? []) as Array<{ id: string; last_activity_at: string | null }>) {
         const at = l.last_activity_at ? Date.parse(l.last_activity_at) : NaN;
