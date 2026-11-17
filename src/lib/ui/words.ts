@@ -976,3 +976,4 @@ export const SEARCHING = "Searching…";
 export const showingAtLeast = (shown: number): string => showingOf(shown, shown) + "+";
 /** The Forms results table heading. */
 export const ALL_FORMS = `All ${FORMS_NAME.toLowerCase()}`;
+export const ADD_ANOTHER_NEXT_STEP = "Add another next step";

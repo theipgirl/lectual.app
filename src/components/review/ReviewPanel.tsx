@@ -21,7 +21,7 @@ import {
 import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadFailedLine } from "@/components/ui/LoadFailed";
 import { Pill } from "@/components/ui/Pill";
-import { ADD_TO_TIMELINE, BLANK, LAST_CONTACT, OWNER_COLUMN, TEAMMATE, UNASSIGNED, noneYet } from "@/lib/ui/words";
+import { ADD_TO_TIMELINE, BLANK, LAST_CONTACT, OWNER_COLUMN, TEAMMATE, UNASSIGNED, noneYet, ADD_ANOTHER_NEXT_STEP, ADD_NEXT_STEP } from "@/lib/ui/words";
 import { ActForm } from "./ActForm";
 import { LostNurture } from "./LostNurture";
 import { PanelShell } from "./PanelShell";
@@ -197,7 +197,7 @@ export function ReviewPanel(props: PanelProps) {
         )}
         {canWrite && (
           <details className="rv-more" open={!next}>
-            <summary>{next ? "Add another next step" : "Add a next step"}</summary>
+            <summary className="lx-btn lx-btn-sec lx-btn-sm">{next ? ADD_ANOTHER_NEXT_STEP : ADD_NEXT_STEP}</summary>
             <ActForm action={setNextStepAction} submit="Save next step">
               {hidden}
               <input className="lx-input" name="title" maxLength={TASK_TITLE_MAX} placeholder="What happens next" aria-label="New next step" required />

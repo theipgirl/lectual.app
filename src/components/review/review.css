@@ -118,7 +118,8 @@
 .rv-panel-sec .lx-label { margin: 0; }
 .rv-panel-foot { display: flex; gap: 8px; flex-wrap: wrap; }
 .rv-snooze { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.rv-more > summary { cursor: pointer; color: var(--ox); font-weight: 500; font-size: var(--fs-2); padding: 6px 0; }
+.rv-more > summary { list-style: none; }
+.rv-more > summary::-webkit-details-marker { display: none; }
 .rv-steps, .rv-activity { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .rv-steps li { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
 .rv-activity li { padding-bottom: 8px; border-bottom: 1px solid var(--line); }
