@@ -135,40 +135,23 @@
 .ifm-row-wrap {
   flex-wrap: wrap;
 }
-.ifm-row-wrap > .ifm-input {
+.ifm-row-wrap > .lx-input {
   flex: 1 1 220px;
   min-width: 0;
 }
-.ifm-input {
-  width: 100%;
-  box-sizing: border-box;
-  min-height: 40px;
-  padding: 9px 12px;
-  border: 1px solid var(--line-3);
-  border-radius: var(--r-md);
-  background-color: var(--card);
-  font: inherit;
-  font-size: 14px;
-  line-height: 20px;
-  color: var(--ink);
-}
-textarea.ifm-input {
+textarea.lx-input {
   resize: vertical;
 }
-.ifm-input:focus {
-  border-color: var(--ox);
-  box-shadow: 0 0 0 3px var(--tint-ox);
-}
-.ifm-input.bad {
+.lx-input.bad {
   border-color: var(--wine);
   background-color: var(--tint-wine);
 }
-.ifm-input.ifm-readonly {
+.lx-input.ifm-readonly {
   background-color: var(--paper);
   color: var(--body);
   border-color: var(--line);
 }
-.ifm-editor:disabled .ifm-input {
+.ifm-editor:disabled .lx-input {
   background-color: var(--paper);
   color: var(--body);
 }
@@ -1114,7 +1097,7 @@ textarea.ifm-input {
   flex: 0 1 460px;
   min-width: 0;
 }
-.ifl-new .ifm-input {
+.ifl-new .lx-input {
   flex: 1;
   min-width: 0;
 }
@@ -1501,7 +1484,7 @@ textarea.ifm-input {
   align-items: center;
   gap: 4px;
 }
-.ifm-opt .ifm-input {
+.ifm-opt .lx-input {
   flex: 1;
   min-width: 0;
 }
@@ -1545,7 +1528,7 @@ textarea.ifm-input {
 .ifm-asm-stays {
   font-style: italic;
 }
-.ifm-asm-q.hidden .ifm-input {
+.ifm-asm-q.hidden .lx-input {
   opacity: 0.55;
 }
 
@@ -1642,7 +1625,7 @@ textarea.ifm-input {
   padding: 0;
   min-width: 0;
 }
-.ifm-bare:disabled .ifm-input {
+.ifm-bare:disabled .lx-input {
   background-color: var(--paper);
   color: var(--body);
 }
@@ -1741,6 +1724,6 @@ textarea.ifm-input {
 
 /* Touch and phones: the form's own small controls get a 44px target. */
 @media (pointer: coarse), (max-width: 640px) {
-  .ifm-icon-btn, .ifm-add, .ifl-copy, .ifl-toggle, .ifm-link, .ifm-domain button, .ifm-input { min-height: 44px; }
+  .ifm-icon-btn, .ifm-add, .ifl-copy, .ifl-toggle, .ifm-link, .ifm-domain button, .lx-input { min-height: 44px; }
   .ifm-icon-btn, .ifm-domain button { min-width: 44px; }
 }

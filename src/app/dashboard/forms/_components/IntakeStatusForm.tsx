@@ -14,7 +14,7 @@ export function IntakeStatusForm({ id, status }: { id: string; status: string })
       <input type="hidden" name="id" value={id} />
       <label className="ifm-field ifm-grow">
         <span className="ifm-caps">Status</span>
-        <select className="ifm-input" name="status" defaultValue={status} disabled={pending}>
+        <select className="lx-input" name="status" defaultValue={status} disabled={pending}>
           {SUBMISSION_STATUSES.map((s) => (
             <option key={s} value={s}>
               {submissionStatusLabel(s)}

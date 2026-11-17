@@ -347,7 +347,7 @@ export function IntakeFormsWorkspace(props: Props) {
                   <Counter n={details.name.length} max={DETAIL_LIMITS.name} />
                 </span>
                 <input
-                  className="ifm-input"
+                  className="lx-input"
                   value={details.name}
                   maxLength={DETAIL_LIMITS.name}
                   placeholder="e.g. UGW 2026 booth"
@@ -360,7 +360,7 @@ export function IntakeFormsWorkspace(props: Props) {
                 <span className="ifm-slug">
                   <span className="ifm-slug-prefix">{`${props.origin.replace(/^https?:\/\//, "").replace(/\/+$/, "")}/i/`}</span>
                   <input
-                    className="ifm-input ifm-slug-input"
+                    className="lx-input ifm-slug-input"
                     value={details.slug}
                     maxLength={60}
                     spellCheck={false}
@@ -385,7 +385,7 @@ export function IntakeFormsWorkspace(props: Props) {
                   <Counter n={(details.sourceTag ?? "").length} max={DETAIL_LIMITS.sourceTag} />
                 </span>
                 <input
-                  className="ifm-input"
+                  className="lx-input"
                   value={details.sourceTag ?? ""}
                   maxLength={DETAIL_LIMITS.sourceTag}
                   placeholder="e.g. UGW 2026"
@@ -483,7 +483,7 @@ export function IntakeFormsWorkspace(props: Props) {
                   <Counter n={config.opening.length} max={LIMITS.opening} />
                 </span>
                 <input
-                  className="ifm-input"
+                  className="lx-input"
                   value={config.opening}
                   maxLength={LIMITS.opening}
                   placeholder="Hi — tell me about what you're building."
@@ -501,20 +501,20 @@ export function IntakeFormsWorkspace(props: Props) {
               <div className="ifm-grid2">
                 <label className="ifm-field">
                   <span className="ifm-field-label">Firm name</span>
-                  <input className="ifm-input" value={config.firmName} maxLength={LIMITS.firmName} placeholder={props.orgName} onChange={(e) => edit({ firmName: e.target.value })} />
+                  <input className="lx-input" value={config.firmName} maxLength={LIMITS.firmName} placeholder={props.orgName} onChange={(e) => edit({ firmName: e.target.value })} />
                 </label>
                 <label className="ifm-field">
                   <span className="ifm-field-label">Headline</span>
-                  <input className="ifm-input" value={config.headline} maxLength={LIMITS.headline} placeholder={INTRO_DEFAULTS.headline} onChange={(e) => edit({ headline: e.target.value })} />
+                  <input className="lx-input" value={config.headline} maxLength={LIMITS.headline} placeholder={INTRO_DEFAULTS.headline} onChange={(e) => edit({ headline: e.target.value })} />
                 </label>
               </div>
               <label className="ifm-field">
                 <span className="ifm-field-label">Disclaimer</span>
-                <textarea className="ifm-input" rows={3} value={config.disclaimer} maxLength={LIMITS.disclaimer} placeholder={INTRO_DEFAULTS.disclaimer} onChange={(e) => edit({ disclaimer: e.target.value })} />
+                <textarea className="lx-input" rows={3} value={config.disclaimer} maxLength={LIMITS.disclaimer} placeholder={INTRO_DEFAULTS.disclaimer} onChange={(e) => edit({ disclaimer: e.target.value })} />
               </label>
               <label className="ifm-field">
                 <span className="ifm-field-label">Consent notice</span>
-                <textarea className="ifm-input" rows={2} value={config.consent} maxLength={LIMITS.consent} placeholder={INTRO_DEFAULTS.consent} onChange={(e) => edit({ consent: e.target.value })} />
+                <textarea className="lx-input" rows={2} value={config.consent} maxLength={LIMITS.consent} placeholder={INTRO_DEFAULTS.consent} onChange={(e) => edit({ consent: e.target.value })} />
               </label>
               <p className="ifm-help">Leave blank to use the standard wording.</p>
             </section>
@@ -581,7 +581,7 @@ export function IntakeFormsWorkspace(props: Props) {
                         </svg>
                       </span>
                       <input
-                        className="ifm-input ifm-q-text"
+                        className="lx-input ifm-q-text"
                         value={q.text}
                         maxLength={LIMITS.question}
                         placeholder="e.g. Have you used this name publicly yet?"
@@ -720,7 +720,7 @@ export function IntakeFormsWorkspace(props: Props) {
                   })}
                 </FilterChips>
                 <textarea
-                  className={`ifm-input${err("fit") ? " bad" : ""}`}
+                  className={`lx-input${err("fit") ? " bad" : ""}`}
                   rows={4}
                   value={config.fitText}
                   maxLength={LIMITS.fitText}
@@ -740,7 +740,7 @@ export function IntakeFormsWorkspace(props: Props) {
                   <Counter n={config.closing.length} max={LIMITS.closing} />
                 </span>
                 <textarea
-                  className={`ifm-input${err("closing") ? " bad" : ""}`}
+                  className={`lx-input${err("closing") ? " bad" : ""}`}
                   rows={3}
                   value={config.closing}
                   maxLength={LIMITS.closing}
@@ -758,7 +758,7 @@ export function IntakeFormsWorkspace(props: Props) {
                 <label className="ifm-field">
                   <span className="ifm-field-label">Office location</span>
                   <input
-                    className={`ifm-input${err("office") ? " bad" : ""}`}
+                    className={`lx-input${err("office") ? " bad" : ""}`}
                     value={config.office}
                     maxLength={LIMITS.office}
                     placeholder="Street, city, state, ZIP"
@@ -830,7 +830,7 @@ export function IntakeFormsWorkspace(props: Props) {
                   <div className="ifm-field">
                     <span className="ifm-field-label">Direct link</span>
                     <div className="ifm-row ifm-row-wrap">
-                      <input className="ifm-input ifm-readonly" value={publicUrl} readOnly aria-label="Direct link" />
+                      <input className="lx-input ifm-readonly" value={publicUrl} readOnly aria-label="Direct link" />
                       <button type="button" className="lx-btn lx-btn-sec" onClick={() => copy(publicUrl, "Link copied")}>
                         Copy link
                       </button>

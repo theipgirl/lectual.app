@@ -103,7 +103,7 @@ export function AssessmentSettingsCard({
             return (
               <li key={q.id} className={`ifm-asm-q${isHidden ? " hidden" : ""}`}>
                 <input
-                  className="ifm-input"
+                  className="lx-input"
                   value={w?.question ?? ""}
                   placeholder={q.question}
                   maxLength={ASSESSMENT_LIMITS.question}
@@ -111,7 +111,7 @@ export function AssessmentSettingsCard({
                   onChange={(e) => setWording(q.id, "question", e.target.value)}
                 />
                 <input
-                  className="ifm-input ifm-asm-sub"
+                  className="lx-input ifm-asm-sub"
                   value={w?.subtext ?? ""}
                   placeholder={q.subtext || "Optional note under the question"}
                   maxLength={ASSESSMENT_LIMITS.subtext}
@@ -150,7 +150,7 @@ export function AssessmentSettingsCard({
             {extras.map((e, i) => (
               <li key={e.id} className={`ifm-extra${isChoice(e) ? " has-options" : ""}`}>
                 <input
-                  className="ifm-input ifm-q-text"
+                  className="lx-input ifm-q-text"
                   value={e.text}
                   maxLength={ASSESSMENT_LIMITS.question}
                   disabled={disabled}

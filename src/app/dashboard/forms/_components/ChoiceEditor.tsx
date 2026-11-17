@@ -24,7 +24,7 @@ export function QuestionTypeSelect({
 }) {
   return (
     <select
-      className="ifm-input ifm-q-type"
+      className="lx-input ifm-q-type"
       value={type}
       disabled={disabled}
       aria-label={`${label} type`}
@@ -59,7 +59,7 @@ export function OptionsEditor({
         {options.map((o, i) => (
           <li key={i} className="ifm-opt">
             <input
-              className="ifm-input"
+              className="lx-input"
               value={o}
               maxLength={CHOICE_LIMITS.option}
               disabled={disabled}
