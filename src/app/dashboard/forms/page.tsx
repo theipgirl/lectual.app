@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { getFirmTimeZone } from "@/lib/org/profile";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { hasRole } from "@/lib/auth/roles";
 import { canEditIntakeForm, listOrCreateIntakeForms, loadIntakeForm, loadIntakePackages } from "@/lib/intake-forms/store";
@@ -75,11 +76,12 @@ export default async function IntakeFormsPage({
   }
 
   if (!sp.form) {
-    const [list, statRows, origin, events] = await Promise.all([
+    const [list, statRows, origin, events, timeZone] = await Promise.all([
       listOrCreateIntakeForms(session.org.name),
       loadSubmissionStatRows(null, 30),
       intakeOrigin(),
       loadBoothEventList(),
+      getFirmTimeZone(),
     ]);
     if (list.status === "ok" && list.value.length > 0) {
       const byForm = statRows.status === "ok" ? statsByForm(statRows.value.rows) : null;
@@ -110,7 +112,7 @@ export default async function IntakeFormsPage({
               };
             })}
           />
-          <EventAssessments read={events} />
+          <EventAssessments read={events} timeZone={timeZone} />
         </>
       );
     }

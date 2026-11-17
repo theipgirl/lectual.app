@@ -68,6 +68,9 @@ describe("Forms list: Event assessments (F15)", () => {
     expect(dd(story, "Started")).toBe("1");
     expect(dd(story, "Finished")).toBe("0 0.0%");
     expect(dd(story, "Typical time (median)")).toBe("—");
+    // Last taken: the newest card's start, in the firm's zone (the fake db has no profile: the standard zone).
+    expect(dd(urban, "Last taken")).toBe("Oct 18");
+    expect(dd(story, "Last taken")).toBe("Sep 11");
     expect(urban).toContain('href="/dashboard/forms?event=urban-golf-2026"');
     expect(story).toContain('href="/dashboard/forms?event=story2profit-2026"');
     // Most recently active first.
