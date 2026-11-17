@@ -10,6 +10,7 @@ import type { QuoteStatus } from "./status";
 import type { QuoteEventType } from "./types";
 import { FIRM_TIME_ZONE } from "./firm-time";
 import { formatDay, formatDayTime } from "@/lib/ui/dates";
+import type { PillTone } from "@/lib/ui/tones";
 
 /**
  * Display vocabulary for the quote surfaces. Pure, so the builder's client
@@ -69,16 +70,22 @@ export function chargeAtOptionsFor(kind: string): QuoteChargeAt[] {
  */
 const STATUS_TONE: Record<QuoteStatus, string> = {
   draft: "lx-pill-mute",
-  sent: "lx-pill-ox",
+  sent: "lx-pill-ok",
   accepted: "lx-pill-ok",
   declined: "lx-pill-risk",
-  expired: "lx-pill-warn",
+  expired: "lx-pill-risk",
   withdrawn: "lx-pill-mute",
 };
 
 /** An unrecognised status gets the neutral tone — never a guess. */
 export function quoteStatusTone(status: string): string {
   return (STATUS_TONE as Record<string, string>)[status] ?? "lx-pill-mute";
+}
+
+/** The same tone as a `Pill` prop ("ok", "risk", ...), from the one table above. */
+export function quotePillTone(status: string): PillTone {
+  const m = /lx-pill-(mute|ok|warn|risk|ox)\b/.exec(quoteStatusTone(status));
+  return (m?.[1] as PillTone | undefined) ?? "mute";
 }
 
 export const EVENT_LABEL: Record<QuoteEventType, string> = {

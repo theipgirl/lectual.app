@@ -3,7 +3,10 @@
 import { useActionState } from "react";
 import { reconcilePaymentAction, recordPaymentAction } from "@/app/dashboard/quotes/[id]/actions";
 import type { ActionState } from "@/app/dashboard/quotes/errors";
-import { formatCents } from "@/lib/quotes/money";
+import { moneyFor } from "@/lib/quotes/staff-money";
+import { Notice } from "@/components/ui/Notice";
+import { Pill, type PillTone } from "@/components/ui/Pill";
+import { SavedNote } from "@/components/ui/SavedNote";
 import { SAVING, OPTIONAL } from "@/lib/ui/words";
 
 export type PanelPayment = {
@@ -37,39 +40,37 @@ export function PaymentsPanel(props: {
   cardNote: string;
 }) {
   return (
-    <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }} aria-labelledby="qb-payments">
-      <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-        <h2 id="qb-payments" className="lx-h2" style={{ fontSize: 23, flex: 1, minWidth: 180 }}>
+    <section className="lx-card lx-pad qb-panel" aria-labelledby="qb-payments">
+      <div className="qb-panel-head qb-panel-head-center">
+        <h2 id="qb-payments" className="lx-h3 qb-grow">
           Payments
         </h2>
-        <span className={`lx-pill lx-pill-${props.summary.tone}`}>{props.summary.text}</span>
+        <Pill tone={props.summary.tone}>{props.summary.text}</Pill>
       </div>
-      <p className="lx-note" style={{ margin: 0 }}>
-        {props.cardNote}
-      </p>
+      <p className="lx-note">{props.cardNote}</p>
 
       {props.payments === null ? (
-        <div role="alert" className="lx-banner lx-banner-risk">
+        <Notice tone="risk" role="alert">
           Can&apos;t show this quote&apos;s payments right now. Refresh to try again. That doesn&apos;t mean nothing was paid.
-        </div>
+        </Notice>
       ) : props.payments.length === 0 ? (
         <div className="lx-empty">No payments recorded on this quote.</div>
       ) : (
-        <div style={{ display: "grid", gap: 8 }}>
+        <div className="qb-pay-list">
           {props.payments.map((p) => (
-            <div key={p.id} style={{ display: "flex", gap: 12, alignItems: "baseline", flexWrap: "wrap", borderTop: "1px solid var(--line)", paddingTop: 8 }}>
-              <span className="lx-num" style={{ minWidth: 96 }}>
-                {formatCents(p.amountCents, p.currency)}
+            <div key={p.id} className="qb-pay-row">
+              <span className="lx-num qb-pay-amount">
+                {moneyFor(p.amountCents, p.currency)}
               </span>
-              <span style={{ flex: 1, minWidth: 200 }}>
+              <span className="qb-pay-what">
                 {p.purposeLabel} · {p.provider === "lawpay" ? "LawPay card" : "recorded by hand"}
-                <span className="lx-note" style={{ display: "block" }}>
+                <span className="lx-note qb-pay-sub">
                   {p.when} · into <b>{p.accountKind === "trust" ? "trust (IOLTA)" : "operating"}</b>
                   {p.accountHint ? ` ···${p.accountHint}` : ""}
                   {p.failureReason ? ` · ${p.failureReason}` : ""}
                 </span>
               </span>
-              <span className={`lx-pill ${statusTone(p.status)}`}>{statusLabel(p)}</span>
+              <Pill tone={statusTone(p.status)}>{statusLabel(p)}</Pill>
               {props.canReconcile && p.provider === "lawpay" && p.status === "pending" && <ReconcileForm quoteId={props.quoteId} paymentId={p.id} />}
             </div>
           ))}
@@ -86,8 +87,8 @@ export function PaymentsPanel(props: {
   );
 }
 
-function statusTone(status: string): string {
-  return status === "succeeded" ? "lx-pill-ok" : status === "pending" ? "lx-pill-warn" : status === "failed" ? "lx-pill-risk" : "lx-pill-mute";
+function statusTone(status: string): PillTone {
+  return status === "succeeded" ? "ok" : status === "pending" ? "warn" : status === "failed" ? "risk" : "mute";
 }
 
 function statusLabel(p: PanelPayment): string {
@@ -100,22 +101,22 @@ function statusLabel(p: PanelPayment): string {
 function RecordForm({ quoteId, currency }: { quoteId: string; currency: string }) {
   const [state, action, pending] = useActionState<ActionState, FormData>(recordPaymentAction, {});
   return (
-    <form action={action} style={{ display: "grid", gap: 10, marginTop: 10, maxWidth: 520 }}>
+    <form action={action} className="qb-record-form">
       <input type="hidden" name="quoteId" value={quoteId} />
-      <p className="lx-note" style={{ margin: 0 }}>
+      <p className="lx-note">
         For money that reached the firm outside Lectual — a check, a wire, or a charge run in LawPay itself. Nothing is charged.
       </p>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        <label className="lx-field" style={{ display: "grid", gap: 4 }}>
+      <div className="qb-record-pair">
+        <label className="lx-field">
           <span className="lx-label">Amount ({currency})</span>
           <input name="amount" className="lx-input" inputMode="decimal" placeholder="0.00" required />
         </label>
-        <label className="lx-field" style={{ display: "grid", gap: 4 }}>
+        <label className="lx-field">
           <span className="lx-label">Date received</span>
           <input name="occurredOn" type="date" className="lx-input" />
         </label>
       </div>
-      <label className="lx-field" style={{ display: "grid", gap: 4 }}>
+      <label className="lx-field">
         <span className="lx-label">What it was for</span>
         <select name="purpose" className="lx-input" defaultValue="" required>
           <option value="" disabled>
@@ -127,34 +128,30 @@ function RecordForm({ quoteId, currency }: { quoteId: string; currency: string }
           <option value="other">Advance or retainer / other</option>
         </select>
       </label>
-      <fieldset style={{ border: 0, padding: 0, margin: 0, display: "grid", gap: 6 }}>
+      <fieldset className="qb-fieldset">
         <legend className="lx-label">Which account it went into</legend>
         {/* No default: the account kind is always chosen, never inferred. */}
-        <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <label className="qb-radio">
           <input type="radio" name="accountKind" value="operating" required /> Operating
         </label>
-        <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <label className="qb-radio">
           <input type="radio" name="accountKind" value="trust" /> Trust (IOLTA)
         </label>
       </fieldset>
-      <label className="lx-field" style={{ display: "grid", gap: 4 }}>
+      <label className="lx-field">
         <span className="lx-label">Note<span className="lx-optional"> {OPTIONAL}</span></span>
         <input name="note" className="lx-input" maxLength={300} placeholder="e.g. check #1042" />
       </label>
-      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+      <div className="qb-record-actions">
         <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={pending}>
           {pending ? SAVING : "Record payment"}
         </button>
         {state.error && (
-          <span role="alert" className="lx-note" style={{ color: "var(--wine)" }}>
+          <Notice tone="risk" role="alert">
             {state.error}
-          </span>
+          </Notice>
         )}
-        {state.saved && (
-          <span role="status" className="lx-note">
-            Recorded.
-          </span>
-        )}
+        <SavedNote show={!!state.saved}>Recorded.</SavedNote>
       </div>
     </form>
   );
@@ -163,7 +160,7 @@ function RecordForm({ quoteId, currency }: { quoteId: string; currency: string }
 function ReconcileForm({ quoteId, paymentId }: { quoteId: string; paymentId: string }) {
   const [state, action, pending] = useActionState<ActionState, FormData>(reconcilePaymentAction, {});
   return (
-    <form action={action} style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+    <form action={action} className="qb-reconcile">
       <input type="hidden" name="quoteId" value={quoteId} />
       <input type="hidden" name="paymentId" value={paymentId} />
       <button type="submit" name="outcome" value="succeeded" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
@@ -173,9 +170,9 @@ function ReconcileForm({ quoteId, paymentId }: { quoteId: string; paymentId: str
         Not charged
       </button>
       {state.error && (
-        <span role="alert" className="lx-note" style={{ color: "var(--wine)" }}>
+        <Notice tone="risk" role="alert">
           {state.error}
-        </span>
+        </Notice>
       )}
     </form>
   );

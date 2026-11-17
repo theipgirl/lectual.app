@@ -4,6 +4,8 @@ import { useActionState } from "react";
 import { createQuoteAction } from "@/app/dashboard/quotes/actions";
 import { generateTermsAction, saveTermsAction, updateDetailsAction } from "@/app/dashboard/quotes/[id]/actions";
 import type { ActionState } from "@/app/dashboard/quotes/errors";
+import { Notice } from "@/components/ui/Notice";
+import { SavedNote } from "@/components/ui/SavedNote";
 import { SAVING, OPTIONAL } from "@/lib/ui/words";
 
 /**
@@ -15,9 +17,9 @@ import { SAVING, OPTIONAL } from "@/lib/ui/words";
 
 function Err({ state }: { state: ActionState }) {
   return state.error ? (
-    <p role="alert" className="lx-note" style={{ color: "var(--wine)", margin: 0 }}>
+    <Notice tone="risk" role="alert">
       {state.error}
-    </p>
+    </Notice>
   ) : null;
 }
 
@@ -129,11 +131,7 @@ export function QuoteDetailsForm(props: { quoteId: string; title: string; introB
         <button type="submit" className="lx-btn lx-btn-sec" disabled={pending}>
           {pending ? SAVING : "Save details"}
         </button>
-        {state.saved && !pending && !state.error && (
-          <span className="lx-note" style={{ color: "var(--ok)" }}>
-            Saved.
-          </span>
-        )}
+        <SavedNote show={!!state.saved && !pending && !state.error} />
         {props.isLive && <span className="lx-note">The client sees changes the next time they open the link.</span>}
         <Err state={state} />
       </div>
@@ -165,9 +163,9 @@ export function TermsEditor(props: { quoteId: string; termsBody: string | null; 
   const [genState, genAction, generating] = useActionState<ActionState, FormData>(generateTermsAction, {});
 
   return (
-    <div style={{ display: "grid", gap: 12 }}>
+    <div className="qb-stack">
       {props.isLive && (
-        <p className="lx-banner lx-banner-warn" style={{ margin: 0 }}>
+        <p className="lx-banner lx-banner-warn">
           This proposal is already with the client. Changing the terms refuses any signature made from the copy they
           have open — they will be asked to re-read the new wording before signing.
         </p>
@@ -175,7 +173,7 @@ export function TermsEditor(props: { quoteId: string; termsBody: string | null; 
 
       <details className="lx-disclosure-inline">
         <summary>Generate from this quote&rsquo;s figures</summary>
-        <p className="lx-note" style={{ margin: "0 0 10px" }}>
+        <p className="lx-note qb-note">
           Every amount comes from this quote&rsquo;s own lines — nothing is invented and no AI is involved. It
           replaces whatever is in the box below, so read it before sending.
         </p>
@@ -195,36 +193,31 @@ export function TermsEditor(props: { quoteId: string; termsBody: string | null; 
           </label>
           <div style={{ gridColumn: "1 / -1", display: "flex", gap: 10, alignItems: "center" }}>
             <button type="submit" className="lx-btn lx-btn-sec" disabled={generating}>
-              {generating ? "Generating…" : "Generate draft"}
+              {generating ? SAVING : "Generate draft"}
             </button>
             <Err state={genState} />
           </div>
         </form>
       </details>
 
-      <form action={saveAction} style={{ display: "grid", gap: 10 }}>
+      <form action={saveAction} className="qb-stack">
         <Hidden values={{ quoteId: props.quoteId }} />
         {/* Keyed on the stored value so a regenerate re-mounts the box with the
             new draft; otherwise the uncontrolled textarea keeps its old text and
             a save would write it back over the draft that was asked for. */}
         <textarea
           key={props.termsBody ?? ""}
-          className="lx-input lx-draft"
+          className="lx-input lx-draft qb-draft"
           name="termsBody"
           rows={14}
           defaultValue={props.termsBody ?? ""}
           placeholder="The engagement terms the client signs. Generate a draft above, or write them here."
-          style={{ fontFamily: "var(--mono)", fontSize: 14 }}
         />
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <button type="submit" className="lx-btn lx-btn-pri" disabled={saving}>
             {saving ? SAVING : "Save terms"}
           </button>
-          {saveState.saved && !saving && !saveState.error && (
-            <span className="lx-note" style={{ color: "var(--ok)" }}>
-              Saved.
-            </span>
-          )}
+          <SavedNote show={!!saveState.saved && !saving && !saveState.error} />
           <span className="lx-note">Saved exactly as typed — the client reads this text and signs it.</span>
         </div>
         <Err state={saveState} />

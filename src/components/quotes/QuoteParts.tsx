@@ -8,11 +8,9 @@ import { TermsEditor } from "./QuoteForms";
 
 function Panel({ title, meta, children }: { title: string; meta?: string; children: React.ReactNode }) {
   return (
-    <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
-        <h2 className="lx-h2" style={{ fontSize: 23 }}>
-          {title}
-        </h2>
+    <section className="lx-card lx-pad qb-panel">
+      <div className="qb-panel-head">
+        <h2 className="lx-h3">{title}</h2>
         {meta && <span className="lx-note">{meta}</span>}
       </div>
       {children}
@@ -56,14 +54,14 @@ export function TermsPanel(props: {
         <TermsEditor quoteId={props.quoteId} termsBody={props.termsBody} isLive={props.isLive} defaultClientName={props.defaultClientName} defaultMark={props.defaultMark} />
       ) : readOnly.kind === "signed" ? (
         <>
-          <p className="lx-note" style={{ margin: 0 }}>
-            The terms <strong style={{ fontWeight: 500 }}>as signed</strong>, from the frozen record of the acceptance.
+          <p className="lx-note">
+            The terms <strong>as signed</strong>, from the frozen record of the acceptance.
             They can no longer be changed.
           </p>
           {/* Byte for byte, exactly as the agreement fingerprint compares them —
               a whitespace-only edit to a fee agreement is still an edit. */}
           {(readOnly.signedTermsBody ?? "") !== (props.termsBody ?? "") && (
-            <p role="status" className="lx-banner lx-banner-warn" style={{ margin: 0 }}>
+            <p role="status" className="lx-banner lx-banner-warn">
               The quote&rsquo;s live terms no longer match what was signed — someone edited them after acceptance. The
               signed wording below is what governs.
             </p>
@@ -72,15 +70,15 @@ export function TermsPanel(props: {
         </>
       ) : readOnly.kind === "signed-missing" ? (
         <>
-          <p role="status" className="lx-banner lx-banner-warn" style={{ margin: 0 }}>
+          <p role="status" className="lx-banner lx-banner-warn">
             This quote was accepted, but no readable signed copy of its terms is stored. The text below is the
-            quote&rsquo;s <strong style={{ fontWeight: 500 }}>current</strong> wording — not the signed record.
+            quote&rsquo;s <strong>current</strong> wording — not the signed record.
           </p>
           <TermsText body={props.termsBody} empty="No engagement terms are stored on this quote." />
         </>
       ) : (
         <>
-          <p className="lx-note" style={{ margin: 0 }}>
+          <p className="lx-note">
             This quote is {readOnly.status}, so its terms can no longer be changed. Nothing was signed — this is the
             wording that was on offer.
           </p>
@@ -94,10 +92,10 @@ export function TermsPanel(props: {
 function TermsText({ body, empty }: { body: string | null; empty: string }) {
   if (!body) {
     return (
-      <p className="lx-note" style={{ margin: 0 }}>
+      <p className="lx-note">
         {empty}
       </p>
     );
   }
-  return <p style={{ margin: 0, whiteSpace: "pre-wrap", fontFamily: "var(--mono)", fontSize: 14, lineHeight: 1.6, color: "var(--body)" }}>{body}</p>;
+  return <p className="qb-terms-text">{body}</p>;
 }
