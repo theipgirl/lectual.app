@@ -70,7 +70,7 @@ const on = (agent: string): Setting => ({ agent, enabled: true, autonomy: "draft
 const off = (agent: string): Setting => ({ agent, enabled: false, autonomy: "draft" });
 const NAMES = { "morning-brief": "Morning brief", "consult-prep": "Consult prep", "inbox-summary": "Inbox summary" } as const;
 const card = (html: string, name: string) => {
-  const start = html.indexOf(`>${name}</div>`, html.indexOf("lx-agrid"));
+  const start = html.indexOf(`>${name}</h2>`, html.indexOf("lx-agrid"));
   return html.slice(html.lastIndexOf("<section", start), html.indexOf("</section>", start));
 };
 const footText = (c: string) => /<span class="lx-note" style="flex:1" title="[^"]*">([^<]*)<\/span>/.exec(c)?.[1] ?? "";

@@ -2,7 +2,9 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { saveProfileAction, type ProfileState } from "@/app/dashboard/settings/firm/actions";
-import { TEMPERATURE_NAME } from "@/lib/ui/words";
+import { SAVING, TEMPERATURE_NAME } from "@/lib/ui/words";
+import { Field } from "@/components/ui/Field";
+import { SavedNote } from "@/components/ui/SavedNote";
 import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 import { SIGNOFF_PLACEHOLDER, firmFormDirty, firmFormValues, zoneOptions, type FirmFormValues } from "@/lib/org/firm-form";
 
@@ -56,8 +58,8 @@ export function FirmProfileForm(props: {
 
   return (
     <form ref={formRef} action={action} onChange={check} onInput={check} style={{ display: "grid", gap: 16 }}>
-      <section className="lx-card" style={{ padding: 20, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 18 }} aria-labelledby="firm-details-h">
-        <h2 id="firm-details-h" className="lx-h2" style={{ fontSize: 23, gridColumn: "1 / -1" }}>
+      <section className="lx-card lx-pad" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 18 }} aria-labelledby="firm-details-h">
+        <h2 id="firm-details-h" className="lx-h2" style={{ gridColumn: "1 / -1" }}>
           Firm details
         </h2>
         <label className="lx-field">
@@ -89,11 +91,11 @@ export function FirmProfileForm(props: {
         </label>
       </section>
 
-      <section className="lx-card" style={{ padding: 20, display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }} aria-labelledby="firm-booking-h">
-        <h2 id="firm-booking-h" className="lx-h2" style={{ fontSize: 23, gridColumn: "1 / -1" }}>
+      <section className="lx-card lx-pad" style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }} aria-labelledby="firm-booking-h">
+        <h2 id="firm-booking-h" className="lx-h2" style={{ gridColumn: "1 / -1" }}>
           Booking links and nurture
         </h2>
-        <p className="lx-note" style={{ gridColumn: "1 / -1", margin: 0 }}>
+        <p className="lx-note" style={{ gridColumn: "1 / -1" }}>
           {TEMPERATURE_NAME}{" "}decides the next step shown on a lead&apos;s page: Hot → a strategy session, Warm → a discovery call,
           Cold → your nurture campaign. These are links and buttons for your team; nothing is sent to a client
           automatically.
@@ -130,7 +132,7 @@ export function FirmProfileForm(props: {
             <>
               <input type="hidden" name="nurtureSequenceId" value={props.nurtureSequenceId ?? ""} />
               <span className="lx-note" style={{ color: "var(--wine)" }}>
-                Campaigns couldn&apos;t be loaded, so this stays as it is. Try again shortly.
+                Campaigns couldn&apos;t be loaded, so this stays as it is. Refresh to try again.
               </span>
             </>
           ) : (
@@ -149,13 +151,13 @@ export function FirmProfileForm(props: {
       {props.canEdit ? (
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <button type="submit" className="lx-btn lx-btn-pri" disabled={pending || !dirty}>
-            {pending ? "Saving…" : "Save"}
+            {pending ? SAVING : "Save"}
           </button>
-          {state.saved && !pending && !dirty && <span className="lx-note" style={{ color: "var(--ok)" }}>Saved.</span>}
+          <SavedNote show={!!state.saved && !pending && !dirty} />
           {state.error && <span role="alert" className="lx-note" style={{ color: "var(--wine)" }}>{state.error}</span>}
         </div>
       ) : (
-        <p className="lx-note" style={{ margin: 0 }}>{ADMIN_TIER_PHRASE} can edit the firm profile.</p>
+        <p className="lx-note">{ADMIN_TIER_PHRASE} can edit the firm profile.</p>
       )}
 
       {props.canEdit && dirty && (
@@ -165,7 +167,7 @@ export function FirmProfileForm(props: {
             Discard
           </button>
           <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={pending}>
-            {pending ? "Saving…" : "Save"}
+            {pending ? SAVING : "Save"}
           </button>
         </div>
       )}

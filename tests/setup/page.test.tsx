@@ -37,7 +37,7 @@ function items(html: string) {
 describe("the role gate", () => {
   it.each([...ADMIN_TIER])("%s sees the header and the ten items", async (role) => {
     const { html } = await renderPage({ kind: "ok", role });
-    expect(html).toContain("Get your firm set up");
+    expect(html).toContain(">Setup</h1>");
     expect(html).toContain(">Setup<");
     expect(items(html)).toHaveLength(10);
   });

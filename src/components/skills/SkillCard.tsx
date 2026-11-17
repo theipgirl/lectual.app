@@ -1,3 +1,4 @@
+import { Pill } from "@/components/ui/Pill";
 import { DRAFTS_ONLY, type Skill } from "@/lib/skills/catalog";
 import { SkillPicker, type PickerGroup } from "./SkillPicker";
 
@@ -10,26 +11,22 @@ export type CardMode =
 /** One skill: what it does, what it reads, that it only drafts, and the way in. */
 export function SkillCard({ skill, card }: { skill: Skill; card: CardMode }) {
   return (
-    <section id={`skill-${skill.slug}`} className="lx-card" style={{ padding: 20, display: "grid", gap: 12, alignContent: "start" }}>
+    <section id={`skill-${skill.slug}`} className="lx-card lx-pad" style={{ display: "grid", gap: 12, alignContent: "start" }}>
       <div>
-        <h2 className="lx-h2" style={{ fontSize: 21 }}>
-          {skill.name}
-        </h2>
-        <div className="lx-label" style={{ fontSize: 11, marginTop: 4 }}>
+        <h2 className="lx-h3">{skill.name}</h2>
+        <div className="lx-label">
           Reads · {skill.reads}
         </div>
       </div>
-      <p style={{ margin: 0, fontSize: 14.5, color: "var(--body)", lineHeight: 1.5 }}>
-        {skill.does}
-      </p>
+      <p style={{ color: "var(--body)", lineHeight: 1.5 }}>{skill.does}</p>
       <div>
-        <span className="lx-pill lx-pill-mute">{DRAFTS_ONLY}</span>
+        <Pill tone="mute">{DRAFTS_ONLY}</Pill>
       </div>
       <div style={{ display: "grid", gap: 8, borderTop: "1px solid var(--line)", paddingTop: 12 }}>
         {card.mode === "picker" ? (
           <>
             <SkillPicker skill={skill} term={card.term} groups={card.groups} />
-            <p className="lx-note" style={{ margin: 0 }}>
+            <p className="lx-note">
               Opens {skill.lands}.
               {skill.extra && (
                 <>
@@ -40,7 +37,7 @@ export function SkillCard({ skill, card }: { skill: Skill; card: CardMode }) {
             </p>
           </>
         ) : card.mode === "unavailable" ? (
-          <p className="lx-note" style={{ margin: 0 }}>
+          <p className="lx-note">
             Not switched on for this firm.
           </p>
         ) : null}

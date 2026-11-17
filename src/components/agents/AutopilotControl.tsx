@@ -2,6 +2,9 @@
 
 import { useActionState } from "react";
 import { setAutopilotAction, type AgentActionState } from "@/app/dashboard/agents/actions";
+import { SavedNote } from "@/components/ui/SavedNote";
+import { Pill } from "@/components/ui/Pill";
+import { SAVING } from "@/lib/ui/words";
 import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 
 /**
@@ -25,7 +28,7 @@ export function AutopilotControl(props: {
   return (
     <div style={{ display: "grid", gap: 6 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-        <span className={`lx-pill ${paused ? "lx-pill-warn" : "lx-pill-ok"}`}>{paused ? "Paused" : "On"}</span>
+        <Pill tone={paused ? "warn" : "ok"}>{paused ? "Paused" : "On"}</Pill>
         <span className="lx-note" style={{ flex: 1, minWidth: 160 }}>
           {props.stateLine}
         </span>
@@ -43,7 +46,7 @@ export function AutopilotControl(props: {
               />
             )}
             <button type="submit" className={`lx-btn lx-btn-sm ${paused ? "lx-btn-pri" : "lx-btn-sec"}`} disabled={pending}>
-              {pending ? "Saving…" : paused ? "Resume assistants" : "Pause assistants"}
+              {pending ? SAVING : paused ? "Resume assistants" : "Pause assistants"}
             </button>
           </form>
         )}
@@ -55,7 +58,7 @@ export function AutopilotControl(props: {
           {state.error}
         </span>
       )}
-      {state.ok && state.message && <span className="lx-note">{state.message}</span>}
+      {state.ok && state.message && <SavedNote show>{state.message}</SavedNote>}
     </div>
   );
 }

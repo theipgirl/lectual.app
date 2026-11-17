@@ -6,6 +6,7 @@ import {
   saveAgentSettingAction,
   type AgentActionState,
 } from "@/app/dashboard/agents/actions";
+import { CANCEL, SAVING } from "@/lib/ui/words";
 import { autonomyHint, type AgentId, type Autonomy } from "@/lib/agents/types";
 import { autonomyChangeQuestion } from "@/lib/agents/health-line";
 import { decideRunNow, runResultLine, RUN_NOW_NO_ANSWER, type RunNowInput } from "@/lib/agents/run-now";
@@ -72,10 +73,10 @@ export function AgentControls(props: {
       </form>
 
       <div className="lx-agent-slot-autonomy">
-        <div className="lx-label" style={{ fontSize: 11, marginBottom: 6 }}>
+        <div className="lx-label">
           Autonomy
         </div>
-        <form action={save} className="lx-lv">
+        <form action={save} className="vs-switch lx-lv">
           <input type="hidden" name="agent" value={agent} />
           <input type="hidden" name="enabled" value={String(enabled)} />
           {asking === null ? (
@@ -96,19 +97,19 @@ export function AgentControls(props: {
             <span role="alert" className="lx-note" style={{ display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               {autonomyChangeQuestion(props.name, autonomy, asking)}
               <button type="submit" name="autonomy" value={asking} className="on" disabled={saving} onClick={() => setTimeout(() => setAsking(null), 0)}>
-                {saving ? "Saving…" : "Confirm"}
+                {saving ? SAVING : "Confirm"}
               </button>
               <button type="button" disabled={saving} onClick={() => setAsking(null)}>
-                Cancel
+                {CANCEL}
               </button>
             </span>
           )}
         </form>
-        <div className="lx-note" style={{ marginTop: 6 }}>
+        <div className="lx-note">
           {autonomyHint(agent, autonomy)}
         </div>
         {saveState.error && (
-          <p role="alert" className="lx-note" style={{ color: "var(--wine)", margin: "6px 0 0" }}>
+          <p role="alert" className="lx-note" style={{ color: "var(--wine)" }}>
             {saveState.error}
           </p>
         )}
@@ -124,7 +125,7 @@ export function AgentControls(props: {
             disabled={!decision.canRun}
             aria-describedby={decision.canRun ? undefined : reasonId}
           >
-            {running ? "Running..." : "Run now"}
+            {running ? "Running…" : "Run now"}
           </button>
         </form>
       </div>
@@ -132,7 +133,7 @@ export function AgentControls(props: {
       {((!decision.canRun && showRun) || result) && (
         <div style={{ gridColumn: "1 / -1", display: "grid", gap: 4 }}>
           {!decision.canRun && showRun && (
-            <p id={reasonId} className="lx-note" style={{ margin: 0, ...(decision.tone === "warn" ? { color: "var(--warn)" } : {}) }}>
+            <p id={reasonId} className="lx-note" style={decision.tone === "warn" ? { color: "var(--warn)" } : undefined}>
               {decision.reason}
             </p>
           )}
@@ -140,7 +141,7 @@ export function AgentControls(props: {
             <p
               role={result.alert ? "alert" : "status"}
               className="lx-note"
-              style={{ margin: 0, ...(result.alert ? { color: "var(--wine)" } : {}) }}
+              style={result.alert ? { color: "var(--wine)" } : undefined}
             >
               {result.text}
             </p>

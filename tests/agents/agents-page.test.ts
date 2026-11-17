@@ -196,10 +196,10 @@ describe("Agents page: Assistants naming and the run log (Sprint 31)", () => {
     vi.resetModules();
   });
 
-  it("is titled Assistants under the AI tools group, never IP.OS or Agents", async () => {
+  it("is titled Assistants (no eyebrow label), never IP.OS or Agents", async () => {
     const { html } = await render({ settings: [on("email-intel")] });
     expect(html).toMatch(/<h1[^>]*>Assistants<\/h1>/);
-    expect(html).toContain("AI tools");
+    expect(html).not.toContain("AI tools");
     expect(html).not.toContain("IP.OS");
     expect(html).not.toMatch(/<h1[^>]*>Agents<\/h1>/);
   });
