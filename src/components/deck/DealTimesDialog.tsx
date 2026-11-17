@@ -17,7 +17,7 @@ import {
   DEAL_TIMES_TITLE,
   dealTimesZoneLine,
 } from "@/lib/ui/words";
-import "@/components/feedback/feedback.css";
+import { Notice } from "@/components/ui/Notice";
 import "./deal-times.css";
 
 type ViewProps = {
@@ -57,28 +57,30 @@ export function DealTimesDialogView({ first, second, zoneLabel, error, saving, o
     </label>
   );
   return (
-    <div className="fb-root dt-root">
-      <div className="fb-backdrop" />
-      <div ref={dialogRef} className="lx-card fb-dialog dt-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} onKeyDown={onKeyDown}>
-        <h2 id={titleId} className="fb-title">
-          {DEAL_TIMES_TITLE}
-        </h2>
+    <div className="lx-modal-root dt-root">
+      <div className="lx-modal-backdrop" aria-hidden="true" />
+      <div ref={dialogRef} className="lx-modal lx-modal-sm dt-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} onKeyDown={onKeyDown}>
+        <header className="lx-modal-head">
+          <h2 id={titleId} className="lx-modal-title">
+            {DEAL_TIMES_TITLE}
+          </h2>
+        </header>
         {select(DEAL_TIMES_FIRST, first, onFirst, firstRef)}
         {select(DEAL_TIMES_SECOND, second, onSecond, secondRef)}
-        <p id={noteId} className="lx-note fb-disclosure">
+        <p id={noteId} className="lx-note">
           {dealTimesZoneLine(zoneLabel)}.{" "}
           {DEAL_TIMES_NOTE}
         </p>
         {error && (
-          <p role="alert" className="fb-error">
+          <Notice tone="risk" role="alert">
             {error}
-          </p>
+          </Notice>
         )}
-        <div className="fb-actions">
-          <button type="button" ref={cancelRef} className="lx-btn lx-btn-sec lx-btn-sm" onClick={onClose} disabled={saving}>
+        <div className="lx-modal-foot">
+          <button type="button" ref={cancelRef} className="lx-btn lx-btn-sec" onClick={onClose} disabled={saving}>
             {DEAL_TIMES_CANCEL}
           </button>
-          <button type="button" ref={saveRef} className="lx-btn lx-btn-pri lx-btn-sm" onClick={onSave} disabled={saving}>
+          <button type="button" ref={saveRef} className="lx-btn lx-btn-pri" onClick={onSave} disabled={saving}>
             {saving ? DEAL_TIMES_SAVING : DEAL_TIMES_SAVE}
           </button>
         </div>

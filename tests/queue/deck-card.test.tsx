@@ -113,7 +113,7 @@ describe("DeckFrame", () => {
     const h = frame();
     expect(h).toContain("Today&#x27;s deal · 7:00 AM");
     expect(h).toContain("Needs you");
-    expect(h).toContain('<h1 class="dk-h1">Approvals</h1>'); // the deck page title is the section name (item 25), was "Your deal"
+    expect(h).toContain('<h1 class="lx-h1 dk-h1">Approvals</h1>'); // the deck page title is the section name (item 25), was "Your deal"
     for (const t of [">Cards<", ">List<", ">Board<"]) expect(h).toContain(t);
     expect(h).toMatch(/aria-current="true"[\s\S]*?First</);
     expect(h).toMatch(/Decided[\s\S]*Done one/);

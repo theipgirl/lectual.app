@@ -27,7 +27,7 @@ export function HandOffPicker({
   const disabled = !!disabledReason || pending;
   return (
     <form
-      className="dk-handto"
+      className="lx-card dk-handto"
       aria-label={DECK_HAND_EYEBROW}
       onSubmit={(e) => {
         e.preventDefault();
@@ -35,9 +35,9 @@ export function HandOffPicker({
         onHandOff(String(fd.get("assigneeId") ?? ""), String(fd.get("note") ?? ""));
       }}
     >
-      <span className="dk-eyebrow">{DECK_HAND_EYEBROW}</span>
+      <span className="lx-label">{DECK_HAND_EYEBROW}</span>
       <div className="dk-handto-row">
-        <select name="assigneeId" aria-label={DECK_HAND_TO} defaultValue="" disabled={disabled} aria-describedby={disabledReason ? reasonId : undefined}>
+        <select className="lx-input" name="assigneeId" aria-label={DECK_HAND_TO} defaultValue="" disabled={disabled} aria-describedby={disabledReason ? reasonId : undefined}>
           <option value="" disabled>
             {DECK_HAND_TO}
           </option>
@@ -47,17 +47,17 @@ export function HandOffPicker({
             </option>
           ))}
         </select>
-        <button type="submit" className="dk-ghost" disabled={disabled} aria-describedby={disabledReason ? reasonId : undefined}>
+        <button type="submit" className="lx-btn lx-btn-sec" disabled={disabled} aria-describedby={disabledReason ? reasonId : undefined}>
           {DECK_HAND_TO}
         </button>
       </div>
-      <label className="dk-row-sub" htmlFor={`${reasonId}-note`}>
+      <label className="lx-label" htmlFor={`${reasonId}-note`}>
         {DECK_HAND_NOTE_LABEL}
       </label>
-      <textarea id={`${reasonId}-note`} name="note" rows={2} maxLength={500} disabled={disabled} />
+      <textarea className="lx-input" id={`${reasonId}-note`} name="note" rows={2} maxLength={500} disabled={disabled} />
       <p className="dk-hint dk-hint--left">{DECK_HAND_WHY}</p>
       {onCancel && (
-        <button type="button" className="dk-ghost dk-handto-cancel" onClick={onCancel}>
+        <button type="button" className="lx-btn lx-btn-ghost dk-handto-cancel" onClick={onCancel}>
           {DECK_CANCEL}
         </button>
       )}

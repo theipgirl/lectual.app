@@ -15,6 +15,8 @@ import {
   sendDraftNowAction,
   type DeckResult,
 } from "@/app/dashboard/queue/deck/actions";
+import { Icon } from "@/components/ui/Icon";
+import { Notice } from "@/components/ui/Notice";
 import { HoldToast } from "./HoldToast";
 import { HandOffPicker, type HandOffPerson } from "./HandOffPicker";
 import {
@@ -172,13 +174,13 @@ export function ApprovalCard(props: ApprovalCardProps) {
 
   return (
     <div className="dk-stage" data-mode={stageMode}>
-      <div className="dk-mini">
+      <div className="lx-card dk-mini">
         <small>{props.source}</small>
         <b>{props.title}</b>
       </div>
       <div className="dk-cardwrap">
         <div className="dk-cardwrap-in">
-          <article className="dk-card" aria-labelledby={`dk-title-${props.id}`}>
+          <article className="lx-card dk-card" aria-labelledby={`dk-title-${props.id}`}>
             <div className="dk-card-top">
               <span className="dk-src">
                 <i aria-hidden="true">L</i>
@@ -210,21 +212,21 @@ export function ApprovalCard(props: ApprovalCardProps) {
               <nav className="dk-pos" aria-label="Cards">
                 {props.prevHref ? (
                   <Link className="dk-arrow" href={props.prevHref} data-deck-prev aria-label={DECK_BACK} title={DECK_BACK}>
-                    ‹
+                    <Icon name="chevron-left" />
                   </Link>
                 ) : (
                   <span className="dk-arrow" aria-disabled="true" aria-hidden="true">
-                    ‹
+                    <Icon name="chevron-left" />
                   </span>
                 )}
                 <span aria-label={`Card ${props.position} of ${props.total}`}>{deckPosition(props.position, props.total)}</span>
                 {props.nextHref ? (
                   <Link className="dk-arrow" href={props.nextHref} data-deck-next aria-label={DECK_SKIP} title={DECK_SKIP}>
-                    ›
+                    <Icon name="chevron-right" />
                   </Link>
                 ) : (
                   <span className="dk-arrow" aria-disabled="true" aria-hidden="true">
-                    ›
+                    <Icon name="chevron-right" />
                   </span>
                 )}
               </nav>
@@ -235,13 +237,13 @@ export function ApprovalCard(props: ApprovalCardProps) {
       </div>
 
       {props.handedToMe && !props.canYes && !decided && (
-        <p className="dk-handnote" role="note">
+        <p className="lx-banner lx-banner-mute dk-handnote" role="note">
           {DECK_HANDED_NO_YES}
         </p>
       )}
 
       {props.closerLook && !decided && (
-        <div className="dk-reason" role="note">
+        <div className="lx-banner lx-banner-warn dk-reason" role="note">
           <Clock />
           <span>
             <b>{DECK_REVIEW_HEAD}</b> {DECK_CLOSER_LOOK}
@@ -255,7 +257,7 @@ export function ApprovalCard(props: ApprovalCardProps) {
         <>
           <div className="dk-scrim" aria-hidden="true" />
           <form
-            className="dk-sheet dk-sheet--reject"
+            className="lx-card dk-sheet dk-sheet--reject"
             onSubmit={(e) => {
               e.preventDefault();
               if (!note.trim()) {
@@ -266,10 +268,10 @@ export function ApprovalCard(props: ApprovalCardProps) {
             }}
           >
             <span className="dk-grab" aria-hidden="true" />
-            <span className="dk-eyebrow">{DECK_REJECT_EYEBROW}</span>
+            <span className="lx-label">{DECK_REJECT_EYEBROW}</span>
             <div className="dk-field">
               <label htmlFor={`dk-reject-${props.id}`}>{DECK_REJECT_NOTE_LABEL}</label>
-              <textarea id={`dk-reject-${props.id}`} rows={3} maxLength={500} required value={note} onChange={(e) => setNote(e.target.value)} />
+              <textarea className="lx-input" id={`dk-reject-${props.id}`} rows={3} maxLength={500} required value={note} onChange={(e) => setNote(e.target.value)} />
             </div>
             <p className="dk-hint dk-hint--left">{DECK_REJECT_HELP}</p>
             <div className="dk-sheet-actions">
@@ -289,15 +291,15 @@ export function ApprovalCard(props: ApprovalCardProps) {
       )}
 
       {mode === "editing" && !decided && (
-        <div className="dk-panel">
+        <div className="lx-card dk-panel">
           <ReviewPanel id={props.id} initialBody={props.review.initialBody} canApprove={props.review.canApprove} canEdit={props.review.canEdit} audit={props.review.audit} />
         </div>
       )}
 
       {result && !result.ok && (
-        <p role="alert" className="lx-banner lx-banner-risk dk-error">
+        <Notice tone="risk" role="alert">
           {result.error}
-        </p>
+        </Notice>
       )}
 
       {result && result.ok && !draft && result.message === DECK_LATER_DONE && (
@@ -349,9 +351,15 @@ export function ApprovalCard(props: ApprovalCardProps) {
               )}
               {!draft.canSend && draft.sendNote && <p className="dk-after-note">{draft.sendNote}</p>}
               {sendResult && (
-                <p role={sendResult.ok ? "status" : "alert"} className={sendResult.ok ? "dk-after-msg" : "lx-banner lx-banner-risk"}>
-                  {sendResult.ok ? sendResult.message : sendResult.error}
-                </p>
+                sendResult.ok ? (
+                  <p role="status" className="dk-after-msg">
+                    {sendResult.message}
+                  </p>
+                ) : (
+                  <Notice tone="risk" role="alert">
+                    {sendResult.error}
+                  </Notice>
+                )
               )}
             </>
           ) : (
