@@ -2,6 +2,7 @@ import { initials } from "@/lib/review/format";
 import { limitTags, rowTags } from "@/lib/review/tags";
 import type { ReviewRow } from "@/lib/review/buckets";
 import { reviewHref, type ReviewParams } from "@/lib/review/params";
+import { Pill } from "@/components/ui/Pill";
 
 type Member = { userId: string; name: string };
 
@@ -28,11 +29,11 @@ export function Tags({ row, today, max, skip }: { row: ReviewRow; today: string;
   return (
     <div className="rv-tags">
       {shown.map((t) => (
-        <span key={t.text} className={`lp-pill${t.tone === "warn" ? " lp-pill-warn" : t.tone === "risk" ? " lp-pill-risk rv-deadline-soon" : ""}`}>
+        <Pill key={t.text} tone={t.tone === "warn" ? "warn" : t.tone === "risk" ? "risk" : "mute"}>
           {t.text}
-        </span>
+        </Pill>
       ))}
-      {more > 0 && <span className="lp-pill">+{more}</span>}
+      {more > 0 && <Pill>+{more}</Pill>}
     </div>
   );
 }

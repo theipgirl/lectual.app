@@ -14,6 +14,7 @@ import {
   type ReviewActionState,
 } from "@/app/dashboard/review/actions";
 import { shortDate } from "@/lib/review/format";
+import { Icon } from "@/components/ui/Icon";
 import { UNASSIGNED_LANE } from "@/lib/review/lanes";
 import {
   EMPTY_SHEET_STATE,
@@ -55,6 +56,9 @@ import {
   type StageChoice,
 } from "@/lib/review/sheet-edit";
 import {
+  BLANK,
+  OWNER_COLUMN,
+  TEAMMATE,
   SHEET_ADD_NOTE,
   SHEET_CANCEL,
   SHEET_DUE,
@@ -108,7 +112,7 @@ const HEADS: { col: SheetEditColumn; label: string }[] = [
   { col: "mark", label: "Mark" },
   { col: "status", label: "Status" },
   { col: "next", label: "Next step" },
-  { col: "court", label: "Whose court" },
+  { col: "court", label: OWNER_COLUMN },
   { col: "waiting", label: "Waiting on" },
   { col: "source", label: "Source" },
   { col: "contact", label: "Last contact" },
@@ -337,7 +341,7 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
     writeSizes(next);
   };
 
-  const courtName = (id: string | null) => (id ? names.get(id) ?? "Teammate" : UNASSIGNED_LANE);
+  const courtName = (id: string | null) => (id ? names.get(id) ?? TEAMMATE : UNASSIGNED_LANE);
   const colCount = HEADS.length + (editing ? 1 : 0);
 
   return (
@@ -426,13 +430,13 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                           {row.client}
                         </Link>
                       </td>
-                      <td data-label="Mark">{row.mark ?? <span className="rse-dash">—</span>}</td>
+                      <td data-label="Mark">{row.mark ?? <span className="rse-dash">{BLANK}</span>}</td>
                       <td data-label="Status">
                         {can("status") ? (
                           <>
                             <button type="button" className={`rse-cell rse-edit${isOpen(row.key, "status") ? " rse-on" : ""}${saving("status") ? " is-saving" : ""}`} aria-label={`Status: ${row.stageLabel ?? "none"}`} {...cellProps("status")}>
-                              {row.stageLabel ?? "—"}
-                              {isOpen(row.key, "status") && <span aria-hidden> ▾</span>}
+                              {row.stageLabel ?? BLANK}
+                              {isOpen(row.key, "status") &&  <Icon name="chevron-down" size={14} />}
                             </button>
                             {isOpen(row.key, "status") && (
                               <ChoicePop
@@ -453,7 +457,7 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                             )}
                           </>
                         ) : (
-                          <span>{row.stageLabel ?? "—"}</span>
+                          <span>{row.stageLabel ?? BLANK}</span>
                         )}
                       </td>
                       <td data-label="Next step" className="rse-next-td">
@@ -476,13 +480,13 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                             />
                           ) : (
                             <button type="button" className={`rse-cell rse-edit rse-wrapcell${nt?.overdue ? " rse-overdue" : ""}${saving("next") ? " is-saving" : ""}`} {...cellProps("next")}>
-                              {nt ? nt.text : "—"}
+                              {nt ? nt.text : BLANK}
                               {nt?.overdue && <span className="rse-sr"> {SHEET_OVERDUE}</span>}
                             </button>
                           )
                         ) : (
                           <span className={nt?.overdue ? "rse-overdue" : undefined}>
-                            {nt ? nt.text : "—"}
+                            {nt ? nt.text : BLANK}
                             {nt?.overdue && <span className="rse-sr"> {SHEET_OVERDUE}</span>}
                           </span>
                         )}
@@ -498,12 +502,12 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                           />
                         )}
                       </td>
-                      <td data-label="Whose court">
+                      <td data-label={OWNER_COLUMN}>
                         {can("court") ? (
                           <>
                             <button type="button" className={`rse-cell rse-edit${isOpen(row.key, "court") ? " rse-on" : ""}${saving("court") ? " is-saving" : ""}`} {...cellProps("court")}>
                               {courtName(court)}
-                              {isOpen(row.key, "court") && <span aria-hidden> ▾</span>}
+                              {isOpen(row.key, "court") &&  <Icon name="chevron-down" size={14} />}
                             </button>
                             {isOpen(row.key, "court") && (
                               <PersonPop
@@ -531,8 +535,8 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                         {can("source") ? (
                           <>
                             <button type="button" className={`rse-cell rse-edit${isOpen(row.key, "source") ? " rse-on" : ""}${saving("source") ? " is-saving" : ""}`} {...cellProps("source")}>
-                              {row.source ?? "—"}
-                              {isOpen(row.key, "source") && <span aria-hidden> ▾</span>}
+                              {row.source ?? BLANK}
+                              {isOpen(row.key, "source") &&  <Icon name="chevron-down" size={14} />}
                             </button>
                             {isOpen(row.key, "source") && (
                               <ChoicePop
@@ -550,10 +554,10 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                             )}
                           </>
                         ) : (
-                          <span>{row.source ?? "—"}</span>
+                          <span>{row.source ?? BLANK}</span>
                         )}
                       </td>
-                      <td data-label="Last contact" className={`rse-locked${row.contactIsDate ? " rse-mono" : ""}`} title={row.contactTitle ?? undefined}>
+                      <td data-label="Last contact" className="rse-locked" title={row.contactTitle ?? undefined}>
                         {row.contactText}
                       </td>
                       {editing && (
@@ -562,7 +566,7 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                             <>
                               <button
                                 type="button"
-                                className={`rse-btn${isOpen(row.key, "note") ? " rse-btn--on rse-on" : ""}`}
+                                className={`lx-btn lx-btn-sec lx-btn-sm${isOpen(row.key, "note") ? " rse-on" : ""}`}
                                 aria-label={sheetNoteFor(row.client)}
                                 aria-expanded={isOpen(row.key, "note")}
                                 data-rse-cell={`${row.key}|note`}
@@ -669,7 +673,7 @@ function PersonPop({ people, current, onPick, onCancel, onTab }: { people: Sheet
   const shown = matchPeople(people, term);
   const showUnassigned = !term.trim() || UNASSIGNED_LANE.toLowerCase().includes(term.trim().toLowerCase());
   return (
-    <div className="rse-pop" role="listbox" aria-label="Whose court" ref={ref} onKeyDown={(e) => listKeys(e, onCancel, onTab)}>
+    <div className="rse-pop" role="listbox" aria-label={OWNER_COLUMN} ref={ref} onKeyDown={(e) => listKeys(e, onCancel, onTab)}>
       <input className="rse-in" type="text" aria-label={SHEET_FIND_PERSON} placeholder={SHEET_FIND_PERSON} value={term} onChange={(e) => setTerm(e.target.value)} autoFocus />
       <div className="rse-pop-list">
         {shown.map((p) => (
@@ -684,7 +688,7 @@ function PersonPop({ people, current, onPick, onCancel, onTab }: { people: Sheet
         {showUnassigned && (
           <button type="button" role="option" aria-selected={current === null} className={`rse-opt${current === null ? " sel" : ""}`} onClick={() => onPick(null)}>
             <span className="rse-av soft" aria-hidden>
-              —
+              {BLANK}
             </span>
             {UNASSIGNED_LANE}
           </button>
@@ -800,10 +804,10 @@ function NotePop({ client, draft, onSave, onCancel }: { client: string; draft?: 
         </p>
       )}
       <div className="rse-note-acts">
-        <button type="button" className="rse-btn" onClick={onCancel}>
+        <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={onCancel}>
           {SHEET_CANCEL}
         </button>
-        <button type="submit" className="rse-btn rse-btn--on" disabled={busy}>
+        <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={busy}>
           {SHEET_ADD_NOTE}
         </button>
       </div>

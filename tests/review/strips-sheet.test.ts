@@ -49,7 +49,7 @@ describe("Waiting on the review person", () => {
 
 describe("Sheet", () => {
   it("columns, in order", () => {
-    expect([...SHEET_COLUMNS]).toEqual(["Client", "Mark", "Status", "Next step", "Whose court", "Waiting on", "Source", "Last contact"]);
+    expect([...SHEET_COLUMNS]).toEqual(["Client", "Mark", "Status", "Next step", "Owner", "Waiting on", "Source", "Last contact"]);
   });
   it("Trademarks = leads + TM/CR/PATENT (no type reads TM); Contracts = the rest; stage order then client", () => {
     const s = sheetSections([
@@ -68,7 +68,7 @@ describe("Sheet", () => {
     const fmt = (d: string) => d;
     expect(waitingCell({ waiting: "client", contactKnown: true, lastOutbound: "Nov 4" }, fmt)).toBe("Client · followed up Nov 4");
     expect(waitingCell({ waiting: "client", contactKnown: true, lastOutbound: null }, fmt)).toBe("Client · no follow-up recorded");
-    expect(waitingCell({ waiting: "us", contactKnown: true }, fmt)).toBe("Us");
+    expect(waitingCell({ waiting: "us", contactKnown: true }, fmt)).toBe("Our turn");
     expect(waitingCell({ waiting: "uspto", contactKnown: true }, fmt)).toBe("USPTO");
     expect(waitingCell({ waiting: "approval", contactKnown: true }, fmt)).toBe("Approval");
     expect(waitingCell({ waiting: null, contactKnown: true }, fmt)).toBe("—");

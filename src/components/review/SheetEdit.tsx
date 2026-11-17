@@ -6,6 +6,7 @@ import { EDITABLE_COLUMNS, cellEditable, type SheetEditRow, type SheetPerms } fr
 import { roleLabel } from "@/lib/auth/roles";
 import { REFERRAL_SOURCES } from "@/lib/intake/referral-source";
 import { SHEET_LEGEND_LABEL, SHEET_STAGES_UNREADABLE, SHEET_WORKED_OUT, SHEET_WORKED_OUT_BODY, SHEET_YOU_TYPE, SHEET_YOU_TYPE_BODY } from "@/lib/ui/words";
+import { Notice } from "@/components/ui/Notice";
 import { SheetEditTable, type SheetEditInitial, type SheetPerson } from "./SheetEditTable";
 import { openHref, type Common } from "./shared";
 import "./review-sheet-edit.css";
@@ -31,7 +32,7 @@ function toSheetRow(r: ReviewRow, href: string, today: string): SheetEditRow {
 }
 
 /**
- * The owner view's Sheet, editable in place: Status, Next step, Whose court and Source are typed; Waiting on and Last contact
+ * The owner view's Sheet, editable in place: Status, Next step, Owner and Source are typed; Waiting on and Last contact
  * are worked out and locked. Every edit goes through an existing review action, which re-resolves the role. A role that can't
  * write gets the same table with no editors. On a phone the rows stack and every edit happens in the record panel.
  */
@@ -54,9 +55,9 @@ export function SheetEdit({ rows, today, members, params, perms, initial }: Comm
   return (
     <div className="rse-root">
       {stagesMissing && (
-        <p className="lx-banner lx-banner-warn" role="status" style={{ margin: 0 }}>
+        <Notice tone="warn" role="status">
           {SHEET_STAGES_UNREADABLE}
-        </p>
+        </Notice>
       )}
       <SheetEditTable sections={sections} people={people} perms={perms} sources={[...REFERRAL_SOURCES]} today={today} initial={initial} />
       {anyEditor && (
