@@ -13,9 +13,10 @@ import { decisionOpen } from "@/lib/intake/stage-decision";
 import { needsStageTitle, showTimeChip } from "@/lib/intake/leads-view";
 import { temperaturePill } from "@/lib/intake/temperature-pill";
 import NeedsRebeccaBadge from "./NeedsRebeccaBadge";
-import AgentMoveChip from "./AgentMoveChip";
+import AssistantChips from "./AssistantChips";
+import { assistantItems } from "@/lib/intake/assistant-column";
 import RowMenu from "./RowMenu";
-import { LEADS_DUPLICATE, LEADS_MOVED_MARK, LEADS_MOVED_MARK_TITLE, LEADS_NEEDS_STAGE } from "@/lib/ui/words";
+import { LEADS_COMPARE_OPEN, LEADS_DUPLICATE, LEADS_MOVED_MARK, LEADS_MOVED_MARK_TITLE, LEADS_NEEDS_STAGE } from "@/lib/ui/words";
 import { duplicateTitle, type DuplicateOf } from "@/lib/intake/duplicates";
 
 /**
@@ -41,6 +42,7 @@ export default function IntakeCard({
   onToggleSelect,
   duplicate,
   movedOut = false,
+  onCompare,
 }: {
   row: IntakeRow;
   stages: Stage[];
@@ -57,6 +59,7 @@ export default function IntakeCard({
   onToggleSelect?: (leadId: string) => void;
   duplicate?: DuplicateOf;
   movedOut?: boolean;
+  onCompare?: (leadId: string, otherId: string, trigger: HTMLElement) => void;
 }) {
   const lead = row.lead;
   const name = `${lead.first_name} ${lead.last_name}`.trim() || lead.email;
@@ -88,7 +91,7 @@ export default function IntakeCard({
       <span className="ix-sub" title={line || undefined}>
         {line || "—"}
       </span>
-      {(pill || drafts.length > 0 || decision || row.agentMove || duplicate || movedOut) && (
+      {(pill || drafts.length > 0 || decision || assistantItems(row).length > 0 || duplicate || movedOut) && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
           {pill && (
             <span className="ix-temp" data-tone={pill.tone} data-suggested={pill.suggested ? "" : undefined} title={pill.title} aria-label={pill.ariaLabel}>
@@ -101,11 +104,11 @@ export default function IntakeCard({
               {LEADS_NEEDS_STAGE}
             </span>
           )}
-          <AgentMoveChip move={row.agentMove} />
+          <AssistantChips row={row} />
           {duplicate && (
-            <a className="ix-marker ix-marker-dup" data-duplicate href={`/dashboard/leads/${duplicate.leadId}/`} title={duplicateTitle(duplicate)}>
+            <button type="button" className="ix-marker ix-marker-dup" data-duplicate aria-haspopup="dialog" aria-label={LEADS_COMPARE_OPEN(name)} title={duplicateTitle(duplicate)} onClick={(event) => onCompare?.(lead.id, duplicate.leadId, event.currentTarget)}>
               {LEADS_DUPLICATE}
-            </a>
+            </button>
           )}
           {movedOut && (
             <span className="ix-marker ix-marker-quiet" data-moved title={LEADS_MOVED_MARK_TITLE}>
@@ -115,8 +118,7 @@ export default function IntakeCard({
         </div>
       )}
       <div className="ix-card-foot">
-        <span className="ix-touch" data-in={touch.waitingOnUs ? "" : undefined} title={touch.waitingOnUs ? "Waiting on us" : "Waiting on them"}>
-          <span className="lx-sr">{touch.waitingOnUs ? "Waiting on us: " : "Waiting on them: "}</span>
+        <span className="ix-touch" data-in={touch.waitingOnUs ? "" : undefined} data-touch={touch.state} title={touch.title}>
           {touch.text}
         </span>
         {showTimeChip(time?.byLeadId[lead.id], time?.running ?? null, lead.id, time === null) && (

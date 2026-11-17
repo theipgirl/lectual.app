@@ -704,6 +704,46 @@ export const LEADS_LOST_CUT = (shown: number, total: number) => "Showing the fir
 export const LEADS_DUPLICATE = "Possible duplicate";
 export const LEADS_DUPLICATES = "Possible duplicates";
 export const LEADS_DUPLICATES_TITLE = "Leads with the same email or the same name as another open lead. Nothing is merged; open each to compare.";
+// Item L2: the Leads list's own columns and chips (Nov 17).
+/** The column that holds what the assistants did on a lead (shown only while some lead in view has something). */
+export const LEADS_ASSISTANT_COLUMN = "Assistant activity";
+export const LEADS_ASSISTANT_SUGGESTS_LTN = "Suggests Long-Term Nurture";
+export const LEADS_ASSISTANT_SUGGESTS_LTN_TITLE = "Unbooked by day 10. Moving the lead is your call; nothing changes by itself.";
+/** The one column that says whose turn it is. Sorted newest first. */
+export const LEADS_CONTACT_COLUMN = "Last contact";
+export const LEADS_TOUCH_OUR_TURN = (date: string) => `${OUR_TURN} · ${date}`;
+export const LEADS_TOUCH_WAITING_ON_THEM = (date: string) => `Waiting on them · ${date}`;
+export const LEADS_TOUCH_NO_CONTACT = "No contact yet";
+/** Only a date is recorded (no email or call), so who is next is not guessed. */
+export const LEADS_TOUCH_ACTIVITY_ONLY = (date: string) => `Last activity · ${date}`;
+export const LEADS_TOUCH_OUR_TURN_TITLE = "They wrote or called last, so the next reply is ours.";
+export const LEADS_TOUCH_WAITING_TITLE = "We wrote or called last, so we are waiting on them.";
+export const LEADS_TOUCH_ACTIVITY_ONLY_TITLE = "No email or call is recorded for this lead, so it isn't clear whose turn it is.";
+export const LEADS_TOUCH_NONE_TITLE = "Nothing has been recorded for this lead yet.";
+/** The word that follows a level the system suggested ("Warm · suggested"). */
+export const LEADS_TEMP_SUGGESTED = "suggested";
+export const LEADS_RESIZE_COLUMN = (column: string) => `Resize the ${column} column. Use the left and right arrow keys; Home restores the width.`;
+// The "Possible duplicate" compare panel: two records side by side. Nothing is merged.
+export const LEADS_COMPARE_OPEN = (name: string) => `Compare ${name} with the other lead`;
+export const LEADS_COMPARE_TITLE = "Compare possible duplicates";
+export const LEADS_COMPARE_NOTE = "Nothing is merged here. Open either lead to decide what to do.";
+export const LEADS_COMPARE_CLOSE = "Close";
+export const LEADS_COMPARE_LOADING = "Loading both leads";
+export const LEADS_COMPARE_FAILED = "Can't show these leads right now. Close this and try again.";
+export const LEADS_COMPARE_GONE = "This lead couldn't be found";
+export const LEADS_COMPARE_COULDNT_LOAD = "Couldn't load";
+export const LEADS_COMPARE_OPEN_LEAD = (name: string) => `Open ${name}`;
+export const LEADS_COMPARE_FIELDS = {
+  name: "Name",
+  business: "Business or mark",
+  email: "Email",
+  stage: "Stage",
+  source: "Source",
+  created: "Created",
+  timeline: "Timeline entries",
+  tasks: "Tasks",
+  proposals: "Proposals",
+} as const;
 export const LEADS_MOVED_MARK = "Moved";
 export const LEADS_MOVED_MARK_TITLE = "You moved this lead; it no longer belongs in this list. It stays until you refresh.";
 export const LEADS_ALL_OPEN_MATCHES = (n: number) => "All open has " + n + (n === 1 ? " match" : " matches");

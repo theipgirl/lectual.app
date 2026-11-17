@@ -232,19 +232,25 @@ describe("ownerColumns", () => {
 });
 
 describe("touchDate / touchStampFor", () => {
-  it("stamps the day and month, with the arrow the legend explains", () => {
+  it("says whose turn it is in words: Our turn / Waiting on them, with the day and month", () => {
     expect(touchDate(daysBefore(2))).toBe("12 Sep");
 
     const [waiting] = rowsFor([lead({ id: "a", last_inbound_at: daysBefore(2), last_outbound_at: daysBefore(5) })]);
-    expect(touchStampFor(waiting)).toEqual({ text: "12 Sep ←", waitingOnUs: true });
+    expect(touchStampFor(waiting)).toMatchObject({ text: "Our turn · 12 Sep", waitingOnUs: true, state: "our-turn" });
 
     const [theirs] = rowsFor([lead({ id: "b", last_outbound_at: daysBefore(5) })]);
-    expect(touchStampFor(theirs)).toEqual({ text: "9 Sep →", waitingOnUs: false });
+    expect(touchStampFor(theirs)).toMatchObject({ text: "Waiting on them · 9 Sep", waitingOnUs: false, state: "waiting" });
   });
 
-  it("shows an em-dash when nothing has ever happened", () => {
+  it("only a date and no email or call: says so, and does not guess a side", () => {
+    const [only] = rowsFor([lead({ id: "d", last_activity_at: daysBefore(3) })]);
+    expect(only.reply).toBe("unknown");
+    expect(touchStampFor(only)).toMatchObject({ text: "Last activity · 11 Sep", waitingOnUs: false, state: "activity-only" });
+  });
+
+  it("says 'No contact yet' when nothing has ever happened", () => {
     const [never] = rowsFor([lead({ id: "c" })]);
-    expect(touchStampFor(never)).toEqual({ text: "—", waitingOnUs: false });
+    expect(touchStampFor(never)).toMatchObject({ text: "No contact yet", waitingOnUs: false, state: "none" });
     expect(touchDate(null)).toBeNull();
     expect(touchDate("not a date")).toBeNull();
   });

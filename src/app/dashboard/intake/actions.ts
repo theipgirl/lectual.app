@@ -3,6 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { assignLead, moveLeadStage } from "@/lib/pipeline";
+import { orgHasModule } from "@/lib/org/modules";
+import { loadCompare, type CompareResult } from "@/lib/intake/compare-load";
+import { LEADS_COMPARE_FAILED } from "@/lib/ui/words";
 import { CAN_MOVE_STAGE, CAN_WRITE_LEAD, resolveCurrentRole } from "@/lib/pipeline/leads";
 import { runBulkMove, type BulkMoveResult } from "@/lib/pipeline/bulk-move";
 import { forbiddenLeadWrite } from "@/lib/pipeline/errors";
@@ -179,4 +182,42 @@ export async function setSourceAction(
   revalidatePath("/dashboard/intake/");
   revalidatePath(`/dashboard/leads/${leadId}`);
   return { ok: true };
+}
+
+/**
+ * The "Possible duplicate" compare panel: two leads side by side, with what is on file for each. READ ONLY: nothing is
+ * merged, moved or written. Everything goes through the caller's scoped client (RLS is the tenant boundary, so another
+ * firm's id reads as "gone"); each count is its own read and a failed one says so. Proposals are counted only for a firm that
+ * has the Proposals feature (the module list that can't be read counts as off).
+ */
+export async function loadCompareAction(leadId: string, otherId: string): Promise<CompareResult> {
+  try {
+    const db = await getScopedClient();
+    return await loadCompare(leadId, otherId, {
+      readLead: async (id) => {
+        const { data, error } = await db
+          .from("crm_lead")
+          .select("id, first_name, last_name, business_name, mark_text, email, referral_source, created_at, current_stage_id")
+          .eq("id", id)
+          .maybeSingle();
+        if (error) throw error;
+        return data ?? null;
+      },
+      readStageName: async (stageId) => {
+        const { data, error } = await db.from("crm_stage").select("name").eq("id", stageId).maybeSingle();
+        if (error) throw error;
+        return data?.name ?? null;
+      },
+      count: async (table, id) => {
+        // `client_proposal` is not in the generated types (the proposals store casts the same way), so the count is typed here.
+        const counter = db as unknown as { from: (t: string) => { select: (c: string, o: { count: "exact"; head: true }) => { eq: (c: string, v: string) => PromiseLike<{ count: number | null; error: unknown }> } } };
+        const { count, error } = await counter.from(table).select("id", { count: "exact", head: true }).eq("lead_id", id);
+        if (error || count === null || count === undefined) throw new Error("count");
+        return count;
+      },
+      proposalsOn: () => orgHasModule("proposals"),
+    });
+  } catch {
+    return { ok: false, error: LEADS_COMPARE_FAILED };
+  }
 }

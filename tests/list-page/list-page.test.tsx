@@ -134,9 +134,10 @@ describe("Leads and Matters share the pattern", () => {
   });
 
   it("the Leads table row and the Matters table row use the same row class, and the same pill", () => {
-    // Item L: the Leads rows are their own even-height grid (ix-row) inside the shared panel; the Matters row keeps lp-row.
+    // Item L2: the Leads rows are the weekly review Sheet's table (rse-tbl in an rse-card) with an ix-row; the Matters row keeps lp-row.
     expect(read("src/app/dashboard/intake/_components/IntakeTable.tsx")).toContain('className="ix-row"');
-    expect(read("src/app/dashboard/intake/_components/IntakeTable.tsx")).toContain("lp-panel");
+    expect(read("src/app/dashboard/intake/_components/IntakeTable.tsx")).toContain("rse-card");
+    expect(read("src/app/dashboard/intake/_components/IntakeTable.tsx")).toContain("rse-tbl");
     expect(matters).toContain('className="lp-row"');
     expect(matters).toContain("lp-pill");
     expect(read("src/app/dashboard/intake/_components/IntakeCard.tsx")).toContain("ix-card");

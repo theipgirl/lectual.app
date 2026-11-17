@@ -132,8 +132,8 @@ describe("default last-touch sort, rendered", () => {
     expect(html.match(/ ↓</g)).toBeNull();
   });
 
-  it("marks Last touch descending on first load", () => {
-    expect(render(THREE)).toMatch(/aria-label="Sort by Last touch"[^>]*>Last touch ↓</);
+  it("marks Last contact descending on first load (the column was called Last touch)", () => {
+    expect(render(THREE)).toMatch(/aria-label="Sort by Last contact"[^>]*>Last contact ↓</);
   });
 
   it("the sub-line is one short sentence: the count, who needs a first reply, and ONE note about owners", () => {
@@ -265,7 +265,8 @@ describe("the Temperature column, rendered", () => {
 
   it("shows a suggested temperature as the SAME pill, lighter, with 'suggested' in its title and accessible name", () => {
     const html = render([suggested]);
-    expect(html).toMatch(/data-testid="temperature-cell"[^>]*>Hot</);
+    // Item L2: an outlined pill that says "suggested" in its words as well as its title.
+    expect(html).toMatch(/data-testid="temperature-cell"[^>]*>Hot · suggested</);
     expect(html).toContain('data-tone="hot"');
     expect(html).toContain('data-suggested=""');
     // The reason is in the tooltip, after "Suggested: Hot".
@@ -290,7 +291,7 @@ describe("the Temperature column, rendered", () => {
 
   it("draws the same cells in every row (lead, stage, temperature, source, last touch, next step, menu) and no LTN line", () => {
     const html = render([person, suggested, blank]);
-    expect(html.match(/data-col="/g)).toHaveLength(7 * 3);
+    expect(html.match(/<td[^>]*data-col="/g)).toHaveLength(7 * 3);
     expect(html).not.toContain("Long-Term Nurture suggested");
     const source = read("src/app/dashboard/intake/_components/IntakeTable.tsx");
     // The suggestion is the "Suggestions" chip now (it stays on the lead page), not a line in the lead cell.
@@ -365,7 +366,7 @@ describe("the board card's one temperature line", () => {
   it("reads 'Suggested: <level>' for a derived one", () => {
     const html = card(lead("a", "Ana", { last_inbound_at: daysBefore(1) }));
     expect(html).toContain('data-suggested=""');
-    expect(html).toContain(">Hot<");
+    expect(html).toContain(">Hot · suggested<");
     expect(html).toContain("Hot, suggested");
   });
 
@@ -385,7 +386,7 @@ describe("the board card's one temperature line", () => {
       // The name row is the link and nothing else: no dot beside the name.
       expect(html).toMatch(/^<div[^>]*><div class="ix-card-top"><a [^>]*>[^<]*<\/a><\/div>/);
       expect(html).not.toMatch(/width:7px;height:7px/);
-      const lines = html.match(/>(Hot|Warm|Cold)</g) ?? [];
+      const lines = html.match(/>(Hot|Warm|Cold)( · suggested)?</g) ?? [];
       expect(lines).toHaveLength(l.id === "c" ? 0 : 1);
     }
   });

@@ -61,6 +61,7 @@ import BulkMoveBar from "./BulkMoveBar";
 import IntakeBoard from "./IntakeBoard";
 import IntakeControls from "./IntakeControls";
 import IntakeTable from "./IntakeTable";
+import CompareDialog, { type CompareTarget } from "./CompareDialog";
 
 /** How long the URL lags the controls, so typing in Search isn't one push per key. */
 const URL_SYNC_DELAY_MS = 300;
@@ -138,6 +139,9 @@ export default function IntakeWorkspace({
   const [pinned, setPinned] = useState<string[]>([]);
   const [colExtra, setColExtra] = useState<Record<string, number>>({});
   const [showEmpty, setShowEmpty] = useState(false);
+  const [compare, setCompare] = useState<CompareTarget | null>(null);
+  const openCompare = useCallback((leadId: string, otherId: string, trigger: HTMLElement) => setCompare({ leadId, otherId, trigger }), []);
+  const closeCompare = useCallback(() => setCompare(null), []);
   const [, startTransition] = useTransition();
 
   const now = useMemo(() => new Date(nowIso), [nowIso]);
@@ -554,6 +558,7 @@ export default function IntakeWorkspace({
             onToggleSelect={toggleSelect}
             duplicates={duplicates}
             movedOut={movedOut}
+            onCompare={openCompare}
           />
         )
       ) : (
@@ -584,8 +589,11 @@ export default function IntakeWorkspace({
           onClearFilters={filtersActive ? clearFilters : undefined}
           emptyAction={emptyContent}
           anyLeads={anyLeads}
+          onCompare={openCompare}
         />
       )}
+
+      <CompareDialog target={compare} onClose={closeCompare} />
     </div>
   );
 }

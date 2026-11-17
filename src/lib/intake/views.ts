@@ -6,7 +6,18 @@ import { inPipelineOrder } from "@/lib/pipeline/stage-order";
 import type { MemberIdentity } from "@/lib/members/directory";
 import { intakeStages } from "./scope";
 import type { IntakeRow } from "./rows";
-import { LEADS_NOTE_UNAVAILABLE, LEADS_NO_ACTIVITY_YET } from "@/lib/ui/words";
+import {
+  LEADS_NOTE_UNAVAILABLE,
+  LEADS_NO_ACTIVITY_YET,
+  LEADS_TOUCH_ACTIVITY_ONLY,
+  LEADS_TOUCH_ACTIVITY_ONLY_TITLE,
+  LEADS_TOUCH_NONE_TITLE,
+  LEADS_TOUCH_NO_CONTACT,
+  LEADS_TOUCH_OUR_TURN,
+  LEADS_TOUCH_OUR_TURN_TITLE,
+  LEADS_TOUCH_WAITING_ON_THEM,
+  LEADS_TOUCH_WAITING_TITLE,
+} from "@/lib/ui/words";
 
 /**
  * Pure arrangement layer for /intake (blueprint §11): the same rows that
@@ -183,23 +194,29 @@ export function touchDate(iso: string | null): string | null {
   return `${at.getUTCDate()} ${MONTHS[at.getUTCMonth()]}`;
 }
 
+export type TouchState = "our-turn" | "waiting" | "activity-only" | "none";
+
 export type TouchStamp = {
-  /** "12 Sep ←" / "9 Sep →" / "—". */
+  /** "Our turn · 16 Nov" / "Waiting on them · 15 Nov" / "Last activity · 12 Sep" / "No contact yet". */
   text: string;
   /** True when the lead spoke last, i.e. the firm owes the reply. */
   waitingOnUs: boolean;
+  state: TouchState;
+  /** One sentence for the cell's tooltip: what the words mean. */
+  title: string;
 };
 
 /**
- * The Last-touch cell. ← means waiting on US, → means waiting on THEM — the
- * legend is printed in the table footer, because an arrow nobody can decode is
- * decoration.
+ * The Last-contact cell, in words (no arrows, so no legend). The direction is `row.reply`, the same field the arrows
+ * read: "replied" = they wrote last (our turn), "awaiting" = we wrote last. "unknown" means no email or call is
+ * recorded, so only the date of the newest activity is known; it says that and does not guess a side.
  */
 export function touchStampFor(row: IntakeRow): TouchStamp {
   const date = touchDate(row.lastTouchAt);
-  if (!date) return { text: "—", waitingOnUs: false };
-  if (row.reply === "replied") return { text: `${date} ←`, waitingOnUs: true };
-  return { text: `${date} →`, waitingOnUs: false };
+  if (!date) return { text: LEADS_TOUCH_NO_CONTACT, waitingOnUs: false, state: "none", title: LEADS_TOUCH_NONE_TITLE };
+  if (row.reply === "replied") return { text: LEADS_TOUCH_OUR_TURN(date), waitingOnUs: true, state: "our-turn", title: LEADS_TOUCH_OUR_TURN_TITLE };
+  if (row.reply === "awaiting") return { text: LEADS_TOUCH_WAITING_ON_THEM(date), waitingOnUs: false, state: "waiting", title: LEADS_TOUCH_WAITING_TITLE };
+  return { text: LEADS_TOUCH_ACTIVITY_ONLY(date), waitingOnUs: false, state: "activity-only", title: LEADS_TOUCH_ACTIVITY_ONLY_TITLE };
 }
 
 /** Days since a timestamp, or null when there isn't one / it doesn't parse. */

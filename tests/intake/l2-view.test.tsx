@@ -1,0 +1,65 @@
+import { readFileSync } from "node:fs";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it } from "vitest";
+import CompareView from "@/app/dashboard/intake/_components/CompareView";
+import { shapeCompareSide } from "@/lib/intake/compare";
+
+const lead = (id: string) => ({ id, first_name: "Dominique", last_name: id === "a" ? "Okonkwo" : "Okonkwo-Reyes", business_name: "Textiles", mark_text: null, email: "d@example.test", referral_source: "UGW", created_at: "2026-09-03T15:00:00Z" });
+const counts = { timeline: { status: "ok" as const, count: 4 }, tasks: { status: "unavailable" as const }, proposals: { status: "off" as const } };
+const html = (state: Parameters<typeof CompareView>[0]["state"]) => renderToStaticMarkup(<CompareView state={state} titleId="t1" />);
+
+describe("the compare panel", () => {
+  it("is a labelled modal dialog with Close, both leads side by side, a link to each and NO merge action", () => {
+    const out = html({ status: "ok", data: { a: shapeCompareSide(lead("a"), "Follow-Up", counts), b: shapeCompareSide(lead("b"), "Follow-Up", counts) } });
+    expect(out).toContain('role="dialog"');
+    expect(out).toContain('aria-modal="true"');
+    expect(out).toContain('aria-labelledby="t1"');
+    expect(out).toContain("Close");
+    expect(out).toContain("Dominique Okonkwo-Reyes");
+    expect(out).toMatch(/href="\/dashboard\/leads\/a\/?"/);
+    expect(out).toMatch(/href="\/dashboard\/leads\/b\/?"/);
+    expect(out).toContain("Couldn&#x27;t load");
+    expect(out).toContain("Nothing is merged here");
+    expect(out).not.toMatch(/merge<|Merge/);
+  });
+  it("loading, failed and gone are their own words, never an empty comparison", () => {
+    expect(html({ status: "loading" })).toContain("Loading both leads");
+    expect(html({ status: "failed", error: "Can't show these leads right now. Close this and try again." })).toContain('role="alert"');
+    expect(html({ status: "ok", data: { a: { status: "gone", id: "a" }, b: shapeCompareSide(lead("b"), "S", counts) } })).toContain("This lead couldn&#x27;t be found");
+  });
+});
+
+describe("one typeface and the colours (CSS)", () => {
+  const css = readFileSync("src/app/dashboard/intake/leads.css", "utf8");
+  it("the Leads page overrides every mono variable to Geist, and the file names no Courier or monospace", () => {
+    expect(css).not.toMatch(/courier-prime\), monospace/);
+    const block = css.slice(css.indexOf(".intake-root.intake-root"));
+    for (const v of ["--font-courier-prime", "--font-jetbrains-mono", "--font-mono", "--mono"]) expect(block).toContain(`${v}: var(--font-geist)`);
+  });
+  const lum = (hex: string) => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const ratio = (a: string, b: string) => {
+    const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
+    return (x + 0.05) / (y + 0.05);
+  };
+  const tokens = (scope: RegExp) => {
+    const m = scope.exec(css);
+    if (!m) throw new Error("scope");
+    return Object.fromEntries([...m[1].matchAll(/--([a-z-]+): (#[0-9a-f]{6})/g)].map((x) => [x[1], x[2]]));
+  };
+  for (const [name, scope] of [
+    ["light", /\n:root \{([^}]*)\}/],
+    ["dark", /\n:root\[data-theme="dark"\] \{([^}]*)\}/],
+  ] as const) {
+    it(`temperature and assistant text reaches 4.5:1 on its own background (${name}), filled and outlined`, () => {
+      const t = tokens(scope);
+      for (const tone of ["hot", "warm", "cold"]) {
+        expect(ratio(t[`tp-${tone}-fg`], t[`tp-${tone}-bg`]), `${tone} filled`).toBeGreaterThanOrEqual(4.5);
+        expect(ratio(t[`tp-${tone}-fg`], t["tp-outline-bg"]), `${tone} outlined`).toBeGreaterThanOrEqual(4.5);
+      }
+      if (name === "dark") expect(ratio(t["asst-fg"], t["asst-bg"])).toBeGreaterThanOrEqual(4.5);
+    });
+  }
+});

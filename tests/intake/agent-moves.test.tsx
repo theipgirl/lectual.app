@@ -275,8 +275,11 @@ describe("styles", () => {
   it("the chip uses the Intake tokens in intake.css, and the global stylesheet is not touched", () => {
     const css = readFileSync("src/app/dashboard/intake/intake.css", "utf8");
     const block = css.slice(css.indexOf(".intake-agent-chip"));
-    expect(block).toContain("var(--oxbg)");
-    expect(block).toContain("var(--ox)");
+    // Item L2: the assistants' own colour, never the oxblood tint of a person's pills.
+    const chip = block.slice(0, block.indexOf("}"));
+    expect(chip).toContain("var(--asst-bg)");
+    expect(chip).toContain("var(--asst-fg)");
+    expect(chip).not.toContain("var(--oxbg)");
     expect(readFileSync("src/app/globals.css", "utf8")).not.toContain("intake-agent-chip");
   });
 });
