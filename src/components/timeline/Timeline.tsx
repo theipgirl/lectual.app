@@ -1,4 +1,5 @@
-import { relativeTime } from "@/lib/relative-time";
+import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
+import { formatDay } from "@/lib/ui/dates";
 import { describeActivity } from "@/components/leads/describe";
 import { UndoAgentMoveButton } from "@/components/leads/StageKeeperControls";
 import { isAgentMoveRow, undoStateFor } from "@/lib/stage-keeper/moves";
@@ -16,6 +17,11 @@ export type TimelineUndo = {
   /** Where the lead is now: Undo is offered only while it is still where the agent put it. */
   currentStageId: string | null;
 };
+
+/** The real date of an entry ("Nov 11", with the year when it is not this year) in the firm's zone; never "6 days ago". */
+export function timelineDate(iso: string, timeZone?: string): string {
+  return formatDay(iso, { tz: timeZone ?? DEFAULT_TIME_ZONE }) ?? "";
+}
 
 /**
  * A record's activity timeline (lead or matter). Voice notes play from a
@@ -52,7 +58,7 @@ export function Timeline({
           <li key={r.id} data-tone={d.tone}>
             <div className="lx-timeline-head">
               <span>{d.title}</span>
-              <span className="lx-note">{relativeTime(r.created_at, undefined, timeZone)}</span>
+              <span className="lx-note">{timelineDate(r.created_at, timeZone)}</span>
             </div>
             {audio && <audio controls preload="none" src={audio} aria-label="Voice note" style={{ width: "100%", height: 34, marginTop: 6 }} />}
             {d.detail && <p>{d.detail}</p>}
