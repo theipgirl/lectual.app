@@ -1,7 +1,7 @@
 /* The approval deck (src/app/dashboard/queue/deck). Tokens only (src/app/globals.css); light only. The page head, cards, pills, chips,
    banners, tables and the board column are the shared ones; this file holds what is the deck's own: the zone, the card, the moves, the hold. */
 
-.dk-frame { display: grid; gap: 18px; }
+.dk-frame { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
 .dk-frame--cards { grid-template-columns: 380px minmax(0, 1fr); gap: 26px; align-items: start; }
 .dk-left { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .dk-pagehead { display: flex; flex-direction: column; gap: 6px; }
@@ -188,7 +188,7 @@ a.dk-move--open { font-size: var(--fs-3); }
 .dk-linkbtn:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; border-radius: var(--r-sm); }
 
 @media (max-width: 900px) {
-  .dk-frame--cards { grid-template-columns: 1fr; }
+  .dk-frame--cards { grid-template-columns: minmax(0, 1fr); }
   .dk-zone { order: -1; margin-top: 0; }
   .dk-board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dk-col { min-height: 0; }
@@ -208,6 +208,8 @@ a.dk-move--open { font-size: var(--fs-3); }
   .dk-zone-titles { gap: 6px; }
   .dk-more3 span { display: none; }
   .dk-wide-head .dk-titlerow { gap: 12px; }
+  /* The view switch and "Change deal times" wrap under each other rather than widen the page past the screen. */
+  .dk-wide-head .lx-head-actions { flex-wrap: wrap; }
   .dk-board { grid-template-columns: 1fr; }
   .dk-moves5 { gap: 6px; }
   /* Five small moves (Reject, Done, Later, Edit, Hand off) stay on ONE row at 14px (the phone floor). */

@@ -1954,6 +1954,9 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
   .lx-head-actions .lx-btn { white-space: nowrap; }
   .lx-head-actions { flex-wrap: nowrap; gap: 6px; }
   .lx-chips { flex-wrap: wrap; }
+  /* A pick-one switch with long options (the consult outcome) wraps inside the screen instead of widening its card. */
+  .vs-switch { flex-wrap: wrap; height: auto; min-height: var(--ctl-h); }
+  .vs-switch:has(> :nth-child(4)) { border-radius: var(--r-lg); }
 }
 
 /* A button that reads as an inline link (opens Send feedback). */
