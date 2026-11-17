@@ -60,7 +60,7 @@ describe("Yes", () => {
   it("goes through the existing approve core, with a receipt, and never passes the stale confirm", async () => {
     const d = deps();
     const r = await runLeadStepYes(d, LEAD, ITEM);
-    expect(r).toEqual({ ok: true, message: W.leadStepDraftInMailbox(null, "Outlook"), webLink: "https://outlook.example/d/1" });
+    expect(r).toEqual({ ok: true, message: W.leadStepDraftInMailbox(null, "Outlook"), webLink: "https://outlook.example/d/1", warn: false });
     expect(d.review).toHaveBeenCalledWith({ id: ITEM, intent: "approve", withReceipt: true });
     expect(d.revalidate).toHaveBeenCalledWith(LEAD);
   });
@@ -154,7 +154,7 @@ describe("the after-Yes sentence comes from the approve core's own result", () =
 
   it("the action returns that sentence", async () => {
     const d = deps({ review: vi.fn(async () => resolved({ send: "none", provider: null, webLink: null })) });
-    expect(await runLeadStepYes(d, LEAD, ITEM)).toEqual({ ok: true, message: W.LEAD_STEP_APPROVED_NO_DRAFT, webLink: null });
+    expect(await runLeadStepYes(d, LEAD, ITEM)).toEqual({ ok: true, message: W.LEAD_STEP_APPROVED_NO_DRAFT, webLink: null, warn: true });
   });
 });
 

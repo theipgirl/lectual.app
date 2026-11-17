@@ -45,6 +45,7 @@ import {
   type OpenTask,
   type PendingDraft,
   type ProposalFact,
+  type QueueRef,
   type Read,
   type RoutingFacts,
 } from "./facts";
@@ -169,7 +170,7 @@ async function enrich(item: QueueItem, payloadKind: string | null, audit: Audit 
  * The pending queue items linked to this lead (any id of its merged set), by the SAME grouping the lead page's
  * "waiting on" read uses (`groupPendingByLead`, over the queue's batched resolver), so the two cannot disagree.
  */
-export async function readLeadApprovals(db: Scoped, leadIds: readonly string[], routing: RoutingFacts): Promise<Read<{ items: PendingDraft[]; total: number }>> {
+export async function readLeadApprovals(db: Scoped, leadIds: readonly string[], routing: RoutingFacts): Promise<Read<{ items: PendingDraft[]; total: number; refs?: QueueRef[]; briefings?: QueueRef[] }>> {
   const queue = await loadActiveQueue("pending");
   if (queue.status === "unconfigured") return notSetUp("queue-off");
   if (queue.status !== "ok") return unavailable();
@@ -182,11 +183,14 @@ export async function readLeadApprovals(db: Scoped, leadIds: readonly string[], 
     const mine = queue.items
       .filter((i) => kinds.has(i.id) && classifyQueueItem(i) !== "internal_briefing")
       .sort((a, b) => (Date.parse(a.created_at) || 0) - (Date.parse(b.created_at) || 0) || a.id.localeCompare(b.id));
-    if (mine.length === 0) return ok({ items: [], total: 0 });
+    const ref = (i: QueueItem): QueueRef => ({ id: i.id, headline: i.headline, createdAt: i.created_at ?? null });
+    const byAge = (a: QueueItem, b: QueueItem) => (Date.parse(a.created_at) || 0) - (Date.parse(b.created_at) || 0) || a.id.localeCompare(b.id);
+    const briefings = queue.items.filter((i) => kinds.has(i.id) && classifyQueueItem(i) === "internal_briefing").sort(byAge).map(ref);
+    if (mine.length === 0) return ok({ items: [], total: 0, refs: [], briefings });
     const capped = mine.slice(0, ENRICH_CAP);
     const [audit, handoffs] = await Promise.all([loadAuditContext().catch(() => null), readHandoffs(capped, routing)]);
     const enriched = await Promise.all(capped.map((i) => enrich(i, kinds.get(i.id) ?? null, audit, handoffs.get(i.id) ?? { status: "unknown" })));
-    return ok({ items: enriched, total: mine.length });
+    return ok({ items: enriched, total: mine.length, refs: mine.map(ref), briefings });
   } catch {
     return unavailable();
   }

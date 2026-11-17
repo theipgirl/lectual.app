@@ -77,3 +77,8 @@
   .ls-fact { padding: 12px 14px; }
   .ls-menu { min-width: 180px; }
 }
+
+.ls-others { display: grid; gap: 4px; padding: 4px 6px; min-width: 0; }
+.ls-others h2 { margin: 0; }
+.ls-others ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: var(--fs-2); }
+.ls-others li { overflow-wrap: anywhere; }

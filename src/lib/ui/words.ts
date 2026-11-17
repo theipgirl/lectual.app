@@ -1174,7 +1174,6 @@ export const ADD_ANOTHER_NEXT_STEP = "Add another next step";
 
 // Lead page
 /** The lead page's top card controls, "What Lectual did" and the four facts (Sprint 9 Part 2). Wording of the card itself is in `// Lead step`. */
-export const LEAD_PAGE_TOP_LABEL = "Next step for this lead";
 export const LEAD_PAGE_FACTS_LABEL = "Where this lead stands";
 export const LEAD_PAGE_WHY = "Why:";
 export const LEAD_PAGE_CHECK_FIRST = "Check first:";
@@ -1185,7 +1184,6 @@ export const LEAD_PAGE_DONE_EDITING_YES = "Save or cancel your edit first, then 
 export const LEAD_PAGE_OPEN_IN_APPROVALS = "Open in Approvals";
 export const LEAD_PAGE_SEND_BACK_NOTE = "Note for them (optional)";
 export const LEAD_PAGE_SEND_BACK_GO = "Send this back";
-export const LEAD_PAGE_YES_HELD = "Held for a moment so you can undo. Nothing has been sent or saved yet.";
 export const LEAD_PAGE_ACTION_FAILED = "That didn't go through. Nothing was sent. Refresh to try again.";
 export const LEAD_PAGE_MARK_DONE = "Mark done";
 export const LEAD_PAGE_SNOOZE = "Snooze";
@@ -1196,5 +1194,41 @@ export const LEAD_PAGE_STEP_WHAT = "What happens next";
 export const LEAD_PAGE_STEP_DUE = "Due date";
 export const LEAD_PAGE_STEP_OWNER = "Assigned to";
 export const LEAD_PAGE_DID_ALL = (n: number) => `Show all (${n})`;
-export const LEAD_PAGE_DID_NO_UNDO_NOTE = "Undo is offered only for a stage move Lectual made.";
 export const LEAD_PAGE_APPROVALS_LINK = "See them in Approvals";
+export const LEAD_PAGE_YES_UNCONFIRMED = "We couldn't confirm that. Check Approvals before trying again. Nothing was sent.";
+export const LEAD_PAGE_STALE_DRAFT = "This client's status changed since the draft was queued, so it can't be approved from here. Open it in Approvals to decide.";
+export const LEAD_PAGE_ALSO_WAITING = "Also waiting on this lead";
+export const LEAD_PAGE_BRIEFINGS = "Internal briefings for this lead";
+export const leadPageQueued = (day: string) => `queued ${day}`;
+export const leadPageMoreInApprovals = (n: number) => `${n} more in Approvals`;
+export const leadStepTheyLastWrote = (day: string) => `They last wrote ${day}`;
+// PGE Sprint 1: sync check and first-user readiness
+/** The stamps a change is credited to. A person is named by first name from the member directory. */
+export const CHANGED_BY_LAWMATICS_SYNC = "Lawmatics sync";
+export const CHANGED_BY_AUTOMATION = "an automation";
+export const CHANGED_BY_ASSISTANT = "an assistant";
+export const UPDATED_AUTOMATICALLY = "Updated automatically";
+export const CAME_IN_THROUGH_A_FORM = "Came in through a form";
+export const OPENED_WHEN_CLIENT_SIGNED = "Opened when the client signed";
+/** The Stage Keeper is never named to a firm (the glossary bans it): its move reads as an automatic one. */
+export const changedAutomaticallyLine = (when: string) => `Changed automatically · ${when}`;
+/** The weekly review's quiet "last changed" line. A date is "Nov 16". */
+export const changedByLine = (who: string, when: string) => `Changed by ${who} · ${when}`;
+export const NOT_CHANGED_SINCE_IMPORT = "Not changed since import";
+export const NO_CHANGES_LAST_YEAR = "No changes in the last year";
+export const LAST_CHANGED_LABEL = "Last changed";
+
+/** Settings → Setup → Team accounts. */
+export const TEAM_ACCOUNTS_NAME = "Team accounts";
+export const TEAM_ACCOUNTS_SUB = "Each person's role and Outlook, read from what is saved. Nothing here sends mail or changes anything.";
+export const TEAM_ACCOUNTS_CANT_CHECK = "Team accounts couldn't be checked right now. Refresh to try again.";
+export const TEAM_ACCOUNTS_OUTLOOK = "Outlook connected";
+export const TEAM_ACCOUNTS_DRAFTS = "Can receive drafts";
+export const TEAM_ACCOUNTS_YOU = "You";
+/** A colleague's personal mailbox is hidden by the database from everyone but them (and, through Lectual's owner view, the owner). */
+export const onlyCanSeeThis = (first: string | null) => `Only ${first ?? "that person"} can see this`;
+export const TEAM_ACCOUNTS_PRIVATE_PILL = "Private";
+export const TEAM_ACCOUNTS_NO_MEMBERS = "No team members were found.";
+
+/** The one line on Getting started that shows a person their own Outlook state. */
+export const YOUR_SETUP_LABEL = "Your setup";

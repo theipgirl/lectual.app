@@ -23,12 +23,12 @@ export function TopCardFrame({ children, initial = null }: { children: ReactNode
   return (
     <SayContext.Provider value={value}>
       {notice && (
-        <Notice tone={notice.tone} role={notice.tone === "risk" ? "alert" : "status"}>
+        <Notice tone={notice.tone} role={notice.tone === "risk" || notice.tone === "warn" ? "alert" : "status"}>
           {notice.message}
           {notice.href ? (
             <>
               {" "}
-              <a className="lx-link" href={notice.href} target="_blank" rel="noopener noreferrer">
+              <a className="lx-link" href={notice.href} {...(/^https:/i.test(notice.href) ? { target: "_blank", rel: "noopener noreferrer" } : {})}>
                 {notice.hrefLabel}
               </a>
             </>

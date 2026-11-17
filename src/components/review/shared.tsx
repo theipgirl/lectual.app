@@ -5,6 +5,7 @@ import type { ReviewRow } from "@/lib/review/buckets";
 import { reviewHref, type ReviewParams } from "@/lib/review/params";
 import { Pill } from "@/components/ui/Pill";
 import { REVIEW_SHOWS_PROPOSALS } from "@/lib/review/scope";
+import { lastChangedText } from "@/lib/review/last-changed";
 
 type Member = { userId: string; name: string };
 
@@ -14,6 +15,20 @@ export type Common = { /** The owner view draws the board look; every other view
 /** The review URL with this record's panel open. */
 export function openHref(params: ReviewParams, row: Pick<ReviewRow, "kind" | "id">): string {
   return reviewHref({ ...params, open: { kind: row.kind, id: row.id } });
+}
+
+/**
+ * The quiet "Changed by Caitlyn · Nov 16" line. Draws NOTHING when the last-change read failed (`lastChange` unset): a failed read is
+ * never "not changed", and the page's "Some details couldn't load" note names it. Name, date and the stamp only: no address, note or payload.
+ */
+export function LastChanged({ row, members, today }: { row: Pick<ReviewRow, "lastChange">; members: Member[]; today: string }) {
+  const text = lastChangedText(row.lastChange, new Map(members.map((m) => [m.userId, m.name])), today);
+  if (!text) return null;
+  return (
+    <span className="lx-note rv-changed" data-last-changed="">
+      {text}
+    </span>
+  );
 }
 
 export function Avatar({ name }: { name: string }) {

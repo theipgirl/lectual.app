@@ -4,7 +4,7 @@ import { dueText, lastContactText, shortDate } from "@/lib/review/format";
 import { documentsTag } from "@/lib/review/documents";
 import { laneOf } from "@/lib/review/lanes";
 import { SHEET_COLUMNS, sheetSections, waitingCell } from "@/lib/review/sheet";
-import { openHref, type Common } from "./shared";
+import { LastChanged, openHref, type Common } from "./shared";
 import { SheetEdit } from "./SheetEdit";
 import type { SheetPerms } from "@/lib/review/sheet-edit";
 import { SheetCard, SheetScroll, SheetTable } from "@/components/ui/SheetTable";
@@ -44,6 +44,7 @@ function SheetSection({ id, title, rows, today, members, params }: Common & { id
                       </Link>
                       {r.company && <span className="lx-note rv-sub">{r.company}</span>}
                       {documentsTag(r.documentCount) && <span className="lx-note rv-sub">{documentsTag(r.documentCount)}</span>}
+                      <LastChanged row={r} members={members} today={today} />
                     </td>
                     <td data-label="Mark">{r.mark ?? <span className="lx-note">{BLANK}</span>}</td>
                     <td data-label="Status">{r.stageLabel ?? <span className="lx-note">{BLANK}</span>}</td>

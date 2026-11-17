@@ -436,6 +436,7 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                           {row.client}
                         </Link>
                         {row.documentsText && <span className="lx-note rv-sub">{row.documentsText}</span>}
+                        {row.changedText && <span className="lx-note rv-changed" data-last-changed="">{row.changedText}</span>}
                       </td>
                       <td data-label="Mark">{row.mark ?? <span className="rse-dash">{BLANK}</span>}</td>
                       <td data-label="Status">

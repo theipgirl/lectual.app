@@ -2213,8 +2213,9 @@ Nothing here sends: a Yes makes a DRAFT through the existing approve core. Order
 - **Yours to do** uses the existing next-step actions (`completeNextStepAction`, `snoozeNextStepAction`, `updateNextStepAction`, `setNextStepAction`), drawn only for `CAN_WRITE_LEAD`; they refresh the page themselves
   because those actions revalidate the review pages, not this one.
 - **What Lectual did** (`WhatLectualDid`): Undo only where the view offers it (the Stage Keeper's `undoAgentMoveAction`); a failed read is "Couldn't load", never "Nothing yet"; a cut list says so.
-- **Replaced on the page:** the "Waiting on attorney review" list (`WaitingOnRebecca`) and its pending-approvals read (the top card shows the item inline and links the rest to Approvals), and the status row's
-  "Last contact" item (the Last contact fact says it, with who wrote last). **Kept because the top card doesn't cover them:** the booked-consult line, proposals from client email, and the stage-suggestion cards
+- **Replaced on the page:** the "Waiting on attorney review" list (`WaitingOnRebecca`) and its pending-approvals read. The top card shows the oldest item inline; `OtherApprovals` lists the OTHER pending drafts and the
+  internal briefings (headline, age, link to `/dashboard/queue/<id>/`), from the engine's `queue` view. The status row's "Last contact" item is hidden only while the facts are drawn (the Last contact fact says it, with who wrote last; a future time is no contact).
+  A saved Edit does not end the card (`lead-step-card.ts`); an approval whose draft failed is a warning with a link, not a green success; a stale draft says this page's own sentence. **Kept because the top card doesn't cover them:** the booked-consult line, proposals from client email, and the stage-suggestion cards
   (Accept / Dismiss). `needsAttention`'s `approvals` input is optional now.
 - Styles: `src/components/leads/lead-step.css` (`ls-` classes, tokens only). Harness: `scripts/design-harness/screens/lead-step.screen.tsx` (five states at 1440 / 1280 / 375).
 - NOT verified: a real browser against the running app, a real Yes against a real queue, keyboard use of the Snooze menu.

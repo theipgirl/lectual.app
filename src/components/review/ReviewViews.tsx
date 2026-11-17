@@ -11,7 +11,7 @@ import { LoadFailedLine } from "@/components/ui/LoadFailed";
 import { Pill } from "@/components/ui/Pill";
 import type { PillTone } from "@/lib/ui/tones";
 import { BoardCard, BoardColumn } from "@/components/ui/Board";
-import { DocTag, openHref, Tags, type Common } from "./shared";
+import { DocTag, LastChanged, openHref, Tags, type Common } from "./shared";
 import "@/components/list-page/list-page.css";
 import "./review.css";
 import { ViewToggle } from "@/components/ViewToggle";
@@ -59,7 +59,7 @@ const BUCKET_TONE: Record<BucketKey, PillTone> = { overdue: "risk", week: "warn"
  * mark, stage), the next step with its due chip, then the timeline line: the newest thing SENT OUT for the record. The title is the
  * link to the panel; Done and Open sit below it as plain text links, so nothing interactive is nested.
  */
-function ReviewCard({ row, bucket, today, canWrite, params, waitingOnClient }: Common & { row: ReviewRow; bucket: BucketKey; /** A "Waiting on client" card also says how long since we followed up. */ waitingOnClient?: boolean }) {
+function ReviewCard({ row, bucket, today, members, canWrite, params, waitingOnClient }: Common & { row: ReviewRow; bucket: BucketKey; /** A "Waiting on client" card also says how long since we followed up. */ waitingOnClient?: boolean }) {
   const due = row.nextStep ? dueText(row.nextStep.dueDate, today) : null;
   const href = openHref(params, row);
   // The chip at the right of the name: the due date, else "Approval" for a record waiting on one, else a nudge to set a step.
@@ -85,6 +85,7 @@ function ReviewCard({ row, bucket, today, canWrite, params, waitingOnClient }: C
       <div className="rv-card-sent lx-note" data-sent={row.lastOutbound ? "yes" : row.contactKnown ? "none" : "unknown"}>
         {sentText(row, today, { days: waitingOnClient })}
       </div>
+      <LastChanged row={row} members={members} today={today} />
       <Tags row={row} today={today} max={2} skip={["waiting"]} />
       <DocTag row={row} />
       <div className="rv-card-acts">

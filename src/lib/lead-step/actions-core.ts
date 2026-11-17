@@ -12,6 +12,7 @@ import {
   LEAD_STEP_APPROVED_MANUAL,
   LEAD_STEP_APPROVED_NO_DRAFT,
   LEAD_STEP_APPROVED,
+  LEAD_PAGE_STALE_DRAFT,
   LEAD_STEP_APPROVED_LETTER,
   LEAD_STEP_HANDED_AWAY,
   LEAD_STEP_LINK_NOT_LIVE,
@@ -89,7 +90,7 @@ export type LeadStepActionDeps = {
   revalidate: (leadId: string) => void;
 };
 
-export type YesResult = { ok: true; message: string; webLink: string | null } | { ok: false; error: string };
+export type YesResult = { ok: true; message: string; webLink: string | null; warn: boolean } | { ok: false; error: string };
 export type NotThisResult = { ok: true; message: string } | { ok: false; error: string };
 /** No "may say yes now" in the answer: the page is revalidated and recomputes it from the re-read item. */
 export type EditResult = { ok: true; message: string } | { ok: false; error: string };
@@ -97,6 +98,8 @@ export type SendBackResult = { ok: true; message: string } | { ok: false; error:
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const QUEUE_ID = /^[A-Za-z0-9_-]{1,128}$/;
+/** The approve core asks for a ticked confirmation box on a stale draft; this page has none, so it says its own sentence. */
+const STALE_CONFIRM = /confirmation box/i;
 export const REASON_MAX = 200;
 export const BODY_MAX = 20_000;
 
@@ -129,6 +132,17 @@ export function cleanBody(raw: unknown): string | null {
  * After a Yes, the sentence for what really happened, from the approve core's OWN result: which mailbox (if any) holds
  * the draft. `owner` names the person whose mailbox it is when it isn't the reader's; null reads "your".
  */
+/**
+ * True when the approval went through but nothing reached a mailbox (the draft failed, or none was made): the page shows
+ * it as a warning with a link to the approval, never as a green success.
+ */
+export function afterYesWarns(outcome: Extract<ReviewOutcome, { kind: "resolved" }>, itemType: string): boolean {
+  const send = outcome.send;
+  if (send === "failed" || send === "mailbox-failed") return true;
+  if (send === "mailbox-microsoft" || send === "mailbox-google" || send === "drafted" || send === "manual" || send === "sent") return false;
+  return !DOCUMENT_QUEUE_TYPES.has(itemType);
+}
+
 export function afterYesSentence(outcome: Extract<ReviewOutcome, { kind: "resolved" }>, itemType: string, owner: string | null = null): string {
   const send = outcome.send;
   if (send === "mailbox-microsoft" || send === "mailbox-google") {
@@ -189,10 +203,10 @@ export async function runLeadStepYes(deps: LeadStepActionDeps, rawLeadId: unknow
   if (look.linkNotLive) return { ok: false, error: LEAD_STEP_LINK_NOT_LIVE };
   if (look.reasons.length > 0) return { ok: false, error: LEAD_STEP_CLOSER_LOOK };
   const outcome = await deps.review({ id: itemId, intent: "approve", withReceipt: true });
-  if (outcome.kind === "error") return { ok: false, error: outcome.error };
+  if (outcome.kind === "error") return { ok: false, error: STALE_CONFIRM.test(outcome.error) ? LEAD_PAGE_STALE_DRAFT : outcome.error };
   if (outcome.kind !== "resolved" || outcome.intent !== "approve") return { ok: false, error: LEAD_STEP_FAILED };
   deps.revalidate(leadId);
-  return { ok: true, message: afterYesSentence(outcome, c.item.type), webLink: outcome.webLink };
+  return { ok: true, message: afterYesSentence(outcome, c.item.type), webLink: outcome.webLink, warn: afterYesWarns(outcome, c.item.type) };
 }
 
 export async function runLeadStepNotThis(deps: LeadStepActionDeps, rawLeadId: unknown, rawItemId: unknown, rawReason: unknown): Promise<NotThisResult> {

@@ -93,6 +93,9 @@ export type PendingDraft = {
  * The card's hand-off state (lectual 0103 `queue_card_event`), folded with `trustedCardState` and `currentHolder`
  * exactly as the deck does. `unknown` (not set up, or the read failed) shows the card as it is today: no hand-off.
  */
+/** A pending queue item named only by what a list needs: its id, headline and age. */
+export type QueueRef = { id: string; headline: string; createdAt: string | null };
+
 export type HandoffFact =
   | { status: "ok"; holder: { userId: string; by: string; note: string | null; at: string } | null }
   | { status: "unknown" };
@@ -187,7 +190,14 @@ export type LeadStepFacts = {
    * The pending drafts for a yes: internal briefings left out, oldest first, the first ENRICH_CAP enriched. `total`
    * counts every one of them, so "N more waiting" is never cut short by the cap.
    */
-  approvals: Read<{ items: PendingDraft[]; total: number }>;
+  approvals: Read<{
+    items: PendingDraft[];
+    total: number;
+    /** Every client-facing item for this lead, oldest first, uncapped (the "also waiting" list). Absent = derive from `items`. */
+    refs?: QueueRef[];
+    /** The internal briefings for this lead (never the card), oldest first. */
+    briefings?: QueueRef[];
+  }>;
   tasks: Read<OpenTask[]>;
   consult: Read<BookedConsult | null>;
   meetings: Read<MeetingFact[]>;

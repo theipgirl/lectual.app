@@ -68,6 +68,8 @@ import {
   leadStepMoreSteps,
   leadStepNeedsYesOf,
   leadStepOpened,
+  leadPageQueued,
+  leadStepTheyLastWrote,
   leadStepOthers,
   leadStepPrepPromise,
   leadStepProposalAfterConsult,
@@ -78,7 +80,7 @@ import {
 } from "@/lib/ui/words";
 import { decideTopCard, type DueState, type TopCard } from "./decide";
 import { readDid, type DidRow } from "./did";
-import type { LeadStepFacts, PendingDraft } from "./facts";
+import type { LeadStepFacts, PendingDraft, QueueRef } from "./facts";
 import type { GapId } from "./gaps";
 import { dayWord, shortDay, whenWords, windowWords } from "./schedule";
 
@@ -144,8 +146,16 @@ export type TopCardView =
 
 export type DidRowView = { id: string; at: string; when: string; text: string; undo: { activityId: string } | null; undone: boolean };
 
+export type QueueRefView = { id: string; headline: string; queued: string | null; href: string };
+
 export type LeadStepView = {
   top: TopCardView;
+  /**
+   * What else is waiting on this lead, so nothing the old "Waiting on attorney review" list showed is lost: the OTHER
+   * client-facing items (the top card's own item left out) and the internal briefings. Null when the queue read didn't
+   * work (the top card already says so).
+   */
+  queue: { others: QueueRefView[]; briefings: QueueRefView[] } | null;
   facts: { contact: FactView; consult: FactView; proposal: FactView | null; waiting: FactView };
   did: { status: "ok"; rows: DidRowView[]; note: string | null } | { status: "unavailable"; text: string };
   /** The viewer can't say yes to the top card's item (or there is none). */
@@ -290,15 +300,18 @@ function topView(facts: LeadStepFacts, top: TopCard): TopCardView {
 function contactFact(facts: LeadStepFacts): FactView {
   const label = LEAD_STEP_FACT_CONTACT;
   const { lastInboundAt: inb, lastOutboundAt: out } = facts.lead;
-  const tIn = inb ? Date.parse(inb) : NaN;
-  const tOut = out ? Date.parse(out) : NaN;
+  // A time in the future is not contact (a clock or import slip): treated as none.
+  const nowMs = Date.parse(facts.now);
+  const past = (t: number) => (Number.isFinite(t) && t <= nowMs ? t : NaN);
+  const tIn = past(inb ? Date.parse(inb) : NaN);
+  const tOut = past(out ? Date.parse(out) : NaN);
   if (!Number.isFinite(tIn) && !Number.isFinite(tOut)) {
     const mailboxOff = facts.jobs.status === "ok" && !facts.jobs.value.modules.mailbox;
     return { label, value: mailboxOff ? LEAD_STEP_CONTACT_OFF : LEAD_STEP_NO_CONTACT, sub: null, state: mailboxOff ? "off" : "ok" };
   }
   const theyLast = Number.isFinite(tIn) && (!Number.isFinite(tOut) || tIn > tOut);
   const at = theyLast ? (inb as string) : (out as string);
-  return { label, value: shortDay(at, facts.timeZone), sub: `${theyLast ? LEAD_STEP_THEY_WROTE : LEAD_STEP_WE_WROTE} · ${theyLast ? OUR_TURN : LEAD_STEP_THEIR_TURN}`, state: "ok" };
+  return { label, value: shortDay(at, facts.timeZone), sub: theyLast ? `${LEAD_STEP_THEY_WROTE} · ${OUR_TURN}` : `${LEAD_STEP_WE_WROTE} · ${LEAD_STEP_THEIR_TURN}${Number.isFinite(tIn) ? ` · ${leadStepTheyLastWrote(shortDay(inb as string, facts.timeZone))}` : ""}`, state: "ok" };
 }
 
 function consultFact(facts: LeadStepFacts): FactView {
@@ -384,10 +397,23 @@ function didView(facts: LeadStepFacts): LeadStepView["did"] {
   };
 }
 
+function refView(facts: LeadStepFacts, r: QueueRef): QueueRefView {
+  return { id: r.id, headline: r.headline, queued: r.createdAt && Number.isFinite(Date.parse(r.createdAt)) ? leadPageQueued(shortDay(r.createdAt, facts.timeZone)) : null, href: `/dashboard/queue/${encodeURIComponent(r.id)}/` };
+}
+
+function queueView(facts: LeadStepFacts, top: TopCardView): LeadStepView["queue"] {
+  if (facts.approvals.status !== "ok") return null;
+  const v = facts.approvals.value;
+  const refs: QueueRef[] = v.refs ?? v.items.map((i) => ({ id: i.id, headline: i.headline, createdAt: i.createdAt }));
+  const own = top.kind === "needs-yes" ? top.itemId : null;
+  return { others: refs.filter((r) => r.id !== own).map((r) => refView(facts, r)), briefings: (v.briefings ?? []).map((r) => refView(facts, r)) };
+}
+
 export function buildLeadStepView(facts: LeadStepFacts): LeadStepView {
   const top = topView(facts, decideTopCard(facts));
   return {
     top,
+    queue: queueView(facts, top),
     facts: { contact: contactFact(facts), consult: consultFact(facts), proposal: proposalFact(facts), waiting: waitingFact(top) },
     did: didView(facts),
     readOnly: top.kind !== "needs-yes" || !top.actions.yes,

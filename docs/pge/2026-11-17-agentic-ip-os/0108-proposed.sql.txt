@@ -1,0 +1,101 @@
+-- =====================================================================================================================
+-- PROPOSAL ONLY. NOT A MIGRATION OF THIS REPO. NOT APPLIED ANYWHERE (not lectual-dev, not lectual-prod).
+--
+-- This file is a draft for the `lectual` repo (theipgirl/lectual), where migrations live (AGENTS.md: "No migrations in this
+-- repo"). To use it: copy it to `lectual/supabase/migrations/0108_mailbox_connections_for_owner.sql` (first-merged-wins
+-- numbering: renumber if 0108 is taken), review it there, apply to lectual-dev, run the tests below, and apply to
+-- lectual-prod only with the owner's OK. Names of helpers (`current_org_id()`) and of the `crm_role` value are assumptions
+-- taken from this app's code and AGENTS.md; verify them against lectual's 0031 / 0075 before copying.
+--
+-- Why (PGE Sprint 1, Taylor Nov 17, question T7): "owners can see what mailbox is connected". A colleague's PERSONAL mailbox
+-- is invisible to everyone else by RLS (0075), so Settings -> Setup -> Team accounts can only say "Only <name> can see this".
+-- This function lets the OWNER (only) see, per colleague: address, provider and status. Nothing else.
+--
+-- Why a function and not a policy: an owner SELECT policy on `mailbox_connection` would expose every column the table grants to
+-- `authenticated` (and any column added later). The function names exactly six columns, so it can never leak a token, a scope
+-- list, a sync cursor, an error text or anything from mail.
+--
+-- App side (this repo): src/lib/mailbox/colleague-connections.ts calls `rpc('mailbox_connections_for_owner')` with the caller's
+-- scoped client, only for role `owner`. A missing function (42883 / PGRST202) reads as "not switched on yet"; any other failure,
+-- including the 42501 refusal, as "couldn't check", never "not connected". The app also keeps only these six fields (colleague-rows.ts).
+-- =====================================================================================================================
+
+create or replace function public.mailbox_connections_for_owner()
+returns table (
+  id        uuid,
+  user_id   uuid,    -- the connection's owner (null for a firm-shared mailbox)
+  scope     text,    -- 'personal' | 'firm'
+  provider  text,    -- 'google' | 'microsoft'
+  email     text,    -- the connected address
+  status    text     -- 'active' | 'reauth' | 'error' | 'revoked'
+)
+language plpgsql
+stable
+security definer
+-- pinned: a caller's search_path must never decide which table or function runs. pg_temp is LAST so a temp object cannot shadow a real one.
+set search_path = pg_catalog, public, pg_temp
+as $$
+begin
+  -- A caller who is not an owner of the ACTIVE org does not get an empty list, they get an error. An empty answer can therefore only
+  -- mean "this firm really has no mailbox connections", never "you were not allowed". This covers: any other role, an owner of another
+  -- org, no active org, and a platform admin acting in firm A with the owner claim but NO crm_org_member row.
+  if public.current_org_id() is null
+     or not exists (
+       select 1
+       from public.crm_org_member m
+       where m.org_id  = public.current_org_id()
+         and m.user_id = auth.uid()
+         and m.role    = 'owner'
+     ) then
+    raise exception 'mailbox_owner_only' using errcode = '42501';
+  end if;
+
+  return query
+    select c.id, c.user_id, c.scope, c.provider, c.email, c.status
+    from public.mailbox_connection c
+    where c.org_id = public.current_org_id();
+end;
+$$;
+
+-- No-one but signed-in users may call it.
+revoke all on function public.mailbox_connections_for_owner() from public;
+revoke all on function public.mailbox_connections_for_owner() from anon;
+grant execute on function public.mailbox_connections_for_owner() to authenticated;
+
+comment on function public.mailbox_connections_for_owner() is
+  'PGE Sprint 1 (T7). Owner-only: id, user_id, scope, provider, email, status of every mailbox_connection (personal AND firm) of the caller''s active org. Never returns tokens, scopes, sync_cursor, last_error, expires_at or mail. RAISES mailbox_owner_only (42501) for any caller who is not an owner of the active org, so an empty result only ever means no connections.';
+
+-- =====================================================================================================================
+-- RLS / grants notes
+--   * `mailbox_connection` keeps its 0075 policies and column grants UNCHANGED. No new policy, no new grant on the table.
+--   * The function is SECURITY DEFINER, so it reads the table as its owner; the ONLY gate is the role check inside it. That is
+--     why the body names the org twice (rows and membership) and why search_path is pinned.
+--   * EXECUTE: `authenticated` only (public and anon revoked). The service role needs no grant to call it and the app never does.
+--   * If `current_org_id()` is not the helper's name in lectual, use whatever 0031's `org_member_directory()` uses for "the
+--     caller's active org" (the same scoping that keeps one firm from resolving another firm's users).
+--
+-- Tenant-isolation cases to add to lectual `tests/tenant-isolation.test.ts` (the gate lives there):
+--   1. Owner of firm A calls it: gets exactly firm A's rows (personal AND firm-scope), none of firm B's (seed one of each in both firms).
+--   2. admin, senior_admin, attorney, intake, paralegal, law_clerk, clerk, social_media and viewer of firm A: the call ERRORS with
+--      message `mailbox_owner_only`, code 42501 (never zero rows).
+--   3. An owner of firm B with active org = firm A (a stale claim): error 42501.
+--   4. A user with no active org: error 42501.
+--   5. A platform admin acting in firm A with the owner claim and NO crm_org_member row: error 42501 (this is the case that must never
+--      look like "no mailboxes").
+--   6. The result has EXACTLY the six columns, in order: id, user_id, scope, provider, email, status (assert the column list, so a
+--      future edit cannot add one without failing the test).
+--   7. A signed-out (anon) call is refused (permission denied), and `public` has no EXECUTE.
+--   8. After the call, `select access_token_enc from mailbox_connection` is still permission denied for an owner (no side effect on grants).
+--   9. `proconfig` of the function is exactly `search_path=pg_catalog, public, pg_temp`.
+--
+-- App side (this repo): the page maps the 42501 refusal, any other error and a malformed answer to "couldn't check". An answer is trusted only
+-- when every connection the caller can see through the table's own RLS (firm-scope as well as personal) is in it; an empty answer, or a
+-- caller whose own read failed, is "couldn't check". The app does not call the function at all for Lectual staff acting in a firm.
+--
+-- Not part of 0108 (separate, optional, needs its own decision):
+--   * "Signed in at least once" for the Team accounts list: `org_member_directory()` has no sign-in field. Adding `last_sign_in_at`
+--     there (a column of auth.users the function already joins) would let the checklist show it without the service role.
+--   * "Can receive drafts" for a COLLEAGUE: the six columns do not say whether the connection granted Mail.ReadWrite. A seventh,
+--     derived boolean (`can_write_drafts`, computed inside the function from `scopes`, never the scope list itself) would answer it.
+--     Until then the app says "Only <name> can see this" for that one item, and each person sees their own on Getting started.
+-- =====================================================================================================================
