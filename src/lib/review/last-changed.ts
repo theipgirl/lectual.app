@@ -5,7 +5,7 @@ import {
   CHANGED_BY_AUTOMATION,
   CHANGED_BY_LAWMATICS_SYNC,
   CHANGED_BY_LECTUAL,
-  CHANGED_BY_STAGE_KEEPER,
+  changedAutomaticallyLine,
   A_TEAMMATE,
   NOT_CHANGED_SINCE_IMPORT,
   NO_CHANGES_RECORDED,
@@ -126,7 +126,7 @@ export function lastChangedText(
     case "import":
       return NOT_CHANGED_SINCE_IMPORT;
     case "stage-keeper":
-      return changedByLine(CHANGED_BY_STAGE_KEEPER, when);
+      return changedAutomaticallyLine(when);
     case "lawmatics-sync":
       return changedByLine(CHANGED_BY_LAWMATICS_SYNC, when);
     case "automation":

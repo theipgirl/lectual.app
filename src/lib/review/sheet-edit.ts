@@ -88,6 +88,8 @@ export type SheetEditRow = {
   contactTitle: string | null;
   /** "3 documents" when the count is known and above 0; absent otherwise (never "0 documents"). */
   documentsText?: string | null;
+  /** "Changed by Caitlyn · Nov 16"; null when the last-change read failed (no line is drawn). */
+  changedText?: string | null;
 };
 
 /** The typed value of one cell, as the editor saves it and the table draws it. */

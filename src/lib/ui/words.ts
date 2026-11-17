@@ -1172,11 +1172,12 @@ export const ADD_ANOTHER_NEXT_STEP = "Add another next step";
 
 // PGE Sprint 1: sync check and first-user readiness
 /** The stamps a change is credited to. A person is named by first name from the member directory. */
-export const CHANGED_BY_STAGE_KEEPER = "the Stage Keeper";
 export const CHANGED_BY_LAWMATICS_SYNC = "Lawmatics sync";
 export const CHANGED_BY_AUTOMATION = "an automation";
 export const CHANGED_BY_ASSISTANT = "an assistant";
 export const CHANGED_BY_LECTUAL = "Lectual";
+/** The Stage Keeper is never named to a firm (the glossary bans it): its move reads as an automatic one. */
+export const changedAutomaticallyLine = (when: string) => `Changed automatically · ${when}`;
 /** The weekly review's quiet "last changed" line. A date is "Nov 16". */
 export const changedByLine = (who: string, when: string) => `Changed by ${who} · ${when}`;
 export const NOT_CHANGED_SINCE_IMPORT = "Not changed since import";
