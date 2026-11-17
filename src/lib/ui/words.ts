@@ -1169,3 +1169,32 @@ export const showingAtLeast = (shown: number): string => showingOf(shown, shown)
 /** The Forms results table heading. */
 export const ALL_FORMS = `All ${FORMS_NAME.toLowerCase()}`;
 export const ADD_ANOTHER_NEXT_STEP = "Add another next step";
+
+// PGE Sprint 1: sync check and first-user readiness
+/** The stamps a change is credited to. A person is named by first name from the member directory. */
+export const CHANGED_BY_STAGE_KEEPER = "the Stage Keeper";
+export const CHANGED_BY_LAWMATICS_SYNC = "Lawmatics sync";
+export const CHANGED_BY_AUTOMATION = "an automation";
+export const CHANGED_BY_ASSISTANT = "an assistant";
+export const CHANGED_BY_LECTUAL = "Lectual";
+/** The weekly review's quiet "last changed" line. A date is "Nov 16". */
+export const changedByLine = (who: string, when: string) => `Changed by ${who} · ${when}`;
+export const NOT_CHANGED_SINCE_IMPORT = "Not changed since import";
+export const NO_CHANGES_RECORDED = "No changes recorded";
+export const LAST_CHANGED_LABEL = "Last changed";
+
+/** Settings → Setup → Team accounts. */
+export const TEAM_ACCOUNTS_NAME = "Team accounts";
+export const TEAM_ACCOUNTS_SUB = "Each person's role and Outlook, read from what is saved. Nothing here sends mail or changes anything.";
+export const TEAM_ACCOUNTS_CANT_CHECK = "Team accounts couldn't be checked right now. Refresh to try again.";
+export const TEAM_ACCOUNTS_OUTLOOK = "Outlook connected";
+export const TEAM_ACCOUNTS_DRAFTS = "Can receive drafts";
+export const TEAM_ACCOUNTS_YOU = "You";
+/** A colleague's personal mailbox is hidden by the database from everyone but them (and, through Lectual's owner view, the owner). */
+export const onlyCanSeeThis = (first: string | null) => `Only ${first ?? "they"} can see this`;
+export const TEAM_ACCOUNTS_PRIVATE_PILL = "Private";
+export const TEAM_ACCOUNTS_MAILBOXES_OFF = "Mailboxes aren't switched on for your firm yet. Lectual turns them on.";
+export const TEAM_ACCOUNTS_NO_MEMBERS = "No team members were found.";
+
+/** The one line on Getting started that shows a person their own Outlook state. */
+export const YOUR_SETUP_LABEL = "Your setup";

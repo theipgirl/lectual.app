@@ -16,6 +16,7 @@ import type { ReviewRow } from "./buckets";
 import { CONTACT_TYPES } from "./contact";
 import { firmSendersFrom, NO_FIRM_SENDERS, type FirmSenders } from "@/lib/mailbox/firm-sender";
 import { proposalExpiryTag, type ProposalExpiryIn } from "./proposal-expiry";
+import { CHANGE_SELECT, CHANGE_TYPES, pickLastChanges, type ChangeRowIn } from "./last-changed";
 import { closeStagesOf, type CloseStage } from "./close-stage";
 import { OPTIONAL_SOURCES, type CriticalSource, type OptionalSource } from "./notes";
 
@@ -157,6 +158,22 @@ export async function readProposalExpiries(db: ScopedClient, matterIds: readonly
   return [...m, ...l];
 }
 
+/**
+ * The change rows of the given records (type, actor, date, and the two stamp fields only), newest first, paged and chunked like
+ * the other reads. A read that cannot finish (an error, or the page budget) rejects: the caller then draws NO line, never "not changed".
+ */
+export async function readChangeRows(db: ScopedClient, matterIds: readonly string[], leadIds: readonly string[]): Promise<ChangeRowIn[]> {
+  type Raw = ChangeRowIn;
+  const types = [...CHANGE_TYPES] as unknown as ActivityType[];
+  const page = (column: "matter_id" | "lead_id", chunk: string[]) =>
+    readAllPages<Raw>(
+      (from, to) =>
+        db.from("crm_activity").select(CHANGE_SELECT).in("type", types).in(column, chunk).order("created_at", { ascending: false }).order("id").range(from, to) as unknown as PromiseLike<{ data: Raw[] | null; error: unknown }>,
+    );
+  const [m, l] = await Promise.all([inChunks(matterIds, (c) => page("matter_id", c)), inChunks(leadIds, (c) => page("lead_id", c))]);
+  return [...m, ...l];
+}
+
 export async function readLastStageChange(db: ScopedClient, leadIds: readonly string[]): Promise<Map<string, string>> {
   const rows = await inChunks(leadIds, (chunk) =>
     readAllPages<{ lead_id: string | null; created_at: string }>((from, to) =>
@@ -265,7 +282,7 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
 
   const dependsOnRecords = failedCritical.length === 0;
   const proposalLeadIds = [...new Set([...leadIds, ...matters.filter((m) => m.status === "open" || m.status === "on_hold").map((m) => m.lead_id).filter((x): x is string => !!x)])];
-  const [tasksS, activityS, deadlinesS, changesS, proposalsS, countsS, sendersS] = dependsOnRecords
+  const [tasksS, activityS, deadlinesS, changesS, proposalsS, countsS, sendersS, changeRowsS] = dependsOnRecords
     ? await Promise.allSettled([
         readOpenTasks(db, matterIds, leadIds),
         readContactActivity(db, matterIds, leadIds),
@@ -274,8 +291,9 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
         readProposalExpiries(db, matterIds, proposalLeadIds),
         readDocumentCounts(db, matterIds, leadIds),
         readFirmSenders(db),
+        readChangeRows(db, matterIds, leadIds),
       ])
-    : ([null, null, null, null, null, null, null] as const);
+    : ([null, null, null, null, null, null, null, null] as const);
   if (dependsOnRecords && tasksS && tasksS.status === "rejected") failedCritical.push("tasks");
   if (failedCritical.length > 0) return { status: "unavailable", failed: failedCritical };
 
@@ -289,6 +307,9 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
 
   const proposals = proposalsS?.status === "fulfilled" ? proposalsS.value : null;
   if (!proposals) failed.push("proposals");
+
+  const lastChanges = changeRowsS?.status === "fulfilled" ? pickLastChanges(changeRowsS.value, timeZone, now) : null;
+  if (!lastChanges) failed.push("last change");
 
   const docCounts = countsS?.status === "fulfilled" ? countsS.value : null;
   if (!docCounts) failed.push("documents");
@@ -338,9 +359,12 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
   // A count only where the read worked; a record with no stored documents is a real 0 (never drawn), a failed read leaves the field unset.
   const counted = docCounts ? tagged.map((r) => ({ ...r, documentCount: docCounts.get(`${r.kind}:${r.id}`) ?? 0 })) : tagged;
 
+  // The last change only where the read worked: a record with no change row is a real `null`; a failed read leaves it unset (no line).
+  const changed = lastChanges ? counted.map((r) => ({ ...r, lastChange: lastChanges.get(`${r.kind}:${r.id}`) ?? null })) : counted;
+
   return {
     status: "ok",
-    rows: counted,
+    rows: changed,
     closeStages: closeStagesOf(leadStages),
     today,
     timeZone,

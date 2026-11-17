@@ -1,6 +1,7 @@
 import type { Direction, Waiting } from "./waiting";
 import type { ContactKind } from "./contact";
 import type { ProposalExpiryTag } from "./proposal-expiry";
+import type { LastChange } from "./last-changed";
 
 /**
  * The weekly review's sections. Pure: rows in, buckets out. A row is in exactly ONE section, the
@@ -62,6 +63,8 @@ export type ReviewRow = {
   proposalExpiry?: ProposalExpiryTag | null;
   /** Stored files plus (matters, Document Center firms) generated letters. Absent = not counted or the count failed: never drawn as 0. */
   documentCount?: number | null;
+  /** The newest change of the record (who, when). `undefined` = the read failed (no line is drawn); `null` = read, and no change row. */
+  lastChange?: LastChange | null;
 };
 
 export const BUCKET_KEYS = ["overdue", "week", "needs", "quiet", "uspto", "track"] as const;
