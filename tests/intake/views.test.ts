@@ -214,7 +214,7 @@ describe("ownerColumns", () => {
     expect(columns.map((column) => column.key)).toEqual([null, "u-rb", "u-dw", "u-ghost"]);
     expect(columns[0].count).toBe(0);
     expect(columns[3].count).toBe(1);
-    expect(columns[3].label).toBe("Unknown teammate");
+    expect(columns[3].label).toBe("Teammate");
   });
 
   it("describes an empty column and an all-waiting column in words, not 0s", () => {
@@ -235,7 +235,7 @@ describe("ownerColumns", () => {
 
 describe("touchDate / touchStampFor", () => {
   it("says whose turn it is in words: Our turn / Waiting on them, with the day and month", () => {
-    expect(touchDate(daysBefore(2))).toBe("12 Sep");
+    expect(touchDate(daysBefore(2))).toBe("Sep 12");
 
     const [waiting] = rowsFor([lead({ id: "a", last_inbound_at: daysBefore(2), last_outbound_at: daysBefore(5) })]);
     expect(touchStampFor(waiting, { now: NOW })).toMatchObject({ text: "Our turn · Sep\u00a012", waitingOnUs: true, state: "our-turn" });

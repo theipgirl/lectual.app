@@ -28,7 +28,12 @@ import SourceCell from "./SourceCell";
 import RowMenu from "./RowMenu";
 import type { Lane } from "@/lib/leads/lane";
 import { SheetCard, SheetScroll, SheetTable } from "@/components/ui/SheetTable";
+import { ShowingCount } from "@/components/ui/ShowingCount";
+import { Pill } from "@/components/ui/Pill";
+import { MEANING_TONE } from "@/lib/ui/tones";
 import {
+  NEXT_STEP,
+  OWNER_COLUMN,
   LEADS_ACTIONS_SR,
   LEADS_ASSISTANT_COLUMN,
   LEADS_COMPARE_OPEN,
@@ -38,11 +43,8 @@ import {
   LEADS_MOVED_MARK_TITLE,
   LEADS_NEEDS_STAGE,
   LEADS_RESIZE_COLUMN,
-  LEADS_SHOWING,
-  LEADS_SHOW_MORE,
 } from "@/lib/ui/words";
 import { duplicateTitle, type DuplicateOf } from "@/lib/intake/duplicates";
-import { SHOW_STEP } from "@/lib/intake/paging";
 
 /** The sort key and the words of each column. The Assistant activity column has no sort: it is not a value a person ranks by. */
 const COLUMNS: Record<ColKey, { key: SortKey | null; label: string }> = {
@@ -50,10 +52,10 @@ const COLUMNS: Record<ColKey, { key: SortKey | null; label: string }> = {
   stage: { key: "stage", label: "Stage" },
   temp: { key: "temperature", label: "Temperature" },
   source: { key: "source", label: "Source" },
-  owner: { key: "owner", label: "Owner" },
+  owner: { key: "owner", label: OWNER_COLUMN },
   assistant: { key: null, label: LEADS_ASSISTANT_COLUMN },
   touch: { key: "lastTouch", label: LEADS_CONTACT_COLUMN },
-  next: { key: "notes", label: "Next step" },
+  next: { key: "notes", label: NEXT_STEP },
 };
 
 /**
@@ -241,7 +243,7 @@ export default function IntakeTable({
                             {business || "—"}
                           </span>
                           {movedOut?.has(lead.id) && (
-                            <span className="ix-marker ix-marker-quiet" data-moved title={LEADS_MOVED_MARK_TITLE}>
+                            <span className="lx-pill lx-pill-mute" data-moved title={LEADS_MOVED_MARK_TITLE}>
                               {LEADS_MOVED_MARK}
                             </span>
                           )}
@@ -250,19 +252,19 @@ export default function IntakeTable({
 
                       <td data-col="stage" data-label="Stage">
                         <span className="ix-stage-line">
-                          <span className={`ix-stage${row.stage ? "" : " ix-stage-warn"}`} title={row.stage?.name ?? "This lead's stage no longer exists"}>
+                          <Pill tone={row.stage ? MEANING_TONE.neutral : MEANING_TONE.needsPerson} wrap title={row.stage?.name ?? "This lead's stage no longer exists"}>
                             {stageLabelFor(row.stage)}
-                          </span>
+                          </Pill>
                           <NeedsRebeccaBadge pending={pendingDrafts} />
                           {decision && (
-                            <span className="ix-marker" data-needs-decision title={needsStageTitle(decision)}>
+                            <span className="lx-pill lx-pill-warn lx-pill-wrap" data-needs-decision title={needsStageTitle(decision)}>
                               {LEADS_NEEDS_STAGE}
                             </span>
                           )}
                           {dup && (
                             <button
                               type="button"
-                              className="ix-marker ix-marker-dup"
+                              className="lx-pill lx-pill-warn lx-pill-wrap ix-pill-btn"
                               data-duplicate
                               aria-haspopup="dialog"
                               aria-label={LEADS_COMPARE_OPEN(name)}
@@ -284,7 +286,7 @@ export default function IntakeTable({
                       </td>
 
                       {hasOwnerColumn && (
-                        <td data-col="owner" data-label="Owner">
+                        <td data-col="owner" data-label={OWNER_COLUMN}>
                           <OwnerCell leadName={name} owner={row.owner} assignedTo={lead.assigned_to} members={members} pending={pending} onAssign={(userId) => onAssign(lead.id, userId)} />
                         </td>
                       )}
@@ -301,7 +303,7 @@ export default function IntakeTable({
                         {touch.text}
                       </td>
 
-                      <td className="rse-next-td" data-col="next" data-label="Next step">
+                      <td className="rse-next-td" data-col="next" data-label={NEXT_STEP}>
                         <div className="ix-next-wrap">
                           <span className="ix-next" data-urgent={step.urgent ? "" : undefined} data-muted={step.muted ? "" : undefined} title={step.text}>
                             {step.text}
@@ -331,7 +333,7 @@ export default function IntakeTable({
         </SheetScroll>
 
         {rows.length === 0 && (
-          <div className="lp-empty" data-empty={!anyLeads ? "none" : "filtered"}>
+          <div className="lx-state-card" data-empty={!anyLeads ? "none" : "filtered"}>
             {emptyAction}
             {onClearFilters && anyLeads && (
               <button type="button" className="lp-clear" onClick={onClearFilters}>
@@ -342,12 +344,7 @@ export default function IntakeTable({
         )}
 
         <div className="ix-foot">
-          <span>{LEADS_SHOWING(rows.length, total)}</span>
-          {left > 0 && (
-            <button type="button" className="ix-more" onClick={onShowMore}>
-              {LEADS_SHOW_MORE(Math.min(SHOW_STEP, left), left)}
-            </button>
-          )}
+          <ShowingCount shown={rows.length} total={total} onMore={left > 0 ? onShowMore : undefined} />
           <span className="lx-sr">{setLabel}</span>
         </div>
       </SheetCard>

@@ -16,7 +16,8 @@ import NeedsRebeccaBadge from "./NeedsRebeccaBadge";
 import AssistantChips from "./AssistantChips";
 import { assistantItems } from "@/lib/intake/assistant-column";
 import RowMenu from "./RowMenu";
-import { LEADS_COMPARE_OPEN, LEADS_DUPLICATE, LEADS_MOVED_MARK, LEADS_MOVED_MARK_TITLE, LEADS_NEEDS_STAGE } from "@/lib/ui/words";
+import { BLANK, LEADS_COMPARE_OPEN, LEADS_DUPLICATE, LEADS_MOVED_MARK, LEADS_MOVED_MARK_TITLE, LEADS_NEEDS_STAGE } from "@/lib/ui/words";
+import { MEANING_TONE } from "@/lib/ui/tones";
 import { duplicateTitle, type DuplicateOf } from "@/lib/intake/duplicates";
 
 /**
@@ -74,27 +75,30 @@ export default function IntakeCard({
   const decision = decisionOpen(row.decision, lead.current_stage_id) ? row.decision : null;
 
   return (
-    <div
+    <li
       data-lead-id={lead.id}
-      className="ix-card"
+      className="lx-board-card ix-card"
+      data-tone={touch.waitingOnUs ? MEANING_TONE.needsPerson : undefined}
       data-selected={selected ? "" : undefined}
       draggable
       onDragStart={(event) => event.dataTransfer.setData("text/plain", lead.id)}
-      style={{ opacity: pending ? 0.55 : 1 }}
+      data-pending={pending ? "" : undefined}
     >
-      <div className="ix-card-top">
+      <div className="lx-board-card-top ix-card-top">
         {selecting && onToggleSelect && (
           <input type="checkbox" className="intake-select" aria-label={`Select ${name}`} checked={selected} onChange={() => onToggleSelect(lead.id)} draggable={false} />
         )}
-        <Link href={`/dashboard/leads/${lead.id}`} className="ix-card-name" title={name} style={{ color: touch.waitingOnUs ? "var(--burg)" : undefined }}>
-          {name}
-        </Link>
+        <span className="lx-board-card-title">
+          <Link href={`/dashboard/leads/${lead.id}`} className="lx-rowlink ix-card-name" title={name} data-in={touch.waitingOnUs ? "" : undefined}>
+            {name}
+          </Link>
+        </span>
       </div>
-      <span className="ix-sub" title={line || undefined}>
-        {line || "—"}
+      <span className="lx-board-card-meta" title={line || undefined}>
+        {line || BLANK}
       </span>
       {(pill || drafts.length > 0 || decision || assistantItems(row).length > 0 || duplicate || movedOut) && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
+        <div className="ix-card-pills">
           {pill && (
             <span className="ix-temp" data-tone={pill.tone} data-suggested={pill.suggested ? "" : undefined} title={pill.title} aria-label={pill.ariaLabel}>
               {pill.text}
@@ -102,24 +106,24 @@ export default function IntakeCard({
           )}
           <NeedsRebeccaBadge pending={drafts} />
           {decision && (
-            <span className="ix-marker" data-needs-decision title={needsStageTitle(decision)}>
+            <span className="lx-pill lx-pill-warn lx-pill-wrap" data-needs-decision title={needsStageTitle(decision)}>
               {LEADS_NEEDS_STAGE}
             </span>
           )}
           <AssistantChips row={row} />
           {duplicate && (
-            <button type="button" className="ix-marker ix-marker-dup" data-duplicate aria-haspopup="dialog" aria-label={LEADS_COMPARE_OPEN(name)} title={duplicateTitle(duplicate)} onClick={(event) => onCompare?.(lead.id, duplicate.leadId, event.currentTarget)}>
+            <button type="button" className="lx-pill lx-pill-warn lx-pill-wrap ix-pill-btn" data-duplicate aria-haspopup="dialog" aria-label={LEADS_COMPARE_OPEN(name)} title={duplicateTitle(duplicate)} onClick={(event) => onCompare?.(lead.id, duplicate.leadId, event.currentTarget)}>
               {LEADS_DUPLICATE}
             </button>
           )}
           {movedOut && (
-            <span className="ix-marker ix-marker-quiet" data-moved title={LEADS_MOVED_MARK_TITLE}>
+            <span className="lx-pill lx-pill-mute" data-moved title={LEADS_MOVED_MARK_TITLE}>
               {LEADS_MOVED_MARK}
             </span>
           )}
         </div>
       )}
-      <div className="ix-card-foot">
+      <div className="lx-board-card-foot ix-card-foot">
         <span className="ix-touch" data-in={touch.waitingOnUs ? "" : undefined} data-touch={touch.state} title={touch.title}>
           {touch.text}
         </span>
@@ -130,10 +134,10 @@ export default function IntakeCard({
       </div>
       <span className="lx-sr">{row.stage ? stageLabelFor(row.stage) : ""}</span>
       {error && (
-        <p role="status" className="ix-err" style={{ margin: 0, borderRadius: 6 }}>
+        <p role="status" className="ix-err">
           {error}
         </p>
       )}
-    </div>
+    </li>
   );
 }

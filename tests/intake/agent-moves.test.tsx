@@ -277,9 +277,9 @@ describe("styles", () => {
     const block = css.slice(css.indexOf(".intake-agent-chip"));
     // Item L2: the assistants' own colour, never the oxblood tint of a person's pills.
     const chip = block.slice(0, block.indexOf("}"));
-    expect(chip).toContain("var(--asst-bg)");
-    expect(chip).toContain("var(--asst-fg)");
-    expect(chip).not.toContain("var(--oxbg)");
+    expect(chip).toContain("var(--tint-ok)");
+    expect(chip).toContain("var(--ok)");
+    expect(chip).not.toContain("var(--tint-ox)");
     expect(readFileSync("src/app/globals.css", "utf8")).not.toContain("intake-agent-chip");
   });
 });

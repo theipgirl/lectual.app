@@ -153,8 +153,6 @@ describe("Leads and Matters share the pattern", () => {
       expect(text, file).not.toContain("intake-statusline");
       expect(text, file).not.toMatch(/\bfilterChip\(|\bgroupPill\(/);
     }
-    const styles = read("src/app/dashboard/intake/_components/styles.ts");
-    expect(styles).not.toMatch(/export (function|const) (filterChip|groupPill|PANEL|PRIMARY_BUTTON|OUTLINE_BUTTON|STAGE_PILL)\b/);
   });
 });
 
