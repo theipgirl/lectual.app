@@ -6,6 +6,7 @@ import type { MatterWaitingOn } from "@/lib/matters/stage-rules";
 import { newEnquiryStage } from "@/lib/pipeline/new-enquiry";
 import type { ReviewRow, ReviewNextStep } from "./buckets";
 import { summarizeContact, type ContactActivity } from "./contact";
+import type { FirmSenders } from "@/lib/mailbox/firm-sender";
 import { stageIsWithUspto, waitingOn } from "./waiting";
 
 /**
@@ -81,6 +82,8 @@ export type ReviewInput = {
   pendingMatterIds: ReadonlySet<string> | null;
   pendingLeadIds: ReadonlySet<string> | null;
   sources: { activity: SourceState; deadlines: SourceState };
+  /** The firm's own sender addresses (its mailbox connections): their `email_received` rows count as ours. Missing = none known. */
+  firmSenders?: FirmSenders;
   timeZone: string;
   now: Date;
 };
@@ -158,7 +161,7 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
 
   const contactOf = (list: readonly ContactActivity[] | undefined) => {
     if (!contactKnown) return { lastContact: null, direction: null, lastOutbound: null };
-    const { last, direction, lastOutbound } = summarizeContact(list ?? [], now);
+    const { last, direction, lastOutbound } = summarizeContact(list ?? [], now, input.firmSenders);
     return {
       lastContact: last ? { date: civilDateIn(last.at, timeZone), type: last.type } : null,
       direction,

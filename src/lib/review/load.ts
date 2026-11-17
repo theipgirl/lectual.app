@@ -14,6 +14,7 @@ import { matterIdsNeedingReview } from "@/app/dashboard/matters/list-utils";
 import { buildReviewRows, civilDateIn, reviewLeadStageIds, type ReviewActivityIn, type ReviewDeadlineIn, type ReviewTaskIn } from "./build";
 import type { ReviewRow } from "./buckets";
 import { CONTACT_TYPES } from "./contact";
+import { firmSendersFrom, NO_FIRM_SENDERS, type FirmSenders } from "@/lib/mailbox/firm-sender";
 import { proposalExpiryTag, type ProposalExpiryIn } from "./proposal-expiry";
 import { closeStagesOf, type CloseStage } from "./close-stage";
 import { OPTIONAL_SOURCES, type CriticalSource, type OptionalSource } from "./notes";
@@ -88,22 +89,40 @@ export async function readOpenTasks(db: ScopedClient, matterIds: readonly string
 }
 
 export async function readContactActivity(db: ScopedClient, matterIds: readonly string[], leadIds: readonly string[]): Promise<ReviewActivityIn[]> {
-  // Type, date and the two ids only. No payload is selected, so no body can reach this module.
-  const select = "lead_id, matter_id, type, created_at";
+  // Type, date, the two ids, and two payload fields: the sender address and the party ("uspto"), which decide an
+  // email's direction. Nothing else of the payload (no subject, no recipients) is selected; the payload holds no body.
+  const select = "lead_id, matter_id, type, created_at, sender:payload->>from, party:payload->>party";
+  type Raw = Omit<ReviewActivityIn, "from"> & { sender?: string | null };
   const types = [...CONTACT_TYPES] as unknown as ActivityType[];
   const [m, l] = await Promise.all([
     inChunks(matterIds, (chunk) =>
-      readAllPages<ReviewActivityIn>((from, to) =>
-        db.from("crm_activity").select(select).in("type", types).in("matter_id", chunk).order("created_at", { ascending: false }).order("id").range(from, to),
+      readAllPages<Raw>((from, to) =>
+        db.from("crm_activity").select(select).in("type", types).in("matter_id", chunk).order("created_at", { ascending: false }).order("id").range(from, to) as unknown as PromiseLike<{ data: Raw[] | null; error: unknown }>,
       ),
     ),
     inChunks(leadIds, (chunk) =>
-      readAllPages<ReviewActivityIn>((from, to) =>
-        db.from("crm_activity").select(select).in("type", types).in("lead_id", chunk).order("created_at", { ascending: false }).order("id").range(from, to),
+      readAllPages<Raw>((from, to) =>
+        db.from("crm_activity").select(select).in("type", types).in("lead_id", chunk).order("created_at", { ascending: false }).order("id").range(from, to) as unknown as PromiseLike<{ data: Raw[] | null; error: unknown }>,
       ),
     ),
   ]);
-  return [...m, ...l];
+  return [...m, ...l].map(({ sender, ...rest }) => ({ ...rest, from: sender ?? null, party: rest.party ?? null }));
+}
+
+/**
+ * The firm's own sender addresses, from its mailbox connections, read through the SAME scoped client (column
+ * `email` only, never a token column: RLS shows the firm rows and the caller's own personal ones). Any failure is
+ * "none known", which is the review's behaviour before this read existed.
+ */
+export async function readFirmSenders(db: ScopedClient): Promise<FirmSenders> {
+  try {
+    const raw = db as unknown as { from(table: string): { select(columns: string): PromiseLike<{ data: { email?: string | null }[] | null; error: unknown }> } };
+    const { data, error } = await raw.from("mailbox_connection").select("email");
+    if (error || !Array.isArray(data)) return NO_FIRM_SENDERS;
+    return firmSendersFrom(data.map((r) => r.email));
+  } catch {
+    return NO_FIRM_SENDERS;
+  }
 }
 
 export async function readOpenDeadlines(db: ScopedClient, matterIds: readonly string[]): Promise<ReviewDeadlineIn[]> {
@@ -246,7 +265,7 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
 
   const dependsOnRecords = failedCritical.length === 0;
   const proposalLeadIds = [...new Set([...leadIds, ...matters.filter((m) => m.status === "open" || m.status === "on_hold").map((m) => m.lead_id).filter((x): x is string => !!x)])];
-  const [tasksS, activityS, deadlinesS, changesS, proposalsS, countsS] = dependsOnRecords
+  const [tasksS, activityS, deadlinesS, changesS, proposalsS, countsS, sendersS] = dependsOnRecords
     ? await Promise.allSettled([
         readOpenTasks(db, matterIds, leadIds),
         readContactActivity(db, matterIds, leadIds),
@@ -254,8 +273,9 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
         readLastStageChange(db, leadIds),
         readProposalExpiries(db, matterIds, proposalLeadIds),
         readDocumentCounts(db, matterIds, leadIds),
+        readFirmSenders(db),
       ])
-    : ([null, null, null, null, null, null] as const);
+    : ([null, null, null, null, null, null, null] as const);
   if (dependsOnRecords && tasksS && tasksS.status === "rejected") failedCritical.push("tasks");
   if (failedCritical.length > 0) return { status: "unavailable", failed: failedCritical };
 
@@ -307,6 +327,7 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
     pendingMatterIds,
     pendingLeadIds,
     sources: { activity: activityOk ? "ok" : "unavailable", deadlines: deadlinesOk ? "ok" : "unavailable" },
+    firmSenders: sendersS?.status === "fulfilled" ? sendersS.value : NO_FIRM_SENDERS,
     timeZone,
     now,
   });

@@ -1,5 +1,5 @@
 import { addDays, daysBetween } from "./buckets";
-import { contactWords, type ContactType } from "./contact";
+import { contactWords, type ContactKind } from "./contact";
 
 /** "Oct 30" (with the year when it isn't this year). `date` and `today` are YYYY-MM-DD. Pure. */
 export function shortDate(date: string, today: string): string {
@@ -12,7 +12,7 @@ export function shortDate(date: string, today: string): string {
 
 /** "Oct 30 · we emailed", or the fixed sentences for no contact / unknown. */
 export function lastContactText(
-  row: { contactKnown: boolean; lastContact: { date: string; type: ContactType } | null },
+  row: { contactKnown: boolean; lastContact: { date: string; type: ContactKind } | null },
   today: string,
 ): string {
   if (!row.contactKnown) return "Couldn't load";

@@ -25,6 +25,7 @@
 import type { NoteEntry } from "@/lib/matters/tracker-import";
 import { initialsFor } from "./initials";
 import type { Party, ThreadMessage } from "./email-threads";
+import { isUsptoSender, USPTO_PARTY } from "@/lib/mailbox/firm-sender";
 
 export type { Party, ThreadMessage } from "./email-threads";
 
@@ -891,6 +892,8 @@ export function activityPayloadForMessage(m: MatchedMessage): Record<string, unk
     basis: m.basis,
     confidence: m.confidence,
     sensitive: m.sensitive,
+    // USPTO mail is inbound but never the client's reply: readers keep it out of "whose turn".
+    ...(isUsptoSender(message.from.address) ? { party: USPTO_PARTY } : {}),
   };
 }
 

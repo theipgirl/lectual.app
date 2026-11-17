@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildEmailEvidence, type EvidenceLead } from "@/lib/intake/email-match";
 import { openToken, sealToken } from "./crypto";
 import { fetchNewMessages } from "./fetch";
-import { matchMessageToMatter, type MatterContact, type MatterLink } from "./matter-match";
+import { matchMessageToMatter, type MatterCandidate, type MatterContact, type MatterLink } from "./matter-match";
 import { applyRun, planActivities, type ApplyCounts } from "./apply";
 import { syncOrgCalendars, type OrgCalendarResult } from "@/lib/calendar/outlook-sync";
 import {
@@ -11,7 +11,7 @@ import {
   type ClientCredentials,
   type MailboxProvider,
 } from "./providers";
-import { firmSendersFrom, NO_FIRM_SENDERS, relabelFirmSent, type FirmSenders } from "./firm-sender";
+import { firmSendersFrom, isUsptoSender, NO_FIRM_SENDERS, relabelFirmSent, type FirmSenders } from "./firm-sender";
 import { foldMergedLeads, leadRead } from "@/lib/leads/live";
 
 /**
@@ -104,6 +104,11 @@ export type OrgContext = {
   leads: EvidenceLead[];
   contacts: MatterContact[];
   links: MatterLink[];
+  /**
+   * The firm's OPEN matters (open / on hold) for the serial, mark and lead-email routes (matter-match.ts). Optional so
+   * older callers that build a context by hand keep working; missing = those routes find nothing.
+   */
+  matters?: MatterCandidate[];
   memberRoles: Map<string, string>;
   /** The addresses of ALL the firm's mailbox connections (any status): mail from them is firm-sent. */
   firmSenders: FirmSenders;
@@ -145,7 +150,8 @@ export async function loadOrgContext(admin: SupabaseClient, orgId: string): Prom
     await Promise.all([
       admin.from("crm_contact").select("id, email").eq("org_id", orgId).not("email", "is", null),
       admin.from("crm_matter_contact").select("contact_id, matter_id").eq("org_id", orgId),
-      admin.from("crm_matter").select("id, mark_text").eq("org_id", orgId),
+      // Only what matching needs: never notes or goods.
+      admin.from("crm_matter").select("id, mark_text, serial_number, lead_id, owner_name, status").eq("org_id", orgId),
       admin.from("crm_org_member").select("user_id, role").eq("org_id", orgId),
     ]);
   for (const e of [cErr, lErr, mErr, rErr]) if (e) throw new Error(`org context read failed: ${e.message}`);
@@ -163,8 +169,32 @@ export async function loadOrgContext(admin: SupabaseClient, orgId: string): Prom
   }
 
   const markByMatter = new Map((matterRows ?? []).map((m) => [m.id as string, (m.mark_text as string | null) ?? null]));
+
+  // A matter's linked lead's address: the lead's own and, when that lead was merged (0107), its keeper's too.
+  const leadById = new Map(leadRows.map((l) => [l.id as string, l]));
+  const leadEmailsOf = (leadId: string | null): string[] => {
+    if (!leadId) return [];
+    const out: string[] = [];
+    const own = leadById.get(leadId);
+    if (typeof own?.email === "string") out.push(own.email);
+    const keeperId = own?.merged_into_id;
+    const keeper = typeof keeperId === "string" ? leadById.get(keeperId) : undefined;
+    if (typeof keeper?.email === "string") out.push(keeper.email);
+    return out;
+  };
+  const matters: MatterCandidate[] = (matterRows ?? [])
+    .filter((m) => m.status === "open" || m.status === "on_hold")
+    .map((m) => ({
+      matterId: m.id as string,
+      markText: (m.mark_text as string | null) ?? null,
+      serialNumber: (m.serial_number as string | null) ?? null,
+      leadEmails: leadEmailsOf((m.lead_id as string | null) ?? null),
+      ownerName: (m.owner_name as string | null) ?? null,
+    }));
+
   return {
     leads,
+    matters,
     contacts: (contactRows ?? []).map((c) => ({ contactId: c.id as string, email: (c.email as string | null) ?? null })),
     links: (linkRows ?? []).map((l) => ({
       contactId: l.contact_id as string,
@@ -190,11 +220,13 @@ export async function syncConnection(deps: SyncDeps, row: ConnectionRow, ctx: Or
 
     // Firm mail that reached this mailbox only as a cc is OUTBOUND, before cadence and activity typing.
     const messages = relabelFirmSent(fetched.messages, ctx.firmSenders ?? NO_FIRM_SENDERS);
-    const report = buildEmailEvidence({ messages, leads: ctx.leads, directory: [] });
+    // USPTO mail is never a lead's reply: it moves no cadence, rings no bell and stops no sequence. It can still
+    // land on a matter (planActivities' second pass), stored as email_received with party "uspto".
+    const report = buildEmailEvidence({ messages: messages.filter((m) => !isUsptoSender(m.from?.address)), leads: ctx.leads, directory: [] });
     const planned = planActivities({
       report,
       messages,
-      matterFor: (m) => matchMessageToMatter(m, ctx.contacts, ctx.links),
+      matterFor: (m) => matchMessageToMatter(m, ctx.contacts, ctx.links, ctx.matters ?? []),
       connectionId: row.id,
     });
     const counts = await applyRun(deps.admin, {
