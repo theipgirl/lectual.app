@@ -23,6 +23,9 @@ export type HarnessState = {
   needsReview: NeedsReviewItem[];
   proposals: OwnerProposal[];
   review: ReviewLoad;
+  /** Forms page (screens/forms-owner.screen.tsx): what the intake-forms loaders return. */
+  formsList?: import("@/lib/intake-forms/store").IntakeFormRecord[];
+  formRecord?: import("@/lib/intake-forms/store").IntakeFormRecord | null;
 };
 
 export const state = {} as HarnessState;

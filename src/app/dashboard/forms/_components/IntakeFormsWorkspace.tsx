@@ -876,7 +876,7 @@ export function IntakeFormsWorkspace(props: Props) {
                 <>
                   <div className="ifm-field">
                     <span className="ifm-field-label">Direct link</span>
-                    <div className="ifm-row">
+                    <div className="ifm-row ifm-row-wrap">
                       <input className="ifm-input ifm-readonly" value={publicUrl} readOnly aria-label="Direct link" />
                       <button type="button" className="lx-btn lx-btn-sec" onClick={() => copy(publicUrl, "Link copied")}>
                         Copy link

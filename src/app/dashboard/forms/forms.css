@@ -191,6 +191,14 @@
   align-items: center;
   gap: 12px;
 }
+/* The Share row (link + three buttons): wraps on a narrow screen instead of running past the edge. */
+.ifm-row-wrap {
+  flex-wrap: wrap;
+}
+.ifm-row-wrap > .ifm-input {
+  flex: 1 1 220px;
+  min-width: 0;
+}
 .ifm-input {
   width: 100%;
   box-sizing: border-box;
@@ -2134,4 +2142,41 @@ textarea.ifm-input {
   .ifl-chan > li > :first-child {
     grid-column: 1 / -1;
   }
+}
+
+/* ── Type floor (Nov 17): no readable text under 13px on desktop or 14px on a phone (<= 640px);
+   uppercase labels may be 12px. Scoped to the Forms pages (.ifl-root list, .ifm-root workspace, its
+   Setup / Results / Performance tabs); the live preview frame (.ifm-pv-*) draws the CLIENT's page and is left alone.
+   Placed last so it wins over the sizes above. ───────────────────────────────────────────────────── */
+.ifm-caps { font-size: 12px; } /* uppercase label, was 11.5px */
+:is(.ifl-root, .ifm-root) :is(.ifm-count, .ifm-private, .ifm-q-pack, .ifm-badge, .ifl-link, .ifl-copy, .ifl-stats dt, .ifl-stats dd small, .ifl-kind, .ifr-bucket, .ifm-slug-prefix, .ifq-url) {
+  font-size: 13px; /* were 11.5 to 12.5px */
+}
+.ifq-url { font-size: 13px; }
+/* A fact that appears only here is never cut: the share link (and its "Not live yet" line) and the channel links wrap. */
+.ifl-link span { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
+.ifl-link { align-items: flex-start; }
+.ifl-chan-url { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
+
+@media (max-width: 640px) {
+  /* The sub-line under the h1 carries facts (what a form is, who the leads are tagged with): let it wrap here, not on other pages. */
+  :is(.ifl-root, .ifm-root) .lx-page-head .lx-sub {
+    font-size: 14px;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    text-wrap: wrap;
+  }
+  :is(.ifl-root, .ifm-root) :is(
+      .lx-btn, .ifm-status, .ifm-help, .ifm-err, .ifm-live-copy, .ifm-hex, .ifm-code, .ifm-domain, .ifm-kpi-arrow span,
+      .ifm-answers dt, .ifm-back, .ifm-asm-sub, .ifr-meta, .ifl-toggle, .ifl-chan-url, .ifl-create-hint, .ifm-seg a, .ifm-seg button,
+      .ifm-count, .ifm-private, .ifm-q-pack, .ifm-badge, .ifl-link, .ifl-copy, .ifl-stats dt, .ifl-stats dd small, .ifl-kind,
+      .ifr-bucket, .ifm-slug-prefix, .ifq-url
+    ) {
+    font-size: 14px;
+  }
+  /* The Results / Performance header row (Export CSV, 7 / 30 / 90 days) wrapped to a second line instead of pushing the page sideways. */
+  .ifm-perf-head { flex-wrap: wrap; }
+  /* A wide table scrolls inside its card instead of being cut off or widening the page. */
+  .ifm-table-card { overflow-x: auto; }
 }
