@@ -44,7 +44,7 @@ connector: the approval queue stays the only path out.
 - **Client information in Claude chats needs the firm owner's agreement first.** Tool results (names,
   marks, deadlines, proposal figures) are stored in the person's Claude conversation history, outside
   Lectual. `claude-connector` is NOT added to a firm until its owner has agreed; for RPB Law that is
-  Rebecca, before step 4 of the rollout. v1 returns no transcripts, consult notes or email bodies.
+  Rebecca, before step 4 of the rollout. v1 returns no transcripts, consult notes or email bodies. **Rebecca agreed on 2026-11-17** (per Taylor), on these terms; a wider scope needs a new OK.
 
 ## Phase 0 — prove the unverified parts on lectual-dev (before any tool is written)
 A half-day spike on a preview deployment. Stop and re-plan if one fails.

@@ -20,7 +20,9 @@ Omi checked 2026-11-12: no related open items (Omi is read-only from the cloud s
 - [ ] Tell me which login to test with on dev (`taylormcghee93@gmail.com` is not a member of any dev firm), or say "create one in hartwell-ip".
 - [ ] **Previews point at lectual-prod.** In Vercel `lectual-app`, the general Preview and Development settings `NEXT_PUBLIC_SUPABASE_URL` / `_ANON_KEY` are
       `qpbogzkdpynhhqmaradu`, which is lectual-prod (the note on them says lectual-dev). Check which project the Preview `SUPABASE_SERVICE_ROLE_KEY` belongs to and repoint all previews at lectual-dev.
-- [ ] Send Rebecca the note asking her OK for client information to appear in Claude chats. `claude-connector` stays off for RPB until she agrees.
+- [x] Rebecca agreed (reported by Taylor, 2026-11-17) that client information may appear in Claude chats, on the terms of the note: each person signs in
+      as themselves and sees only what they can already see, drafts only (nothing sent or approved), no transcripts, consult notes or email text in v1, and it can be turned off.
+      She has NOT agreed to anything wider: ask her again before the connector returns transcripts, consult notes or email bodies. `claude-connector` is still off for RPB on prod until the rollout.
 
 ### Claude, next
 
