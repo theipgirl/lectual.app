@@ -3,6 +3,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { QueueLoad } from "@/lib/queue/load";
 import { followup, MEMBERS, qitem, U } from "./routing-fixtures";
 
+// The failed-read card carries a Refresh button, which needs the app router.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
+
 process.env.__NEXT_TRAILING_SLASH = "true";
 
 const NOW = Date.parse("2026-10-28T12:00:00Z");

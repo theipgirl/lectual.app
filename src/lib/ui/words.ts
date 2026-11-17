@@ -511,7 +511,7 @@ export const DECK_FOR = "for";
 
 /* ── Owner view: the weekly review's editable Sheet ── */
 export const SHEET_YOU_TYPE = "You type these";
-export const SHEET_YOU_TYPE_BODY = "Status (moves the stage), Next step (text and due date), Whose court (a person), Source. Each change saves on its own and is logged on the record.";
+export const SHEET_YOU_TYPE_BODY = `Status (moves the stage), Next step (text and due date), ${OWNER_COLUMN} (a person), Source. Each change saves on its own and is logged on the record.`;
 export const SHEET_WORKED_OUT = "Lectual works these out";
 export const SHEET_WORKED_OUT_BODY = "Waiting on and Last contact come from next steps, mail and calls. They can't be edited here; log what happened with + Note instead.";
 export const SHEET_LEGEND_LABEL = "Which columns you can edit";

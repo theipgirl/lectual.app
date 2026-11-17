@@ -17,7 +17,7 @@ function contrast(a: string, b: string): number {
 
 describe("Yes is the clear primary move on the white card", () => {
   it("Yes is the one solid oxblood tile, with hover, focus-visible and disabled states", () => {
-    expect(css).toMatch(/\.dk-move--yes,\s*a\.dk-move--yes \{[\s\S]*?background: var\(--st-1\);[\s\S]*?color: var\(--cream\);/);
+    expect(css).toMatch(/\.dk-move--yes,\s*a\.dk-move--yes \{[\s\S]*?background: var\(--ox\);[\s\S]*?color: var\(--cream\);/);
     expect(css).toMatch(/\.dk-move--yes:hover:not\(:disabled\)/);
     expect(css).toMatch(/\.dk-move:focus-visible/);
     expect(css).toMatch(/\.dk-move--yes:disabled/);
@@ -32,8 +32,8 @@ describe("Yes is the clear primary move on the white card", () => {
 
 describe("the hold toast's Undo stays readable", () => {
   it("is pink on the dark toast", () => {
-    expect(css).toMatch(/\.dk-toast \{[^}]*background: var\(--st-1\);[^}]*color: var\(--cream\)/);
-    expect(css).toMatch(/\.dk-toast \.dk-undo \{[^}]*color: var\(--st-pink\)/);
+    expect(css).toMatch(/\.dk-toast \{[^}]*background: var\(--ink\);[^}]*color: var\(--cream\)/);
+    expect(css).toMatch(/\.dk-toast \.dk-undo \{[^}]*color: var\(--pink\)/);
   });
 });
 
@@ -60,7 +60,7 @@ describe("the side box states its own emptiness", () => {
 
 describe("the five small moves stay on one row on a phone", () => {
   it("keeps five columns at 14px and never wraps to three", () => {
-    expect(css).toMatch(/\.dk-moves5--5 \.dk-move \{ font-size: 14px;/);
+    expect(css).toMatch(/\.dk-moves5--5 \.dk-move \{ font-size: var\(--fs-2\);/);
     expect(css).not.toMatch(/\.dk-moves5--5 \{ grid-template-columns: repeat\(3/);
   });
 });

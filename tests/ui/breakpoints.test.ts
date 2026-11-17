@@ -20,9 +20,7 @@ const BASELINE: Record<string, number> = {
   "src/app/globals.css": 0,
   "src/app/i/intake-public.css": 1,
   "src/components/copilot/copilot.css": 1,
-  "src/components/deck/deck.css": 1,
   "src/components/onboarding/hub.css": 1,
-  "src/components/review/review.css": 1,
   "src/components/setup/setup.css": 1,
 };
 const counts: Record<string, number> = {};

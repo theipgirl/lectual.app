@@ -7,6 +7,8 @@ import { openHref, type Common } from "./shared";
 import { SheetEdit } from "./SheetEdit";
 import type { SheetPerms } from "@/lib/review/sheet-edit";
 import { SheetCard, SheetScroll, SheetTable } from "@/components/ui/SheetTable";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { BLANK, OWNER_COLUMN, TEAMMATE, UNASSIGNED } from "@/lib/ui/words";
 import "@/components/list-page/list-page.css";
 import "./review.css";
 
@@ -14,11 +16,11 @@ function SheetSection({ id, title, rows, today, members, params }: Common & { id
   const names = new Map(members.map((m) => [m.userId, m.name]));
   return (
     <SheetCard as="section" className="rv-sheet-sec" data-section={id} aria-labelledby={`rv-sheet-${id}`}>
-      <h2 id={`rv-sheet-${id}`} className="rv-sheet-title">
+      <h2 id={`rv-sheet-${id}`} className="lx-h3 rv-sheet-title">
         {title} <span className="lx-note">{rows.length}</span>
       </h2>
       {rows.length === 0 ? (
-        <p className="lx-note rv-strip-note">Nothing here for this view.</p>
+        <div className="rv-strip-note"><EmptyState variant="line">Nothing here for this view.</EmptyState></div>
       ) : (
         <SheetScroll>
           <SheetTable className="rv-sheet">
@@ -40,8 +42,8 @@ function SheetSection({ id, title, rows, today, members, params }: Common & { id
                         {r.client}
                       </Link>
                     </td>
-                    <td data-label="Mark">{r.mark ?? <span className="lx-note">—</span>}</td>
-                    <td data-label="Status">{r.stageLabel ?? <span className="lx-note">—</span>}</td>
+                    <td data-label="Mark">{r.mark ?? <span className="lx-note">{BLANK}</span>}</td>
+                    <td data-label="Status">{r.stageLabel ?? <span className="lx-note">{BLANK}</span>}</td>
                     <td data-label="Next step">
                       {r.nextStep && due ? (
                         <>
@@ -52,9 +54,9 @@ function SheetSection({ id, title, rows, today, members, params }: Common & { id
                         <span className="lx-note">No next step</span>
                       )}
                     </td>
-                    <td data-label="Whose court">{lane ? names.get(lane) ?? "Teammate" : "Unassigned"}</td>
+                    <td data-label={OWNER_COLUMN}>{lane ? names.get(lane) ?? TEAMMATE : UNASSIGNED}</td>
                     <td data-label="Waiting on">{waitingCell(r, (d) => shortDate(d, today))}</td>
-                    <td data-label="Source">{r.source ?? <span className="lx-note">—</span>}</td>
+                    <td data-label="Source">{r.source ?? <span className="lx-note">{BLANK}</span>}</td>
                     <td data-label="Last contact">{lastContactText(r, today)}</td>
                   </tr>
                 );

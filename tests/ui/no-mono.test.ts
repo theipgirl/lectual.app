@@ -18,12 +18,7 @@ const CSS: Record<string, number> = {
   "src/app/dashboard/proposals/proposals.css": 14,
   "src/app/dashboard/quotes/quotes.css": 20,
   "src/components/copilot/copilot.css": 4,
-  "src/components/deck/deck.css": 17,
-  "src/components/queue/review.css": 2,
-  "src/components/review/review-sheet-edit.css": 5,
-  "src/components/review/review.css": 8,
   "src/components/setup/setup.css": 1,
-  "src/components/today/owner/owner-today.css": 3,
 };
 const TSX: Record<string, number> = {
   "src/components/intake/TimeChip.tsx": 1,

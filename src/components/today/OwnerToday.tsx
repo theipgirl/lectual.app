@@ -15,6 +15,11 @@ import { liveConsultDeps } from "@/lib/calendar/consult-sources-live";
 import { loadOwnerDeadlines, loadOwnerNeedsReview, loadOwnerProposals } from "@/lib/today/owner-load";
 import { cardsHero, deadlineChip, deadlineParts, proposalTone, weekdayDate, OWNER_PROPOSALS_SHOWN, OWNER_DEADLINES_SHOWN, weekStrip } from "@/lib/today/owner-rules";
 import { DECK_PATH } from "@/lib/views";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Notice } from "@/components/ui/Notice";
+import { Pill } from "@/components/ui/Pill";
+import { formatDay } from "@/lib/ui/dates";
+import type { PillTone } from "@/lib/ui/tones";
 import { AddNameLink } from "@/components/account/AddNameLink";
 import { OwnerNeedsReview } from "@/components/today/owner/OwnerNeedsReview";
 import { OwnerConsults } from "@/components/today/owner/OwnerConsults";
@@ -44,9 +49,13 @@ import {
   OWNER_WEEK_HEADING,
 } from "@/lib/ui/words";
 
+/** "Tuesday, Nov 17": the weekday word, then the shared day format in the firm's zone. */
 function longDate(now: Date, tz: string): string {
-  return new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "long", month: "long", day: "numeric" }).format(now);
+  return formatDay(now, { tz, now, weekday: "long" }) ?? "";
 }
+
+/** The owner view's own tone words ("plain") onto the shared pill tones. */
+const pillTone = (tone: "risk" | "warn" | "plain"): PillTone => (tone === "plain" ? "mute" : tone);
 
 function greeting(hour: number): string {
   return hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening";
@@ -111,7 +120,7 @@ export async function OwnerToday({
   return (
     <div className="ot-page">
       <div className="ot-top">
-        <h1 className="ot-h1">
+        <h1 className="lx-h1">
           Good {greeting(hourInZone(now, tz))}
           {greetingSuffix(firstName)}.
         </h1>
@@ -120,7 +129,7 @@ export async function OwnerToday({
       </div>
 
       <section className="ot-hero" aria-labelledby="ot-cards-h" data-state={hero.state}>
-        <h2 id="ot-cards-h" className="ot-eyebrow ot-only-narrow">
+        <h2 id="ot-cards-h" className="lx-label ot-only-narrow">
           {OWNER_CARDS_HEADING}
         </h2>
         {hero.big !== null ? (
@@ -147,23 +156,23 @@ export async function OwnerToday({
           </p>
         )}
         {hero.canStart && (
-          <Link href={DECK_PATH} className="ot-start">
+          <Link href={DECK_PATH} className="lx-btn lx-btn-cream ot-start">
             {OWNER_CARDS_START}
           </Link>
         )}
       </section>
 
-      <section className="ot-card ot-week-card" aria-labelledby="ot-week-h">
+      <section className="lx-card ot-card ot-week-card" aria-labelledby="ot-week-h">
         <div className="ot-card-head">
-          <h2 id="ot-week-h" className="ot-card-title">
+          <h2 id="ot-week-h" className="lx-h3">
             {OWNER_WEEK_HEADING}
           </h2>
-          <span className="ot-sub">
+          <span className="ot-count">
             <span className="ot-only-narrow">
               <span className="ot-key ot-key-consult" /> {OWNER_WEEK_KEY_CONSULT} <span className="ot-key ot-key-deadline" /> {OWNER_WEEK_KEY_DEADLINE}
             </span>
             <span className="ot-only-wide">
-              <Link href="/dashboard/calendar/" className="ot-link">
+              <Link href="/dashboard/calendar/" className="lx-link">
                 {OWNER_WEEK_OPEN_CALENDAR}
               </Link>
             </span>
@@ -171,9 +180,9 @@ export async function OwnerToday({
         </div>
         <WeekStrip days={week} />
         {weekNote && (
-          <p className="ot-sub ot-note" role="alert">
+          <Notice tone="warn" role="alert">
             {weekNote}
-          </p>
+          </Notice>
         )}
       </section>
 
@@ -182,36 +191,34 @@ export async function OwnerToday({
           {consults ? (
             <OwnerConsults result={consults} timeZone={tz} today={today} />
           ) : (
-            <section className="ot-card" aria-labelledby="ot-consults-h">
-              <h2 id="ot-consults-h" className="ot-card-title">
+            <section className="lx-card ot-card" aria-labelledby="ot-consults-h">
+              <h2 id="ot-consults-h" className="lx-h3">
                 {OWNER_CONSULTS_HEADING}
               </h2>
-              <p className="ot-sub ot-note" role="alert">
+              <Notice tone="warn" role="alert">
                 {OWNER_CONSULTS_FAILED}
-              </p>
+              </Notice>
             </section>
           )}
         </div>
 
         {proposals !== null && (
           <div className="ot-col-proposals">
-            <section className="ot-card" aria-labelledby="ot-proposals-h">
+            <section className="lx-card ot-card" aria-labelledby="ot-proposals-h">
               <div className="ot-card-head">
-                <h2 id="ot-proposals-h" className="ot-card-title">
+                <h2 id="ot-proposals-h" className="lx-h3">
                   {OWNER_PROPOSALS_HEADING}
                 </h2>
                 {Array.isArray(proposals) && proposals.length > 0 && (
-                  <span className="ot-sub">
-                    {proposals.length}
-                  </span>
+                  <span className="ot-count">{proposals.length}</span>
                 )}
               </div>
               {proposals === undefined ? (
-                <p className="ot-sub ot-note" role="alert">
+                <Notice tone="warn" role="alert">
                   {OWNER_PROPOSALS_FAILED}
-                </p>
+                </Notice>
               ) : proposals.length === 0 ? (
-                <p className="ot-sub ot-empty">{OWNER_PROPOSALS_NONE}</p>
+                <EmptyState variant="line">{OWNER_PROPOSALS_NONE}</EmptyState>
               ) : (
                 proposals.slice(0, OWNER_PROPOSALS_SHOWN).map((p) => {
                   const opens = ownerProposalOpens(p.opens);
@@ -226,13 +233,13 @@ export async function OwnerToday({
                           {opens ? ` \u00b7 ${opens}` : ""}
                         </span>
                       </div>
-                      <span className={`ot-pill ot-pill-${proposalTone(p, today)}`}>{p.expiry}</span>
+                      <Pill tone={pillTone(proposalTone(p, today))}>{p.expiry}</Pill>
                     </div>
                   );
                 })
               )}
               {Array.isArray(proposals) && proposals.length > OWNER_PROPOSALS_SHOWN && (
-                <Link href="/dashboard/proposals/" className="ot-link ot-more">
+                <Link href="/dashboard/proposals/" className="lx-link ot-more">
                   {ownerSeeAll(proposals.length)}
                 </Link>
               )}
@@ -241,19 +248,19 @@ export async function OwnerToday({
         )}
 
         <div className="ot-col-deadlines">
-          <section className="ot-card" aria-labelledby="ot-deadlines-h">
+          <section className="lx-card ot-card" aria-labelledby="ot-deadlines-h">
             <div className="ot-card-head">
-              <h2 id="ot-deadlines-h" className="ot-card-title">
+              <h2 id="ot-deadlines-h" className="lx-h3">
                 {OWNER_DEADLINES_HEADING}
               </h2>
-              {deadlines !== null && deadlines.length > 0 && <span className="ot-sub">{deadlines.length}</span>}
+              {deadlines !== null && deadlines.length > 0 && <span className="ot-count">{deadlines.length}</span>}
             </div>
             {deadlines === null ? (
-              <p className="ot-sub ot-note" role="alert">
+              <Notice tone="warn" role="alert">
                 {OWNER_DEADLINES_FAILED}
-              </p>
+              </Notice>
             ) : deadlines.length === 0 ? (
-              <p className="ot-sub ot-empty">{OWNER_DEADLINES_NONE}</p>
+              <EmptyState variant="line">{OWNER_DEADLINES_NONE}</EmptyState>
             ) : (
               deadlines.slice(0, OWNER_DEADLINES_SHOWN).map((d) => {
                 const chip = deadlineChip(d, today);
@@ -269,13 +276,13 @@ export async function OwnerToday({
                         {weekdayDate(d.dueDate)}
                       </span>
                     </div>
-                    <span className={`ot-pill ot-pill-${chip.tone}`}>{chip.text}</span>
+                    <Pill tone={pillTone(chip.tone)}>{chip.text}</Pill>
                   </div>
                 );
               })
             )}
             {deadlines !== null && deadlines.length > OWNER_DEADLINES_SHOWN && (
-              <Link href="/dashboard/calendar/" className="ot-link ot-more">
+              <Link href="/dashboard/calendar/" className="lx-link ot-more">
                 {ownerSeeAll(deadlines.length)}
               </Link>
             )}

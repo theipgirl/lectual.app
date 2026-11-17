@@ -1,3 +1,4 @@
+import { Notice } from "@/components/ui/Notice";
 import { notFound } from "next/navigation";
 import { orgHasModule } from "@/lib/org/modules";
 import { resolveFirmSession } from "@/lib/firm/session";
@@ -45,6 +46,7 @@ import { DeckKeys } from "@/components/review/DeckKeys";
 import { agentLabel } from "@/components/queue/format";
 import { outcomeOf } from "@/lib/queue/done";
 import {
+  BLANK,
   DECK_BADGE_INTERNAL,
   DECK_BADGE_REVIEW,
   DECK_BADGE_YES,
@@ -245,9 +247,9 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
     {seenMark}
     <DeckFrame {...frameProps} side={side} meta={meta} wideSub={wideSub}>
       {routed.status !== "ok" && (
-        <p role="status" className="lx-note" style={{ margin: 0 }}>
+        <Notice tone="warn" role="status">
           {DECK_ROUTING_UNREAD}
-        </p>
+        </Notice>
       )}
       {children}
     </DeckFrame>
@@ -276,8 +278,8 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
       ...deck.cards.map((c) => row(c.item, dealAt, statusOf(c))),
       ...deck.laterArrivals.map((c) => row(c.item, deal.next.label, { label: DECK_ST_NEXT_DEAL, tone: "line" })),
       ...deck.later.map((c) => row(c.item, deal.next.label, { label: DECK_COL_LATER, tone: "line" })),
-      ...deck.handedOff.map((c) => row(c.item, "—", { label: `${DECK_COL_HANDED_OFF} · ${nameOf(c.holder.userId)}`, tone: "line" })),
-      ...decided.map((i) => row(i, "—", outcomeOf(i) === "rejected" ? { label: DECK_CHIP_REJECTED, tone: "risk" } : { label: decidedChip(i), tone: "ok" })),
+      ...deck.handedOff.map((c) => row(c.item, BLANK, { label: `${DECK_COL_HANDED_OFF} · ${nameOf(c.holder.userId)}`, tone: "line" })),
+      ...decided.map((i) => row(i, BLANK, outcomeOf(i) === "rejected" ? { label: DECK_CHIP_REJECTED, tone: "risk" } : { label: decidedChip(i), tone: "ok" })),
     ];
     return frame(null, null, <DeckList rows={rows} decidedReadable={decidedReadable} />, deckListSub(waiting, deck.cards.length, deck.laterArrivals.length, dealLabel ?? deal.next.label));
   }

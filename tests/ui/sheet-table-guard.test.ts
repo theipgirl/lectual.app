@@ -13,9 +13,6 @@ import { ROOT, walk } from "./_scan";
  * EXEMPT is for good: public client pages and rendered prose are not part of the workspace look.
  */
 const TODO_BY_AREA: Record<string, { area: string; count: number }> = {
-  "src/components/review/ReviewSection.tsx": { area: "C", count: 1 },
-  "src/app/dashboard/queue/page.tsx": { area: "C", count: 1 },
-  "src/components/deck/DeckList.tsx": { area: "C", count: 1 },
   "src/components/proposal-list/ProposalsTable.tsx": { area: "D", count: 1 },
   "src/app/dashboard/quotes/page.tsx": { area: "D", count: 1 },
   "src/app/dashboard/campaigns/page.tsx": { area: "E", count: 1 },

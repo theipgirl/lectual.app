@@ -1,0 +1,17 @@
+/* Today (technician view): the small layout classes the page used to type in place. Tokens only. */
+.td-card { padding: 18px; display: grid; gap: 10px; }
+.td-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.td-head .lx-h2 { margin: 0; }
+.td-count { font-size: var(--fs-4); }
+.td-body { min-width: 0; }
+.td-sub { display: block; }
+.td-cta { font-weight: 500; color: var(--wine); white-space: nowrap; }
+.td-more > summary { cursor: pointer; color: var(--wine); font-weight: 500; font-size: var(--fs-2); }
+.td-more > summary:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; border-radius: var(--r-sm); }
+.td-more > ol { margin-top: 10px; }
+.td-row { padding: 2px 0; }
+.td-foot { margin: 0; font-size: var(--fs-1); }
+.td-rule b { color: var(--ox); }
+.td-pad { margin: 0; padding: 0 18px; }
+.td-pad-end { margin: 0; padding: 0 18px 14px; }
+.td-list { padding: 0 18px 8px; }

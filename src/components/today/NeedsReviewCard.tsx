@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { formatCivilDate } from "@/lib/matters/ip-fields";
 import { NEEDS_REVIEW_PAST_DUE_DAYS, NEEDS_REVIEW_SHOWN, type NeedsReviewItem } from "@/lib/today/needs-review";
+import { LoadFailedLine } from "@/components/ui/LoadFailed";
+import { Pill } from "@/components/ui/Pill";
+import "./today.css";
 import { NEEDS_REVIEW_FAILED, NEEDS_REVIEW_HEADING, needsReviewCut, needsReviewExplain, needsReviewPastDue } from "@/lib/ui/words";
 
 /**
@@ -18,31 +21,31 @@ export function NeedsReviewCard({ items }: { items: NeedsReviewItem[] | null }) 
         {items !== null && <span className="lx-note">{items.length}</span>}
       </header>
       {items === null ? (
-        <p className="lx-note" role="alert" style={{ margin: 0, padding: "0 18px 14px", color: "var(--warn)" }}>
-          {NEEDS_REVIEW_FAILED}
-        </p>
+        <div className="td-pad-end">
+          <LoadFailedLine refresh={false}>{NEEDS_REVIEW_FAILED}</LoadFailedLine>
+        </div>
       ) : (
         <>
-          <p className="lx-note" style={{ margin: 0, padding: "0 18px" }}>
+          <p className="lx-note td-pad">
             {needsReviewExplain(NEEDS_REVIEW_PAST_DUE_DAYS)}
           </p>
-          <ul className="lx-list" style={{ padding: "0 18px 8px" }}>
+          <ul className="lx-list td-list">
             {items.slice(0, NEEDS_REVIEW_SHOWN).map((d) => (
               <li key={d.key} className="lx-task">
-                <span style={{ minWidth: 0 }}>
+                <span className="td-body">
                   <Link prefetch={false} href={d.href} className="lx-rowlink">
                     {d.name}
                   </Link>
-                  <span className="lx-note" style={{ display: "block" }}>
+                  <span className="lx-note td-sub">
                     {`${d.matter} · due ${formatCivilDate(d.dueDate) ?? d.dueDate}`}
                   </span>
                 </span>
-                <span className="lx-pill lx-pill-mute">{needsReviewPastDue(d.daysPastDue)}</span>
+                <Pill>{needsReviewPastDue(d.daysPastDue)}</Pill>
               </li>
             ))}
           </ul>
           {items.length > NEEDS_REVIEW_SHOWN && (
-            <p className="lx-note" style={{ margin: 0, padding: "0 18px 14px" }}>
+            <p className="lx-note td-pad-end">
               {needsReviewCut(NEEDS_REVIEW_SHOWN, items.length)}
             </p>
           )}

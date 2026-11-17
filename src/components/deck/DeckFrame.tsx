@@ -90,10 +90,10 @@ export function DeckFrame({
       <div className="dk-frame dk-frame--wide">
         <div className="dk-wide-head">
           <div className="dk-titlerow">
-            <h1 className="dk-h1 dk-h1--wide">{APPROVALS_NAME}</h1>
+            <h1 className="lx-h1 dk-h1">{APPROVALS_NAME}</h1>
             {switcher("")}
           </div>
-          {wideSub && <p className="dk-sub">{wideSub}</p>}
+          {wideSub && <p className="lx-sub dk-sub">{wideSub}</p>}
           {canChangeDealTimes && <DealTimesButton />}
         </div>
         {children}
@@ -111,20 +111,19 @@ export function DeckFrame({
     <div className="dk-frame dk-frame--cards">
       <div className="dk-left">
         <div className="dk-pagehead">
-          <span className="dk-eyebrow">{APPROVALS_NAME}</span>
           <div className="dk-head-row">
-            <h1 className="dk-h1">{DECK_PAGE_TITLE}</h1>
+            <h1 className="lx-h1 dk-h1">{DECK_PAGE_TITLE}</h1>
             {switcher("")}
           </div>
-          <p className="dk-sub">{DECK_PAGE_SUB}</p>
+          <p className="lx-sub dk-sub">{DECK_PAGE_SUB}</p>
           {canChangeDealTimes && <DealTimesButton />}
         </div>
         <DeckSide rows={side ?? []} failed={sideFailed} note={sideNote} later={sideLater} decidedFailed={sideDecidedFailed} />
         {laterArrivals > 0 && dealLabel && (
-          <section className="dk-arrived" aria-label={deckArrivedTitle(dealLabel)}>
+          <section className="lx-card dk-arrived" aria-label={deckArrivedTitle(dealLabel)}>
             <div className="dk-sidecard-head">
               <h2>{deckArrivedTitle(dealLabel)}</h2>
-              <span className="dk-sub-mono">{deckArrivedCount(laterArrivals, nextDealLabel)}</span>
+              <span className="dk-count">{deckArrivedCount(laterArrivals, nextDealLabel)}</span>
             </div>
             <p className="dk-side-note">{deckArrivedBody(nextDealLabel)}</p>
           </section>
@@ -138,8 +137,8 @@ export function DeckFrame({
           </div>
           <div className="dk-zone-head">
             <div className="dk-zone-titles">
-              <span className="dk-eyebrow">{dealLine}</span>
-              <h2 className="dk-zone-title">{DECK_TITLE}</h2>
+              <span className="lx-label">{dealLine}</span>
+              <h2 className="lx-h2 dk-zone-title">{DECK_TITLE}</h2>
             </div>
             <div className="dk-zone-meta">
               {meta && <span className="dk-meta">{meta}</span>}

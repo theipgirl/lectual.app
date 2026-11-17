@@ -12,11 +12,9 @@ export function ReviewerSummary({ summary }: { summary: string | null | undefine
   const { shown, hidden } = splitForDisplay(items);
   return (
     <div className="lx-rv" data-reviewer-summary>
-      <div className="lx-label" style={{ fontSize: 11 }}>
-        For the reviewer
-      </div>
+      <div className="lx-label">For the reviewer</div>
       {items.length === 0 ? (
-        <p className="lx-note" style={{ margin: 0, color: "var(--body)" }}>
+        <p className="lx-note lx-rv-plain">
           {summary}
         </p>
       ) : (
