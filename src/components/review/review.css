@@ -15,7 +15,8 @@
 .rv-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .rv-since { display: inline-flex; align-items: center; gap: 6px; min-height: var(--ctl-h); padding: 0 13px; border-radius: var(--r-pill); border: 1px solid var(--ox); background: var(--card); color: var(--ox); font-size: var(--fs-2); font-weight: 500; text-decoration: none; white-space: nowrap; }
 .rv-since:hover { text-decoration: none; }
-.rv-since-act { text-decoration: underline; }
+.rv-since-act { text-decoration: none; }
+.rv-since:hover .rv-since-act { text-decoration: underline; }
 .rv-divider { width: 1px; height: 24px; background: var(--line); margin: 0 4px; }
 .rv-search { margin-left: auto; display: flex; align-items: center; gap: 6px; }
 .rv-search-label { font-family: var(--sans); font-size: var(--fs-1); color: var(--muted); }

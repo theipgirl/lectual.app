@@ -98,7 +98,7 @@
   .lx-app:has(.lx-top--owner) .lx-qi .lx-rv-item { background: transparent; padding: 0; border-radius: 0; font-size: var(--fs-2); line-height: 1.45; color: var(--ink); }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-rv-item[data-check-first="true"] { background: transparent; border: 0; }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-rv-tag { font-size: var(--fs-1); color: var(--warn); background: var(--tint-warn); border-radius: var(--r-sm); padding: 2px 7px; margin-right: 8px; }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-rv-more > summary { font-size: var(--fs-2); text-decoration: underline; text-underline-offset: 2px; min-height: 44px; display: inline-flex; align-items: center; }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-rv-more > summary { font-size: var(--fs-2); text-decoration: none; text-underline-offset: 2px; min-height: 44px; display: inline-flex; align-items: center; }
   .lx-app:has(.lx-top--owner) .lx-qi-aside > .lx-card { order: 6; }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-qi-status { order: 7; justify-self: start; }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-qi-owner { order: 7; margin: 0; font-size: var(--fs-2); }

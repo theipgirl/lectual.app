@@ -462,7 +462,8 @@
 .pe-letter-switch { font-size: var(--fs-2); font-weight: 500; color: var(--ink); white-space: normal; }
 .pe-letter-version { margin: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .pe-letter-setup { margin: 0; font-size: var(--fs-2); line-height: 1.5; color: var(--body); }
-.pe-letter-setup a { color: var(--ox); text-decoration: underline; }
+.pe-letter-setup a { color: var(--wine); text-decoration: none; }
+.pe-letter-setup a:hover { text-decoration: underline; }
 .pe-letter-preview { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .pe-letter-preview > summary { cursor: pointer; width: fit-content; list-style: none; }
 .pe-letter-preview > summary::-webkit-details-marker { display: none; }

@@ -966,7 +966,8 @@ select:not([multiple]):not([size]):disabled {
 .sheet-tbl tbody tr:last-child td { border-bottom: 0; }
 .sheet-tbl td.pri { font-weight: 400; }
 /* .sheet-tbl .sheet-link outranks a page's own `.x a { text-decoration: none }` (Intake's .intake-root a). */
-.sheet-link, .sheet-tbl .sheet-link, .sheet-tbl td.pri > a { color: var(--ox); text-decoration: underline; text-underline-offset: 2px; }
+.sheet-link, .sheet-tbl .sheet-link, .sheet-tbl td.pri > a { color: var(--ox); text-decoration: none; text-underline-offset: 2px; }
+.sheet-link:hover, .sheet-tbl .sheet-link:hover, .sheet-tbl td.pri > a:hover { text-decoration: underline; }
 .sheet-tbl th.num, .sheet-tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .sheet-sort { font: inherit; letter-spacing: inherit; text-transform: inherit; text-align: left; border: 0; background: transparent; padding: 0; color: inherit; cursor: pointer; }
 .sheet-sort[data-on], .sheet-tbl th[aria-sort="ascending"] .sheet-sort, .sheet-tbl th[aria-sort="descending"] .sheet-sort { color: var(--ox); }

@@ -179,7 +179,7 @@ textarea.ifm-input {
   font: inherit;
   font-size: 14px;
   font-weight: 500;
-  color: var(--ox);
+  color: var(--wine);
   cursor: pointer;
 }
 .ifm-link:hover {
