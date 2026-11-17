@@ -46,9 +46,9 @@
  * component) and the server action can share it.
  */
 
-/** The zone every court in this docket sits in. See the note above. */
 import { formatDayTime } from "@/lib/ui/dates";
 
+/** The zone every court in this docket sits in. See the note above. */
 export const COURT_TIME_ZONE = "America/New_York";
 
 /**

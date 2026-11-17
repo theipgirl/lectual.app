@@ -225,7 +225,7 @@ export function FilingForm({ matterId, values: v }: { matterId: string; values: 
       </div>
       <div className="mx-actions">
         <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
-          {pending ? "Saving…" : "Save filing details"}
+          {pending ? SAVING : "Save filing details"}
         </button>
         <SavedNote show={!!state.saved && !pending} />
         <Err state={state} />
@@ -242,7 +242,7 @@ export function NotesForm({ matterId, notes }: { matterId: string; notes: string
       <textarea className="lx-input" name="notes" rows={5} defaultValue={notes ?? ""} aria-label="Staff notes" placeholder="Internal. Never shown to the client." />
       <div className="mx-actions">
         <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
-          {pending ? "Saving…" : "Save notes"}
+          {pending ? SAVING : "Save notes"}
         </button>
         <SavedNote show={!!state.saved && !pending} />
         <Err state={state} />

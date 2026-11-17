@@ -73,10 +73,10 @@ export function LitigationForm({ matterId, values: v }: { matterId: string; valu
           {pending ? SAVING : "Save case details"}
         </button>
         {state.error && (
-          <Notice tone="risk" role="alert">
-            {state.error}
-          </Notice>
-        )}
+        <Notice tone="risk" role="alert">
+          {state.error}
+        </Notice>
+      )}
       </div>
     </form>
   );
@@ -113,10 +113,10 @@ export function WelcomeEmailCard({ matterId, sentQueueItemId, alreadySent }: { m
         </button>
       </div>
       {state.error && (
-          <Notice tone="risk" role="alert">
-            {state.error}
-          </Notice>
-        )}
+        <Notice tone="risk" role="alert">
+          {state.error}
+        </Notice>
+      )}
     </form>
   );
 }
@@ -149,10 +149,10 @@ export function FilingFollowUpCard({ matterId, status }: { matterId: string; sta
         </button>
       </div>
       {state.error && (
-          <Notice tone="risk" role="alert">
-            {state.error}
-          </Notice>
-        )}
+        <Notice tone="risk" role="alert">
+          {state.error}
+        </Notice>
+      )}
     </form>
   );
 }

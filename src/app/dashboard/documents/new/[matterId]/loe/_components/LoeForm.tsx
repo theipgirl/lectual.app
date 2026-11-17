@@ -162,7 +162,6 @@ export default function LoeForm({
                 name="benefitRowsText"
                 rows={6}
                 className="lx-input"
-                
                 defaultValue={prefill?.benefitRowsText ?? ""}
                 placeholder={"Preliminary Consultation Strategy Call ($450) — ✓\nComprehensive Trademark Search Report ($675 each) — 1 included"}
               />
@@ -181,7 +180,6 @@ export default function LoeForm({
                 required
                 defaultValue={prefill?.scopeDescription ?? ""}
                 className="lx-input"
-                
               />
             </label>
             <label className="lx-field">

@@ -7,7 +7,7 @@ import { ListHeader } from "@/components/list-page/ListHeader";
 import { ListToolbar } from "@/components/list-page/ListToolbar";
 import { Chip, FilterChips } from "@/components/list-page/Chips";
 import "@/components/list-page/list-page.css";
-import { BoardCard, Notice, Pill } from "@/components/ui";
+import { BoardCard, LoadFailedLine, Notice, Pill } from "@/components/ui";
 import { BLANK, CANT_SHOW, PIPELINE_VIEW_ONLY, TEAMMATE, UNASSIGNED, columnEmpty, searchPlaceholder } from "@/lib/ui/words";
 import { showingOf } from "@/lib/ui/format";
 import "./pipeline.css";
@@ -124,7 +124,7 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
           const body = (
             <>
               {isFailed ? (
-                <p className="lx-board-empty">Can&apos;t show this column right now.</p>
+                <LoadFailedLine refresh={false}>Can&apos;t show this column right now.</LoadFailedLine>
               ) : cards.length === 0 ? (
                 <p className="lx-board-empty">{q || owner ? "Nothing matches." : columnEmpty(COLUMN_NOUN[column])}</p>
               ) : (

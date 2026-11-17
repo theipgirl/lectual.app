@@ -49,7 +49,6 @@ export default function TrademarkClearanceForm({
               rows={10}
               required
               className="lx-input"
-              
               placeholder={
                 "e.g. No live federal registrations found for identical marks in Class 25.\n" +
                 "SIMILARMARK (U.S. Reg. No. 1234567) — registered for \"t-shirts\" in Class 25, owner Acme Apparel LLC, live.\n" +

@@ -30,7 +30,7 @@ import type { MatterContactsRead } from "@/lib/matters/contacts";
 import { NOTE_KIND_OPTIONS } from "@/lib/pipeline/lead-input";
 import { Err, Field, RowButton, type Action } from "./MatterForms";
 import { InlineConfirm, Notice, SavedNote, Field as UiField } from "@/components/ui";
-import { searchPlaceholder, ADD_TO_TIMELINE, BLANK, DELETE, SAVING, UNASSIGNED } from "@/lib/ui/words";
+import { searchPlaceholder, ADD_TO_TIMELINE, BLANK, DELETE, OWNER_COLUMN, SAVING, UNASSIGNED } from "@/lib/ui/words";
 import "@/components/list-page/list-page.css";
 import "./matter-page.css";
 
@@ -432,7 +432,7 @@ export function TaskControls(props: {
           <div className="mx-row">
             <input className="lx-input mx-auto-w" type="date" name="dueAt" defaultValue={task.dueDate ?? ""} aria-label="Task due date" />
             {props.members ? (
-              <select className="lx-input mx-flex-1" name="assigneeId" defaultValue={task.assigneeId ?? ""} aria-label="Assign to">
+              <select className="lx-input mx-flex-1" name="assigneeId" defaultValue={task.assigneeId ?? ""} aria-label={OWNER_COLUMN}>
                 <option value="">{UNASSIGNED}</option>
                 {props.members.map((m) => (
                   <option key={m.userId} value={m.userId}>
