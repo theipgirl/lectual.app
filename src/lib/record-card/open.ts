@@ -3,14 +3,13 @@ import { openToken, parseOpenParam, type OpenRef } from "@/lib/review/open";
 /**
  * `?open=<lead|matter>:<uuid>` on the Intake and Matters pages opens one record as a card. PURE. The grammar is the Weekly
  * review's (`parseOpenParam` / `openToken`), imported, not copied: anything that is not exactly a kind, a colon and a
- * uuid is no card. The helpers below only build addresses: every other query key (view, set, filters, `show`, repeated
- * keys too) is kept as it was, so Back and the close link land on the same view.
+ * uuid is no card. The helpers below only build addresses: every other query key (view, set, filters, `show`, the
+ * Matters `group`, repeated keys too) is kept as it was, so Back and the close link land on the same view. The page
+ * passes its OWN path; nothing here names a list path, so no link to a list loses its group.
  */
 export type CardRef = OpenRef;
 
 export const OPEN_PARAM = "open";
-export const INTAKE_PATH = "/dashboard/intake/";
-export const MATTERS_PATH = "/dashboard/matters/";
 
 export function parseCardOpen(raw: string | string[] | null | undefined): CardRef | null {
   return parseOpenParam(raw);

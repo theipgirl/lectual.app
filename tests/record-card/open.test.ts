@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { parseOpenParam } from "@/lib/review/open";
-import { INTAKE_PATH, MATTERS_PATH, closeHref, openHref, parseCardOpen } from "@/lib/record-card/open";
+import { closeHref, openHref, parseCardOpen } from "@/lib/record-card/open";
+
+const INTAKE_PATH = "/dashboard/intake/";
+const MATTERS_PATH = "/dashboard/matters/";
 
 const ID = "11111111-1111-4111-8111-111111111111";
 
@@ -42,6 +45,12 @@ describe("?open= for Intake and Matters: the review's grammar, not a second one"
     const start = new URLSearchParams("view=board&set=working&show=50");
     const opened = new URL(openHref(INTAKE_PATH, start, { kind: "lead", id: ID }), "https://x.test");
     expect(closeHref(INTAKE_PATH, opened.searchParams)).toBe(`${INTAKE_PATH}?${start.toString()}`);
+  });
+
+  it("keeps the Matters group, so the closed list is the same group", () => {
+    const href = openHref(MATTERS_PATH, { group: "all", view: "board" }, { kind: "matter", id: ID });
+    expect(href).toBe(`/dashboard/matters/?group=all&view=board&open=matter%3A${ID}`);
+    expect(closeHref(MATTERS_PATH, new URL(href, "https://x.test").searchParams)).toBe("/dashboard/matters/?group=all&view=board");
   });
 
   it("ignores undefined values", () => {
