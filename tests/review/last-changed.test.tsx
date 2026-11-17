@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { LEAD, MATTER, OTHER_LEAD, OTHER_ORG, ORG, makeWorld, seedTables } from "../files/helpers";
-import { actorOf, firstNameOf, lastChangedText, pickLastChanges, CHANGE_SELECT, type ChangeRowIn, type LastChange } from "@/lib/review/last-changed";
+import { actorOf, changeWindowStart, firstNameOf, lastChangeFor, lastChangedText, pickLastChanges, withoutPeople, CHANGE_SELECT, type ChangeRowIn, type LastChange } from "@/lib/review/last-changed";
 import { row } from "./fixtures";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
@@ -47,19 +47,35 @@ describe("who changed it (acceptance 1 and 2)", () => {
 
   it("a record with a read that worked and no change row says so, never 'not changed'", () => {
     expect(lastOf([])).toBeNull();
-    expect(text(null)).toBe("No changes recorded");
+    expect(text(null)).toBe("No changes in the last year");
   });
 
-  it("other actors are named in words", () => {
+  it("other actors are named in words, and a system row is never credited to Lectual", () => {
     expect(text(lastOf([change({ type: "note", actor_type: "automation", actor_id: null })]))).toBe("Changed by an automation · Nov 16");
     expect(text(lastOf([change({ type: "note", actor_type: "ai", actor_id: null })]))).toBe("Changed by an assistant · Nov 16");
-    expect(text(lastOf([change({ type: "note", actor_type: "system", actor_id: null })]))).toBe("Changed by Lectual · Nov 16");
+    expect(text(lastOf([change({ type: "note", actor_type: "system", actor_id: null })]))).toBe("Updated automatically · Nov 16");
+    expect(text(lastOf([change({ type: "note", actor_type: "system", actor_id: null })]))).not.toContain("Lectual");
   });
 
-  it("a person the directory does not know, or could not be read, is a teammate; an email is never used as a name", () => {
+  it("system rows are named by payload.source: a form, a signing; an unknown source stays generic", () => {
+    const sys = { actor_type: "system", actor_id: null };
+    expect(text(lastOf([change({ type: "lead_created", ...sys, source: "Intake form" })]))).toBe("Came in through a form · Nov 16");
+    expect(text(lastOf([change({ type: "matter_opened", ...sys, source: "quote_accepted" })]))).toBe("Opened when the client signed · Nov 16");
+    expect(text(lastOf([change({ type: "matter_opened", ...sys, source: "something_else" })]))).toBe("Updated automatically · Nov 16");
+    // the same source on the wrong type, or from a person, is not given the special reading
+    expect(text(lastOf([change({ type: "note", ...sys, source: "Intake form" })]))).toBe("Updated automatically · Nov 16");
+    expect(text(lastOf([change({ type: "lead_created", source: "Intake form" })]))).toBe("Changed by Caitlyn · Nov 16");
+    // sheet and other imports write no row, so they are not an actor here
+    expect(actorOf({ type: "lead_created", actor_type: "system", actor_id: null, source: "sheet_import" })).toEqual({ kind: "system" });
+  });
+
+  it("a person the directory does not know is a teammate; an email is never used as a name; an unreadable directory draws no line", () => {
     expect(text(lastOf([change({ type: "note", actor_id: "u-gone" })]))).toBe("Changed by a teammate · Nov 16");
     expect(text(lastOf([change({ type: "note", actor_id: "u-mail" })]))).toBe("Changed by a teammate · Nov 16");
-    expect(lastChangedText(lastOf([change({ type: "note" })]), null, "2026-11-17")).toBe("Changed by a teammate · Nov 16");
+    expect(lastChangedText(lastOf([change({ type: "note" })]), null, "2026-11-17")).toBeNull();
+    // a non-person actor needs no name, so it still draws
+    expect(lastChangedText(lastOf([change({ type: "stage_changed", actor_type: "system", actor_id: null, actor: "lawmatics-sync" })]), null, "2026-11-17")).toBe("Changed by Lawmatics sync · Nov 16");
+    expect(withoutPeople(lastOf([change({ type: "note" })]))).toBeUndefined();
     expect(firstNameOf("rayn@firm.example")).toBeNull();
     expect(firstNameOf("  Caitlyn  Ross ")).toBe("Caitlyn");
   });
@@ -92,7 +108,7 @@ describe("picking the newest change", () => {
 
   it("keeps only a date and an actor: no payload value, note text or address can ride along", () => {
     const c = lastOf([change({ type: "note", actor: "someone@firm.example", source: "x@y.co" })])!;
-    expect(Object.keys(c).sort()).toEqual(["actor", "date"]);
+    expect(Object.keys(c).sort()).toEqual(["actor", "at", "date"]);
     expect(JSON.stringify(c)).not.toContain("@");
     expect(text(c)).not.toContain("@");
     expect(actorOf({ type: "note", actor_type: "user", actor_id: "u", actor: "someone@firm.example", source: null })).toEqual({ kind: "person", userId: "u" });
@@ -100,8 +116,33 @@ describe("picking the newest change", () => {
   });
 });
 
+describe("rows with both ids, and a matter's lead (item 4)", () => {
+  it("a row carrying both lead_id and matter_id counts under both", () => {
+    const m = pickLastChanges([change({ type: "stage_changed", lead_id: LEAD })], TZ, NOW);
+    expect([...m.keys()].sort()).toEqual([`lead:${LEAD}`, `matter:${MATTER}`].sort());
+  });
+
+  it("a matter also takes changes filed on its lead; the newer wins; a lead-less matter is unchanged", () => {
+    const m = pickLastChanges([
+      change({ type: "note", matter_id: MATTER, created_at: "2026-11-10T15:00:00Z" }),
+      change({ type: "note", matter_id: null, lead_id: LEAD, created_at: "2026-11-14T15:00:00Z" }),
+    ], TZ, NOW);
+    expect(lastChangeFor(m, "matter", MATTER, LEAD)!.date).toBe("2026-11-14");
+    expect(lastChangeFor(m, "matter", MATTER, null)!.date).toBe("2026-11-10");
+    expect(lastChangeFor(m, "matter", "other", LEAD)!.date).toBe("2026-11-14");
+    expect(lastChangeFor(m, "lead", LEAD)!.date).toBe("2026-11-14");
+    expect(lastChangeFor(new Map(), "matter", MATTER, LEAD)).toBeNull();
+  });
+});
+
+describe("the 12-month window (item 3)", () => {
+  it("starts twelve months before now", () => {
+    expect(changeWindowStart(NOW)).toBe("2025-11-17T15:00:00.000Z");
+  });
+});
+
 describe("the line on a card, a sheet row and the panel (acceptance 4)", () => {
-  const withChange = row({ key: "m-1", lastChange: { date: "2026-11-16", actor: { kind: "person", userId: "u-cait" } } });
+  const withChange = row({ key: "m-1", lastChange: { date: "2026-11-16", at: 0, actor: { kind: "person", userId: "u-cait" } } });
   const failed = row({ key: "m-2", id: "00000000-0000-4000-8000-000000000002" }); // lastChange undefined
   const params = { view: "sheet", who: "all", kind: "both", q: "", i: 1, person: null, open: null, since: "default" } as never;
 
@@ -167,7 +208,35 @@ describe("the read, three-state (acceptance 3)", () => {
     const { loadReview } = await import("../../src/lib/review/load");
     const r = await loadReview(NOW);
     expect(r.status === "ok" && r.failed).not.toContain("last change");
-    expect(r.status === "ok" && r.rows[0].lastChange).toEqual({ date: "2026-11-16", actor: { kind: "person", userId: "u-cait" } });
+    expect(r.status === "ok" && r.rows[0].lastChange).toMatchObject({ date: "2026-11-16", actor: { kind: "person", userId: "u-cait" } });
+  });
+
+  it("only the last 12 months are asked for: an older row is not read, and the record reads 'No changes in the last year'", async () => {
+    const world = makeWorld({ tables: seedTables({ crm_activity: [act({ created_at: "2025-06-01T15:00:00Z" })] }) });
+    mockAll(world);
+    const { loadReview } = await import("../../src/lib/review/load");
+    const r = await loadReview(NOW);
+    expect(r.status === "ok" && r.rows[0].lastChange).toBeNull();
+    expect(lastChangedText(null, names, "2026-11-17")).toBe("No changes in the last year");
+  });
+
+  it("a failed team-names read draws no line for a person's change, but keeps an automatic one", async () => {
+    const world = makeWorld({ tables: seedTables({ crm_activity: [act({})] }) });
+    mockAll(world);
+    vi.doMock("@/lib/members/directory", () => ({ listMemberDirectory: vi.fn(async () => { throw new Error("x"); }) }));
+    const { loadReview } = await import("../../src/lib/review/load");
+    const r = await loadReview(NOW);
+    expect(r.status === "ok" && r.failed).toContain("team names");
+    expect(r.status === "ok" && r.rows[0].lastChange).toBeUndefined();
+  });
+
+  it("a matter also shows a change filed on its lead", async () => {
+    const world = makeWorld({ tables: seedTables({ crm_activity: [act({ matter_id: null, lead_id: LEAD, created_at: "2026-11-15T15:00:00Z" })] }) });
+    mockAll(world);
+    vi.doMock("@/lib/matters", () => ({ listMatters: vi.fn(async () => [{ id: MATTER, status: "open", lead_id: LEAD, title: "Acme", owner_name: "Acme", matter_number: "TM-1", stage_id: null, type: "TM" }]) }));
+    const { loadReview } = await import("../../src/lib/review/load");
+    const r = await loadReview(NOW);
+    expect(r.status === "ok" && r.rows[0].lastChange).toMatchObject({ date: "2026-11-15" });
   });
 
   it("a failed read leaves lastChange unset on every row (no line) and names 'last change' in the note", async () => {

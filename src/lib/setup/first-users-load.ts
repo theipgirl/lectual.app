@@ -1,5 +1,4 @@
 import "server-only";
-import { getScopedClient } from "@/lib/db/scoped-client";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { listConnections } from "@/lib/mailbox/connections";
 import { loadColleagueMailboxes } from "@/lib/mailbox/colleague-connections";
@@ -11,7 +10,6 @@ import type { Reading } from "./types";
 /** The reads behind the account rows; named so a test can hand in fakes. Every one is through the caller's scoped client. */
 export type FirstUsersReaders = {
   listMembers: () => Promise<PersonIn[]>;
-  readModules: () => Promise<{ ok: true; modules: string[] } | { ok: false }>;
   listOwn: () => Promise<OwnConnection[] | null>;
   colleagues: (role: string) => Promise<ColleagueMailboxes>;
 };
@@ -30,13 +28,8 @@ async function attempt<T>(run: () => Promise<T | null>): Promise<Reading<T>> {
 export const liveFirstUsersReaders: FirstUsersReaders = {
   async listMembers() {
     const rows = await listMemberDirectory();
-    return rows.map((m) => ({ userId: m.userId, name: m.displayName || m.email || null, role: m.role }));
-  },
-  async readModules() {
-    const supabase = await getScopedClient();
-    const { data, error } = await supabase.from("crm_org").select("modules").maybeSingle();
-    if (error || !data) return { ok: false };
-    return { ok: true, modules: data.modules ?? [] };
+    // A display name only: an address is never used as a name.
+    return rows.map((m) => ({ userId: m.userId, name: m.displayName || null, role: m.role }));
   },
   async listOwn() {
     const r = await listConnections();
@@ -58,16 +51,21 @@ export const liveFirstUsersReaders: FirstUsersReaders = {
  * Team accounts for the signed-in admin tier. Mailboxes are only read when the firm has the feature (the same rule as the Outlook item:
  * off must not read connections), and the owner-only call is made for role `owner` alone. Never throws.
  */
-export async function loadFirstUsers(viewer: { id: string; role: string }, readers: FirstUsersReaders = liveFirstUsersReaders): Promise<FirstUsers> {
-  const [members, modules] = await Promise.all([attempt(() => readers.listMembers()), attempt(async () => {
-    const m = await readers.readModules();
-    return m.ok ? m.modules : null;
-  })]);
+export async function loadFirstUsers(
+  viewer: { id: string; role: string; /** Lectual staff standing inside a firm: they carry the owner claim but have no membership. */ actingAsStaff?: boolean },
+  /** The firm's module list from the session (`null` = it could not be read). */
+  firmModules: string[] | null,
+  readers: FirstUsersReaders = liveFirstUsersReaders,
+): Promise<FirstUsers> {
+  const members = await attempt(() => readers.listMembers());
+  const modules: Reading<string[]> = firmModules === null ? FAILED : { ok: true, value: firmModules };
   const mailboxOn = modules.ok && modules.value.includes("mailbox");
+  // Staff acting in a firm get no owner function call: no membership row, so an answer could only mislead. They see "Only <name> can see this".
+  const asked = !viewer.actingAsStaff;
   const [own, colleagues] = mailboxOn
     ? await Promise.all([
         attempt(() => readers.listOwn()),
-        readers.colleagues(viewer.role).catch((): ColleagueMailboxes => ({ kind: "unavailable" })),
+        asked ? readers.colleagues(viewer.role).catch((): ColleagueMailboxes => ({ kind: "unavailable" })) : Promise.resolve<ColleagueMailboxes>({ kind: "not-asked" }),
       ])
     : [FAILED as Reading<OwnConnection[]>, { kind: "not-asked" } as ColleagueMailboxes];
   return firstUsers({ viewerId: viewer.id, viewerRole: viewer.role, members, modules, own, colleagues });

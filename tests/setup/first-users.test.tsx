@@ -4,6 +4,7 @@ import { firstUsers, ownItems, type FirstUsersInput, type OwnConnection, type Pe
 import { loadFirstUsers, loadYourSetup, type FirstUsersReaders } from "@/lib/setup/first-users-load";
 import { readColleagueRows, isMissingOwnerFunction, type ColleagueMailbox, type ColleagueMailboxes } from "@/lib/mailbox/colleague-rows";
 import { TeamAccountsView, YourSetupView } from "@/components/setup/TeamAccounts";
+import { notReadyPlural } from "@/lib/ui/words";
 import { ADMIN_TIER, ALL_DONE, OTHER_ROLES, bad, ok } from "./helpers";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }), notFound: () => { throw new Error("NEXT_HTTP_ERROR_FALLBACK;404"); } }));
@@ -80,13 +81,17 @@ describe("the viewer's own row (their own scoped read)", () => {
 });
 
 describe("the Mailboxes feature gate (the checklist fails closed)", () => {
-  it("off: every item is to do, with the platform-voice sentence and a link to Features for the admin tier", () => {
+  it("off: Lectual's to switch on, never 'to do', no link to Features, in the glossary's words", () => {
     const r = firstUsers(input({ modules: ok([]) }));
     for (const p of PEOPLE) {
-      expect(rowOf(r, p.userId).items.map((i) => i.status)).toEqual(["to-do", "to-do"]);
-      expect(item(r, p.userId, "outlook").text).toBe("Mailboxes aren't switched on for your firm yet. Lectual turns them on.");
-      expect(item(r, p.userId, "outlook").href).toBe("/dashboard/settings/modules/");
+      expect(rowOf(r, p.userId).items.map((i) => i.status)).toEqual(["lectual", "lectual"]);
+      expect(item(r, p.userId, "outlook").text).toBe(notReadyPlural("Mailboxes"));
+      expect(item(r, p.userId, "outlook").href).toBeUndefined();
     }
+    const html = renderToStaticMarkup(<TeamAccountsView data={r} />).replaceAll("&#x27;", "'");
+    expect(html).toContain("Lectual sets this up");
+    expect(html).not.toContain(">To do<");
+    expect(html).not.toContain("/dashboard/settings/modules/");
   });
 
   it("an unreadable module list is couldn't check, not 'off'", () => {
@@ -136,9 +141,35 @@ describe("a colleague's mailbox: owner through 0108, everyone else 'Only <name> 
     expect(item(r, "u-c", "outlook").status).toBe("couldnt-check");
   });
 
-  it("a member with no readable first name (an address as name) gets a neutral sentence, never the address", () => {
-    const r = firstUsers(input({ viewerRole: "admin", colleagues: { kind: "not-asked" }, members: ok([{ userId: "u-x", name: "x@firm.test", role: "clerk" }]) }));
-    expect(item(r, "u-x", "outlook").text).toBe("Only they can see this");
+  it("a member with no readable first name gets a neutral sentence, and an address is never their name (item 8)", () => {
+    const r = firstUsers(input({ viewerRole: "admin", colleagues: { kind: "not-asked" }, members: ok([{ userId: "u-x", name: "x@firm.test", role: "clerk" }, { userId: "u-y", name: null, role: "clerk" }]) }));
+    expect(item(r, "u-x", "outlook").text).toBe("Only that person can see this");
+    expect(rowOf(r, "u-x").name).toBe("Teammate");
+    expect(rowOf(r, "u-y").name).toBe("Teammate");
+    expect(JSON.stringify(r)).not.toContain("x@firm.test");
+  });
+
+  it("an own connection with a status we don't know is couldn't check, not 'Only a Gmail mailbox' (item 7)", () => {
+    const r = firstUsers(input({ own: ok([own({ status: "weird" })]) }));
+    expect(rowOf(r, ME).items.map((i) => i.status)).toEqual(["couldnt-check", "couldnt-check"]);
+    expect(JSON.stringify(rowOf(r, ME))).not.toContain("Gmail");
+  });
+
+  it("an empty answer is never 'not connected': the caller's own visible connections, firm-scope too, must be in the answer (item 1c)", () => {
+    const empty = firstUsers(input({ colleagues: { kind: "ok", rows: [] }, own: ok([]) }));
+    expect(item(empty, "u-c", "outlook").status).toBe("couldnt-check");
+    // a firm-scope mailbox the caller sees but the answer lacks: not trusted
+    const missingFirm = firstUsers(input({ own: ok([own(), own({ id: "c-firm", scope: "firm", userId: null })]), colleagues: { kind: "ok", rows: [theirs(ME, { id: "c-me" })] } }));
+    expect(item(missingFirm, "u-c", "outlook").status).toBe("couldnt-check");
+    // all of them present: trusted
+    const full = firstUsers(input({ own: ok([own(), own({ id: "c-firm", scope: "firm", userId: null })]), colleagues: { kind: "ok", rows: [theirs(ME, { id: "c-me" }), { ...theirs("x"), id: "c-firm", userId: null, scope: "firm" }, theirs("u-c")] } }));
+    expect(item(full, "u-c", "outlook").status).toBe("done");
+  });
+
+  it("when the caller's own read failed, an answer cannot be checked: fail closed (item 1c)", () => {
+    const r = firstUsers(input({ own: bad }));
+    expect(item(r, "u-c", "outlook").status).toBe("couldnt-check");
+    expect(item(r, "u-r", "outlook").status).toBe("couldnt-check");
   });
 });
 
@@ -159,6 +190,7 @@ describe("what reaches the page from 0108's answer (acceptance 7)", () => {
   it("a missing function is by CODE only: 42883 and PGRST202 mean not switched on; any other error, or text alone, is unavailable", () => {
     expect(readColleagueRows(null, { code: "42883" })).toEqual({ kind: "not-switched-on" });
     expect(readColleagueRows(null, { code: "PGRST202" })).toEqual({ kind: "not-switched-on" });
+    // the proposed function RAISES mailbox_owner_only (42501) for a non-owner, staff acting without membership, or no active org
     expect(readColleagueRows(null, { code: "42501" })).toEqual({ kind: "unavailable" });
     expect(readColleagueRows(null, { message: "function does not exist" } as never)).toEqual({ kind: "unavailable" });
     expect(isMissingOwnerFunction(undefined)).toBe(false);
@@ -178,10 +210,10 @@ describe("what reaches the page from 0108's answer (acceptance 7)", () => {
 });
 
 describe("the loader", () => {
+  const MODS = ["mailbox"];
   function readers(over: Partial<FirstUsersReaders> = {}): FirstUsersReaders & { colleagues: ReturnType<typeof vi.fn> } {
     return {
       listMembers: vi.fn(async () => PEOPLE),
-      readModules: vi.fn(async () => ({ ok: true as const, modules: ["mailbox"] })),
       listOwn: vi.fn(async () => [own()]),
       colleagues: vi.fn(async (): Promise<ColleagueMailboxes> => ({ kind: "ok", rows: [theirs(ME, { id: "c-me" })] })),
       ...over,
@@ -190,33 +222,58 @@ describe("the loader", () => {
 
   it("asks the owner function for the viewer's role, and only when Mailboxes is on", async () => {
     const r = readers();
-    await loadFirstUsers({ id: ME, role: "owner" }, r);
+    await loadFirstUsers({ id: ME, role: "owner" }, MODS, r);
     expect(r.colleagues).toHaveBeenCalledWith("owner");
-    const off = readers({ readModules: vi.fn(async () => ({ ok: true as const, modules: [] })) });
-    await loadFirstUsers({ id: ME, role: "owner" }, off);
+    const off = readers();
+    await loadFirstUsers({ id: ME, role: "owner" }, [], off);
     expect(off.colleagues).not.toHaveBeenCalled();
     expect(off.listOwn).not.toHaveBeenCalled();
   });
 
-  it("never throws: a throwing member read, module read, own read or colleague call each become couldn't check", async () => {
-    const boom = vi.fn(async () => { throw new Error("SECRET-detail"); });
-    expect(await loadFirstUsers({ id: ME, role: "owner" }, readers({ listMembers: boom }))).toEqual({ status: "couldnt-check" });
-    const m = await loadFirstUsers({ id: ME, role: "owner" }, readers({ readModules: boom as never }));
-    expect(m.status === "ok" && m.rows[1].items.map((i) => i.status)).toEqual(["couldnt-check", "couldnt-check"]);
-    const o = await loadFirstUsers({ id: ME, role: "owner" }, readers({ listOwn: boom as never }));
-    expect(o.status === "ok" && o.rows[0].items[0].status).toBe("couldnt-check");
-    const c = await loadFirstUsers({ id: ME, role: "owner" }, readers({ colleagues: boom as never }));
-    expect(c.status === "ok" && c.rows[1].items[0].status).toBe("couldnt-check");
-    expect(JSON.stringify([m, o, c])).not.toContain("SECRET");
+  it("never calls the function for Lectual staff acting in a firm, and shows Only <name> can see this (item 1a)", async () => {
+    const r = readers();
+    const out = await loadFirstUsers({ id: ME, role: "owner", actingAsStaff: true }, MODS, r);
+    expect(r.colleagues).not.toHaveBeenCalled();
+    expect(out.status === "ok" && out.rows.find((x) => x.userId === "u-c")!.items.map((i) => i.status)).toEqual(["private", "private"]);
+    expect(JSON.stringify(out)).not.toMatch(/not connected|No Outlook/i);
   });
 
-  it("Your setup reads only the person's own connections, and not at all when Mailboxes is off or unreadable", async () => {
+  it("takes the module list from the session: an unreadable one is couldn't check, with no connection read", async () => {
+    const r = readers();
+    const out = await loadFirstUsers({ id: ME, role: "owner" }, null, r);
+    expect(out.status === "ok" && out.rows[1].items.map((i) => i.status)).toEqual(["couldnt-check", "couldnt-check"]);
+    expect(r.listOwn).not.toHaveBeenCalled();
+    expect(r.colleagues).not.toHaveBeenCalled();
+  });
+
+  it("a refused call (42501 from the function) is couldn't check, never not connected", async () => {
+    const refused = readers({ colleagues: async () => readColleagueRows(null, { code: "42501" }) });
+    const out = await loadFirstUsers({ id: ME, role: "owner" }, MODS, refused);
+    expect(out.status === "ok" && out.rows[1].items.map((i) => i.status)).toEqual(["couldnt-check", "couldnt-check"]);
+  });
+
+  it("the live member reader never turns an address into a name", async () => {
+    const src = (await import("node:fs")).readFileSync("src/lib/setup/first-users-load.ts", "utf8");
+    expect(src).not.toMatch(/displayName \|\| m\.email/);
+  });
+
+  it("never throws: a throwing member read, own read or colleague call each become couldn't check", async () => {
+    const boom = vi.fn(async () => { throw new Error("SECRET-detail"); });
+    expect(await loadFirstUsers({ id: ME, role: "owner" }, MODS, readers({ listMembers: boom }))).toEqual({ status: "couldnt-check" });
+    const o = await loadFirstUsers({ id: ME, role: "owner" }, MODS, readers({ listOwn: boom as never }));
+    expect(o.status === "ok" && o.rows[0].items[0].status).toBe("couldnt-check");
+    const c = await loadFirstUsers({ id: ME, role: "owner" }, MODS, readers({ colleagues: boom as never }));
+    expect(c.status === "ok" && c.rows[1].items[0].status).toBe("couldnt-check");
+    expect(JSON.stringify([o, c])).not.toContain("SECRET");
+  });
+
+  it("Your setup reads only the person's own connections; Mailboxes off is Lectual's to set up, never a permanent To do", async () => {
     const listOwn = vi.fn(async () => [own()]);
     const items = await loadYourSetup({ id: ME, role: "paralegal" }, ["mailbox"], { listOwn });
     expect(items.map((i) => i.status)).toEqual(["done", "done"]);
     const off = await loadYourSetup({ id: ME, role: "paralegal" }, [], { listOwn });
-    expect(off.map((i) => i.status)).toEqual(["to-do", "to-do"]);
-    expect(off[0].href).toBeUndefined(); // Features is the admin tier's page
+    expect(off.map((i) => i.status)).toEqual(["lectual", "lectual"]);
+    expect(off[0].href).toBeUndefined();
     const unreadable = await loadYourSetup({ id: ME, role: "paralegal" }, null, { listOwn });
     expect(unreadable.map((i) => i.status)).toEqual(["couldnt-check", "couldnt-check"]);
     expect(listOwn).toHaveBeenCalledTimes(1);
@@ -287,9 +344,9 @@ describe("the Setup page (acceptance 5)", () => {
   });
 
   it.each([...ADMIN_TIER])("%s sees Team accounts, and the loader gets the session's own id and role", async (role) => {
-    const { Page, loadFirstUsers } = await page({ kind: "ok", role, user: { id: "u-me" } }, firstUsers(input({ viewerRole: role, colleagues: { kind: "not-asked" } })));
+    const { Page, loadFirstUsers } = await page({ kind: "ok", role, user: { id: "u-me" }, actingAsStaff: true, org: { modules: ["mailbox"] } }, firstUsers(input({ viewerRole: role, colleagues: { kind: "not-asked" } })));
     const out = renderToStaticMarkup(await Page());
     expect(out).toContain('data-section="team-accounts"');
-    expect(loadFirstUsers).toHaveBeenCalledWith({ id: "u-me", role });
+    expect(loadFirstUsers).toHaveBeenCalledWith({ id: "u-me", role, actingAsStaff: true }, ["mailbox"]);
   });
 });

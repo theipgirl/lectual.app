@@ -3,13 +3,12 @@ import { firstNameOf } from "@/lib/review/last-changed";
 import type { ColleagueMailbox, ColleagueMailboxes } from "@/lib/mailbox/colleague-rows";
 import {
   TEAM_ACCOUNTS_DRAFTS,
-  TEAM_ACCOUNTS_MAILBOXES_OFF,
+  notReadyPlural,
   TEAM_ACCOUNTS_OUTLOOK,
   TEAMMATE,
   onlyCanSeeThis,
 } from "@/lib/ui/words";
-import { canSeeSetup } from "./roles";
-import { INTEGRATIONS_PATH, MODULES_PATH } from "./routes";
+import { INTEGRATIONS_PATH } from "./routes";
 import type { Reading } from "./types";
 
 /**
@@ -34,7 +33,8 @@ export type OwnConnection = {
 };
 
 export type AccountItemId = "outlook" | "drafts";
-export type AccountItemStatus = "done" | "to-do" | "couldnt-check" | "private";
+/** "lectual" = a feature only Lectual can switch on (Mailboxes off): not the firm's to do, so never "to do" and no link. */
+export type AccountItemStatus = "done" | "to-do" | "couldnt-check" | "private" | "lectual";
 export type AccountItem = { id: AccountItemId; label: string; status: AccountItemStatus; text: string; href?: string };
 export type AccountRow = { userId: string; name: string; roleLabel: string; isYou: boolean; items: AccountItem[] };
 export type FirstUsers = { status: "ok"; rows: AccountRow[] } | { status: "couldnt-check" };
@@ -71,21 +71,24 @@ function statusWords(status: string): string | null {
   }
 }
 
-function moduleGate(modules: Reading<string[]>, viewerRole: string): AccountItem[] | null {
+function moduleGate(modules: Reading<string[]>): AccountItem[] | null {
   if (!modules.ok) return pair("couldnt-check", CANT);
-  if (!modules.value.includes("mailbox")) return pair("to-do", TEAM_ACCOUNTS_MAILBOXES_OFF, canSeeSetup(viewerRole) ? MODULES_PATH : undefined);
+  if (!modules.value.includes("mailbox")) return pair("lectual", notReadyPlural("Mailboxes"));
   return null;
 }
 
 /** The viewer's own two items, from their own scoped read of their own connections. */
 export function ownItems(args: { viewerId: string; viewerRole: string; modules: Reading<string[]>; own: Reading<OwnConnection[]> }): AccountItem[] {
-  const gate = moduleGate(args.modules, args.viewerRole);
+  const gate = moduleGate(args.modules);
   if (gate) return gate;
   if (!args.own.ok) return pair("couldnt-check", CANT);
   const mine = args.own.value.filter((c) => c.scope === "personal" && c.userId === args.viewerId);
   const outlook = mine.filter((c) => c.provider === "microsoft");
   const active = outlook.find((c) => c.status === "active");
   if (!active) {
+    // A connection whose status is not one we know is never guessed at.
+    const unknown = outlook.find((c) => !statusWords(c.status));
+    if (unknown) return pair("couldnt-check", CANT);
     const broken = outlook.find((c) => statusWords(c.status));
     const text = broken
       ? `Your Outlook mailbox (${broken.email}) ${statusWords(broken.status)}.`
@@ -107,12 +110,11 @@ function colleagueItems(p: PersonIn, input: FirstUsersInput): AccountItem[] {
   if (c.kind === "not-asked" || c.kind === "not-switched-on") return hidden();
   if (c.kind === "unavailable") return pair("couldnt-check", CANT);
 
-  // A sanity check against a function that answers with nothing for the wrong reason (no active firm): the owner's own
-  // visible personal mailbox must be in the answer too. If it is not, the answer is not trusted and nothing reads "not connected".
-  if (input.own.ok) {
-    const mineIds = input.own.value.filter((x) => x.scope === "personal" && x.userId === input.viewerId).map((x) => x.id);
-    if (mineIds.length > 0 && !c.rows.some((r) => mineIds.includes(r.id))) return pair("couldnt-check", CANT);
-  }
+  // The answer is trusted only when it is checked against EVERY connection the caller can see themselves (firm-scope as well as personal):
+  // each must be in it. An empty answer, or a caller whose own read failed, cannot be checked, so nothing reads "not connected".
+  if (!input.own.ok || c.rows.length === 0) return pair("couldnt-check", CANT);
+  const answered = new Set(c.rows.map((r) => r.id));
+  if (!input.own.value.every((x) => answered.has(x.id))) return pair("couldnt-check", CANT);
 
   const theirs: ColleagueMailbox[] = c.rows.filter((r) => r.scope === "personal" && r.userId === p.userId);
   const outlook = theirs.filter((r) => r.provider === "microsoft");
@@ -124,13 +126,19 @@ function colleagueItems(p: PersonIn, input: FirstUsersInput): AccountItem[] {
   return [item("outlook", "to-do", text), item("drafts", "to-do", "Connect Outlook first.")];
 }
 
+/** A display name; an address is never used as one. */
+function safeName(name: string | null): string {
+  const n = name?.trim() ?? "";
+  return n && !n.includes("@") ? n : TEAMMATE;
+}
+
 export function firstUsers(input: FirstUsersInput): FirstUsers {
   if (!input.members.ok) return { status: "couldnt-check" };
-  const gate = moduleGate(input.modules, input.viewerRole);
+  const gate = moduleGate(input.modules);
   const rows = input.members.value.map<AccountRow>((p) => {
     const isYou = p.userId === input.viewerId;
     const items = gate ?? (isYou ? ownItems(input) : colleagueItems(p, input));
-    return { userId: p.userId, name: p.name?.trim() || TEAMMATE, roleLabel: roleLabel(p.role), isYou, items };
+    return { userId: p.userId, name: safeName(p.name), roleLabel: roleLabel(p.role), isYou, items };
   });
   return { status: "ok", rows };
 }

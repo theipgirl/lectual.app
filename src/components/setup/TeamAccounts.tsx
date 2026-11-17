@@ -3,7 +3,7 @@ import { Pill } from "@/components/ui/Pill";
 import { LoadFailedLine } from "@/components/ui/LoadFailed";
 import type { PillTone } from "@/lib/ui/tones";
 import type { AccountItem, AccountItemStatus, FirstUsers } from "@/lib/setup/first-users";
-import { TEAM_ACCOUNTS_CANT_CHECK, TEAM_ACCOUNTS_NAME, TEAM_ACCOUNTS_NO_MEMBERS, TEAM_ACCOUNTS_PRIVATE_PILL, TEAM_ACCOUNTS_SUB, TEAM_ACCOUNTS_YOU, YOUR_SETUP_LABEL } from "@/lib/ui/words";
+import { LECTUAL_SETS_UP, TEAM_ACCOUNTS_CANT_CHECK, TEAM_ACCOUNTS_NAME, TEAM_ACCOUNTS_NO_MEMBERS, TEAM_ACCOUNTS_PRIVATE_PILL, TEAM_ACCOUNTS_SUB, TEAM_ACCOUNTS_YOU, YOUR_SETUP_LABEL } from "@/lib/ui/words";
 import "./setup.css";
 
 /** Every status has its own words, so colour is never the only signal. */
@@ -12,6 +12,7 @@ export const ACCOUNT_PILL: Record<AccountItemStatus, { label: string; tone: Pill
   "to-do": { label: "To do", tone: "mute" },
   "couldnt-check": { label: "Couldn't check", tone: "warn" },
   private: { label: TEAM_ACCOUNTS_PRIVATE_PILL, tone: "mute" },
+  lectual: { label: LECTUAL_SETS_UP, tone: "mute" },
 };
 
 function ItemLine({ item }: { item: AccountItem }) {

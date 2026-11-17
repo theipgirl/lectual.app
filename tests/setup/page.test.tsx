@@ -13,7 +13,7 @@ type Session = { kind: "ok"; role: string | null } | { kind: "signed-out"; redir
 async function renderPage(session: Session, state: SetupState = ALL_DONE) {
   vi.resetModules();
   const loadSetupState = vi.fn(async () => state);
-  vi.doMock("@/lib/firm/session", () => ({ resolveFirmSession: vi.fn(async () => ({ ...session, user: { id: "u-viewer" } })) }));
+  vi.doMock("@/lib/firm/session", () => ({ resolveFirmSession: vi.fn(async () => ({ ...session, user: { id: "u-viewer" }, org: { modules: ["mailbox"] } })) }));
   vi.doMock("@/lib/setup/load", () => ({ loadSetupState }));
   vi.doMock("@/lib/setup/first-users-load", () => ({ loadFirstUsers: vi.fn(async () => ({ status: "ok", rows: [] })) }));
   const { default: Page } = await import("../../src/app/dashboard/settings/setup/page");

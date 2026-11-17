@@ -16,7 +16,7 @@ import type { ReviewRow } from "./buckets";
 import { CONTACT_TYPES } from "./contact";
 import { firmSendersFrom, NO_FIRM_SENDERS, type FirmSenders } from "@/lib/mailbox/firm-sender";
 import { proposalExpiryTag, type ProposalExpiryIn } from "./proposal-expiry";
-import { CHANGE_SELECT, CHANGE_TYPES, pickLastChanges, type ChangeRowIn } from "./last-changed";
+import { CHANGE_SELECT, CHANGE_TYPES, changeWindowStart, lastChangeFor, pickLastChanges, withoutPeople, type ChangeRowIn } from "./last-changed";
 import { closeStagesOf, type CloseStage } from "./close-stage";
 import { OPTIONAL_SOURCES, type CriticalSource, type OptionalSource } from "./notes";
 
@@ -162,13 +162,14 @@ export async function readProposalExpiries(db: ScopedClient, matterIds: readonly
  * The change rows of the given records (type, actor, date, and the two stamp fields only), newest first, paged and chunked like
  * the other reads. A read that cannot finish (an error, or the page budget) rejects: the caller then draws NO line, never "not changed".
  */
-export async function readChangeRows(db: ScopedClient, matterIds: readonly string[], leadIds: readonly string[]): Promise<ChangeRowIn[]> {
+export async function readChangeRows(db: ScopedClient, matterIds: readonly string[], leadIds: readonly string[], now: Date = new Date()): Promise<ChangeRowIn[]> {
+  const since = changeWindowStart(now);
   type Raw = ChangeRowIn;
   const types = [...CHANGE_TYPES] as unknown as ActivityType[];
   const page = (column: "matter_id" | "lead_id", chunk: string[]) =>
     readAllPages<Raw>(
       (from, to) =>
-        db.from("crm_activity").select(CHANGE_SELECT).in("type", types).in(column, chunk).order("created_at", { ascending: false }).order("id").range(from, to) as unknown as PromiseLike<{ data: Raw[] | null; error: unknown }>,
+        db.from("crm_activity").select(CHANGE_SELECT).in("type", types).gte("created_at", since).in(column, chunk).order("created_at", { ascending: false }).order("id").range(from, to) as unknown as PromiseLike<{ data: Raw[] | null; error: unknown }>,
     );
   const [m, l] = await Promise.all([inChunks(matterIds, (c) => page("matter_id", c)), inChunks(leadIds, (c) => page("lead_id", c))]);
   return [...m, ...l];
@@ -291,7 +292,7 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
         readProposalExpiries(db, matterIds, proposalLeadIds),
         readDocumentCounts(db, matterIds, leadIds),
         readFirmSenders(db),
-        readChangeRows(db, matterIds, leadIds),
+        readChangeRows(db, matterIds, proposalLeadIds, now),
       ])
     : ([null, null, null, null, null, null, null, null] as const);
   if (dependsOnRecords && tasksS && tasksS.status === "rejected") failedCritical.push("tasks");
@@ -360,7 +361,15 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
   const counted = docCounts ? tagged.map((r) => ({ ...r, documentCount: docCounts.get(`${r.kind}:${r.id}`) ?? 0 })) : tagged;
 
   // The last change only where the read worked: a record with no change row is a real `null`; a failed read leaves it unset (no line).
-  const changed = lastChanges ? counted.map((r) => ({ ...r, lastChange: lastChanges.get(`${r.kind}:${r.id}`) ?? null })) : counted;
+  // A matter also takes the changes filed on its lead. With the member directory unreadable a person's change draws no line (never "a teammate").
+  const leadOfMatter = new Map(matters.map((m) => [m.id, m.lead_id]));
+  const namesKnown = membersS.status === "fulfilled";
+  const changed = lastChanges
+    ? counted.map((r) => {
+        const c = lastChangeFor(lastChanges, r.kind, r.id, r.kind === "matter" ? leadOfMatter.get(r.id) : null);
+        return { ...r, lastChange: namesKnown ? c : withoutPeople(c) };
+      })
+    : counted;
 
   return {
     status: "ok",

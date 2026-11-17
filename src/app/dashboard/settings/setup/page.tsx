@@ -26,7 +26,7 @@ export default async function SetupPage() {
   const session = await resolveFirmSession({ signInNext: SETUP_PATH });
   if (session.kind !== "ok" || !canSeeSetup(session.role)) notFound();
 
-  const [state, accounts] = await Promise.all([loadSetupState(), loadFirstUsers({ id: session.user.id, role: session.role })]);
+  const [state, accounts] = await Promise.all([loadSetupState(), loadFirstUsers({ id: session.user.id, role: session.role, actingAsStaff: session.actingAsStaff }, session.org.modules)]);
   const checklist = setupChecklist(state);
 
   return (

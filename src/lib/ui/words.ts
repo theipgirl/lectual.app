@@ -1175,13 +1175,15 @@ export const ADD_ANOTHER_NEXT_STEP = "Add another next step";
 export const CHANGED_BY_LAWMATICS_SYNC = "Lawmatics sync";
 export const CHANGED_BY_AUTOMATION = "an automation";
 export const CHANGED_BY_ASSISTANT = "an assistant";
-export const CHANGED_BY_LECTUAL = "Lectual";
+export const UPDATED_AUTOMATICALLY = "Updated automatically";
+export const CAME_IN_THROUGH_A_FORM = "Came in through a form";
+export const OPENED_WHEN_CLIENT_SIGNED = "Opened when the client signed";
 /** The Stage Keeper is never named to a firm (the glossary bans it): its move reads as an automatic one. */
 export const changedAutomaticallyLine = (when: string) => `Changed automatically · ${when}`;
 /** The weekly review's quiet "last changed" line. A date is "Nov 16". */
 export const changedByLine = (who: string, when: string) => `Changed by ${who} · ${when}`;
 export const NOT_CHANGED_SINCE_IMPORT = "Not changed since import";
-export const NO_CHANGES_RECORDED = "No changes recorded";
+export const NO_CHANGES_LAST_YEAR = "No changes in the last year";
 export const LAST_CHANGED_LABEL = "Last changed";
 
 /** Settings → Setup → Team accounts. */
@@ -1192,9 +1194,8 @@ export const TEAM_ACCOUNTS_OUTLOOK = "Outlook connected";
 export const TEAM_ACCOUNTS_DRAFTS = "Can receive drafts";
 export const TEAM_ACCOUNTS_YOU = "You";
 /** A colleague's personal mailbox is hidden by the database from everyone but them (and, through Lectual's owner view, the owner). */
-export const onlyCanSeeThis = (first: string | null) => `Only ${first ?? "they"} can see this`;
+export const onlyCanSeeThis = (first: string | null) => `Only ${first ?? "that person"} can see this`;
 export const TEAM_ACCOUNTS_PRIVATE_PILL = "Private";
-export const TEAM_ACCOUNTS_MAILBOXES_OFF = "Mailboxes aren't switched on for your firm yet. Lectual turns them on.";
 export const TEAM_ACCOUNTS_NO_MEMBERS = "No team members were found.";
 
 /** The one line on Getting started that shows a person their own Outlook state. */
