@@ -23,6 +23,7 @@ import { L, M, tables } from "../mono-data";
 import { NOW, OWNER_ID, ORG, pending, proposals, resetState, review, session } from "../fixtures";
 import type { FirmSession } from "@/lib/firm/session";
 import type { ReviewRow } from "@/lib/review/buckets";
+import type { ReviewLoad } from "@/lib/review/load";
 import { state } from "../state";
 import { OwnerShell } from "../shell";
 import { TechShell } from "../mono-shell";
@@ -83,8 +84,11 @@ async function withExtra<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
+/** The sample review load is always "ok"; narrowed here so its rows can be read. */
+const okReview = review as Extract<ReviewLoad, { status: "ok" }>;
+
 /** A review row whose id is a real (fixture) matter id, so ?open= parses and the real detail loader can read it. */
-const openRow = { ...review.rows[1], id: M.lumen, key: `matter:${M.lumen}`, client: "Sam Lee", mark: "LUMEN TEA" } as ReviewRow;
+const openRow = { ...okReview.rows[1], id: M.lumen, key: `matter:${M.lumen}`, client: "Sam Lee", mark: "LUMEN TEA" } as ReviewRow;
 
 const reuse = (list: Screen[], id: string): Pick<Page, "render" | "prepare"> => {
   const s = list.find((x) => x.id === id)!;
@@ -111,7 +115,7 @@ const pages: Page[] = [
     key: "review-panel",
     pathname: "/dashboard/review/",
     prepare: () => {
-      state.review = { ...review, rows: [...review.rows, openRow] };
+      state.review = { ...okReview, rows: [...okReview.rows, openRow] };
       (state as { reviewDetailReal?: boolean }).reviewDetailReal = true;
     },
     render: () => a(ReviewPage({ searchParams: sp({ open: `matter:${M.lumen}` }) })),
@@ -129,7 +133,7 @@ const pages: Page[] = [
   { key: "calendar-week", pathname: "/dashboard/calendar/", render: () => a(CalendarPage({ searchParams: sp({ view: "week", d: "2026-11-10" }) })) },
   { key: "documents", pathname: "/dashboard/documents/", render: () => a(DocumentsPage({ searchParams: sp() })) },
   { key: "notifications", pathname: "/dashboard/notifications/", render: () => a(NotificationsPage({ searchParams: sp() } as never)) },
-  { key: "assistants", pathname: "/dashboard/agents/", render: () => a(AgentsPage({ searchParams: sp() } as never)) },
+  { key: "assistants", pathname: "/dashboard/agents/", render: () => a(AgentsPage()) },
   { key: "reports", pathname: "/dashboard/reports/", render: () => a(ReportsIndexPage()) },
   { key: "report-intake", pathname: "/dashboard/reports/intake/", render: () => a(ReportPage({ params: Promise.resolve({ key: "intake" }), searchParams: sp() } as never)) },
   { key: "settings-integrations", pathname: "/dashboard/settings/integrations/", render: async () => a(SettingsLayout({ children: await IntegrationsPage({ searchParams: sp() } as never) })) },

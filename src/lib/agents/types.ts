@@ -57,7 +57,7 @@ export const AGENT_DEFS: Record<AgentId, { name: string; reads: string; descript
     name: "Consult prep",
     reads: "Outlook consults and the lead record",
     description:
-      `For each consult in the next 24 hours that is linked to a lead, drafts an internal heads-up with the facts on file and, for firms with the ${SHORTCUTS_NAME}, a short client email about what to have ready. It never picks classes, a package or a price: that stays with the attorney. It only drafts: an attorney reviews and sends everything.`,
+      `For each consult in the next 24 hours that is linked to a lead, drafts an internal heads-up with the facts on file and, for firms with ${SHORTCUTS_NAME} switched on, a short client email about what to have ready. It never picks classes, a package or a price: that stays with the attorney. It only drafts: an attorney reviews and sends everything.`,
     defaultAutonomy: "draft",
   },
   "inbox-summary": {

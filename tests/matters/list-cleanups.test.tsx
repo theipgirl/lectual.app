@@ -35,6 +35,9 @@ describe("pure helpers", () => {
     expect(stageDisplayName("5b. Waiting on Client Specimen")).toBe("Waiting on Client Specimen");
     expect(stageDisplayName("oa. 4. Office Action Response")).toBe("Office Action Response");
     expect(stageDisplayName("1. Signed LOE / Deposit Received")).toBe("Signed LOE / Deposit Received");
+    // A number code with no space after it is still a code, as before; a word ending in a dot with no space is not.
+    expect(stageDisplayName("3.Filed")).toBe("Filed");
+    expect(stageDisplayName("Pre.filing")).toBe("Pre.filing");
   });
   it("has exactly four chips", () => {
     expect(LIST_CHIPS.map((c) => c.label)).toEqual(["Open", "Needs your review", "Unassigned", "Closed"]);
