@@ -1,9 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
+import { InlineConfirm } from "@/components/ui/InlineConfirm";
+import { Icon } from "@/components/ui/Icon";
+import { Notice } from "@/components/ui/Notice";
+import { Pill } from "@/components/ui/Pill";
+import { yesVerb } from "@/lib/ui/words";
 import { resetHubProgressAction, pickHubRecordsAction, type HubRecordPicks } from "@/lib/onboarding/hub-actions";
-import { mergeLocalDone, overallCount, recommendedFlow, stepReset, trackCounts, type HubFlow, type HubTrack, type RecordPick, type ResetState } from "@/lib/onboarding/hub";
+import { mergeLocalDone, overallCount, recommendedFlow, trackCounts, type HubFlow, type HubTrack, type RecordPick } from "@/lib/onboarding/hub";
 import {
   HUB_LOCAL_DONE_KEY,
   HUB_START_EVENT,
@@ -68,13 +73,7 @@ export function FlowList({ tracks, doneIds, picks, modulesUnreadable }: Props) {
   // Finished flows whose save failed earlier in this session still count here.
   const localRaw = useSyncExternalStore(subscribeLocal, localSnapshot, serverSnapshot);
   const [cleared, setCleared] = useState(false);
-  const [reset, setReset] = useState<ResetState>("idle");
   const [starting, setStarting] = useState<string | null>(null);
-  const confirmRef = useRef<HTMLButtonElement | null>(null);
-
-  useEffect(() => {
-    if (reset === "confirming") confirmRef.current?.focus();
-  }, [reset]);
 
   const local = readLocalDone({ getItem: () => localRaw, setItem: () => undefined, removeItem: () => undefined });
   const done = mergeLocalDone(cleared ? [] : doneIds, local);
@@ -99,10 +98,7 @@ export function FlowList({ tracks, doneIds, picks, modulesUnreadable }: Props) {
     setStarting(null);
   }
 
-  async function onReset(event: "ask" | "confirm" | "cancel") {
-    const next = stepReset(reset, event);
-    setReset(next.state);
-    if (!next.run) return;
+  async function runReset() {
     writeLocalDone(sessionStore(), []);
     window.dispatchEvent(new Event(LOCAL_EVENT));
     setCleared(true);
@@ -117,25 +113,25 @@ export function FlowList({ tracks, doneIds, picks, modulesUnreadable }: Props) {
   return (
     <div className="gs-root">
       {modulesUnreadable && (
-        <p className="lx-banner lx-banner-warn" role="status" style={{ margin: 0 }}>
+        <Notice tone="warn" role="status">
           Some guides couldn&apos;t be checked, so they are hidden for now. Reload the page to try again.
-        </p>
+        </Notice>
       )}
-      <p className="lx-sub" style={{ margin: 0 }}>
+      <p className="lx-sub">
         {`${total.done} of ${total.total} guides done`}
       </p>
       {tracks.map((track, i) => (
         <section key={track.id} className="lx-card gs-track" aria-labelledby={`gs-${track.id}`}>
           <header className="gs-track-head">
             <div>
-              <h2 id={`gs-${track.id}`} className="lx-h2 gs-track-title">
+              <h2 id={`gs-${track.id}`} className="lx-h2">
                 {track.title}
               </h2>
-              <p className="lx-note" style={{ margin: 0 }}>
+              <p className="lx-note">
                 {track.summary}
               </p>
             </div>
-            <span className="lx-pill lx-pill-mute">{`${counts[i].done} of ${counts[i].total} done`}</span>
+            <Pill tone="mute" num>{`${counts[i].done} of ${counts[i].total} done`}</Pill>
           </header>
           <ul className="gs-flows">
             {track.flows.map((flow) => {
@@ -145,13 +141,13 @@ export function FlowList({ tracks, doneIds, picks, modulesUnreadable }: Props) {
               return (
                 <li key={flow.id} className="gs-flow">
                   <span className={`gs-check${finished ? " is-done" : ""}`} aria-hidden="true">
-                    {finished ? "✓" : ""}
+                    {finished ? <Icon name="check" size={14} /> : null}
                   </span>
                   <div className="gs-flow-main">
                     <div className="gs-flow-title">
                       {flow.title}
                       {finished && <span className="gs-sr"> (done)</span>}
-                      {isRecommended && <span className="lx-pill lx-pill-ok gs-rec">Start here</span>}
+                      {isRecommended && <span className="gs-rec"><Pill tone="ok">Start here</Pill></span>}
                     </div>
                     <div className="lx-note">{flow.summary}</div>
                     {note && <div className="lx-note gs-flow-note">{note}</div>}
@@ -172,21 +168,13 @@ export function FlowList({ tracks, doneIds, picks, modulesUnreadable }: Props) {
         </section>
       ))}
       <div className="gs-reset">
-        {reset === "idle" ? (
-          <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={() => void onReset("ask")}>
-            Reset progress
-          </button>
-        ) : (
-          <div role="group" aria-label="Confirm reset" className="gs-confirm">
-            <span className="lx-note">Clear every check and show the card on Today again?</span>
-            <button ref={confirmRef} type="button" className="lx-btn lx-btn-pri lx-btn-sm" onClick={() => void onReset("confirm")}>
-              Yes, reset
-            </button>
-            <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={() => void onReset("cancel")}>
-              Cancel
-            </button>
-          </div>
-        )}
+        <InlineConfirm
+          label="Reset progress"
+          question="Clear every check and show the card on Today again?"
+          confirmLabel={yesVerb("reset")}
+          className="lx-btn lx-btn-ghost lx-btn-sm"
+          onConfirm={() => void runReset()}
+        />
       </div>
     </div>
   );

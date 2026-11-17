@@ -6,6 +6,7 @@ import { pickHubRecordsAction } from "@/lib/onboarding/hub-actions";
 import { FlowList } from "@/components/onboarding/FlowList";
 import { SendFeedbackButton } from "@/components/feedback/SendFeedbackButton";
 import { pageTitle } from "@/lib/ui/page-title";
+import { EmptyState, PageHeader } from "@/components/ui";
 
 export const metadata: Metadata = { title: pageTitle("Getting started") };
 
@@ -28,17 +29,9 @@ export default async function GettingStartedPage() {
 
   return (
     <div>
-      <div className="lx-page-head">
-        <div>
-          <div className="lx-label">Help</div>
-          <h1 className="lx-h1">Getting started</h1>
-          <p className="lx-sub">Short guided tours of the real screens. A guide only points things out; it never changes anything for you.</p>
-        </div>
-      </div>
+      <PageHeader title="Getting started" sub={<>Short guided tours of the real screens. A guide only points things out; it never changes anything for you.</>} />
       {tracks.length === 0 ? (
-        <p className="lx-note" role="status">
-          There are no guides to show for your account yet.
-        </p>
+        <EmptyState variant="line">There are no guides to show for your account yet.</EmptyState>
       ) : (
         <FlowList tracks={tracks} doneIds={progress.done} picks={picks} modulesUnreadable={modules === null} />
       )}

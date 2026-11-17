@@ -65,7 +65,7 @@ export function TourView({ steps, index, placement, onNext, onBack, onSkip, onLi
         tabIndex={-1}
         style={popStyle}
       >
-        <div className="lx-label" style={{ fontSize: 11 }}>
+        <div className="lx-label">
           {`Step ${index + 1} of ${steps.length}`}
         </div>
         <h2 id={titleId} className="ot-title">
