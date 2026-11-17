@@ -1,6 +1,6 @@
 # Sprint 9: the lead page where Lectual does the step
 
-> **AWAITING TAYLOR'S "BUILD IT". NOT APPROVED.** This is a contract for review only. No code starts until Taylor says "build it" (`questions.md`, T10).
+> **APPROVED (Taylor, Nov 17: "build it", with two changes: keep today's activity timeline and composer exactly as they are, and put the full Documents & files card with upload on the page).** Part 1 (the engine, new files only) is being built on branch s9-engine; Part 2 (the page) waits for the design rollout.
 
 **Size:** large. **Starts:** only after "build it", the design rollout, Sprint 4 and Sprint 7 (Sprint 5 for the signed / paid states). **Schema:** none planned. **Evaluator:** quality pass; **STRICT** for the approval and permission parts (the top card's Yes, Edit and Not this, the outcome-from-recording yes, every Undo).
 
