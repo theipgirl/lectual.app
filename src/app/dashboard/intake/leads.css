@@ -71,7 +71,7 @@
 /* A stage name is never cut with an ellipsis: the pill wraps to two lines at its words. */
 .ix-stage { display: inline-block; max-width: 100%; padding: 2px 8px; border-radius: 6px; background: var(--surface2); color: var(--ink2); font-size: 13px; line-height: 1.3; white-space: normal; overflow-wrap: normal; vertical-align: middle; }
 .ix-stage-warn { background: var(--warnbg); color: var(--warn); }
-/* The stage pill and the person's own markers (Needs attorney, Needs a stage, Possible duplicate) share one wrapping line. */
+/* The stage pill and the person's own markers (Awaiting approval, Needs a stage, Possible duplicate) share one wrapping line. */
 .ix-stage-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-width: 0; }
 /* Last contact, in words, at the cell's own size. "Our turn" is the one risk colour on the row. */
 .ix-sheet .rse-tbl td.ix-touch { font-size: inherit; line-height: 1.4; color: var(--ink); }

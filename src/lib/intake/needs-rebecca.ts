@@ -1,7 +1,7 @@
 import type { LeadPendingApproval, LeadPendingApprovals } from "./pending-approvals";
 
 /**
- * Pure helpers behind the "Needs attorney" badge and filter on /intake. No
+ * Pure helpers behind the "Awaiting approval" badge and filter on /intake. No
  * server imports — see scope.ts's header for why that matters here.
  *
  * The approvals read has three states plus "not passed at all", and none of the
@@ -52,9 +52,9 @@ export function filterNeedsRebecca<T extends { lead: { id: string } }>(
   return rows.filter((row) => needing.has(row.lead.id));
 }
 
-/** "Needs attorney · 2" (role-neutral: every firm sees this, not one firm's attorney). */
+/** "Awaiting approval · 2": drafts in the approval queue for this lead (role-neutral: every firm sees this). */
 export function needsRebeccaLabel(count: number): string {
-  return `Needs attorney · ${count}`;
+  return `Awaiting approval · ${count}`;
 }
 
 /** Tooltip text: one headline per line, blank headlines named rather than dropped. */

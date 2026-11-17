@@ -6,7 +6,7 @@ import { LEADS_ASSISTANT_SUGGESTS_LTN, LEADS_ASSISTANT_SUGGESTS_LTN_TITLE } from
  * built: no new read. Two kinds, in this order:
  *   moved       the Stage Keeper placed the lead in the last 7 days and nobody has moved it since ("Moved automatically · LOE sent Oct 20");
  *   suggestion  the temperature rule suggests Long-Term Nurture (unbooked by day 10).
- * "Needs attorney" is NOT here: it is a person's to-do and sits with the stage markers. When the moves could not be read the row
+ * "Awaiting approval" is NOT here: it is a queue count and sits with the stage markers. When the moves could not be read the row
  * carries no `agentMove`, so nothing is drawn for them (the page's own note says the read failed).
  */
 export type AssistantItem = { kind: "moved" | "suggestion"; key: string; text: string; title: string };

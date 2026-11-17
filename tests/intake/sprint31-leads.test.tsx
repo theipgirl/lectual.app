@@ -107,7 +107,7 @@ describe("one note for the side reads that did not land", () => {
 
   it("leaves the chips that depend on a failed read off, exactly as before", () => {
     const html = render([lead("a", "Ana")], {}, { pendingApprovals: bad, agentMoves: bad, stageDecisions: bad });
-    expect(html).not.toContain("Needs attorney");
+    expect(html).not.toContain("Awaiting approval");
     expect(html).not.toContain('aria-label="Filter by automatic moves"');
     expect(html).not.toContain("Needs a stage decision");
   });
