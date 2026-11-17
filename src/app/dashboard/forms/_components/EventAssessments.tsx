@@ -26,26 +26,26 @@ export function EventAssessments({ read, timeZone }: { read: Awaited<ReturnType<
   if (read.status === "unconfigured") {
     return (
       <p className="ifm-help">
-        Event assessments aren&apos;t switched on for your firm yet. Lectual will turn them on.
+        Scored assessments aren&apos;t switched on for your firm yet. Lectual will turn them on.
       </p>
     );
   }
   if (read.status === "unavailable") {
     return (
       <div role="status" className="lx-banner lx-banner-warn" style={{ fontSize: 14 }}>
-        Event assessments couldn&apos;t be loaded. Refresh to try again.
+        Scored assessments couldn&apos;t be loaded. Refresh to try again.
       </div>
     );
   }
   const events = eventSummaries(read.value.rows);
   if (events.length === 0) return null;
   return (
-    <section className="ifl-root ife-section" aria-label="Event assessments">
+    <section className="ifl-root ife-section" aria-label="Scored assessments">
       <div className="ife-head">
         <h2 className="lx-h2" style={{ fontSize: 23 }}>
-          Event assessments
+          Scored assessments
         </h2>
-        <span className="ifm-help">From booth scorecards taken at events. Read-only, all time.</span>
+        <span className="ifm-help">Taken on the firm&apos;s assessment page or at an event. Read-only, all time.</span>
       </div>
       <div className="ifl-list" style={{ marginTop: 12 }}>
         {events.map((e) => (
@@ -56,7 +56,7 @@ export function EventAssessments({ read, timeZone }: { read: Awaited<ReturnType<
                   {eventDisplayName(e.code)}
                 </Link>
                 <span className="ev-name-code">{e.code}</span>
-                <span className="ifl-kind">Booth assessment</span>
+                <span className="ifl-kind">Scored assessment</span>
               </div>
             </div>
             <dl className="ifl-stats" aria-label={`${eventDisplayName(e.code)}, all time`}>
@@ -88,7 +88,7 @@ export function EventAssessments({ read, timeZone }: { read: Awaited<ReturnType<
           </article>
         ))}
       </div>
-      {read.value.capped && <p className="ifm-help">{`Numbers cover the latest ${EVENT_LIST_ROW_LIMIT.toLocaleString("en-US")} booth cards.`}</p>}
+      {read.value.capped && <p className="ifm-help">{`Numbers cover the latest ${EVENT_LIST_ROW_LIMIT.toLocaleString("en-US")} assessments.`}</p>}
     </section>
   );
 }

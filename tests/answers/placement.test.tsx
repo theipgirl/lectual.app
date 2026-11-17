@@ -163,7 +163,7 @@ describe("lead page placement (F6)", () => {
     db.fail("crm_intake_submission", "select");
     db.fail("crm_booth_scorecard", "select");
     const html = text(await leadPage(db, { status: "ok", matters: [{ id: "m-1", matterNumber: "TM-1", label: "SANKOFA", stageLabel: "3. Awaiting filing" }] }));
-    expect(html).toContain("Couldn't load answers: Intake submissions, Booth scorecards");
+    expect(html).toContain("Couldn't load answers: Intake submissions, Scored assessments");
     expect(html).not.toContain("No intake or assessment answers yet.");
     expect(html).toMatch(/<a href="\/dashboard\/matters\/m-1\/?">SANKOFA<\/a>/);
     expect(html).toContain("Timeline");
@@ -178,7 +178,7 @@ describe("lead page placement (F6)", () => {
     expect(items.map((i) => i[0])).toEqual(["submission", "booth", "submission"]);
     expect(items[0][1]).toContain("UGW 2026 booth");
     expect(items[0][1]).toContain("Didn't finish");
-    expect(items[1][1]).toContain("Booth · urban-golf-2026");
+    expect(items[1][1]).toContain("Scored assessment · urban-golf-2026");
     expect(items[1][1]).toContain("Score 72/100");
     expect(items[2][1]).toContain("Booth assessment · Assessment");
     // Full answers sit inside the expandable blocks.
@@ -240,7 +240,7 @@ describe("matter page placement (F6)", () => {
     expect(html.slice(0, html.indexOf("<aside"))).not.toContain("Intake & assessment answers");
     expect(aside).toContain("Intake questions sent to the client · Oct 12, 10:00 AM");
     expect(aside).toContain("Registered owner?");
-    expect(aside).toContain("Booth · urban-golf-2026");
+    expect(aside).toContain("Scored assessment · urban-golf-2026");
     expect(aside).toContain("UGW 2026 booth · Intake · Oct 19");
     // Only the completed request is an answer.
     expect(aside.match(/data-kind="request"/g)).toHaveLength(1);
@@ -255,7 +255,7 @@ describe("matter page placement (F6)", () => {
     expect(html).toContain('aria-label="Intake & assessment answers"');
     expect(html).toContain("Registered owner?");
     expect(html).not.toContain("Couldn't load answers");
-    expect(html).not.toContain("Booth · ");
+    expect(html).not.toContain("Scored assessment · ");
     expect(db.froms).not.toContain("crm_booth_scorecard");
     expect(db.froms).not.toContain("crm_intake_submission");
   });
@@ -275,6 +275,6 @@ describe("matter page placement (F6)", () => {
     expect(html).not.toContain("No intake or assessment answers yet.");
     expect(html).toContain("Deadlines");
     expect(html).toContain("Timeline");
-    expect(html).toContain("Booth · urban-golf-2026");
+    expect(html).toContain("Scored assessment · urban-golf-2026");
   });
 });

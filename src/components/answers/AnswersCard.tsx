@@ -22,7 +22,7 @@ export const EMPTY_LINE = "No intake or assessment answers yet.";
 
 const SOURCES = [
   { key: "submissions", name: "Intake submissions" },
-  { key: "booth", name: "Booth scorecards" },
+  { key: "booth", name: "Scored assessments" },
   { key: "requests", name: "Questions sent to the client" },
 ] as const;
 
@@ -92,14 +92,14 @@ function Item({ item, tz }: { item: AnswerItem; tz: string }) {
   const head =
     item.kind === "submission"
       ? `${item.formName} · ${item.formKind === "assessment" ? "Assessment" : "Intake"} · ${when} · ${state}`
-      : `Booth · ${item.eventCode} · ${when} · ${state}`;
+      : `Scored assessment · ${item.eventCode} · ${when} · ${state}`;
   return (
     <details className="lx-disclosure-inline" data-kind={item.kind}>
       <summary>{score ? `${head} · ${score}` : head}</summary>
       <div style={{ display: "grid", gap: 10 }}>
         {item.kind === "booth" && (
           <div className="lx-meta">
-            <span>Event · track</span>
+            <span>Assessment · track</span>
             <span>{`${item.eventCode} · ${item.track === "brand" ? "Personal brand" : item.track === "business" ? "Business" : "Track not recorded"}`}</span>
           </div>
         )}
@@ -107,7 +107,7 @@ function Item({ item, tz }: { item: AnswerItem; tz: string }) {
         {!finished && (
           <p className="lx-note" style={{ margin: 0 }}>
             {item.kind === "booth"
-              ? "They gave contact details at the booth and didn't finish the card."
+              ? "They gave contact details and didn't finish the assessment."
               : "They gave contact details and didn't send answers."}
           </p>
         )}
