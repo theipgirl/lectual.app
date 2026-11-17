@@ -33,6 +33,8 @@ import { moveTargetStages } from "@/lib/intake/board-columns";
 import { boardModel } from "@/lib/intake/board-columns";
 import { hiddenSelectedCount, movableIds, selectShown, selectionKey } from "@/lib/intake/selection";
 import type { IntakeTime } from "@/lib/time";
+import { openHrefFromHref } from "@/lib/record-card/open";
+import { resyncRows } from "@/lib/intake/resync";
 import type { IntakeCardData } from "@/lib/record-card/intake-cards";
 import { ListHeader } from "@/components/list-page/ListHeader";
 import { ListToolbar } from "@/components/list-page/ListToolbar";
@@ -139,9 +141,15 @@ export default function IntakeWorkspace({
   timeZone?: string;
 }) {
   const [rows, setRows] = useState(initialRows);
+  // Fresh rows from the server (a save in the opened card, router.refresh()) replace the drawn ones; the row with a write in flight keeps its optimistic version.
+  const [seenRows, setSeenRows] = useState(initialRows);
   const [filters, setFilters] = useState(initialFilters);
   const [viewState, setViewState] = useState(initialViewState);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  if (seenRows !== initialRows) {
+    setSeenRows(initialRows);
+    setRows((current) => resyncRows(current, initialRows, pendingId));
+  }
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [savedId, setSavedId] = useState<string | null>(null);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -170,6 +178,9 @@ export default function IntakeWorkspace({
     // The set the person CHOSE, not the one drawn: while the All-open fallback shows, the URL must not lock `set=open` in.
     viewState,
   );
+
+  // Open links are built from the CURRENT address, so a filter, search or page change survives opening, closing and Back.
+  const openHrefFor = (leadId: string) => openHrefFromHref("/dashboard/intake/", href, { kind: "lead", id: leadId });
 
   // The URL mirrors the state (history.replaceState, not a router push: the page re-reads a dozen things on a navigation).
   const firstRender = useRef(true);
@@ -563,6 +574,7 @@ export default function IntakeWorkspace({
             pendingLeadId={pendingId}
             errors={errors}
             cards={cards}
+            openHrefFor={openHrefFor}
             savedId={savedId}
             onSetLane={setLane}
             onSetSource={setSource}
@@ -598,6 +610,7 @@ export default function IntakeWorkspace({
           pendingLeadId={pendingId}
           errors={errors}
           cards={cards}
+          openHrefFor={openHrefFor}
           savedId={savedId}
           time={time}
           pendingApprovals={pendingApprovals}

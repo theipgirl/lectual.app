@@ -10,7 +10,7 @@ import { updateMatterHeaderAction } from "@/app/dashboard/matters/[id]/actions";
 import { assignRecordAction, completeNextStepAction, moveStageAction, setNextStepAction, snoozeNextStepAction, updateNextStepAction } from "@/app/dashboard/review/actions";
 import { SNOOZE_CHOICES, SNOOZE_LABEL } from "@/lib/review/snooze";
 import { TASK_TITLE_MAX } from "@/lib/matters/task-edit";
-import { startHold, type Hold } from "@/lib/record-card/hold";
+import { beginOnce, type Hold } from "@/lib/record-card/hold";
 import type { CardMember, CardView, StepLine } from "@/lib/record-card/model";
 import type { TemperatureControl, MenuItem, CardKind } from "@/lib/record-card/rules";
 import type { ReferralSource } from "@/lib/intake";
@@ -358,24 +358,29 @@ export function NextStepLine({ kind, id, line, dueIso, text }: { kind: CardKind;
 export function useNoShow(leadId: string, name: string) {
   const { mark, run } = useRun();
   const [held, setHeld] = useState(false);
-  const [doneLine, setDoneLine] = useState<string | null>(null);
+  const [undone, setUndone] = useState(false);
   const holdRef = useRef<Hold | null>(null);
   const noteRef = useRef<HTMLInputElement | null>(null);
+  // Leaving the page inside the hold cancels it, exactly as Undo does, and nothing is posted. There is no component left to say
+  // "Not logged." then, and the page is gone, so the person leaving is the one who knows; nothing was written.
   useEffect(() => () => void holdRef.current?.cancel(), []);
   const begin = () => {
-    setDoneLine(null);
+    // A second request while one is held is ignored: one hold, one post.
+    if (holdRef.current?.settled() === "held") return;
+    setUndone(false);
     setHeld(true);
-    holdRef.current = startHold(() => {
+    holdRef.current = beginOnce(holdRef.current, () => {
       setHeld(false);
       run(viaForm(logConsultOutcomeAction, { leadId, outcome: "no_show", note: noteRef.current?.value ?? "" }));
-      setDoneLine(RECORD_CARD_NO_SHOW_DONE);
     });
   };
   const undo = () => {
     holdRef.current?.cancel();
     setHeld(false);
-    setDoneLine(RECORD_CARD_NO_SHOW_UNDONE);
+    setUndone(true);
   };
+  // "No-show logged." only from the action's own { saved: true }; never before it answers.
+  const doneLine = undone ? RECORD_CARD_NO_SHOW_UNDONE : mark?.saved ? RECORD_CARD_NO_SHOW_DONE : null;
   const toast = held ? (
     <Toast
       action={
@@ -388,7 +393,7 @@ export function useNoShow(leadId: string, name: string) {
       <input ref={noteRef} className="lx-input rc-noshow-note" aria-label={RECORD_CARD_NO_SHOW_NOTE} placeholder={RECORD_CARD_NO_SHOW_NOTE} maxLength={500} />
     </Toast>
   ) : null;
-  return { begin, toast, mark, doneLine };
+  return { begin, toast, mark, doneLine, held };
 }
 
 /** The ⋯ menu for a board card, list row or opened card. Move to stage, Set next step, Mark no-show, Merge, Open full page. */
@@ -429,7 +434,7 @@ export function CardMenu({ card, onMovePick, stepHref }: { card: CardView; onMov
                   </div>
                 );
               if (item.id === "noShow")
-                return (
+                return noShow.held ? null : (
                   <button key="noShow" type="button" className="lp-pop-item" onClick={() => { close(); noShow.begin(); }}>
                     <span className="lp-pop-text">{item.label}</span>
                   </button>
@@ -444,8 +449,8 @@ export function CardMenu({ card, onMovePick, stepHref }: { card: CardView; onMov
           </div>
         )}
       </Popover>
-      <SavedMarkView mark={mark ?? noShow.mark} />
-      {noShow.doneLine && !noShow.mark && <span className="lx-saved" role="status">{noShow.doneLine}</span>}
+      <SavedMarkView mark={mark ?? (noShow.mark?.error ? noShow.mark : null)} />
+      {noShow.doneLine && !noShow.mark?.error && <span className="lx-saved" role="status">{noShow.doneLine}</span>}
       {noShow.toast}
     </span>
   );

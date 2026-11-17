@@ -31,6 +31,7 @@ export default function IntakeBoard({
   pendingLeadId,
   errors,
   cards,
+  openHrefFor,
   savedId,
   onSetLane,
   onSetSource,
@@ -58,6 +59,7 @@ export default function IntakeBoard({
   pendingLeadId: string | null;
   errors: Record<string, string>;
   cards?: Record<string, IntakeCardData>;
+  openHrefFor?: (leadId: string) => string;
   savedId?: string | null;
   onSetLane?: (leadId: string, lane: Lane | null) => void;
   onSetSource?: (leadId: string, source: ReferralSource | null) => void;
@@ -141,6 +143,7 @@ export default function IntakeBoard({
                 pending={pendingLeadId === row.lead.id}
                 error={errors[row.lead.id] || undefined}
                 card={cards?.[row.lead.id]}
+                openHref={openHrefFor?.(row.lead.id)}
                 saved={savedId === row.lead.id}
                 onSetLane={onSetLane}
                 onSetSource={onSetSource}

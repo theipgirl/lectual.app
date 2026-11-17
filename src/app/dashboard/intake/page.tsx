@@ -25,6 +25,7 @@ import { loadPendingApprovalsByLead } from "@/lib/queue/lead-pending";
 import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { getFirmTimeZone } from "@/lib/org/profile";
+import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
 import { loadAgentMoves, type AgentMovesRead } from "@/lib/stage-keeper/read";
 import { loadStageDecisions, type StageDecisionsRead } from "@/lib/intake/stage-decisions-read";
 import { canReconcile } from "@/lib/reconcile/roles";
@@ -99,7 +100,7 @@ export default async function IntakePage({
 
   // The Stage Keeper's recent moves, for the chip and the "Agent moves" filter. Two states: a read
   // that failed is `unavailable`, which the workspace says out loud and never filters on.
-  const zonePromise = getFirmTimeZone().catch(() => "UTC");
+  const zonePromise = getFirmTimeZone().catch(() => DEFAULT_TIME_ZONE);
   const agentMovesPromise: Promise<AgentMovesRead> = zonePromise
     .then((tz) => loadAgentMoves(now, tz))
     .catch((): AgentMovesRead => ({ status: "unavailable" }));

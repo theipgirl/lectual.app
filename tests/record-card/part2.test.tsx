@@ -77,7 +77,7 @@ describe("Mark no-show holds for 5 seconds and posts nothing until then", () => 
   it("is the only path to the no-show action: it is posted from inside the hold callback, as the no_show outcome, and moves no stage", () => {
     const c = src("src/components/record-card/controls.tsx");
     const body = c.slice(c.indexOf("export function useNoShow"), c.indexOf("/** The ⋯ menu for a board card"));
-    expect(body).toMatch(/startHold\(\(\) => \{[\s\S]*logConsultOutcomeAction[\s\S]*outcome: "no_show"[\s\S]*\}\)/);
+    expect(body).toMatch(/beginOnce\(holdRef\.current, \(\) => \{[\s\S]*logConsultOutcomeAction[\s\S]*outcome: "no_show"[\s\S]*\}\)/);
     expect(body.match(/logConsultOutcomeAction/g)).toHaveLength(1);
     expect(body).not.toMatch(/moveStageAction|moveLeadStage/);
   });

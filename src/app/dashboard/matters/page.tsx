@@ -51,6 +51,7 @@ import { buildMatterCards } from "@/lib/record-card/matter-cards";
 import { parseCardOpen } from "@/lib/record-card/open";
 import { loadOpenSteps } from "@/lib/record-card/steps-read";
 import { getFirmTimeZone } from "@/lib/org/profile";
+import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
 import type { CardMember, CardRead } from "@/lib/record-card/model";
 import { leadLabel } from "@/lib/record-card/lead-label";
 import "@/components/record-card/record-card.css";
@@ -121,14 +122,14 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
   const leadOptions = leads.map((l) => ({
     id: l.id,
     // The person's name first, the company beside it (Taylor, Nov 17 call); the company stands in only with no person's name.
-    label: [leadLabel(l).name, leadLabel(l).sub, l.email].filter(Boolean).join(" · "),
+    label: [leadLabel(l).name, leadLabel(l).sub, l.email && l.email !== leadLabel(l).name ? l.email : null].filter(Boolean).join(" · "),
   }));
 
   // Sprint 10 Part 2: what each role may do on each matter, the open link and the next-step line. A matter on screen is either in
   // `shown`; its steps are one batched read, three-state (a failed one says so on the card and is never "No next step").
   const stepsRead = loadError ? ({ status: "unavailable" } as const) : await loadOpenSteps("matter", shown.map((m) => m.id));
   const memberRead: CardRead<CardMember[]> = members.length > 0 ? { status: "ok", value: members.map((m) => ({ userId: m.userId, name: (m.displayName ?? m.email ?? "").trim() || TEAMMATE })) } : { status: "unavailable" };
-  const firmZone = await getFirmTimeZone().catch(() => "America/New_York");
+  const firmZone = await getFirmTimeZone().catch(() => DEFAULT_TIME_ZONE);
   const cards = buildMatterCards({
     matters: shown,
     ctx: {
@@ -249,15 +250,15 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
               </span>
             </header>
             <SheetScroll>
-              <SheetTable fixed minWidth={900}>
+              <SheetTable fixed minWidth={800}>
                 <colgroup>
-                  <col style={{ width: "27%" }} />
-                  <col style={{ width: "9%" }} />
-                  <col style={{ width: "19%" }} />
-                  <col style={{ width: "8%" }} />
-                  <col style={{ width: "12%" }} />
                   <col style={{ width: "25%" }} />
-                  <col style={{ width: 52 }} />
+                  <col style={{ width: "10%" }} />
+                  <col style={{ width: "17%" }} />
+                  <col style={{ width: "7%" }} />
+                  <col style={{ width: "8%" }} />
+                  <col style={{ width: "28%" }} />
+                  <col style={{ width: "5%" }} />
                 </colgroup>
                 <thead>
                   <tr>
@@ -267,9 +268,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
                     <th className="num">In stage</th>
                     <th>{OWNER_COLUMN}</th>
                     <th>Next step</th>
-                    <th>
-                      <span className="lx-sr">Actions</span>
-                    </th>
+                    <th aria-label="Actions" />
                   </tr>
                 </thead>
                 <tbody>
@@ -307,7 +306,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
                         <td className="num" data-label="In stage">
                           {age.days === null ? BLANK : age.stale ? <Pill num tone="risk">{age.days}d</Pill> : `${age.days}d`}
                         </td>
-                        <td data-label={OWNER_COLUMN}>{rc.edits.owner ? <OwnerPick kind="matter" id={m.id} name={matterLabel(m)} owner={rc.owner} withName /> : m.assigned_to ? memberName.get(m.assigned_to) ?? TEAMMATE : UNASSIGNED}</td>
+                        <td data-label={OWNER_COLUMN}>{rc.edits.owner ? <OwnerPick kind="matter" id={m.id} name={matterLabel(m)} owner={rc.owner} /> : m.assigned_to ? memberName.get(m.assigned_to) ?? TEAMMATE : UNASSIGNED}</td>
                         <td data-label="Next step">
                           <NextStepLine kind="matter" id={m.id} line={rc.nextStep} dueIso={rc.dueIso} text={rc.bottom.nextStep} />
                         </td>

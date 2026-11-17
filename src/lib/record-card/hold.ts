@@ -29,3 +29,11 @@ export function startHold(
     settled: () => state,
   };
 }
+
+/**
+ * Starts a hold only when none is running: a second "Mark no-show" while one is held is ignored (it would otherwise replace the
+ * first, leaving its timer to post a second `call_logged` row). Returns the hold to keep.
+ */
+export function beginOnce(current: Hold | null, post: () => void, opts: Parameters<typeof startHold>[1] = {}): Hold {
+  return current && current.settled() === "held" ? current : startHold(post, opts);
+}

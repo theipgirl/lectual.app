@@ -57,6 +57,7 @@ export default function IntakeCard({
   timeZone,
   onCompare,
   card,
+  openHref,
   saved = false,
   onSetLane,
   onSetSource,
@@ -80,6 +81,8 @@ export default function IntakeCard({
   onCompare?: (leadId: string, otherId: string, trigger: HTMLElement) => void;
   /** Sprint 10: what this role may do on the card, and the card's open link and lines. Absent: the plain card, as before. */
   card?: IntakeCardData;
+  /** The opened-card address built on the client from the page's current address (overrides the server's, which is from the address the page loaded with). */
+  openHref?: string;
   /** The action's own `{ ok: true }` just landed: a quiet "Saved". */
   saved?: boolean;
   onSetLane?: (leadId: string, lane: Lane | null) => void;
@@ -111,7 +114,7 @@ export default function IntakeCard({
           <input type="checkbox" className="intake-select" aria-label={`Select ${name}`} checked={selected} onChange={() => onToggleSelect(lead.id)} draggable={false} />
         )}
         <span className="lx-board-card-title">
-          <Link href={card?.openHref ?? `/dashboard/leads/${lead.id}`} scroll={card ? false : undefined} data-card-open={card ? "" : undefined} aria-label={card ? recordCardOpenLabel(name) : undefined} className={`${selecting ? "" : "lx-rowlink "}ix-card-name`} title={name} data-in={touch.waitingOnUs ? "" : undefined}>
+          <Link href={openHref ?? card?.openHref ?? `/dashboard/leads/${lead.id}`} scroll={card ? false : undefined} data-card-open={card ? "" : undefined} aria-label={card ? recordCardOpenLabel(name) : undefined} className={`${selecting ? "" : "lx-rowlink "}ix-card-name`} title={name} data-in={touch.waitingOnUs ? "" : undefined}>
             {name}
           </Link>
         </span>
@@ -132,7 +135,7 @@ export default function IntakeCard({
           )}
           {card?.approvals ? (
             card.approvals.href ? (
-              <Link href={card.approvals.href} className="lx-pill lx-pill-warn lx-pill-wrap rc-attn">
+              <Link href={card.approvals.href === card.openHref && openHref ? openHref : card.approvals.href} className="lx-pill lx-pill-warn lx-pill-wrap rc-attn">
                 {card.approvals.text}
               </Link>
             ) : (
@@ -177,7 +180,7 @@ export default function IntakeCard({
         {showTimeChip(time?.byLeadId[lead.id], time?.running ?? null, lead.id, time === null) && (
           <TimeChip leadId={lead.id} leadName={name} summary={time?.byLeadId[lead.id]} unavailable={time === null} running={time?.running ?? null} members={members} compact />
         )}
-        <RowMenu card={card} lead={lead} name={name} stages={stages} members={members} running={time?.running ?? null} onMoveStage={onMoveStage} onAssign={onAssign} />
+        <RowMenu card={card} openHref={openHref} lead={lead} name={name} stages={stages} members={members} running={time?.running ?? null} onMoveStage={onMoveStage} onAssign={onAssign} />
       </div>
       <span className="lx-sr">{row.stage ? stageLabelFor(row.stage) : ""}</span>
       {error && (

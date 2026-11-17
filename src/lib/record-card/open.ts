@@ -50,3 +50,13 @@ export function closeHref(path: string, current: CurrentParams): string {
   params.delete(OPEN_PARAM);
   return withQuery(path, params);
 }
+
+/**
+ * The opened-card address built from a page's CURRENT address (`/dashboard/intake/?view=table&q=ana`), for a client component that
+ * changes its filters without a navigation. The server-built `card.openHref` is from the address the page LOADED with, so after
+ * a filter, a search or a page change it would send the person back to the old view. Every other key is kept.
+ */
+export function openHrefFromHref(path: string, currentHref: string, ref: CardRef): string {
+  const q = currentHref.indexOf("?");
+  return openHref(path, new URLSearchParams(q >= 0 ? currentHref.slice(q + 1) : ""), ref);
+}

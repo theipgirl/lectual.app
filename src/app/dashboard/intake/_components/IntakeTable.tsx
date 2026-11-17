@@ -88,6 +88,7 @@ export default function IntakeTable({
   pendingLeadId,
   errors,
   cards,
+  openHrefFor,
   savedId,
   time,
   pendingApprovals,
@@ -121,6 +122,7 @@ export default function IntakeTable({
   errors: Record<string, string>;
   /** Sprint 10: what each role may do on each row, the open link and the next-step line. Absent: the plain list, as before. */
   cards?: Record<string, IntakeCardData>;
+  openHrefFor?: (leadId: string) => string;
   savedId?: string | null;
   time: IntakeTime | null;
   pendingApprovals?: LeadPendingApprovals;
@@ -225,6 +227,7 @@ export default function IntakeTable({
               {rows.map((row) => {
                 const lead = row.lead;
                 const card = cards?.[lead.id];
+                const openHref = openHrefFor?.(lead.id) ?? card?.openHref;
                 const label = leadLabel(lead);
                 const name = label.name;
                 const business = label.sub ?? "";
@@ -242,12 +245,12 @@ export default function IntakeTable({
                       data-lead-row={lead.id}
                       onClick={(event) => {
                         if ((event.target as HTMLElement).closest("button, a, input, select")) return;
-                        router.push(card?.openHref ?? `/dashboard/leads/${lead.id}`, card ? { scroll: false } : undefined);
+                        router.push(openHref ?? `/dashboard/leads/${lead.id}`, card ? { scroll: false } : undefined);
                       }}
                       style={{ opacity: pending ? 0.55 : 1 }}
                     >
                       <td className="ix-lead-td" data-col="lead" data-primary="true">
-                        <Link href={card?.openHref ?? `/dashboard/leads/${lead.id}`} scroll={card ? false : undefined} data-card-open={card ? "" : undefined} aria-label={card ? recordCardOpenLabel(name) : undefined} className="ix-name sheet-link" title={name}>
+                        <Link href={openHref ?? `/dashboard/leads/${lead.id}`} scroll={card ? false : undefined} data-card-open={card ? "" : undefined} aria-label={card ? recordCardOpenLabel(name) : undefined} className="ix-name sheet-link" title={name}>
                           {name}
                         </Link>
                         <span className="ix-subline">
@@ -280,7 +283,7 @@ export default function IntakeTable({
                           )}
                           {card?.approvals ? (
                             card.approvals.href ? (
-                              <Link href={card.approvals.href} className="lx-pill lx-pill-warn lx-pill-wrap rc-attn">
+                              <Link href={card.approvals.href === card.openHref && openHref ? openHref : card.approvals.href} className="lx-pill lx-pill-warn lx-pill-wrap rc-attn">
                                 {card.approvals.text}
                               </Link>
                             ) : (
@@ -350,7 +353,7 @@ export default function IntakeTable({
                       </td>
 
                       <td data-col="menu" className="ix-menu-td">
-                        <RowMenu card={card} lead={lead} name={name} stages={stages} members={members} running={time?.running ?? null} onMoveStage={onMoveStage} onAssign={onAssign} />
+                        <RowMenu card={card} openHref={openHref} lead={lead} name={name} stages={stages} members={members} running={time?.running ?? null} onMoveStage={onMoveStage} onAssign={onAssign} />
                       </td>
                     </tr>
                     {error && (

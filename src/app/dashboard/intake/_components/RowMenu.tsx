@@ -32,6 +32,7 @@ export default function RowMenu({
   running,
   showMove = true,
   card,
+  openHref,
   onMoveStage,
   onAssign,
 }: {
@@ -44,6 +45,8 @@ export default function RowMenu({
   showMove?: boolean;
   /** The card's decisions for this role (Sprint 10): which items are drawn, and the extra ones. Absent: the plain menu, as before. */
   card?: IntakeCardData;
+  /** The opened-card address built on the client from the page's CURRENT address (search, paging, filters, view and grouping kept). */
+  openHref?: string;
   onMoveStage: (leadId: string, stageId: string) => void;
   onAssign: (leadId: string, userId: string | null) => void;
 }) {
@@ -94,17 +97,20 @@ export default function RowMenu({
       >
         {(close) => (
           <div className="ix-menu-scroll">
-            {extra.map((item) =>
-              item.id === "noShow" ? (
-                <button key="noShow" type="button" className="lp-pop-item" onClick={() => { close(); noShow.begin(); }}>
-                  <span className="lp-pop-text">{item.label}</span>
-                </button>
-              ) : item.id === "open" ? null : (
-                <Link key={item.id} href={item.id === "step" ? `${card!.openHref}#card-steps` : (item.href ?? card!.fullHref)} className="lp-pop-item" onClick={close} scroll={item.id !== "step"}>
+            {extra.map((item) => {
+              if (item.id === "noShow")
+                return noShow.held ? null : (
+                  <button key="noShow" type="button" className="lp-pop-item" onClick={() => { close(); noShow.begin(); }}>
+                    <span className="lp-pop-text">{item.label}</span>
+                  </button>
+                );
+              if (item.id === "open") return null;
+              return (
+                <Link key={item.id} href={item.id === "step" ? `${openHref ?? card!.openHref}#card-steps` : (item.href ?? card!.fullHref)} className="lp-pop-item" onClick={close} scroll={item.id !== "step"}>
                   <span className="lp-pop-text">{item.label}</span>
                 </Link>
-              ),
-            )}
+              );
+            })}
             {showMove && canMove && (
               <>
                 <span className="ix-menu-h lx-label">Move to stage</span>
@@ -190,7 +196,8 @@ export default function RowMenu({
           </div>
         )}
       </Popover>
-      {noShow.mark && <SavedMarkView mark={noShow.mark} />}
+      {noShow.mark?.error && <SavedMarkView mark={noShow.mark} />}
+      {noShow.doneLine && !noShow.mark?.error && <span className="lx-saved" role="status">{noShow.doneLine}</span>}
       {noShow.toast}
       {error && !dialog && (
         <span role="status" className="ix-sub ix-err-inline" title={error}>

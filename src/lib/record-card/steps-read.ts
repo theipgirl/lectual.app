@@ -16,17 +16,23 @@ export async function loadOpenSteps(kind: "lead" | "matter", ids: readonly strin
   try {
     const db = await getScopedClient();
     const column = kind === "lead" ? "lead_id" : "matter_id";
-    for (let i = 0; i < ids.length; i += CHUNK) {
-      const chunk = ids.slice(i, i + CHUNK);
-      const { data, error } = await db
-        .from("crm_task")
-        .select("id, title, due_at, assignee_id, lead_id, matter_id, created_at")
-        .eq("status", "open")
-        .in(column, chunk)
-        .order("due_at", { ascending: true, nullsFirst: false })
-        .order("created_at", { ascending: true })
-        .limit(1000);
-      // A page that hit the cap may have cut rows off: a row would then read "No next step" wrongly, so say couldn't-load.
+    const chunks: (readonly string[])[] = [];
+    for (let i = 0; i < ids.length; i += CHUNK) chunks.push(ids.slice(i, i + CHUNK));
+    // The chunks are read at once; ANY chunk failing makes the whole read unavailable.
+    const results = await Promise.all(
+      chunks.map((chunk) =>
+        db
+          .from("crm_task")
+          .select("id, title, due_at, assignee_id, lead_id, matter_id, created_at")
+          .eq("status", "open")
+          .in(column, chunk as string[])
+          .order("due_at", { ascending: true, nullsFirst: false })
+          .order("created_at", { ascending: true })
+          .limit(1000),
+      ),
+    );
+    for (const { data, error } of results) {
+      // A chunk that hit the cap may have cut rows off: a row would then read "No next step" wrongly, so say couldn't-load.
       if (error || (data ?? []).length >= 1000) return { status: "unavailable" };
       for (const t of data ?? []) {
         const owner = (kind === "lead" ? t.lead_id : t.matter_id) as string | null;

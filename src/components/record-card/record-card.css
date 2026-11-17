@@ -18,6 +18,14 @@ button.rc-temp { cursor: pointer; }
 .rc-temp[data-style="outlined"] { background: transparent; border-color: currentColor; }
 .rc-temp[data-tone="cold"][data-style="outlined"] { color: var(--muted); }
 .rc-temp[data-empty] { background: transparent; border-color: var(--line); color: var(--muted); }
+/* On a row or a board card an empty "Set" pill is invisible until hover or focus, as the Leads page always drew it. */
+.ix-row .rc-temp[data-empty], .ix-card .rc-temp[data-empty] { color: transparent; border-color: transparent; }
+.ix-row:hover .rc-temp[data-empty], .ix-card:hover .rc-temp[data-empty], .ix-row .rc-temp[data-empty]:focus-visible, .ix-card .rc-temp[data-empty]:focus-visible { color: var(--muted); border-color: var(--line); }
+/* The pill keeps its height; the 44px tap area is an invisible layer around it (coarse pointers and phones). */
+@media (pointer: coarse), (max-width: 640px) {
+  button.rc-temp { position: relative; }
+  button.rc-temp::after { content: ""; position: absolute; inset: -12px 0; }
+}
 .rc-temp-mark { font-size: var(--fs-1); font-weight: 400; opacity: 0.85; }
 .rc-pill { display: inline-block; max-width: 100%; padding: 2px 8px; border-radius: var(--r-pill); background: var(--well); color: var(--body); font: inherit; font-size: var(--fs-1); border: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rc-pill-btn { cursor: pointer; }

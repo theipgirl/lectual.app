@@ -235,26 +235,28 @@ export async function RecordCardHost({ open, path, params, duplicateOf, load: gi
             <p className="lx-note">{RECORD_CARD_CONTACT_NOTE}</p>
           </section>
           {view.facts && <FourFacts facts={view.facts} />}
-          <section className="rc-sec" aria-label={RECORD_CARD_PROPOSAL}>
-            <h3 className="lx-label">{RECORD_CARD_PROPOSAL}</h3>
-            {view.proposal === null ? null : view.proposal.status === "unavailable" ? (
-              <LoadFailedLine refresh={false}>{view.proposal.text}</LoadFailedLine>
-            ) : view.proposal.status === "none" ? (
-              <p className="lx-note">{RECORD_CARD_NO_PROPOSAL}</p>
-            ) : (
-              <>
-                {view.proposal.lines.map((l) => (
-                  <p key={l.label} className="rc-fee">
-                    <span>{l.label}</span>
-                    <span>{l.value}</span>
-                  </p>
-                ))}
-                <Link className="lx-link" href={view.proposal.href}>
-                  {RECORD_CARD_OPEN_PROPOSAL} →
-                </Link>
-              </>
-            )}
-          </section>
+          {view.proposal !== null && (
+            <section className="rc-sec" aria-label={RECORD_CARD_PROPOSAL}>
+              <h3 className="lx-label">{RECORD_CARD_PROPOSAL}</h3>
+              {view.proposal.status === "unavailable" ? (
+                <LoadFailedLine refresh={false}>{view.proposal.text}</LoadFailedLine>
+              ) : view.proposal.status === "none" ? (
+                <p className="lx-note">{RECORD_CARD_NO_PROPOSAL}</p>
+              ) : (
+                <>
+                  {view.proposal.lines.map((l) => (
+                    <p key={l.label} className="rc-fee">
+                      <span>{l.label}</span>
+                      <span>{l.value}</span>
+                    </p>
+                  ))}
+                  <Link className="lx-link" href={view.proposal.href}>
+                    {RECORD_CARD_OPEN_PROPOSAL} →
+                  </Link>
+                </>
+              )}
+            </section>
+          )}
           <Docs view={view} role={role} directory={directory} />
           <WhatLectualDid leadId={c.id} did={view.did} />
           <Link href={c.fullHref} className="lx-btn lx-btn-sec lx-btn-sm">
