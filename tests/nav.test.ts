@@ -49,9 +49,9 @@ describe("rail tree (design/Rail.dc.html)", () => {
     expect(withAll).toContain("Assistants");
   });
 
-  it("opens the parent of the current page, and a lead's page belongs to Leads", () => {
+  it("opens the parent of the current page, and a lead's page belongs to Intake", () => {
     const groups = railGroups(visibleNav([], "owner"), "/dashboard/leads/abc/");
-    const intake = groups.flat().find((e) => e.label === "Leads")!;
+    const intake = groups.flat().find((e) => e.label === "Intake")!;
     expect(intake.childActive).toBe(true);
     expect(intake.kids.find((k) => k.label === "Leads")?.active).toBe(true);
     expect(intake.active).toBe(false);
@@ -74,7 +74,7 @@ describe("rail tree (design/Rail.dc.html)", () => {
     const hrefs = Object.fromEntries(groups.flat().filter((x) => x.kids.length).map((e) => [e.label, e.href]));
     expect(hrefs).toEqual({
       Communication: "/dashboard/mail/",
-      Leads: "/dashboard/intake/",
+      Intake: "/dashboard/intake/",
       "Active matters": "/dashboard/matters/",
       "AI tools": "/dashboard/copilot/",
     });

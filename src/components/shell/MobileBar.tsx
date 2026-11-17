@@ -17,7 +17,7 @@ type Props = {
   dealReady?: string | null;
   pendingCount: number;
   counts: Partial<Record<string, number>>;
-  /** A view's own bar (default: Today, Leads, Approvals, Mail or Matters). Still filtered through `items`. */
+  /** A view's own bar (default: Today, Intake, Approvals, Mail or Matters). Still filtered through `items`. */
   bar?: MobileBarSpec;
   /** A view's own More sheet groups (default: the rail's groups plus Reports). */
   groups?: readonly MoreGroup[];
@@ -57,7 +57,7 @@ export function MoreSheet({ sections, onClose, sheetRef, note }: { sections: Mor
 }
 
 /**
- * The phone navigation (under 900px, where the rail is hidden): Leads,
+ * The phone navigation (under 900px, where the rail is hidden): Intake,
  * Approvals, Mail and Matters straight to their lists, and More for the rest.
  * What shows comes from the rail's own visibility, so a section the firm lacks
  * (Mail without the mailbox module) is never offered. The Approvals count

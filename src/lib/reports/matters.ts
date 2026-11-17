@@ -39,7 +39,7 @@ export async function loadMattersReport(period: ReportPeriod): Promise<MattersRe
       kpis: [{ ...failed, label: "Open matters" }, { ...failed, label: "Waiting on us" }, { ...failed, label: "USPTO deadlines · 30 days" }, { ...failed, label: "Registrations" }],
       waiting: [],
       links: [
-        { label: "All matters", sub: "The full worklist, grouped by client", href: "/dashboard/matters/", count: null },
+        { label: "All matters", sub: "The full worklist, grouped by client", href: "/dashboard/matters/?group=all", count: null },
         { label: "Pipeline", sub: "Every client from intake to registration", href: "/dashboard/pipeline/", count: null },
         { label: "Documents", sub: "Filings, specimens and letters", href: "/dashboard/documents/", count: null },
       ],
@@ -100,7 +100,7 @@ export async function loadMattersReport(period: ReportPeriod): Promise<MattersRe
   const waiting = [...overdueItems, ...waitingItems];
 
   const links: LinkTile[] = [
-    { label: "All matters", sub: "The full worklist, grouped by client", href: "/dashboard/matters/", count: docket.open },
+    { label: "All matters", sub: "The full worklist, grouped by client", href: "/dashboard/matters/?group=all", count: docket.open },
     { label: "Pipeline", sub: "Every client from intake to registration", href: "/dashboard/pipeline/", count: null },
     { label: "Documents", sub: "Filings, specimens and letters", href: "/dashboard/documents/", count: null },
     ...(needsReview.length > 0

@@ -480,11 +480,20 @@ export type StartOutcome = { ok: true; submissionId: string; token: string; lead
 export async function startPublicIntake(
   handle: IntakeHandle,
   start: ValidatedStart,
-  ctx: { sourceHost: string | null; startedAt: number; now: Date },
+  ctx: {
+    sourceHost: string | null;
+    startedAt: number;
+    now: Date;
+    /**
+     * A resume token the caller derived itself (the worksheet route derives it from the browser's own submission id,
+     * so a retried POST finds the same row). Must have the random token's shape; otherwise a random one is made.
+     */
+    token?: string;
+  },
 ): Promise<StartOutcome> {
   const admin = db();
   const nowIso = ctx.now.toISOString();
-  const token = randomBytes(32).toString("base64url");
+  const token = ctx.token && RESUME_TOKEN_SHAPE.test(ctx.token) ? ctx.token : randomBytes(32).toString("base64url");
   const { data: row, error } = await admin
     .from("crm_intake_submission")
     .insert({

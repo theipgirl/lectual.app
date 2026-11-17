@@ -20,8 +20,8 @@ describe("Pipeline (sprint 31)", () => {
 
   it("says in one line that it is a view-only overview and where to move a lead", async () => {
     const html = await render({});
-    expect(html).toContain("This is a view-only overview. To move a lead, open it in Leads.");
-    expect(PIPELINE_VIEW_ONLY).toBe("This is a view-only overview. To move a lead, open it in Leads.");
+    expect(html).toContain("This is a view-only overview. To move a lead, open it in Intake.");
+    expect(PIPELINE_VIEW_ONLY).toBe("This is a view-only overview. To move a lead, open it in Intake.");
     expect(html).not.toContain("lx-label");
   });
 
@@ -30,8 +30,8 @@ describe("Pipeline (sprint 31)", () => {
     const href = (column: string) => html.match(new RegExp(`data-column-link="${column}" href="([^"]+)"`))?.[1];
     expect(href("intake")).toMatch(/^\/dashboard\/intake\/?\?view=board$/);
     expect(href("consult")).toMatch(/^\/dashboard\/intake\/?\?view=board$/);
-    expect(href("engaged")).toMatch(/^\/dashboard\/matters\/?\?view=board$/);
-    expect(href("registered")).toMatch(/^\/dashboard\/matters\/?\?view=board$/);
+    expect(href("engaged")).toMatch(/^\/dashboard\/matters\/?\?group=all&amp;view=board$/);
+    expect(href("registered")).toMatch(/^\/dashboard\/matters\/?\?group=all&amp;view=board$/);
   });
 
   it("uses the shared chips for the owner row and the shared search with Clear when a term is set", async () => {

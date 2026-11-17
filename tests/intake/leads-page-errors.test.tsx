@@ -72,12 +72,12 @@ describe("the Leads page when the lead read throws", () => {
     log.mockRestore();
   });
 
-  it("is titled Leads, and the lead page's back link reads Leads", async () => {
+  it("is titled Intake, and the lead page's back link reads Intake", async () => {
     vi.doMock("@/lib/pipeline", async (original) => ({ ...(await original<typeof import("@/lib/pipeline")>()) }));
     const { metadata } = await import("@/app/dashboard/intake/page");
-    expect(String(metadata.title)).toBe("Leads · Lectual");
+    expect(String(metadata.title)).toBe("Intake · Lectual");
     const lead = fs.readFileSync(path.join(root, "src/app/dashboard/leads/[id]/page.tsx"), "utf8");
-    expect(lead).toMatch(/className="lx-back">\s*← \{LEADS_NAME\}/);
-    expect(lead).not.toContain("← Intake");
+    expect(lead).toMatch(/className="lx-back">\s*← \{INTAKE_NAME\}/);
+    expect(lead).not.toContain("← Leads");
   });
 });

@@ -43,7 +43,7 @@ describe("the Change deal times opener", () => {
     expect(await render({ view })).toContain("Change deal times");
   });
   it.each(["cards", "list", "board"])("is not drawn for a role in the technician view (%s)", async (view) => {
-    for (const role of ["attorney", "paralegal", "admin"]) {
+    for (const role of ["attorney", "paralegal", "senior_admin"]) {
       state.role = role;
       expect(await render({ view })).not.toContain("Change deal times");
     }

@@ -45,7 +45,7 @@ import {
   LEADS_LOST_CUT,
   LEADS_LOST_UNAVAILABLE,
   LEADS_MOVED_TO,
-  LEADS_NAME,
+  INTAKE_NAME,
   LEADS_NO_MATCH_IN_SET,
   LEADS_SELECT,
   LEADS_SET_EMPTY,
@@ -415,7 +415,7 @@ export default function IntakeWorkspace({
 
   return (
     <div className="lp-root">
-      <ListHeader title={LEADS_NAME} sub={leadsHeaderLine(drawn, sorted)} />
+      <ListHeader title={INTAKE_NAME} sub={leadsHeaderLine(drawn, sorted)} />
 
       <ListToolbar
         search={{

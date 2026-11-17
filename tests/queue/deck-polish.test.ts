@@ -57,3 +57,10 @@ describe("the side box states its own emptiness", () => {
     expect(readFileSync("src/components/deck/DeckSide.tsx", "utf8")).toMatch(/DECK_SIDE_NOTHING_LEFT/);
   });
 });
+
+describe("the five small moves stay on one row on a phone", () => {
+  it("keeps five columns at 14px and never wraps to three", () => {
+    expect(css).toMatch(/\.dk-moves5--5 \.dk-move \{ font-size: 14px;/);
+    expect(css).not.toMatch(/\.dk-moves5--5 \{ grid-template-columns: repeat\(3/);
+  });
+});

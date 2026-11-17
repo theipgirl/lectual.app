@@ -49,7 +49,7 @@ import { TemperatureCard } from "@/components/leads/TemperatureCard";
 import { WaitingOnRebecca } from "@/components/leads/WaitingOnRebecca";
 import { ConsultBookedView } from "@/components/calendar/ConsultBookedLine";
 import { recordPageTitle } from "@/lib/ui/page-title";
-import { AUTOMATIC_STAGE_MOVES, FIRST_READ, FROM_THEIR_EMAILS, LEADS_NAME } from "@/lib/ui/words";
+import { AUTOMATIC_STAGE_MOVES, FIRST_READ, FROM_THEIR_EMAILS, INTAKE_NAME } from "@/lib/ui/words";
 import { loadBookedConsult } from "@/lib/calendar/outlook-read";
 import { loadPendingApprovalsByLead } from "@/lib/queue/lead-pending";
 import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
@@ -179,7 +179,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   return (
     <>
       <Link href="/dashboard/intake/" className="lx-back">
-        ← {LEADS_NAME}
+        ← {INTAKE_NAME}
       </Link>
       <div className="lx-page-head">
         <div style={{ flex: 1, minWidth: 260 }}>

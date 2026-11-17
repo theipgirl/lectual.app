@@ -9,7 +9,7 @@ import { QUEUE_EDIT_ROLES } from "@/lib/queue/roles";
 import { dismissableFollowups } from "@/lib/queue/dismiss";
 import { PersonSwitch } from "@/components/queue/PersonSwitch";
 import { DismissFollowups } from "@/components/queue/DismissFollowups";
-import { STATUS_PILL, agentLabel, fmtWhen, parseQueueStatus, preview, typeLabel, type QueueStatus } from "@/components/queue/format";
+import { agentLabel, statusPill, fmtWhen, parseQueueStatus, preview, typeLabel, type QueueStatus } from "@/components/queue/format";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 import { APPROVALS_NAME, HANDED_TO_YOU_MARKER } from "@/lib/ui/words";
@@ -153,7 +153,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
                   <td data-label="Client">{item.client_name ?? "—"}</td>
                   <td data-label="From">{agentLabel(item.agent)}</td>
                   <td data-label="Status">
-                    <span className={`lx-pill ${STATUS_PILL[item.status].tone}`}>{STATUS_PILL[item.status].label}</span>
+                    <span className={`lx-pill ${statusPill(item).tone}`}>{statusPill(item).label}</span>
                   </td>
                   <td className="lx-num" data-label="Queued">{fmtWhen(item.created_at, tz)}</td>
                 </tr>

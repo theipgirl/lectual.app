@@ -52,6 +52,17 @@ const fieldSchemas = {
   // signs the render stamp. Optional: unset = sessions are not hashed (null),
   // stamps are unsigned. Never reuse another secret here.
   INTAKE_EVENT_SALT: z.string().optional(),
+  // Master-class worksheet (POST /api/worksheet/, src/lib/worksheet/). The slug of the firm's LIVE intake form the
+  // submissions are filed under (unset = the route answers "not taking submissions"); who is notified (comma-separated);
+  // the sender (an address on a domain verified on RESEND_API_KEY's account) and the attendee copy's reply-to; the
+  // pages allowed to post (comma-separated origins, default https://masterclass.rpblawfirm.com); "on" also pushes each
+  // new person to the firm's Lawmatics like any intake (default off).
+  WORKSHEET_INTAKE_SLUG: z.string().optional(),
+  WORKSHEET_NOTIFY_TO: z.string().optional(),
+  WORKSHEET_FROM: z.string().optional(),
+  WORKSHEET_REPLY_TO: z.string().optional(),
+  WORKSHEET_ALLOWED_ORIGINS: z.string().optional(),
+  WORKSHEET_LAWMATICS_SYNC: z.string().optional(),
   // LawPay (AffiniPay) partner OAuth app — docs/lawpay-setup.md. All optional:
   // unset = "Connect LawPay" is disabled with an explanation, and payments are
   // recorded manually. The firm signs in to ITS OWN LawPay account; there is

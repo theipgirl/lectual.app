@@ -7,7 +7,8 @@ import { QUEUE_EDIT_ROLES, resolveQueueRole } from "@/lib/queue/roles";
 import { QueueUnavailable } from "@/components/queue/QueueUnavailable";
 import { ReviewPanel } from "@/components/queue/ReviewPanel";
 import { getFirmTimeZone } from "@/lib/org/profile";
-import { STATUS_PILL, agentLabel, fmtWhen, isUnconfiguredError, outcomeText, typeLabel } from "@/components/queue/format";
+import { isDoneItem } from "@/lib/queue/done";
+import { agentLabel, statusPill, fmtWhen, isUnconfiguredError, outcomeText, typeLabel } from "@/components/queue/format";
 import { checkDraftStaleness, type StaleCheck } from "@/lib/queue/stale";
 import { staleWarning } from "@/components/queue/stale-warning";
 import { Markdown } from "@/components/markdown/Markdown";
@@ -98,7 +99,7 @@ export default async function QueueItemPage({
   const routeArgs = { role: editRole, userId: view.viewer?.userId, item, routing: view.routing, members: view.members ?? [] };
   const mayApprove = canApproveItem(routeArgs);
   const refusal = approvalRefusal(routeArgs);
-  const outcome = outcomeText(justResolved, send);
+  const outcome = outcomeText(justResolved, send, isDoneItem(item));
   const resolved = item.status !== "pending";
 
   // Handed to the viewer right now? Additive: read only while pending, shown only when the events were READ and the
@@ -200,8 +201,8 @@ export default async function QueueItemPage({
           </section>
         </div>
         <aside className="lx-card lx-aside lx-qi-aside">
-          <span className={`lx-pill lx-qi-status ${STATUS_PILL[item.status].tone}`} style={{ justifySelf: "start" }}>
-            {STATUS_PILL[item.status].label}
+          <span className={`lx-pill lx-qi-status ${statusPill(item).tone}`} style={{ justifySelf: "start" }}>
+            {statusPill(item).label}
           </span>
           <p className="lx-note lx-qi-owner" data-queue-owner style={{ margin: 0 }}>
             {kindLabel(classifyQueueItem(item))} · {ownerText(item, view.routing, view.members ?? [])}

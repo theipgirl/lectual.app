@@ -40,7 +40,7 @@ describe("viewFor", () => {
   it("switch on: a firm member's view is their role's alone (owner -> owner view, everyone else today's shell)", () => {
     for (const role of ROLES) {
       for (const preview of [NO_PREVIEW, AS_OWNER, { kind: "as", role: "attorney" } as ViewPref]) {
-        expect(viewFor({ role, preview, firmHasRoleViews: true, actingAsStaff: false })).toBe(role === "owner" ? "owner" : "technician");
+        expect(viewFor({ role, preview, firmHasRoleViews: true, actingAsStaff: false })).toBe(role === "owner" || role === "admin" ? "owner" : "technician");
       }
     }
   });
@@ -96,7 +96,7 @@ describe("the staff preview, kept per firm", () => {
     expect(prefAllowed("technician")).toEqual(NO_PREVIEW);
     expect(prefAllowed("as:owner")).toEqual(AS_OWNER);
     for (const raw of [undefined, "", "auto", "owner", 1, "Technician", "as:attorney", "as:boss"]) expect(prefAllowed(raw)).toBeNull();
-    expect(previewableRoles()).toEqual(["owner"]);
+    expect(previewableRoles()).toEqual(["owner", "admin"]);
   });
 
   it("who may switch: Lectual staff acting in a firm with role views; never a firm member", () => {
@@ -115,8 +115,8 @@ describe("viewMenuFor", () => {
   });
 
   it("staff get Technician view (current by default) and the live views to preview", () => {
-    expect(viewMenuFor({ preview: NO_PREVIEW, firmHasRoleViews: true, actingAsStaff: true })).toEqual({ pref: "technician", previewRoles: ["owner"] });
-    expect(viewMenuFor({ preview: AS_OWNER, firmHasRoleViews: true, actingAsStaff: true })).toEqual({ pref: "as:owner", previewRoles: ["owner"] });
+    expect(viewMenuFor({ preview: NO_PREVIEW, firmHasRoleViews: true, actingAsStaff: true })).toEqual({ pref: "technician", previewRoles: ["owner", "admin"] });
+    expect(viewMenuFor({ preview: AS_OWNER, firmHasRoleViews: true, actingAsStaff: true })).toEqual({ pref: "as:owner", previewRoles: ["owner", "admin"] });
     expect(viewMenuFor({ preview: { kind: "as", role: "attorney" }, firmHasRoleViews: true, actingAsStaff: true })?.pref).toBe("technician");
   });
 });
@@ -136,7 +136,7 @@ describe("drawnNav", () => {
     }
   });
 
-  it("owner: Today, Approvals (the deck), Weekly review, Proposals, Leads, Forms, Matters, Calendar; no Settings", () => {
+  it("owner: Today, Approvals (the deck), Weekly review, Proposals, Intake, Forms, Matters, Calendar; no Settings", () => {
     const drawn = drawnNav(visibleNav(ALL, "owner"), "owner");
     expect(drawn.map((i) => i.slug)).toEqual(["", "queue", "review", "proposals", "intake", "forms", "matters", "calendar"]);
     expect(drawn.find((i) => i.slug === "queue")?.href).toBe(DECK_PATH);
@@ -148,7 +148,7 @@ describe("drawnNav", () => {
     const groups = railGroups(drawn, "/dashboard/queue/abc/", railTreeFor("owner")!);
     expect(groups.map((g) => g.map((e) => e.label))).toEqual([["Today", "Approvals", "Weekly review", "Proposals"], ["More"]]);
     expect(groups[0][1]).toMatchObject({ href: DECK_PATH, active: true, countKey: "queue" });
-    expect(groups[1][0].kids.map((k) => k.label)).toEqual(["Leads", "Forms", "Matters", "Calendar"]);
+    expect(groups[1][0].kids.map((k) => k.label)).toEqual(["Intake", "Forms", "Matters", "Calendar"]);
     expect(groups[1][0].href).toBe("/dashboard/intake/");
   });
 
@@ -161,7 +161,7 @@ describe("drawnNav", () => {
     expect(bar.find((i) => i.slug === "queue")?.href).toBe(DECK_PATH);
     const sheet = moreSections(drawn, "/dashboard/review/", shell.moreGroups, shell.bar);
     expect(sheet.map((g) => g.label)).toEqual(["More"]);
-    expect(sheet[0].items.map((i) => i.label)).toEqual(["Leads", "Forms", "Matters", "Calendar"]);
+    expect(sheet[0].items.map((i) => i.label)).toEqual(["Intake", "Forms", "Matters", "Calendar"]);
     for (const g of sheet) for (const i of g.items) expect(i.href).not.toMatch(/reports|settings/);
   });
 

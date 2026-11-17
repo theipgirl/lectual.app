@@ -8,6 +8,8 @@ import { stageAge } from "@/lib/matters/worklist";
 import { matterCardId, reviewHref, stageDisplayName } from "@/lib/matters/list-view";
 import { MoveMenu } from "./MoveMenu";
 import { MovedCardScroller } from "./MovedCardScroller";
+import { BoardEmptyStages } from "./BoardEmptyStages";
+import { emptyStagesLabel } from "@/lib/intake/board-columns";
 
 /**
  * The docket as a board: one column per live stage (terminal stages fold into
@@ -17,6 +19,10 @@ import { MovedCardScroller } from "./MovedCardScroller";
  */
 export function MatterBoard(props: {
   stages: MatterStage[];
+  /** Every stage a card can be moved to (a phase group's board draws only its own stages). Defaults to `stages`. */
+  moveStages?: MatterStage[];
+  /** A phase group's board: stages with no matter are named in one row ("N empty stages: A, B · Show") instead of drawn. */
+  collapseEmpty?: boolean;
   matters: Matter[];
   canMove: boolean;
   reviewIds: ReadonlySet<string>;
@@ -25,7 +31,7 @@ export function MatterBoard(props: {
   ownerName: (id: string | null) => string | null;
 }) {
   const board = buildBoard(props.stages, props.matters);
-  const stageOptions = props.stages.map((s) => ({ id: s.id, label: s.label }));
+  const stageOptions = (props.moveStages ?? props.stages).map((s) => ({ id: s.id, label: s.label, phase: s.phase ?? null }));
 
   const card = (m: Matter) => {
     const age = stageAge(m);
@@ -48,7 +54,7 @@ export function MatterBoard(props: {
             ))}
           {owner && <span className="lx-note">{owner}</span>}
         </span>
-        {props.canMove && stageOptions.length > 0 && <MoveMenu matterId={m.id} stageId={m.stage_id} stages={stageOptions} />}
+        {props.canMove && stageOptions.length > 0 && <MoveMenu matterId={m.id} stageId={m.stage_id} stages={stageOptions} type={m.type} announceGroup={!!props.collapseEmpty} />}
       </li>
     );
   };
@@ -67,18 +73,54 @@ export function MatterBoard(props: {
     </section>
   );
 
-  return (
-    <div className="lx-board" role="region" aria-label="Docket board">
-      <MovedCardScroller />
-      {board.unstaged.length > 0 && column("unstaged", "Not on the docket yet", null, board.unstaged)}
-      {board.open.map((c) => column(c.stage.id, stageDisplayName(c.stage.label), null, c.matters, c.stale))}
-      {board.closedCount > 0 &&
-        column(
+  const unstaged = board.unstaged.length > 0 ? column("unstaged", "Not on the docket yet", null, board.unstaged) : null;
+  const closed =
+    board.closedCount > 0
+      ? column(
           "closed",
           "Closed",
           board.closed.map((c) => c.stage.label).join(", "),
           board.closed.flatMap((c) => c.matters),
-        )}
+        )
+      : null;
+  const openColumn = (c: (typeof board.open)[number]) => column(c.stage.id, stageDisplayName(c.stage.label), null, c.matters, c.stale);
+
+  if (props.collapseEmpty) {
+    const populated = board.open.filter((c) => c.matters.length > 0);
+    const empty = board.open.filter((c) => c.matters.length === 0);
+    const body = (
+      <>
+        <MovedCardScroller />
+        {unstaged}
+        {populated.map(openColumn)}
+        {closed}
+      </>
+    );
+    if (empty.length === 0) {
+      return (
+        <div className="lx-board" role="region" aria-label="Docket board">
+          {body}
+        </div>
+      );
+    }
+    const names = empty.map((c) => stageDisplayName(c.stage.label));
+    return (
+      <BoardEmptyStages
+        labelHidden={emptyStagesLabel(empty.length, false, names)}
+        labelShown={emptyStagesLabel(empty.length, true, names)}
+        empty={empty.map(openColumn)}
+      >
+        {body}
+      </BoardEmptyStages>
+    );
+  }
+
+  return (
+    <div className="lx-board" role="region" aria-label="Docket board">
+      <MovedCardScroller />
+      {unstaged}
+      {board.open.map(openColumn)}
+      {closed}
     </div>
   );
 }

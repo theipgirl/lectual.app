@@ -13,7 +13,8 @@ import { dismissStale, dismissableFollowups, type DismissResult } from "@/lib/qu
 import type { Role } from "@/lib/auth/roles";
 import { cardIdOf, cardNoteOf, sendCardBack } from "@/lib/queue/card-moves";
 import { SEND_BACK_NOTE_MAX } from "@/lib/queue/handed";
-import { DECK_FAILED, SEND_BACK_NOTE_TOO_LONG } from "@/lib/ui/words";
+import { isDoneNote } from "@/lib/queue/done";
+import { DECK_FAILED, REJECT_NOTE_IS_DONE_MARKER, SEND_BACK_NOTE_TOO_LONG } from "@/lib/ui/words";
 
 export type ReviewState = { error?: string };
 
@@ -26,6 +27,8 @@ export async function reviewQueueAction(_prev: ReviewState, formData: FormData):
   const id = String(formData.get("id") ?? "");
   const intent = String(formData.get("intent") ?? "");
   const body = formData.get("body");
+  // A person's own reject note may not be the Done marker (doneCardAction is the only thing that writes it).
+  if (intent === "reject" && isDoneNote(String(formData.get("note") ?? ""))) return { error: REJECT_NOTE_IS_DONE_MARKER };
   const outcome = await runQueueReview({
     id,
     intent,

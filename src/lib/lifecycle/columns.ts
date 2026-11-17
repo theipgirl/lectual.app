@@ -24,7 +24,9 @@
  *       alone.
  *
  * POST-ENGAGEMENT (matters) is read from the docket stage (crm_matter_stage).
- * The table has no phase column, so this is a documented keyword rule over
+ * crm_matter_stage now has a `phase` column (pipeline / pre_filing / post_filing / maintenance). The Matters page
+ * groups by it (src/lib/matters/phase-group.ts); THIS pipeline does not read it, so its rules below are unchanged and
+ * stay a documented keyword rule over
  * the stage's code + label, applied in board order, with a fallback:
  *   1. a closed stage (is_open = false): "regist" → registered, else closed
  *   2. an open stage matching the OFFICE-ACTION words → office
