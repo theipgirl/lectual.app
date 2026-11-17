@@ -1,3 +1,4 @@
+import { sheetDay } from "./views";
 import { LEADS_COMPARE_COULDNT_LOAD, LEADS_COMPARE_FIELDS } from "@/lib/ui/words";
 
 /**
@@ -26,23 +27,14 @@ export type CompareSide =
 
 export type CompareData = { a: CompareSide; b: CompareSide };
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const DASH = "—";
-
-/** "9 Sep 2026" (UTC, spelled out so the server and the browser agree). */
-export function createdDate(iso: string | null | undefined): string {
-  if (!iso) return DASH;
-  const at = new Date(iso);
-  if (Number.isNaN(at.getTime())) return DASH;
-  return `${at.getUTCDate()} ${MONTHS[at.getUTCMonth()]} ${at.getUTCFullYear()}`;
-}
 
 const clean = (v: string | null | undefined) => (v ?? "").trim();
 
 /** The stage read: a lead with no stage is "—"; a read that failed is "Couldn't load" (never the same as no stage). */
 export type CompareStage = { status: "ok"; name: string } | { status: "none" } | { status: "unavailable" };
 
-export function shapeCompareSide(lead: CompareLeadInput, stage: CompareStage, counts: { timeline: CountRead; tasks: CountRead; proposals: CountRead }): CompareSide {
+export function shapeCompareSide(lead: CompareLeadInput, stage: CompareStage, counts: { timeline: CountRead; tasks: CountRead; proposals: CountRead }, dates: { now: Date; timeZone?: string }): CompareSide {
   const name = `${clean(lead.first_name)} ${clean(lead.last_name)}`.trim() || clean(lead.email) || DASH;
   return {
     status: "ok",
@@ -52,7 +44,7 @@ export function shapeCompareSide(lead: CompareLeadInput, stage: CompareStage, co
     email: clean(lead.email) || DASH,
     stage: stage.status === "ok" ? stage.name : stage.status === "none" ? DASH : LEADS_COMPARE_COULDNT_LOAD,
     source: clean(lead.referral_source) || DASH,
-    created: createdDate(lead.created_at),
+    created: sheetDay(lead.created_at, dates.now, dates.timeZone) ?? DASH,
     ...counts,
   };
 }

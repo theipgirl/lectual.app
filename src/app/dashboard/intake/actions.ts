@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { assignLead, moveLeadStage } from "@/lib/pipeline";
 import { orgHasModule } from "@/lib/org/modules";
+import { getFirmTimeZone } from "@/lib/org/profile";
 import { PROPOSAL_STAFF_WRITE_ROLES } from "@/lib/proposals/types";
 import { loadCompare, type CompareResult } from "@/lib/intake/compare-load";
 import { LEADS_COMPARE_FAILED } from "@/lib/ui/words";
@@ -221,6 +222,8 @@ export async function loadCompareAction(leadId: string, otherId: string): Promis
       // Proposals are counted only for the roles that read them (the proposals roles of lectual 0089, PROPOSAL_STAFF_WRITE_ROLES) in a firm
       // that has the feature. Any other role gets no Proposals row at all, never a "0". The count is by lead_id only: a proposal filed on the
       // lead's matter but not on the lead is not counted.
+      now: new Date(),
+      timeZone: await getFirmTimeZone().catch(() => "UTC"),
       proposalsOn: async () => PROPOSAL_STAFF_WRITE_ROLES.includes(role) && (await orgHasModule("proposals")),
     });
   } catch {

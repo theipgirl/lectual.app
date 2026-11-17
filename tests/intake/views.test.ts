@@ -282,10 +282,10 @@ describe("nextStepFor", () => {
 
   it("otherwise states the reply state as a fact, never a suggestion", () => {
     const [waiting] = rowsFor([lead({ id: "a", last_inbound_at: daysBefore(2), last_outbound_at: daysBefore(6) })]);
-    expect(nextStepFor(waiting, NOW).text).toBe("Waiting on our reply since 12 Sep");
+    expect(nextStepFor(waiting, NOW).text).toBe("Waiting on our reply since Sep\u00a012");
 
     const [theirs] = rowsFor([lead({ id: "b", last_outbound_at: daysBefore(5) })]);
-    expect(nextStepFor(theirs, NOW).text).toBe("Waiting on them since 9 Sep");
+    expect(nextStepFor(theirs, NOW).text).toBe("Waiting on them since Sep\u00a09");
   });
 
   it("says nothing has happened rather than inventing a next step", () => {

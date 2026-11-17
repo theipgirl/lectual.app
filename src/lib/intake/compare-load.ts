@@ -17,6 +17,9 @@ export type CompareDeps = {
   readStageName: (stageId: string) => Promise<string | null>;
   count: (table: "crm_activity" | "crm_task" | "client_proposal", leadId: string) => Promise<number>;
   proposalsOn: () => Promise<boolean>;
+  /** The Created date is worded like the weekly review Sheet, on the firm's calendar day. */
+  now: Date;
+  timeZone: string;
 };
 
 export type CompareResult = { ok: true; data: CompareData } | { ok: false; error: string };
@@ -52,7 +55,7 @@ async function side(id: string, deps: CompareDeps, proposals: boolean): Promise<
     counted(() => deps.count("crm_task", id)),
     proposals ? counted(() => deps.count("client_proposal", id)) : Promise.resolve<CountRead>({ status: "off" }),
   ]);
-  return shapeCompareSide(lead, stage, { timeline, tasks, proposals: proposalCount });
+  return shapeCompareSide(lead, stage, { timeline, tasks, proposals: proposalCount }, { now: deps.now, timeZone: deps.timeZone });
 }
 
 export async function loadCompare(aId: string, bId: string, deps: CompareDeps): Promise<CompareResult> {

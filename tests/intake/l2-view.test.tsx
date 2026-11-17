@@ -10,7 +10,7 @@ const html = (state: Parameters<typeof CompareView>[0]["state"]) => renderToStat
 
 describe("the compare panel", () => {
   it("is a labelled modal dialog with Close, both leads side by side, a link to each and NO merge action", () => {
-    const out = html({ status: "ok", data: { a: shapeCompareSide(lead("a"), { status: "ok", name: "Follow-Up" }, counts), b: shapeCompareSide(lead("b"), { status: "ok", name: "Follow-Up" }, counts) } });
+    const out = html({ status: "ok", data: { a: shapeCompareSide(lead("a"), { status: "ok", name: "Follow-Up" }, counts, { now: new Date("2026-11-10T14:00:00Z") }), b: shapeCompareSide(lead("b"), { status: "ok", name: "Follow-Up" }, counts, { now: new Date("2026-11-10T14:00:00Z") }) } });
     expect(out).toContain('role="dialog"');
     expect(out).toContain('aria-modal="true"');
     expect(out).toContain('aria-labelledby="t1"');
@@ -25,7 +25,7 @@ describe("the compare panel", () => {
   it("loading, failed and gone are their own words, never an empty comparison", () => {
     expect(html({ status: "loading" })).toContain("Loading both leads");
     expect(html({ status: "failed", error: "Can't show these leads right now. Close this and try again." })).toContain('role="alert"');
-    expect(html({ status: "ok", data: { a: { status: "gone", id: "a" }, b: shapeCompareSide(lead("b"), { status: "ok", name: "S" }, counts) } })).toContain("This lead couldn&#x27;t be found");
+    expect(html({ status: "ok", data: { a: { status: "gone", id: "a" }, b: shapeCompareSide(lead("b"), { status: "ok", name: "S" }, counts, { now: new Date("2026-11-10T14:00:00Z") }) } })).toContain("This lead couldn&#x27;t be found");
   });
 });
 

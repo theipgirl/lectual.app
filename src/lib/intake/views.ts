@@ -213,15 +213,18 @@ export type TouchStamp = {
  * read: "replied" = they wrote last (our turn), "awaiting" = we wrote last. "unknown" means no email or call is
  * recorded, so only the date of the newest activity is known; it says that and does not guess a side.
  */
+/**
+ * Every date on the Intake list and board, in the weekly review Sheet's words ("Nov 16", `shortDate`, the year only for another year),
+ * on the firm's calendar day, with the month and day kept together on one line. Null for no date or one that doesn't parse.
+ */
+export function sheetDay(iso: string | null | undefined, now: Date, timeZone: string = DEFAULT_ZONE): string | null {
+  const civil = iso ? civilDay(iso, timeZone) : null;
+  const today = civilDay(now.toISOString(), timeZone);
+  return civil && today ? shortDate(civil, today).replace(" ", "\u00a0") : null;
+}
+
 export function touchStampFor(row: IntakeRow, opts: { now: Date; timeZone?: string }): TouchStamp {
-  const zone = opts.timeZone ?? DEFAULT_ZONE;
-  const today = civilDay(opts.now.toISOString(), zone) ?? "";
-  // The weekly review Sheet's own date words ("Nov 16", `shortDate`, the year added only for another year), in the firm's zone, with the
-  // month and day kept together on one line.
-  const day = (iso: string | null): string | null => {
-    const civil = iso ? civilDay(iso, zone) : null;
-    return civil ? shortDate(civil, today).replace(" ", "\u00a0") : null;
-  };
+  const day = (iso: string | null): string | null => sheetDay(iso, opts.now, opts.timeZone);
   const newest = day(row.lastTouchAt);
   if (!newest) return { text: LEADS_TOUCH_NO_CONTACT, waitingOnUs: false, state: "none", title: LEADS_TOUCH_NONE_TITLE };
   // "Our turn" is dated by their last email or call (last_inbound_at), "Waiting on them" by ours (last_outbound_at): a note or a stage
@@ -260,7 +263,7 @@ export type NextStep = {
  * anything a reader could mistake for legal advice. If nobody has written
  * anything and nothing has happened, it says so.
  */
-export function nextStepFor(row: IntakeRow, now: Date, opts: { notesUnavailable?: boolean } = {}): NextStep {
+export function nextStepFor(row: IntakeRow, now: Date, opts: { notesUnavailable?: boolean; timeZone?: string } = {}): NextStep {
   const waited = daysSince(row.lastTouchAt, now);
   const urgent =
     row.stale || (row.reply === "replied" && waited != null && waited >= UNANSWERED_URGENT_DAYS);
@@ -268,12 +271,14 @@ export function nextStepFor(row: IntakeRow, now: Date, opts: { notesUnavailable?
   const note = row.latestNote?.trim();
   if (note) return { text: note, urgent, muted: false };
 
-  const since = touchDate(row.lastTouchAt);
-  if (row.reply === "replied" && since) {
-    return { text: `Waiting on our reply since ${since}`, urgent, muted: false };
+  // Dated like the Last contact cell: their last email or call for "our reply", ours for "them", in the Sheet's words.
+  const inbound = sheetDay(row.lead.last_inbound_at, now, opts.timeZone);
+  const outbound = sheetDay(row.lead.last_outbound_at, now, opts.timeZone);
+  if (row.reply === "replied" && inbound) {
+    return { text: `Waiting on our reply since ${inbound}`, urgent, muted: false };
   }
-  if (row.reply === "awaiting" && since) {
-    return { text: `Waiting on them since ${since}`, urgent, muted: false };
+  if (row.reply === "awaiting" && outbound) {
+    return { text: `Waiting on them since ${outbound}`, urgent, muted: false };
   }
   // A failed notes read is never "no activity": the row says it could not look.
   return { text: opts.notesUnavailable ? LEADS_NOTE_UNAVAILABLE : LEADS_NO_ACTIVITY_YET, urgent, muted: true };

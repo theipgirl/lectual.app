@@ -204,7 +204,7 @@ export default function IntakeTable({
                 const lead = row.lead;
                 const name = `${lead.first_name} ${lead.last_name}`.trim() || lead.email;
                 const business = lead.mark_text?.trim() || lead.business_name?.trim() || "";
-                const step = nextStepFor(row, now, { notesUnavailable });
+                const step = nextStepFor(row, now, { notesUnavailable, timeZone });
                 const touch = touchStampFor(row, { now, timeZone });
                 const error = errors[lead.id];
                 const pending = pendingLeadId === lead.id;

@@ -85,8 +85,8 @@ const comparePanel = (shell: "tech" | "owner", id: string, viewport: "desktop" |
               state={{
                 status: "ok",
                 data: {
-                  a: shapeCompareSide(lead("a", "Okonkwo", "Okonkwo Textiles"), { status: "ok", name: "Follow-Up" }, { timeline: { status: "ok", count: 7 }, tasks: { status: "ok", count: 1 }, proposals: { status: "ok", count: 0 } }),
-                  b: shapeCompareSide(lead("b", "Okonkwo", "Okonkwo Textiles & Home"), { status: "ok", name: "Potential New Client" }, { timeline: { status: "ok", count: 2 }, tasks: { status: "unavailable" }, proposals: { status: "ok", count: 1 } }),
+                  a: shapeCompareSide(lead("a", "Okonkwo", "Okonkwo Textiles"), { status: "ok", name: "Follow-Up" }, { timeline: { status: "ok", count: 7 }, tasks: { status: "ok", count: 1 }, proposals: { status: "ok", count: 0 } }, { now: new Date("2026-11-10T14:00:00Z"), timeZone: "America/New_York" }),
+                  b: shapeCompareSide(lead("b", "Okonkwo", "Okonkwo Textiles & Home"), { status: "ok", name: "Potential New Client" }, { timeline: { status: "ok", count: 2 }, tasks: { status: "unavailable" }, proposals: { status: "ok", count: 1 } }, { now: new Date("2026-11-10T14:00:00Z"), timeZone: "America/New_York" }),
                 },
               }}
             />

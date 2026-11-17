@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { assistantColumnShown, assistantItems } from "@/lib/intake/assistant-column";
 import { COL_ORDER, DEFAULT_COL_WIDTHS, MAX_COL, MENU_COL_WIDTH, MIN_COL, NEXT_MIN_WIDTH, clampWidth, colWidth, parseColSizes, resizedWidth, tableMinWidth, visibleColumns, withoutCol } from "@/lib/intake/col-widths";
-import { compareRows, countText, createdDate, shapeCompareSide, type CountRead } from "@/lib/intake/compare";
+import { compareRows, countText, shapeCompareSide, type CountRead } from "@/lib/intake/compare";
 import { loadCompare, type CompareDeps, type CompareLeadRow } from "@/lib/intake/compare-load";
 import { temperaturePill } from "@/lib/intake/temperature-pill";
 import type { IntakeRow } from "@/lib/intake/rows";
@@ -69,19 +69,20 @@ const ok = (count: number): CountRead => ({ status: "ok", count });
 
 describe("compare panel data", () => {
   it("shapes a side with dashes for blanks and the mark before the business", () => {
-    const side = shapeCompareSide(lead("a", { mark_text: "OKO", business_name: "Okonkwo Textiles", referral_source: null }), { status: "ok", name: "Follow-Up" }, { timeline: ok(4), tasks: ok(0), proposals: ok(1) });
-    expect(side).toMatchObject({ status: "ok", name: "Dominique Okonkwo", business: "OKO", stage: "Follow-Up", source: "—", created: "3 Sep 2026" });
-    expect(createdDate("nope")).toBe("—");
+    const side = shapeCompareSide(lead("a", { mark_text: "OKO", business_name: "Okonkwo Textiles", referral_source: null }), { status: "ok", name: "Follow-Up" }, { timeline: ok(4), tasks: ok(0), proposals: ok(1) }, { now: new Date("2026-11-10T14:00:00Z"), timeZone: "America/New_York" });
+    expect(side).toMatchObject({ status: "ok", name: "Dominique Okonkwo", business: "OKO", stage: "Follow-Up", source: "—", created: "Sep\u00a03" });
+    const odd = shapeCompareSide(lead("a", { created_at: "nope" }), { status: "none" }, { timeline: ok(0), tasks: ok(0), proposals: { status: "off" } }, { now: new Date("2026-11-10T14:00:00Z"), timeZone: "America/New_York" });
+    expect(odd.status === "ok" && odd.created).toBe("—");
   });
   it("a lead with no stage is a dash; a failed stage read says it couldn't load", () => {
-    const none = shapeCompareSide(lead("a", { current_stage_id: null }), { status: "none" }, { timeline: ok(0), tasks: ok(0), proposals: { status: "off" } });
-    const failed = shapeCompareSide(lead("a"), { status: "unavailable" }, { timeline: ok(0), tasks: ok(0), proposals: { status: "off" } });
+    const none = shapeCompareSide(lead("a", { current_stage_id: null }), { status: "none" }, { timeline: ok(0), tasks: ok(0), proposals: { status: "off" } }, { now: new Date("2026-11-10T14:00:00Z"), timeZone: "America/New_York" });
+    const failed = shapeCompareSide(lead("a"), { status: "unavailable" }, { timeline: ok(0), tasks: ok(0), proposals: { status: "off" } }, { now: new Date("2026-11-10T14:00:00Z"), timeZone: "America/New_York" });
     expect(none.status === "ok" && none.stage).toBe("—");
     expect(failed.status === "ok" && failed.stage).toBe("Couldn't load");
   });
   it("a failed count says it couldn't load, never 0; proposals are left out for a firm without them", () => {
-    const a = shapeCompareSide(lead("a"), { status: "ok", name: "S" }, { timeline: { status: "unavailable" }, tasks: ok(0), proposals: { status: "off" } });
-    const b = shapeCompareSide(lead("b"), { status: "unavailable" }, { timeline: ok(2), tasks: ok(1), proposals: { status: "off" } });
+    const a = shapeCompareSide(lead("a"), { status: "ok", name: "S" }, { timeline: { status: "unavailable" }, tasks: ok(0), proposals: { status: "off" } }, { now: new Date("2026-11-10T14:00:00Z"), timeZone: "America/New_York" });
+    const b = shapeCompareSide(lead("b"), { status: "unavailable" }, { timeline: ok(2), tasks: ok(1), proposals: { status: "off" } }, { now: new Date("2026-11-10T14:00:00Z"), timeZone: "America/New_York" });
     if (a.status !== "ok" || b.status !== "ok") throw new Error("shape");
     expect(countText({ status: "unavailable" })).toBe("Couldn't load");
     const rows = compareRows(a, b);
@@ -100,6 +101,8 @@ function deps(over: Partial<CompareDeps> = {}): CompareDeps {
   return {
     readLead: async (id) => lead(id),
     readStageName: async () => "Follow-Up",
+    now: new Date("2026-11-10T14:00:00Z"),
+    timeZone: "America/New_York",
     count: async () => 3,
     proposalsOn: async () => true,
     ...over,
