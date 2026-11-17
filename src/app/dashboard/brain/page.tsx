@@ -30,7 +30,10 @@ import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 import { listStages } from "@/lib/pipeline/stages";
 import { isSignalId } from "@/lib/stage-keeper/signals";
-import { CANT_SHOW, FIRM_NOTES_NAME, FIRM_NOTES_PURPOSE } from "@/lib/ui/words";
+import { formatDay as sharedFormatDay } from "@/lib/ui/dates";
+import { getFirmTimeZone } from "@/lib/org/profile";
+import { FIRM_NOTES_NAME, FIRM_NOTES_PURPOSE, noneYet } from "@/lib/ui/words";
+import { EmptyState, LoadFailedCard, PageHeader, Pill } from "@/components/ui";
 
 export const metadata: Metadata = { title: pageTitle(FIRM_NOTES_NAME) };
 
@@ -59,12 +62,9 @@ const CLAIM_STATUS_FOOTNOTE: Record<ClaimStatus, string> = {
   forbidden: "Do not use",
 };
 
-const dateFormat = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" });
-
-function formatDay(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? null : dateFormat.format(d);
+/** "Nov 16" in the firm's zone (year only when it is not this year); null for a missing or unreadable date. */
+function formatDay(iso: string | null | undefined, tz: string): string | null {
+  return sharedFormatDay(iso, { tz });
 }
 
 /** Newest `updated_at` in a set of rows, or null when the set is empty. */
@@ -152,38 +152,33 @@ export default async function BrainPage({
   const entriesByCategory = groupBy(entries, (e) => e.category as BrainCategory);
   const claimsByStatus = groupBy(claims, (c) => c.status as ClaimStatus);
   const usedCategories = BRAIN_CATEGORIES.filter((c) => entriesByCategory.has(c));
-  const lastTouched = formatDay(latestUpdate([...entries, ...claims]));
+  const tz = await getFirmTimeZone();
+  const lastTouched = formatDay(latestUpdate([...entries, ...claims]), tz);
 
   return (
     <>
-      <div className="lx-page-head">
-        <div style={{ flex: 1, minWidth: 260 }}>
-          <h1 className="lx-h1">{FIRM_NOTES_NAME}</h1>
-          <p className="lx-sub">
+      <PageHeader
+        title={FIRM_NOTES_NAME}
+        sub={
+          <>
             {entries.length} {entries.length === 1 ? "entry" : "entries"} · {claims.length}{" "}
             {claims.length === 1 ? "claim" : "claims"}
             {lastTouched ? ` · updated ${lastTouched}` : ""}
-          </p>
-          <p className="lx-note" style={{ margin: 0 }}>{FIRM_NOTES_PURPOSE}</p>
-        </div>
-      </div>
+          </>
+        }
+      />
+      <p className="lx-note">{FIRM_NOTES_PURPOSE}</p>
 
       {loadFailed ? (
-        <div className="lx-card lx-empty-card">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            Couldn&apos;t load your firm notes
-          </h2>
-          <p className="lx-note" style={{ margin: 0 }}>{CANT_SHOW}</p>
-        </div>
+        <LoadFailedCard what="your firm notes" />
       ) : (
         <>
-          <nav className="lx-brain-tabs" role="tablist" aria-label="Firm notes sections">
+          <nav className="lx-tabs" role="tablist" aria-label="Firm notes sections">
             <Link
               href="/dashboard/brain/"
               role="tab"
               aria-selected={tab === "knowledge"}
               aria-current={tab === "knowledge" ? "page" : undefined}
-              className={tab === "knowledge" ? "lx-brain-tab lx-brain-tab-on" : "lx-brain-tab"}
             >
               Knowledge
             </Link>
@@ -192,7 +187,6 @@ export default async function BrainPage({
               role="tab"
               aria-selected={tab === "claims"}
               aria-current={tab === "claims" ? "page" : undefined}
-              className={tab === "claims" ? "lx-brain-tab lx-brain-tab-on" : "lx-brain-tab"}
             >
               Claim library
             </Link>
@@ -201,29 +195,24 @@ export default async function BrainPage({
           {tab === "knowledge" && (
           <div className="lx-brain-collections">
             <h2 className="lx-h2">Knowledge</h2>
-            <p className="lx-note" style={{ margin: 0 }}>{knowledgeHelp(role)}</p>
+            <p className="lx-note">{knowledgeHelp(role)}</p>
             {canManageEntries && <NewEntryForm stages={stageChoices} ruledSignals={ruledSignals} />}
             {usedCategories.length === 0 ? (
-              <div className="lx-card lx-empty-card">
-                <h2 className="lx-h2" style={{ fontSize: 20 }}>
-                  No firm notes yet
-                </h2>
-                <p className="lx-note" style={{ margin: 0 }}>
-                  {canManageEntries
-                    ? "Use New entry above to start building the firm's shared memory."
-                    : "Nothing has been recorded yet. Ask a firm admin to add entries."}
-                </p>
-              </div>
+              <EmptyState title="No firm notes yet">
+                {canManageEntries
+                  ? "Use New entry above to start building the firm's shared memory."
+                  : "Nothing has been recorded yet. Ask a firm admin to add entries."}
+              </EmptyState>
             ) : (
               usedCategories.map((category) => {
                 const rows = entriesByCategory.get(category)!;
-                const updated = formatDay(latestUpdate(rows));
+                const updated = formatDay(latestUpdate(rows), tz);
                 return (
                   <div key={category} className="lx-brain-collection">
                     <div className="lx-brain-collection-head">
                       <div className="lx-brain-collection-title">
-                        <h3>{BRAIN_CATEGORY_LABEL[category]}</h3>
-                        <span className="lx-pill lx-pill-mute">{rows.length}</span>
+                        <h3 className="lx-h3">{BRAIN_CATEGORY_LABEL[category]}</h3>
+                        <Pill tone="mute" num>{rows.length}</Pill>
                       </div>
                       {updated && <span className="lx-brain-foot">Updated {updated}</span>}
                     </div>
@@ -244,7 +233,7 @@ export default async function BrainPage({
           {tab === "claims" && (
           <div className="lx-brain-collections">
             <h2 className="lx-h2">Claim library</h2>
-            <p className="lx-note" style={{ margin: 0 }}>{claimsHelp(role)}</p>
+            <p className="lx-note">{claimsHelp(role)}</p>
             {canPropose && <ProposeClaimForm />}
             <p className="lx-brain-fine">
               Approved/forbidden status here is an attorney-advertising compliance aid for this firm&apos;s
@@ -252,14 +241,9 @@ export default async function BrainPage({
               attorney.
             </p>
             {claims.length === 0 ? (
-              <div className="lx-card lx-empty-card">
-                <h2 className="lx-h2" style={{ fontSize: 20 }}>
-                  No claims proposed yet
-                </h2>
-                <p className="lx-note" style={{ margin: 0 }}>
-                  {canPropose ? "Use Propose a claim above — an admin or attorney will review it." : "Nothing has been proposed yet."}
-                </p>
-              </div>
+              <EmptyState title="No claims proposed yet">
+                {canPropose ? "Use Propose a claim above — an admin or attorney will review it." : "Nothing has been proposed yet."}
+              </EmptyState>
             ) : (
               CLAIM_STATUSES.filter((status) => (claimsByStatus.get(status)?.length ?? 0) > 0).map((status) => {
                 const rows = claimsByStatus.get(status)!;
@@ -267,8 +251,8 @@ export default async function BrainPage({
                   <div key={status} className="lx-brain-collection">
                     <div className="lx-brain-collection-head">
                       <div className="lx-brain-collection-title">
-                        <h3>{CLAIM_STATUS_LABEL[status]}</h3>
-                        <span className="lx-pill lx-pill-mute">{rows.length}</span>
+                        <h3 className="lx-h3">{CLAIM_STATUS_LABEL[status]}</h3>
+                        <Pill tone="mute" num>{rows.length}</Pill>
                       </div>
                       <span className="lx-brain-foot">{CLAIM_STATUS_FOOTNOTE[status]}</span>
                     </div>

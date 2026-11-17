@@ -2,6 +2,8 @@
 
 import { useActionState } from "react";
 import type { ClaimEntry } from "@/lib/brain";
+import { Pill } from "@/components/ui/Pill";
+import { SAVING } from "@/lib/ui/words";
 import { CLAIM_STATUS_LABEL, pillToneForClaimStatus } from "../enums";
 import { reviewClaimAction, type ActionState } from "../actions";
 
@@ -28,9 +30,7 @@ export default function ClaimRow({ claim, canReview }: { claim: ClaimEntry; canR
   return (
     <li className="lx-card lx-brain-row">
       <div className="lx-brain-row-head">
-        <span className={`lx-pill lx-pill-${pillToneForClaimStatus(claim.status)}`}>
-          {CLAIM_STATUS_LABEL[claim.status]}
-        </span>
+        <Pill tone={pillToneForClaimStatus(claim.status)}>{CLAIM_STATUS_LABEL[claim.status]}</Pill>
         {claim.source && <span className="lx-brain-key">via {claim.source}</span>}
       </div>
 
@@ -52,7 +52,7 @@ export default function ClaimRow({ claim, canReview }: { claim: ClaimEntry; canR
               <input name="notes" type="text" className="lx-input" />
             </label>
             <button type="submit" disabled={approvePending} className="lx-btn lx-btn-sec lx-btn-sm">
-              {approvePending ? "…" : "Approve"}
+              {approvePending ? SAVING : "Approve"}
             </button>
           </form>
 
@@ -64,7 +64,7 @@ export default function ClaimRow({ claim, canReview }: { claim: ClaimEntry; canR
               <input name="notes" type="text" className="lx-input" />
             </label>
             <button type="submit" disabled={forbidPending} className="lx-btn lx-btn-sec lx-btn-sm">
-              {forbidPending ? "…" : "Mark forbidden"}
+              {forbidPending ? SAVING : "Mark forbidden"}
             </button>
           </form>
         </div>

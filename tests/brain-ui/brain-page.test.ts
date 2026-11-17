@@ -38,6 +38,7 @@ function claim(overrides: Partial<ClaimEntry> = {}): ClaimEntry {
 
 /** Mocks resolveFirmSession() the way BrainPage reads the caller's role. */
 function mockSessionWithRole(role: string) {
+  vi.doMock("next/navigation", async (orig) => ({ ...(await orig<typeof import("next/navigation")>()), useRouter: () => ({ refresh: () => {} }) }));
   vi.doMock("@/lib/firm/session", () => ({
     resolveFirmSession: vi.fn(async () => ({
       kind: "ok",
@@ -175,7 +176,7 @@ describe("BrainPage", () => {
     const element = await BrainPage();
     const html = renderToStaticMarkup(element);
 
-    expect(html).toContain("Couldn&#x27;t load your firm notes");
+    expect(html).toContain("Can&#x27;t show your firm notes right now");
     expect(html).toContain(">Firm notes</h1>");
     expect(html).not.toContain("IP.OS");
     // The thrown message is a sentinel for database text: it is logged, never drawn.

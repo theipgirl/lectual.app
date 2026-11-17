@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { SAVING } from "@/lib/ui/words";
 import { proposeClaimAction, type ActionState } from "../actions";
 
 /**
@@ -36,7 +37,7 @@ export default function ProposeClaimForm() {
         </label>
 
         <button type="submit" className="lx-btn lx-btn-pri" disabled={pending} style={{ justifySelf: "start" }}>
-          {pending ? "Proposing…" : "Propose claim"}
+          {pending ? SAVING : "Propose claim"}
         </button>
 
         {state.error && <p role="alert" className="lx-brain-error">{state.error}</p>}
