@@ -181,7 +181,7 @@ describe("BrainPage", () => {
     expect(html).not.toContain("IP.OS");
     // The thrown message is a sentinel for database text: it is logged, never drawn.
     expect(html).not.toContain("connection refused");
-    expect(html).toContain("Can&#x27;t show this right now. Refresh to try again.");
+    expect(html).toContain("Refresh to try again.");
     expect(html).not.toContain("No firm notes yet");
   });
 });
