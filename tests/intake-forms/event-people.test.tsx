@@ -148,3 +148,36 @@ describe("peopleCountLine", () => {
     expect(peopleCountLine(200, 5000, true)).toBe("Showing 200 of more than 5,000.");
   });
 });
+
+describe("director fixes (Nov 17)", () => {
+  it("the h1 reads the name, a space, then the code (no glued text for screen readers or copy)", async () => {
+    const html = await eventPage(newDb(tables()), "owner");
+    const h1 = html.match(/<h1 class="lx-h1">([\s\S]*?)<\/h1>/)![1].replace(/<[^>]+>/g, "");
+    expect(h1).toBe("Urban Golf 2026 urban-golf-2026");
+  });
+
+  it("a missing scorecard table says its own not-switched-on sentence, not 'couldn't be loaded', and no People", async () => {
+    const db = newDb(tables());
+    db.fail("crm_booth_scorecard", "select", { code: "PGRST205", message: "x" });
+    const out = await eventPage(db, "owner");
+    expect(out).toContain("switched on for your firm yet");
+    expect(out).not.toContain("couldn't be loaded");
+    expect(out).not.toContain("ev-person");
+  });
+
+  it("canSeeEventPeople holds the same roles as MATTER_WRITE_ROLES (and canExportCsv)", async () => {
+    const { canSeeEventPeople } = await import("../../src/lib/intake-forms/event-people");
+    const { MATTER_WRITE_ROLES } = await import("../../src/lib/matters/matters");
+    const { canExportCsv } = await import("../../src/lib/intake-forms/export-csv");
+    expect(ROLES.filter((r) => canSeeEventPeople(r)).sort()).toEqual([...MATTER_WRITE_ROLES].sort());
+    for (const r of ROLES) expect(canSeeEventPeople(r), r).toBe(canExportCsv(r));
+  });
+});
+
+describe("isEventCode", () => {
+  it("takes the three real codes and refuses anything not shaped like one", async () => {
+    const { isEventCode } = await import("../../src/lib/intake-forms/event-name");
+    for (const c of ["legal-assessment", "story2profit-2026", "urban-golf-2026", "a_b"]) expect(isEventCode(c), c).toBe(true);
+    for (const c of ["", "x".repeat(121), 'a"b', "a\r\nb", "a b", "a/b", "é", undefined, ["a"]]) expect(isEventCode(c), String(c)).toBe(false);
+  });
+});

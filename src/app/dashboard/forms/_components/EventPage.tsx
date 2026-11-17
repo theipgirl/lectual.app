@@ -46,7 +46,7 @@ export async function EventPage({ code, range, role, now = new Date() }: { code:
         <div style={{ flex: 1, minWidth: 240 }}>
           <div className="lx-label">Event assessment</div>
           <h1 className="lx-h1">
-            {eventDisplayName(code)}
+            {eventDisplayName(code)}{" "}
             <span className="ev-name-code">{code}</span>
           </h1>
           <p className="lx-sub">Read-only: nothing here changes a card or a lead.</p>

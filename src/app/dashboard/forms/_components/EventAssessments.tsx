@@ -4,6 +4,7 @@ import "./event.css";
 import { eventSummaries } from "@/lib/intake-forms/booth-results";
 import { formatDuration } from "@/lib/intake-forms/performance";
 import { shortDate } from "@/lib/campaigns/stops";
+import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
 import { EVENT_LIST_ROW_LIMIT, type loadBoothEventList } from "@/lib/intake-forms/load-results";
 
 /**
@@ -76,7 +77,7 @@ export function EventAssessments({ read, timeZone }: { read: Awaited<ReturnType<
               </div>
               <div>
                 <dt>Last taken</dt>
-                <dd>{shortDate(e.latest || null, timeZone) || "\u2014"}</dd>
+                <dd>{shortDate(e.latest || null, timeZone ?? DEFAULT_TIME_ZONE) || "\u2014"}</dd>
               </div>
             </dl>
             <div className="ifl-actions">

@@ -1,3 +1,4 @@
+import { isEventCode } from "./event-name";
 import "server-only";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { CSV_BOM, CSV_MAX_ROWS, csvLine } from "./csv";
@@ -11,7 +12,7 @@ import { loadEventPeople } from "./load-results";
  *
  *   401  not signed in;
  *   403  a role that may not export, or one that could not be established;
- *   400  no event code, or one longer than any real one;
+ *   400  no event code, or one not shaped like a booth code (EVENT_CODE_PATTERN);
  *   404  the firm has no booth cards for that code;
  *   413  more than CSV_MAX_ROWS cards: told, not cut;
  *   500/503  a read that failed or a table that isn't there: never a
@@ -38,7 +39,7 @@ export async function exportEventCsv(request: Request): Promise<Response> {
   }
 
   const code = new URL(request.url).searchParams.get("event") ?? "";
-  if (code.length === 0 || code.length > 120) return text(400, "Choose an event to export.");
+  if (!isEventCode(code)) return text(400, "Choose an event to export.");
 
   const read = await loadEventPeople(code, { contact: true, max: CSV_MAX_ROWS, show: CSV_MAX_ROWS });
   if (read.status === "unconfigured") return text(503, "Event assessments aren't switched on for your firm yet. Lectual will turn them on.");

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { isEventCode } from "@/lib/intake-forms/event-name";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { hasRole } from "@/lib/auth/roles";
@@ -70,8 +71,8 @@ export default async function IntakeFormsPage({
   const canEdit = canEditIntakeForm(session.role);
 
   if (!sp.form && sp.event !== undefined) {
-    // One booth event. A code that is empty, or longer than any real one, is no event.
-    if (typeof sp.event !== "string" || sp.event.length === 0 || sp.event.length > 120) notFound();
+    // One booth event. A code that is not shaped like one (letters, digits, - and _, at most 120) is no event.
+    if (!isEventCode(sp.event)) notFound();
     return <EventPage code={sp.event} range={parseEventRange(sp.range)} role={session.role} />;
   }
 

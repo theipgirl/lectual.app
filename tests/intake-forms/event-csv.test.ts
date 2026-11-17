@@ -50,6 +50,20 @@ describe("event CSV", () => {
     expect((await get(odd, "event=urban-golf-2026")).status).toBe(403);
   });
 
+  it("200 for every role that may export", async () => {
+    const { ROLES } = await import("@/lib/auth/roles");
+    const { canExportCsv } = await import("@/lib/intake-forms/export-csv");
+    for (const role of ROLES.filter((r) => canExportCsv(r))) expect((await get(newDb(tables(), role), "event=urban-golf-2026")).status, role).toBe(200);
+  });
+
+  it("400 for a hostile code (quote, CR/LF, slash, space): it never reaches the filename", async () => {
+    for (const bad of ['urban"golf', "urban%0D%0AX-Evil:%201", "a%2Fb", "a%20b", "a;b"]) {
+      const res = await get(newDb(tables()), `event=${bad}`);
+      expect(res.status, bad).toBe(400);
+      expect(res.headers.get("content-disposition"), bad).toBeNull();
+    }
+  });
+
   it("400 for a missing or over-long code", async () => {
     expect((await get(newDb(tables()), "")).status).toBe(400);
     expect((await get(newDb(tables()), `event=${"x".repeat(121)}`)).status).toBe(400);
