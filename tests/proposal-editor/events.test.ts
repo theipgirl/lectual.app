@@ -104,7 +104,7 @@ describe("the other events", () => {
     expect(describeProposalEvent(event({ type: "viewed", actor: "client", actor_user_id: null }), { names })).toMatchObject({ who: "The client", what: "opened the proposal" });
     expect(describeProposalEvent(event({ type: "accepted", actor: "client", actor_user_id: null }), { names }).what).toBe("accepted the proposal");
     expect(describeProposalEvent(event({ type: "approved", actor_user_id: "u2" }), { names })).toMatchObject({ who: "Rebecca", what: "saved it" });
-    expect(describeProposalEvent(event({ type: "approved", actor_user_id: "ghost" }), { names }).who).toBe("A teammate");
+    expect(describeProposalEvent(event({ type: "approved", actor_user_id: "ghost" }), { names }).who).toBe("Teammate");
   });
   it("says which version", () => {
     const versions = new Map([["p1", 2]]);

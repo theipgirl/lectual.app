@@ -165,10 +165,10 @@ export function TermsEditor(props: { quoteId: string; termsBody: string | null; 
   return (
     <div className="qb-stack">
       {props.isLive && (
-        <p className="lx-banner lx-banner-warn">
+        <Notice tone="warn">
           This proposal is already with the client. Changing the terms refuses any signature made from the copy they
           have open — they will be asked to re-read the new wording before signing.
-        </p>
+        </Notice>
       )}
 
       <details className="lx-disclosure-inline">

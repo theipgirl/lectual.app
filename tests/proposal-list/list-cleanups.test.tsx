@@ -5,7 +5,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ROWS, STRIP_OK, item, renderListPage } from "../proposals/list-page-harness";
 import type { ConsultsStripData } from "@/lib/proposals/consults-load";
-import { consultsCapNote, emptySegmentSentence, OPEN_OFFERS_LABEL, TRANSCRIPT_PROCESSING } from "@/lib/proposals/list-copy";
+import { emptySegmentSentence, OPEN_OFFERS_LABEL, TRANSCRIPT_PROCESSING } from "@/lib/proposals/list-copy";
 import { FEE_SENTENCE, PROPOSALS_NAME, PROPOSALS_SUBLINE } from "@/lib/ui/words";
 
 const root = path.resolve(__dirname, "../..");
@@ -106,10 +106,6 @@ describe("Proposals list (F11)", () => {
     expect(html).toMatch(/<a href="\/dashboard\/proposals\/?">Show all<\/a>/);
     expect(emptySegmentSentence("accepted")).toBe("No accepted proposals yet.");
     expect(ROWS.length).toBeGreaterThan(0);
-  });
-
-  it("the cap note says how many are shown", () => {
-    expect(consultsCapNote(30)).toBe("Showing the newest 30.");
   });
 
   it("h1, title and back links use one name", async () => {

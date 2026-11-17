@@ -5,7 +5,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
   DELETE_CONFIRM,
   DELETE_FAILED,
-  DELETE_LABEL,
   DELETE_NEEDS_DB_UPDATE,
   DELETE_NOT_FOUND,
   DELETE_OWNER_ONLY,

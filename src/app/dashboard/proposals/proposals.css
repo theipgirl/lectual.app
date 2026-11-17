@@ -132,7 +132,6 @@
 
 /* Expand: the client preview, full width, in the shared large dialog (portalled to <body>). The client page sits on its paper ground. */
 .pe-xp-body { background: var(--paper); border-radius: var(--r-md); overflow: hidden; }
-.pe-placeholder { padding: 22px; border: 1px dashed var(--line); border-radius: 10px; margin: 14px; font-size: var(--fs-2); color: var(--body); }
 
 /* ── history ───────────────────────────────────────────────── */
 .pe-versions { list-style: none; margin: 0; padding: 0; display: grid; }
@@ -244,6 +243,7 @@
 .pq-c-response .pq-c-paid { margin-top: 4px; }
 /* Fees: Geist with tabular numerals, the amount in ink and the word quiet. */
 .pq-fee { font-family: var(--sans); font-variant-numeric: tabular-nums; font-size: var(--fs-2); line-height: 1.45; white-space: nowrap; }
+@media (max-width: 900px) { .pq-fee { white-space: normal; } }
 .pq-fee-n { color: var(--ink); }
 .pq-fee-l { color: var(--muted); font-size: var(--fs-1); }
 .pq-sub { margin-top: 4px; font-weight: 400; }
@@ -308,7 +308,6 @@
 .pe-more[open] > .pe-more-sum svg { transform: rotate(180deg); }
 .pe-more-body { display: grid; gap: 14px; padding: 16px; border: 1px solid var(--line-2); border-radius: var(--r-md); }
 .pe-lock { font-size: var(--fs-1); color: var(--muted); white-space: nowrap; }
-.pe-added-badge { font-size: var(--fs-1); color: var(--ox); }
 .pe-for { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 6px; font-size: var(--fs-3); }
 .pe-for-link { font-weight: 600; }
 .pe-for-warn { color: var(--warn); }

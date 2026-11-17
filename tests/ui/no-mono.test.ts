@@ -15,8 +15,6 @@ const CSS: Record<string, number> = {
   "src/app/dashboard/forms/forms.css": 13,
   "src/app/dashboard/intake/intake.css": 2,
   "src/app/dashboard/intake/reconcile/reconcile.css": 1,
-  "src/app/dashboard/proposals/proposals.css": 14,
-  "src/app/dashboard/quotes/quotes.css": 20,
   "src/components/copilot/copilot.css": 4,
   "src/components/deck/deck.css": 17,
   "src/components/loe/loe.css": 3,
@@ -31,8 +29,6 @@ const CSS: Record<string, number> = {
 const TSX: Record<string, number> = {
   "src/app/dashboard/layout.tsx": 1,
   "src/components/intake/TimeChip.tsx": 1,
-  "src/components/quotes/QuoteForms.tsx": 1,
-  "src/components/quotes/QuoteParts.tsx": 1,
 };
 const ALLOW_CSS_LINES: Array<[string, RegExp]> = [["src/app/globals.css", /^\.lx-md (code|pre)\b/]];
 

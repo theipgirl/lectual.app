@@ -188,7 +188,7 @@ describe("history and the list", () => {
   });
 
   it("a payload with no readable snapshot still reads as a reset, never an exception", () => {
-    expect(describeResetEvent({}, "A teammate", formatDollars).text).toBe("Acceptance reset by A teammate");
+    expect(describeResetEvent({}, "Teammate", formatDollars).text).toBe("Acceptance reset by Teammate");
     expect(describeResetEvent({ previous_snapshot: "x" }, "Taylor", formatDollars).details[1]).toBe("The earlier acceptance is kept in this record.");
   });
 

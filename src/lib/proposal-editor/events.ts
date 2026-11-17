@@ -14,6 +14,7 @@
  */
 
 import { formatMoney } from "@/lib/ui/format";
+import { TEAMMATE } from "@/lib/ui/words";
 import { describeStepEvent } from "@/lib/proposals/paid";
 import { EVENT_WORDS } from "./vocabulary";
 import { describePayLinkEvent } from "./pay-link";
@@ -155,7 +156,7 @@ export function actorName(event: Pick<ProposalEventRow, "actor" | "actor_user_id
     case "system":
       return "Lectual";
     default:
-      return (event.actor_user_id && names.get(event.actor_user_id)) || "A teammate";
+      return (event.actor_user_id && names.get(event.actor_user_id)) || TEAMMATE;
   }
 }
 

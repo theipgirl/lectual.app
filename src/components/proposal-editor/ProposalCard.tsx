@@ -3,6 +3,7 @@ import type { ProposalCard as Card } from "@/lib/proposals/card";
 import { formatDollars } from "@/lib/proposal-editor/events";
 import { formatShortFirmDate } from "@/lib/quotes/labels";
 import { Pill } from "@/components/ui/Pill";
+import { Notice } from "@/components/ui/Notice";
 
 /**
  * One card for the approver: who the offer is for, the package, what was heard
@@ -111,9 +112,9 @@ export function ProposalCard({ card, showFees = true }: { card: Card; /** The ed
       )}
 
       {receipts.status === "unavailable" && (
-        <p role="status" className="lx-banner lx-banner-warn" style={{ margin: 0 }}>
+        <Notice tone="warn" role="status">
           Receipts couldn&apos;t be loaded just now, so the quotes from the call aren&apos;t shown. That doesn&apos;t mean there were none.
-        </p>
+        </Notice>
       )}
       {receipts.status === "ok" && (
         <div className="pe-pcard-receipts">

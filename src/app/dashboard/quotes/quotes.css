@@ -24,7 +24,7 @@
 .qb-head-meta { font-size: var(--fs-2); color: var(--muted); }
 .qb-head-meta a { color: var(--body); }
 .qb-details { padding: 16px 20px; border-bottom: 1px solid var(--line); background: var(--paper); }
-.qb-banner { margin: 16px 20px 0; }
+.qb-card > .lx-banner { margin: 16px 20px 0; }
 .qb-note { margin: 8px 0 0; }
 .qb-stack { display: grid; gap: 12px; }
 .qb-confirm-q { font-size: var(--fs-2); color: var(--body); }

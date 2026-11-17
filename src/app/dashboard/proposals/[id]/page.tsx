@@ -74,7 +74,7 @@ import { requireProposalsModule } from "../gate";
 import "../proposals.css";
 import type { Metadata } from "next";
 import { recordPageTitle } from "@/lib/ui/page-title";
-import { CANT_SHOW, PROPOSALS_NAME, REFRESH_TO_TRY_AGAIN } from "@/lib/ui/words";
+import { CANT_SHOW, PROPOSALS_NAME, REFRESH_TO_TRY_AGAIN, TEAMMATE } from "@/lib/ui/words";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadFailedCard } from "@/components/ui/LoadFailed";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -190,7 +190,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
   const card = buildProposalCard(proposal, events);
 
   const nameOf = new Map<string, string>();
-  for (const m of members) nameOf.set(m.userId, firstNameOf(m.displayName) ?? firstNameOf(m.email) ?? "A teammate");
+  for (const m of members) nameOf.set(m.userId, firstNameOf(m.displayName) ?? firstNameOf(m.email) ?? TEAMMATE);
   const approverNames = (settings?.approver_user_ids ?? []).map((uid) => nameOf.get(uid)).filter((n): n is string => !!n);
 
   const statusEditable = isProposalEditable(proposal.status);
@@ -230,7 +230,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
         proposalId: proposal.id,
         matterId: proposal.matter_id,
         events: stepRead.ok ? stepRead.events : null,
-        // Real names only: a teammate we can't name is left out of "marked by", not shown as "A teammate".
+        // Real names only: a teammate we can't name is left out of "marked by", not shown as the teammate word.
         names: new Map(members.flatMap((m): Array<[string, string]> => {
           const n = firstNameOf(m.displayName) ?? firstNameOf(m.email);
           return n ? [[m.userId, n]] : [];

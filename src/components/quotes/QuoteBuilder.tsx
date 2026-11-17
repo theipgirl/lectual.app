@@ -375,13 +375,13 @@ export function QuoteBuilder(props: BuilderProps) {
         )}
 
         {props.mode === "signed-missing" && (
-          <p role="status" className="lx-banner lx-banner-warn qb-banner">
+          <Notice tone="warn" role="status">
             This quote was accepted, but no readable signed copy is stored. The lines below are the quote&rsquo;s{" "}
             <strong>current</strong> rows, not the signed record.
-          </p>
+          </Notice>
         )}
         {props.drift.length > 0 && (
-          <div role="status" className="lx-banner lx-banner-warn qb-banner">
+          <Notice tone="warn" role="status">
             <strong>The live lines no longer match what was signed.</strong> The signed copy is
             unchanged and is what governs.
             <ul className="lx-flags">
@@ -389,16 +389,16 @@ export function QuoteBuilder(props: BuilderProps) {
                 <li key={entry}>{entry}</li>
               ))}
             </ul>
-          </div>
+          </Notice>
         )}
         {props.mode === "live" && !editable && (
-          <p role="status" className={`lx-banner ${props.status === "declined" ? "lx-banner-risk" : "lx-banner-mute"} qb-banner`}>
+          <Notice tone={props.status === "declined" ? "risk" : "mute"} role="status">
             {props.status === "declined"
               ? "The client declined this proposal. Nothing was signed."
               : props.status === "withdrawn"
                 ? "You withdrew this proposal. Its link now shows the client that it isn't available."
                 : "This proposal expired before it was signed. Its link now shows the client that it isn't available."}
-          </p>
+          </Notice>
         )}
 
         <div className="qb-cols">
@@ -585,14 +585,14 @@ export function QuoteBuilder(props: BuilderProps) {
             </Notice>
 
             {problems.length > 0 && (
-              <div role="status" className="lx-banner lx-banner-warn">
+              <Notice tone="warn" role="status">
                 <strong>Before the client can sign</strong>
                 <ul className="qb-problems">
                   {problems.map((p, i) => (
                     <li key={`${p.reason}-${p.lineId ?? p.packageName ?? i}`}>{p.message}</li>
                   ))}
                 </ul>
-              </div>
+              </Notice>
             )}
 
             <div>

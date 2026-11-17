@@ -1,4 +1,5 @@
 import { TermsEditor } from "./QuoteForms";
+import { Notice } from "@/components/ui/Notice";
 
 /**
  * The engagement-terms panel under the quote builder. A server component; the
@@ -61,19 +62,19 @@ export function TermsPanel(props: {
           {/* Byte for byte, exactly as the agreement fingerprint compares them —
               a whitespace-only edit to a fee agreement is still an edit. */}
           {(readOnly.signedTermsBody ?? "") !== (props.termsBody ?? "") && (
-            <p role="status" className="lx-banner lx-banner-warn">
+            <Notice tone="warn" role="status">
               The quote&rsquo;s live terms no longer match what was signed — someone edited them after acceptance. The
               signed wording below is what governs.
-            </p>
+            </Notice>
           )}
           <TermsText body={readOnly.signedTermsBody} empty="The signed record carries no engagement terms." />
         </>
       ) : readOnly.kind === "signed-missing" ? (
         <>
-          <p role="status" className="lx-banner lx-banner-warn">
+          <Notice tone="warn" role="status">
             This quote was accepted, but no readable signed copy of its terms is stored. The text below is the
             quote&rsquo;s <strong>current</strong> wording — not the signed record.
-          </p>
+          </Notice>
           <TermsText body={props.termsBody} empty="No engagement terms are stored on this quote." />
         </>
       ) : (
