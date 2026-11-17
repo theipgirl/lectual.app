@@ -51,7 +51,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 /** "2020-01-31" or "2020-01-31T00:00:00-05:00" -> "2020-01-31"; anything else (or an impossible date) -> undefined. */
 function civilDate(v: unknown): string | undefined {
   if (typeof v !== "string") return undefined;
-  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$/.exec(v.trim());
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/.exec(v.trim());
   if (!m) return undefined;
   const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
   const probe = new Date(Date.UTC(y, mo - 1, d));

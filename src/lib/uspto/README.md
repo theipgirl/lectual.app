@@ -38,10 +38,25 @@ also came back empty. What WAS read:
 2. **The whole JSON shape**: `trademarks[0].status.{serialNumber, status, statusDescription, statusDate, filingDate,
    publicationDate, usRegistrationDate, abandonDate}`. `officeActionResponseDueDate` is very likely NOT a real field
    (response due dates are probably only in the prosecution history); it parses as null when absent.
-3. **The numeric status codes** in `stage-map.ts` (602, 630, 641, 680, 700) and the text patterns. Both came from memory, not a current USPTO list.
+3. **The numeric status codes.** `stage-map.ts` has NO codes (every `codes` list is empty) until a real response confirms them; the code mechanism (code and text must agree, else unknown / `code+text-conflict`) is kept and tested with an injected table. Remembered but unconfirmed: 602 abandoned (failure to respond), 630 new application, 641 non-final action, 700 registered. **680 might be "Approved for publication" and 686 "Published for opposition"** (not the other way round). The text patterns are from memory too.
 4. The 60/min rate limit (third party). Auth header name is documented in USPTO's Swagger and key-manager guide.
 5. Stage names assume RPB's labels without the code: Application Filed (17), Awaiting Trademark Registration (18), OA Issued (19A),
    Publication for Opposition (22), Registered, Abandoned. The caller resolves names to the firm's own stages.
 
 Before wiring this in: with a real key, `curl -H "USPTO-API-KEY: ..." https://tsdrapi.uspto.gov/ts/cd/casestatus/sn<serial>/info.json`
 and `.../info.xml`, then fix `parse.ts` and the fixtures in `tests/uspto/fixtures.ts` to the real response.
+
+## Caller rules (rate limit)
+The limit is per key (about 60 a minute, third-party figure) and is enforced only by a 429. Run reads ONE AT A TIME, at most about one a
+second; stop the whole batch on the first 429 (a 429 carries `retryAfterSeconds` when USPTO sent a numeric Retry-After, capped at 3600);
+and treat "every read in a batch is `not_found`" as a KEY problem, because an invalid key was seen to answer 404. Redirects are never
+followed (`redirect: "error"`, reported as `network`), so the key cannot leave `tsdrapi.uspto.gov`.
+
+## Product question for the firm, before any nightly run
+Five different statuses all suggest "Awaiting Trademark Registration" (response filed / reconsideration / petition, notice of allowance,
+approved for publication, pending examination). That may be noisy as a "USPTO differs from Lectual" signal. Decide what the firm wants
+flagged before anything runs on a schedule.
+
+## Follow-ups (not done here; other files are being edited elsewhere)
+`src/lib/uspto` now uses the shared `stripStageCode` (`src/lib/stages/code.ts`). These still carry their own copy of the strip and
+should move to it: `src/lib/review/waiting.ts`, `src/lib/matters/list-view.ts`, `src/lib/lawmatics/stage-map.ts`, `src/lib/intake/views.ts`.

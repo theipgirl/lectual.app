@@ -1,4 +1,5 @@
 import type { FetchStatusResult } from "./fetch-status";
+import { stripStageCode } from "@/lib/stages/code";
 import { suggestStage } from "./stage-map";
 
 export type CompareResult = {
@@ -8,16 +9,12 @@ export type CompareResult = {
   /** The firm's own stage label as given. */
   lectualStage: string | null;
   /** Why the verdict is "unknown". */
-  unknownBecause?: "not-set-up" | "unavailable" | "unmapped" | "no-lectual-stage";
+  unknownBecause?: "not-set-up" | "unavailable" | "unmapped" | "conflict" | "no-lectual-stage";
 };
 
 /** "19A. OA Issued" -> "oa issued"; "Registered" -> "registered". */
 function normalise(label: string): string {
-  return label
-    .replace(/^\s*\d+[A-Za-z]?\s*[.)\-:]?\s*/, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase();
+  return stripStageCode(label).replace(/\s+/g, " ").trim().toLowerCase();
 }
 
 /**
@@ -34,7 +31,8 @@ export function compareStatusToStage(read: FetchStatusResult, lectualStage: stri
   }
   const suggestion = suggestStage(read.result);
   if (suggestion.stageNames.length === 0) {
-    return { verdict: "unknown", usptoStageNames: [], lectualStage: lectual, unknownBecause: "unmapped" };
+    const conflict = suggestion.matchedBy === "code+text-conflict";
+    return { verdict: "unknown", usptoStageNames: [], lectualStage: lectual, unknownBecause: conflict ? "conflict" : "unmapped" };
   }
   if (lectual === null) {
     return { verdict: "unknown", usptoStageNames: suggestion.stageNames, lectualStage: null, unknownBecause: "no-lectual-stage" };

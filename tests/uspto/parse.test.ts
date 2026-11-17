@@ -55,6 +55,7 @@ describe("parseTsdrStatus", () => {
     ["impossible date", tsdr({ statusDate: "2023-02-31" })],
     ["unreadable optional date", tsdr({ filingDate: "last tuesday" })],
     ["bad serial", tsdr({}, "123")],
+    ["date with a garbage time part", tsdr({ statusDate: "2024-01-01Tgarbage" })],
   ])("shape failure: %s", (_n, body) => {
     expect(parseTsdrStatus(body)).toEqual({ ok: false, reason: "shape" });
   });

@@ -26,6 +26,29 @@ describe("fetchTsdrStatus", () => {
   it("429 -> rate_limited", async () => {
     expect(await run((async () => json(429, {})) as typeof fetch)).toEqual(unavailable("rate_limited"));
   });
+  it("429 carries a numeric Retry-After, capped at 3600; a date or junk is ignored", async () => {
+    const r = (h?: string) => run((async () => new Response("{}", { status: 429, headers: h ? { "retry-after": h } : {} })) as typeof fetch);
+    expect(await r("30")).toEqual({ status: "unavailable", reason: "rate_limited", retryAfterSeconds: 30 });
+    expect(await r("999999")).toEqual({ status: "unavailable", reason: "rate_limited", retryAfterSeconds: 3600 });
+    expect(await r("Wed, 21 Oct 2026 07:28:00 GMT")).toEqual(unavailable("rate_limited"));
+    expect(await r()).toEqual(unavailable("rate_limited"));
+  });
+  it("every non-200 response has its body cancelled", async () => {
+    for (const code of [204, 401, 404, 429, 500]) {
+      const cancel = vi.fn(async () => undefined);
+      const res = { status: code, headers: new Headers(), body: { cancel } } as unknown as Response;
+      await run((async () => res) as typeof fetch);
+      expect(cancel).toHaveBeenCalledTimes(1);
+    }
+  });
+  it("never follows a redirect: the key stays on this host (a refused redirect is network)", async () => {
+    const f = vi.fn(async (_u: unknown, init: RequestInit) => {
+      if (init.redirect === "error") throw new TypeError("redirect mode is set to error");
+      return json(200, registered);
+    });
+    expect(await run(f as unknown as typeof fetch)).toEqual(unavailable("network"));
+    expect((f.mock.calls[0][1] as RequestInit).redirect).toBe("error");
+  });
   it("500 -> http_500, and 204 is not ok", async () => {
     expect(await run((async () => json(500, {})) as typeof fetch)).toEqual(unavailable("http_500"));
     expect(await run((async () => new Response(null, { status: 204 })) as typeof fetch)).toEqual(unavailable("http_204"));

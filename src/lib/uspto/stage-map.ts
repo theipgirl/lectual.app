@@ -7,11 +7,13 @@ import type { TsdrStatus } from "./parse";
  * nothing here writes anything. Names are the stage LABELS without the numeric code ("17. Application Filed"
  * is "Application Filed"; the code is an ordering aid, see src/lib/matters/list-view.ts).
  *
- * UNVERIFIED: the numeric TSDR status codes below come from memory of the public code list, not from a
- * current USPTO page (README.md). Text patterns are the wider net. A status neither matches is "unknown":
- * never guessed, never mapped to a stage.
+ * UNVERIFIED: the numeric TSDR status codes were not confirmed against a real response, so every row's `codes`
+ * is EMPTY on purpose (README.md); the code mechanism stays and is tested with an injected table. Text patterns
+ * decide. A status nothing matches is "unknown": never guessed, never mapped to a stage.
  *
- * Row order matters: the first row whose code or text matches wins. Terminal and specific rows come first.
+ * Row order matters: the first row whose TEXT matches wins. Exclusion rows (empty `stageNames`) come first, so a
+ * revived, withdrawn or cancelled status never lands on the abandoned / published / registered rows.
+ * When a code row and a text row both match and DISAGREE the answer is unknown, `matchedBy: "code+text-conflict"`.
  */
 export type StageSuggestion = {
   key: string;
@@ -19,10 +21,10 @@ export type StageSuggestion = {
   stageNames: readonly string[];
   /** Deadline type to suggest (the matter deadline kinds), or null. A SUGGESTION: an attorney confirms it. */
   deadlineKind: DeadlineKind | null;
-  matchedBy: "code" | "text" | "none";
+  matchedBy: "code" | "text" | "none" | "code+text-conflict";
 };
 
-type Row = {
+export type Row = {
   key: string;
   codes: readonly number[];
   text: readonly RegExp[];
@@ -30,49 +32,61 @@ type Row = {
   deadlineKind: DeadlineKind | null;
 };
 
+const AWAITING = ["Awaiting Trademark Registration"] as const;
+
 export const STAGE_MAP: readonly Row[] = [
-  { key: "abandoned", codes: [602], text: [/\babandon/i], stageNames: ["Abandoned"], deadlineKind: null },
-  { key: "registered", codes: [700], text: [/^registered\b/i], stageNames: ["Registered"], deadlineKind: "section_8_declaration" },
+  // Exclusions: no stage. A petition to revive is not an abandonment, a withdrawn publication is not a publication.
+  {
+    key: "excluded",
+    codes: [],
+    text: [/\brevive/i, /\breinstat/i, /\bwithdrawn\b/i, /\bcancel/i],
+    stageNames: [],
+    deadlineKind: null,
+  },
+  { key: "abandoned", codes: [], text: [/\babandon/i], stageNames: ["Abandoned"], deadlineKind: null },
+  {
+    key: "registered_maintained",
+    codes: [],
+    text: [/^registered\b.*\b(renewed|sec(tion|\.)?\s*(8|9|15|71)|accepted)/i],
+    stageNames: ["Registered"],
+    deadlineKind: null,
+  },
+  { key: "registered", codes: [], text: [/^registered\b/i], stageNames: ["Registered"], deadlineKind: "section_8_declaration" },
   {
     key: "response_filed",
     codes: [],
-    text: [/response (after|to) .*(entered|received|filed)/i, /(suspension|suspended)/i],
-    stageNames: ["Awaiting Trademark Registration"],
+    text: [
+      /response (after|to) .*(entered|received|filed)/i,
+      /(suspension|suspended)/i,
+      /request for reconsideration/i,
+      /\bpetition/i,
+    ],
+    stageNames: AWAITING,
     deadlineKind: null,
   },
-  {
-    key: "notice_of_allowance",
-    codes: [],
-    text: [/notice of allowance/i],
-    stageNames: ["Awaiting Trademark Registration"],
-    deadlineKind: "statement_of_use",
-  },
+  { key: "notice_of_allowance", codes: [], text: [/notice of allowance/i], stageNames: AWAITING, deadlineKind: "statement_of_use" },
+  // Approved but not yet published: still waiting. Product call: it is not "Publication for Opposition" yet.
+  { key: "approved_for_publication", codes: [], text: [/approved for publication/i], stageNames: AWAITING, deadlineKind: null },
   {
     key: "published",
-    codes: [680],
-    text: [/published for opposition/i, /\bpublication\b/i],
+    codes: [],
+    text: [/published for opposition/i, /notice of publication/i],
     stageNames: ["Publication for Opposition"],
     deadlineKind: "opposition_window",
   },
   {
     key: "office_action",
-    codes: [641],
+    codes: [],
     text: [/non-?final action/i, /final refusal/i, /office action/i],
     stageNames: ["OA Issued"],
     deadlineKind: "office_action_response",
   },
-  {
-    key: "new_application",
-    codes: [630],
-    text: [/new application/i],
-    stageNames: ["Application Filed"],
-    deadlineKind: null,
-  },
+  { key: "new_application", codes: [], text: [/new application/i], stageNames: ["Application Filed"], deadlineKind: null },
   {
     key: "pending_examination",
     codes: [],
     text: [/awaiting examination/i, /assigned to (an )?examin/i, /examining attorney/i],
-    stageNames: ["Awaiting Trademark Registration"],
+    stageNames: AWAITING,
     deadlineKind: null,
   },
 ];
@@ -84,20 +98,26 @@ export const UNKNOWN_SUGGESTION: StageSuggestion = {
   matchedBy: "none",
 };
 
-/** Code first, then text. Unknown when neither matches. */
-export function suggestStage(status: Pick<TsdrStatus, "statusCode" | "statusText">): StageSuggestion {
-  for (const row of STAGE_MAP) {
-    if (row.codes.includes(status.statusCode)) {
-      return { key: row.key, stageNames: row.stageNames, deadlineKind: row.deadlineKind, matchedBy: "code" };
-    }
-  }
+function from(row: Row, matchedBy: "code" | "text"): StageSuggestion {
+  return { key: row.key, stageNames: row.stageNames, deadlineKind: row.deadlineKind, matchedBy };
+}
+
+/** The table-injectable core (tests use it to exercise code rows). Code and text must agree or the answer is unknown. */
+export function suggestStageWith(
+  table: readonly Row[],
+  status: Pick<TsdrStatus, "statusCode" | "statusText">,
+): StageSuggestion {
+  const byCode = table.find((r) => r.codes.includes(status.statusCode));
   const text = status.statusText ?? "";
-  if (text !== "") {
-    for (const row of STAGE_MAP) {
-      if (row.text.some((re) => re.test(text))) {
-        return { key: row.key, stageNames: row.stageNames, deadlineKind: row.deadlineKind, matchedBy: "text" };
-      }
-    }
+  const byText = text === "" ? undefined : table.find((r) => r.text.some((re) => re.test(text)));
+  if (byCode && byText && byCode.key !== byText.key) {
+    return { key: "unknown", stageNames: [], deadlineKind: null, matchedBy: "code+text-conflict" };
   }
-  return UNKNOWN_SUGGESTION;
+  const row = byCode ?? byText;
+  if (!row || row.stageNames.length === 0) return UNKNOWN_SUGGESTION;
+  return from(row, byCode ? "code" : "text");
+}
+
+export function suggestStage(status: Pick<TsdrStatus, "statusCode" | "statusText">): StageSuggestion {
+  return suggestStageWith(STAGE_MAP, status);
 }
