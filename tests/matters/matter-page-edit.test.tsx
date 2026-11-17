@@ -53,7 +53,7 @@ async function load() {
   vi.doMock("@/components/voice/VoiceNoteRecorder", () => ({ default: stub }));
   vi.doMock("@/components/matters/IntakeRequestCard", () => ({ IntakeRequestCard: stub }));
   vi.doMock("next/cache", () => ({ revalidatePath: vi.fn() }));
-  vi.doMock("next/navigation", async (orig) => ({ ...(await orig<typeof import("next/navigation")>()), redirect: vi.fn() }));
+  vi.doMock("next/navigation", async (orig) => ({ ...(await orig<typeof import("next/navigation")>()), redirect: vi.fn(), useRouter: () => ({ refresh: () => {} }) }));
 
   const page = await import("../../src/app/dashboard/matters/[id]/page");
   const actions = await import("../../src/app/dashboard/matters/[id]/actions");

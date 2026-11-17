@@ -1,4 +1,5 @@
 import { roleLabel } from "@/lib/auth/roles";
+import { LoadFailedLine } from "@/components/ui/LoadFailed";
 import type { ReactNode } from "react";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { loadConsultEntries, type ConsultDb, type ConsultEntry } from "@/lib/consult/store";
@@ -101,7 +102,7 @@ export async function ConsultDetailsSection({ leadId, canWrite, timeZone }: { le
   );
 
   if (read.status === "unavailable") {
-    return shell(<p className="lx-note" style={{ margin: 0 }}>Consult details couldn&apos;t be loaded just now. Nothing is shown rather than a guess.</p>);
+    return shell(<LoadFailedLine>Consult details couldn&apos;t be loaded. Nothing is shown rather than a guess.</LoadFailedLine>);
   }
 
   if (read.entries.length === 0) {

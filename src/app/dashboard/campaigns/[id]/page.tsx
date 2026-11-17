@@ -36,7 +36,7 @@ import {
 import "../campaigns.css";
 import type { Metadata } from "next";
 import { recordPageTitle } from "@/lib/ui/page-title";
-import { PageHeader, SheetScroll, SheetTable } from "@/components/ui";
+import { PageHeader, SheetScroll, SheetTable, LoadFailedLine } from "@/components/ui";
 import { formatDayTime } from "@/lib/ui/dates";
 import { BLANK } from "@/lib/ui/words";
 import { campaignLoadError } from "@/lib/campaigns/load-errors";
@@ -185,7 +185,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
                             Template: <strong>{template.name}</strong> — {template.subject}
                           </>
                         ) : templatesFailed && step.template_id ? (
-                          <span className="lx-campaigns-error">Couldn&apos;t load the template library to show this step&apos;s template.</span>
+                          <LoadFailedLine>Couldn&apos;t load the template library to show this step&apos;s template.</LoadFailedLine>
                         ) : (
                           <span className="lx-campaigns-error">No template attached — this step can&apos;t run yet.</span>
                         )}
@@ -210,9 +210,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
         {canManage && (
           <div className="lx-campaigns-pad-end">
             {templatesFailed && (
-              <p className="lx-note lx-campaigns-error lx-campaigns-gap">
-                The template library couldn&apos;t be loaded, so email steps can&apos;t be added right now. Try again shortly.
-              </p>
+              <LoadFailedLine>The template library couldn&apos;t be loaded, so email steps can&apos;t be added right now.</LoadFailedLine>
             )}
             <AddStepForm sequenceId={sequence.id} templates={templateOptions} />
           </div>
@@ -229,11 +227,11 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
         </header>
         {canOperate &&
           (leadsFailed || enrollmentsRead.error ? (
-            <p className="lx-note lx-campaigns-inlineerror lx-campaigns-pad-bottom">
+            <LoadFailedLine>
               {leadsFailed
-                ? "Leads couldn't be loaded, so leads can't be enrolled right now. Refresh to try again."
-                : "Who's already enrolled couldn't be loaded, so leads can't be enrolled right now. Try again shortly."}
-            </p>
+                ? "Leads couldn't be loaded, so leads can't be enrolled right now."
+                : "Who's already enrolled couldn't be loaded, so leads can't be enrolled right now."}
+            </LoadFailedLine>
           ) : (
             <div className="lx-campaigns-pad">
               <EnrollLeadForm sequenceId={sequence.id} leads={leadOptions} />

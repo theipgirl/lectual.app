@@ -1,4 +1,5 @@
 import "@/components/list-page/list-page.css";
+import { LoadFailedLine } from "@/components/ui/LoadFailed";
 import { ListSearch } from "@/components/list-page/ListToolbar";
 import { searchPlaceholder } from "@/lib/ui/words";
 import { showingOf } from "@/lib/ui/format";
@@ -39,9 +40,7 @@ export function SkillPicker({ skill, term, groups }: { skill: Skill; term: strin
         <div key={g.kind} style={{ display: "grid", gap: 4 }}>
           {showHeadings && <div className="lx-label">{KIND_HEADING[g.kind]}</div>}
           {g.read.status === "failed" ? (
-            <p className="lx-note" role="alert" style={{ margin: 0, color: "var(--warn)" }}>
-              We couldn&apos;t load your {KIND_PLURAL[g.kind]}.
-            </p>
+            <LoadFailedLine role="alert">We couldn&apos;t load your {KIND_PLURAL[g.kind]}.</LoadFailedLine>
           ) : g.read.shown.length === 0 ? (
             <p className="lx-note" style={{ margin: 0 }}>
               {term ? `No matches for "${term}".` : `No ${KIND_PLURAL[g.kind]} on file yet.`}

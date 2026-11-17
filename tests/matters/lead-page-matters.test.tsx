@@ -35,6 +35,7 @@ const lead = {
 type MattersRead = { status: "ok"; matters: unknown[] } | { status: "none" } | { status: "unavailable" };
 
 function mockPage(mattersRead: MattersRead | "throws", role = "attorney") {
+  vi.doMock("next/navigation", async (orig) => ({ ...(await orig<typeof import("next/navigation")>()), useRouter: () => ({ refresh: () => {} }) }));
   vi.doMock("@/lib/db/scoped-client", () => ({
     getScopedClient: vi.fn(async () => ({
       from: () => {

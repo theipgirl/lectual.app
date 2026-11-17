@@ -11,6 +11,7 @@ import { standardSeed } from "./helpers/seed";
  */
 
 const h = vi.hoisted(() => ({ db: null as unknown as { client(): unknown } }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
 vi.mock("@/lib/db/scoped-client", () => ({ getScopedClient: vi.fn(async () => h.db.client()) }));
 
 const { loadMattersForLead } = await import("@/lib/matters/for-lead");

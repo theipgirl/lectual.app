@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState, type ReactNode } from "react";
-import { Field as UiField, Notice, SavedNote } from "@/components/ui";
+import { Field as UiField, Notice, SavedNote, LoadFailedLine } from "@/components/ui";
 import { ADD_NEXT_STEP, SAVED, SAVING } from "@/lib/ui/words";
 import "./matter-page.css";
 import {
@@ -90,7 +90,7 @@ function AutoSelect(props: {
  */
 export function StageSelect({ matterId, stageId, stages }: { matterId: string; stageId: string | null; stages: { id: string; code: string; label: string }[] | null }) {
   if (stages === null) {
-    return <span className="lx-note mx-self-center">Couldn&apos;t load docket stages. Reload to try again.</span>;
+    return <LoadFailedLine>Couldn&apos;t load docket stages.</LoadFailedLine>;
   }
   if (stages.length === 0) {
     return (

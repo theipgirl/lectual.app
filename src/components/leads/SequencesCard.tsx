@@ -1,5 +1,6 @@
 "use client";
 
+import { LoadFailedLine } from "@/components/ui/LoadFailed";
 import Link from "next/link";
 import { useActionState } from "react";
 import { stopLeadSequenceAction, type LeadSequenceState } from "@/app/dashboard/leads/[id]/sequence-actions";
@@ -64,9 +65,7 @@ export function SequencesCard(props: { leadId: string; rows: SequenceRow[] | nul
         Campaigns
       </h2>
       {rows === null ? (
-        <p role="alert" className="lx-note" style={{ margin: 0, color: "var(--wine)" }}>
-          Couldn&apos;t load this lead&apos;s campaigns. That isn&apos;t the same as none — try again shortly.
-        </p>
+        <LoadFailedLine role="alert">Couldn&apos;t load this lead&apos;s campaigns. That isn&apos;t the same as none.</LoadFailedLine>
       ) : rows.length === 0 ? (
         <p className="lx-note" style={{ margin: 0 }}>
           Not in any campaign.

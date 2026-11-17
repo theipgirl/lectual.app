@@ -1,5 +1,6 @@
 "use client";
 
+import { LoadFailedLine } from "@/components/ui/LoadFailed";
 import Link from "next/link";
 import { useRef } from "react";
 import { MarkAllReadButton } from "./MarkAllReadButton";
@@ -23,9 +24,7 @@ function triggerLabel(count: BellCount): string {
 function Panel({ count, list, close }: { count: BellCount; list: BellList; close: () => void }) {
   if (list.status === "unavailable") {
     return (
-      <p role="alert" className="lx-note lx-bell-msg">
-        Couldn&apos;t load your notifications. This isn&apos;t the same as having none. Try refreshing in a moment.
-      </p>
+      <LoadFailedLine role="alert">Couldn&apos;t load your notifications. This isn&apos;t the same as having none.</LoadFailedLine>
     );
   }
   if (list.rows.length === 0) {

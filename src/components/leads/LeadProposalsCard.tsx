@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LoadFailedLine } from "@/components/ui/LoadFailed";
 import type { ProposalListItem } from "@/lib/proposals/store";
 import { statusLabel, statusTone } from "@/lib/proposal-editor/labels";
 import { formatMoney } from "@/lib/ui/format";
@@ -37,7 +38,7 @@ export function LeadProposalsCard({
         )}
       </div>
       {read.status === "unavailable" ? (
-        <p className="lx-note" style={{ margin: 0 }}>Proposals couldn&apos;t be loaded just now.</p>
+        <LoadFailedLine>Proposals couldn&apos;t be loaded.</LoadFailedLine>
       ) : read.proposals.length === 0 ? (
         <p className="lx-note" style={{ margin: 0 }}>No proposal for this lead yet.</p>
       ) : (

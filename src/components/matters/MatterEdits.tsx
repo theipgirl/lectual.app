@@ -29,7 +29,7 @@ import { contactLabel } from "@/lib/matters/contact-input";
 import type { MatterContactsRead } from "@/lib/matters/contacts";
 import { NOTE_KIND_OPTIONS } from "@/lib/pipeline/lead-input";
 import { Err, Field, RowButton, type Action } from "./MatterForms";
-import { InlineConfirm, Notice, SavedNote, Field as UiField } from "@/components/ui";
+import { InlineConfirm, Notice, SavedNote, Field as UiField, LoadFailedLine } from "@/components/ui";
 import { searchPlaceholder, ADD_TO_TIMELINE, BLANK, DELETE, OWNER_COLUMN, SAVING, SEARCHING, UNASSIGNED } from "@/lib/ui/words";
 import "@/components/list-page/list-page.css";
 import "./matter-page.css";
@@ -105,9 +105,7 @@ export function ClientContactCard({ matterId, read, canWrite }: { matterId: stri
     <section className="lx-card lx-aside">
       <div className="lx-label">Client contact</div>
       {read.status === "unavailable" ? (
-        <Notice tone="warn" role="status">
-          The client contact couldn&apos;t be loaded. Refresh to try again.
-        </Notice>
+        <LoadFailedLine>The client contact couldn&apos;t be loaded.</LoadFailedLine>
       ) : read.status === "none" ? (
         <p className="lx-note">No contact linked yet.</p>
       ) : (
