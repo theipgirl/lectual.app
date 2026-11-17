@@ -1,3 +1,4 @@
+import { signInRedirect } from "@/lib/auth/return-path";
 import "server-only";
 import type { User } from "@supabase/supabase-js";
 import { getScopedClient } from "@/lib/db/scoped-client";
@@ -58,7 +59,7 @@ export async function resolveFirmSession(
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return { kind: "signed-out", redirectTo: `/sign-in/?next=${signInNext}` };
+    return { kind: "signed-out", redirectTo: signInRedirect(signInNext) };
   }
 
   const [{ data: member }, { data: org }, { data: isPlatformAdmin }] =
