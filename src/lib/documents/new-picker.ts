@@ -1,4 +1,5 @@
 import { buildPicker, type ListRead, type PickerDestination, type PickerView } from "@/lib/proposals/new-picker";
+import { REFRESH_TO_TRY_AGAIN } from "@/lib/ui/words";
 import { normalizeTerm } from "@/lib/skills/pick";
 import type { RecordKind } from "@/lib/skills/catalog";
 
@@ -44,7 +45,7 @@ export type LeadRoute =
   | { kind: "failed"; message: string };
 
 export const LETTER_NEEDS_MATTER = (leadLabel: string): string => `Letters are drafted on a matter. Open a matter for ${leadLabel} first.`;
-export const LEAD_MATTERS_FAILED = "We couldn't load this lead's matters. Try again shortly.";
+export const LEAD_MATTERS_FAILED = "We couldn't load this lead's matters. " + REFRESH_TO_TRY_AGAIN;
 
 /** What choosing a lead does, from the lead's open matters. A failed read is never the 'none' message. */
 export function routeLead(input: {

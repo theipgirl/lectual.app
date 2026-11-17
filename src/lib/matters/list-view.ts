@@ -20,7 +20,7 @@ export function stageDisplayName(label: string): string {
 
 export function mattersSubtitle(view: "table" | "board"): string {
   return view === "board"
-    ? "Every open matter in its docket stage. Use Move on a card to change its stage."
+    ? "Every open matter in its docket stage. Open a card's menu to move it to another stage."
     : "Every engaged matter, grouped by whose move it is. Longest in its stage first.";
 }
 

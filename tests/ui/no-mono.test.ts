@@ -19,7 +19,6 @@ const CSS: Record<string, number> = {
   "src/app/dashboard/quotes/quotes.css": 20,
   "src/components/copilot/copilot.css": 4,
   "src/components/deck/deck.css": 17,
-  "src/components/loe/loe.css": 3,
   "src/components/queue/review.css": 2,
   "src/components/review/review-sheet-edit.css": 5,
   "src/components/review/review.css": 8,

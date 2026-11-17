@@ -11,20 +11,13 @@
   .lx-split-matter > .lx-col-aside > * { width: auto; }
 }
 
-@media (pointer: coarse) {
-  .lx-board-move .lp-btn { min-height: 44px; }
-}
-
 /* Layout helpers for the matter page and its forms (replace inline styles). Tokens only. */
 .mx-span { grid-column: 1 / -1; }
 .mx-actions { grid-column: 1 / -1; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.mx-actions-note { margin: 0; }
 .mx-grid { display: grid; gap: 8px; }
 .mx-grid-6 { display: grid; gap: 6px; }
-.mx-grid-12 { display: grid; gap: 12px; }
 .mx-grid-14 { display: grid; gap: 14px; }
 .mx-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.mx-row-end { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .mx-between { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .mx-card { padding: var(--pad-card); display: grid; gap: 12px; }
 .mx-block { display: block; }
@@ -35,7 +28,6 @@
 .mx-mt-8 { margin-top: 8px; }
 .mx-note-pre { margin: 0; white-space: pre-wrap; }
 .mx-head-actions { display: grid; gap: 8px; justify-items: start; }
-.mx-ink { color: var(--ink); }
 .mx-anywhere { overflow-wrap: anywhere; }
 .mx-min0 { min-width: 0; }
 .mx-basis-full { flex-basis: 100%; }
