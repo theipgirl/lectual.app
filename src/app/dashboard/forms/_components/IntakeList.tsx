@@ -8,6 +8,8 @@ import { IntakeQrButton } from "./IntakeQr";
 import { InlineConfirm } from "@/components/ui/InlineConfirm";
 import { NOT_LIVE_MESSAGE, shareState } from "@/lib/intake-forms/share";
 import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
+import { EmptyState, Notice, PageHeader, Pill } from "@/components/ui";
+import { BLANK, FORMS_NAME } from "@/lib/ui/words";
 
 /**
  * Intake → Forms, the list: every intake the firm keeps (one per event,
@@ -77,54 +79,55 @@ export function IntakeList({
 
   return (
     <div className="ifl-root">
-      <div className="lx-page-head">
-        <div style={{ flex: 1, minWidth: 240 }}>
-          <h1 className="lx-h1">Forms</h1>
-          <p className="lx-sub">One per event, campaign or page: a form or a scored assessment. Each has its own link, QR code, source tag and numbers.</p>
-        </div>
-        {canEdit && (
-          <form
-            className="ifl-new ifl-create"
-            onSubmit={(e) => {
-              e.preventDefault();
-              create("intake");
-            }}
-          >
-            <input
-              className="ifm-input"
-              value={newName}
-              maxLength={120}
-              placeholder="Name it, e.g. UGW 2026 booth"
-              aria-label="New form name"
-              onChange={(e) => setNewName(e.target.value)}
-            />
-            <div className="ifl-create-row">
-              <div>
-                <button type="submit" data-kind="intake" className="lx-btn lx-btn-pri" disabled={pending || !newName.trim()}>
-                  New form
-                </button>
-                <span className="ifl-create-hint">A chat or form that collects contact details and answers.</span>
+      <PageHeader
+        title={FORMS_NAME}
+        tour="forms-head"
+        sub="One per event, campaign or page: a form or a scored assessment. Each has its own link, QR code, source tag and numbers."
+        actions={
+          canEdit ? (
+            <form
+              className="ifl-new ifl-create"
+              onSubmit={(e) => {
+                e.preventDefault();
+                create("intake");
+              }}
+            >
+              <input
+                className="lx-input"
+                value={newName}
+                maxLength={120}
+                placeholder="Name it, e.g. UGW 2026 booth"
+                aria-label="New form name"
+                onChange={(e) => setNewName(e.target.value)}
+              />
+              <div className="ifl-create-row">
+                <div>
+                  <button type="submit" data-kind="intake" className="lx-btn lx-btn-pri" disabled={pending || !newName.trim()}>
+                    New form
+                  </button>
+                  <span className="ifl-create-hint">A chat or form that collects contact details and answers.</span>
+                </div>
+                <div>
+                  <button type="button" data-kind="assessment" className="lx-btn lx-btn-sec" disabled={pending || !newName.trim()} onClick={() => create("assessment")}>
+                    New scored assessment (for events)
+                  </button>
+                  <span className="ifl-create-hint">A short scored quiz for a booth or event, with a result for the person.</span>
+                </div>
               </div>
-              <div>
-                <button type="button" data-kind="assessment" className="lx-btn lx-btn-sec" disabled={pending || !newName.trim()} onClick={() => create("assessment")}>
-                  New scored assessment (for events)
-                </button>
-                <span className="ifl-create-hint">A short scored quiz for a booth or event, with a result for the person.</span>
-              </div>
-            </div>
-          </form>
-        )}
-      </div>
+            </form>
+          ) : undefined
+        }
+      />
 
       {error && (
-        <div role="alert" className="lx-banner lx-banner-risk" style={{ fontSize: 14 }}>
+        <Notice tone="risk" role="alert">
           {error}
-        </div>
+        </Notice>
       )}
       {statsFailed && (
-        <div role="status" className="lx-banner lx-banner-warn" style={{ fontSize: 14 }}>
+        <Notice tone="warn" role="status">
           The numbers couldn&apos;t be loaded just now. Refresh to try again.
-        </div>
+        </Notice>
       )}
 
       <div className="ifl-list">
@@ -135,18 +138,15 @@ export function IntakeList({
                 <Link href={`/dashboard/forms/?form=${encodeURIComponent(i.id)}`} className="ifl-name">
                   {i.name}
                 </Link>
-                <span className={`ifm-status${i.status === "live" ? " live" : ""}`}>
-                  <i />
-                  {i.status === "live" ? "Live" : i.status === "archived" ? "Archived" : "Draft"}
-                </span>
-                <span className="ifl-kind">{i.kind === "assessment" ? "Assessment" : "Chat or form"}</span>
-                {i.sourceTag && <span className="lx-pill lx-pill-ox">{i.sourceTag}</span>}
+                <Pill tone={i.status === "live" ? "ok" : "mute"}>{i.status === "live" ? "Live" : i.status === "archived" ? "Archived" : "Draft"}</Pill>
+                <Pill>{i.kind === "assessment" ? "Assessment" : "Chat or form"}</Pill>
+                {i.sourceTag && <Pill tone="ox">{i.sourceTag}</Pill>}
               </div>
               <div className="ifl-link">
                 {shareState(i.status).canShare ? (
                   <>
                     <span>{i.url.replace(/^https?:\/\//, "")}</span>
-                    <button type="button" className="ifl-copy" onClick={() => copy(i.url, i.id)}>
+                    <button type="button" className="lx-link ifl-copy" onClick={() => copy(i.url, i.id)}>
                       {copied === i.id ? "Copied" : "Copy link"}
                     </button>
                   </>
@@ -155,7 +155,7 @@ export function IntakeList({
                     <span id={`ifl-notlive-${i.id}`} className="ifl-notlive">
                       {NOT_LIVE_MESSAGE}
                     </span>
-                    <button type="button" className="ifl-copy" disabled aria-describedby={`ifl-notlive-${i.id}`}>
+                    <button type="button" className="lx-link ifl-copy" disabled aria-describedby={`ifl-notlive-${i.id}`}>
                       Copy link
                     </button>
                   </>
@@ -165,22 +165,22 @@ export function IntakeList({
             <dl className="ifl-stats" aria-label="Last 30 days">
               <div>
                 <dt>Gave details</dt>
-                <dd>{i.stats ? i.stats.captured.toLocaleString("en-US") : "—"}</dd>
+                <dd>{i.stats ? i.stats.captured.toLocaleString("en-US") : BLANK}</dd>
               </div>
               <div>
                 <dt>Finished</dt>
                 <dd>
-                  {i.stats ? i.stats.completed.toLocaleString("en-US") : "—"}
+                  {i.stats ? i.stats.completed.toLocaleString("en-US") : BLANK}
                   {i.stats && i.stats.captured > 0 && <small> {i.stats.rate}</small>}
                 </dd>
               </div>
               <div>
                 <dt>Didn&apos;t finish</dt>
-                <dd>{i.stats ? i.stats.unfinished.toLocaleString("en-US") : "—"}</dd>
+                <dd>{i.stats ? i.stats.unfinished.toLocaleString("en-US") : BLANK}</dd>
               </div>
               <div>
                 <dt>Typical time (median)</dt>
-                <dd>{i.stats ? i.stats.median : "—"}</dd>
+                <dd>{i.stats ? i.stats.median : BLANK}</dd>
               </div>
             </dl>
             <div className="ifl-actions">
@@ -219,11 +219,9 @@ export function IntakeList({
           </article>
         ))}
         {shown.length === 0 && (
-          <div className="lx-card lx-empty-card">
-            <p className="lx-note" style={{ margin: 0 }}>
-              {canEdit ? "No forms yet. Name one above to start." : `No forms yet. ${ADMIN_TIER_PHRASE} can set them up.`}
-            </p>
-          </div>
+          <EmptyState variant="line">
+            {canEdit ? "No forms yet. Name one above to start." : `No forms yet. ${ADMIN_TIER_PHRASE} can set them up.`}
+          </EmptyState>
         )}
       </div>
 

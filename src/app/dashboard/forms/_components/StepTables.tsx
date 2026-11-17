@@ -2,6 +2,9 @@ import type { Load } from "@/lib/intake-forms/load-results";
 import { STEP_EVENT_LIMIT, STEP_PEOPLE_LIMIT, type StepFunnelRead } from "@/lib/intake-forms/load-steps";
 import { formatDuration } from "@/lib/intake-forms/performance";
 import { stoppedAtLabel, type StoppedAt } from "@/lib/intake-forms/step-funnel";
+import { Notice } from "@/components/ui/Notice";
+import { SheetScroll, SheetTable } from "@/components/ui/SheetTable";
+import { BLANK } from "@/lib/ui/words";
 
 /**
  * Step-level numbers (Sprint 10): the drop-off table (Results), the median time
@@ -18,16 +21,16 @@ import { stoppedAtLabel, type StoppedAt } from "@/lib/intake-forms/step-funnel";
 export function StepNotice({ state, range, what = "Step data" }: { state: Load<StepFunnelRead>; range: number; what?: string }) {
   if (state.status === "unconfigured") {
     return (
-      <div className="lx-banner lx-banner-warn" role="status">
+      <Notice tone="warn" role="status">
         {`${what} isn't recorded yet for this intake. Lectual will turn it on; the numbers appear once people answer.`}
-      </div>
+      </Notice>
     );
   }
   if (state.status === "unavailable") {
     return (
-      <div className="lx-banner lx-banner-warn" role="status">
+      <Notice tone="warn" role="status">
         {`Couldn't load ${what.toLowerCase()}. Refresh to try again.`}
-      </div>
+      </Notice>
     );
   }
   if (!state.value.recorded) {
@@ -51,15 +54,15 @@ export function StepDropOff({ state, range }: { state: Load<StepFunnelRead>; ran
       </div>
       <StepNotice state={state} range={range} />
       {ok && (
-        <div style={{ overflowX: "auto" }}>
-          <table className="lx-tbl ifm-tbl">
+        <SheetScroll>
+          <SheetTable minWidth={560}>
             <thead>
               <tr>
                 <th>Question</th>
-                <th>Reached</th>
-                <th>Answered</th>
-                <th>Went on</th>
-                <th>Drop-off</th>
+                <th className="num">Reached</th>
+                <th className="num">Answered</th>
+                <th className="num">Went on</th>
+                <th className="num">Drop-off</th>
               </tr>
             </thead>
             <tbody>
@@ -69,15 +72,15 @@ export function StepDropOff({ state, range }: { state: Load<StepFunnelRead>; ran
                     {`Q${i + 1}. ${r.question}`}
                     {!r.inForm && <div className="ifm-help">No longer asked</div>}
                   </td>
-                  <td>{r.reached.toLocaleString("en-US")}</td>
-                  <td>{r.answered.toLocaleString("en-US")}</td>
-                  <td>{r.wentOn.toLocaleString("en-US")}</td>
-                  <td>{r.reached === 0 ? "—" : `${r.dropOff.toLocaleString("en-US")} · ${r.dropOffPct}`}</td>
+                  <td className="num" data-label="Reached">{r.reached.toLocaleString("en-US")}</td>
+                  <td className="num" data-label="Answered">{r.answered.toLocaleString("en-US")}</td>
+                  <td className="num" data-label="Went on">{r.wentOn.toLocaleString("en-US")}</td>
+                  <td className="num" data-label="Drop-off">{r.reached === 0 ? BLANK : `${r.dropOff.toLocaleString("en-US")} · ${r.dropOffPct}`}</td>
                 </tr>
               ))}
             </tbody>
-          </table>
-        </div>
+          </SheetTable>
+        </SheetScroll>
       )}
       {ok && (
         <p className="ifm-help">
@@ -100,26 +103,26 @@ export function StepMedians({ state, range }: { state: Load<StepFunnelRead>; ran
       </div>
       <StepNotice state={state} range={range} />
       {ok && (
-        <div style={{ overflowX: "auto" }}>
-          <table className="lx-tbl ifm-tbl">
+        <SheetScroll>
+          <SheetTable minWidth={480}>
             <thead>
               <tr>
                 <th>Question</th>
-                <th>Typical time on the question (median)</th>
-                <th>People</th>
+                <th className="num">Typical time on the question (median)</th>
+                <th className="num">People</th>
               </tr>
             </thead>
             <tbody>
               {ok.rows.map((r, i) => (
                 <tr key={r.key}>
                   <td className="pri">{`Q${i + 1}. ${r.question}`}</td>
-                  <td>{formatDuration(r.medianMs)}</td>
-                  <td>{r.reached.toLocaleString("en-US")}</td>
+                  <td className="num" data-label="Typical time on the question (median)">{formatDuration(r.medianMs)}</td>
+                  <td className="num" data-label="People">{r.reached.toLocaleString("en-US")}</td>
                 </tr>
               ))}
             </tbody>
-          </table>
-        </div>
+          </SheetTable>
+        </SheetScroll>
       )}
       {ok && (
         <p className="ifm-help">
@@ -134,9 +137,9 @@ export function StepMedians({ state, range }: { state: Load<StepFunnelRead>; ran
 /** The "Stopped at" cell: nothing to say for someone who finished. */
 export function StoppedAtCell({ reading, state }: { reading: StoppedAt | undefined; state: "ok" | "unconfigured" | "unavailable" }) {
   // Someone who finished has no stopping point, whatever state the step read is in.
-  if (reading?.kind === "finished") return <td className="ifm-stopped ifm-muted">—</td>;
-  if (state === "unavailable") return <td className="ifm-stopped ifm-muted">Couldn&apos;t load</td>;
-  if (state === "unconfigured") return <td className="ifm-stopped ifm-muted">not recorded</td>;
+  if (reading?.kind === "finished") return <td className="ifm-stopped ifm-muted" data-label="Stopped at">{BLANK}</td>;
+  if (state === "unavailable") return <td className="ifm-stopped ifm-muted" data-label="Stopped at">Couldn&apos;t load</td>;
+  if (state === "unconfigured") return <td className="ifm-stopped ifm-muted" data-label="Stopped at">not recorded</td>;
   const label = reading ? stoppedAtLabel(reading) : null;
-  return <td className="ifm-stopped ifm-muted">{label ?? "—"}</td>;
+  return <td className="ifm-stopped ifm-muted" data-label="Stopped at">{label ?? BLANK}</td>;
 }

@@ -68,7 +68,7 @@ describe("Where they came from (three states)", () => {
   it("with people but none tagged shows only Direct (no tag)", () => {
     const html = ok([c(), c(), c()]);
     expect(html).toContain("Direct (no tag)");
-    expect(html).toContain("<td>3</td>");
+    expect(html).toContain('<td class="num" data-label="People">3</td>');
     expect(html).not.toContain("Instagram");
     expect(html).toContain("3 people in this range.");
   });

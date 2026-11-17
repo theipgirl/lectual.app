@@ -10,7 +10,6 @@ import { ceilingCheck, cssFiles, read, removeBlocks, stripCssComments, tsxFiles 
 const ALLOW_TSX = new Set(["src/app/dashboard/forms/_components/IntakePreview.tsx"]);
 const CSS: Record<string, number> = {
   "src/app/dashboard/copilot/copilot.css": 3,
-  "src/app/dashboard/forms/forms.css": 69,
   "src/app/dashboard/intake/intake.css": 2,
   "src/app/dashboard/intake/leads.css": 1,
   "src/app/dashboard/proposals/proposals.css": 6,

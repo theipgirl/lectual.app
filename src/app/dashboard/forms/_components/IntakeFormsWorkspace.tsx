@@ -31,6 +31,11 @@ import { AssessmentPreview, AssessmentSettingsCard } from "./AssessmentSettings"
 import { OptionsEditor, QuestionTypeSelect } from "./ChoiceEditor";
 import { isChoice, questionType } from "@/lib/intake-forms/choice";
 import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
+import { Icon, Notice, PageHeader, PageTabs, Pill, Toast } from "@/components/ui";
+import { MoreMenu } from "@/components/list-page/MoreMenu";
+import { formatDay } from "@/lib/ui/dates";
+import { FORMS_NAME, SAVING } from "@/lib/ui/words";
+import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
 
 /**
  * Intake → Forms (design/Intake_Forms.dc.html): the header, the two tabs,
@@ -55,6 +60,8 @@ export type WorkspacePackage = { id: string; name: string; price: string; includ
 
 type Props = {
   form: IntakeFormRecord;
+  /** The firm's time zone, for the dates on this page. */
+  timeZone?: string;
   orgName: string;
   packages: { status: "ok"; items: WorkspacePackage[] } | { status: "unavailable" };
   origin: string;
@@ -74,11 +81,7 @@ const LOCK = (
     <path d="M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3" />
   </svg>
 );
-const CHECK = (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-    <path d="M5 12l5 5 9-10" />
-  </svg>
-);
+const CHECK = <Icon name="check" size={12} />;
 
 function Toggle({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {
   return (
@@ -140,7 +143,6 @@ export function IntakeFormsWorkspace(props: Props) {
   const [showErrors, setShowErrors] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [justAdded, setJustAdded] = useState<Set<string>>(new Set());
-  const [menu, setMenu] = useState<string | null>(null);
   const [drag, setDrag] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
   const [domInput, setDomInput] = useState("");
@@ -193,16 +195,6 @@ export function IntakeFormsWorkspace(props: Props) {
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
 
-  // The question "More" menu closes on any click outside it.
-  useEffect(() => {
-    if (!menu) return;
-    const close = (e: MouseEvent) => {
-      if (!(e.target as HTMLElement).closest?.("[data-qmenu]")) setMenu(null);
-    };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, [menu]);
-
   const edit = (patch: Partial<IntakeFormConfig> | ((c: IntakeFormConfig) => Partial<IntakeFormConfig>)) =>
     setConfig((c) => ({ ...c, ...(typeof patch === "function" ? patch(c) : patch) }));
   const editQ = (id: string, patch: Partial<IntakeQuestion>) =>
@@ -242,7 +234,6 @@ export function IntakeFormsWorkspace(props: Props) {
     setDetails(saved.details);
     setShowErrors(false);
     setSaveError(null);
-    setMenu(null);
     flash("Changes discarded");
   };
 
@@ -298,44 +289,34 @@ export function IntakeFormsWorkspace(props: Props) {
 
   return (
     <div className="ifm-root">
-      <div className="lx-page-head ifm-head">
-        <div style={{ flex: 1, minWidth: 240 }}>
-          <Link href="/dashboard/forms/" className="ifm-back">
-            ← All forms
-          </Link>
-          <h1 className="lx-h1">{saved.details.name}</h1>
-          <p className="lx-sub">
-            {saved.details.sourceTag ? `Leads from it are tagged “${saved.details.sourceTag}”.` : "How it looks, what it asks, and where it lives."}
-          </p>
-        </div>
-        <div className="ifm-head-actions">
-          <span className={`ifm-status${live ? " live" : ""}`}>
-            <i />
-            {live ? "Live" : archived ? "Archived" : "Draft"}
-          </span>
-          <a className="lx-btn lx-btn-sec" href="#ifm-sec-share">
-            Share
-          </a>
-          {canEdit && (
-            <button type="button" className="lx-btn lx-btn-pri" onClick={save} disabled={saving || !dirty} aria-busy={saving}>
-              {saving && <span className="ifm-spin" aria-hidden />}
-              {saving ? "Saving…" : "Save changes"}
-            </button>
-          )}
-        </div>
-      </div>
+      <PageHeader
+        className="ifm-head"
+        back={{ href: "/dashboard/forms/", label: FORMS_NAME }}
+        title={saved.details.name}
+        sub={saved.details.sourceTag ? `Leads from it are tagged “${saved.details.sourceTag}”.` : "How it looks, what it asks, and where it lives."}
+        actions={
+          <>
+            <Pill tone={live ? "ok" : "mute"}>{live ? "Live" : archived ? "Archived" : "Draft"}</Pill>
+            <a className="lx-btn lx-btn-sec" href="#ifm-sec-share">
+              Share
+            </a>
+            {canEdit && (
+              <button type="button" className="lx-btn lx-btn-pri" onClick={save} disabled={saving || !dirty} aria-busy={saving}>
+                {saving ? SAVING : "Save changes"}
+              </button>
+            )}
+          </>
+        }
+      />
 
-      <nav className="ifm-tabs" aria-label="Forms">
-        <Link href={tabHref("setup")} scroll={false} aria-current={props.tab === "setup" ? "page" : undefined}>
-          Setup
-        </Link>
-        <Link href={tabHref("results")} scroll={false} aria-current={props.tab === "results" ? "page" : undefined}>
-          Results
-        </Link>
-        <Link href={tabHref("performance")} scroll={false} aria-current={props.tab === "performance" ? "page" : undefined}>
-          Performance
-        </Link>
-      </nav>
+      <PageTabs
+        label="Forms"
+        tabs={[
+          { href: tabHref("setup"), label: "Setup", current: props.tab === "setup", scroll: false },
+          { href: tabHref("results"), label: "Results", current: props.tab === "results", scroll: false },
+          { href: tabHref("performance"), label: "Performance", current: props.tab === "performance", scroll: false },
+        ]}
+      />
 
       {props.tab === "performance" ? (
         props.performance
@@ -346,21 +327,19 @@ export function IntakeFormsWorkspace(props: Props) {
           <div className="ifm-editor-col">
           <fieldset className="ifm-editor" disabled={!canEdit}>
             {!canEdit && (
-              <div className="lx-banner lx-banner-mute" style={{ fontSize: 14 }}>
-                You can look but not change. {ADMIN_TIER_PHRASE} can edit the intake.
-              </div>
+              <Notice tone="mute">You can look but not change. {ADMIN_TIER_PHRASE} can edit the intake.</Notice>
             )}
             {saveError && (
-              <div role="alert" className="lx-banner lx-banner-risk" style={{ fontSize: 14 }}>
+              <Notice tone="risk" role="alert">
                 {saveError}
-              </div>
+              </Notice>
             )}
 
             <section id="ifm-sec-details" className="ifm-card">
               <h2 className="ifm-title">Name, link and source</h2>
               <label className="ifm-field">
                 <span className="ifm-field-head">
-                  <span className="ifm-field-label" style={{ flex: 1 }}>
+                  <span className="ifm-field-label ifm-grow">
                     Name
                   </span>
                   <Counter n={details.name.length} max={DETAIL_LIMITS.name} />
@@ -398,7 +377,7 @@ export function IntakeFormsWorkspace(props: Props) {
               </label>
               <label className="ifm-field">
                 <span className="ifm-field-head">
-                  <span className="ifm-field-label" style={{ flex: 1 }}>
+                  <span className="ifm-field-label ifm-grow">
                     Source tag
                   </span>
                   <Counter n={(details.sourceTag ?? "").length} max={DETAIL_LIMITS.sourceTag} />
@@ -415,9 +394,7 @@ export function IntakeFormsWorkspace(props: Props) {
             </section>
 
             {archived ? (
-              <div className="lx-banner lx-banner-mute" style={{ fontSize: 14 }}>
-                Archived: the link doesn&apos;t take new people. Its leads and numbers are kept. Restore it from All intakes.
-              </div>
+              <Notice tone="mute">Archived: the link doesn&apos;t take new people. Its leads and numbers are kept. Restore it from the Forms list.</Notice>
             ) : allDone ? (
               <div className="ifm-live-banner">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -435,7 +412,7 @@ export function IntakeFormsWorkspace(props: Props) {
             ) : (
               <div className="ifm-card ifm-checklist">
                 <div className="ifm-checklist-head">
-                  <div className="ifm-title" style={{ flex: 1 }}>
+                  <div className="ifm-title ifm-grow">
                     Finish these to go live.
                   </div>
                   <span className="ifm-count">
@@ -582,8 +559,7 @@ export function IntakeFormsWorkspace(props: Props) {
                         e.dataTransfer.effectAllowed = "move";
                         e.dataTransfer.setData("text/plain", q.id);
                         setDrag(q.id);
-                        setMenu(null);
-                      }}
+                                          }}
                       onDragOver={(e) => {
                         e.preventDefault();
                         if (over !== q.id) setOver(q.id);
@@ -628,27 +604,14 @@ export function IntakeFormsWorkspace(props: Props) {
                         <span className="ifm-help">Required</span>
                         <Toggle on={q.required} label={`Question ${i + 1} required`} onClick={() => editQ(q.id, { required: !q.required })} />
                       </span>
-                      <span className="ifm-q-more" data-qmenu>
-                        <button type="button" className="ifm-icon-btn" aria-label={`More for question ${i + 1}`} aria-expanded={menu === q.id} onClick={() => setMenu(menu === q.id ? null : q.id)}>
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                            <circle cx="5" cy="12" r="1.8" />
-                            <circle cx="12" cy="12" r="1.8" />
-                            <circle cx="19" cy="12" r="1.8" />
-                          </svg>
-                        </button>
-                        {menu === q.id && (
-                          <span className="ifm-menu" role="menu">
-                            <button type="button" role="menuitem" disabled={i === 0} onClick={() => { edit((c) => ({ questions: moveQuestion(c.questions, i, -1) })); setMenu(null); }}>
-                              Move up
-                            </button>
-                            <button type="button" role="menuitem" disabled={i === config.questions.length - 1} onClick={() => { edit((c) => ({ questions: moveQuestion(c.questions, i, 1) })); setMenu(null); }}>
-                              Move down
-                            </button>
-                            <button type="button" role="menuitem" className="danger" onClick={() => { edit((c) => ({ questions: c.questions.filter((x) => x.id !== q.id) })); setMenu(null); }}>
-                              Remove
-                            </button>
-                          </span>
-                        )}
+                      <span className="ifm-q-more">
+                        <MoreMenu
+                          items={[
+                            { label: "Move up", disabled: i === 0, onSelect: () => edit((c) => ({ questions: moveQuestion(c.questions, i, -1) })) },
+                            { label: "Move down", disabled: i === config.questions.length - 1, onSelect: () => edit((c) => ({ questions: moveQuestion(c.questions, i, 1) })) },
+                            { label: "Remove", tone: "danger", onSelect: () => edit((c) => ({ questions: c.questions.filter((x) => x.id !== q.id) })) },
+                          ]}
+                        />
                       </span>
                       {isChoice(q) && (
                         <div className="ifm-q-options">
@@ -678,15 +641,13 @@ export function IntakeFormsWorkspace(props: Props) {
             <section id="ifm-sec-fees" className="ifm-card">
               <h2 className="ifm-title">Fee packages</h2>
               <div className="ifm-row">
-                <span className="ifm-field-label" style={{ flex: 1 }}>
+                <span className="ifm-field-label ifm-grow">
                   Show my flat-fee packages in the intake.
                 </span>
                 <Toggle on={config.feesOn} label="Show fee packages" onClick={() => edit({ feesOn: !config.feesOn })} />
               </div>
               {props.packages.status === "unavailable" ? (
-                <div className="lx-banner lx-banner-warn" style={{ fontSize: 14 }}>
-                  Your packages couldn&apos;t be loaded just now, so none are listed here. Your saved choices are kept.
-                </div>
+                <Notice tone="warn">Your packages couldn&apos;t be loaded just now, so none are listed here. Your saved choices are kept.</Notice>
               ) : packages.length > 0 ? (
                 <>
                   <ul className={`ifm-pkgs${config.feesOn ? "" : " off"}`}>
@@ -694,7 +655,7 @@ export function IntakeFormsWorkspace(props: Props) {
                       const shown = config.visiblePackageIds.includes(p.id);
                       return (
                         <li key={p.id}>
-                          <div style={{ flex: 1, minWidth: 0 }}>
+                          <div className="ifm-grow">
                             <div className="ifm-pkg-head">
                               <span className="ifm-pkg-name">{p.name}</span>
                               <span className="ifm-pkg-price">{p.price}</span>
@@ -721,7 +682,7 @@ export function IntakeFormsWorkspace(props: Props) {
                 </>
               ) : (
                 <div className="ifm-empty ifm-empty-row">
-                  <span style={{ flex: 1 }}>No packages yet.</span>
+                  <span className="ifm-grow">No packages yet.</span>
                   {canEdit ? (
                     <Link href="/dashboard/settings/services/" className="ifm-link">
                       Add packages
@@ -781,7 +742,7 @@ export function IntakeFormsWorkspace(props: Props) {
               )}
               <label className="ifm-field">
                 <span className="ifm-field-head">
-                  <span className="ifm-field-label" style={{ flex: 1 }}>
+                  <span className="ifm-field-label ifm-grow">
                     Closing message
                   </span>
                   <Counter n={config.closing.length} max={LIMITS.closing} />
@@ -816,9 +777,9 @@ export function IntakeFormsWorkspace(props: Props) {
                 <div className="ifm-field">
                   <span className="ifm-field-label">Participation agreement</span>
                   <div className="ifm-row">
-                    <span className={`ifm-badge ${agreementSigned ? "ok" : "warn"}`}>
-                      {agreementSigned ? `Signed ${new Date(form.agreementSignedAt as string).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : "Not signed"}
-                    </span>
+                    <Pill tone={agreementSigned ? "ok" : "warn"}>
+                      {agreementSigned ? `Signed ${formatDay(form.agreementSignedAt as string, { tz: props.timeZone ?? DEFAULT_TIME_ZONE }) ?? ""}`.trim() : "Not signed"}
+                    </Pill>
                   </div>
                   {err("agreement") && <span className="ifm-err">The participation agreement must be signed before referrals can reach you.</span>}
                   <span className="ifm-help">Lectual records this when your firm signs the agreement. It can&apos;t be changed here.</span>
@@ -837,9 +798,9 @@ export function IntakeFormsWorkspace(props: Props) {
               <h2 className="ifm-title">Appearance</h2>
               <div className="ifm-field">
                 <span className="ifm-field-label">Theme</span>
-                <div className="ifm-seg" role="group" aria-label="Theme">
+                <div className="vs-switch" role="group" aria-label="Theme">
                   {(["light", "dark", "auto"] as const).map((t) => (
-                    <button key={t} type="button" className={config.theme === t ? "on" : ""} aria-pressed={config.theme === t} onClick={() => setTheme(t)}>
+                    <button key={t} type="button" aria-pressed={config.theme === t} onClick={() => setTheme(t)}>
                       {t === "light" ? "Light" : t === "dark" ? "Dark" : "Auto"}
                     </button>
                   ))}
@@ -861,7 +822,7 @@ export function IntakeFormsWorkspace(props: Props) {
                 ))}
               </div>
               <div className="ifm-row">
-                <span className="ifm-field-label" style={{ flex: 1 }}>
+                <span className="ifm-field-label ifm-grow">
                   Show &lsquo;Powered by Lectual&rsquo;
                 </span>
                 <Toggle on={config.powered} label="Show Powered by Lectual" onClick={() => edit({ powered: !config.powered })} />
@@ -891,7 +852,7 @@ export function IntakeFormsWorkspace(props: Props) {
                   <details className="ifm-field ifm-embed">
                     <summary className="ifm-field-label">Embed on a website (for your web person)</summary>
                     <span className="ifm-field-head">
-                      <span className="ifm-field-label" style={{ flex: 1 }}>
+                      <span className="ifm-field-label ifm-grow">
                         Put this on your website
                       </span>
                       <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={() => copy(embed, "Website code copied")}>
@@ -926,9 +887,7 @@ export function IntakeFormsWorkspace(props: Props) {
                     <span key={d} className="ifm-domain">
                       <span>{d}</span>
                       <button type="button" aria-label={`Remove ${d}`} onClick={() => setDomains(domains.filter((x) => x !== d))}>
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" aria-hidden>
-                          <path d="M6 6l12 12M18 6L6 18" />
-                        </svg>
+                        <Icon name="close" size={12} />
                       </button>
                     </span>
                   ))}
@@ -955,7 +914,7 @@ export function IntakeFormsWorkspace(props: Props) {
               {canEdit && (
                 <div className="ifm-row ifm-save-row">
                   <button type="button" className="lx-btn lx-btn-pri" onClick={save} disabled={saving || !dirty} aria-busy={saving}>
-                    {saving ? "Saving…" : "Save changes"}
+                    {saving ? SAVING : "Save changes"}
                   </button>
                 </div>
               )}
@@ -971,25 +930,18 @@ export function IntakeFormsWorkspace(props: Props) {
       )}
 
       {canEdit && (dirty || saving) && (
-        <div className="ifm-unsaved" data-save-bar role="region" aria-label="Unsaved changes">
-          <i />
-          <span style={{ flex: 1, minWidth: 0 }}>Unsaved changes</span>
-          <button type="button" className="ifm-unsaved-discard" onClick={discard} disabled={saving}>
+        <div className="lx-unsaved" data-save-bar role="region" aria-label="Unsaved changes">
+          <span className="ifm-grow">Unsaved changes</span>
+          <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={discard} disabled={saving}>
             Discard
           </button>
-          <button type="button" className="ifm-unsaved-save" onClick={save} disabled={saving}>
-            {saving && <span className="ifm-spin dark" aria-hidden />}
-            {saving ? "Saving…" : "Save"}
+          <button type="button" className="lx-btn lx-btn-pri lx-btn-sm" onClick={save} disabled={saving}>
+            {saving ? SAVING : "Save"}
           </button>
         </div>
       )}
 
-      {toast && (
-        <div className="ifm-toast" role="status">
-          {CHECK}
-          <span>{toast}</span>
-        </div>
-      )}
+      {toast && <Toast>{toast}</Toast>}
     </div>
   );
 }

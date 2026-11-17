@@ -106,7 +106,7 @@ function tableRows(html: string, label: string): string[][] {
 /** The "Stopped at" cell for each person in the All intakes table, by name. */
 function stoppedCells(html: string): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const m of html.matchAll(/<tr[^>]*><td class="pri"><a [^>]*>([^<]*)<\/a>.*?<td class="ifm-stopped[^"]*">([^<]*)<\/td><\/tr>/g)) out[m[1]] = m[2];
+  for (const m of html.matchAll(/<tr[^>]*><td class="pri"><a [^>]*>([^<]*)<\/a>.*?<td class="ifm-stopped[^"]*"[^>]*>([^<]*)<\/td><\/tr>/g)) out[m[1]] = m[2];
   return out;
 }
 
@@ -184,7 +184,7 @@ describe("the surfaces agree (D4)", () => {
     const drawerOnPerformance = await w.performance({ intakeId: String(B.row.id) });
     const drawerOnResults = await w.results({ intakeId: String(B.row.id) });
     for (const html of [drawerOnPerformance, drawerOnResults]) {
-      const drawer = html.slice(html.indexOf("ifm-drawer-wrap"));
+      const drawer = html.slice(html.indexOf("lx-drawer-root"));
       expect(drawer).toContain("Where they stopped");
       expect(drawer).toContain(table["Person 2"]);
     }
@@ -196,7 +196,7 @@ describe("the person drawer (F25)", () => {
   it("shows where they stopped and 'Answers so far (not submitted)' when progress was saved", async () => {
     const { w, B } = await story();
     const html = await w.performance({ intakeId: String(B.row.id) });
-    const drawer = html.slice(html.indexOf("ifm-drawer-wrap"));
+    const drawer = html.slice(html.indexOf("lx-drawer-root"));
     expect(drawer).toContain("Answers so far (not submitted)");
     expect(drawer).toMatch(/<dt>What name do you want to protect\?<\/dt><dd>ACME<\/dd>/);
     expect(drawer).toContain("Stopped at Q2");
@@ -204,14 +204,14 @@ describe("the person drawer (F25)", () => {
 
   it("shows the reading but no 'Answers so far' for someone with nothing saved", async () => {
     const { w, D } = await story();
-    const drawer = (await w.performance({ intakeId: String(D.row.id) })).split("ifm-drawer-wrap")[1];
+    const drawer = (await w.performance({ intakeId: String(D.row.id) })).split("lx-drawer-root")[1];
     expect(drawer).toContain("Stopped at Q1");
     expect(drawer).not.toContain("Answers so far");
   });
 
   it("shows neither for someone who finished, and the rest of the drawer is as before", async () => {
     const { w, A } = await story();
-    const drawer = (await w.performance({ intakeId: String(A.row.id) })).split("ifm-drawer-wrap")[1];
+    const drawer = (await w.performance({ intakeId: String(A.row.id) })).split("lx-drawer-root")[1];
     expect(drawer).not.toContain("Where they stopped");
     expect(drawer).not.toContain("Answers so far");
     expect(drawer).toContain("Screening note");
@@ -224,7 +224,7 @@ describe("the person drawer (F25)", () => {
     setNow(0);
     await w.actions.recordIntakeStepAction(SLUG, { token: A.token, stepIndex: 2, questionId: "q-many", progress: { "q-many": ["Slogan, tagline", "Word mark"] } });
     setNow(3600);
-    const drawer = (await w.performance({ intakeId: uuid(1) })).split("ifm-drawer-wrap")[1];
+    const drawer = (await w.performance({ intakeId: uuid(1) })).split("lx-drawer-root")[1];
     expect(drawer).toMatch(/<dt>Which of these do you have\?<\/dt><dd>Word mark, Slogan, tagline<\/dd>/);
   });
 });
@@ -325,9 +325,9 @@ describe("three states (F26)", () => {
 
   it("a person's drawer says 'not recorded' or couldn't load, in its own words", async () => {
     const w = await degraded({ code: "42703", message: "column does not exist" });
-    expect((await w.performance({ intakeId: uuid(1) })).split("ifm-drawer-wrap")[1]).toContain("not recorded");
+    expect((await w.performance({ intakeId: uuid(1) })).split("lx-drawer-root")[1]).toContain("not recorded");
     const w2 = await degraded({ code: "57014", message: "timeout" });
-    expect((await w2.performance({ intakeId: uuid(1) })).split("ifm-drawer-wrap")[1]).toContain("Couldn't load step data");
+    expect((await w2.performance({ intakeId: uuid(1) })).split("lx-drawer-root")[1]).toContain("Couldn't load step data");
   });
 
   it("only reads step data through the staff's scoped client, never writing anything", async () => {

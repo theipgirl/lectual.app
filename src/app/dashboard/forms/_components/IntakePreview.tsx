@@ -94,16 +94,16 @@ export function IntakePreview(props: {
     <section className="ifm-preview" aria-label="Live preview">
       <div className="ifm-pv-bar">
         <div className="ifm-pv-title">Live preview</div>
-        <div className="ifm-seg" role="group" aria-label="Device">
+        <div className="vs-switch" role="group" aria-label="Device">
           {(["desktop", "mobile"] as const).map((d) => (
-            <button key={d} type="button" className={device === d ? "on" : ""} aria-pressed={device === d} onClick={() => setDevice(d)}>
+            <button key={d} type="button" aria-pressed={device === d} onClick={() => setDevice(d)}>
               {d === "desktop" ? "Desktop" : "Mobile"}
             </button>
           ))}
         </div>
-        <div className="ifm-seg" role="group" aria-label="Preview theme">
+        <div className="vs-switch" role="group" aria-label="Preview theme">
           {(["light", "dark"] as const).map((t) => (
-            <button key={t} type="button" className={props.theme === t ? "on" : ""} aria-pressed={props.theme === t} onClick={() => props.onTheme(t)}>
+            <button key={t} type="button" aria-pressed={props.theme === t} onClick={() => props.onTheme(t)}>
               {t === "light" ? "Light" : "Dark"}
             </button>
           ))}

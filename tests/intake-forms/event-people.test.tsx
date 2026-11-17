@@ -61,7 +61,7 @@ describe("the People section", () => {
     expect(section.match(/<li class="ifm-card ev-person"/g)).toHaveLength(4);
     expect(section.indexOf("=Ada")).toBeLessThan(section.indexOf("Bo Marsh"));
     expect(section).toContain("Quill Studio");
-    expect(section).toContain("Nov 15, 2026, 2:42 PM EST");
+    expect(section).toContain("Nov 15, 2:42 PM");
     expect(section).toContain("40 · Partly protected");
     expect(section).toContain("Temperature (staff only)");
     expect(section).toContain('ev-temp-hot">Hot<');
@@ -133,8 +133,8 @@ describe("the People section", () => {
 
 describe("takenAtText", () => {
   it("names the zone and falls back to UTC for an unknown one", () => {
-    expect(takenAtText("2026-11-15T19:42:00Z", "America/New_York")).toBe("Nov 15, 2026, 2:42 PM EST");
-    expect(takenAtText("2026-11-15T19:42:00Z", "Not/AZone")).toContain("UTC");
+    expect(takenAtText("2026-11-15T19:42:00Z", "America/New_York")).toBe("Nov 15, 2:42 PM");
+    expect(takenAtText("2026-11-15T19:42:00Z", "Not/AZone")).toBe("Nov 15, 7:42 PM");
     expect(takenAtText("nonsense", "UTC")).toBe("");
   });
 });

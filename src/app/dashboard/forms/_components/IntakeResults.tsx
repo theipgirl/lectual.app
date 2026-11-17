@@ -64,7 +64,7 @@ export async function IntakeResults({
   return (
     <div className="ifm-perf">
       <div className="ifm-perf-head">
-        <h2 className="ifm-title" style={{ flex: 1 }}>
+        <h2 className="ifm-title ifm-grow">
           Results
         </h2>
         {canExport ? (
@@ -74,9 +74,9 @@ export async function IntakeResults({
         ) : (
           <span className="ifm-help">CSV export is for staff roles.</span>
         )}
-        <nav className="ifm-seg" aria-label="Date range">
+        <nav className="vs-switch" aria-label="Date range">
           {RANGES.map((r) => (
-            <Link key={r} href={resultsHref(form.id, r)} scroll={false} className={range === r ? "on" : ""} aria-current={range === r ? "page" : undefined}>
+            <Link key={r} href={resultsHref(form.id, r)} scroll={false} aria-current={range === r ? "page" : undefined}>
               {r} days
             </Link>
           ))}

@@ -85,7 +85,7 @@ export function AssessmentSettingsCard({
         <input type="checkbox" checked={settings.showScore} onChange={(e) => onChange({ ...settings, showScore: e.target.checked })} />
         <span>Show people their score and biggest gaps when they finish</span>
       </label>
-      <p className="ifm-help" style={{ margin: 0 }}>
+      <p className="ifm-help">
         Hot, warm or cold is only ever shown to your firm: on the lead, in Intake numbers and as a Lawmatics tag.
       </p>
 
@@ -208,10 +208,10 @@ export function AssessmentPreview({ settings }: { settings: AssessmentSettings }
   return (
     <div className="ifm-card ifm-asm-preview" aria-label="Assessment preview">
       <div className="ifm-field-label">Preview</div>
-      <h3 className="ifm-title" style={{ margin: 0 }}>
+      <h3 className="ifm-title">
         {boothVariant(settings.variant).title}
       </h3>
-      <p className="ifm-help" style={{ margin: 0 }}>
+      <p className="ifm-help">
         Name, email, phone and consent first. Then one question at a time:
       </p>
       <ol className="ifm-asm-plist">
@@ -228,7 +228,7 @@ export function AssessmentPreview({ settings }: { settings: AssessmentSettings }
           </li>
         ))}
       </ol>
-      <p className="ifm-help" style={{ margin: 0 }}>
+      <p className="ifm-help">
         {settings.showScore ? "At the end they see their score out of 100, a band and their biggest gaps." : "At the end they see your closing message."}
       </p>
     </div>
