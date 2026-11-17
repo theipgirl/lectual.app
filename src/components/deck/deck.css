@@ -267,4 +267,5 @@ a.dk-move--open { font-size: var(--fs-3); }
   .dk-deal-btn { min-height: 44px; }
   .dk-linkbtn { min-height: 44px; }
   .dk-after-next, .dk-handto-cancel { min-height: 44px; }
+  .dk-toast button, .dk-toast .dk-undo { height: auto; min-height: 44px; }
 }
