@@ -2,6 +2,7 @@ import type { StopDb } from "@/lib/campaigns/stop-db";
 import { rowsOf, str } from "@/lib/campaigns/stop-db";
 import type { QueueItem } from "./api";
 import { DRAFT_PAYLOAD_KEYS, MAX_RECIPIENT_LEADS, QUEUE_ID, UUID, recipientAddresses } from "./link-rules";
+import { keeperIdOf, leadRead } from "@/lib/leads/live";
 
 /**
  * Which lead(s) each pending queue item belongs to: the batched resolver that the
@@ -104,7 +105,9 @@ export async function resolveBatch(db: StopDb, items: QueueItem[]): Promise<Map<
     const all = [...new Set(byRecipient.flatMap((x) => x.addresses))];
     const rows: Record<string, unknown>[] = [];
     for (const part of chunks(all)) {
-      const { data, error } = await db.from("crm_lead").select("id, email").in("email", part);
+      // A merged lead (lectual 0107) is never the lead an item is about: its old address is FOLLOWED to its keeper.
+      // live-guard: reads merged leads WITH their pointer and maps each to its keeper (keeperIdOf)
+      const { data, error } = await leadRead(({ merged }) => db.from("crm_lead").select(merged ? "id, email, merged_into_id" : "id, email").in("email", part));
       if (error) throw new Error(error.message ?? "crm_lead read failed");
       rows.push(...rowsOf(data));
     }
@@ -113,7 +116,7 @@ export async function resolveBatch(db: StopDb, items: QueueItem[]): Promise<Map<
     // Lower-casing here would let one item borrow another item's casing.
     const leadsByEmail = new Map<string, string[]>();
     for (const row of rows) {
-      const id = str(row.id);
+      const id = keeperIdOf(row);
       const email = str(row.email);
       if (!id || !email) continue;
       leadsByEmail.set(email, [...(leadsByEmail.get(email) ?? []), id]);

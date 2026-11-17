@@ -72,7 +72,7 @@ describe("queueMonthlyStatusUpdate", () => {
         matterId: "matter-1",
         recipient: "jane@example.com",
         subject: "A quick update on your trademark application",
-        headline: "Monthly Status Update — Month 1 of ~5 — SUNBEAM",
+        headline: "Monthly Status Update — Month 1 of 4 — SUNBEAM",
       }),
     );
     expect(result).toEqual({ queueItemId: "queue-1" });

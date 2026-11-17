@@ -1,6 +1,6 @@
 import type { Matter } from "./matters";
 import type { MatterWaitingOn } from "./stage-rules";
-import { daysInStage, matterIsStale } from "./stage-rules";
+import { STALE_THRESHOLD_DAYS, daysInStage, matterIsStale } from "./stage-rules";
 import { isOpenMatter } from "./docket-summary";
 
 /**
@@ -20,7 +20,7 @@ export const BAND_ORDER: readonly BandKey[] = ["firm", "client", "uspto", "court
 
 export const BAND_COPY: Record<BandKey, { label: string; hint: string }> = {
   firm: { label: "Waiting on us", hint: "we owe the next move" },
-  client: { label: "Waiting on the client", hint: "nudge past 21 days" },
+  client: { label: "Waiting on the client", hint: `nudge past ${STALE_THRESHOLD_DAYS.client} days` },
   uspto: { label: "With the USPTO", hint: "nothing to do but watch" },
   court: { label: "With the court", hint: "watch the docket" },
   unplaced: { label: "Not on the docket yet", hint: "give these a stage" },

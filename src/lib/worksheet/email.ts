@@ -7,7 +7,7 @@ import {
   WORKSHEET_FOOTER,
   worksheetSummary,
 } from "./answers";
-import { attendeeHtml } from "./email-html";
+import { attendeeHtml, PERSONAL_BOOKING_SENTENCE } from "./email-html";
 import type { WorksheetInput } from "./schema";
 
 /**
@@ -50,7 +50,8 @@ export function firmNotice(input: WorksheetInput, ctx: { now: Date; filedAs: str
 }
 
 /** To the attendee, only when they ticked the box asking for a copy. */
-export function attendeeCopy(input: WorksheetInput, ctx: { now: Date }): BuiltEmail {
+export function attendeeCopy(input: WorksheetInput, ctx: { now: Date; bookingUrl?: string | null }): BuiltEmail {
+  const personal = ctx.bookingUrl ?? null;
   const first = input.contact.firstName || "there";
   const lines = [
     `Hi ${first},`,
@@ -60,11 +61,12 @@ export function attendeeCopy(input: WorksheetInput, ctx: { now: Date }): BuiltEm
     worksheetSummary(input, ctx.now),
     "",
     "When you're ready to talk with our team about protecting what you've built, you can book a Legal Strategy Session here:",
-    STRATEGY_SESSION_URL,
+    personal ?? STRATEGY_SESSION_URL,
+    ...(personal ? ["", PERSONAL_BOOKING_SENTENCE] : []),
     "",
     "RPB Law Firm",
     "",
     WORKSHEET_FOOTER,
   ];
-  return { subject: `Your IP Portfolio from ${WORKSHEET_EVENT.name}`, text: lines.join("\n"), html: attendeeHtml(input, ctx.now) };
+  return { subject: `Your IP Portfolio from ${WORKSHEET_EVENT.name}`, text: lines.join("\n"), html: attendeeHtml(input, ctx.now, personal) };
 }

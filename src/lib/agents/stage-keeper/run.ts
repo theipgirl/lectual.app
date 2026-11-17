@@ -22,6 +22,7 @@ import { orgFencedReader } from "../shared";
 import type { AgentContext, AgentResult } from "../types";
 import { parseStageMapping, type StageMapping } from "./mapping";
 import { targetStageFromSignals } from "./target";
+import { leadRead } from "@/lib/leads/live";
 
 /**
  * Stage Keeper: places each lead on the board from facts the firm already recorded.
@@ -356,7 +357,8 @@ async function readApprovedQueue(ctx: AgentContext, sinceMs: number): Promise<Qu
 async function readLeads(admin: SupabaseClient, orgId: string, ids: readonly string[]): Promise<LeadRow[]> {
   const out: LeadRow[] = [];
   for (const batch of chunk(ids, CHUNK)) {
-    const { data, error } = await admin.from("crm_lead").select("id, current_stage_id").eq("org_id", orgId).in("id", batch);
+    // A merged lead (lectual 0107) is left out, so its signals give no move (the guard would refuse it anyway).
+    const { data, error } = await leadRead(({ live }) => live(admin.from("crm_lead").select("id, current_stage_id")).eq("org_id", orgId).in("id", batch));
     if (error) throw new Error(`lead read failed: ${error.message}`);
     out.push(...((data ?? []) as LeadRow[]));
   }

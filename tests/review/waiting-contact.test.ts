@@ -13,6 +13,45 @@ describe("stageIsWithUspto", () => {
   });
 });
 
+describe("stageIsWithUspto: live RPB stages", () => {
+  const withOwn: Array<[string, string, string, boolean]> = [
+    ["15", "Send Invoice for Remaining Balance", "client", false],
+    ["17", "Application Filed", "uspto", true],
+    ["18", "Awaiting Trademark Registration", "uspto", true],
+    ["19D", "Invoice for OA Response Sent", "client", false],
+    ["19F", "OA Response Sent", "uspto", true],
+    ["19H", "Invoice for OA Response Extension Request", "client", false],
+    ["20D", "SOU Preparation", "firm", false],
+    ["21E", "NOA Accepted", "firm", false],
+    ["22", "Publication for Opposition", "uspto", true],
+  ];
+  for (const [code, name, waiting_on, expected] of withOwn) {
+    for (const label of [name, `${code} · ${name}`, `${code}. ${name}`]) {
+      it(`${label} (${waiting_on})`, () => expect(stageIsWithUspto({ label, waiting_on })).toBe(expected));
+    }
+  }
+  it("a stage's own waiting_on beats a matching name", () => {
+    expect(stageIsWithUspto({ label: "Invoice for OA Response Sent", waiting_on: "uspto" })).toBe(true);
+    expect(stageIsWithUspto({ label: "OA Response Sent", waiting_on: "client" })).toBe(false);
+  });
+  // No waiting_on for 19A to 19C exists in the repo (no seed script or fixture), so these go through the name table only.
+  it.each([
+    ["19A OA Issued", false],
+    ["19B Notified Client of OA", false],
+    ["19C OA Response Preparation", false],
+    ["Invoice for OA Response Sent", false],
+    ["19D · Invoice for OA Response Sent", false],
+    ["Send Invoice for Remaining Balance", false],
+    ["Payment for OA Response Filed", false],
+    ["19F · OA Response Sent", true],
+    ["OA Response Filed", true],
+    ["17 · Application Filed", true],
+  ])("keyword path, no waiting_on: %s", (label, expected) => {
+    expect(stageIsWithUspto({ label, waiting_on: null })).toBe(expected);
+    expect(stageIsWithUspto({ label })).toBe(expected);
+  });
+});
+
 describe("waitingOn", () => {
   it("precedence: uspto, approval, then direction", () => {
     expect(waitingOn({ withUspto: true, pendingApproval: true, lastDirection: "they" })).toBe("uspto");

@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import type { Matter } from "@/lib/matters";
 import type { MatterStage } from "@/lib/matters/stages";
-import { bandOf, filterBySegment, groupIntoBands, isSegment, searchMatters, stageAge } from "@/lib/matters/worklist";
+import { STALE_THRESHOLD_DAYS } from "@/lib/matters/stage-rules";
+import { BAND_COPY, bandOf, filterBySegment, groupIntoBands, isSegment, searchMatters, stageAge } from "@/lib/matters/worklist";
 
 const NOW = new Date("2026-09-26T12:00:00Z");
 const daysAgo = (n: number) => new Date(NOW.getTime() - n * 86_400_000).toISOString();
@@ -113,5 +114,13 @@ describe("searchMatters", () => {
     expect(searchMatters(all, "9712").map((m) => m.id)).toEqual(["2"]);
     expect(searchMatters(all, "ruiz").map((m) => m.id)).toEqual(["3"]);
     expect(searchMatters(all, "  ")).toHaveLength(3);
+  });
+});
+
+describe("band hints follow the stale rule", () => {
+  it("the Waiting on the client hint names the client stale threshold", () => {
+    expect(STALE_THRESHOLD_DAYS.client).toBe(30);
+    expect(BAND_COPY.client.hint).toBe(`nudge past ${STALE_THRESHOLD_DAYS.client} days`);
+    expect(BAND_COPY.client.hint).not.toContain("21");
   });
 });

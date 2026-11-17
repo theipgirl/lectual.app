@@ -55,6 +55,7 @@ export const liveConsultDeps: ConsultDeps = {
     const leadIds = [...new Set(rows.map((r) => r.lead_id).filter((x): x is string => !!x))];
     const names = new Map<string, string>();
     if (leadIds.length > 0) {
+      // live-guard: names the leads of Today's consults
       const { data: leads } = await supabase.from("crm_lead").select("id, first_name, last_name, business_name, email").in("id", leadIds);
       for (const l of leads ?? []) {
         const name = `${l.first_name ?? ""} ${l.last_name ?? ""}`.trim() || l.business_name || l.email;

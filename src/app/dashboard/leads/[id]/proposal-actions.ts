@@ -38,6 +38,7 @@ export async function draftProposalFromTranscriptAction(_prev: PasteProposalStat
 
   const supabase = await getScopedClient();
   const { data: lead } = await supabase
+    // live-guard: reads one lead's name for a proposal draft started from its (live) page
     .from("crm_lead")
     .select("id, first_name, last_name, business_name, email")
     .eq("id", leadId)

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { RETURN_PATH_HEADER, isDashboardPath } from "@/lib/auth/return-path";
 import { redirect } from "next/navigation";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { loadActiveQueue } from "@/lib/queue/load";
@@ -48,7 +49,9 @@ function initialsOf(name: string): string {
  * reachable — that is RLS's job on the active_org_id claim.
  */
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const session = await resolveFirmSession({ signInNext: "/dashboard/" });
+  // Come back to the page that was asked for (the proxy passes its path + query; see return-path.ts).
+  const returnTo = (await headers()).get(RETURN_PATH_HEADER);
+  const session = await resolveFirmSession({ signInNext: isDashboardPath(returnTo) ? returnTo : "/dashboard/" });
 
   if (session.kind === "signed-out") redirect(session.redirectTo);
   if (session.kind === "no-access") return <NoFirmAccess email={session.user.email} />;

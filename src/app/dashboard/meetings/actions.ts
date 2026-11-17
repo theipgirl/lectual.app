@@ -112,6 +112,7 @@ export async function draftFollowUpAction(_prev: ActionState, formData: FormData
   }
   if (!leadId) return { error: "Link this meeting to a lead (or a matter with a client) first, so the draft has someone to go to." };
   const { data: lead } = await supabase
+    // live-guard: reads the name of the lead a meeting is linked to; meetings move to the keeper in the merge
     .from("crm_lead")
     .select("id, first_name, last_name, business_name, email")
     .eq("id", leadId)
@@ -236,6 +237,7 @@ export async function draftProposalAction(_prev: ActionState, formData: FormData
   }
   if (!leadId) return { error: "Link this meeting to a lead (or a matter with a client) first, so the draft has someone to go to." };
   const { data: lead } = await supabase
+    // live-guard: reads the name of the lead a meeting is linked to; meetings move to the keeper in the merge
     .from("crm_lead")
     .select("id, first_name, last_name, business_name, email")
     .eq("id", leadId)

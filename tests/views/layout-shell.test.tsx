@@ -13,7 +13,7 @@ const loadDealNudge = vi.fn(async (...args: unknown[]) => {
 });
 vi.mock("@/lib/queue/deal-nudge-load", () => ({ loadDealNudge: (...a: unknown[]) => loadDealNudge(...a) }));
 vi.mock("@/lib/nav-counts", () => ({ loadRailCounts: async () => ({}) }));
-vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }) }));
+vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }), headers: async () => new Headers() }));
 vi.mock("next/navigation", () => ({
   redirect: (to: string) => {
     throw new Error(`redirect:${to}`);

@@ -16,10 +16,11 @@ describe("buildWelcomeEmailDraft — deterministic, no AI", () => {
     expect(draft.draftBody).toContain("never rewrite the template");
   });
 
-  it("is sent from Rebecca, cc Trademarks, per the SOP", () => {
+  it("is sent from the Trademarks mailbox, cc Rebecca, per the Pre-filing SOP", () => {
     const draft = buildWelcomeEmailDraft(base);
-    expect(draft.draftBody).toContain("From: Rebecca P. Beliard, Esq.");
-    expect(draft.draftBody).toContain("Cc: Trademarks");
+    expect(draft.draftBody).toContain("From: Trademarks (trademarks@rpblawfirm.com)");
+    expect(draft.draftBody).toContain("Cc: Rebecca P. Beliard, Esq.");
+    expect(draft.draftBody).not.toContain("From: Rebecca");
   });
 
   it("notes the trademark questionnaire as an external Lawmatics link, never a guessed URL", () => {
@@ -28,10 +29,10 @@ describe("buildWelcomeEmailDraft — deterministic, no AI", () => {
     expect(draft.draftBody).not.toMatch(/https?:\/\//);
   });
 
-  it("carries the follow-through flag to notify Rain directly", () => {
+  it("carries the follow-through flag to notify Rayn directly", () => {
     const draft = buildWelcomeEmailDraft(base);
-    expect(draft.draftBody).toContain("notify Rain directly");
-    expect(draft.summary).toContain("Rain");
+    expect(draft.draftBody).toContain("notify Rayn directly");
+    expect(draft.summary).toContain("Rayn");
   });
 
   it("fills only the variable fields — client name, mark, matter number, send date", () => {

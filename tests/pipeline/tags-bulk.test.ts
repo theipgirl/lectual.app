@@ -18,6 +18,10 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: unknown }> {
     this.calls.push(["eq", a]);
     return this;
   }
+  is(...a: unknown[]) {
+    this.calls.push(["is", a]);
+    return this;
+  }
   then<TResult1 = { data: unknown; error: unknown }, TResult2 = never>(
     onfulfilled?:
       | ((value: { data: unknown; error: unknown }) => TResult1 | PromiseLike<TResult1>)

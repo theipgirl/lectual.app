@@ -1,5 +1,8 @@
 import { getScopedClient } from "@/lib/db/scoped-client";
 import type { Database } from "@/lib/db/types";
+import { isLeadMergeGuarded } from "@/lib/leads/merge";
+import { resolveLeadId } from "@/lib/leads/live";
+import { LEAD_MERGED_WRITE, MERGE_RULE_LEAD_GONE, MERGE_RULE_LEAD_UNREADABLE } from "@/lib/ui/words";
 // @/lib/matters does NOT import automation or pipeline, so this is cycle-free
 // (pipeline → automation → matters; matters is a leaf).
 import { ensureMatterForLead } from "@/lib/matters";
@@ -125,13 +128,21 @@ function isUniqueViolation(error: unknown): boolean {
 async function executeAction(
   supabase: ScopedClient,
   orgId: string,
-  ctx: RunRulesContext,
+  given: RunRulesContext,
   action: unknown,
 ): Promise<ActionResult> {
   const raw = action as { type?: unknown } & Record<string, unknown>;
   const type = typeof raw?.type === "string" ? raw.type : "unknown";
 
   try {
+    // A merged lead (lectual 0107) is never written to, nor are child rows (tags, enrollments, tasks) filed on it:
+    // the rule acts on the lead it was merged into. A lead that can't be resolved is skipped with a fixed sentence.
+    let ctx = given;
+    if (given.leadId) {
+      const resolved = await resolveLeadId(supabase, given.leadId, orgId);
+      if (resolved.status !== "ok") return { type, ok: false, error: resolved.status === "not-found" ? MERGE_RULE_LEAD_GONE : MERGE_RULE_LEAD_UNREADABLE };
+      if (resolved.id !== given.leadId) ctx = { ...given, leadId: resolved.id };
+    }
     switch (type) {
       case "apply_tag": {
         const a = raw as unknown as ApplyTagAction;
@@ -156,10 +167,12 @@ async function executeAction(
         }
         const now = new Date().toISOString();
         const { error } = await supabase
+          // live-guard: change_stage writes the rule's lead; a merged lead's refusal is recorded as LEAD_MERGED_WRITE
           .from("crm_lead")
           .update({ current_stage_id: a.stageId, stage_entered_at: now, last_activity_at: now })
           .eq("id", ctx.leadId);
-        if (error) throw error;
+        // A merged lead (lectual 0107) refuses the write: recorded as that fixed sentence, never the raw text.
+        if (error) throw isLeadMergeGuarded(error) ? new ReadableError(LEAD_MERGED_WRITE) : error;
         // Parity with a user-driven move (src/lib/pipeline/leads.ts): a "won"
         // target stage fires the pipeline→matter handoff, so an automated move
         // can't land a lead in "won" with no matter. Best-effort — the stage

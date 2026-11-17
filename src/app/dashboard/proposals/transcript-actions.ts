@@ -39,6 +39,7 @@ export async function draftProposalFromUploadAction(_prev: TranscriptDraftState,
 
   const supabase = await getScopedClient();
   const { data: lead } = await supabase
+    // live-guard: reads the name of a lead chosen from a live picker
     .from("crm_lead")
     .select("id, first_name, last_name, business_name, email")
     .eq("id", leadId)
@@ -89,6 +90,7 @@ export async function draftProposalFromMeetingAction(_prev: TranscriptDraftState
   }
   if (!leadId) return { error: "Link this meeting to a lead (or a matter with a client) first, so the draft has someone to go to." };
   const { data: lead } = await supabase
+    // live-guard: reads the name of a lead chosen from a live picker
     .from("crm_lead")
     .select("id, first_name, last_name, business_name, email")
     .eq("id", leadId)

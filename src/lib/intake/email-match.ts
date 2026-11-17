@@ -753,7 +753,9 @@ export type BuildEvidenceInput = {
  */
 export function buildEmailEvidence(input: BuildEvidenceInput): EmailEvidenceReport {
   const notes = input.notesByLeadId ?? new Map<string, readonly NoteEntry[]>();
-  const leadById = new Map(input.leads.map((l) => [l.id, l]));
+  // The FIRST row per id: a keeper can be listed again with a merged lead's old address (M5), after its own row.
+  const leadById = new Map<string, EvidenceLead>();
+  for (const l of input.leads) if (!leadById.has(l.id)) leadById.set(l.id, l);
   const matchedByLead = new Map<string, MatchedMessage[]>();
   const ambiguous: AmbiguousMessage[] = [];
   const unmatched: ThreadMessage[] = [];

@@ -13,6 +13,7 @@ import {
 import type { MatterMatch } from "./matter-match";
 import { stopLeadSequences } from "@/lib/campaigns/stop";
 import type { StopDb } from "@/lib/campaigns/stop-db";
+import { leadRead } from "@/lib/leads/live";
 
 /**
  * Turning a sync run's findings into rows.
@@ -198,7 +199,8 @@ export async function applyRun(
       counts.addressesRecovered += 1;
     }
     if (Object.keys(changes).length === 0) continue;
-    const { error } = await admin.from("crm_lead").update(changes).eq("id", lead.id).eq("org_id", orgId);
+    // A lead merged since the list was read (lectual 0107) matches no row instead of tripping its guard.
+    const { error } = await leadRead(({ live }) => live(admin.from("crm_lead").update(changes).eq("id", lead.id).eq("org_id", orgId)));
     if (error) throw new Error(`lead update failed: ${error.message}`);
     counts.leadsUpdated += 1;
   }

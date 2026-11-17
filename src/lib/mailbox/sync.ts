@@ -11,6 +11,7 @@ import {
   type ClientCredentials,
   type MailboxProvider,
 } from "./providers";
+import { foldMergedLeads, leadRead } from "@/lib/leads/live";
 
 /**
  * The mailbox sync: every active connection, in every firm that holds the
@@ -108,16 +109,23 @@ export type OrgContext = {
 export async function loadOrgContext(admin: SupabaseClient, orgId: string): Promise<OrgContext> {
   const leadRows: Record<string, unknown>[] = [];
   for (let from = 0; from < 20_000; from += 1000) {
-    const { data, error } = await admin
-      .from("crm_lead")
-      .select("id, first_name, last_name, business_name, email, mark_text, assigned_to, last_outbound_at, last_inbound_at")
-      .eq("org_id", orgId)
-      .range(from, from + 999);
+    // Merged leads (lectual 0107) are read with their pointer and FOLLOWED: mail from a merged lead's old address files
+    // on its keeper (foldMergedLeads below). The same list feeds the Outlook calendar's lead link.
+    const columns = "id, first_name, last_name, business_name, email, mark_text, assigned_to, last_outbound_at, last_inbound_at";
+    const { data, error } = await leadRead(({ merged }) =>
+      admin
+        // live-guard: reads merged leads WITH their pointer and folds them onto the keeper (foldMergedLeads)
+        .from("crm_lead")
+        .select(merged ? `${columns}, merged_into_id` : columns)
+        .eq("org_id", orgId)
+        .range(from, from + 999),
+    );
     if (error) throw new Error(`lead read failed: ${error.message}`);
-    leadRows.push(...(data ?? []));
+    leadRows.push(...((data ?? []) as unknown as Record<string, unknown>[]));
     if (!data || data.length < 1000) break;
   }
-  const leads: EvidenceLead[] = leadRows.map((l) => ({
+  const folded = foldMergedLeads(leadRows as Array<Record<string, unknown> & { id: string; email?: string | null; merged_into_id?: string | null }>);
+  const leads: EvidenceLead[] = folded.map((l) => ({
     id: l.id as string,
     firstName: (l.first_name as string | null) ?? "",
     lastName: (l.last_name as string | null) ?? "",

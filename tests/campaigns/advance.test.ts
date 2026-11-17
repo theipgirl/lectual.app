@@ -38,6 +38,10 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: unknown }> {
     this.filters.push((r) => values.includes(r[col]));
     return this;
   }
+  is(col: string, value: null) {
+    this.filters.push((r) => (value === null ? r[col] === null || r[col] === undefined : r[col] === value));
+    return this;
+  }
   lt(col: string, value: string) {
     this.filters.push((r) => typeof r[col] === "string" && Date.parse(r[col] as string) < Date.parse(value));
     return this;

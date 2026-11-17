@@ -71,6 +71,7 @@ for (let i = 0; i < 23; i++) addMatter("BL", null);
 addMatter("LIT", null);
 
 const MINE: Record<string, StageRow[]> = { crm_matter_stage: stageRows, crm_matter: matterRows };
+// live-guard: a design-harness table list for sample data, not a database read
 const EXTRA = ["crm_drip_enrollment", "crm_meeting", "crm_calendar_event", "client_proposal", "crm_lead", "queue_card_event"];
 
 async function withMatterData<T>(fn: () => Promise<T>): Promise<T> {

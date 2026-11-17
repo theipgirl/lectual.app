@@ -10,7 +10,8 @@ import type { FileParentKind } from "./rules";
  * report their own outcome, so one failing cannot hide the other.
  */
 
-export type FileParent = { kind: FileParentKind; id: string };
+/** `mergedIds` (a lead only): the leads merged into this one (lectual 0107), whose files stay on them and are listed here too. */
+export type FileParent = { kind: FileParentKind; id: string; mergedIds?: readonly string[] };
 
 /** Each parent shows its newest 100 entries of each kind; the card says so when there are more. */
 export const LIST_CAP = 100;
@@ -33,10 +34,10 @@ export type FilesRead =
 export async function listFiles(parent: FileParent): Promise<FilesRead> {
   try {
     const supabase = await getScopedClient();
-    const { data, error } = await supabase
-      .from("crm_file")
-      .select("id, file_name, mime, size_bytes, uploaded_by, created_at")
-      .eq(parent.kind === "lead" ? "lead_id" : "matter_id", parent.id)
+    const base = supabase.from("crm_file").select("id, file_name, mime, size_bytes, uploaded_by, created_at");
+    const column = parent.kind === "lead" ? "lead_id" : "matter_id";
+    const merged = parent.kind === "lead" && parent.mergedIds?.length ? parent.mergedIds : null;
+    const { data, error } = await (merged ? base.in(column, [parent.id, ...merged]) : base.eq(column, parent.id))
       .order("created_at", { ascending: false })
       .limit(LIST_CAP + 1);
     if (error) {

@@ -7,6 +7,8 @@ import { orgHasModule } from "@/lib/org/modules";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { compareRoleRules, loadCompare, type CompareResult } from "@/lib/intake/compare-load";
 import { LEADS_COMPARE_FAILED } from "@/lib/ui/words";
+import { canMergeLeads } from "@/lib/leads/merge";
+import { mergeAvailable } from "@/lib/leads/live";
 import { CAN_MOVE_STAGE, CAN_WRITE_LEAD, resolveCurrentRole } from "@/lib/pipeline/leads";
 import { runBulkMove, type BulkMoveResult } from "@/lib/pipeline/bulk-move";
 import { forbiddenLeadWrite } from "@/lib/pipeline/errors";
@@ -121,6 +123,7 @@ export async function bulkMoveStageAction(leadIds: string[], stageId: string): P
       },
       readLeads: async (ids) => {
         const supabase = await getScopedClient();
+        // live-guard: bulk move re-reads the ticked (live) leads by id and moves each through moveLeadStage (refusal mapped); the compare panel reads two leads by id
         const { data, error } = await supabase.from("crm_lead").select("id, current_stage_id").in("id", ids);
         if (error) throw error;
         return data ?? [];
@@ -195,10 +198,14 @@ export async function loadCompareAction(leadId: string, otherId: string): Promis
   try {
     const db = await getScopedClient();
     // The role is resolved first: a caller with no resolvable role reads nothing and gets the one fixed sentence.
-    const rules = compareRoleRules(await resolveCurrentRole(db));
-    return await loadCompare(leadId, otherId, {
+    const role = await resolveCurrentRole(db);
+    const rules = compareRoleRules(role);
+    // The Merge link (M5): only for the roles that may merge, and only where lectual 0107 is there. Hidden otherwise.
+    const merge = canMergeLeads(role) && (await mergeAvailable(db));
+    const result = await loadCompare(leadId, otherId, {
       readLead: async (id) => {
         const { data, error } = await db
+          // live-guard: bulk move re-reads the ticked (live) leads by id and moves each through moveLeadStage (refusal mapped); the compare panel reads two leads by id
           .from("crm_lead")
           .select("id, first_name, last_name, business_name, mark_text, email, referral_source, created_at, current_stage_id")
           .eq("id", id)
@@ -227,6 +234,7 @@ export async function loadCompareAction(leadId: string, otherId: string): Promis
       timeZone: await getFirmTimeZone().catch(() => "UTC"),
       proposalsOn: async () => rules.mayCountProposals && (await orgHasModule("proposals")),
     });
+    return result.ok && merge ? { ok: true, data: { ...result.data, merge: true } } : result;
   } catch {
     return { ok: false, error: LEADS_COMPARE_FAILED };
   }

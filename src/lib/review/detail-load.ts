@@ -46,6 +46,7 @@ export async function loadReviewDetail(ref: OpenRef): Promise<DetailLoad> {
       assignedTo = data.assigned_to;
       cameFrom = data.referral_source?.trim() || null;
     } else {
+      // live-guard: re-reads one record of the weekly review (built from live lists)
       const { data, error } = await db.from("crm_lead").select("id, current_stage_id, assigned_to, referral_source").eq("id", ref.id).maybeSingle();
       if (error) throw error;
       if (!data) return { status: "missing" };

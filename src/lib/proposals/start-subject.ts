@@ -34,6 +34,7 @@ const MATTER_COLUMNS = "id, lead_id, owner_name, mark_text, title, matter_number
 async function readLead(id: string): Promise<{ status: "ok"; lead: LeadFill } | { status: "not-found" } | { status: "unavailable" }> {
   try {
     const supabase = await getScopedClient();
+    // live-guard: reads the lead a New proposal link names; the pickers that build that link are live
     const { data, error } = await supabase.from("crm_lead").select(LEAD_COLUMNS).eq("id", id).maybeSingle();
     if (error) return { status: "unavailable" };
     return data ? { status: "ok", lead: data } : { status: "not-found" };

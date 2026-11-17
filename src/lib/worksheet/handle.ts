@@ -5,6 +5,7 @@ import type { IntakeHandle, CompleteOutcome, StartOutcome } from "@/lib/intake-f
 import type { InternalMail, InternalMailResult } from "@/lib/mail/internal-mail";
 import { SlidingWindowThrottle, clientIp } from "@/lib/intake-forms/spam";
 import { fullName, worksheetIntakeAnswers } from "./answers";
+import { BOOKING_LINK_SHAPE } from "./booking-link";
 import { attendeeCopy, firmNotice } from "./email";
 import { parseWorksheetBody, WORKSHEET_HONEYPOT, type WorksheetInput } from "./schema";
 
@@ -54,6 +55,8 @@ export type WorksheetDeps = {
   mail: (m: InternalMail) => Promise<InternalMailResult>;
   /** Lawmatics push for a new person (only when the config switch is on). Must never throw. */
   lawmatics?: (handle: IntakeHandle, submissionId: string, input: WorksheetInput, noteBody: string) => Promise<void>;
+  /** The attendee's own pre-filled booking link (private form config), or null. Optional; a throw counts as null. */
+  bookingLinkFor?: (formId: string, email: string) => Promise<string | null>;
   now: () => Date;
   ipThrottle: SlidingWindowThrottle;
   emailThrottle: SlidingWindowThrottle;
@@ -214,7 +217,17 @@ export async function handleWorksheetPost(
   let notice: "sent" | "failed" | "skipped" = "skipped";
   if (config.resendKey && config.from && sameAddress) {
     if (input.consent.given) {
-      const mail = attendeeCopy(input, { now });
+      let personal: string | null = null;
+      if (deps.bookingLinkFor) {
+        try {
+          personal = (await deps.bookingLinkFor(handle.formId, start.contact.email)) ?? null;
+        } catch {
+          personal = null;
+        }
+        // Re-checked here so a dependency can never hand an unvetted URL to the email.
+        if (personal !== null && !BOOKING_LINK_SHAPE.test(personal)) personal = null;
+      }
+      const mail = attendeeCopy(input, { now, bookingUrl: personal });
       const r = await deps.mail({
         apiKey: config.resendKey,
         from: config.from,
