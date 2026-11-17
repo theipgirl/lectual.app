@@ -75,11 +75,10 @@ function Chips({ view }: { view: Ok }) {
   );
 }
 
-async function TimelineBlock({ view, tz, leadUndo }: { view: Ok; tz: string; leadUndo?: { leadId: string; canMove: boolean; currentStageId: string | null } }) {
+function TimelineBlock({ view, tz, urls, leadUndo }: { view: Ok; tz: string; urls: Record<string, string>; leadUndo?: { leadId: string; canMove: boolean; currentStageId: string | null } }) {
   if (view.timeline.status !== "ok") return <LoadFailedLine refresh={false}>{LEAD_STEP_COULDNT_LOAD}</LoadFailedLine>;
   // The same rows the lead and matter pages hand the timeline (crm_activity), read by the card's loader.
   const rows = view.timeline.value.rows as unknown as Parameters<typeof Timeline>[0]["rows"];
-  const urls = await voiceNotePlaybackUrls(rows as unknown as Parameters<typeof voiceNotePlaybackUrls>[0]).catch(() => ({}));
   return <Timeline rows={rows} mediaUrls={urls} timeZone={tz} undo={leadUndo} />;
 }
 
@@ -123,6 +122,9 @@ export async function RecordCardHost({ open, path, params, duplicateOf, load: gi
   const directory = load.members.status === "ok" ? load.members.value.map((m) => ({ userId: m.userId, name: m.name })) : [];
   const tz = load.timeZone;
   const c = view.card;
+  // Voice notes play from short-lived signed URLs minted through the caller's own scoped client; a failure just shows the transcript.
+  const urls: Record<string, string> =
+    view.timeline.status === "ok" ? await voiceNotePlaybackUrls(view.timeline.value.rows as unknown as Parameters<typeof voiceNotePlaybackUrls>[0]).catch(() => ({})) : {};
   const stepsHere = openHref(path, params, { kind: view.kind, id: c.id }) + "#card-steps";
 
   if (view.kind === "matter") {
@@ -155,7 +157,7 @@ export async function RecordCardHost({ open, path, params, duplicateOf, load: gi
             )}
             <section className="rc-sec">
               <h3 className="lx-label">{RECORD_CARD_TIMELINE}</h3>
-              <TimelineBlock view={view} tz={tz} />
+              <TimelineBlock view={view} tz={tz} urls={urls} />
             </section>
           </div>
           <div className="rc-side">
@@ -212,7 +214,7 @@ export async function RecordCardHost({ open, path, params, duplicateOf, load: gi
           )}
           <section className="rc-sec">
             <h3 className="lx-label">{RECORD_CARD_TIMELINE}</h3>
-            <TimelineBlock view={view} tz={tz} leadUndo={{ leadId: c.id, canMove: c.edits.stage, currentStageId: stageId }} />
+            <TimelineBlock view={view} tz={tz} urls={urls} leadUndo={{ leadId: c.id, canMove: c.edits.stage, currentStageId: stageId }} />
           </section>
         </div>
         <div className="rc-side">

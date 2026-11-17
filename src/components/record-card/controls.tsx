@@ -358,23 +358,23 @@ export function NextStepLine({ kind, id, line, dueIso, text }: { kind: CardKind;
 export function useNoShow(leadId: string, name: string) {
   const { mark, run } = useRun();
   const [held, setHeld] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [doneLine, setDoneLine] = useState<string | null>(null);
   const holdRef = useRef<Hold | null>(null);
   const noteRef = useRef<HTMLInputElement | null>(null);
   useEffect(() => () => void holdRef.current?.cancel(), []);
   const begin = () => {
-    setMessage(null);
+    setDoneLine(null);
     setHeld(true);
     holdRef.current = startHold(() => {
       setHeld(false);
       run(viaForm(logConsultOutcomeAction, { leadId, outcome: "no_show", note: noteRef.current?.value ?? "" }));
-      setMessage(RECORD_CARD_NO_SHOW_DONE);
+      setDoneLine(RECORD_CARD_NO_SHOW_DONE);
     });
   };
   const undo = () => {
     holdRef.current?.cancel();
     setHeld(false);
-    setMessage(RECORD_CARD_NO_SHOW_UNDONE);
+    setDoneLine(RECORD_CARD_NO_SHOW_UNDONE);
   };
   const toast = held ? (
     <Toast
@@ -388,7 +388,7 @@ export function useNoShow(leadId: string, name: string) {
       <input ref={noteRef} className="lx-input rc-noshow-note" aria-label={RECORD_CARD_NO_SHOW_NOTE} placeholder={RECORD_CARD_NO_SHOW_NOTE} maxLength={500} />
     </Toast>
   ) : null;
-  return { begin, toast, mark, message };
+  return { begin, toast, mark, doneLine };
 }
 
 /** The ⋯ menu for a board card, list row or opened card. Move to stage, Set next step, Mark no-show, Merge, Open full page. */
@@ -445,7 +445,7 @@ export function CardMenu({ card, onMovePick, stepHref }: { card: CardView; onMov
         )}
       </Popover>
       <SavedMarkView mark={mark ?? noShow.mark} />
-      {noShow.message && !noShow.mark && <span className="lx-saved" role="status">{noShow.message}</span>}
+      {noShow.doneLine && !noShow.mark && <span className="lx-saved" role="status">{noShow.doneLine}</span>}
       {noShow.toast}
     </span>
   );
