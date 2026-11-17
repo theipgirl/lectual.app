@@ -3,7 +3,8 @@
  * (case-insensitive, whitespace collapsed). PURE, from the leads the page already loaded: no new query, and nothing is
  * merged or changed. A lead is only ever compared with OTHER leads in an open-category stage; a name needs both parts.
  */
-export type DupLead = { id: string; first_name: string; last_name: string; email: string; current_stage_id: string };
+/** `merged_into_id` (lectual 0107): a merged lead is never a duplicate, on either side (lists already leave it out). */
+export type DupLead = { id: string; first_name: string; last_name: string; email: string; current_stage_id: string; merged_into_id?: string | null };
 export type DupStage = { id: string; name: string; category?: string | null };
 export type DuplicateOf = { leadId: string; name: string; stageName: string };
 
@@ -16,7 +17,7 @@ const nameOf = (l: Pick<DupLead, "first_name" | "last_name">) => `${l.first_name
  */
 export function findDuplicates(shown: readonly DupLead[], pool: readonly DupLead[], stages: readonly DupStage[]): Record<string, DuplicateOf> {
   const stageById = new Map(stages.map((s) => [s.id, s]));
-  const open = pool.filter((l) => stageById.get(l.current_stage_id)?.category === "open");
+  const open = pool.filter((l) => !l.merged_into_id && stageById.get(l.current_stage_id)?.category === "open");
   const byEmail = new Map<string, DupLead[]>();
   const byName = new Map<string, DupLead[]>();
   for (const l of open) {
@@ -28,6 +29,7 @@ export function findDuplicates(shown: readonly DupLead[], pool: readonly DupLead
   }
   const out: Record<string, DuplicateOf> = {};
   for (const l of shown) {
+    if (l.merged_into_id) continue;
     const email = norm(l.email);
     const first = norm(l.first_name);
     const last = norm(l.last_name);

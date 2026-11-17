@@ -1,0 +1,10 @@
+/* M5 merge screen: layout only (grid and spacing). Colours, type, buttons and chips are the shared ones. */
+.mg-page { display: grid; gap: 16px; min-width: 0; }
+.mg-sides { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); }
+.mg-card { padding: 18px; display: grid; gap: 8px; min-width: 0; }
+.mg-form { display: grid; gap: 16px; min-width: 0; }
+.mg-counts { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); }
+.mg-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.mg-list li { display: flex; justify-content: space-between; gap: 12px; }
+.mg-choice { display: flex; gap: 8px; align-items: flex-start; min-width: 0; }
+.mg-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }

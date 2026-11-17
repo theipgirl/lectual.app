@@ -7,6 +7,8 @@ import { orgHasModule } from "@/lib/org/modules";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { compareRoleRules, loadCompare, type CompareResult } from "@/lib/intake/compare-load";
 import { LEADS_COMPARE_FAILED } from "@/lib/ui/words";
+import { canMergeLeads } from "@/lib/leads/merge";
+import { mergeAvailable } from "@/lib/leads/live";
 import { CAN_MOVE_STAGE, CAN_WRITE_LEAD, resolveCurrentRole } from "@/lib/pipeline/leads";
 import { runBulkMove, type BulkMoveResult } from "@/lib/pipeline/bulk-move";
 import { forbiddenLeadWrite } from "@/lib/pipeline/errors";
@@ -195,8 +197,11 @@ export async function loadCompareAction(leadId: string, otherId: string): Promis
   try {
     const db = await getScopedClient();
     // The role is resolved first: a caller with no resolvable role reads nothing and gets the one fixed sentence.
-    const rules = compareRoleRules(await resolveCurrentRole(db));
-    return await loadCompare(leadId, otherId, {
+    const role = await resolveCurrentRole(db);
+    const rules = compareRoleRules(role);
+    // The Merge link (M5): only for the roles that may merge, and only where lectual 0107 is there. Hidden otherwise.
+    const merge = canMergeLeads(role) && (await mergeAvailable(db));
+    const result = await loadCompare(leadId, otherId, {
       readLead: async (id) => {
         const { data, error } = await db
           .from("crm_lead")
@@ -227,6 +232,7 @@ export async function loadCompareAction(leadId: string, otherId: string): Promis
       timeZone: await getFirmTimeZone().catch(() => "UTC"),
       proposalsOn: async () => rules.mayCountProposals && (await orgHasModule("proposals")),
     });
+    return result.ok && merge ? { ok: true, data: { ...result.data, merge: true } } : result;
   } catch {
     return { ok: false, error: LEADS_COMPARE_FAILED };
   }

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { MailingAddressCard } from "@/components/loe/MailingAddressCard";
@@ -49,7 +49,9 @@ import { TemperatureCard } from "@/components/leads/TemperatureCard";
 import { WaitingOnRebecca } from "@/components/leads/WaitingOnRebecca";
 import { ConsultBookedView } from "@/components/calendar/ConsultBookedLine";
 import { recordPageTitle } from "@/lib/ui/page-title";
-import { AUTOMATIC_STAGE_MOVES, FIRST_READ, FROM_THEIR_EMAILS, INTAKE_NAME } from "@/lib/ui/words";
+import { AUTOMATIC_STAGE_MOVES, FIRST_READ, FROM_THEIR_EMAILS, INTAKE_NAME, LEAD_MERGED_INTO, MERGE_DONE, MERGE_HISTORY_PARTIAL } from "@/lib/ui/words";
+import { mergedSetFor, resolveLeadId } from "@/lib/leads/live";
+import { mergeNotice, mergedFromRedirect } from "@/lib/leads/merge-links";
 import { loadBookedConsult } from "@/lib/calendar/outlook-read";
 import { loadPendingApprovalsByLead } from "@/lib/queue/lead-pending";
 import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
@@ -73,8 +75,15 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   };
 }
 
-export default async function LeadPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function LeadPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { id } = await params;
+  const sp = (await searchParams) ?? {};
   const session = await resolveFirmSession();
   if (session.kind !== "ok") notFound();
 
@@ -83,6 +92,15 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   if (!lead) notFound();
 
   const supabase = await getScopedClient();
+  // A merged lead (lectual 0107) is not a page of its own: its link goes to the lead it was merged into.
+  if (lead.merged_into_id) {
+    const followed = await resolveLeadId(supabase, id);
+    redirect(mergedFromRedirect(followed.status === "ok" ? followed.id : lead.merged_into_id, id));
+  }
+  // The history that stays on merged leads (timeline, files, proposals) is read with this lead's own.
+  const mergedSet = await mergedSetFor(supabase, id);
+  const mergedIds = mergedSet.ids.filter((x) => x !== id);
+  const notice = mergeNotice({ merged: sp.merged, from: sp.from }, mergedIds);
   const [hasAgentToolkit, hasProposals, hasMailbox, applied, catalog, meetings] = await Promise.all([
     orgHasModule("agent-toolkit"),
     orgHasModule("proposals"),
@@ -96,19 +114,21 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     listMemberDirectory().catch(() => []),
     supabase
       .from("crm_activity")
-      .select("id, type, actor_type, created_at, payload")
-      .eq("lead_id", id)
+      .select("id, lead_id, type, actor_type, created_at, payload")
+      .in("lead_id", mergedSet.ids)
       .order("created_at", { ascending: false })
       .limit(100),
   ]);
   const proposalRead = hasProposals
-    ? await listProposals({ leadId: id })
+    ? await listProposals(mergedIds.length ? { leadIds: mergedSet.ids } : { leadId: id })
         .then((proposals) => ({ status: "ok" as const, proposals }))
         .catch(() => ({ status: "unavailable" as const }))
     : null;
   const proposalCanWrite = CAN_WRITE_LEAD.includes(session.role) && PROPOSAL_STAFF_WRITE_ROLES.includes(session.role);
   const draftBlock = proposalRead && proposalCanWrite ? await loadDraftBlock() : null;
   const rows = activity ?? [];
+  // What a person can act on (suggestions, proposals from email) is this lead's own rows only.
+  const ownRows = rows.filter((r) => !r.lead_id || r.lead_id === id);
   const voiceUrls = await voiceNotePlaybackUrls(rows);
 
   // Lane + next step (SOP Stage 2) and the lead's sequences (SOP rule 1).
@@ -125,7 +145,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     // Three states per source and never throws; a failed read is named on the card, not an empty one.
     loadLeadAnswers(lead.id),
     // Files stored on this lead. Never throws: a failed read is named on the card, not an empty list.
-    loadDocumentsRead({ kind: "lead", id: lead.id }, { includeLetters: false }),
+    loadDocumentsRead({ kind: "lead", id: lead.id, mergedIds }, { includeLetters: false }),
     // Outlook consults exist only for a firm with the mailbox module: without it, no read. Never throws (three states).
     hasMailbox ? loadBookedConsult(lead.id) : Promise.resolve(null),
     // The address the client gave when they signed their letter: staff roles only (null = not asked). Never throws (three states).
@@ -151,11 +171,11 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     : null;
   const canOperate = AUTOMATION_STAFF_ROLES.includes(session.role);
   const renderedAt = new Date().getTime();
-  const proposals = pendingProposals(rows);
+  const proposals = pendingProposals(ownRows);
   const canWrite = CAN_WRITE_LEAD.includes(session.role);
   // The automatic stage moves suggestions waiting for a person, and who may act on them (the stage-move roles).
   const canMove = CAN_MOVE_STAGE.includes(session.role);
-  const stageSuggestions = pendingStageSuggestions(rows);
+  const stageSuggestions = pendingStageSuggestions(ownRows);
   const name = `${lead.first_name} ${lead.last_name}`.trim() || lead.email;
   const current: Record<string, string | null> = {
     business_name: lead.business_name,
@@ -199,6 +219,17 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           </div>
         )}
       </div>
+
+      {notice && (
+        <p className="lx-note" role="status">
+          {notice === "merged" ? MERGE_DONE : LEAD_MERGED_INTO(name)}
+        </p>
+      )}
+      {mergedSet.status === "unavailable" && (
+        <p className="lx-note" role="status">
+          {MERGE_HISTORY_PARTIAL}
+        </p>
+      )}
 
       <LeadStatusRow
         stageName={stageName}

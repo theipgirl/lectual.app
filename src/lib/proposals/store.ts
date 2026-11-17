@@ -527,6 +527,8 @@ export type ProposalListOptions = {
   latestOnly?: boolean;
   status?: ProposalStatus;
   leadId?: string;
+  /** Several leads at once: a kept lead and the leads merged into it (lectual 0107). Wins over `leadId`. */
+  leadIds?: string[];
   matterId?: string;
   /** Rows read (not families returned). Default 200, max 500. */
   limit?: number;
@@ -539,7 +541,8 @@ export async function listProposals(options: ProposalListOptions = {}): Promise<
 
   let query = db.from("client_proposal").select(LIST_COLUMNS);
   if (options.status) query = query.eq("status", options.status);
-  if (options.leadId) query = query.eq("lead_id", options.leadId);
+  if (options.leadIds && options.leadIds.length > 0) query = query.in("lead_id", options.leadIds);
+  else if (options.leadId) query = query.eq("lead_id", options.leadId);
   if (options.matterId) query = query.eq("matter_id", options.matterId);
   const { data, error } = await query.order("updated_at", { ascending: false }).limit(limit);
   if (error) throw friendlyProposalError(error, "load the proposals");

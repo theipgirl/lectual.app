@@ -13,7 +13,7 @@ const FOCUSABLE = "a[href], button:not([disabled]), input, select, textarea, [ta
 /**
  * The "Possible duplicate" compare panel's behaviour: reads both leads when it opens (one server action, read only), moves focus
  * into the dialog, closes on Esc, the Close button or the backdrop, wraps Tab inside, and puts focus back on the marker that
- * opened it. The two leads are never changed here, and there is no merge.
+ * opened it. The two leads are never changed here; a Merge link (owner and admin) goes to the merge screen.
  */
 export default function CompareDialog({ target, onClose }: { target: CompareTarget | null; onClose: () => void }) {
   const titleId = useId();
