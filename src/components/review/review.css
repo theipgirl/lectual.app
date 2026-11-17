@@ -59,6 +59,10 @@
 .rv-sheet .rv-sub { font-size: inherit; color: inherit; display: inline; }
 .rv-sheet .rv-sub::before { content: " · "; }
 .rv-sheet .rv-deadline-soon { color: var(--ox); font-weight: 600; }
+@media (min-width: 641px) {
+  .lp-root:not(.rv-owner) .rv-sheet-sec .sheet-scroll { max-height: 75vh; overflow: auto; }
+  .lp-root:not(.rv-owner) .rv-sheet thead th { position: sticky; top: 0; z-index: 2; }
+}
 
 /* Shared fact grid (Cards, detail panel) */
 .rv-prog { margin: 0; }
