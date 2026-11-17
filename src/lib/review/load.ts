@@ -286,7 +286,8 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
   const [tasksS, activityS, deadlinesS, changesS, proposalsS, countsS, sendersS, changeRowsS] = dependsOnRecords
     ? await Promise.allSettled([
         readOpenTasks(db, matterIds, leadIds),
-        readContactActivity(db, matterIds, leadIds),
+        // A matter shows its lead's mail too (the emails were filed on the lead before it signed), so the lead ids behind matters are read as well.
+        readContactActivity(db, matterIds, proposalLeadIds),
         readOpenDeadlines(db, matterIds),
         readLastStageChange(db, leadIds),
         readProposalExpiries(db, matterIds, proposalLeadIds),

@@ -1,5 +1,5 @@
 import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
-import { formatDay } from "@/lib/ui/dates";
+import { civilDay, formatDay, formatDayTime } from "@/lib/ui/dates";
 import { describeActivity } from "@/components/leads/describe";
 import { UndoAgentMoveButton } from "@/components/leads/StageKeeperControls";
 import { isAgentMoveRow, undoStateFor } from "@/lib/stage-keeper/moves";
@@ -19,8 +19,11 @@ export type TimelineUndo = {
 };
 
 /** The real date of an entry ("Nov 11", with the year when it is not this year) in the firm's zone; never "6 days ago". */
-export function timelineDate(iso: string, timeZone?: string): string {
-  return formatDay(iso, { tz: timeZone ?? DEFAULT_TIME_ZONE }) ?? "";
+export function timelineDate(iso: string, timeZone?: string, now: Date = new Date()): string {
+  const tz = timeZone ?? DEFAULT_TIME_ZONE;
+  // Today's entries also carry the time, so several on the same day keep their order.
+  if (civilDay(iso, tz) === civilDay(now, tz)) return formatDayTime(iso, { tz, now }) ?? "";
+  return formatDay(iso, { tz, now }) ?? "";
 }
 
 /**

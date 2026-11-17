@@ -93,11 +93,12 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const isApprover = !!role && !!userId && QUEUE_APPROVE_ROLES.includes(role);
   const person = isApprover ? { userId: userId!, firstName: "you" } : reviewPerson(load.members);
   const olderHidden = olderHiddenCount(load.rows, params, userId);
-  const strips = (
+  // No review person, no strip: nothing (not an empty wrapper) is drawn.
+  const strips = person ? (
     <div className="rv-strips">
-      {person && <WaitingOnStrip owner={owner} firstName={person.firstName} you={isApprover} personId={person.userId} rows={waitingOnPerson(shown, person.userId)} approvalsKnown={approvalsKnown} params={params} />}
+      <WaitingOnStrip owner={owner} firstName={person.firstName} you={isApprover} personId={person.userId} rows={waitingOnPerson(shown, person.userId)} approvalsKnown={approvalsKnown} params={params} />
     </div>
-  );
+  ) : null;
   const lanes = boardLanes(buckets, load.members);
   const rest = offBoard(buckets);
 

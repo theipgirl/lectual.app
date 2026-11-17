@@ -4,7 +4,7 @@ import { laneLabel, laneLoad, laneLoadText, type Kpis, type Lane } from "@/lib/r
 import { cardSubline, dueText, sentText } from "@/lib/review/format";
 import { openToken } from "@/lib/review/open";
 import { reviewHref, REVIEW_VIEWS, type ReviewParams, type ReviewView } from "@/lib/review/params";
-import { NOTHING_WAITING_ON_YOU, OUR_TURN, WAITING_ON_YOU, WAITING_ON_YOU_PARTIAL, REVIEW_BOARD_VIEW, REVIEW_CARDS_VIEW, REVIEW_SHEET_VIEW } from "@/lib/ui/words";
+import { LANE_COUNT_NOTE, LANE_NOBODY_WAITING, LANE_NOTHING_FOR_US, LANE_WAITING_ON_CLIENT, NOTHING_WAITING_ON_YOU, OUR_TURN, WAITING_ON_YOU, WAITING_ON_YOU_PARTIAL, REVIEW_BOARD_VIEW, REVIEW_CARDS_VIEW, REVIEW_SHEET_VIEW } from "@/lib/ui/words";
 import { DoneButton } from "./DoneButton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadFailedLine } from "@/components/ui/LoadFailed";
@@ -39,7 +39,7 @@ function Tile({ label, value, tone }: { label: string; value: number | null; ton
   );
 }
 
-/** Overdue, due this week, needs a next step, waiting on the USPTO. (Approvals and proposals have their own strips.) */
+/** Overdue, due this week, needs a next step, waiting on the USPTO. (What waits on the review person has its own strip; proposals are not drawn in the first wave.) */
 export function KpiStrip({ kpis }: { kpis: Kpis; owner?: boolean }) {
   return (
     <div className="rv-kpis" role="group" aria-label="This week at a glance">
@@ -119,26 +119,41 @@ export function ReviewBoard({ lanes, ...common }: Common & { lanes: Lane[] }) {
             className="rv-person"
             data-lane={id}
             title={lane.name}
+            headingLevel={2}
             count={load.total}
+            countTitle={LANE_COUNT_NOTE}
             ariaLabel={laneLabel(lane.name, load)}
+            bare
             note={split ? <p className="lx-note rv-lane-load" data-lane-load>{split}</p> : undefined}
           >
-            <li className="rv-lane-head lx-label" data-half="our">
-              {OUR_TURN} · {lane.our.length}
-            </li>
-            {lane.our.length === 0 ? (
-              <li className="lx-board-empty">Nothing for us to do here.</li>
-            ) : (
-              lane.our.map((row) => <ReviewCard key={row.key} row={row} bucket={bucketOf(row, common.today)} {...common} />)
-            )}
-            <li className="rv-lane-head lx-label" data-half="client">
-              Waiting on client · {lane.client.length}
-            </li>
-            {lane.client.length === 0 ? (
-              <li className="lx-board-empty">Nobody is waiting on a client.</li>
-            ) : (
-              lane.client.map((row) => <ReviewCard key={row.key} row={row} bucket={bucketOf(row, common.today)} waitingOnClient {...common} />)
-            )}
+            <section className="rv-lane-list" data-half="our">
+              <h3 className="rv-lane-head lx-label">
+                {OUR_TURN} · {lane.our.length}
+              </h3>
+              {lane.our.length === 0 ? (
+                <p className="lx-board-empty">{LANE_NOTHING_FOR_US}</p>
+              ) : (
+                <ul className="lx-board-cards">
+                  {lane.our.map((row) => (
+                    <ReviewCard key={row.key} row={row} bucket={bucketOf(row, common.today)} {...common} />
+                  ))}
+                </ul>
+              )}
+            </section>
+            <section className="rv-lane-list" data-half="client">
+              <h3 className="rv-lane-head lx-label">
+                {LANE_WAITING_ON_CLIENT} · {lane.client.length}
+              </h3>
+              {lane.client.length === 0 ? (
+                <p className="lx-board-empty">{LANE_NOBODY_WAITING}</p>
+              ) : (
+                <ul className="lx-board-cards">
+                  {lane.client.map((row) => (
+                    <ReviewCard key={row.key} row={row} bucket={bucketOf(row, common.today)} waitingOnClient {...common} />
+                  ))}
+                </ul>
+              )}
+            </section>
           </BoardColumn>
         );
       })}

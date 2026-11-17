@@ -1,3 +1,4 @@
+import { LANE_DUE_THIS_WEEK, LANE_OVERDUE } from "@/lib/ui/words";
 import { bucketOf, type BucketKey, type ReviewBuckets, type ReviewRow } from "./buckets";
 
 /**
@@ -131,7 +132,7 @@ export function laneLoad(lane: Pick<Lane, "our" | "client">, today: string): Lan
 
 /** "3 overdue · 4 due this week", or null when neither applies. */
 export function laneLoadText(load: LaneLoad): string | null {
-  const parts = [load.overdue > 0 ? `${load.overdue} overdue` : null, load.week > 0 ? `${load.week} due this week` : null].filter(Boolean);
+  const parts = [load.overdue > 0 ? LANE_OVERDUE(load.overdue) : null, load.week > 0 ? LANE_DUE_THIS_WEEK(load.week) : null].filter(Boolean);
   return parts.length ? parts.join(" · ") : null;
 }
 

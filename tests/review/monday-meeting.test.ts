@@ -102,3 +102,31 @@ describe("the newest outbound contact carries what it was", () => {
     expect(failed.lastOutboundType).toBeNull();
   });
 });
+
+describe("a matter's Sent line sees the mail filed on its lead", () => {
+  const matter = (over: Record<string, unknown> = {}) => ({
+    id: "m1", matter_number: "TM-1", title: "Acme mark", mark_text: "ACME", owner_name: "Acme Inc", status: "open", lead_id: "l1", assigned_to: null,
+    stage_entered_at: "2026-10-20T00:00:00Z", created_at: "2026-01-01T00:00:00Z", lawmatics_id: null, lawmatics_synced_at: null,
+    stage: { code: "10", label: "Application Prep", is_open: true, waiting_on: "firm", order_index: 5 }, ...over,
+  });
+  it("lastOutbound and its type come from the lead's outbound mail when the matter has none of its own", () => {
+    const [r] = buildReviewRows(input({ matters: [matter()] as never, leads: [lead()] as never, activity: [{ lead_id: "l1", matter_id: null, type: "email_sent", created_at: "2026-11-11T16:00:00Z" }] }));
+    expect(r.kind).toBe("matter");
+    expect(r.lastOutbound).toBe("2026-11-11");
+    expect(r.lastOutboundType).toBe("email_sent");
+  });
+  it("the newer of the matter's own and its lead's wins; another lead's mail is ignored", () => {
+    const [r] = buildReviewRows(input({ matters: [matter()] as never, leads: [], activity: [
+      { lead_id: null, matter_id: "m1", type: "call_logged", created_at: "2026-11-14T16:00:00Z" },
+      { lead_id: "l1", matter_id: null, type: "email_sent", created_at: "2026-11-11T16:00:00Z" },
+      { lead_id: "other", matter_id: null, type: "email_sent", created_at: "2026-11-16T16:00:00Z" },
+    ] }));
+    expect(r.lastOutbound).toBe("2026-11-14");
+    expect(r.lastOutboundType).toBe("call_logged");
+  });
+  it("a matter with no lead and no mail still says nothing was sent", () => {
+    const [r] = buildReviewRows(input({ matters: [matter({ lead_id: null })] as never, leads: [] }));
+    expect(r.lastOutbound).toBeNull();
+    expect(r.contactKnown).toBe(true);
+  });
+});

@@ -28,4 +28,10 @@ describe("Timeline dates are real dates (Nov 17)", () => {
     expect(html.indexOf("May 2")).toBeLessThan(html.indexOf("Apr 1"));
     expect(html.split("Called the client").length - 1).toBe(2);
   });
+
+  it("today's entries also show the time (so same-day entries keep their order); other days do not", () => {
+    const now = new Date("2026-11-17T20:00:00Z");
+    expect(timelineDate("2026-11-17T19:30:00Z", "America/New_York", now)).toBe("Nov 17, 2:30 PM");
+    expect(timelineDate("2026-11-16T19:30:00Z", "America/New_York", now)).toBe("Nov 16");
+  });
 });

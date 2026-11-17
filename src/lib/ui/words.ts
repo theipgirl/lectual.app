@@ -827,8 +827,13 @@ export const MATTER_GROUP_EMPTY = (group: keyof typeof MATTER_GROUP_LABEL | "all
       ? "No contracts or one-offs match these filters."
       : `No matters in ${MATTER_GROUP_LABEL[group]} match these filters.`;
 export const MATTER_MOVED_TO = "Moved to";
-export const MATTER_INTAKE_STAGES = (n: number) => `${n} ${n === 1 ? "matter is" : "matters are"} still in intake stages.`;
-export const MATTER_INTAKE_STAGES_LINK = "See them in Pipeline";
+export const MATTER_INTAKE_STAGES = (n: number, matching = false) =>
+  `${n} ${matching ? "matching " : ""}${n === 1 ? "matter is" : "matters are"} in intake stages`;
+export const MATTER_INTAKE_SHOW = "Show them";
+export const MATTER_SHOWING_INTAKE = "Showing matters still in intake stages.";
+export const MATTER_BACK_TO_PAST_INTAKE = "Back to matters";
+export const MATTER_ALL_INTAKE_TITLE = "No matters past intake yet";
+export const MATTER_ALL_INTAKE_BODY = "Every matter is still in an intake stage. A matter shows here once it reaches the signed engagement.";
 
 // M5: merge duplicate leads (lectual 0107). Owner, admin and senior admin only.
 export const MERGE_LEADS_TITLE = "Merge two leads";
@@ -1232,3 +1237,17 @@ export const TEAM_ACCOUNTS_NO_MEMBERS = "No team members were found.";
 
 /** The one line on Getting started that shows a person their own Outlook state. */
 export const YOUR_SETUP_LABEL = "Your setup";
+
+// Weekly review (Nov 17): the Sent line on every card and the person lanes.
+export const SENT_COULDNT_LOAD = "Sent: couldn't load";
+export const SENT_NOTHING_YET = "Nothing sent yet";
+export const SENT_ON = (date: string, kind?: string) => `Sent ${date}${kind ? ` · ${kind}` : ""}`;
+export const SENT_KIND_EMAIL = "email";
+export const SENT_KIND_CALL = "call";
+export const LANE_OVERDUE = (n: number) => `${n} overdue`;
+export const LANE_DUE_THIS_WEEK = (n: number) => `${n} due this week`;
+export const LANE_WAITING_ON_CLIENT = "Waiting on client";
+export const LANE_NOTHING_FOR_US = "Nothing for us to do here.";
+export const LANE_NOBODY_WAITING = "Nobody is waiting on a client.";
+/** What the number beside a person's name counts. */
+export const LANE_COUNT_NOTE = "Cards in this column: our turn plus waiting on client";

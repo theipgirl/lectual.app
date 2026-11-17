@@ -1,3 +1,4 @@
+import { loadIntakeStageIds, withoutIntake } from "@/lib/matters/intake-ids";
 import { aiConfigured } from "@/lib/ai/claude";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { getFirmTimeZone } from "@/lib/org/profile";
@@ -87,13 +88,16 @@ export default async function CopilotPage(props?: { searchParams?: Promise<{ c?:
   let firmZone = DEFAULT_TIME_ZONE;
   if (configured && session?.kind === "ok") {
     const now = new Date();
-    const [tzS, membersS, mattersS, deadlinesS, queueS] = await Promise.allSettled([
+    const [tzS, membersS, mattersS, deadlinesS, queueS, intakeS] = await Promise.allSettled([
       getFirmTimeZone(),
       listMemberDirectory(),
       listMatters(),
       listUpcomingDeadlines({ withinDays: DEADLINE_WINDOW_DAYS }),
       loadActiveQueue(),
+      loadIntakeStageIds(),
     ]);
+    // Matters still in an intake stage are not on the Matters page, so they are not counted as open or stalled here.
+    const intakeIds = intakeS.status === "fulfilled" ? intakeS.value : null;
     const tz = tzS.status === "fulfilled" ? tzS.value : DEFAULT_TIME_ZONE;
     firmZone = tz;
     const members = membersS.status === "fulfilled" ? membersS.value : [];
@@ -113,8 +117,8 @@ export default async function CopilotPage(props?: { searchParams?: Promise<{ c?:
     landing = (
       <StatCards
         cards={buildStatCards({
-          open: statOf(mattersS, (m) => summarizeDocket(m, now).open),
-          stalled: statOf(mattersS, (m) => summarizeDocket(m, now).stalled.length),
+          open: statOf(mattersS, (m) => summarizeDocket(withoutIntake(m, intakeIds), now).open),
+          stalled: statOf(mattersS, (m) => summarizeDocket(withoutIntake(m, intakeIds), now).stalled.length),
           deadlines: statOf(deadlinesS, (d) => d.length),
           approvals: queueRead,
         })}

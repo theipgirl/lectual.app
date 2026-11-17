@@ -137,7 +137,7 @@ describe("phase groups on the Matters page", () => {
   });
 
   it("an empty group says so in words", async () => {
-    const html = await render({ matters: [m("TM", S.a)], read: ok, params: { group: "pre" } });
+    const html = await render({ matters: [m("TM", S.c)], read: ok, params: { group: "pre" } });
     expect(html).toContain("No matters in Pre-filing match these filters.");
   });
 
@@ -153,23 +153,49 @@ describe("phase groups on the Matters page", () => {
     expect(status).toMatch(/>Open<span class="lp-chip-count">8</);
   });
 
-  it("matters in intake-phase stages are named in one quiet line with a link, not silently dropped", async () => {
+  it("matters in intake stages are named in one quiet line with a Show them link, not silently dropped", async () => {
     const html = await render({ matters: sample(), read: ok });
-    expect(html).toContain("2 matters are still in intake stages.");
-    expect(html).toMatch(/<a href="\/dashboard\/pipeline\/?">See them in Pipeline<\/a>/);
+    expect(html).toContain("2 matters are in intake stages · ");
+    expect(html).toMatch(/<a href="\/dashboard\/matters\/?\?intake=1">Show them<\/a>/);
     n = 0;
     const one = await render({ matters: [m("TM", S.a), m("TM", S.b)], read: ok });
-    expect(one).toContain("1 matter is still in intake stages.");
+    expect(one).toContain("1 matter is in intake stages");
     const none = await render({ matters: [m("TM", S.b)], read: ok });
-    expect(none).not.toContain("still in intake stages");
+    expect(none).not.toContain("in intake stages");
   });
 
-  it("a contract (non-filing type) sitting on an intake-phase stage is hidden by the stage's phase, and counted", async () => {
+  it("Show them lists the intake matters, and only those, with a way back", async () => {
+    const html = await render({ matters: sample(), read: ok, params: { intake: "1", view: "table" } });
+    expect(html).toContain("Showing matters still in intake stages.");
+    expect(html).toContain("Mk1z");
+    expect(html).toContain("Mk2z");
+    expect(html).not.toContain("Mk3z<");
+    expect(html).not.toContain("Matter group");
+    expect(html).toMatch(/<a href="\/dashboard\/matters\/?\?view=table">Back to matters<\/a>/);
+  });
+
+  it("the intake line is about the Open chip and, with a search, counts the matches only", async () => {
+    const closed = await render({ matters: sample(), read: ok, params: { seg: "closed" } });
+    expect(closed).not.toContain("in intake stages");
+    n = 0;
+    const found = await render({ matters: sample(), read: ok, params: { q: "Mk1z" } });
+    expect(found).toContain("1 matching matter is in intake stages");
+  });
+
+  it("when every matter is in an intake stage the empty state says so, not 'match these filters'", async () => {
+    n = 0;
+    const html = await render({ matters: [m("TM", S.a), m("TM", S.a)], read: ok, params: { view: "table" } });
+    expect(html).toContain("No matters past intake yet");
+    expect(html).not.toContain("match these filters");
+    expect(html).toContain("2 matters are in intake stages");
+  });
+
+  it("a contract (non-filing type) on an intake stage is hidden by the stage's phase, and counted", async () => {
     n = 0;
     const html = await render({ matters: [m("BL", S.a), m("BL", null)], read: ok, params: { group: "all" } });
     expect(html).not.toContain("Mk1z<");
     expect(html).toContain("Mk2z");
-    expect(html).toContain("1 matter is still in intake stages.");
+    expect(html).toContain("1 matter is in intake stages");
   });
 
   it("the board draws no intake-phase column or card, and the Move menu offers no intake stage", async () => {
@@ -180,41 +206,59 @@ describe("phase groups on the Matters page", () => {
     expect(html).toContain("Published");
   });
 
-  it("the stage's name never decides: a stage called 'Intake' in pre_filing is drawn, one called 'Filed' in pipeline is not", async () => {
+  it("the stage's name never decides: a pipeline stage named 'Filed' is intake, a pre_filing one named 'Intake review' is drawn", async () => {
     n = 0;
     const tricky = [st("x1", "Intake review", "pre_filing", 1), st("x2", "Filed", "pipeline", 2)];
     const html = await render({ matters: [m("TM", tricky[0]), m("TM", tricky[1])], read: { status: "ok", stages: tricky }, params: { group: "all" } });
     expect(html).toContain("Mk1z");
     expect(html).not.toContain("Mk2z<");
-    expect(html).toContain("1 matter is still in intake stages.");
+    expect(html).toContain("1 matter is in intake stages");
   });
 
-  it("the Matters group has its own empty sentence", async () => {
-    const html = await render({ matters: [m("TM", S.a)], read: ok, params: { group: "other" } });
-    expect(html).toContain("No contracts or one-offs match these filters.");
-    expect(html).not.toContain("No matters in Matters");
-  });
+  describe("RPB's real docket (lectual-prod phases, Nov 17)", () => {
+    const rpb = [
+      ...[1, 2, 3, 4, 5, 6].map((c) => st(`c${c}`, `Intake ${c}`, "pipeline", c - 1)),
+      st("c7", "Signed LOE / Deposit Received", "pipeline", 6),
+      st("c8", "Application Preparation", "pre_filing", 7),
+      st("c17", "Application Filed", "post_filing", 16),
+      st("c23", "Abandoned", "inactive", 22, false),
+      st("c24", "Trademark Registered", "maintenance", 23, false),
+      st("c25", "Lost/Nurture", null, 24, false),
+    ];
+    const read: Read = { status: "ok", stages: rpb };
+    const byId = Object.fromEntries(rpb.map((s) => [s.id, s]));
+    const board = () => (n = 0, [m("TM", byId.c1), m("TM", byId.c6), m("TM", byId.c7), m("TM", byId.c8), m("TM", byId.c17), m("TM", byId.c24, { status: "closed" }), m("TM", byId.c25, { status: "closed" }), m("TM", byId.c23, { status: "closed" })]);
 
-  it("the board draws only the group's stages that hold a matter, and names the empty ones in one row", async () => {
-    const html = await render({ matters: sample(), read: ok, params: { view: "board" } });
-    expect(html).toContain("Questionnaire");
-    expect(html).not.toContain("New client");
-    expect(html).not.toContain("Published");
-    expect(html).toContain("1 empty stage: Balance received");
-    expect(html).toContain("· Show");
-    expect(html).not.toContain("No matters here yet.");
-  });
+    it("codes 1 to 6 are intake and named; Signed LOE (also pipeline) stays visible, as Pre-filing", async () => {
+      const html = await render({ matters: board(), read, params: { group: "pre", view: "table" } });
+      expect(html).toContain("2 matters are in intake stages");
+      expect(html).not.toContain("Mk1z<");
+      expect(html).not.toContain("Mk2z<");
+      expect(html).toContain("Mk3z");
+      expect(html).toContain("Mk4z");
+      expect(groupNav(html)).toMatch(/>Pre-filing<span class="lp-chip-count">2</);
+    });
 
-  it("the Matters group board keeps unstaged matters visible and a stage-less stage as a column", async () => {
-    const html = await render({ matters: sample(), read: ok, params: { view: "board", group: "other" } });
-    expect(html).toContain("Not on the docket yet");
-    expect(html).toContain("Misc");
-    expect(html).not.toContain("Questionnaire");
-  });
+    it("the board draws the Signed LOE column and no intake column", async () => {
+      const html = await render({ matters: board(), read, params: { group: "all", view: "board" } });
+      expect(html).toContain("Signed LOE / Deposit Received");
+      expect(html).not.toContain("Intake 1");
+      expect(html).not.toContain("Intake 6");
+    });
 
-  it("a card can be moved to any stage, not only the group's", async () => {
-    const html = await render({ matters: sample(), read: ok, params: { view: "board" } });
-    expect(html).toContain('aria-label="Move ');
+    it("a null phase (Lost/Nurture) does not crash, is not intake, and shows under All and Closed", async () => {
+      const open = await render({ matters: board(), read, params: { group: "all", view: "table" } });
+      expect(open).not.toContain("Mk7z<");
+      const closed = await render({ matters: board(), read, params: { group: "all", seg: "closed", view: "table" } });
+      expect(closed).toContain("Mk7z");
+      expect(closed).not.toContain("in intake stages");
+    });
+
+    it("inactive and maintenance (closed) stages are not intake either and show under All / Closed", async () => {
+      const closed = await render({ matters: board(), read, params: { group: "all", seg: "closed", view: "table" } });
+      expect(closed).toContain("Mk6z");
+      expect(closed).toContain("Mk8z");
+    });
   });
 });
 

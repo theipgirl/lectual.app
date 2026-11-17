@@ -1,5 +1,6 @@
 import { addDays, daysBetween } from "./buckets";
 import { formatDay } from "@/lib/ui/dates";
+import { SENT_COULDNT_LOAD, SENT_KIND_CALL, SENT_KIND_EMAIL, SENT_NOTHING_YET, SENT_ON } from "@/lib/ui/words";
 import { contactWords, type ContactKind } from "./contact";
 
 /** "Oct 30" (with the year when it isn't this year). `date` and `today` are YYYY-MM-DD. Pure; the shared day formatter draws it. */
@@ -51,7 +52,7 @@ export function followUpText(row: { contactKnown: boolean; lastOutbound?: string
   return `Last followed up ${shortDate(row.lastOutbound, today)}${ago}`;
 }
 
-const SENT_WORD: Partial<Record<ContactKind, string>> = { email_sent: "email", call_logged: "call" };
+const SENT_WORD: Partial<Record<ContactKind, string>> = { email_sent: SENT_KIND_EMAIL, call_logged: SENT_KIND_CALL };
 
 /**
  * The card's timeline line: the newest thing SENT OUT for the record (an email we sent or a call we logged), as
@@ -63,10 +64,10 @@ export function sentText(
   today: string,
   opts: { days?: boolean } = {},
 ): string {
-  if (!row.contactKnown) return "Sent: couldn't load";
-  if (!row.lastOutbound) return "Nothing sent yet";
+  if (!row.contactKnown) return SENT_COULDNT_LOAD;
+  if (!row.lastOutbound) return SENT_NOTHING_YET;
   const word = row.lastOutboundType ? SENT_WORD[row.lastOutboundType] : undefined;
-  let text = `Sent ${shortDate(row.lastOutbound, today)}${word ? ` · ${word}` : ""}`;
+  let text = SENT_ON(shortDate(row.lastOutbound, today), word);
   if (opts.days) {
     const n = daysBetween(row.lastOutbound, today);
     if (Number.isFinite(n) && n >= 0) text += n === 0 ? " · today" : n === 1 ? " · 1 day" : ` · ${n} days`;

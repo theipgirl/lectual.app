@@ -108,6 +108,25 @@ describe("Weekly review page", () => {
     expect(sheet).not.toMatch(/Proposal expire/);
   });
 
+  it("a person's lane is an h2, its two lists are h3s over two separate lists, and the count covers cards only", async () => {
+    mock(ok());
+    const html = await render();
+    expect(html).toMatch(/<h2 class="lx-board-title lx-board-heading">Rayn<\/h2>/);
+    expect(html).toMatch(/<h3 class="rv-lane-head lx-label">Our turn · 2<\/h3>/);
+    expect(html).toMatch(/<h3 class="rv-lane-head lx-label">Waiting on client · 2<\/h3>/);
+    expect(html).not.toMatch(/<li[^>]*rv-lane-head/);
+    // Rayn: 2 our + 2 client cards = 4 (the headings are not counted), and the count says what it covers.
+    expect(html).toMatch(/title="Cards in this column: our turn plus waiting on client">4</);
+    const lane = html.slice(html.indexOf('data-lane="u-rayn"'), html.indexOf('data-lane="none"') > 0 ? html.indexOf('data-lane="none"') : undefined);
+    expect(lane.split('<li class="lx-board-card').length - 1).toBe(4);
+  });
+
+  it("no review person and not an approver: no empty strips wrapper is drawn", async () => {
+    mock(ok({ members: [{ userId: "u-rayn", name: "Rayn", role: "paralegal" }] }), "paralegal");
+    const html = await render();
+    expect(html).not.toContain("rv-strips");
+  });
+
   it("each person's column says how much they hold, split into overdue and due this week", async () => {
     mock(ok());
     const html = await render();

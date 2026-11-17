@@ -182,7 +182,8 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
       imported: Boolean(m.lawmatics_id || m.lawmatics_synced_at),
       now,
     });
-    const { lastContact, direction, lastOutbound, lastOutboundType } = contactOf(activityByMatter.get(m.id));
+    // Mail filed on the matter's lead before it signed is part of the matter's contact (the Sent line, last contact, whose turn).
+    const { lastContact, direction, lastOutbound, lastOutboundType } = contactOf([...(activityByMatter.get(m.id) ?? []), ...(m.lead_id ? activityByLead.get(m.lead_id) ?? [] : [])]);
     const display = matterDisplayTitle(m);
     const client = m.owner_name?.trim() || display.title;
     rows.push({
