@@ -3,6 +3,8 @@
  * The label carries the meaning; the tone is only a second signal, so colour
  * is never the only thing telling a person what state a service is in.
  */
+import type { PillTone } from "@/lib/ui/tones";
+
 export const INTEGRATION_STATES = [
   "connected",
   "not-connected",
@@ -15,16 +17,16 @@ export const INTEGRATION_STATES = [
 
 export type IntegrationState = (typeof INTEGRATION_STATES)[number];
 
-export type PillSpec = { label: string; tone: string };
+export type PillSpec = { label: string; tone: PillTone };
 
 const PILLS: Record<IntegrationState, PillSpec> = {
-  connected: { label: "Connected", tone: "lx-pill-ok" },
-  "not-connected": { label: "Not connected", tone: "lx-pill-mute" },
-  reconnect: { label: "Reconnect", tone: "lx-pill-risk" },
-  "needs-attention": { label: "Needs attention", tone: "lx-pill-warn" },
-  "couldnt-check": { label: "Couldn't check", tone: "lx-pill-warn" },
-  "not-available": { label: "Not available yet", tone: "lx-pill-mute" },
-  "coming-soon": { label: "Coming soon", tone: "lx-pill-mute" },
+  connected: { label: "Connected", tone: "ok" },
+  "not-connected": { label: "Not connected", tone: "mute" },
+  reconnect: { label: "Reconnect", tone: "risk" },
+  "needs-attention": { label: "Needs attention", tone: "warn" },
+  "couldnt-check": { label: "Couldn't check", tone: "warn" },
+  "not-available": { label: "Not available yet", tone: "mute" },
+  "coming-soon": { label: "Coming soon", tone: "mute" },
 };
 
 /** The pill for a state: its own label and tone. */

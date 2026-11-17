@@ -1,3 +1,4 @@
+import { Pill } from "@/components/ui/Pill";
 import { integrationPill, type IntegrationState } from "./states";
 import "./integrations.css";
 
@@ -5,13 +6,13 @@ import "./integrations.css";
 export function StatusPill({ state }: { state: IntegrationState }) {
   const pill = integrationPill(state);
   return (
-    <span className={`lx-pill ${pill.tone}`} data-state={state}>
+    <Pill tone={pill.tone} dataState={state}>
       {pill.label}
-    </span>
+    </Pill>
   );
 }
 
 /** Live or test mode on a payment connection. A mode, not a status, so it sits beside the pill. */
 export function ModeBadge({ live }: { live: boolean }) {
-  return <span className={`lx-pill ${live ? "lx-pill-ox" : "lx-pill-warn"}`}>{live ? "Live" : "Test"}</span>;
+  return <Pill tone={live ? "ox" : "warn"}>{live ? "Live" : "Test"}</Pill>;
 }

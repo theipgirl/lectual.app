@@ -2,8 +2,8 @@
  * The copilot chat (/dashboard/copilot/ and the drawer on every other
  * dashboard page) and the floating launcher. Loaded by the components
  * themselves, so it is on every dashboard page. Reuses the app's tokens;
- * the page's hero palette (--cp-*) is defined once in
- * src/app/dashboard/copilot/copilot.css and used here only inside `.cpl-page`.
+ * the page's hero palette (--hero-*) comes from
+ * src/app/dashboard/copilot/copilot.css and read here only inside `.cpl-page`.
  */
 
 .cpl-root {

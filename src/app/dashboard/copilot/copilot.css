@@ -7,32 +7,19 @@
  */
 
 .cph-hero {
-  /* Aliases of the shared tokens in globals.css (--hero-*, --ox, --ox-deep, --rail-ink, --paper). */
-  --cp-mist: var(--hero-mist);
-  --cp-blush: var(--rail-ink);
-  --cp-rose: var(--hero-rose);
-  --cp-wine: var(--ox);
-  --cp-deep: var(--ox-deep);
-  --cp-rail: var(--hero-rail);
-  --cp-pill: var(--paper);
-  --cp-glass: var(--hero-glass);
-  --cp-glass-line: var(--hero-glass-line);
-  --cp-text: var(--hero-text);
-  --cp-text-soft: var(--hero-text-2);
-
   position: relative;
   isolation: isolate;
   border-radius: var(--r-lg);
   overflow: hidden;
   min-height: 560px;
   padding: 36px 20px 32px;
-  color: var(--cp-text);
-  background-color: var(--cp-deep);
+  color: var(--hero-text);
+  background-color: var(--ox-deep);
   background-image:
-    radial-gradient(60% 70% at 18% 22%, var(--cp-rose) 0%, transparent 62%),
-    radial-gradient(55% 65% at 82% 16%, var(--cp-mist) 0%, transparent 60%),
-    radial-gradient(70% 80% at 72% 90%, var(--cp-wine) 0%, transparent 66%),
-    radial-gradient(50% 60% at 10% 92%, var(--cp-blush) 0%, transparent 60%);
+    radial-gradient(60% 70% at 18% 22%, var(--hero-rose) 0%, transparent 62%),
+    radial-gradient(55% 65% at 82% 16%, var(--hero-mist) 0%, transparent 60%),
+    radial-gradient(70% 80% at 72% 90%, var(--ox) 0%, transparent 66%),
+    radial-gradient(50% 60% at 10% 92%, var(--rail-ink) 0%, transparent 60%);
   background-size: 170% 170%;
   background-repeat: no-repeat;
   animation: cph-drift 26s ease-in-out infinite alternate;
@@ -76,7 +63,7 @@
   font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.22;
-  color: var(--cp-text);
+  color: var(--hero-text);
   text-wrap: balance;
 }
 .cph-greeting-b {
@@ -114,24 +101,24 @@
   gap: 8px;
   padding: 18px;
   border-radius: var(--r-lg);
-  background: var(--cp-glass);
-  border: 1px solid var(--cp-glass-line);
-  color: var(--cp-text);
+  background: var(--hero-glass);
+  border: 1px solid var(--hero-glass-line);
+  color: var(--hero-text);
   text-decoration: none;
 }
 .cph-stat:hover {
-  background: color-mix(in srgb, var(--cp-glass) 85%, var(--cp-text));
-  color: var(--cp-text);
+  background: color-mix(in srgb, var(--hero-glass) 85%, var(--hero-text));
+  color: var(--hero-text);
   text-decoration: none;
 }
 .cph-stat:focus-visible {
-  outline: 2px solid var(--cp-text);
+  outline: 2px solid var(--hero-text);
   outline-offset: 2px;
 }
 .cph-stat-label {
   font-size: var(--fs-1);
   font-weight: 500;
-  color: var(--cp-text-soft);
+  color: var(--hero-text-2);
 }
 .cph-stat-value {
   font-size: 34px;
@@ -142,7 +129,7 @@
 .cph-stat-note {
   font-size: var(--fs-2);
   line-height: 1.45;
-  color: var(--cp-text-soft);
+  color: var(--hero-text-2);
 }
 
 @media (max-width: 900px) {
