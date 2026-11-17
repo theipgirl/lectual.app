@@ -19,9 +19,12 @@ const css = readFileSync(path.join(root, "src/components/leads/lead-page.css"), 
 const NOW = Date.parse("2026-10-27T12:00:00Z");
 
 describe("F1: lead page order", () => {
-  it("draws the sections in the Sprint 33 order", () => {
+  it("draws the sections in the Sprint 33 order, with the top card, What Lectual did and the four facts after the status row (Sprint 9)", () => {
     const order = [
       "<LeadStatusRow",
+      "<TopCardFrame>",
+      "<WhatLectualDid",
+      "<FourFacts",
       "<NeedsAttentionCard>",
       "<ComposerTabs",
       'data-tour="lead-timeline"',

@@ -102,7 +102,7 @@ describe("the lead step engine", () => {
     }
   });
 
-  it("is not wired to a page yet (Part 2 draws it)", () => {
+  it("is used by the lead page and its cards only (Part 2), nowhere else", () => {
     const walk = (dir: string, out: string[] = []): string[] => {
       for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
         const p = path.join(dir, e.name);
@@ -112,6 +112,12 @@ describe("the lead step engine", () => {
       return out;
     };
     const users = [...walk(path.join(ROOT, "src/app")), ...walk(path.join(ROOT, "src/components"))].filter((f) => /@\/lib\/lead-step\//.test(fs.readFileSync(f, "utf8")));
-    expect(users).toEqual([]);
+    expect(users.map((f) => path.relative(ROOT, f)).sort()).toEqual([
+      "src/app/dashboard/leads/[id]/page.tsx",
+      "src/components/leads/FourFacts.tsx",
+      "src/components/leads/NeedsYourYes.tsx",
+      "src/components/leads/TopCard.tsx",
+      "src/components/leads/WhatLectualDid.tsx",
+    ]);
   });
 });

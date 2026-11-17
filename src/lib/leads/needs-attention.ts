@@ -10,7 +10,8 @@ import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
 export type NeedsAttentionInput = {
   leadId: string;
   consult: { status: "ok"; event: unknown | null } | { status: "database-update-needed" } | { status: "unavailable" } | null;
-  approvals: LeadPendingApprovals;
+  /** Pending approvals are the lead page's top card now (Sprint 9); only a caller that still draws them passes this. */
+  approvals?: LeadPendingApprovals;
   clientEmailProposals: number;
   stageSuggestions: number;
 };
@@ -19,7 +20,7 @@ export function needsAttention(input: NeedsAttentionInput): boolean {
   const { consult, approvals } = input;
   if (consult?.status === "unavailable") return true;
   if (consult?.status === "ok" && consult.event) return true;
-  if (approvals.status === "unavailable") return true;
-  if (approvals.status === "ok" && (approvals.byLead[input.leadId] ?? []).length > 0) return true;
+  if (approvals?.status === "unavailable") return true;
+  if (approvals?.status === "ok" && (approvals.byLead[input.leadId] ?? []).length > 0) return true;
   return input.clientEmailProposals > 0 || input.stageSuggestions > 0;
 }

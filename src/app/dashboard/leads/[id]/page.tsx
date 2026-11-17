@@ -47,15 +47,18 @@ import { meetingsFor } from "@/lib/meetings/read";
 import { LinkedMeetings } from "@/components/meetings/LinkedMeetings";
 import { ConsultDetailsSection } from "@/components/leads/ConsultDetailsSection";
 import { TemperatureCard } from "@/components/leads/TemperatureCard";
-import { WaitingOnRebecca } from "@/components/leads/WaitingOnRebecca";
+import { TopCard } from "@/components/leads/TopCard";
+import { TopCardFrame } from "@/components/leads/TopCardFrame";
+import { WhatLectualDid } from "@/components/leads/WhatLectualDid";
+import { FourFacts } from "@/components/leads/FourFacts";
+import { loadLeadStepFacts, type LeadStepLoad } from "@/lib/lead-step/load";
+import { buildLeadStepView } from "@/lib/lead-step/view-model";
 import { ConsultBookedView } from "@/components/calendar/ConsultBookedLine";
 import { recordPageTitle } from "@/lib/ui/page-title";
-import { AUTOMATIC_STAGE_MOVES, BLANK, FIRST_READ, LAST_CONTACT, FROM_THEIR_EMAILS, INTAKE_NAME, LEAD_MERGED_INTO, MERGE_DONE, MERGE_HISTORY_PARTIAL, MERGE_OWN_ROWS_UNAVAILABLE } from "@/lib/ui/words";
+import { AUTOMATIC_STAGE_MOVES, BLANK, FIRST_READ, LAST_CONTACT, FROM_THEIR_EMAILS, INTAKE_NAME, LEAD_STEP_CANT_SHOW_NEEDS, LEAD_STEP_DID_UNAVAILABLE, LEAD_MERGED_INTO, MERGE_DONE, MERGE_HISTORY_PARTIAL, MERGE_OWN_ROWS_UNAVAILABLE } from "@/lib/ui/words";
 import { mergedSetFor, resolveLeadId } from "@/lib/leads/live";
 import { mergeNotice, mergedFromRedirect } from "@/lib/leads/merge-links";
 import { loadBookedConsult } from "@/lib/calendar/outlook-read";
-import { loadPendingApprovalsByLead } from "@/lib/queue/lead-pending";
-import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
 import { SequencesCard, type SequenceRow } from "@/components/leads/SequencesCard";
 import { laneView, nextStepForLane } from "@/lib/leads/lane";
 import { getFirmTimeZone, getLaneLinks } from "@/lib/org/profile";
@@ -165,12 +168,12 @@ export default async function LeadPage({
   const voiceUrls = await voiceNotePlaybackUrls(rows);
 
   // Lane + next step (SOP Stage 2) and the lead's sequences (SOP rule 1).
-  const [{ links, failed: linksFailed }, tz, enrollments, approvals, factsRead, mattersRead, answersRead, documentsRead, consultRead, mailingRead] = await Promise.all([
+  const [{ links, failed: linksFailed }, tz, enrollments, stepLoad, factsRead, mattersRead, answersRead, documentsRead, consultRead, mailingRead] = await Promise.all([
     getLaneLinks(),
     getFirmTimeZone(),
     listLeadEnrollments(id).catch(() => null),
-    // Never throws on an outage (it says `unavailable`); the catch is for the unexpected.
-    loadPendingApprovalsByLead().catch((): LeadPendingApprovals => ({ status: "unavailable" })),
+    // The top card, the four facts and "What Lectual did" are decided from these (src/lib/lead-step/). Never throws; the catch is for the unexpected.
+    loadLeadStepFacts(lead.id).catch((): LeadStepLoad => ({ status: "unavailable" })),
     // The same facts the Intake board reads; a failed read leaves the existing rules, never a guessed "cold".
     loadTemperatureFacts([lead], stages).catch((): TemperatureFactsRead => ({ status: "unavailable" })),
     // Never throws (a failed read is `unavailable`), so it can't take the page down.
@@ -225,10 +228,15 @@ export default async function LeadPage({
   const showAttention = needsAttention({
     leadId: lead.id,
     consult: consultRead,
-    approvals,
     clientEmailProposals: proposals.length,
     stageSuggestions: stageSuggestions.length,
   });
+
+  // The engine's view: exactly one top card. A lead the engine couldn't read is the "couldn't load" card, never a calm one.
+  const step = stepLoad.status === "ok" ? buildLeadStepView(stepLoad.facts) : null;
+  const yoursId = step?.top.kind === "yours" ? step.top.taskId : null;
+  const yoursTask = yoursId && stepLoad.status === "ok" && stepLoad.facts.tasks.status === "ok" ? stepLoad.facts.tasks.value.find((t) => t.id === yoursId) : undefined;
+  const stepMembers = members.map((m) => ({ userId: m.userId, name: m.displayName ?? m.email ?? "Teammate" }));
 
   return (
     <>
@@ -268,15 +276,28 @@ export default async function LeadPage({
         ownerName={ownerName}
         lastInboundAt={lead.last_inbound_at}
         now={renderedAt}
+        hideLastHeard
       />
+
+      <div className="ls-top">
+        <TopCardFrame>
+          <TopCard
+            leadId={lead.id}
+            view={step ? step.top : { kind: "couldnt-load", text: LEAD_STEP_CANT_SHOW_NEEDS }}
+            canWriteSteps={canWrite}
+            members={stepMembers}
+            yoursDueDate={yoursTask?.dueAt ? yoursTask.dueAt.slice(0, 10) : null}
+          />
+        </TopCardFrame>
+        <WhatLectualDid leadId={lead.id} did={step ? step.did : { status: "unavailable", text: LEAD_STEP_DID_UNAVAILABLE }} />
+        {step && <FourFacts facts={step.facts} />}
+      </div>
 
       <div className="lx-split lx-split-lead">
         <div className="lx-col">
           {showAttention && (
             <NeedsAttentionCard>
               {consultRead && <ConsultBookedView read={consultRead} timeZone={tz} bare />}
-
-              <WaitingOnRebecca leadId={lead.id} approvals={approvals} now={renderedAt} timeZone={tz} bare />
 
               {proposals.length > 0 && (
                 <div className="lx-grid-12">
