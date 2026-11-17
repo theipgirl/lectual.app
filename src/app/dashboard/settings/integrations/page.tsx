@@ -12,6 +12,9 @@ import { listMeetingConnections } from "@/lib/meetings/connection";
 import Link from "next/link";
 import { PROVIDER_LABEL, PROVIDERS, hasCalendarScope, isProvider, type MailboxProvider } from "@/lib/mailbox/providers";
 import { relativeTime } from "@/lib/relative-time";
+import { getFirmTimeZone } from "@/lib/org/profile";
+import { formatDay } from "@/lib/ui/dates";
+import { Notice, PageHeader } from "@/components/ui";
 import { ProviderMark } from "@/components/mailbox/ProviderMark";
 import { DisconnectButton } from "@/components/mailbox/DisconnectButton";
 import { IntegrationRow, ROW_ICON, RowIcon } from "@/components/integrations/IntegrationRow";
@@ -19,7 +22,7 @@ import { ModeBadge, StatusPill } from "@/components/integrations/StatusPill";
 import { stateForStatus, type IntegrationState } from "@/components/integrations/states";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
-import { FROM_THEIR_EMAILS, integrationErrorLine, LAWPAY_NOT_ISSUED, SWITCH_ON_WORDS } from "@/lib/ui/words";
+import { BLANK, FROM_THEIR_EMAILS, integrationErrorLine, LAWPAY_NOT_ISSUED, MAIL_NAME, REFRESH_TO_TRY_AGAIN, SWITCH_ON_WORDS } from "@/lib/ui/words";
 import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 import { ClearResultParams } from "@/components/integrations/ClearResultParams";
 
@@ -71,7 +74,7 @@ function providerState(readOk: boolean, rows: MailboxConnection[]): IntegrationS
   return rows.some((c) => c.status === "active") ? "connected" : "not-connected";
 }
 
-function MailboxRow({ c, canManage }: { c: MailboxConnection; canManage: boolean }) {
+function MailboxRow({ c, canManage, tz }: { c: MailboxConnection; canManage: boolean; tz: string }) {
   // Outlook only. A `reauth` row already shows "Reconnect", which fixes this too.
   const needsCalendar = c.provider === "microsoft" && c.status === "active" && !hasCalendarScope(c.provider, c.scopes);
   return (
@@ -80,18 +83,18 @@ function MailboxRow({ c, canManage }: { c: MailboxConnection; canManage: boolean
         <ProviderMark provider={c.provider} />
       </div>
       <div className="lx-mbx-main">
-        <div style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis" }}>{c.email}</div>
+        <div className="lx-mbx-email">{c.email}</div>
         <div className="lx-note">
           {PROVIDER_LABEL[c.provider]} · {c.scope === "personal" ? "My mailbox" : "Shared"} · since{" "}
-          {new Date(c.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+          {formatDay(c.created_at, { tz }) ?? BLANK}
         </div>
         {c.status !== "active" && c.last_error && (
-          <div className="lx-note" style={{ color: "var(--wine)" }}>
+          <div className="lx-note lx-mbx-problem">
             {integrationErrorLine(c.status, c.last_error)}
           </div>
         )}
         {needsCalendar && (
-          <div className="lx-note" style={{ color: "var(--warn)" }}>
+          <div className="lx-note lx-mbx-caution">
             {canManage
               ? "Mail keeps working. Consults from this calendar won't show in Lectual until you allow the calendar."
               : `Allow calendar: ask the mailbox's owner or ${ADMIN_TIER_PHRASE.toLowerCase()}. Mail keeps working meanwhile.`}
@@ -105,7 +108,7 @@ function MailboxRow({ c, canManage }: { c: MailboxConnection; canManage: boolean
       <div style={{ textAlign: "right", minWidth: 92 }}>
         <StatusPill state={stateForStatus(c.status)} />
         <div className="lx-note" style={{ marginTop: 4 }}>
-          {c.last_synced_at ? relativeTime(c.last_synced_at) : "first sync pending"}
+          {c.last_synced_at ? relativeTime(c.last_synced_at, Date.now(), tz) : "first sync pending"}
         </div>
       </div>
       {canManage && (
@@ -152,6 +155,7 @@ export default async function IntegrationsPage({
   const lm = lawmatics.ok ? lawmatics.connection : null;
   const connectable = connectableProviders();
   const canManageFirm = canManageScope(session.role, "firm");
+  const tz = await getFirmTimeZone();
 
   const errorText = outcomeMessage(error);
   const nothingConfigured = !connectable.google && !connectable.microsoft;
@@ -178,33 +182,27 @@ export default async function IntegrationsPage({
 
   return (
     <>
-      <div>
-        <div className="lx-label">Settings</div>
-        <h1 className="lx-h1" data-tour="integrations-head">Integrations</h1>
-        <p className="lx-sub">Connect outside services to your firm.</p>
-      </div>
+      <PageHeader title="Integrations" tour="integrations-head" sub={<>Connect outside services to your firm.</>} />
 
       {(connected || reconnected || error) && <ClearResultParams />}
       {connected && isProvider(connected) && (
-        <div role="status" className="lx-banner lx-banner-ok">
+        <Notice tone="ok" role="status">
           {PROVIDER_LABEL[connected]} {reconnected ? "reconnected" : "connected"}. The first sync
-          will pull the last 30 days. Matched mail shows up in My Mail.
-        </div>
+          will pull the last 30 days. Matched mail shows up in {MAIL_NAME}.
+        </Notice>
       )}
       {errorText && (
-        <div role="alert" className="lx-banner lx-banner-risk">
+        <Notice tone="risk" role="alert">
           {errorText}
-        </div>
+        </Notice>
       )}
       {!list.ok && (
-        <div role="alert" className="lx-banner lx-banner-risk">
-          We couldn&apos;t load your mailbox connections, so this list may be incomplete. Refresh to try again.
-        </div>
+        <Notice tone="risk" role="alert">
+          We couldn&apos;t load your mailbox connections, so this list may be incomplete. {REFRESH_TO_TRY_AGAIN}
+        </Notice>
       )}
       {nothingConfigured && (
-        <div className="lx-banner lx-banner-mute">
-          Connecting a mailbox isn&apos;t switched on yet. Lectual is setting it up.
-        </div>
+        <Notice tone="mute">Connecting a mailbox isn&apos;t switched on yet. Lectual is setting it up.</Notice>
       )}
 
       {hasMailbox && (
@@ -326,7 +324,7 @@ export default async function IntegrationsPage({
                   </div>
                   <ConnectButton provider={p} scope="personal" enabled={connectable[p]} label={mineHere.length ? "Connect another" : `Connect ${PROVIDER_LABEL[p]}`} />
                 </div>
-                {mineHere.length > 0 ? mineHere.map((c) => <MailboxRow key={c.id} c={c} canManage />) : <div className="lx-empty">No personal {PROVIDER_LABEL[p]} connected.</div>}
+                {mineHere.length > 0 ? mineHere.map((c) => <MailboxRow key={c.id} c={c} canManage tz={tz} />) : <div className="lx-empty">No personal {PROVIDER_LABEL[p]} connected.</div>}
                 <div className="lx-card-head">
                   <div style={{ flex: 1, minWidth: 220 }}>
                     <b style={{ color: "var(--ink)" }}>Firm mailboxes</b>
@@ -337,7 +335,7 @@ export default async function IntegrationsPage({
                   </div>
                   {canManageFirm && <ConnectButton provider={p} scope="firm" enabled={connectable[p]} label="Add shared mailbox" />}
                 </div>
-                {firmHere.length > 0 ? firmHere.map((c) => <MailboxRow key={c.id} c={c} canManage={canManageFirm} />) : <div className="lx-empty">No shared {PROVIDER_LABEL[p]} mailbox.</div>}
+                {firmHere.length > 0 ? firmHere.map((c) => <MailboxRow key={c.id} c={c} canManage={canManageFirm} tz={tz} />) : <div className="lx-empty">No shared {PROVIDER_LABEL[p]} mailbox.</div>}
             </IntegrationRow>
           );
         })}

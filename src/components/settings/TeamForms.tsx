@@ -2,6 +2,8 @@
 
 import { useActionState, useState, useTransition } from "react";
 import { InlineConfirm } from "@/components/ui/InlineConfirm";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { CANCEL, SAVING, TEAM_NAME } from "@/lib/ui/words";
 import {
   inviteMemberAction,
   removeMemberAction,
@@ -44,10 +46,10 @@ export function RoleSelect({ userId, role, grantable, name = "this person" }: { 
         <span role="alert" className="lx-note" style={{ display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           {roleChangeQuestion(name, role, chosen)}
           <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={pending}>
-            {pending ? "Saving…" : "Confirm"}
+            {pending ? SAVING : "Confirm"}
           </button>
           <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending} onClick={() => setChosen(role)}>
-            Cancel
+            {CANCEL}
           </button>
         </span>
       )}
@@ -64,7 +66,6 @@ export function RemoveMember({ userId, name }: { userId: string; name: string })
       <InlineConfirm
         label="Remove"
         question={`Remove ${name} from the firm? They're signed out straight away.`}
-        confirmLabel="Remove"
         pending={pending}
         onConfirm={() => {
           const form = new FormData();
@@ -97,10 +98,39 @@ export function InviteForm({ grantable }: { grantable: string[] }) {
       </label>
       <div style={{ gridColumn: "1 / -1", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <button type="submit" className="lx-btn lx-btn-pri" disabled={pending}>
-          {pending ? "Inviting…" : "Invite teammate"}
+          {pending ? SAVING : "Invite teammate"}
         </button>
         <Msg state={state} />
       </div>
     </form>
+  );
+}
+
+/**
+ * The Team page header. "Invite teammate" is the page's one main button (in the header); it opens the form below.
+ * A team of fewer than three starts with the form open (`defaultOpen`); only the admin tier sees any of it.
+ */
+export function TeamHeader({ isAdmin, grantable, defaultOpen }: { isAdmin: boolean; grantable: string[]; defaultOpen: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <>
+      <PageHeader
+        title={TEAM_NAME}
+        tour="team-head"
+        sub={<>Ten roles, enforced in the database, not just hidden in the menu. A role decides what someone can open, edit and approve.</>}
+        actions={
+          isAdmin ? (
+            <button type="button" className="lx-btn lx-btn-pri" aria-expanded={open} aria-controls="invite-teammate" onClick={() => setOpen((o) => !o)}>
+              Invite teammate
+            </button>
+          ) : undefined
+        }
+      />
+      {isAdmin && open ? (
+        <section id="invite-teammate" className="lx-card lx-pad" aria-label="Invite teammate">
+          <InviteForm grantable={grantable} />
+        </section>
+      ) : null}
+    </>
   );
 }

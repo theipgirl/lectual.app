@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useRef } from "react";
+import { CANCEL, SAVING } from "@/lib/ui/words";
 import {
   disconnectAction,
   mapAccountAction,
@@ -52,7 +53,7 @@ export function MapAccountForm({ kind, choices, current }: { kind: "operating" |
           ))}
         </select>
       </label>
-      <label style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 13.5, color: "var(--body)" }}>
+      <label className="lx-note" style={{ display: "flex", gap: 8, alignItems: "flex-start", color: "var(--body)" }}>
         <input type="checkbox" name="confirm" value="yes" required style={{ marginTop: 3 }} />
         <span>
           {kind === "operating"
@@ -62,7 +63,7 @@ export function MapAccountForm({ kind, choices, current }: { kind: "operating" |
       </label>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={pending}>
-          {pending ? "Saving…" : kind === "operating" ? "Use as operating account" : "Use as trust account"}
+          {pending ? SAVING : kind === "operating" ? "Use as operating account" : "Use as trust account"}
         </button>
         <Status state={state} />
       </div>
@@ -76,7 +77,7 @@ export function UnmapButton({ kind }: { kind: "operating" | "trust" }) {
     <form action={action} style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
       <input type="hidden" name="kind" value={kind} />
       <button type="submit" className="lx-btn lx-btn-ghost lx-btn-sm" disabled={pending}>
-        {pending ? "Removing…" : "Remove"}
+        {pending ? SAVING : "Remove"}
       </button>
       <Status state={state} />
     </form>
@@ -100,27 +101,27 @@ export function DisconnectLawPayButton({ merchant }: { merchant: string }) {
   const dialog = useRef<HTMLDialogElement>(null);
   return (
     <>
-      <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={() => dialog.current?.showModal()}>
+      <button type="button" className="lx-btn lx-btn-danger lx-btn-sm" onClick={() => dialog.current?.showModal()}>
         Disconnect
       </button>
       <Status state={state} />
       <dialog ref={dialog} className="lx-dialog" aria-labelledby="lp-dc-title">
         <form action={action} onSubmit={() => dialog.current?.close()}>
           <div style={{ padding: 22, display: "grid", gap: 10 }}>
-            <h2 id="lp-dc-title" className="lx-h2" style={{ fontSize: 25 }}>
+            <h2 id="lp-dc-title" className="lx-modal-title">
               Disconnect {merchant}?
             </h2>
-            <p style={{ margin: 0, color: "var(--body)", lineHeight: 1.55 }}>
+            <p className="lx-note" style={{ color: "var(--body)" }}>
               Lectual revokes its access at LawPay, deletes the stored credentials and forgets which accounts you chose. Clients stop seeing a
               card form on their proposals. Payments already recorded stay on their quotes.
             </p>
           </div>
           <div className="lx-dialog-foot">
-            <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={() => dialog.current?.close()}>
-              Keep it
+            <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={() => dialog.current?.close()}>
+              {CANCEL}
             </button>
-            <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={pending}>
-              {pending ? "Disconnecting…" : "Disconnect"}
+            <button type="submit" className="lx-btn lx-btn-danger lx-btn-sm" disabled={pending}>
+              {pending ? SAVING : "Disconnect"}
             </button>
           </div>
         </form>

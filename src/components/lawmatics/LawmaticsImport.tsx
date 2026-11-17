@@ -1,7 +1,10 @@
 "use client";
 
-import { IMPORT_PERSON_NOT_SAVED, LAWMATICS_TOKEN_HELP } from "@/lib/ui/words";
-import { useActionState, useState, type ReactNode } from "react";
+import { IMPORT_PERSON_NOT_SAVED, LAWMATICS_TOKEN_HELP, SAVING, searchPlaceholder } from "@/lib/ui/words";
+import { useActionState, useRef, useState, type ReactNode } from "react";
+import { InlineConfirm } from "@/components/ui/InlineConfirm";
+import { Notice } from "@/components/ui/Notice";
+import { ListSearch } from "@/components/list-page/ListToolbar";
 import {
   applyMattersImportAction,
   connectLawmaticsAction,
@@ -23,9 +26,9 @@ const MATTERS_IDLE: MattersImportState = { phase: "idle" };
 
 function Err({ text }: { text?: string }) {
   return text ? (
-    <p role="alert" className="lx-banner lx-banner-risk" style={{ margin: 0 }}>
+    <Notice tone="risk" role="alert">
       {text}
-    </p>
+    </Notice>
   ) : null;
 }
 
@@ -52,10 +55,10 @@ export function ConnectLawmatics({ reconnect }: { reconnect: boolean }) {
           aria-describedby="lawmatics-token-help"
         />
       </label>
-      <p id="lawmatics-token-help" className="lx-note" style={{ margin: 0 }}>
+      <p id="lawmatics-token-help" className="lx-note">
         {LAWMATICS_TOKEN_HELP}
       </p>
-      <p className="lx-note" style={{ margin: 0 }}>
+      <p className="lx-note">
         We check the token with one read-only request, then store it encrypted. No one at your firm can see it again, including you.
         Lectual only ever reads from Lawmatics; it never changes anything there.
       </p>
@@ -63,11 +66,7 @@ export function ConnectLawmatics({ reconnect }: { reconnect: boolean }) {
         <button type="submit" className="lx-btn lx-btn-pri" disabled={pending}>
           {pending ? "Checking…" : reconnect ? "Replace token" : "Connect Lawmatics"}
         </button>
-        {state.ok && (
-          <span className="lx-note" style={{ color: "var(--ok)" }}>
-            Connected.
-          </span>
-        )}
+        {state.ok && <span className="lx-saved">Connected.</span>}
       </div>
       <Err text={state.error} />
     </form>
@@ -76,17 +75,16 @@ export function ConnectLawmatics({ reconnect }: { reconnect: boolean }) {
 
 export function DisconnectLawmatics() {
   const [state, action, pending] = useActionState<ConnectState, FormData>(disconnectLawmaticsAction, {});
+  const formRef = useRef<HTMLFormElement>(null);
   return (
-    <form
-      action={action}
-      onSubmit={(e) => {
-        if (!confirm("Disconnect Lawmatics? The token is deleted. Records already imported stay.")) e.preventDefault();
-      }}
-      className="lx-inline-form"
-    >
-      <button type="submit" className="lx-btn lx-btn-danger lx-btn-sm" disabled={pending}>
-        {pending ? "…" : "Disconnect"}
-      </button>
+    <form ref={formRef} action={action} className="lx-inline-form">
+      <InlineConfirm
+        label="Disconnect"
+        question="Disconnect Lawmatics? The token is deleted. Records already imported stay."
+        className="lx-btn lx-btn-danger lx-btn-sm"
+        pending={pending}
+        onConfirm={() => formRef.current?.requestSubmit()}
+      />
       <Err text={state.error} />
     </form>
   );
@@ -135,14 +133,10 @@ function Notices({ truncated, truncatedReason, includeDropped, includeDroppedRea
   return (
     <>
       {truncated && (
-        <p className="lx-banner lx-banner-warn" style={{ margin: 0 }}>
-          Not everything was read from Lawmatics. {truncatedReason ?? ""} Run it again after this import to pick up the rest.
-        </p>
+        <Notice tone="warn">Not everything was read from Lawmatics. {truncatedReason ?? ""} Run it again after this import to pick up the rest.</Notice>
       )}
       {includeDropped && (
-        <p className="lx-banner lx-banner-warn" style={{ margin: 0 }}>
-          Stages and linked contacts couldn&apos;t be read this time, so records may look stage-less. {includeDroppedReason ?? ""}
-        </p>
+        <Notice tone="warn">Stages and linked contacts couldn&apos;t be read this time, so records may look stage-less. {includeDroppedReason ?? ""}</Notice>
       )}
     </>
   );
@@ -181,22 +175,14 @@ export function FindPerson({ preview }: { preview: PreviewView }) {
   const searching = foldTerm(term).length > 0;
   return (
     <div style={{ display: "grid", gap: 8 }} data-find-person>
-      <label className="lx-field">
+      <div className="lx-field">
         <span className="lx-label">Find a person in this pull</span>
-        <input
-          className="lx-input"
-          type="search"
-          value={term}
-          maxLength={80}
-          autoComplete="off"
-          placeholder="A name, business or email"
-          onChange={(e) => setTerm(e.target.value)}
-        />
-      </label>
+        <ListSearch label="Find a person in this pull" placeholder={searchPlaceholder("by name, business or email")} value={term} onChange={setTerm} onClear={() => setTerm("")} />
+      </div>
       {searching && results.length === 0 ? (
-        <p role="status" className="lx-banner lx-banner-warn" style={{ margin: 0 }}>
+        <Notice tone="warn" role="status">
           {notInPullMessage({ truncated: preview.truncated, practiceAreaFilterOn: preview.options.practiceAreaFilter !== null, includeDropped: preview.includeDropped })}
-        </p>
+        </Notice>
       ) : null}
       {results.length > 0 ? (
         <ul className="lx-list" aria-label="People found">
@@ -218,7 +204,7 @@ export function FindPerson({ preview }: { preview: PreviewView }) {
 export function PreviewBody({ p, action, pending }: { p: PreviewView; action: (formData: FormData) => void; pending: boolean }) {
   return (
   <>
-    <p className="lx-note" style={{ margin: 0 }}>
+    <p className="lx-note">
       Read {p.counts.prospects} records and {p.counts.contacts} contacts from Lawmatics. Nothing has been written yet.
     </p>
     <Notices truncated={p.truncated} truncatedReason={p.truncatedReason} includeDropped={p.includeDropped} includeDroppedReason={p.includeDroppedReason} />
@@ -233,7 +219,7 @@ export function PreviewBody({ p, action, pending }: { p: PreviewView; action: (f
         ["skipped", p.totals.skipped],
       ]}
     />
-    <p className="lx-note" style={{ margin: 0 }} data-summary-line>
+    <p className="lx-note" data-summary-line>
       {`${p.totals.skipped} skipped, ${p.totals.stageDecision} need a stage decision.`}
     </p>
     <FindPerson preview={p} />
@@ -293,7 +279,7 @@ export function PreviewBody({ p, action, pending }: { p: PreviewView; action: (f
       <Acknowledge label={`Write ${p.totals.create} new and ${p.totals.update} updated leads into Lectual.`} />
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         <button type="submit" className="lx-btn lx-btn-pri" disabled={pending}>
-          {pending ? "Importing…" : "Import"}
+          {pending ? SAVING : "Import"}
         </button>
       </div>
     </form>
@@ -325,7 +311,7 @@ export function ClientsImport() {
         </form>
       )}
 
-      {state.notice && <p className="lx-banner lx-banner-ok" style={{ margin: 0 }}>{state.notice}</p>}
+      {state.notice && <Notice tone="ok">{state.notice}</Notice>}
       <Err text={state.error} />
 
       {p && state.phase === "preview" && <PreviewBody p={p} action={action} pending={pending} />}
@@ -343,14 +329,14 @@ export function ClientsImport() {
             ]}
           />
           {r.partial && (
-            <p className="lx-banner lx-banner-warn" style={{ margin: 0 }}>
+            <Notice tone="warn">
               The import stopped at its time limit. Everything counted above was written. Run it again to finish the other {r.remaining.creates + r.remaining.updates}.
-            </p>
+            </Notice>
           )}
           {r.flagsNotRecorded > 0 && (
-            <p className="lx-banner lx-banner-warn" style={{ margin: 0 }}>
+            <Notice tone="warn">
               {`${r.flagsNotRecorded} of the leads whose Lawmatics stage needs a decision could not be flagged on their timeline. They were created; find them in the new-enquiry stage.`}
-            </p>
+            </Notice>
           )}
           <Notices truncated={r.truncated} truncatedReason={r.truncatedReason} />
           <Section title="Failed" count={r.failures.length}>
@@ -376,7 +362,7 @@ export function MattersImport() {
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
-      <p className="lx-note" style={{ margin: 0 }}>
+      <p className="lx-note">
         Links your existing matters to their Lawmatics records and fills in blanks: the Lawmatics id, referral source, notes, opened date. It never creates a matter and never overwrites a value someone entered here.
       </p>
       <form action={previewAction}>
@@ -385,7 +371,7 @@ export function MattersImport() {
         </button>
       </form>
 
-      {state.notice && <p className="lx-banner lx-banner-ok" style={{ margin: 0 }}>{state.notice}</p>}
+      {state.notice && <Notice tone="ok">{state.notice}</Notice>}
       <Err text={state.error} />
 
       {p && (
@@ -424,7 +410,7 @@ export function MattersImport() {
               <Acknowledge label={`Update ${p.totals.update} matters in Lectual.`} />
               <div>
                 <button type="submit" className="lx-btn lx-btn-pri" disabled={applying}>
-                  {applying ? "Updating…" : "Update matters"}
+                  {applying ? SAVING : "Update matters"}
                 </button>
               </div>
             </form>
@@ -443,9 +429,9 @@ export function MattersImport() {
             ]}
           />
           {r.partial && (
-            <p className="lx-banner lx-banner-warn" style={{ margin: 0 }}>
+            <Notice tone="warn">
               The update stopped at its time limit. Everything counted above was written. Run it again to finish.
-            </p>
+            </Notice>
           )}
           <Section title="Failed" count={r.failures.length}>
             {r.failures.map((f, i) => (
@@ -462,7 +448,7 @@ export function HiredMattersSync() {
   const [state, action, pending] = useActionState<HiredSyncState, FormData>(syncHiredMattersAction, {});
   return (
     <form action={action} style={{ display: "grid", gap: 10 }}>
-      <p className="lx-note" style={{ margin: 0 }}>
+      <p className="lx-note">
         People marked Hired in Lawmatics get a matter here automatically every day. This button does it now for your firm. It only reads from
         Lawmatics, and it never changes a matter that is already linked.
       </p>
@@ -471,7 +457,7 @@ export function HiredMattersSync() {
           {pending ? "Reading Lawmatics…" : "Sync hired matters now"}
         </button>
         {state.ok && state.notice && (
-          <span className="lx-note" style={{ color: "var(--ok)" }} role="status">
+          <span className="lx-saved" role="status">
             {state.notice}
           </span>
         )}

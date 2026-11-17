@@ -4,6 +4,7 @@ import { MODULES } from "@/lib/settings/modules-copy";
 import { FeedbackLink } from "@/components/feedback/SendFeedbackButton";
 import { listConnections } from "@/lib/mailbox/connections";
 import type { Metadata } from "next";
+import { PageHeader, Pill } from "@/components/ui";
 import { pageTitle } from "@/lib/ui/page-title";
 import { CONTACT_LECTUAL, FEATURES_NAME, FEATURES_SUBLINE_END, FEATURES_SUBLINE_START } from "@/lib/ui/words";
 
@@ -39,13 +40,15 @@ export default async function ModulesPage() {
   const mailbox = await mailboxStatus(on.includes("mailbox"));
   return (
     <>
-      <div>
-        <div className="lx-label">Settings</div>
-        <h1 className="lx-h1" data-tour="modules-head">{FEATURES_NAME}</h1>
-        <p className="lx-sub">
-          {FEATURES_SUBLINE_START} <FeedbackLink>{CONTACT_LECTUAL}</FeedbackLink> {FEATURES_SUBLINE_END}
-        </p>
-      </div>
+      <PageHeader
+        title={FEATURES_NAME}
+        tour="modules-head"
+        sub={
+          <>
+            {FEATURES_SUBLINE_START} <FeedbackLink>{CONTACT_LECTUAL}</FeedbackLink> {FEATURES_SUBLINE_END}
+          </>
+        }
+      />
       <section className="lx-card lx-int" aria-label={FEATURES_NAME}>
         {MODULES.map((m) => {
           const enabled = on.includes(m.key);
@@ -70,13 +73,13 @@ export default async function ModulesPage() {
                     </span>
                   )}
                 </span>
-                <span className={`lx-pill lx-pill-${status.tone}`}>{status.label}</span>
+                <Pill tone={status.tone}>{status.label}</Pill>
               </div>
             </div>
           );
         })}
       </section>
-      <p className="lx-note" style={{ margin: 0 }}>
+      <p className="lx-note">
         Integrations with your own accounts, like Lawmatics, don&apos;t need to be switched on by Lectual: connect them in Integrations.
       </p>
     </>

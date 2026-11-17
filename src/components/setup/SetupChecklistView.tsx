@@ -29,7 +29,7 @@ export function SetupChecklistView({ checklist }: { checklist: SetupChecklist })
   return (
     <div className="su-wrap">
       <section className="lx-card su-summary" aria-labelledby="setup-count">
-        <h2 id="setup-count" className="su-count">
+        <h2 id="setup-count" className="lx-h2">
           {`${doneCount} of ${total} done`}
         </h2>
         <div
@@ -43,17 +43,17 @@ export function SetupChecklistView({ checklist }: { checklist: SetupChecklist })
           <span style={{ width: `${total === 0 ? 100 : Math.round((doneCount / total) * 100)}%` }} />
         </div>
         {complete ? (
-          <p className="lx-sub" style={{ margin: 0 }}>
+          <p className="lx-sub">
             All set. Next: try the{" "}
             <Link href="/dashboard/getting-started/">Getting started guides</Link>.
           </p>
         ) : (
-          <p className="lx-sub" style={{ margin: 0 }}>
+          <p className="lx-sub">
             Work down the list. Each button opens the page where that step is done.
           </p>
         )}
         {waitingOnLectual > 0 && (
-          <p className="lx-note" style={{ margin: 0 }}>
+          <p className="lx-note">
             {waitingOnLectual === 1 ? "One step is" : `${waitingOnLectual} steps are`} Lectual&apos;s to switch on, so{" "}
             {waitingOnLectual === 1 ? "it isn't" : "they aren't"} counted against you.
           </p>
