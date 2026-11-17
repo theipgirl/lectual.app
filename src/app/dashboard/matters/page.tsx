@@ -358,7 +358,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
           </SheetCard>
         ))
       )}
-      {openRef ? <RecordCardHost open={openRef} path="/dashboard/matters/" params={rawParams as Record<string, string | string[] | undefined>} /> : null}
+      {openRef ? <RecordCardHost open={openRef} path="/dashboard/matters/" params={rawParams as Record<string, string | string[] | undefined>} moveStages={stageRead.status === "unavailable" ? undefined : moveStages} /> : null}
     </div>
   );
 }

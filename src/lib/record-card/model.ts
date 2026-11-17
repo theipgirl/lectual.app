@@ -400,6 +400,15 @@ function proposalView(read: CardRead<CardProposal | null>): ProposalView {
   return { status: "ok", lines: proposalFeeLines(read.value), href: `/dashboard/proposals/${encodeURIComponent(read.value.id)}/` };
 }
 
+/**
+ * The Matters page offers its card menus only `matterMoveStages`; the opened card gets the same list. Only a matter whose
+ * stage read worked is touched: a lead, and a failed stage read, keep the loader's result exactly.
+ */
+export function withMatterMoveStages(load: RecordCardLoad, moveStages?: readonly CardStage[]): RecordCardLoad {
+  if (!moveStages || load.status !== "ok" || load.kind !== "matter" || load.stages.status !== "ok") return load;
+  return { ...load, stages: { status: "ok", value: moveStages.map((s) => ({ id: s.id, label: s.label })) } };
+}
+
 /** The opened card for `?open=`. A foreign or missing id carries no field of the record, only the sentence. */
 export function buildOpenedCard(load: RecordCardLoad, page: { path: string; params: CurrentParams }): OpenedCardView {
   const close = closeHref(page.path, page.params);

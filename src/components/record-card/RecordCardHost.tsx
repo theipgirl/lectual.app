@@ -16,7 +16,7 @@ import { addVoiceNoteAction as addLeadVoiceNote } from "@/app/dashboard/leads/[i
 import { addVoiceNoteAction as addMatterVoiceNote } from "@/app/dashboard/matters/[id]/actions";
 import { FILE_DELETE_ROLES } from "@/lib/files/roles";
 import { voiceNotePlaybackUrls } from "@/lib/voice/notes";
-import { buildOpenedCard, type OpenedCardView, type RecordCardLoad } from "@/lib/record-card/model";
+import { buildOpenedCard, withMatterMoveStages, type OpenedCardView, type RecordCardLoad } from "@/lib/record-card/model";
 import { loadRecordCard } from "@/lib/record-card/load";
 import { closeHref, openHref, type CardRef, type CurrentParams } from "@/lib/record-card/open";
 import {
@@ -101,9 +101,25 @@ function Docs({ view, role, directory }: { view: Ok; role: string; directory: { 
  * found" with no field of the record, a failed read says so. Esc, Back and the close button all follow the close LINK.
  * Nothing here sends: Call and Email open the person's own apps.
  */
-export async function RecordCardHost({ open, path, params, duplicateOf, load: given }: { open: CardRef | null; path: string; params: CurrentParams; duplicateOf?: string | null; load?: RecordCardLoad }) {
+export async function RecordCardHost({
+  open,
+  path,
+  params,
+  duplicateOf,
+  load: given,
+  moveStages,
+}: {
+  open: CardRef | null;
+  path: string;
+  params: CurrentParams;
+  duplicateOf?: string | null;
+  load?: RecordCardLoad;
+  /** Matters page only: the stages its board and card menus offer (`matterMoveStages`). Leads and a failed stage read keep the loader's list. */
+  moveStages?: readonly { id: string; label: string }[];
+}) {
   if (!open) return null;
-  const load = given ?? (await loadRecordCard(open, { duplicateOf }));
+  const loaded = given ?? (await loadRecordCard(open, { duplicateOf }));
+  const load = withMatterMoveStages(loaded, moveStages);
   const view = buildOpenedCard(load, { path, params });
   if (view.status !== "ok" || load.status !== "ok") {
     return (

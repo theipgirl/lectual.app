@@ -11,7 +11,7 @@ import { leadLabel } from "@/lib/record-card/lead-label";
 import { buildMatterCards } from "@/lib/record-card/matter-cards";
 import { intakeStageIds, matterMoveStages, pastLoeView } from "@/lib/matters/phase-group";
 import { TM_HIRED_STAGE_LABEL } from "@/lib/matters/hired-stage";
-import { type CardContext, type CardRead, type RecordCardLoad } from "@/lib/record-card/model";
+import { buildOpenedCard, withMatterMoveStages, type CardContext, type CardRead, type RecordCardLoad } from "@/lib/record-card/model";
 import { NO_SHOW_HOLD_MS } from "@/lib/record-card/rules";
 import { LEAD, NOW, TZ, facts as stepFacts, pending, draft } from "../lead-step/fixtures";
 import IntakeCard from "@/app/dashboard/intake/_components/IntakeCard";
@@ -264,6 +264,37 @@ async function host(load: RecordCardLoad, kind: "lead" | "matter" = "lead", id =
   const el = await RecordCardHost({ open: { kind, id }, path: kind === "lead" ? "/dashboard/intake/" : "/dashboard/matters/", params: { view: "board" }, load });
   return renderToStaticMarkup(el);
 }
+
+describe("the opened Matters card's Move to stage", () => {
+  const all = [
+    { id: "m0", label: "1. Consult held", phase: "pipeline", order_index: 1 },
+    { id: "m-loe", label: TM_HIRED_STAGE_LABEL, phase: "pipeline", order_index: 2 },
+    { id: "m1", label: "3. Filed", phase: "post_filing", order_index: 3 },
+    { id: "m2", label: "4. Published", phase: "post_filing", order_index: 4 },
+  ];
+  const view = pastLoeView([], all, intakeStageIds(all));
+  const load = () => matterLoad("attorney", { stages: { status: "ok", value: all.map((s) => ({ id: s.id, label: s.label })) } });
+  it("does not offer an intake stage on the grouped board, and does on ?intake=1", () => {
+    const targets = (moveStages?: typeof all) => {
+      const v = buildOpenedCard(withMatterMoveStages(load(), moveStages), { path: "/dashboard/matters/", params: {} });
+      return v.status === "ok" && v.kind === "matter" ? v.card.stage.targets.map((t) => t.id) : [];
+    };
+    expect(targets()).toEqual(["m0", "m-loe", "m2"]); // the loader's own list, unfiltered
+    expect(targets(matterMoveStages(all, view.stages, false))).toEqual(["m-loe", "m2"]);
+    expect(targets(matterMoveStages(all, view.stages, true))).toEqual(["m0", "m-loe", "m2"]);
+  });
+  it("a lead is untouched", () => {
+    const l = leadLoad("attorney");
+    expect(withMatterMoveStages(l, [])).toBe(l);
+  });
+  it("a failed stage read keeps the loader's behaviour", () => {
+    const failed = matterLoad("attorney", { stages: { status: "unavailable" } });
+    expect(withMatterMoveStages(failed, [])).toBe(failed);
+  });
+  it("the page passes its move list to the opened card", () => {
+    expect(src("src/app/dashboard/matters/page.tsx")).toMatch(/<RecordCardHost open=.*moveStages=\{/);
+  });
+});
 
 describe("the opened card's states", () => {
   it("a foreign or missing id shows the sentence and nothing of the record, with a close link that keeps the view", async () => {
