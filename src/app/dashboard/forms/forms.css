@@ -191,6 +191,14 @@
   align-items: center;
   gap: 12px;
 }
+/* The Share row (link + three buttons): wraps on a narrow screen instead of running past the edge. */
+.ifm-row-wrap {
+  flex-wrap: wrap;
+}
+.ifm-row-wrap > .ifm-input {
+  flex: 1 1 220px;
+  min-width: 0;
+}
 .ifm-input {
   width: 100%;
   box-sizing: border-box;
