@@ -40,7 +40,7 @@ import {
   RECORD_CARD_TAGS,
   RECORD_CARD_TIMELINE,
 } from "@/lib/ui/words";
-import { CardMenu, NextStepLine, OwnerPick, SourcePick, StagePick, TempPill } from "./controls";
+import { CardMenu, OwnerPick, SourcePick, StagePick, TempPill } from "./controls";
 import { RenameForm, StepsChecklist, TagsEditor } from "./opened-parts";
 import "./record-card.css";
 
@@ -129,7 +129,6 @@ export async function RecordCardHost({ open, path, params, duplicateOf, load: gi
 
   if (view.kind === "matter") {
     const matter = load.kind === "matter" ? load.matter : null;
-    const first = view.steps.status === "ok" ? view.steps.items[0] : null;
     return (
       <Dialog closeHref={view.closeHref} title={c.name} titleId={view.titleId} size="lg" className="rc-card">
         <div className="rc-head">
@@ -143,9 +142,6 @@ export async function RecordCardHost({ open, path, params, duplicateOf, load: gi
         </div>
         <div className="rc-cols">
           <div className="rc-main">
-            <section className="rc-sec" aria-label="Next step">
-              <NextStepLine kind="matter" id={c.id} line={c.nextStep} dueIso={first?.dueIso ?? null} text={c.bottom.nextStep} />
-            </section>
             <StepsChecklist kind="matter" id={c.id} steps={view.steps} />
             {c.edits.notes && (
               <section className="rc-sec" aria-label={RECORD_CARD_NOTE_HEADING}>
