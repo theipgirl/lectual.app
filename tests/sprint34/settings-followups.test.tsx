@@ -128,7 +128,7 @@ describe("item 5: Team", () => {
     const { InlineConfirm } = await import("@/components/ui/InlineConfirm");
     const asking = renderToStaticMarkup(createElement(InlineConfirm, { label: "Remove", question: "Remove Sam from the firm?", onConfirm: vi.fn(), initial: "asking" }));
     expect(asking).toContain("Remove Sam from the firm?");
-    expect(asking).toMatch(/>Confirm</);
+    expect(asking).toMatch(/>Yes, remove</);
     expect(asking).toMatch(/>Cancel</);
     expect(renderToStaticMarkup(createElement(InlineConfirm, { label: "Archive", question: "q", onConfirm: vi.fn() }))).toMatch(/>Archive</);
     for (const f of ["src/components/settings/TeamForms.tsx", "src/app/dashboard/forms/_components/IntakeList.tsx"]) {

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Popover from "./Popover";
+import { Icon } from "@/components/ui/Icon";
 import { MORE_NAME } from "@/lib/ui/words";
 
 /** A link item (Import, Reconcile stages) or an action item (a button that does something, optionally a danger one). */
@@ -23,14 +24,14 @@ export function MoreMenu({ items, label = MORE_NAME, align = "right" }: { items:
       trigger={({ onClick, ref, ...aria }) => (
         <button {...aria} ref={ref} type="button" onClick={onClick} className="lx-btn lx-btn-sec lp-more">
           <span className="lp-btn-icon" aria-hidden>
-            ⋯
+            <Icon name="more" />
           </span>
           <span className="lp-label-long">{label}</span>
           <span className="lp-label-short" aria-hidden>
             {label}
           </span>
           <span aria-hidden className="lp-label-long">
-            ▾
+            <Icon name="chevron-down" size={14} />
           </span>
         </button>
       )}

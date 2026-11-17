@@ -31,7 +31,7 @@ async function render(params: { seg?: string; q?: string; view?: string } = {}) 
 
 /** The shared header and toolbar (everything up to the filter chips). */
 function pageHead(html: string): string {
-  return html.slice(html.indexOf('class="lp-header"'), html.indexOf('aria-label="Filter matters"'));
+  return html.slice(html.indexOf('class="lx-page-head lx-head lp-header"'), html.indexOf('aria-label="Filter matters"'));
 }
 
 const anchor = (html: string, label: string) => html.match(new RegExp(`<a [^>]*>${label}</a>`))?.[0] ?? "";

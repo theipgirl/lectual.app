@@ -12,24 +12,14 @@
   --lp-row-h: 46px;
   /* Sentence-like sub-lines and meta lines: the type scale's smallest step (13px, 14px on a phone). No monospace anywhere. */
   --lp-meta: var(--fs-1);
-  --lp-gap: 12px;
+  --lp-gap: var(--gap-section);
   --lp-radius: var(--r-md);
   display: flex;
   flex-direction: column;
   gap: var(--lp-gap);
 }
 
-/* ---- header: h1 + one sub-line, no eyebrow ---- */
-.lp-header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  column-gap: 12px;
-  row-gap: 2px;
-}
-.lp-header .lx-h1 { margin: 0; }
-.lp-header .lp-count { font-family: var(--sans); font-variant-numeric: tabular-nums; font-size: var(--fs-2); color: var(--muted); }
-.lp-header .lp-sub { flex-basis: 100%; margin: 0; }
+/* header: see .lx-head in globals.css */
 
 /* ---- toolbar: search, view toggle, primary action, More ---- */
 .lp-toolbar {
@@ -135,18 +125,7 @@
 .lp-pop-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---- a note above the table (one, not three) ---- */
-.lp-note {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
-  margin: 0;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: var(--tint-warn);
-  color: var(--body);
-  font-size: var(--fs-1);
-}
+.lp-note { padding: 12px 14px; border-radius: var(--r-md); border: 1px solid var(--line-warn); background: var(--tint-warn); color: var(--warn); font-size: var(--fs-2); line-height: 1.5; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 0; }
 
 /* ---- table: panel, header strip, rows ---- */
 .lp-panel {
@@ -156,6 +135,7 @@
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   background: var(--card);
+  box-shadow: none;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -248,8 +228,7 @@
 
 /* ---- Compact top under 640px (Sprint 34): one row of buttons, one scrolling row of chips ---- */
 @media (max-width: 640px) {
-  .lp-root { --lp-gap: 8px; }
-  .lp-header { row-gap: 0; }
+  .lp-root { --lp-gap: 10px; }
   .lp-toolbar { flex-wrap: wrap; gap: 6px; }
   .lp-toolbar-spacer { display: none; }
   .lp-toolbar > :not(.lp-search) { flex: 0 0 auto; }

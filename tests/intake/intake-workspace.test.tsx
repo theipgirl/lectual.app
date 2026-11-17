@@ -154,10 +154,10 @@ describe("default last-touch sort, rendered", () => {
 
 describe("the page header and toolbar (shared list-page components)", () => {
   const html = render(THREE);
-  const head = html.slice(html.indexOf('class="lp-header"'), html.indexOf('aria-label="Filter by stage"'));
+  const head = html.slice(html.indexOf('class="lx-page-head lx-head lp-header"'), html.indexOf('aria-label="Filter by stage"'));
 
   it("uses the shared header: one h1, one sub-line, no eyebrow label", () => {
-    expect(html).toContain('class="lp-header"');
+    expect(html).toContain('class="lx-page-head lx-head lp-header"');
     expect(head).toContain('<h1 class="lx-h1">Intake</h1>');
     expect(head).toContain('class="lx-sub lp-sub"');
     expect(head).not.toContain("lx-label");
@@ -213,7 +213,7 @@ describe("the page header and toolbar (shared list-page components)", () => {
 
   it("has no separate status strip above the header", () => {
     expect(html).not.toContain("intake-statusline");
-    expect(html.startsWith('<div class="lp-root ix-leads"><header class="lp-header">')).toBe(true);
+    expect(html.startsWith('<div class="lp-root ix-leads"><header class="lx-page-head lx-head lp-header">')).toBe(true);
   });
 
   it("marks the current view on the controlled toggle", () => {
@@ -227,7 +227,7 @@ describe("the page header and toolbar (shared list-page components)", () => {
     expect(render(THREE)).not.toContain("Group by");
     const board = render(THREE, { view: "board" });
     expect(board).toContain("Group by");
-    expect(board.indexOf("Group by")).toBeGreaterThan(board.indexOf('class="lp-header"'));
+    expect(board.indexOf("Group by")).toBeGreaterThan(board.indexOf('class="lx-page-head lx-head lp-header"'));
     expect(board.indexOf("Group by")).toBeGreaterThan(board.indexOf("Add a lead"));
   });
 });

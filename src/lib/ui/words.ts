@@ -99,6 +99,19 @@ export function notReadyYet(feature?: string): string {
 
 /** A read that failed. The state logic stays: a failed read is never drawn as empty or zero. */
 export const CANT_SHOW = "Can't show this right now. Refresh to try again.";
+export const cantShowTitle = (what: string) => `Can't show ${what} right now`;
+export const REFRESH_TO_TRY_AGAIN = "Refresh to try again.";
+export const REFRESH = "Refresh";
+/** An empty list that was READ successfully: "No proposals yet. Start one from a lead." */
+export const noneYet = (what: string, how?: string) => `No ${what} yet.${how ? ` ${how}` : ""}`;
+export const columnEmpty = (noun: string) => `No ${noun} here yet.`;
+export const OPTIONAL = "(optional)";
+export const TEAM_NAME = "Team";
+export const APPROVAL_SETTINGS_NAME = "Approval settings";
+export const LAWMATICS_NAME = "Lawmatics";
+export const MEETINGS_INTEGRATION_NAME = "Meetings integration";
+export const EMAIL_TEMPLATES_NAME = "Email templates";
+export const NEW_LETTER_NAMES = { loe: "New engagement letter", opinion: "New opinion letter", clearance: "New trademark clearance" } as const;
 export function cantShow(what: string): string {
   return `Can't show ${what} right now. Refresh to try again.`;
 }

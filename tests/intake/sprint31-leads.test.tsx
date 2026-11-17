@@ -172,7 +172,7 @@ describe("the table starts on the first screen (768px tall)", () => {
   it("above the table there is only the header, one toolbar row and two chip rows (the sets, then the filters)", () => {
     const html = render([lead("a", "Ana")]);
     const above = html.slice(0, html.indexOf('class="lp-panel"'));
-    expect(above.match(/class="lp-header"/g)).toHaveLength(1);
+    expect(above.match(/class="lx-page-head lx-head lp-header"/g)).toHaveLength(1);
     expect(above.match(/class="lp-toolbar"/g)).toHaveLength(1);
     expect(above.match(/class="ix-sets"/g)).toHaveLength(1);
     expect(above.match(/class="ix-filters"/g)).toHaveLength(1);

@@ -214,6 +214,16 @@ a:focus-visible {
   background: var(--card);
   box-shadow: var(--shadow);
 }
+/* The second card style: the same card without the shadow (side columns, panels inside a page). */
+.lx-panel,
+.lx-aside,
+.lx-agent {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--card);
+  box-shadow: none;
+}
+.lx-pad { padding: var(--pad-card); }
 .lx-upl {
   display: flex;
   gap: 10px;
@@ -563,7 +573,7 @@ select:not([multiple]):not([size]):disabled {
 .lx-empty {
   padding: 22px 18px 24px;
   color: var(--muted);
-  font-size: var(--fs-3);
+  font-size: var(--fs-2);
 }
 .lx-facts {
   padding: 18px;
@@ -580,18 +590,28 @@ select:not([multiple]):not([size]):disabled {
 .lx-banner {
   padding: 12px 14px;
   border-radius: var(--r-md);
-  font-size: var(--fs-3);
+  font-size: var(--fs-2);
   line-height: 1.5;
   border: 1px solid;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  align-items: center;
 }
 .lx-banner-ok {
   background: var(--tint-ok);
-  border-color: var(--line-ok);
+  border-color: color-mix(in srgb, var(--ok) 30%, transparent);
   color: var(--ok);
+}
+.lx-banner-warn,
+.lp-note {
+  background: var(--tint-warn);
+  border-color: color-mix(in srgb, var(--warn) 30%, transparent);
+  color: var(--warn);
 }
 .lx-banner-risk {
   background: var(--tint-wine);
-  border-color: var(--line-wine);
+  border-color: color-mix(in srgb, var(--wine) 30%, transparent);
   color: var(--wine);
 }
 .lx-banner-mute {
@@ -619,8 +639,106 @@ select:not([multiple]):not([size]):disabled {
   border-top: 1px solid var(--line);
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 8px;
+  flex-wrap: wrap;
 }
+.lx-dialog h2 { font-family: var(--sans); font-weight: 600; font-size: var(--fs-5); line-height: 1.25; margin: 0; }
+
+/* ── the one dialog and the one side panel ─────────────────────────── */
+.lx-modal-root,
+.lx-drawer-root { position: fixed; inset: 0; z-index: 200; }
+.lx-modal-root { z-index: 210; display: grid; place-items: center; padding: 16px; }
+.lx-modal-backdrop,
+.lx-drawer-backdrop { position: absolute; inset: 0; background: var(--scrim); }
+.lx-modal {
+  position: relative;
+  width: 480px;
+  max-width: 100%;
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lift);
+  padding: 20px;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+.lx-modal-sm { width: 400px; }
+.lx-modal-lg { width: min(1240px, 100%); }
+.lx-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(440px, 100%);
+  background: var(--card);
+  border-left: 1px solid var(--line);
+  box-shadow: var(--shadow-lift);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 18px 18px 28px;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+.lx-modal:focus,
+.lx-drawer:focus { outline: none; }
+.lx-modal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.lx-modal-title { margin: 0; font-family: var(--sans); font-weight: 600; font-size: var(--fs-5); line-height: 1.25; }
+.lx-modal-foot { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.lx-close {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  cursor: pointer;
+  text-decoration: none;
+}
+.lx-close:hover { background: var(--well); color: var(--ink); }
+@media (max-width: 900px) {
+  .lx-drawer { width: 100%; border-left: 0; }
+}
+
+/* ── the one toast ─────────────────────────────────────────────────── */
+.lx-toast {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 24px;
+  z-index: 220;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-radius: var(--r-pill);
+  background: var(--ink);
+  color: var(--cream);
+  font-size: var(--fs-2);
+  box-shadow: var(--shadow-lift);
+  max-width: calc(100vw - 32px);
+}
+.lx-toast .lx-link,
+.lx-toast .lx-linkbtn { color: var(--pink); }
+@media (max-width: 900px) {
+  .lx-toast { bottom: 84px; }
+}
+
+/* ── the one page header ───────────────────────────────────────────── */
+.lx-page-head.lx-head { flex-direction: column; align-items: stretch; gap: 4px; flex-wrap: nowrap; }
+.lx-head .lx-h1 { margin: 0; }
+.lx-head-title { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; min-width: 0; }
+.lx-head-count { font-family: var(--sans); font-size: var(--fs-2); color: var(--muted); font-variant-numeric: tabular-nums; }
+.lx-head-details { margin: 0; font-size: var(--fs-2); color: var(--muted); }
+.lx-head .lx-sub { margin: 2px 0 0; }
+.lx-head .lx-head-actions { margin-top: 8px; }
 
 @media (max-width: 900px) {
   .lx-split {
@@ -877,8 +995,11 @@ select:not([multiple]):not([size]):disabled {
 .lx-rowlink::after { content: ""; position: absolute; inset: 0; }
 .lx-tbl tbody tr { position: relative; }
 .lx-tbl tbody tr:hover td { background: var(--row-hover); }
-.lx-empty-card { padding: 34px; display: grid; gap: 8px; justify-items: start; }
-.lx-back { font-size: var(--fs-2); color: var(--body); }
+.lx-state-card,
+.lx-empty-card { padding: var(--pad-card); display: grid; gap: 8px; justify-items: start; }
+.lx-state-line { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.lx-back { font-size: var(--fs-2); color: var(--muted); font-weight: 400; width: fit-content; text-decoration: none; }
+.lx-back:hover { color: var(--ink); }
 .lx-aside {
   width: var(--aside-w);
   flex: 0 0 auto;
@@ -935,7 +1056,9 @@ select:not([multiple]):not([size]):disabled {
 .lx-disclosure[open] > summary::before { content: "− "; }
 .lx-disclosure > form { padding: 0 18px 18px; }
 .lx-form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
-.lx-field { display: grid; gap: 5px; }
+.lx-field { display: grid; gap: 6px; }
+.lx-optional { font-weight: 400; color: var(--muted); }
+.lx-saved { color: var(--ok); font-size: var(--fs-2); }
 .lx-inline-form { display: grid; gap: 4px; }
 .lx-inline-form select { min-width: 170px; }
 .lx-sr { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
@@ -964,7 +1087,6 @@ select:not([multiple]):not([size]):disabled {
 /* ── matters ──────────────────────────────────────────────────────── */
 .lx-band { padding: 0; }
 .lx-band-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; padding: 16px 18px 10px; }
-.lx-banner-warn { background: var(--tint-warn); color: var(--warn); border-color: var(--line-warn); }
 .lx-list { list-style: none; margin: 0; padding: 0; display: grid; }
 .lx-list > li + li { border-top: 1px solid var(--line-2); }
 .lx-deadline { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: flex-start; padding: 12px 0; }
@@ -978,7 +1100,7 @@ select:not([multiple]):not([size]):disabled {
 @media (min-width: 641px) {
   .lx-band .lx-tbl { table-layout: fixed; min-width: 760px; }
 }
-.lx-col-aside { flex: 0 0 340px; }
+.lx-col-aside { flex: 0 0 var(--aside-w); }
 .lx-col-aside > .lx-aside { width: auto; align-self: stretch; }
 @media (max-width: 900px) {
   .lx-col-aside { flex: 1 1 auto; }
@@ -1637,6 +1759,7 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
 
 /* Touch screens and phones: every control reaches at least 44px. */
 @media (pointer: coarse), (max-width: 640px) {
+  .lx-close { min-width: 44px; min-height: 44px; }
   .lx-btn,
   .lx-btn-sm,
   .lp-btn,
@@ -1688,6 +1811,7 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
   .lx-page { gap: 10px; padding-right: 0; }
   .lx-h1 { font-size: 24px; line-height: 1.15; margin: 0; }
   .lx-page-head { gap: 8px; align-items: center; }
+  .lx-page-head.lx-head { align-items: stretch; gap: 2px; }
   .lx-page-head > div { min-width: 0 !important; flex: 1 1 100% !important; }
   .lx-page-head-list .lx-label { display: none; }
   .lx-page-head .lx-sub,
@@ -1746,4 +1870,7 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
   border-radius: var(--r-lg);
   box-shadow: var(--shadow);
   font-size: var(--fs-2);
+}
+@media (max-width: 640px) {
+  .lx-close { min-width: 44px; min-height: 44px; }
 }
