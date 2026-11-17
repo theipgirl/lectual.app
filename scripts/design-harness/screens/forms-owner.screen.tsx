@@ -61,12 +61,25 @@ const eventRows = [
   card("e6", { answers: { "1": "business", "2": "no", "3": "4_10" }, created_at: "2026-11-13T12:00:00Z" }),
 ];
 
+/** Event people: six invented people, mixed hot/warm/cold, one unfinished, one whose lead is missing. */
+const eventPeople = {
+  cards: eventRows.map((r, i) => ({ id: r.id, lead_id: i === 4 ? "lead-gone" : `lead-${i}`, score: r.score, band: r.band, temperature: r.temperature, created_at: r.created_at, completed_at: r.completed_at, gaps: r.gaps })),
+  leads: [
+    { id: "lead-0", first_name: "Maya", last_name: "Okafor", business_name: "Okafor Candle Co." },
+    { id: "lead-1", first_name: "Theo", last_name: "Lindqvist", business_name: "Northlight Studio" },
+    { id: "lead-2", first_name: "Priya", last_name: "Raman", business_name: null },
+    { id: "lead-3", first_name: "Jonah", last_name: "Whitfield", business_name: "Whitfield & Daughters Bakery" },
+    { id: "lead-5", first_name: "Sofia", last_name: "Brandt", business_name: "Brandt Ceramics" },
+  ],
+};
+
 const prepare = (record: IntakeFormRecord | null = null) => () => {
   resetState();
   vi.setSystemTime(new Date("2026-11-16T14:00:00Z"));
   state.pathname = "/dashboard/forms/";
   (state as { boothList?: unknown }).boothList = boothList;
   (state as { boothEventRows?: unknown }).boothEventRows = eventRows;
+  (state as { eventPeople?: unknown }).eventPeople = eventPeople;
   state.formsList = forms;
   state.formRecord = record;
   (state as { formStatRows?: unknown[] }).formStatRows = statRows;
