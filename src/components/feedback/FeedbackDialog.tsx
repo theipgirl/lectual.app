@@ -31,13 +31,14 @@ type ViewProps = {
   textRef?: React.Ref<HTMLTextAreaElement>;
   cancelRef?: React.Ref<HTMLButtonElement>;
   sendRef?: React.Ref<HTMLButtonElement>;
+  closeRef?: React.Ref<HTMLButtonElement>;
 };
 
 /**
  * The dialog itself, presentational so the server renders it the same as the browser. It is the shared `Dialog`: Esc and Tab are
  * handled by `onKeyDown` (the tour's key rules, with the "sending" guard), so the shared one's own Esc is off.
  */
-export function FeedbackDialogView({ state, onType, onText, onSend, onClose, onKeyDown, selectRef, textRef, cancelRef, sendRef }: ViewProps) {
+export function FeedbackDialogView({ state, onType, onText, onSend, onClose, onKeyDown, selectRef, textRef, cancelRef, sendRef, closeRef }: ViewProps) {
   const descId = useId();
   const sending = state.status === "sending";
   const sent = state.status === "sent";
@@ -48,6 +49,8 @@ export function FeedbackDialogView({ state, onType, onText, onSend, onClose, onK
         title="Send feedback"
         onClose={onClose}
         handleEsc={false}
+        inertBackdrop
+        closeRef={closeRef}
         initialFocus={textRef as React.RefObject<HTMLElement | null> | undefined}
         footer={
           sent ? (
@@ -119,6 +122,7 @@ export function FeedbackDialog() {
   const text = useRef<HTMLTextAreaElement>(null);
   const cancel = useRef<HTMLButtonElement>(null);
   const send = useRef<HTMLButtonElement>(null);
+  const closeBtn = useRef<HTMLButtonElement>(null);
   const opener = useRef<OpenerLike | null>(null);
   const inFlight = useRef(false);
 
@@ -154,7 +158,7 @@ export function FeedbackDialog() {
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
-    const controls = [select.current, text.current, cancel.current, send.current].filter((el): el is NonNullable<typeof el> => !!el && !el.disabled);
+    const controls = [closeBtn.current, select.current, text.current, cancel.current, send.current].filter((el): el is NonNullable<typeof el> => !!el && !el.disabled);
     const current = controls.findIndex((el) => el === e.target);
     const action = tourKeyAction({ key: e.key, shiftKey: e.shiftKey, inField: true }, { count: controls.length, current });
     if (!action) return;
@@ -182,6 +186,7 @@ export function FeedbackDialog() {
       textRef={text}
       cancelRef={cancel}
       sendRef={send}
+      closeRef={closeBtn}
     />
   );
 }

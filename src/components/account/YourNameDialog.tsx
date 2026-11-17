@@ -24,16 +24,19 @@ type ViewProps = {
   lastRef?: React.Ref<HTMLInputElement>;
   cancelRef?: React.Ref<HTMLButtonElement>;
   saveRef?: React.Ref<HTMLButtonElement>;
+  closeRef?: React.Ref<HTMLButtonElement>;
 };
 
 /** Presentational, so the server renders it the same as the browser. The shared `Dialog`, with the same key rules as FeedbackDialog. */
-export function YourNameDialogView({ first, last, error, saving, onFirst, onLast, onSave, onClose, onKeyDown, firstRef, lastRef, cancelRef, saveRef }: ViewProps) {
+export function YourNameDialogView({ first, last, error, saving, onFirst, onLast, onSave, onClose, onKeyDown, firstRef, lastRef, cancelRef, saveRef, closeRef }: ViewProps) {
   return (
     <div onKeyDown={onKeyDown}>
       <Dialog
         title="Your name"
         onClose={onClose}
         handleEsc={false}
+        inertBackdrop
+        closeRef={closeRef}
         initialFocus={firstRef as React.RefObject<HTMLElement | null> | undefined}
         footer={
           <>
@@ -79,6 +82,7 @@ export function YourNameDialog({ currentFullName }: { currentFullName: string | 
   const lastEl = useRef<HTMLInputElement>(null);
   const cancel = useRef<HTMLButtonElement>(null);
   const save = useRef<HTMLButtonElement>(null);
+  const closeBtn = useRef<HTMLButtonElement>(null);
   const opener = useRef<OpenerLike | null>(null);
   const inFlight = useRef(false);
 
@@ -128,7 +132,7 @@ export function YourNameDialog({ currentFullName }: { currentFullName: string | 
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
-    const controls = [firstEl.current, lastEl.current, cancel.current, save.current].filter((el): el is NonNullable<typeof el> => !!el && !el.disabled);
+    const controls = [closeBtn.current, firstEl.current, lastEl.current, cancel.current, save.current].filter((el): el is NonNullable<typeof el> => !!el && !el.disabled);
     const current = controls.findIndex((el) => el === e.target);
     const action = tourKeyAction({ key: e.key, shiftKey: e.shiftKey, inField: true }, { count: controls.length, current });
     if (!action) return;
@@ -159,6 +163,7 @@ export function YourNameDialog({ currentFullName }: { currentFullName: string | 
       lastRef={lastEl}
       cancelRef={cancel}
       saveRef={save}
+      closeRef={closeBtn}
     />
   );
 }

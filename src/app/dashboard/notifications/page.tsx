@@ -76,7 +76,7 @@ export default async function NotificationsPage({
       />
 
       {!loaded ? (
-        <LoadFailedCard what="notifications" body={REFRESH_TO_TRY_AGAIN} />
+        <LoadFailedCard role="alert" what="notifications" body={REFRESH_TO_TRY_AGAIN} />
       ) : rows.length === 0 ? (
         <EmptyState title={page > 1 ? "Nothing on this page" : tab === "unread" ? "No unread notifications" : "You're all caught up"}>
           {page > 1 ? (

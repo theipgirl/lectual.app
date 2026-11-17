@@ -49,7 +49,7 @@ export function WaitingOnRebecca({
         Waiting on attorney review
       </Heading>
       {approvals.status === "unavailable" ? (
-        <LoadFailedLine>Can&apos;t show what&apos;s waiting for approval right now. Refresh to try again.</LoadFailedLine>
+        <LoadFailedLine role="alert">Can&apos;t show what&apos;s waiting for approval right now. Refresh to try again.</LoadFailedLine>
       ) : (
         <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 10 }}>
           {items.map((a) => (

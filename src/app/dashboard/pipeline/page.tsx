@@ -131,7 +131,7 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
               note={
                 <>
                   <p className="lx-board-card-meta">{COLUMN_HINT[column]}</p>
-                  {isFailed && <LoadFailedLine refresh={false}>Can&apos;t show this column right now.</LoadFailedLine>}
+                  {isFailed && <LoadFailedLine role="alert" refresh={false}>Can&apos;t show this column right now.</LoadFailedLine>}
                 </>
               }
               empty={isFailed ? undefined : q || owner ? "Nothing matches." : columnEmpty(COLUMN_NOUN[column])}

@@ -42,7 +42,7 @@ export default async function TeamPage() {
       <TeamHeader isAdmin={isAdmin} grantable={grantable} defaultOpen={inviteFormOpen(members.length, loadError)} />
 
       {loadError ? (
-        <LoadFailedCard what="your team" />
+        <LoadFailedCard role="alert" what="your team" />
       ) : (
         <SheetCard>
           <SheetScroll>

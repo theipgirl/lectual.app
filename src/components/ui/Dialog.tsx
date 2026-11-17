@@ -21,7 +21,7 @@ type Common = CloseWay & {
 };
 
 /** The one close control (36): an X with the label "Close". A button, or a link when the close is a URL (a server-rendered panel). */
-export function CloseButton({ onClick, href, label = "Close" }: { onClick?: () => void; href?: string; label?: string }) {
+export function CloseButton({ onClick, href, label = "Close", buttonRef }: { onClick?: () => void; href?: string; label?: string; buttonRef?: React.Ref<HTMLButtonElement> }) {
   if (href) {
     return (
       <Link data-close href={href} className="lx-close" aria-label={label} scroll={false}>
@@ -30,7 +30,7 @@ export function CloseButton({ onClick, href, label = "Close" }: { onClick?: () =
     );
   }
   return (
-    <button type="button" className="lx-close" aria-label={label} onClick={onClick}>
+    <button type="button" ref={buttonRef} className="lx-close" aria-label={label} onClick={onClick}>
       <Icon name="close" size={18} />
     </button>
   );
@@ -69,27 +69,31 @@ export function useDialogKeys(
   }, []);
 }
 
-function Backdrop({ className, onClose, closeHref }: { className: string; onClose?: () => void; closeHref?: string }) {
+function Backdrop({ className, onClose, closeHref, inert }: { className: string; onClose?: () => void; closeHref?: string; inert?: boolean }) {
+  if (inert) return <div className={className} aria-hidden="true" />;
   if (closeHref) return <Link href={closeHref} className={className} tabIndex={-1} aria-hidden="true" scroll={false} />;
   return <div className={className} onClick={onClose} aria-hidden="true" />;
 }
 
-/** The one centred dialog. */
-export function Dialog(props: Common & { size?: DialogSize; handleEsc?: boolean }) {
-  const { title, titleId, describedById, footer, initialFocus, className, children, size = "md", handleEsc } = props;
+/**
+ * The one centred dialog. `inertBackdrop` leaves a click outside the dialog doing nothing (a dialog with typed text in it, such as
+ * Send feedback); `closeRef` lets a dialog that runs its own Tab cycle include the header's Close button in it.
+ */
+export function Dialog(props: Common & { size?: DialogSize; handleEsc?: boolean; inertBackdrop?: boolean; closeRef?: React.Ref<HTMLButtonElement> }) {
+  const { title, titleId, describedById, footer, initialFocus, className, children, size = "md", handleEsc, inertBackdrop, closeRef } = props;
   const autoId = useId();
   const id = titleId ?? `dlg-${autoId}`;
   const ref = useRef<HTMLDivElement>(null);
   useDialogKeys(ref, { onClose: props.onClose, initialFocus, handleEsc });
   return (
     <div className="lx-modal-root">
-      <Backdrop className="lx-modal-backdrop" onClose={props.onClose} closeHref={props.closeHref} />
+      <Backdrop className="lx-modal-backdrop" onClose={props.onClose} closeHref={props.closeHref} inert={inertBackdrop} />
       <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={id} aria-describedby={describedById} tabIndex={-1} className={dialogClass(size, className)}>
         <header className="lx-modal-head">
           <h2 id={id} className="lx-modal-title">
             {title}
           </h2>
-          <CloseButton onClick={props.onClose} href={props.closeHref} />
+          <CloseButton onClick={props.onClose} href={props.closeHref} buttonRef={closeRef} />
         </header>
         <div className="lx-modal-body">{children}</div>
         {footer ? <footer className="lx-modal-foot">{footer}</footer> : null}

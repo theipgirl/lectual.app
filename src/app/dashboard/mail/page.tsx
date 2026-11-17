@@ -70,7 +70,7 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
   const list = await listConnections();
   if (!list.ok) {
     // Unknown is not "none": never tell someone to connect a mailbox they may already have.
-    return <LoadFailedCard what="your mail" body="We couldn't load your mailbox connections, so we can't show your mail right now. Refresh to try again." />;
+    return <LoadFailedCard role="alert" what="your mail" body="We couldn't load your mailbox connections, so we can't show your mail right now. Refresh to try again." />;
   }
   const connections = list.connections.filter((c) => c.status !== "revoked");
   if (connections.length === 0) return <ConnectMailbox />;
@@ -198,7 +198,7 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
             <>
         {error ? (
           <div className="lx-mail-list">
-            <LoadFailedCard what="your mail" />
+            <LoadFailedCard role="alert" what="your mail" />
           </div>
         ) : groups.length === 0 ? (
           <div className="lx-mail-list">

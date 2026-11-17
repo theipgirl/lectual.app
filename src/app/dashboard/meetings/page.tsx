@@ -98,7 +98,7 @@ export default async function MeetingsPage({ searchParams }: { searchParams: Pro
       )}
 
       {read.status === "unavailable" ? (
-        <LoadFailedCard what="meetings" />
+        <LoadFailedCard role="alert" what="meetings" />
       ) : meetings.length === 0 ? (
         filtered ? (
           <EmptyState title="Nothing matches">Try another filter.</EmptyState>

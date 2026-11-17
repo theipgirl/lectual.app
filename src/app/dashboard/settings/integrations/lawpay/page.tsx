@@ -99,7 +99,7 @@ export default async function LawPayPage({
         </Notice>
       )}
       {!read.ok && (
-        <LoadFailedCard what="your LawPay connection" />
+        <LoadFailedCard role="alert" what="your LawPay connection" />
       )}
 
       <section className="lx-card lx-pad" style={{ display: "grid", gap: 12 }} aria-labelledby="lp-conn">

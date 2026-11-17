@@ -46,7 +46,7 @@ export default async function ApprovalSettingsPage() {
     return (
       <>
         {head}
-        <LoadFailedCard what="the approval settings" />
+        <LoadFailedCard role="alert" what="the approval settings" />
       </>
     );
   }

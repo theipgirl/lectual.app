@@ -296,7 +296,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         </p>
       )}
 
-      {unavailable && <LoadFailedCard what="this calendar" body={REFRESH_TO_TRY_AGAIN} />}
+      {unavailable && <LoadFailedCard role="alert" what="this calendar" body={REFRESH_TO_TRY_AGAIN} />}
 
       {!unavailable && view === "month" && <MonthView weeks={monthGrid(anchor, today, items)} timeZone={timeZone} />}
       {!unavailable && view === "week" && <WeekView days={weekGrid(anchor, today, items)} timeZone={timeZone} />}

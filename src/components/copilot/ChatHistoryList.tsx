@@ -99,7 +99,7 @@ export function ChatHistoryList({
       ) : history.status === "not-set-up" ? (
         <p className="cpw-note">{SAVED_CHATS_NOT_SET_UP}</p>
       ) : (
-        <LoadFailedLine refresh={false}>{SAVED_CHATS_UNAVAILABLE}</LoadFailedLine>
+        <LoadFailedLine role="alert" refresh={false}>{SAVED_CHATS_UNAVAILABLE}</LoadFailedLine>
       )}
     </nav>
   );

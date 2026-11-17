@@ -313,7 +313,7 @@ export default async function TodayPage() {
                 </Link>
               </>
             ) : (
-              <LoadFailedLine refresh={false}>Matters couldn&apos;t be loaded.</LoadFailedLine>
+              <LoadFailedLine role="alert" refresh={false}>Matters couldn&apos;t be loaded.</LoadFailedLine>
             )}
           </section>
 

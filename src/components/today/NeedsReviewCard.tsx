@@ -22,7 +22,7 @@ export function NeedsReviewCard({ items }: { items: NeedsReviewItem[] | null }) 
       </header>
       {items === null ? (
         <div className="td-pad-end">
-          <LoadFailedLine refresh={false}>{NEEDS_REVIEW_FAILED}</LoadFailedLine>
+          <LoadFailedLine role="alert" refresh={false}>{NEEDS_REVIEW_FAILED}</LoadFailedLine>
         </div>
       ) : (
         <>

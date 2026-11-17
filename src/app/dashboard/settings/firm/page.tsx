@@ -42,7 +42,7 @@ export default async function FirmProfilePage() {
         sub={<>How the firm appears on the drafts Lectual prepares for you, and where each temperature&apos;s next step points.</>}
       />
       {loadError ? (
-        <LoadFailedCard what="the firm profile" />
+        <LoadFailedCard role="alert" what="the firm profile" />
       ) : (
         <FirmProfileForm
           firmName={session.org.name}

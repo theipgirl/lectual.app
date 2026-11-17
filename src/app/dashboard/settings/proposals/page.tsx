@@ -69,7 +69,7 @@ export default async function ProposalSettingsPage() {
     return (
       <>
         {head}
-        <LoadFailedCard what="the proposal settings" />
+        <LoadFailedCard role="alert" what="the proposal settings" />
       </>
     );
   }

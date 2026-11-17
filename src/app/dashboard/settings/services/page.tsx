@@ -63,7 +63,7 @@ export default async function ServiceLibraryPage() {
       {!canRead ? (
         <EmptyState title="Restricted">{`${ADMIN_TIER_PHRASE} can manage the service library. Ask one of them for access.`}</EmptyState>
       ) : loadError ? (
-        <LoadFailedCard what="the service library" />
+        <LoadFailedCard role="alert" what="the service library" />
       ) : (
         <>
           {canEdit ? (

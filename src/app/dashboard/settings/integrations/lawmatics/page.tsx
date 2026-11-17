@@ -51,7 +51,7 @@ export default async function LawmaticsPage() {
       />
 
       {!read.ok && (
-        <LoadFailedCard what="your Lawmatics connection" />
+        <LoadFailedCard role="alert" what="your Lawmatics connection" />
       )}
 
       <section className="lx-card lx-pad" style={{ display: "grid", gap: 12 }}>

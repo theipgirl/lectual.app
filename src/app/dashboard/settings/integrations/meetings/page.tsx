@@ -82,7 +82,7 @@ export default async function MeetingsIntegrationPage({ searchParams }: { search
         </Notice>
       )}
       {!read.ok && (
-        <LoadFailedCard what="your meeting connections" />
+        <LoadFailedCard role="alert" what="your meeting connections" />
       )}
 
       <section className="lx-card lxi-card" aria-labelledby="fathom-title">

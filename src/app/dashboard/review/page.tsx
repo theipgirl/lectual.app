@@ -58,7 +58,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
     return (
       <div className="lp-root">
         <ListHeader title={REVIEW_NAME} tour="review-head" sub="Open matters and leads that need a person this week." />
-        <LoadFailedCard what="the weekly review" body={criticalAlert(load.failed)} />
+        <LoadFailedCard role="alert" what="the weekly review" body={criticalAlert(load.failed)} />
       </div>
     );
   }

@@ -297,7 +297,7 @@ export default async function AgentsPage() {
           <span className="lx-note">Every run is logged for your firm</span>
         </div>
         {runsError ? (
-          <LoadFailedLine>We couldn&apos;t load the run log.</LoadFailedLine>
+          <LoadFailedLine role="alert">We couldn&apos;t load the run log.</LoadFailedLine>
         ) : runs.length === 0 ? (
           <EmptyState variant="line">{noneYet("runs")}</EmptyState>
         ) : (
