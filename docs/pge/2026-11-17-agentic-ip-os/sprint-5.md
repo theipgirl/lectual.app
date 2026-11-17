@@ -1,6 +1,6 @@
 # Sprint 5: Signed and paid opens everything
 
-**Size:** large (the Adobe part alone is about two of the design note's sprints, so it runs as 5a and 5b). **Starts:** after Sprint 4 and the design rollout. **Schema:** lectual 0113, plus 0106 on production, which is **NOT approved yet** (Taylor, Nov 17: T1 is to be asked directly; 0103 is already on prod). **Evaluator: STRICT.**
+**Size:** large (the Adobe part alone is about two of the design note's sprints, so it runs as 5a and 5b). **Starts:** after Sprint 4 and the design rollout. **Schema:** lectual 0113, 0106 is already on production (verified by the director, Nov 17; 0103 too). **Evaluator: STRICT.**
 
 Design input: `docs/pge/2026-11-17-agentic-ip-os/adobe-sign-design.md` (B3). This contract follows that note for everything Adobe (connection, agreement creation, embedded signing, webhook re-read, completion function, files). Where the note and this contract disagree, stop and ask; do not pick. The note calls its migration "0108"; in this plan's sprint order it is **0113**.
 
@@ -35,7 +35,7 @@ After a consult, Rebecca approves ONE card and the rest happens without anyone c
    - **The write:** `crm_lead` updated conditional on `current_stage_id = <from>` (a person's move in between wins), `stage_entered_at` and `last_activity_at` set to now, and ONE `stage_changed` row (`actor_type system`, payload `from_stage`, `from_stage_id`, `to_stage`, `to_stage_id`, `actor: "signed-and-paid"`, `reason`). A row that can't be written puts the lead back.
    - **No automation rule run, and no matter handoff** beyond what the chain itself already did (the matter is opened by step 7, before the move). Counted (`leadsMoved` / `leadMovesFailed`); never fails the chain or undoes the matter.
    - AGENTS.md gets a paragraph naming this exception beside the hired-sync one.
-9. **0106 to production** only after Taylor's direct OK (T1), verified there as it was on dev. Until then this sprint runs on lectual-dev only.
+9. **0106 is on production** (since 2026-11-12, verified Nov 17). The lectual AGENTS.md line saying otherwise was stale and is being corrected.
 
 **Out**
 - Any send (Rayn sends). A second signer (only the client signs). Creating, editing or marking any invoice. Writing the welcome email's text. Changing prices or `pricing.ts`. Any other path into a `won` stage.
@@ -61,7 +61,7 @@ After a consult, Rebecca approves ONE card and the rest happens without anyone c
 11. With no welcome text saved, the welcome step is `blocked` with its sentence and nothing is drafted; with it saved, the draft body equals the saved text with only the existing merge fields filled.
 12. No step writes a deadline; no step sends; the welcome and questionnaire are queue drafts only.
 13. Tests never call Adobe Sign, LawPay or Lawmatics; unset Adobe env means "not set up" and the in-app signature works.
-14. Tests, lint, build; 0113's isolation cases on lectual-dev; 0106 verified on production only after T1.
+14. Tests, lint, build; 0113's isolation cases on lectual-dev.
 
 ## New schema: lectual 0113 (the design note's "0108")
 As designed in `adobe-sign-design.md`:
@@ -86,7 +86,7 @@ As designed in `adobe-sign-design.md`:
 - A send to a client. Legal advice in any added text. A deadline written. A cross-firm read (webhook org from our own row). The service role in dashboard code. A raw error shown (Adobe or LawPay text included). A module gate failing open. **A matter opened, a won move, or a welcome drafted on signed-only or paid-only.** **A charge for any amount not from the signed snapshot.** **Any signer other than the client.** **A signature recorded whose text doesn't match the fingerprint.** **An invoice created by Lectual.** **A welcome email text written by Lectual or a model.** **A won move by any path other than the hired sync and this chain.**
 
 ## Dependencies and blockers
-- **0106 on production: NOT approved yet** (T1, to be asked directly).
+- 0106 on production: done (since Nov 12).
 - **Adobe Sign access** on Rebecca's account (T3): Developer Edition, a PARTNER app, and the design note's one-day sandbox spike for its unverified items.
 - Sprint 4 (approved email → Rayn's draft).
 - The welcome email text pasted from the trademarks@ mailbox (R8); the questionnaire question (R8, open).

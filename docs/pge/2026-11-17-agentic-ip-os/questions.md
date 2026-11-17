@@ -6,7 +6,7 @@ Only questions that only these people can answer. No answer is guessed in the co
 
 | # | Question | Sprint | Until answered |
 |---|---|---|---|
-| T1 | Production migration: OK to apply **0106** (engagement letter and signatures) to lectual-prod? (0103, the hand-off events, has been on lectual-prod since Nov 10; corrected Nov 17.) | 5 | Sprint 5 stays dev-only |
+| T1 | ~~Production migration: OK to apply **0106** to lectual-prod?~~ **Answered (director, Nov 17): 0106 is already on lectual-prod** (recorded 2026-11-12 as 0106_proposal_engagement_letter, verified); 0103 since Nov 10. | 5 | Nothing waits on it |
 | T2 | Who holds the **USPTO API key**: one Lectual key for the deployment (USPTO data is public, not a firm account), or each firm's own? | 3 | Watcher reads "isn't switched on"; tests use fixtures |
 | T3 | **Adobe Sign**: which account and developer app; is it each firm's own Adobe Sign account (like LawPay) or a Lectual one? Who registers the webhook URL? | 5 | Built per firm (the LawPay rule); live runs wait |
 | T4 | Decision 11 says "the letter and **invoice** go out with the proposal". What is the invoice: a Lawmatics invoice someone creates, the LawPay pay step on the proposal page, or something else? May Lectual create it? | 5 | Nothing creates an invoice; the existing pay step is used |
@@ -69,7 +69,7 @@ How Taylor's reply lines were matched to the questions is our reading; items mar
 
 | # | Answer | What it means for the plan |
 |---|---|---|
-| T1 | "yes" | **NOT approved yet.** A positional "yes" is too thin for a production migration; the director will ask Taylor directly. 0103 is already on lectual-prod (since Nov 10); only **0106** is outstanding. |
+| T1 | "yes" | Moot: the director verified that **0106 is already on lectual-prod** (since 2026-11-12) and 0103 since Nov 10. No production migration is outstanding. |
 | T2 | "i will get the key" | Taylor gets the USPTO API key; the watcher stays "not switched on" until it is set |
 | T3 | "rebeccas" | Rebecca's Adobe Sign account (the firm's own, per-firm connection) |
 | T4 | "the custom lawmatics pay link" | The "invoice" is the firm's custom Lawmatics pay link on the proposal; Lectual creates no invoice |
@@ -89,4 +89,4 @@ How Taylor's reply lines were matched to the questions is our reading; items mar
 | R8 | "the welcome email is in the trademarks@ email" | Use the welcome email as it stands in the trademarks@ mailbox; questionnaire still to confirm |
 
 ### Still open after Taylor's answers (director's reading, Nov 17)
-T1 (0106 only; to be asked directly), T6 (Dawn's role), T8, T10, T11, C2 (now S2-2), C3, C5, C6 (account and title; "zoom or fathom" only), C9 (Amor), C10 (paste the welcome text), R1 to R7, the questionnaire half of R8, and S2-1 to S2-11.
+T6 (Dawn's role), T8, T10, T11, C2 (now S2-2), C3, C5, C6 (account and title; "zoom or fathom" only), C9 (Amor), C10 (paste the welcome text), R1 to R7, the questionnaire half of R8, and S2-1 to S2-11.
