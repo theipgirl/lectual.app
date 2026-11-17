@@ -219,25 +219,44 @@ export type TouchStamp = {
  */
 export function sheetDay(iso: string | null | undefined, now: Date, timeZone: string = DEFAULT_ZONE): string | null {
   // A date in the future is never shown ("Our turn · Dec 3" before Dec 3): it is treated as missing, like one that doesn't parse.
-  const at = iso ? Date.parse(iso) : NaN;
-  if (!Number.isFinite(at) || at > now.getTime()) return null;
-  const civil = civilDay(iso as string, timeZone);
+  const usable = usableTime(iso, now);
+  if (!usable) return null;
+  const civil = civilDay(usable, timeZone);
   const today = civilDay(now.toISOString(), timeZone);
   return civil && today ? shortDate(civil, today).replace(" ", "\u00a0") : null;
 }
 
+/** The stamp itself when it parses and is not after `now`; else null. The ONE "is this a date we may show" rule: the cell and the sort both use it. */
+export function usableTime(iso: string | null | undefined, now: Date): string | null {
+  const at = iso ? Date.parse(iso) : NaN;
+  return iso && Number.isFinite(at) && at <= now.getTime() ? iso : null;
+}
+
+/**
+ * Which date the Last-contact cell shows, and what kind it is, BEFORE it is worded. `touchStampFor` words it and the sort orders by it, so the
+ * sort key and the shown date cannot disagree.
+ *   our-turn       they wrote or called last: `last_inbound_at`
+ *   waiting        we did: `last_outbound_at`
+ *   activity-only  no email or call to go by: the newest of the lead's own dates (`lastTouchAt`, else `last_activity_at`)
+ *   none           nothing usable (a future or unparseable date is missing): "No contact yet"
+ */
+export function shownTouch(row: IntakeRow, now: Date): { state: TouchState; iso: string | null } {
+  const newest = usableTime(row.lastTouchAt, now) ?? usableTime(row.lead.last_activity_at, now);
+  if (!newest) return { state: "none", iso: null };
+  const inbound = usableTime(row.lead.last_inbound_at, now);
+  const outbound = usableTime(row.lead.last_outbound_at, now);
+  if (row.reply === "replied" && inbound) return { state: "our-turn", iso: inbound };
+  if (row.reply === "awaiting" && outbound) return { state: "waiting", iso: outbound };
+  return { state: "activity-only", iso: newest };
+}
+
 export function touchStampFor(row: IntakeRow, opts: { now: Date; timeZone?: string }): TouchStamp {
-  const day = (iso: string | null): string | null => sheetDay(iso, opts.now, opts.timeZone);
-  // The newest date; if that one is in the future (never shown), the lead's own last activity stands in for it.
-  const newest = day(row.lastTouchAt) ?? day(row.lead.last_activity_at);
-  if (!newest) return { text: LEADS_TOUCH_NO_CONTACT, waitingOnUs: false, state: "none", title: LEADS_TOUCH_NONE_TITLE };
-  // "Our turn" is dated by their last email or call (last_inbound_at), "Waiting on them" by ours (last_outbound_at): a note or a stage
-  // move that is newer than either must not re-date who wrote last. `lastTouchAt` (the newest of all three) is for the sort and "Last activity".
-  const inbound = day(row.lead.last_inbound_at);
-  const outbound = day(row.lead.last_outbound_at);
-  if (row.reply === "replied" && inbound) return { text: LEADS_TOUCH_OUR_TURN(inbound), waitingOnUs: true, state: "our-turn", title: LEADS_TOUCH_OUR_TURN_TITLE };
-  if (row.reply === "awaiting" && outbound) return { text: LEADS_TOUCH_WAITING_ON_THEM(outbound), waitingOnUs: false, state: "waiting", title: LEADS_TOUCH_WAITING_TITLE };
-  return { text: LEADS_TOUCH_ACTIVITY_ONLY(newest), waitingOnUs: false, state: "activity-only", title: LEADS_TOUCH_ACTIVITY_ONLY_TITLE };
+  const { state, iso } = shownTouch(row, opts.now);
+  const day = sheetDay(iso, opts.now, opts.timeZone);
+  if (state === "none" || !day) return { text: LEADS_TOUCH_NO_CONTACT, waitingOnUs: false, state: "none", title: LEADS_TOUCH_NONE_TITLE };
+  if (state === "our-turn") return { text: LEADS_TOUCH_OUR_TURN(day), waitingOnUs: true, state, title: LEADS_TOUCH_OUR_TURN_TITLE };
+  if (state === "waiting") return { text: LEADS_TOUCH_WAITING_ON_THEM(day), waitingOnUs: false, state, title: LEADS_TOUCH_WAITING_TITLE };
+  return { text: LEADS_TOUCH_ACTIVITY_ONLY(day), waitingOnUs: false, state, title: LEADS_TOUCH_ACTIVITY_ONLY_TITLE };
 }
 
 /** Days since a timestamp, or null when there isn't one / it doesn't parse. */

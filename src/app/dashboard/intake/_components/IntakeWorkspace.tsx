@@ -231,7 +231,7 @@ export default function IntakeWorkspace({
     return out;
   }, [movedIds, rows, stages, drawn]);
   const { sort } = viewState;
-  const sorted = useMemo(() => sortRows(filtered, sort.key, sort.dir), [filtered, sort]);
+  const sorted = useMemo(() => sortRows(filtered, sort.key, sort.dir, { now }), [filtered, sort, now]);
   const page = useMemo(() => pageSlice(sorted, viewState.show), [sorted, viewState.show]);
   const rowById = useCallback((id: string) => rows.find((r) => r.lead.id === id), [rows]);
 
@@ -243,8 +243,8 @@ export default function IntakeWorkspace({
   const nurtureColumn = useMemo(() => {
     if (!board || viewState.group !== "stage" || lostView || drawn === "nurture" || !nurtureStage) return null;
     const mine = rows.filter((r) => stages.find((s) => s.id === r.lead.current_stage_id)?.category === "nurture");
-    return { rows: sortRows(applyAll(mine), sort.key, sort.dir), stage: nurtureStage };
-  }, [board, viewState.group, lostView, drawn, nurtureStage, rows, stages, applyAll, sort]);
+    return { rows: sortRows(applyAll(mine), sort.key, sort.dir, { now }), stage: nurtureStage };
+  }, [board, viewState.group, lostView, drawn, nurtureStage, rows, stages, applyAll, sort, now]);
   // Lost stages are offered as a destination ONLY while the Lost set is shown (so a lead can be moved back out). Elsewhere,
   // moving a lead to Lost happens on the lead page or the weekly review, as before.
   const moveStages = useMemo(() => moveTargetStages(intakeStages, lostStages, lostView, nurtureStages), [intakeStages, lostStages, lostView, nurtureStages]);
