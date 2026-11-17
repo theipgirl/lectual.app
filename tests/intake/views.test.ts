@@ -236,16 +236,25 @@ describe("touchDate / touchStampFor", () => {
     expect(touchDate(daysBefore(2))).toBe("12 Sep");
 
     const [waiting] = rowsFor([lead({ id: "a", last_inbound_at: daysBefore(2), last_outbound_at: daysBefore(5) })]);
-    expect(touchStampFor(waiting)).toMatchObject({ text: "Our turn · 12 Sep", waitingOnUs: true, state: "our-turn" });
+    expect(touchStampFor(waiting)).toMatchObject({ text: "Our turn · 12\u00a0Sep", waitingOnUs: true, state: "our-turn" });
 
     const [theirs] = rowsFor([lead({ id: "b", last_outbound_at: daysBefore(5) })]);
-    expect(touchStampFor(theirs)).toMatchObject({ text: "Waiting on them · 9 Sep", waitingOnUs: false, state: "waiting" });
+    expect(touchStampFor(theirs)).toMatchObject({ text: "Waiting on them · 9\u00a0Sep", waitingOnUs: false, state: "waiting" });
+  });
+
+  it("dates the turn by the inbound / outbound mail, not by a newer note or stage move", () => {
+    // A note logged yesterday bumps last_activity_at, but they last wrote 5 days ago: still "Our turn · 9 Sep", sorted by the newest touch.
+    const [ours] = rowsFor([lead({ id: "e", last_inbound_at: daysBefore(5), last_outbound_at: daysBefore(8), last_activity_at: daysBefore(1) })]);
+    expect(ours.lastTouchAt).toBe(daysBefore(1));
+    expect(touchStampFor(ours)).toMatchObject({ text: "Our turn · 9\u00a0Sep", state: "our-turn" });
+    const [theirs] = rowsFor([lead({ id: "f", last_inbound_at: daysBefore(9), last_outbound_at: daysBefore(4), last_activity_at: daysBefore(1) })]);
+    expect(touchStampFor(theirs)).toMatchObject({ text: "Waiting on them · 10\u00a0Sep", state: "waiting" });
   });
 
   it("only a date and no email or call: says so, and does not guess a side", () => {
     const [only] = rowsFor([lead({ id: "d", last_activity_at: daysBefore(3) })]);
     expect(only.reply).toBe("unknown");
-    expect(touchStampFor(only)).toMatchObject({ text: "Last activity · 11 Sep", waitingOnUs: false, state: "activity-only" });
+    expect(touchStampFor(only)).toMatchObject({ text: "Last activity · 11\u00a0Sep", waitingOnUs: false, state: "activity-only" });
   });
 
   it("says 'No contact yet' when nothing has ever happened", () => {

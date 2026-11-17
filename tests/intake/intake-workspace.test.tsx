@@ -213,7 +213,7 @@ describe("the page header and toolbar (shared list-page components)", () => {
 
   it("has no separate status strip above the header", () => {
     expect(html).not.toContain("intake-statusline");
-    expect(html.startsWith('<div class="lp-root"><header class="lp-header">')).toBe(true);
+    expect(html.startsWith('<div class="lp-root ix-leads"><header class="lp-header">')).toBe(true);
   });
 
   it("marks the current view on the controlled toggle", () => {

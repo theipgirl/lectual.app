@@ -22,7 +22,6 @@ export default function IntakeBoard({
   model,
   moveStages,
   members,
-  now,
   pendingLeadId,
   errors,
   time,
@@ -125,7 +124,6 @@ export default function IntakeBoard({
                 row={row}
                 stages={moveStages}
                 members={members}
-                now={now}
                 pending={pendingLeadId === row.lead.id}
                 error={errors[row.lead.id] || undefined}
                 time={time}

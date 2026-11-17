@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Stage } from "@/lib/pipeline";
@@ -21,7 +21,7 @@ import NeedsRebeccaBadge from "./NeedsRebeccaBadge";
 import AssistantChips from "./AssistantChips";
 import { useColWidths } from "./useColWidths";
 import { assistantColumnShown } from "@/lib/intake/assistant-column";
-import { MENU_COL_WIDTH, NEXT_MIN_WIDTH, colWidth, tableMinWidth, visibleColumns, type ColKey } from "@/lib/intake/col-widths";
+import { MAX_COL, MENU_COL_WIDTH, MIN_COL, NEXT_MIN_WIDTH, colWidth, tableMinWidth, visibleColumns, type ColKey } from "@/lib/intake/col-widths";
 import "@/components/review/review.css";
 import "@/components/review/review-sheet-edit.css";
 import SourceCell from "./SourceCell";
@@ -29,6 +29,7 @@ import RowMenu from "./RowMenu";
 import type { Lane } from "@/lib/leads/lane";
 import type { CSSProperties } from "react";
 import {
+  LEADS_ACTIONS_SR,
   LEADS_ASSISTANT_COLUMN,
   LEADS_COMPARE_OPEN,
   LEADS_CONTACT_COLUMN,
@@ -130,13 +131,26 @@ export default function IntakeTable({
   const router = useRouter();
   const showAssistant = assistantColumnShown(rows);
   const cols = visibleColumns({ owner: hasOwnerColumn, assistant: showAssistant });
-  const { sizes, dragCol, startDrag, onKeyDown, reset } = useColWidths();
-  const tableStyle = { "--rse-min": `${tableMinWidth(cols, sizes)}px` } as CSSProperties;
+  const { sizes, drag, startDrag, onKeyDown, reset } = useColWidths();
+  const dragCol = drag?.col ?? null;
+  const minWidth = tableMinWidth(cols, sizes);
+  // The table scrolls inside its card only when it is wider than the card. Otherwise the card does not scroll at all, so a menu
+  // that opens on the last row is never clipped and never adds a scrollbar.
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [needsScroll, setNeedsScroll] = useState(false);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => setNeedsScroll(minWidth > el.clientWidth));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [minWidth]);
+  const tableStyle = { "--rse-min": `${minWidth}px` } as CSSProperties;
 
   return (
     <div className="rv-owner ix-sheet" data-leads-sheet>
       <div className="lx-card rse-card">
-        <div className="rse-scroll ix-scroll">
+        <div className="rse-scroll ix-scroll" ref={scrollRef} data-scroll={needsScroll ? "true" : "false"}>
           <table className="lx-tbl lx-stack rse-tbl ix-tbl" style={tableStyle}>
             <colgroup>
               {cols.map((c) => {
@@ -165,18 +179,21 @@ export default function IntakeTable({
                         className={`rse-col-grip${dragCol === c ? " is-active" : ""}`}
                         role="separator"
                         aria-orientation="vertical"
+                        aria-valuenow={w ?? NEXT_MIN_WIDTH}
+                        aria-valuemin={MIN_COL}
+                        aria-valuemax={MAX_COL}
                         aria-label={LEADS_RESIZE_COLUMN(label)}
                         tabIndex={0}
                         onPointerDown={startDrag(c)}
                         onKeyDown={onKeyDown(c)}
                         onDoubleClick={() => reset(c)}
                       />
-                      {dragCol === c && <span className="rse-col-tip">{Math.round(w ?? NEXT_MIN_WIDTH)} px</span>}
+                      {dragCol === c && <span className="rse-col-tip">{drag?.width ?? Math.round(w ?? NEXT_MIN_WIDTH)} px</span>}
                     </th>
                   );
                 })}
                 <th scope="col">
-                  <span className="rse-sr">Actions</span>
+                  <span className="rse-sr">{LEADS_ACTIONS_SR}</span>
                 </th>
               </tr>
             </thead>
@@ -289,8 +306,8 @@ export default function IntakeTable({
                     </tr>
                     {error && (
                       <tr>
-                        <td colSpan={cols.length + 1} role="status" className="ix-err">
-                          {error}
+                        <td colSpan={cols.length + 1} className="ix-err">
+                          <div role="status">{error}</div>
                         </td>
                       </tr>
                     )}

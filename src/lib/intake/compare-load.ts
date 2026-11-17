@@ -1,5 +1,5 @@
 import { LEADS_COMPARE_FAILED } from "@/lib/ui/words";
-import { shapeCompareSide, type CompareData, type CompareLeadInput, type CompareSide, type CountRead } from "./compare";
+import { shapeCompareSide, type CompareData, type CompareStage, type CompareLeadInput, type CompareSide, type CountRead } from "./compare";
 
 /**
  * Reads the two leads of a "Possible duplicate" and what is on file for each, then shapes them (compare.ts). Every read is
@@ -32,16 +32,27 @@ async function counted(read: () => Promise<number>): Promise<CountRead> {
   }
 }
 
+async function readStage(stageId: string | null, deps: CompareDeps): Promise<CompareStage> {
+  if (!stageId) return { status: "none" };
+  try {
+    const name = await deps.readStageName(stageId);
+    // A stage row that isn't there (deleted) is not a failed read.
+    return name ? { status: "ok", name } : { status: "none" };
+  } catch {
+    return { status: "unavailable" };
+  }
+}
+
 async function side(id: string, deps: CompareDeps, proposals: boolean): Promise<CompareSide> {
   const lead = await deps.readLead(id);
   if (!lead) return { status: "gone", id };
-  const [stageName, timeline, tasks, proposalCount] = await Promise.all([
-    lead.current_stage_id ? deps.readStageName(lead.current_stage_id).catch(() => null) : Promise.resolve(null),
+  const [stage, timeline, tasks, proposalCount] = await Promise.all([
+    readStage(lead.current_stage_id, deps),
     counted(() => deps.count("crm_activity", id)),
     counted(() => deps.count("crm_task", id)),
     proposals ? counted(() => deps.count("client_proposal", id)) : Promise.resolve<CountRead>({ status: "off" }),
   ]);
-  return shapeCompareSide(lead, stageName, { timeline, tasks, proposals: proposalCount });
+  return shapeCompareSide(lead, stage, { timeline, tasks, proposals: proposalCount });
 }
 
 export async function loadCompare(aId: string, bId: string, deps: CompareDeps): Promise<CompareResult> {

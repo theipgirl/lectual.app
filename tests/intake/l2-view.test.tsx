@@ -10,7 +10,7 @@ const html = (state: Parameters<typeof CompareView>[0]["state"]) => renderToStat
 
 describe("the compare panel", () => {
   it("is a labelled modal dialog with Close, both leads side by side, a link to each and NO merge action", () => {
-    const out = html({ status: "ok", data: { a: shapeCompareSide(lead("a"), "Follow-Up", counts), b: shapeCompareSide(lead("b"), "Follow-Up", counts) } });
+    const out = html({ status: "ok", data: { a: shapeCompareSide(lead("a"), { status: "ok", name: "Follow-Up" }, counts), b: shapeCompareSide(lead("b"), { status: "ok", name: "Follow-Up" }, counts) } });
     expect(out).toContain('role="dialog"');
     expect(out).toContain('aria-modal="true"');
     expect(out).toContain('aria-labelledby="t1"');
@@ -25,7 +25,34 @@ describe("the compare panel", () => {
   it("loading, failed and gone are their own words, never an empty comparison", () => {
     expect(html({ status: "loading" })).toContain("Loading both leads");
     expect(html({ status: "failed", error: "Can't show these leads right now. Close this and try again." })).toContain('role="alert"');
-    expect(html({ status: "ok", data: { a: { status: "gone", id: "a" }, b: shapeCompareSide(lead("b"), "S", counts) } })).toContain("This lead couldn&#x27;t be found");
+    expect(html({ status: "ok", data: { a: { status: "gone", id: "a" }, b: shapeCompareSide(lead("b"), { status: "ok", name: "S" }, counts) } })).toContain("This lead couldn&#x27;t be found");
+  });
+});
+
+describe("source guards", () => {
+  const read = (f: string) => readFileSync(f, "utf8");
+  it("the compare action resolves the role before any read, and counts proposals only for the proposals roles", () => {
+    const src = read("src/app/dashboard/intake/actions.ts");
+    const body = src.slice(src.indexOf("export async function loadCompareAction"));
+    expect(body.indexOf("resolveCurrentRole(db)")).toBeGreaterThan(-1);
+    expect(body.indexOf("resolveCurrentRole(db)")).toBeLessThan(body.indexOf("loadCompare("));
+    expect(body).toContain("PROPOSAL_STAFF_WRITE_ROLES.includes(role)");
+  });
+  it("the Geist override is the Leads workspace's class only, not .intake-root (Reconcile keeps its look)", () => {
+    expect(read("src/app/dashboard/intake/leads.css")).not.toContain(".intake-root.intake-root");
+    expect(read("src/app/dashboard/intake/_components/IntakeWorkspace.tsx")).toContain('className="lp-root ix-leads"');
+  });
+  it("the error row's status role is on an inner div, and the screen-reader words come from the glossary", () => {
+    const t = read("src/app/dashboard/intake/_components/IntakeTable.tsx");
+    expect(t).toContain('<div role="status">{error}</div>');
+    expect(t).not.toMatch(/<td[^>]*role="status"/);
+    expect(t).not.toContain(">Actions<");
+    expect(read("src/app/dashboard/intake/_components/CompareView.tsx")).not.toContain(">Field<");
+  });
+  it("the resize handle ends a drag on cancel and lost capture, and carries aria-valuenow/min/max", () => {
+    expect(read("src/app/dashboard/intake/_components/useColWidths.ts")).toMatch(/pointercancel[\s\S]*lostpointercapture/);
+    const t = read("src/app/dashboard/intake/_components/IntakeTable.tsx");
+    for (const a of ["aria-valuenow", "aria-valuemin", "aria-valuemax"]) expect(t).toContain(a);
   });
 });
 
@@ -33,7 +60,7 @@ describe("one typeface and the colours (CSS)", () => {
   const css = readFileSync("src/app/dashboard/intake/leads.css", "utf8");
   it("the Leads page overrides every mono variable to Geist, and the file names no Courier or monospace", () => {
     expect(css).not.toMatch(/courier-prime\), monospace/);
-    const block = css.slice(css.indexOf(".intake-root.intake-root"));
+    const block = css.slice(css.indexOf(".ix-leads.ix-leads"));
     for (const v of ["--font-courier-prime", "--font-jetbrains-mono", "--font-mono", "--mono"]) expect(block).toContain(`${v}: var(--font-geist)`);
   });
   const lum = (hex: string) => {

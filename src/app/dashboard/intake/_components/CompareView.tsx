@@ -2,6 +2,7 @@ import Link from "next/link";
 import { compareRows, type CompareData } from "@/lib/intake/compare";
 import {
   LEADS_COMPARE_CLOSE,
+  LEADS_COMPARE_FIELD_SR,
   LEADS_COMPARE_FAILED,
   LEADS_COMPARE_GONE,
   LEADS_COMPARE_LOADING,
@@ -61,7 +62,7 @@ export default function CompareView({
             <thead>
               <tr>
                 <th scope="col">
-                  <span className="lx-sr">Field</span>
+                  <span className="lx-sr">{LEADS_COMPARE_FIELD_SR}</span>
                 </th>
                 <th scope="col">{both.a.name}</th>
                 <th scope="col">{both.b.name}</th>

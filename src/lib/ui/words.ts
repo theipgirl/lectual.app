@@ -728,6 +728,9 @@ export const LEADS_COMPARE_OPEN = (name: string) => `Compare ${name} with the ot
 export const LEADS_COMPARE_TITLE = "Compare possible duplicates";
 export const LEADS_COMPARE_NOTE = "Nothing is merged here. Open either lead to decide what to do.";
 export const LEADS_COMPARE_CLOSE = "Close";
+/** Screen-reader-only header words. */
+export const LEADS_COMPARE_FIELD_SR = "Field";
+export const LEADS_ACTIONS_SR = "Actions";
 export const LEADS_COMPARE_LOADING = "Loading both leads";
 export const LEADS_COMPARE_FAILED = "Can't show these leads right now. Close this and try again.";
 export const LEADS_COMPARE_GONE = "This lead couldn't be found";

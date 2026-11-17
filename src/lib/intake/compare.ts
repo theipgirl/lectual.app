@@ -39,7 +39,10 @@ export function createdDate(iso: string | null | undefined): string {
 
 const clean = (v: string | null | undefined) => (v ?? "").trim();
 
-export function shapeCompareSide(lead: CompareLeadInput, stageName: string | null, counts: { timeline: CountRead; tasks: CountRead; proposals: CountRead }): CompareSide {
+/** The stage read: a lead with no stage is "—"; a read that failed is "Couldn't load" (never the same as no stage). */
+export type CompareStage = { status: "ok"; name: string } | { status: "none" } | { status: "unavailable" };
+
+export function shapeCompareSide(lead: CompareLeadInput, stage: CompareStage, counts: { timeline: CountRead; tasks: CountRead; proposals: CountRead }): CompareSide {
   const name = `${clean(lead.first_name)} ${clean(lead.last_name)}`.trim() || clean(lead.email) || DASH;
   return {
     status: "ok",
@@ -47,7 +50,7 @@ export function shapeCompareSide(lead: CompareLeadInput, stageName: string | nul
     name,
     business: clean(lead.mark_text) || clean(lead.business_name) || DASH,
     email: clean(lead.email) || DASH,
-    stage: stageName ?? LEADS_COMPARE_COULDNT_LOAD,
+    stage: stage.status === "ok" ? stage.name : stage.status === "none" ? DASH : LEADS_COMPARE_COULDNT_LOAD,
     source: clean(lead.referral_source) || DASH,
     created: createdDate(lead.created_at),
     ...counts,

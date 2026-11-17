@@ -212,11 +212,17 @@ export type TouchStamp = {
  * recorded, so only the date of the newest activity is known; it says that and does not guess a side.
  */
 export function touchStampFor(row: IntakeRow): TouchStamp {
-  const date = touchDate(row.lastTouchAt);
-  if (!date) return { text: LEADS_TOUCH_NO_CONTACT, waitingOnUs: false, state: "none", title: LEADS_TOUCH_NONE_TITLE };
-  if (row.reply === "replied") return { text: LEADS_TOUCH_OUR_TURN(date), waitingOnUs: true, state: "our-turn", title: LEADS_TOUCH_OUR_TURN_TITLE };
-  if (row.reply === "awaiting") return { text: LEADS_TOUCH_WAITING_ON_THEM(date), waitingOnUs: false, state: "waiting", title: LEADS_TOUCH_WAITING_TITLE };
-  return { text: LEADS_TOUCH_ACTIVITY_ONLY(date), waitingOnUs: false, state: "activity-only", title: LEADS_TOUCH_ACTIVITY_ONLY_TITLE };
+  const newest = touchDate(row.lastTouchAt);
+  if (!newest) return { text: LEADS_TOUCH_NO_CONTACT, waitingOnUs: false, state: "none", title: LEADS_TOUCH_NONE_TITLE };
+  // The day and month never break across lines.
+  const glue = (d: string) => d.replace(" ", "\u00a0");
+  // "Our turn" is dated by their last email or call (last_inbound_at), "Waiting on them" by ours (last_outbound_at): a note or a stage
+  // move that is newer than either must not re-date who wrote last. `lastTouchAt` (the newest of all three) is for the sort and "Last activity".
+  const inbound = touchDate(row.lead.last_inbound_at);
+  const outbound = touchDate(row.lead.last_outbound_at);
+  if (row.reply === "replied" && inbound) return { text: LEADS_TOUCH_OUR_TURN(glue(inbound)), waitingOnUs: true, state: "our-turn", title: LEADS_TOUCH_OUR_TURN_TITLE };
+  if (row.reply === "awaiting" && outbound) return { text: LEADS_TOUCH_WAITING_ON_THEM(glue(outbound)), waitingOnUs: false, state: "waiting", title: LEADS_TOUCH_WAITING_TITLE };
+  return { text: LEADS_TOUCH_ACTIVITY_ONLY(glue(newest)), waitingOnUs: false, state: "activity-only", title: LEADS_TOUCH_ACTIVITY_ONLY_TITLE };
 }
 
 /** Days since a timestamp, or null when there isn't one / it doesn't parse. */

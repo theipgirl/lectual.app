@@ -46,26 +46,44 @@ const STEP = 16;
 
 export function useColWidths() {
   const sizes = useSyncExternalStore(store.subscribe, store.get, store.server);
-  /** The column being dragged, for the width tip. */
-  const [dragCol, setDragCol] = useState<ColKey | null>(null);
+  /** The column being dragged and its real width in px (also for the flexible Next step column), for the width tip. */
+  const [drag, setDrag] = useState<{ col: ColKey; width: number } | null>(null);
 
   /** Drag a column's right edge. The header cell (the handle's parent) is measured when the drag starts. */
   const startDrag = useCallback((col: ColKey) => (event: ReactPointerEvent<HTMLElement>) => {
-    const cell = event.currentTarget.parentElement;
+    const handle = event.currentTarget;
+    const cell = handle.parentElement;
     if (!cell) return;
     event.preventDefault();
     const x0 = event.clientX;
     const w0 = cell.getBoundingClientRect().width;
-    setDragCol(col);
-    const onMove = (e: PointerEvent) => store.set({ ...store.get(), [col]: resizedWidth(w0, e.clientX - x0) });
+    setDrag({ col, width: Math.round(w0) });
+    try {
+      handle.setPointerCapture(event.pointerId);
+    } catch {
+      // No capture (an old browser): the document listeners below still end the drag.
+    }
+    const onMove = (e: PointerEvent) => {
+      const width = resizedWidth(w0, e.clientX - x0);
+      store.set({ ...store.get(), [col]: width });
+      setDrag({ col, width });
+    };
+    // One ending for every way a drag can stop: release, cancel (a touch interrupted by the browser) or a lost capture.
+    let ended = false;
     const onUp = () => {
-      setDragCol(null);
+      if (ended) return;
+      ended = true;
       document.removeEventListener("pointermove", onMove);
       document.removeEventListener("pointerup", onUp);
+      document.removeEventListener("pointercancel", onUp);
+      handle.removeEventListener("lostpointercapture", onUp);
+      setDrag(null);
       write(store.get());
     };
     document.addEventListener("pointermove", onMove);
     document.addEventListener("pointerup", onUp);
+    document.addEventListener("pointercancel", onUp);
+    handle.addEventListener("lostpointercapture", onUp);
   }, []);
 
   /** Left and Right change the width by 16px; Home (or a double click) restores the default. */
@@ -92,5 +110,5 @@ export function useColWidths() {
     write(next);
   }, []);
 
-  return { sizes, dragCol, startDrag, onKeyDown, reset };
+  return { sizes, drag, startDrag, onKeyDown, reset };
 }

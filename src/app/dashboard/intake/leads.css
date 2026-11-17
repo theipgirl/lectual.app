@@ -35,8 +35,8 @@
 
 /* ---- one typeface (Item L2): no monospace anywhere on the Leads list and board ----------------------------------
    Everything on this page that used the app's Courier (headers, dates, counts, chips) reads the same Geist stack. The
-   override is scoped to this page's root, so Matters, Pipeline, the lead page and the rest keep theirs. */
-.intake-root.intake-root {
+   override is scoped to the Leads workspace (.ix-leads), so Matters, Pipeline, the lead page and the rest keep theirs. */
+.ix-leads.ix-leads {
   --font-courier-prime: var(--font-geist), system-ui, sans-serif;
   --font-jetbrains-mono: var(--font-geist), system-ui, sans-serif;
   --font-mono: var(--font-geist), system-ui, sans-serif;
@@ -59,7 +59,10 @@
    wrapper those rules are scoped to. Only what the Leads page needs on top of it is here. The table scrolls inside .rse-scroll only if a
    person makes it wider than the page; the page itself never scrolls sideways. */
 .ix-sheet { min-width: 0; max-width: 100%; }
-.ix-sheet .rse-card { overflow: hidden; }
+.ix-sheet .rse-card { overflow: visible; }
+/* No inner scroll unless the table is wider than the card: an overflow-x scroller would also clip, or add a scrollbar for, a menu
+   that opens below the last row (menus are absolutely positioned). */
+.ix-sheet .rse-scroll[data-scroll="false"] { overflow: visible; }
 .ix-sheet .ix-sort { font: inherit; letter-spacing: inherit; text-transform: inherit; text-align: left; border: 0; background: transparent; padding: 0; color: inherit; cursor: pointer; }
 .ix-sheet .ix-sort[data-on] { color: var(--ox); }
 .ix-sheet .ix-sort:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; border-radius: 3px; }

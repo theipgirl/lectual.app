@@ -30,7 +30,6 @@ export default function IntakeCard({
   row,
   stages,
   members,
-  now: _now,
   pending,
   error,
   time,
@@ -47,7 +46,6 @@ export default function IntakeCard({
   row: IntakeRow;
   stages: Stage[];
   members: MemberIdentity[];
-  now: Date;
   pending: boolean;
   error?: string;
   time: IntakeTime | null;

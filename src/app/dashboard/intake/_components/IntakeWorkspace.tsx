@@ -418,7 +418,7 @@ export default function IntakeWorkspace({
   );
 
   return (
-    <div className="lp-root">
+    <div className="lp-root ix-leads">
       <ListHeader title={INTAKE_NAME} sub={leadsHeaderLine(drawn, sorted)} />
 
       <ListToolbar

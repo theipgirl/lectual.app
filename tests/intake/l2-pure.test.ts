@@ -69,13 +69,19 @@ const ok = (count: number): CountRead => ({ status: "ok", count });
 
 describe("compare panel data", () => {
   it("shapes a side with dashes for blanks and the mark before the business", () => {
-    const side = shapeCompareSide(lead("a", { mark_text: "OKO", business_name: "Okonkwo Textiles", referral_source: null }), "Follow-Up", { timeline: ok(4), tasks: ok(0), proposals: ok(1) });
+    const side = shapeCompareSide(lead("a", { mark_text: "OKO", business_name: "Okonkwo Textiles", referral_source: null }), { status: "ok", name: "Follow-Up" }, { timeline: ok(4), tasks: ok(0), proposals: ok(1) });
     expect(side).toMatchObject({ status: "ok", name: "Dominique Okonkwo", business: "OKO", stage: "Follow-Up", source: "—", created: "3 Sep 2026" });
     expect(createdDate("nope")).toBe("—");
   });
+  it("a lead with no stage is a dash; a failed stage read says it couldn't load", () => {
+    const none = shapeCompareSide(lead("a", { current_stage_id: null }), { status: "none" }, { timeline: ok(0), tasks: ok(0), proposals: { status: "off" } });
+    const failed = shapeCompareSide(lead("a"), { status: "unavailable" }, { timeline: ok(0), tasks: ok(0), proposals: { status: "off" } });
+    expect(none.status === "ok" && none.stage).toBe("—");
+    expect(failed.status === "ok" && failed.stage).toBe("Couldn't load");
+  });
   it("a failed count says it couldn't load, never 0; proposals are left out for a firm without them", () => {
-    const a = shapeCompareSide(lead("a"), "S", { timeline: { status: "unavailable" }, tasks: ok(0), proposals: { status: "off" } });
-    const b = shapeCompareSide(lead("b"), null, { timeline: ok(2), tasks: ok(1), proposals: { status: "off" } });
+    const a = shapeCompareSide(lead("a"), { status: "ok", name: "S" }, { timeline: { status: "unavailable" }, tasks: ok(0), proposals: { status: "off" } });
+    const b = shapeCompareSide(lead("b"), { status: "unavailable" }, { timeline: ok(2), tasks: ok(1), proposals: { status: "off" } });
     if (a.status !== "ok" || b.status !== "ok") throw new Error("shape");
     expect(countText({ status: "unavailable" })).toBe("Couldn't load");
     const rows = compareRows(a, b);
@@ -123,6 +129,17 @@ describe("loadCompare (reads through injected scoped reads)", () => {
     expect(gone.ok && gone.data.b).toEqual({ status: "gone", id: B });
     const failed = await loadCompare(A, B, deps({ readLead: async () => { throw new Error("secret db text"); } }));
     expect(failed).toEqual({ ok: false, error: "Can't show these leads right now. Close this and try again." });
+  });
+  it("stage: none without current_stage_id (no read), unavailable when the read throws, none when the row is gone", async () => {
+    let stageReads = 0;
+    const base = { readStageName: async () => { stageReads++; return "Follow-Up"; } };
+    const noStage = await loadCompare(A, B, deps({ ...base, readLead: async (id) => lead(id, { current_stage_id: null }) }));
+    expect(noStage.ok && noStage.data.a.status === "ok" && noStage.data.a.stage).toBe("—");
+    expect(stageReads).toBe(0);
+    const failed = await loadCompare(A, B, deps({ readStageName: async () => { throw new Error("x"); } }));
+    expect(failed.ok && failed.data.a.status === "ok" && failed.data.a.stage).toBe("Couldn't load");
+    const gone = await loadCompare(A, B, deps({ readStageName: async () => null }));
+    expect(gone.ok && gone.data.a.status === "ok" && gone.data.a.stage).toBe("—");
   });
   it("refuses ids that are not two different uuids, reading nothing", async () => {
     let reads = 0;
