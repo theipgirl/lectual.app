@@ -185,6 +185,8 @@ function MoreMenu({
   items: MoreMenuItem[];
   updatedAt?: string;
 }) {
+  // Allowed exception (plan, rule (h)): these confirms are opened from a menu item and submit a form, which
+  // InlineConfirm (its own asking button, onConfirm callback) cannot do; they use its look, words and classes.
   // One confirm open at a time: choosing another item replaces the one showing.
   const [confirming, setConfirming] = useState<MoreMenuItem | null>(null);
   const label: Record<MoreMenuItem, string> = { withdraw: BUTTON_WORDS.withdraw, reset: RESET_LABEL, delete: DELETE_LABEL };

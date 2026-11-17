@@ -1,5 +1,6 @@
 import "@/app/dashboard/proposals/proposals.css";
 import "@/components/list-page/list-page.css";
+import { ListSearch } from "@/components/list-page/ListToolbar";
 import { ViewToggle } from "@/components/ViewToggle";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { searchPlaceholder } from "@/lib/ui/words";
@@ -83,30 +84,18 @@ export function WhoIsThisFor({
         ]}
         hrefFor={(k) => view.switchHrefs[k]}
       />
-      <form method="get" action={basePath} className="lp-search pe-who-search" role="search">
-        <input type="hidden" name="kind" value={kind} />
-        {Object.entries(hidden ?? {}).map(([k, v]) => (
-          <input key={k} type="hidden" name={k} value={v} />
-        ))}
-        <input
-          id={inputId}
-          className="lx-input"
-          name="q"
-          type="search"
-          maxLength={SEARCH_MAX}
-          defaultValue={term}
-          placeholder={searchPlaceholder(PLURAL[kind])}
-          aria-label={`Search ${PLURAL[kind]}`}
-        />
-        <button type="submit" className="lp-search-submit">
-          Search
-        </button>
-        {term ? (
-          <a className="lp-clear" href={`${basePath}?${new URLSearchParams({ kind, ...(hidden ?? {}) }).toString()}`}>
-            Clear
-          </a>
-        ) : null}
-      </form>
+      <ListSearch
+        id={inputId}
+        className="pe-who-search"
+        action={basePath}
+        maxLength={SEARCH_MAX}
+        name="q"
+        defaultValue={term}
+        placeholder={searchPlaceholder(PLURAL[kind])}
+        label={`Search ${PLURAL[kind]}`}
+        hidden={{ kind, ...(hidden ?? {}) }}
+        clearHref={`${basePath}?${new URLSearchParams({ kind, ...(hidden ?? {}) }).toString()}`}
+      />
       <p className="lx-note pe-hint">{SEARCH_HINT[kind]}</p>
       {list.status === "failed" ? (
         <p className="pe-msg pe-msg-err" role="alert">
