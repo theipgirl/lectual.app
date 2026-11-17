@@ -3,6 +3,7 @@
 import { useActionState, useRef, useState } from "react";
 import { logConsultOutcomeAction, type ConsultOutcomeState } from "@/app/dashboard/leads/[id]/outcome-actions";
 import { CONSULT_OUTCOMES, CONSULT_OUTCOME_LABEL, type ConsultOutcome } from "@/lib/pipeline/consult-outcome-labels";
+import { SAVING } from "@/lib/ui/words";
 
 /**
  * "Log a consult outcome" on the lead page: no-show, asked to reschedule, or
@@ -26,7 +27,7 @@ export function ConsultOutcomeForm({ leadId }: { leadId: string }) {
     <form ref={formRef} action={action} style={{ display: "grid", gap: 8 }}>
       <input type="hidden" name="leadId" value={leadId} />
       <div className="lx-label">Log a consult outcome</div>
-      <div className="lx-segs" role="radiogroup" aria-label="Consult outcome">
+      <div className="vs-switch" role="radiogroup" aria-label="Consult outcome">
         {CONSULT_OUTCOMES.map((value) => (
           <label key={value} className={outcome === value ? "on" : undefined}>
             <input
@@ -44,7 +45,7 @@ export function ConsultOutcomeForm({ leadId }: { leadId: string }) {
       <textarea className="lx-input" name="note" rows={2} placeholder="Optional note: what you heard, when they might rebook." />
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={pending || outcome === ""}>
-          {pending ? "Saving…" : "Log outcome"}
+          {pending ? SAVING : "Log outcome"}
         </button>
         <span className="lx-note">Tells the lead&apos;s owner and the intake team in the app. Nothing is sent to the client.</span>
       </div>

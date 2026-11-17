@@ -3,6 +3,7 @@ import { FIRM_TIME_ZONE } from "@/lib/quotes/firm-time";
 import { formatIntakeTime } from "@/lib/intake-forms/performance";
 import { scoreLine, mergeAnswerItems, type AnswerItem, type ScoreSummary } from "@/lib/answers/items";
 import type { AnswersRead, SourceRead } from "@/lib/answers/load-answers";
+import { Notice } from "@/components/ui/Notice";
 
 /**
  * "Intake & assessment answers": what this person (lead page) or this matter
@@ -130,14 +131,14 @@ export function AnswersCard({ read, tz = FIRM_TIME_ZONE }: { read: AnswersRead; 
     <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }} aria-label={TITLE}>
       <div>
         <div className="lx-label">Staff only</div>
-        <h2 className="lx-h2" style={{ fontSize: 23 }}>
+        <h2 className="lx-h2">
           {TITLE}
         </h2>
       </div>
       {failed.length > 0 && (
-        <div className="lx-banner lx-banner-warn" role="alert">
+        <Notice tone="warn" role="alert">
           {`Couldn't load answers: ${failed.map((s) => s.name).join(", ")}. Refresh to try again.`}
-        </div>
+        </Notice>
       )}
       {missing.map((s) => (
         <p key={s.key} className="lx-note" style={{ margin: 0 }}>

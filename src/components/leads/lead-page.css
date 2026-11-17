@@ -11,7 +11,10 @@
 .lx-status-row b { color: var(--ink); font-weight: 500; }
 .lx-needs > * + * { border-top: 1px solid var(--line); padding-top: 14px; }
 .lx-needs > h2 + * { border-top: 0; padding-top: 0; }
-.lx-contact-actions { display: none; gap: 8px; margin-top: 10px; }
+.lx-contact-actions { display: none; gap: 8px; }
+.lx-head-selects { display: flex; gap: 8px; flex-wrap: wrap; }
+.lx-grid-12 { display: grid; gap: 12px; }
+.lx-disclosure-body { padding: 0 var(--pad-card) var(--pad-card); }
 .lx-aside-details > summary { display: none; cursor: pointer; font-weight: 500; color: var(--ink); }
 .lx-aside-body { display: grid; gap: 12px; }
 
@@ -24,3 +27,4 @@
   .lx-split-lead > .lx-col { display: contents; }
   .lx-split-lead > .lx-aside { order: -1; width: auto; }
 }
+.lx-check { display: flex; gap: 8px; align-items: center; font-size: var(--fs-2); }

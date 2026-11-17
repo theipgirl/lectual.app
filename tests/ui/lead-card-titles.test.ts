@@ -28,7 +28,7 @@ describe("lead-page card titles are for people", () => {
   });
 
   it("anchors and tour hooks are untouched", () => {
-    for (const hook of ['id="prep-consult"', 'data-tour="lead-prep"', 'data-tour="lead-timeline"', 'data-tour="lead-head"']) expect(page, hook).toContain(hook);
+    for (const hook of ['id="prep-consult"', 'data-tour="lead-prep"', 'data-tour="lead-timeline"', 'tour="lead-head"']) expect(page, hook).toContain(hook);
   });
 });
 

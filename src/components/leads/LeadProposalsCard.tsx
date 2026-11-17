@@ -27,7 +27,7 @@ export function LeadProposalsCard({
   return (
     <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }} aria-labelledby="lead-proposals-title">
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-        <h2 id="lead-proposals-title" className="lx-h2" style={{ fontSize: 23 }}>
+        <h2 id="lead-proposals-title" className="lx-h2">
           Client proposal
         </h2>
         {canWrite && (

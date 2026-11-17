@@ -51,11 +51,11 @@ export function ReconcilePreview({
     <div className="rc-wrap">
       <SummaryStrip summary={view.summary} />
       {view.rows.length === 0 ? (
-        <section className="lx-card lx-empty-card" aria-label="No leads">
-          <h2 className="lx-h2" style={{ fontSize: 23 }}>
+        <section className="lx-card lx-state-card" aria-label="No leads">
+          <h2 className="lx-h2">
             {EMPTY_TITLE}
           </h2>
-          <p>There are no leads in intake to compare, and none of the sheet&apos;s rows matched a lead the app has.</p>
+          <p className="lx-note">There are no leads in intake to compare, and none of the sheet&apos;s rows matched a lead the app has.</p>
         </section>
       ) : (
         <>

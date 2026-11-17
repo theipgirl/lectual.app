@@ -1,4 +1,6 @@
 import type { ApplyResult, ReconcileRow } from "@/lib/reconcile/types";
+import { CANCEL, yesVerb } from "@/lib/ui/words";
+import { Notice } from "@/components/ui/Notice";
 
 export const BULK_LABEL = "Accept all where two or more sources agree";
 
@@ -53,10 +55,10 @@ export function ApplyBar({
               {`Move ${accepted} ${accepted === 1 ? "lead" : "leads"} to the chosen stages? Moves are logged on each lead's timeline.`}
             </span>
             <button type="button" className="lx-btn lx-btn-pri" onClick={onConfirm} disabled={busy || accepted === 0}>
-              {`Yes, ${applyLabel(accepted).toLowerCase()}`}
+              {yesVerb(applyLabel(accepted))}
             </button>
-            <button type="button" className="lx-btn lx-btn-ghost" onClick={onCancel} disabled={busy}>
-              Cancel
+            <button type="button" className="lx-btn lx-btn-sec" onClick={onCancel} disabled={busy}>
+              {CANCEL}
             </button>
           </>
         ) : (
@@ -82,10 +84,10 @@ export function ResultPanel({
   const names = new Map(rows.map((r) => [r.leadId, r.leadName]));
   const outcomes = result.ok ? result.outcomes : (result.outcomes ?? []);
   return (
-    <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }} aria-label="Result">
+    <section className="lx-card rc-panel" aria-label="Result">
       {result.ok ? (
         <>
-          <h2 className="lx-h2" style={{ fontSize: 23 }}>
+          <h2 className="lx-h2">
             Done
           </h2>
           <p>
@@ -94,12 +96,12 @@ export function ResultPanel({
         </>
       ) : (
         <>
-          <h2 className="lx-h2" style={{ fontSize: 23 }}>
+          <h2 className="lx-h2">
             {result.stale ? "This plan is out of date" : "Nothing was moved"}
           </h2>
-          <p role="alert" className="lx-banner lx-banner-risk">
+          <Notice tone="risk" role="alert">
             {result.error}
-          </p>
+          </Notice>
         </>
       )}
       {outcomes.length > 0 ? (

@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { lastHeardLabel } from "@/lib/leads/status-row";
 import { NOT_RATED, TEMPERATURE_NAME } from "@/lib/ui/words";
+import { Pill } from "@/components/ui/Pill";
+import { MEANING_TONE } from "@/lib/ui/tones";
 
 /**
  * The one line under the lead's name: Stage pill, Temperature, Owner (when known) and how long
@@ -23,7 +25,7 @@ export function LeadStatusRow({
   return (
     <ul className="lx-status-row" aria-label="Lead status">
       <li>
-        <span className="lx-pill lx-pill-ox">{stageName ?? "No stage"}</span>
+        <Pill tone={MEANING_TONE.neutral}>{stageName ?? "No stage"}</Pill>
       </li>
       <li className="lx-note">
         {TEMPERATURE_NAME}: <b>{temperatureLabel ?? NOT_RATED}</b>

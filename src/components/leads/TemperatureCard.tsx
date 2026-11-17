@@ -9,6 +9,7 @@ import {
 import { LANES, LANE_LABEL, suggestionLine, type LaneView, type NextStep } from "@/lib/leads/lane";
 import { temperatureLabel, type EffectiveTemperature } from "@/lib/intake/effective-temperature";
 import { LtnSuggestion } from "@/components/intake/LtnSuggestion";
+import { SAVING } from "@/lib/ui/words";
 
 /**
  * The lead page's ONE temperature card (intake SOP Stage 2), the twin of the
@@ -48,7 +49,7 @@ export function TemperatureCard(props: {
   return (
     <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }} aria-labelledby="temperature-heading">
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-        <h2 id="temperature-heading" className="lx-h2" style={{ fontSize: 23, margin: 0 }}>
+        <h2 id="temperature-heading" className="lx-h2">
           Temperature
         </h2>
         <span
@@ -116,7 +117,7 @@ export function TemperatureCard(props: {
             </select>
           </label>
           <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={lanePending}>
-            {lanePending ? "Saving…" : "Save temperature"}
+            {lanePending ? SAVING : "Save temperature"}
           </button>
           {laneState.error && (
             <span role="alert" className="lx-note" style={{ color: "var(--wine)" }}>
@@ -144,7 +145,7 @@ export function TemperatureCard(props: {
                 <form action={nurtureAction} style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                   <input type="hidden" name="leadId" value={leadId} />
                   <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={nurturePending}>
-                    {nurturePending ? "Adding…" : nextStep.label}
+                    {nurturePending ? SAVING : nextStep.label}
                   </button>
                   <span className="lx-note">Enrolls them in the firm&apos;s nurture campaign. Its emails draft into the approval queue.</span>
                   {nurtureState.error && (
