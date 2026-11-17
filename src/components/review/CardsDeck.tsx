@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { BUCKET_COPY } from "@/lib/review/buckets";
 import type { DeckCard, DeckPerson } from "@/lib/review/deck";
-import type { LatestNote } from "@/lib/review/detail-load";
+import type { DeckDocuments as DeckDocumentsRead, LatestNote } from "@/lib/review/detail-load";
 import type { MeetingPosition } from "@/lib/review/lanes";
 import { dueText, lastContactText } from "@/lib/review/format";
 import { reviewHref } from "@/lib/review/params";
@@ -9,7 +9,8 @@ import { SNOOZE_LABEL } from "@/lib/review/snooze";
 import { WAITING_LABEL } from "@/lib/review/waiting";
 import { deckDoneAction, deckHandToAction, deckNoteAction, deckSnoozeAction } from "@/app/dashboard/review/card-actions";
 import { DeckKeys } from "./DeckKeys";
-import { Avatar, openHref, Tags, type Common } from "./shared";
+import { Avatar, DocTag, openHref, Tags, type Common } from "./shared";
+import { DeckDocuments } from "./ReviewDocuments";
 import "./review.css";
 
 const MAX_DOTS = 40;
@@ -43,8 +44,10 @@ export function CardsDeck({
   personName,
   personId,
   note,
+  docs,
+  timeZone,
   ...common
-}: Common & { card: DeckCard | null; pos: MeetingPosition | null; personName: string | null; personId: string | null; note: LatestNote | null }) {
+}: Common & { card: DeckCard | null; pos: MeetingPosition | null; personName: string | null; personId: string | null; note: LatestNote | null; docs?: DeckDocumentsRead | null; timeZone?: string }) {
   const { params, today, members, canWrite } = common;
   if (!card || !pos) {
     return (
@@ -121,6 +124,7 @@ export function CardsDeck({
           </div>
         </dl>
         <Tags row={row} today={today} />
+        {docs ? <DeckDocuments read={docs.ok ? docs.read : null} members={members} today={today} timeZone={timeZone ?? "America/New_York"} /> : <DocTag row={row} />}
         {note && (
           <p className="rv-big-note lx-note">
             {note.status === "unavailable" ? "The latest note couldn't load." : note.text ? `Latest note: ${note.text}` : "No notes yet."}

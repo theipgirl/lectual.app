@@ -30,10 +30,11 @@ function mock(load: unknown, role: string | null = "attorney") {
   vi.doMock("@/lib/review/detail-load", () => ({
     loadReviewDetail: vi.fn(async () => detailResult),
     loadLatestNote: vi.fn(async () => ({ status: "ok", text: "Spoke to the client" })),
+    loadDeckDocuments: vi.fn(async () => ({ ok: true, read: { files: { status: "ok", files: [], capped: false }, letters: null } })),
   }));
 }
 
-let detailResult: unknown = { status: "ok", currentStageId: null, assignedTo: null, cameFrom: null, steps: { ok: true, items: [] }, activity: { ok: true, items: [] }, stages: { ok: true, options: [] } };
+let detailResult: unknown = { status: "ok", currentStageId: null, assignedTo: null, cameFrom: null, steps: { ok: true, items: [] }, activity: { ok: true, items: [] }, stages: { ok: true, options: [] }, documents: { files: { status: "ok", files: [], capped: false }, letters: null } };
 
 /** The toolbar's search box is a form; the cards and the panel are what must not carry one for a viewer. */
 const withoutSearch = (html: string) => html.replace(/<form class="lp-search"[\s\S]*?<\/form>/, "");
@@ -231,7 +232,7 @@ describe("Weekly review page", () => {
   describe("detail panel", () => {
     const ID = "00000000-0000-4000-8000-000000000001";
     const lead = row({ key: "l1", kind: "lead", id: ID, client: "Lead Co", nextStep: step("2026-11-04", "u-reb") });
-    const detailOk = { status: "ok", currentStageId: "s1", assignedTo: "u-reb", cameFrom: "Referral", steps: { ok: true, items: [{ id: "t", title: "Follow up", dueDate: "2026-11-04", assigneeId: "u-reb" }, { id: "t2", title: "Send form", dueDate: null, assigneeId: null }] }, activity: { ok: true, items: [{ id: "a1", type: "note", actor_type: "user", created_at: "2026-10-31T15:00:00Z", payload: { note: "Spoke to the client" } }] }, stages: { ok: true, options: [{ id: "s1", name: "Proposal" }, { id: "s2", name: "Hired" }] } };
+    const detailOk = { status: "ok", currentStageId: "s1", assignedTo: "u-reb", cameFrom: "Referral", steps: { ok: true, items: [{ id: "t", title: "Follow up", dueDate: "2026-11-04", assigneeId: "u-reb" }, { id: "t2", title: "Send form", dueDate: null, assigneeId: null }] }, activity: { ok: true, items: [{ id: "a1", type: "note", actor_type: "user", created_at: "2026-10-31T15:00:00Z", payload: { note: "Spoke to the client" } }] }, stages: { ok: true, options: [{ id: "s1", name: "Proposal" }, { id: "s2", name: "Hired" }] }, documents: { files: { status: "ok", files: [], capped: false }, letters: null } };
     const stages = [{ id: "00000000-0000-4000-8000-0000000000aa", name: "Nurture 2027", category: "nurture" }];
 
     it("renders for a valid open param with facts, editable next step, snooze, other steps, stage, owner, note, activity", async () => {
@@ -245,6 +246,8 @@ describe("Weekly review page", () => {
       expect(html).toMatch(/name="dueAt"[^>]*value="2026-11-04"/);
       for (const w of ["Tomorrow", "Next Monday", "In 2 weeks", "Add another next step", "Send form", "Move stage", "Log what happened", "Recent activity", "Spoke to the client", "Lost / Nurture"]) expect(html).toContain(w);
       expect(html).toContain("Open the full lead page");
+      for (const w of ["Documents", "No documents yet.", "Open all documents", "Comment on a document", 'id="rv-sec-note"']) expect(html).toContain(w);
+      expect(html.indexOf("Comment on a document")).toBeLessThan(html.indexOf('id="rv-sec-note"'));
       expect(html).toMatch(/data-close[^>]*href="\/dashboard\/review\/?"|href="\/dashboard\/review\/?"[^>]*data-close/);
       expect(html).not.toContain("Hired</option><option");
     });
@@ -278,6 +281,8 @@ describe("Weekly review page", () => {
       const panel = html.slice(html.indexOf('role="dialog"'));
       expect(panel).not.toContain("<form");
       expect(panel).not.toContain("<textarea");
+      expect(panel).toContain("Open all documents");
+      expect(panel).not.toContain("Comment on a document");
     });
     it("optional reads that failed say so", async () => {
       detailResult = { ...detailOk, steps: { ok: false }, activity: { ok: false }, stages: { ok: false } };
