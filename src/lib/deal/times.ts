@@ -130,6 +130,5 @@ export function whenLabel(at: Date, now: Date, timeZone: string): string {
   const diff = dayNumber(a) - dayNumber(n);
   if (diff === 0) return `today at ${time}`;
   if (diff === 1) return `tomorrow at ${time}`;
-  const weekday = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short" }).format(at);
-  return `${weekday}, ${formatDay(at, { tz, now }) ?? ""} at ${time}`;
+  return `${formatDay(at, { tz, now, weekday: "short" }) ?? ""} at ${time}`;
 }

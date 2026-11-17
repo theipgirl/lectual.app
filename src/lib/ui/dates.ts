@@ -77,13 +77,22 @@ export function civilDay(input: DateInput, tz: string): string | null {
   return c ? `${c.y}-${pad(c.m)}-${pad(c.d)}` : null;
 }
 
-/** "Nov 16"; "Nov 16, 2025" when that year is not the current year in the firm's zone. */
-export function formatDay(input: DateInput | null | undefined, opts: { tz: string; now?: Date }): string | null {
+const WEEKDAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+const WEEKDAYS_LONG = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
+
+/**
+ * "Nov 16"; "Nov 16, 2025" when that year is not the current year in the firm's zone.
+ * With `weekday` the day name leads: "Mon, Nov 16" ("short") or "Monday, Nov 16" ("long").
+ */
+export function formatDay(input: DateInput | null | undefined, opts: { tz: string; now?: Date; weekday?: "short" | "long" }): string | null {
   const c = civilOf(input, opts.tz);
   if (!c) return null;
   const nowCivil = civilOfInstant(opts.now ?? new Date(), opts.tz);
   const label = `${MONTHS[c.m - 1]} ${c.d}`;
-  return nowCivil && nowCivil.y === c.y ? label : `${label}, ${c.y}`;
+  const day = nowCivil && nowCivil.y === c.y ? label : `${label}, ${c.y}`;
+  if (!opts.weekday) return day;
+  const dow = new Date(Date.UTC(c.y, c.m - 1, c.d)).getUTCDay();
+  return `${(opts.weekday === "long" ? WEEKDAYS_LONG : WEEKDAYS_SHORT)[dow]}, ${day}`;
 }
 
 /** "2:30 PM", in the firm's zone, with a plain space. A civil date has no time, so it gives null. */

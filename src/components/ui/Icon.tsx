@@ -1,4 +1,4 @@
-export type IconName = "close" | "chevron-down" | "chevron-right" | "chevron-left" | "more" | "check";
+export type IconName = "close" | "chevron-down" | "chevron-right" | "chevron-left" | "more" | "check" | "pencil";
 
 /** The small icon set: one stroke weight, `currentColor`. Replaces typed glyphs (×, ⋯, ▾, ›, ✓). */
 export function Icon({ name, size = 16, label }: { name: IconName; size?: number; label?: string }) {
@@ -22,6 +22,7 @@ export function Icon({ name, size = 16, label }: { name: IconName; size?: number
       {name === "chevron-right" && <path d="M9 6l6 6-6 6" />}
       {name === "chevron-left" && <path d="M15 6l-6 6 6 6" />}
       {name === "check" && <path d="M5 12.5l4.5 4.5L19 7" />}
+      {name === "pencil" && <path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 013 3L8 19l-4 1zM14 7l3 3" />}
       {name === "more" && (
         <>
           <circle cx="6" cy="12" r="1.6" fill="currentColor" stroke="none" />

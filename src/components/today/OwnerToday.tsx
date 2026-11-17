@@ -51,8 +51,7 @@ import {
 
 /** "Tuesday, Nov 17": the weekday word, then the shared day format in the firm's zone. */
 function longDate(now: Date, tz: string): string {
-  const weekday = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "long" }).format(now);
-  return `${weekday}, ${formatDay(now, { tz, now }) ?? ""}`;
+  return formatDay(now, { tz, now, weekday: "long" }) ?? "";
 }
 
 /** The owner view's own tone words ("plain") onto the shared pill tones. */

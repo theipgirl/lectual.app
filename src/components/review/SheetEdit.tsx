@@ -6,6 +6,7 @@ import { EDITABLE_COLUMNS, cellEditable, type SheetEditRow, type SheetPerms } fr
 import { roleLabel } from "@/lib/auth/roles";
 import { REFERRAL_SOURCES } from "@/lib/intake/referral-source";
 import { SHEET_LEGEND_LABEL, SHEET_STAGES_UNREADABLE, SHEET_WORKED_OUT, SHEET_WORKED_OUT_BODY, SHEET_YOU_TYPE, SHEET_YOU_TYPE_BODY } from "@/lib/ui/words";
+import { Icon } from "@/components/ui/Icon";
 import { Notice } from "@/components/ui/Notice";
 import { SheetEditTable, type SheetEditInitial, type SheetPerson } from "./SheetEditTable";
 import { openHref, type Common } from "./shared";
@@ -64,7 +65,7 @@ export function SheetEdit({ rows, today, members, params, perms, initial }: Comm
         <section className="lx-card rse-legend" aria-label={SHEET_LEGEND_LABEL}>
           <div>
             <p className="rse-legend-title">
-              {SHEET_YOU_TYPE} <span aria-hidden>✎</span>
+              {SHEET_YOU_TYPE} <Icon name="pencil" size={13} />
             </p>
             <p className="rse-legend-body">{SHEET_YOU_TYPE_BODY}</p>
           </div>

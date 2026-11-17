@@ -371,7 +371,12 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                 return (
                   <th key={h.col} className={locked ? "rse-lock-th" : undefined} scope="col">
                     {h.label}
-                    {typed && <span aria-hidden> ✎</span>}
+                    {typed && (
+                      <>
+                        {" "}
+                        <Icon name="pencil" size={13} />
+                      </>
+                    )}
                     {editing && (
                       <span
                         className={`rse-col-grip${active ? " is-active" : ""}`}

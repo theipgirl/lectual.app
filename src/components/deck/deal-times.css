@@ -1,4 +1,4 @@
 /* The deal-times dialog is the shared dialog frame (.lx-modal in globals.css). Its grid track may shrink, so at 375px the card narrows to the screen. */
-.dt-root { grid-template-columns: minmax(0, 1fr); }
+.lx-modal-root:has(> .dt-dialog) { grid-template-columns: minmax(0, 1fr); }
 .dt-dialog { width: min(400px, 100%); }
 .dt-dialog .lx-input { max-width: 100%; }

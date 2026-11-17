@@ -28,6 +28,8 @@ function Row({ n }: { n: NeedsYouItem }) {
 /**
  * Today's "Needs you": the top three, then "See all N" opens the rest in place (a <details>, no navigation),
  * in the same order. The unavailable warning and the empty note are unchanged.
+ * Rollout item 14 is NOT done here: "See all N" stays a <details> and is not moved to ShowingCount, because this is a
+ * server component with no page to link to and ShowingCount has no disclosure form that works without JavaScript.
  */
 export function NeedsYouSection({ needs, queue }: { needs: NeedsYou; queue: "ok" | "unconfigured" | "unavailable" }) {
   const forYouCount = needs.items.filter((i) => i.forYou).length;
