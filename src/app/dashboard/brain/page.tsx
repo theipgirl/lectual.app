@@ -32,7 +32,7 @@ import { listStages } from "@/lib/pipeline/stages";
 import { isSignalId } from "@/lib/stage-keeper/signals";
 import { formatDay as sharedFormatDay } from "@/lib/ui/dates";
 import { getFirmTimeZone } from "@/lib/org/profile";
-import { FIRM_NOTES_NAME, FIRM_NOTES_PURPOSE, noneYet } from "@/lib/ui/words";
+import { FIRM_NOTES_NAME, FIRM_NOTES_PURPOSE } from "@/lib/ui/words";
 import { EmptyState, LoadFailedCard, PageHeader, Pill } from "@/components/ui";
 
 export const metadata: Metadata = { title: pageTitle(FIRM_NOTES_NAME) };

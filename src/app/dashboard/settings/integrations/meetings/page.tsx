@@ -31,8 +31,8 @@ const ERRORS: Record<string, string> = {
 };
 
 function statusLine(c: MeetingConnection, tz: string): string {
-  return `${c.account_hint ?? "Connected"} · connected ${relativeTime(c.created_at, Date.now(), tz)}${
-    c.last_import_at ? ` · last import ${relativeTime(c.last_import_at, Date.now(), tz)}` : " · not imported yet"
+  return `${c.account_hint ?? "Connected"} · connected ${relativeTime(c.created_at, undefined, tz)}${
+    c.last_import_at ? ` · last import ${relativeTime(c.last_import_at, undefined, tz)}` : " · not imported yet"
   }`;
 }
 

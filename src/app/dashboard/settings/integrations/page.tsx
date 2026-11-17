@@ -108,7 +108,7 @@ function MailboxRow({ c, canManage, tz }: { c: MailboxConnection; canManage: boo
       <div style={{ textAlign: "right", minWidth: 92 }}>
         <StatusPill state={stateForStatus(c.status)} />
         <div className="lx-note" style={{ marginTop: 4 }}>
-          {c.last_synced_at ? relativeTime(c.last_synced_at, Date.now(), tz) : "first sync pending"}
+          {c.last_synced_at ? relativeTime(c.last_synced_at, undefined, tz) : "first sync pending"}
         </div>
       </div>
       {canManage && (

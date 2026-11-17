@@ -110,7 +110,7 @@ export default async function LawPayPage({
             </h2>
             <div className="lx-note">
               {conn
-                ? `${conn.display_hint ?? "LawPay merchant"} · connected ${relativeTime(conn.created_at, Date.now(), tz)}`
+                ? `${conn.display_hint ?? "LawPay merchant"} · connected ${relativeTime(conn.created_at, undefined, tz)}`
                 : read.ok
                   ? "Not connected."
                   : "Status unknown."}
@@ -123,7 +123,7 @@ export default async function LawPayPage({
           <details className="lx-disclosure">
             <summary>Details</summary>
             <p className="lx-note">
-              {conn.last_verified_at ? `Checked ${relativeTime(conn.last_verified_at, Date.now(), tz)}. ` : ""}
+              {conn.last_verified_at ? `Checked ${relativeTime(conn.last_verified_at, undefined, tz)}. ` : ""}
               {conn.mode === "test" ? "Test mode: cards are charged against LawPay's test credentials, and no real money moves." : "Live mode: cards are charged for real."}
             </p>
           </details>
@@ -205,7 +205,7 @@ export default async function LawPayPage({
                     <span style={{ flex: 1, minWidth: 200 }}>
                       <b style={{ color: "var(--ink)" }}>{currentAccount ? accountShortLabel(currentAccount) : "An account LawPay no longer lists"}</b>
                       <span className="lx-note" style={{ display: "block" }}>
-                        {current.verified_at ? `Confirmed ${relativeTime(current.verified_at, Date.now(), tz)}` : "Not confirmed"}
+                        {current.verified_at ? `Confirmed ${relativeTime(current.verified_at, undefined, tz)}` : "Not confirmed"}
                         {currentAccount ? "" : " · no longer listed by LawPay"}
                       </span>
                       <details className="lx-disclosure">

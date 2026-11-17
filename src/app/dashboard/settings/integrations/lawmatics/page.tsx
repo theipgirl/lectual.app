@@ -62,7 +62,7 @@ export default async function LawmaticsPage() {
             </h2>
             <div className="lx-note">
               {conn
-                ? `Token ${conn.token_hint ?? ""} · connected ${relativeTime(conn.created_at, Date.now(), tz)}${conn.last_import_at ? ` · last import ${relativeTime(conn.last_import_at, Date.now(), tz)}` : ""}`
+                ? `Token ${conn.token_hint ?? ""} · connected ${relativeTime(conn.created_at, undefined, tz)}${conn.last_import_at ? ` · last import ${relativeTime(conn.last_import_at, undefined, tz)}` : ""}`
                 : "Not connected."}
             </div>
           </div>
