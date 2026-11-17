@@ -1,4 +1,4 @@
-import { SCORED_ASSESSMENT, SCORED_ASSESSMENTS } from "@/lib/ui/words";
+import { SCORED_ASSESSMENT, SCORED_ASSESSMENTS, showingAtLeast } from "@/lib/ui/words";
 import { FIRM_TIME_ZONE } from "@/lib/quotes/firm-time";
 import { formatIntakeTime } from "@/lib/intake-forms/performance";
 import { scoreLine, mergeAnswerItems, type AnswerItem, type ScoreSummary } from "@/lib/answers/items";
@@ -159,7 +159,7 @@ export function AnswersCard({ read, tz = FIRM_TIME_ZONE }: { read: AnswersRead; 
       )}
       {capped.map((s) => (
         <p key={s.key} className="lx-note" style={{ margin: 0 }}>
-          {`Showing the latest 200 ${s.name.toLowerCase()}.`}
+          {`${showingAtLeast(200)} ${s.name.toLowerCase()}.`}
         </p>
       ))}
     </section>

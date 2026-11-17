@@ -75,14 +75,14 @@ describe("the list state", () => {
     const read = { files: okFiles([file("f1", "a.pdf", "2026-10-20T10:00:00Z", 100, "gone"), file("f2", "b.pdf", "2026-10-19T10:00:00Z", 100, null)]), letters: null };
     for (const directory of [null, DIR]) {
       const html = await render(read, { directory });
-      expect(html.match(/A teammate/g)).toHaveLength(2);
+      expect(html.match(/Teammate/g)).toHaveLength(2);
       expect(html).toContain("a.pdf");
     }
   });
 
   it("states the cap when there are more than 100", async () => {
     const html = await render({ files: okFiles([file("f1", "a.pdf", "2026-10-20T10:00:00Z")], true), letters: null });
-    expect(html).toContain("Showing the newest 100 files.");
+    expect(html).toContain("Showing 100 of 100+ files.");
   });
 });
 

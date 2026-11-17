@@ -140,7 +140,7 @@ describe("lead page placement", () => {
     expect(html).toContain(">Timeline<");
   });
 
-  it("still renders when the member directory cannot be read: entries say 'A teammate'", async () => {
+  it("still renders when the member directory cannot be read: entries say 'Teammate'", async () => {
     const world = leadWorld({ tables: { crm_file: [fileRow()] } });
     const html = await leadPage(world, {
       members: () => {
@@ -149,7 +149,7 @@ describe("lead page placement", () => {
     });
     // The page already treats a failed directory as an empty one.
     expect(html).toContain("Signed LOE.pdf");
-    expect(html).toContain("A teammate");
+    expect(html).toContain("Teammate");
   });
 
   it("shows the uploader's directory name", async () => {
@@ -304,9 +304,9 @@ describe("matter page placement", () => {
     expect(htmlB).toContain("Specimen.png");
   });
 
-  it("says the uploader is 'A teammate' when the directory could not be read, and still renders", async () => {
+  it("says the uploader is 'Teammate' when the directory could not be read, and still renders", async () => {
     const html = await matterPage(matterDb(), { members: () => { throw new Error("boom"); } });
-    expect(html).toContain("A teammate");
+    expect(html).toContain("Teammate");
     expect(html).toContain("Specimen.png");
   });
 

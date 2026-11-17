@@ -1,6 +1,6 @@
 "use client";
 
-import { IMPORT_PERSON_NOT_SAVED, LAWMATICS_TOKEN_HELP, SAVING, searchPlaceholder } from "@/lib/ui/words";
+import { IMPORT_PERSON_NOT_SAVED, LAWMATICS_TOKEN_HELP, SAVING, searchPlaceholder, showingOf } from "@/lib/ui/words";
 import { useActionState, useRef, useState, type ReactNode } from "react";
 import { InlineConfirm } from "@/components/ui/InlineConfirm";
 import { Notice } from "@/components/ui/Notice";
@@ -115,7 +115,7 @@ function Section({ title, count, omitted, open, children }: { title: string; cou
         {title} <span className="lx-chip-count">{count}</span>
       </summary>
       <ul className="lx-list">{children}</ul>
-      {omitted ? <p className="lx-note" style={{ margin: 0 }}>…and {omitted} more, not listed here. They are counted above and included in the import.</p> : null}
+      {omitted ? <p className="lx-note" style={{ margin: 0 }}>{showingOf(count - omitted, count)} here. The rest are counted above and included in the import.</p> : null}
     </details>
   );
 }

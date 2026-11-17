@@ -1,7 +1,7 @@
 import { formatRelative } from "@/lib/ui/dates";
 import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
 import { EmptyState, Notice, Pill } from "@/components/ui";
-import { BLANK, noneYet } from "@/lib/ui/words";
+import { BLANK, noneYet, showingAtLeast } from "@/lib/ui/words";
 import "./files.css";
 import { buildEntries, LIST_CAP, type Directory, type DocEntry, type DocumentsRead } from "@/lib/files/read";
 import type { FileParentInput } from "@/lib/files/guard";
@@ -108,10 +108,10 @@ export function DocumentsCard({
         </ul>
       )}
       {filesCapped && (
-        <p className="lx-note">{`Showing the newest ${LIST_CAP} files.`}</p>
+        <p className="lx-note">{`${showingAtLeast(LIST_CAP)} files.`}</p>
       )}
       {lettersCapped && (
-        <p className="lx-note">{`Showing the newest ${LIST_CAP} generated letters.`}</p>
+        <p className="lx-note">{`${showingAtLeast(LIST_CAP)} generated letters.`}</p>
       )}
     </section>
   );

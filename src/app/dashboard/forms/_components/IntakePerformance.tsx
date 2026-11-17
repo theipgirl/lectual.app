@@ -9,7 +9,7 @@ import { getFirmTimeZone } from "@/lib/org/profile";
 import { IntakeDrawer, Unreadable, FIT_TONE, STATUS_TONE } from "./IntakeDrawer";
 import { StepMedians, StoppedAtCell } from "./StepTables";
 import { Pill, SheetCard, SheetScroll, SheetTable } from "@/components/ui";
-import { LAST_CONTACT } from "@/lib/ui/words";
+import { LAST_CONTACT, showingAtLeast } from "@/lib/ui/words";
 
 /**
  * The Performance tab (server-rendered, handed to the workspace as a slot).
@@ -212,7 +212,7 @@ export async function IntakePerformance({
                     </tbody>
                   </SheetTable>
                 </SheetScroll>
-                {rows.length >= INTAKE_TABLE_LIMIT && <p className="ifm-help ifm-pad-x">Showing the latest {INTAKE_TABLE_LIMIT}.</p>}
+                {rows.length >= INTAKE_TABLE_LIMIT && <p className="ifm-help ifm-pad-x">{showingAtLeast(INTAKE_TABLE_LIMIT)}</p>}
               </>
             )}
           </SheetCard>

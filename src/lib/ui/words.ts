@@ -750,7 +750,7 @@ export const LEADS_ASSIGNED_TO = (name: string, who: string) => `Assigned ${name
 export const LEADS_ROW_MENU = (name: string) => `Actions for ${name}`;
 export const LEADS_NO_MATCH_IN_SET = (set: string) => `No lead matches these filters in ${set}.`;
 export const LEADS_SET_EMPTY = (set: string) => `Nobody is in ${set} right now.`;
-export const LEADS_LOST_CUT = (shown: number, total: number) => "Showing the first " + shown + " of " + total + " lost leads.";
+export const LEADS_LOST_CUT = (shown: number, total: number) => `${showingOf(shown, total)} lost leads.`;
 export const LEADS_DUPLICATE = "Possible duplicate";
 export const LEADS_DUPLICATES = "Possible duplicates";
 export const LEADS_DUPLICATES_TITLE = "Leads with the same email or the same name as another open lead. Nothing is merged; open each to compare.";
@@ -971,3 +971,5 @@ export const LEADS_TOUCH_CONSULT_TITLE = "A consult is booked on the calendar, s
 // Review fixes (2026-11-17)
 /** The busy word on a search button (a search is not a save). */
 export const SEARCHING = "Searching…";
+/** A list cut off at its cap where the real total is not known: "Showing 200 of 200+". */
+export const showingAtLeast = (shown: number): string => showingOf(shown, shown) + "+";

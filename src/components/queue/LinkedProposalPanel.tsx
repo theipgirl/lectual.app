@@ -4,6 +4,7 @@ import { statusLabel, statusTone } from "@/lib/proposal-editor/labels";
 import { Notice } from "@/components/ui/Notice";
 import { Pill } from "@/components/ui/Pill";
 import { formatMoney } from "@/lib/ui/format";
+import { BLANK } from "@/lib/ui/words";
 import { ProposalCard } from "@/components/proposal-editor/ProposalCard";
 
 /**
@@ -54,7 +55,7 @@ export function LinkedProposalPanel({ panel, pending }: { panel: LinkedPanel; pe
           <span>Needs attention</span>
           <span>
             {p.errorCount === 0 && p.warningCount === 0
-              ? "None"
+              ? BLANK
               : [p.errorCount ? `${p.errorCount} to fix` : null, p.warningCount ? `${p.warningCount} to check` : null].filter(Boolean).join(", ")}
           </span>
         </div>

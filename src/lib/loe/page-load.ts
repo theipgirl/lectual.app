@@ -7,6 +7,7 @@ import { getProposalSettings } from "@/lib/proposals/store";
 import { PROPOSAL_ADMIN_ROLES, PROPOSAL_STAFF_WRITE_ROLES } from "@/lib/proposals/types";
 import type { LetterPageModel } from "./page-model";
 import { listLetterVersions } from "./templates-store";
+import { TEAMMATE } from "@/lib/ui/words";
 
 /**
  * Everything the Engagement letter settings page draws, read through the caller's scoped client.
@@ -31,7 +32,7 @@ export async function loadLetterPage(): Promise<LetterPageModel> {
     approverIds = settings?.approver_user_ids ?? [];
     const names = approverIds.map((id) => {
       const m = members.find((x) => x.userId === id);
-      return m ? (m.displayName ?? firstNameOf(m.email) ?? m.email ?? "A teammate") : "A teammate";
+      return m ? (m.displayName ?? firstNameOf(m.email) ?? m.email ?? TEAMMATE) : TEAMMATE;
     });
     approvers = { status: "ok", names };
   } catch {

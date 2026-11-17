@@ -1,4 +1,5 @@
 import "@/app/dashboard/proposals/proposals.css";
+import { showingOf } from "@/lib/ui/words";
 import type { ProposalCard as Card } from "@/lib/proposals/card";
 import { formatDollars } from "@/lib/proposal-editor/events";
 import { formatShortFirmDate } from "@/lib/quotes/labels";
@@ -138,7 +139,7 @@ export function ProposalCard({ card, showFees = true }: { card: Card; /** The ed
               </ul>
             </>
           )}
-          {receipts.more > 0 && <p className="lx-note" style={{ margin: 0 }}>And {receipts.more} more {receipts.more === 1 ? "quote" : "quotes"} not shown.</p>}
+          {receipts.more > 0 && <p className="lx-note" style={{ margin: 0 }}>{showingOf(receipts.verified.length + receipts.unverified.length, receipts.verified.length + receipts.unverified.length + receipts.more)} quotes.</p>}
           {receipts.notes && (
             <p className="lx-note" style={{ margin: 0 }}>
               Notes for the reviewer: {receipts.notes}
