@@ -112,10 +112,10 @@ export default async function LeadPage({
   const [stages, members, { data: activity }] = await Promise.all([
     listStages(),
     listMemberDirectory().catch(() => []),
-    supabase
-      .from("crm_activity")
-      .select("id, lead_id, type, actor_type, created_at, payload")
-      .in("lead_id", mergedSet.ids)
+    (mergedIds.length
+      ? supabase.from("crm_activity").select("id, lead_id, type, actor_type, created_at, payload").in("lead_id", mergedSet.ids)
+      : supabase.from("crm_activity").select("id, lead_id, type, actor_type, created_at, payload").eq("lead_id", id)
+    )
       .order("created_at", { ascending: false })
       .limit(100),
   ]);
