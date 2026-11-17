@@ -33,9 +33,9 @@ describe("compact page tops under 640px (Sprint 34 B)", () => {
     expect(globals).toMatch(/\.lx-page\s*\{[^}]*gap:\s*10px/);
   });
 
-  it("filter chips are one horizontally scrolling row (both chip families)", () => {
-    expect(globals).toMatch(/\.lx-chips\s*\{[^}]*flex-wrap:\s*nowrap;[^}]*overflow-x:\s*auto/);
-    expect(listPage).toMatch(/\.lp-chips\s*\{[^}]*flex-wrap:\s*nowrap;[^}]*overflow-x:\s*auto/);
+  it("filter chips wrap onto more rows on a phone instead of scrolling out of sight (both chip families)", () => {
+    expect(globals).toMatch(/\.lx-chips\s*\{\s*flex-wrap:\s*wrap/);
+    expect(listPage).toMatch(/\.lp-chips\s*\{\s*flex-wrap:\s*wrap/);
   });
 
   it("toolbar buttons stay on one compact row", () => {
@@ -44,8 +44,8 @@ describe("compact page tops under 640px (Sprint 34 B)", () => {
     expect(globals).toMatch(/\.lx-head-actions\s*\{[^}]*flex-wrap:\s*nowrap/);
   });
 
-  it("the non-search toolbar controls sit on one nowrap row under 640px, with an icon and a short label", () => {
-    expect(listPage).toMatch(/\.lp-toolbar-actions\s*\{[^}]*display:\s*flex;[^}]*flex-wrap:\s*nowrap[^}]*overflow-x:\s*auto/);
+  it("the non-search toolbar controls wrap onto a second row under 640px, with an icon and a short label", () => {
+    expect(listPage).toMatch(/\.lp-toolbar-actions\s*\{[^}]*display:\s*flex;[^}]*flex-wrap:\s*wrap/);
     expect(listPage).toMatch(/\.lp-label-long\s*\{\s*display:\s*none/);
     expect(listPage).toMatch(/\.lp-label-short\s*\{\s*display:\s*inline/);
   });

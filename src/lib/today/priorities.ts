@@ -1,3 +1,4 @@
+import { NEXT_STEP } from "@/lib/ui/words";
 import type { CalendarRow } from "@/lib/matters/calendar-rows";
 import type { StalledMatter } from "@/lib/matters/docket-summary";
 import { formatCivilDate } from "@/lib/matters/ip-fields";
@@ -32,7 +33,7 @@ export function buildPriorities(input: PriorityInput, limit = 5): Priority[] {
   input.deadlines.slice(0, 6).forEach((d, i) => {
     const soon = d.overdueDays > 0 || Date.parse(`${d.dueDate}T00:00:00Z`) - input.now.getTime() <= 14 * DAY;
     if (!soon) return;
-    const where = d.source === "task" ? "Task" : d.detail;
+    const where = d.source === "task" ? NEXT_STEP : d.detail;
     pool.push({
       key: `d-${d.key}`,
       href: d.href,

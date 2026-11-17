@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getScopedClient } from "@/lib/db/scoped-client";
-import { moneyFor } from "@/lib/quotes/staff-money";
+import { formatCents } from "@/lib/quotes/money";
 import { PURPOSE_LABEL, checkManualPayment, type ManualPaymentInput } from "./manual";
 import type { PaymentAccountKind, PaymentPurpose, PaymentStatus } from "./types";
 import { stopSequencesForQuote } from "@/lib/campaigns/stop";
@@ -81,7 +81,7 @@ export async function recordManualPayment(input: ManualPaymentInput & { quoteId:
   }
 
   // Best effort: the audit trail and the timeline.
-  const summary = `${moneyFor(p.amountCents, quote.currency || "USD")} recorded by hand — ${PURPOSE_LABEL[p.purpose].toLowerCase()}, into the ${p.accountKind} account.${p.note ? ` Note: ${p.note}` : ""}`;
+  const summary = `${formatCents(p.amountCents, quote.currency || "USD")} recorded by hand — ${PURPOSE_LABEL[p.purpose].toLowerCase()}, into the ${p.accountKind} account.${p.note ? ` Note: ${p.note}` : ""}`;
   const payload = {
     quote_id: quote.id,
     provider: "manual",

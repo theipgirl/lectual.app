@@ -46,7 +46,7 @@ describe("F10/P2: Withdraw in a More menu with a confirm", () => {
   it("Withdraw is a menu with a confirm, not a main button", () => {
     const html = life({ status: "sent", clientUrl: URL_ });
     // The menu is the shared "More"; the confirm stays closed until an item is chosen.
-    expect(html).toContain(">More<");
+    expect(html).toContain('data-more-items="withdraw"');
     expect(html).not.toContain("Withdraw this version?");
   });
   it("the menu is the shared More menu (Esc / outside click) and the confirm has an explicit Cancel", () => {

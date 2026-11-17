@@ -853,7 +853,7 @@ export const MERGE_FIELD_LABELS = {
   referral_source: "Source",
   referral_detail: "Source detail",
   practice_area: "Practice area",
-  assigned_to: "Assigned to",
+  assigned_to: OWNER_COLUMN,
   temperature: "Suggested temperature",
   lane: "Temperature",
 } as const;
@@ -864,7 +864,7 @@ export const MERGE_STAYS_HEADING = "Stays on the merged lead, shown on the kept 
 export const MERGE_COUNT_UNAVAILABLE = "Couldn't load";
 export const MERGE_COUNTS_NOTE = "Counts are for the lead being merged. Tags are added to the kept lead's tags. A campaign the kept lead is already in is stopped on the merged lead instead of moved.";
 export const MERGE_COUNT_LABELS = {
-  tasks: "Tasks",
+  tasks: NEXT_STEPS,
   time: "Time entries",
   matters: "Matters",
   meetings: "Meetings",

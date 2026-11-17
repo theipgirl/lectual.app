@@ -104,6 +104,8 @@
 }
 @media (pointer: coarse), (max-width: 640px) { .ix-cell-btn, button.ix-temp, .ix-pill-btn { min-height: 44px; } }
 
+.ix-sets > *, .ix-filters > * { flex: 0 0 auto; }
+
 .ix-subline { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .ix-subline .ix-sub { flex: 1 1 0; min-width: 3ch; }
 .ix-subline .lx-pill { flex: 0 0 auto; }

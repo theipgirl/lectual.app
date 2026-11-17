@@ -53,7 +53,7 @@ describe("Lifecycle", () => {
     expect(html).toMatch(/<a [^>]*href="https:\/\/proposals\.example\.com\/p\/tok123\/"[^>]*>\s*Open/);
     expect(html).toContain(`value="${URL_}"`);
     expect(html).toContain("Start a new version");
-    expect(html).toContain(">More<");
+    expect(html).toContain('data-more-items="withdraw"');
     expect(html).not.toMatch(/Revise|Turn on the link|Edit again/);
   });
 

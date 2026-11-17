@@ -223,7 +223,7 @@ describe("Lifecycle: Reset acceptance in More", () => {
     );
 
   it("an accepted version shows the Reset menu only when the page allows a reset", () => {
-    expect(render({ canReset: true })).toContain(">More<");
+    expect(render({ canReset: true })).toContain('data-more-items="reset"');
     expect(render({ canReset: false })).not.toContain(">More<");
     expect(render({ canReset: true, canWrite: false })).not.toContain(">More<");
   });

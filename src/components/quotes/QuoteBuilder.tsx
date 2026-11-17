@@ -339,7 +339,7 @@ export function QuoteBuilder(props: BuilderProps) {
 
       <section className="qb-card" aria-label="Quote builder">
         <header className="qb-head">
-          <h1 className="lx-h2 qb-title">{props.title}</h1>
+          <h1 className="lx-h1 qb-title">{props.title}</h1>
           <Pill tone={quotePillTone(props.status)}>{props.statusLabel}</Pill>
           {editable && (
             <button type="button" className="lx-link" onClick={() => setShowDetails((v) => !v)} aria-expanded={showDetails}>

@@ -7,6 +7,7 @@
  * The app is light-only: there is no dark theme and no prefers-color-scheme block anywhere.
  */
 :root {
+  accent-color: var(--ox);
   /* surfaces */
   --paper: #f6f0e3;
   --card: #fffdf7;
@@ -1905,6 +1906,8 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
   .lx-page-head { gap: 8px; align-items: center; }
   .lx-page-head.lx-head { align-items: stretch; gap: 2px; }
   .lx-page-head > div { min-width: 0 !important; flex: 1 1 100% !important; }
+  /* The shared header is a column here: its children keep their own height, so the sub-line is never squeezed to a sliver. */
+  .lx-page-head.lx-head > * { flex: 0 0 auto !important; }
   .lx-page-head-list .lx-label { display: none; }
   .lx-page-head .lx-sub,
   .lp-header .lp-sub {

@@ -143,13 +143,16 @@ export function stepAnchor(view: CalendarView, anchor: string, dir: -1 | 1): str
 }
 
 /** "September 2026" or "Sep 20 – 26, 2026". */
-export function viewTitle(view: CalendarView, anchor: string): string {
+export function viewTitle(view: CalendarView, anchor: string, now: Date = new Date()): string {
   if (view === "week") {
     const from = parseCivil(startOfWeek(anchor));
     const to = parseCivil(addDays(startOfWeek(anchor), 6));
     const md = (d: Date) => formatMonthDay(d.toISOString().slice(0, 10)) ?? "";
     const sameMonth = from.getUTCMonth() === to.getUTCMonth();
-    return `${md(from)} – ${sameMonth ? to.getUTCDate() : md(to)}, ${to.getUTCFullYear()}`;
+    const range = `${md(from)} – ${sameMonth ? to.getUTCDate() : md(to)}`;
+    // The year only when the week is not in this year.
+    const thisYear = now.getUTCFullYear();
+    return from.getUTCFullYear() === thisYear && to.getUTCFullYear() === thisYear ? range : `${range}, ${to.getUTCFullYear()}`;
   }
   return formatMonthYear(startOfMonth(anchor)) ?? "";
 }

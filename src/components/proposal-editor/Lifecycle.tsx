@@ -192,7 +192,7 @@ function MoreMenu({
   const label: Record<MoreMenuItem, string> = { withdraw: BUTTON_WORDS.withdraw, reset: RESET_LABEL, delete: DELETE_LABEL };
   const moreItems: MoreItem[] = items.map((item) => ({ label: label[item], onSelect: () => setConfirming(item), ...(item === "reset" ? {} : { tone: "danger" as const }) }));
   return (
-    <div className="pe-more-menu">
+    <div className="pe-more-menu" data-more-items={items.join(",")}>
       <MoreButton items={moreItems} align="left" />
       {(confirming === "withdraw" || confirming === "reset") && (
         <ActionForm key={confirming} action={confirming === "reset" ? resetAcceptanceAction : withdrawAction} className="pe-act pe-confirm">

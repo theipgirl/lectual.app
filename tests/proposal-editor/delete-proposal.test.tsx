@@ -144,7 +144,7 @@ describe("who may delete, and the More menu", () => {
     );
 
   it("an accepted proposal shows the More menu (with Delete in it) only to the owner", async () => {
-    expect(await render(true, "accepted")).toContain(">More<");
+    expect(await render(true, "accepted")).toContain('data-more-items="delete"');
     expect(await render(false, "accepted")).not.toContain(">More<");
   });
 

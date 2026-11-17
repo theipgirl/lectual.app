@@ -15,12 +15,12 @@
 .ot-hero-main.ot-only-narrow { display: none; }
 .ot-big { font-family: var(--serif); font-size: 96px; line-height: 0.9; }
 .ot-hero-text { display: flex; flex-direction: column; gap: 6px; padding-bottom: 8px; }
-.ot-hero-title { font-family: var(--serif); font-size: 30px; line-height: 1.1; }
+.ot-hero-title { font-family: var(--serif); font-size: var(--fs-6); line-height: 1.1; }
 .ot-hero-sub { color: var(--blush); font-size: var(--fs-3); margin: 0; }
 /* The deal-ready nudge is a solid cream dot (no ring) in front of the sub-line, on the deep panel; on the phone's light card it is burgundy. */
 .ot-hero-sub[data-ready="true"] { display: flex; align-items: flex-start; gap: 8px; }
 .ot-hero-sub[data-ready="true"]::before { content: ""; width: 8px; height: 8px; margin-top: 0.45em; border-radius: var(--r-pill); background: var(--cream); flex: 0 0 auto; }
-.ot-hero-message { font-family: var(--serif); font-size: 30px; line-height: 1.15; margin: 0; }
+.ot-hero-message { font-family: var(--serif); font-size: var(--fs-6); line-height: 1.15; margin: 0; }
 .ot-hero .ot-start { flex: 0 0 auto; }
 .ot-hero .ot-start:focus-visible { outline: 2px solid var(--cream); outline-offset: 2px; }
 .ot-day:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; }
@@ -84,7 +84,7 @@ a.ot-row-title:hover { text-decoration: underline; }
 
   .ot-hero { flex-direction: column; align-items: stretch; gap: 10px; padding: 18px; background: var(--card); color: var(--ink); border: 1px solid var(--line); }
   .ot-hero-main.ot-only-narrow { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
-  .ot-hero-count { font-family: var(--serif); font-size: 30px; line-height: 1; margin: 0; }
+  .ot-hero-count { font-family: var(--serif); font-size: var(--fs-6); line-height: 1; margin: 0; }
   .ot-hero-about { font-size: var(--fs-5); color: var(--muted); }
   .ot-hero-sub { color: var(--body); font-size: var(--fs-2); }
   .ot-hero-sub[data-ready="true"]::before { background: var(--ox); }
