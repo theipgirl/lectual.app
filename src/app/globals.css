@@ -954,6 +954,9 @@ select:not([multiple]):not([size]):disabled {
 .lx-lv a:focus-visible, .lx-lv button:focus-visible, .lx-lv label:has(input:focus-visible),
 .lx-view-toggle a:focus-visible, .lx-view-toggle button:focus-visible, .lx-view-toggle label:has(input:focus-visible) { outline: 2px solid var(--ox); outline-offset: 2px; }
 .vs-switch :disabled, .lx-segs :disabled, .lx-lv :disabled, .lx-view-toggle :disabled { opacity: 0.5; cursor: default; }
+/* .lx-lv (an assistant's autonomy) fills its card, and grows when it holds the "change autonomy?" question instead of its options. */
+.lx-lv { display: flex; height: auto; min-height: var(--ctl-h); }
+.lx-lv:has(> [role="alert"]) { border-radius: var(--r-md); padding: 6px 10px; }
 /* ── page tabs: one strip, the chosen tab underlined in burgundy ─────────────────────────────────── */
 .lx-tabs { display: flex; gap: 24px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
 .lx-tabs a, .lx-tabs button, .lx-tabs [role="tab"] {
@@ -1031,7 +1034,7 @@ select:not([multiple]):not([size]):disabled {
 
 /* ── leads ────────────────────────────────────────────────────────── */
 /* ── filter chip (one look: list-page Chip and .lx-chips links) ─────────────────────────────────── */
-.lp-chips, .lx-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.lp-chips, .lx-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; flex-shrink: 0; } /* never squeezed by a height-bound page column (the phone chip strip scrolls, so it would shrink to nothing) */
 .lp-chip, .lx-chips a {
   height: var(--ctl-h);
   padding: 0 14px;
@@ -1231,6 +1234,9 @@ select:not([multiple]):not([size]):disabled {
 .lx-board-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 24px; }
 .lx-board-menu { width: 28px; height: 28px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--muted); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .lx-board-menu:hover { background: var(--well); color: var(--ink); }
+/* The card's title link covers the whole card (.lx-rowlink::after); the menu and the foot's own links and buttons sit above it. */
+.lx-board-menu,
+.lx-board-card-foot :is(a, button, select, label) { position: relative; z-index: 1; }
 .lx-board-move { position: relative; z-index: 1; }
 .lx-board-move select { min-width: 0; width: 100%; font-size: var(--fs-1); height: 30px; }
 
