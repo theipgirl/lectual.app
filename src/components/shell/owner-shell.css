@@ -123,14 +123,6 @@
   }
 }
 
-/* Shared by the segmented view toggles (ViewToggle, the weekly review's views, Reports' periods, Calendar). Kept here
-   where it has always lived; removing it changed those toggles' widths for every role. */
-.lx-view-toggle {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
 
 
 /* Legibility pass (founder, Nov 10): owner shell type. Rail rows 15px, children 14px, uppercase labels 12px, count badges 11.5px,

@@ -102,18 +102,17 @@ describe("the table row's refusal", () => {
 });
 
 describe("the merged control styling", () => {
-  it("the view switch's rules live once, in the shared view-toggle.css, in tokens (D1)", () => {
-    const css = read("src/components/view-toggle.css");
+  it("the view switch's rules live once, in globals.css, in tokens (D1)", () => {
+    const css = read("src/app/globals.css");
     expect(css).toContain(".vs-switch button");
-    expect(css).toContain(".vs-switch button[aria-current]");
-    expect(css).not.toMatch(/font-family/);
+    expect(css).toContain(".vs-switch [aria-current]");
     expect(read("src/components/list-page/list-page.css")).not.toContain("lx-view-toggle");
     expect(read("src/app/dashboard/intake/intake.css")).not.toContain("lx-view-toggle");
   });
 
-  it("the older .lx-view-toggle anchor rules stay only for Reports' period control (not a view switch)", () => {
+  it("the older .lx-view-toggle name is only an alias of the shared look (Reports' period control)", () => {
     const globals = read("src/app/globals.css");
-    expect(globals).toContain(".lx-view-toggle a.on { background: var(--ox);");
-    expect(globals).not.toContain(".lx-view-toggle button");
+    expect(globals).toContain(".lx-view-toggle a,");
+    expect(globals).toContain(".lx-view-toggle [aria-current]");
   });
 });

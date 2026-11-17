@@ -14,9 +14,6 @@
   --lp-meta: var(--fs-1);
   --lp-gap: 12px;
   --lp-radius: var(--r-md);
-  --lp-tint: var(--tint-ox);
-  --lp-warn-tint: var(--tint-warn);
-  --lp-risk-tint: var(--tint-wine);
   display: flex;
   flex-direction: column;
   gap: var(--lp-gap);
@@ -45,9 +42,8 @@
 .lp-toolbar-actions { display: contents; }
 .lp-btn-icon, .lp-label-short { display: none; }
 .lp-search { display: flex; align-items: center; gap: 6px; flex: 0 1 380px; min-width: 220px; }
-.lp-search .lx-input { flex: 1; min-width: 0; height: var(--ctl-h); }
+.lp-search .lx-input { flex: 1; min-width: 0; }
 /* Same look and height as .lx-btn .lx-btn-sec / .lx-btn-pri: ONE button style, 38px at the top of a page. */
-.lp-search-submit,
 .lp-btn {
   height: var(--ctl-h);
   padding: 0 16px;
@@ -65,7 +61,6 @@
   white-space: nowrap;
   text-decoration: none;
 }
-.lp-search-submit:hover,
 .lp-btn:hover { background: var(--well); color: var(--ink); text-decoration: none; }
 .lp-btn-primary,
 .lp-btn.lp-btn-primary { background: var(--ox); border-color: transparent; color: var(--cream); font-weight: 500; }
@@ -85,27 +80,7 @@
 }
 .lp-clear:hover { text-decoration: underline; }
 
-/* ---- filter chips ---- */
-.lp-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
-.lp-chip {
-  height: var(--ctl-h);
-  padding: 0 14px;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: var(--card);
-  color: var(--body);
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font: inherit;
-  font-size: var(--fs-2);
-  cursor: pointer;
-  white-space: nowrap;
-  text-decoration: none;
-}
-.lp-chip:hover { color: var(--ink); text-decoration: none; }
-.lp-chip-on { border-color: var(--ox); background: var(--lp-tint); color: var(--ox); font-weight: 500; }
-.lp-chip-count { font-family: var(--sans); font-variant-numeric: tabular-nums; font-size: var(--fs-1); opacity: 0.8; }
+/* ---- filter chips: the look lives in globals.css (.lp-chip, .lx-chips) ---- */
 .lp-chips-end { margin-left: auto; }
 .lp-link-button {
   border: 0;
@@ -153,7 +128,7 @@
   text-decoration: none;
 }
 .lp-pop-item:hover { background: var(--well); text-decoration: none; }
-.lp-pop-item-on { background: var(--lp-tint); color: var(--ox); }
+.lp-pop-item-on { background: var(--tint-ox); color: var(--ox); }
 .lp-pop-item-muted { color: var(--muted); }
 .lp-pop-dot { width: 6px; height: 6px; border-radius: 999px; flex: 0 0 auto; border: 1px solid var(--line); }
 .lp-pop-item-on .lp-pop-dot { background: var(--ox); border: 0; }
@@ -168,7 +143,7 @@
   margin: 0;
   padding: 8px 12px;
   border-radius: 8px;
-  background: var(--lp-warn-tint);
+  background: var(--tint-warn);
   color: var(--body);
   font-size: var(--fs-1);
 }
@@ -219,40 +194,9 @@
   justify-items: center;
 }
 
-/* ---- pills ---- */
-.lp-pill {
-  display: inline-block;
-  max-width: 100%;
-  padding: 3px 8px;
-  border-radius: 5px;
-  background: var(--well);
-  color: var(--body);
-  font-family: var(--sans);
-  font-size: var(--lp-meta, var(--fs-1));
-  line-height: 1.4;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-/* A stage name is a name: it wraps instead of being cut off (Leads table and cards, Matters). */
-/* A days-in-stage pill is a count: tabular digits, never a monospace face. */
-.lp-pill-num { font-family: var(--sans); font-variant-numeric: tabular-nums; }
-.lp-pill-wrap { white-space: normal; overflow: visible; text-overflow: clip; }
-.lp-pill-warn { background: var(--lp-warn-tint); color: var(--warn); }
-.lp-pill-risk { background: var(--lp-risk-tint); color: var(--wine); }
+/* ---- pills: the one look and tones live in globals.css (.lx-pill, .lp-pill) ---- */
 
-/* ---- board cards ---- */
-.lp-board-card {
-  position: relative;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--lp-radius);
-  padding: 11px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: var(--fs-1);
-}
+/* ---- board cards: .lx-board-card in globals.css ---- */
 
 @media (max-width: 640px) {
   .lp-search { flex-basis: 100%; }

@@ -135,11 +135,11 @@ describe("Weekly review page", () => {
     expect(html).toContain("only next steps assigned to you are listed.");
   });
 
-  it("view switch is exactly Board, Sheet, Cards", async () => {
+  it("view switch is exactly Board, List, Cards", async () => {
     mock(ok());
     const html = await render();
     const nav = html.slice(html.indexOf('aria-label="View"'), html.indexOf("</nav>", html.indexOf('aria-label="View"')));
-    expect([...nav.matchAll(/>([A-Za-z ]+)<\/a>/g)].map((m) => m[1])).toEqual(["Board", "Sheet", "Cards"]);
+    expect([...nav.matchAll(/>([A-Za-z ]+)<\/a>/g)].map((m) => m[1])).toEqual(["Board", "List", "Cards"]);
     expect(nav).toContain("view=sheet");
     expect(nav).toContain("view=cards");
     expect(html).not.toContain("view=meeting");
@@ -161,7 +161,7 @@ describe("Weekly review page", () => {
     const contract = row({ key: "k", client: "Contract Co", matterType: "BL", stageLabel: "Drafting", stageOrder: 100_001, waiting: "client", lastOutbound: "2026-10-28", source: "Referral" });
     mock(ok({ rows: [...rows, contract] }));
     const html = await render({ view: "sheet" });
-    expect(html).toMatch(/aria-current="page" href="[^"]*">Sheet/);
+    expect(html).toMatch(/aria-current="page" href="[^"]*">List/);
     expect(html.indexOf("Trademarks")).toBeGreaterThan(-1);
     expect(html.indexOf("Trademarks")).toBeLessThan(html.indexOf("Contracts"));
     expect(html.indexOf("Lapsed Co")).toBeLessThan(html.indexOf("Contracts"));

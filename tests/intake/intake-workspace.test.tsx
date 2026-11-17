@@ -217,7 +217,7 @@ describe("the page header and toolbar (shared list-page components)", () => {
   });
 
   it("marks the current view on the controlled toggle", () => {
-    expect(head).toMatch(/<button type="button" aria-current="true">Table<\/button>/);
+    expect(head).toMatch(/<button type="button" aria-current="true">List<\/button>/);
     expect(head).toMatch(/<button type="button">Board<\/button>/);
     const board = render(THREE, { view: "board" });
     expect(board).toMatch(/<button type="button" aria-current="true">Board<\/button>/);

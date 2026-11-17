@@ -1,10 +1,8 @@
-/** "just now", "3 min ago", "2 h ago", "4 days ago", else a short date. */
-export function relativeTime(iso: string | null, now = Date.now()): string {
+import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
+import { formatRelative } from "@/lib/ui/dates";
+
+/** "just now", "3 min ago", "2 h ago", "4 days ago", else a short date ("Nov 16"). Callers that know the firm's zone pass it. */
+export function relativeTime(iso: string | null, now = Date.now(), tz: string = DEFAULT_TIME_ZONE): string {
   if (!iso) return "never";
-  const s = Math.round((now - new Date(iso).getTime()) / 1000);
-  if (s < 60) return "just now";
-  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
-  if (s < 86400 * 14) return `${Math.floor(s / 86400)} day${s < 86400 * 2 ? "" : "s"} ago`;
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return formatRelative(iso, { tz, now: new Date(now) }) ?? "never";
 }

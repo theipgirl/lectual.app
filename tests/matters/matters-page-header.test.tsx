@@ -42,36 +42,37 @@ describe("Matters page header", () => {
     mockLoaders();
   });
 
-  it("labels the toggle Table and Board, never List, inside the page-head", async () => {
+  it("labels the toggle Board and List (Board first, never Table), inside the page-head", async () => {
     const head = pageHead(await render());
     expect(head).toContain("vs-switch");
-    expect(anchor(head, "Table")).not.toBe("");
+    expect(anchor(head, "List")).not.toBe("");
     expect(anchor(head, "Board")).not.toBe("");
-    expect(head).not.toContain(">List<");
+    expect(head).not.toContain(">Table<");
+    expect(head.indexOf(">Board<")).toBeLessThan(head.indexOf(">List<"));
   });
 
   it("links the table to no view param and the board to ?view=board", async () => {
     const head = pageHead(await render());
-    expect(anchor(head, "Table")).toMatch(/href="\/dashboard\/matters\/?"/);
-    expect(anchor(head, "Table")).not.toContain("view=");
+    expect(anchor(head, "List")).toMatch(/href="\/dashboard\/matters\/?"/);
+    expect(anchor(head, "List")).not.toContain("view=");
     expect(anchor(head, "Board")).toMatch(/href="\/dashboard\/matters\/?\?view=board"/);
   });
 
   it("marks the table current by default and the board when ?view=board", async () => {
     const table = pageHead(await render());
-    expect(anchor(table, "Table")).toContain('aria-current="page"');
+    expect(anchor(table, "List")).toContain('aria-current="page"');
     expect(anchor(table, "Board")).not.toContain("aria-current");
 
     const board = pageHead(await render({ view: "board" }));
     expect(anchor(board, "Board")).toContain('aria-current="page"');
-    expect(anchor(board, "Table")).not.toContain("aria-current");
+    expect(anchor(board, "List")).not.toContain("aria-current");
   });
 
   it("keeps the segment and the search term when switching view", async () => {
     const head = pageHead(await render({ seg: "court", q: "acme" }));
-    expect(anchor(head, "Table")).toMatch(/href="[^"]*seg=court/);
-    expect(anchor(head, "Table")).toMatch(/q=acme/);
-    expect(anchor(head, "Table")).not.toContain("view=");
+    expect(anchor(head, "List")).toMatch(/href="[^"]*seg=court/);
+    expect(anchor(head, "List")).toMatch(/q=acme/);
+    expect(anchor(head, "List")).not.toContain("view=");
     expect(anchor(head, "Board")).toMatch(/seg=court/);
     expect(anchor(head, "Board")).toMatch(/q=acme/);
     expect(anchor(head, "Board")).toContain("view=board");

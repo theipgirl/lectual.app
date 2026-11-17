@@ -185,7 +185,11 @@ describe("list-page.css", () => {
   it("gives one row height, pill and spacing to both pages", () => {
     expect(css).toContain("--lp-row-h: 46px");
     expect(css).toMatch(/\.lp-row \{ min-height: var\(--lp-row-h\)/);
-    expect(css).toContain(".lp-pill {");
-    expect(css).toContain(".lp-board-card {");
+    // The pill and the board card are one look, defined once in globals.css (the list-page aliases `.lp-pill` / `.lp-board-card` share it).
+    const globals = readFileSync("src/app/globals.css", "utf8");
+    expect(globals).toContain(".lp-pill {");
+    expect(globals).toContain(".lp-board-card {");
+    expect(css).not.toContain(".lp-pill {");
+    expect(css).not.toContain(".lp-board-card {");
   });
 });

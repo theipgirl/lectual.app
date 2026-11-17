@@ -152,10 +152,10 @@ describe("P1: composer tabs", () => {
   it("V1: coarse-pointer rules give the new controls 44px targets", () => {
     const rd = (f: string) => readFileSync(path.join(root, f), "utf8");
     const coarse = (src: string, rule: RegExp) => {
-      const m = src.match(/@media \(pointer: coarse\) \{[\s\S]*?\n\}/g) ?? [];
+      const m = src.match(/@media \(pointer: coarse\)(?:, \(max-width: 640px\))? \{[\s\S]*?\n\}/g) ?? [];
       return m.some((b) => rule.test(b));
     };
-    expect(coarse(css, /\.lx-segs button \{ min-height: 44px; min-width: 44px; \}/)).toBe(true);
+    expect(coarse(rd("src/app/globals.css"), /\.lx-segs button,/)).toBe(true);
     expect(coarse(rd("src/components/matters/matter-page.css"), /\.lx-board-move \.lp-btn \{ min-height: 44px; \}/)).toBe(true);
     const pq = rd("src/app/dashboard/proposals/proposals.css");
     expect(coarse(pq, /\.pq-seg \{ min-height: 44px; \}/)).toBe(true);

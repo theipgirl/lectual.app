@@ -18,9 +18,10 @@ describe("ViewToggle, link mode", () => {
   const anchor = (markup: string, label: string) => markup.match(new RegExp(`<a [^>]*>${label}</a>`))?.[0] ?? "";
   const html = renderToStaticMarkup(<ViewToggle value="board" hrefFor={hrefFor} />);
 
-  it("renders two anchors labelled Table and Board, with the hrefs the builder returns", () => {
+  it("renders two anchors labelled Board and List, Board first, with the hrefs the builder returns", () => {
     expect(html.match(/<a /g)).toHaveLength(2);
-    expect(anchor(html, "Table")).toContain('href="/x"');
+    expect(anchor(html, "List")).toContain('href="/x"');
+    expect(html.indexOf(">Board<")).toBeLessThan(html.indexOf(">List<"));
     expect(anchor(html, "Board")).toContain('href="/x?view=board"');
     expect(html).not.toContain("<button");
   });
@@ -28,7 +29,7 @@ describe("ViewToggle, link mode", () => {
   it("marks the current one, and only that one, with aria-current=page", () => {
     expect(html.match(/aria-current="page"/g)).toHaveLength(1);
     expect(anchor(html, "Board")).toContain('aria-current="page"');
-    expect(anchor(html, "Table")).not.toContain("aria-current");
+    expect(anchor(html, "List")).not.toContain("aria-current");
   });
 
   it("sits in a labelled nav of the one shared pill", () => {
@@ -37,13 +38,13 @@ describe("ViewToggle, link mode", () => {
 
   it("takes any options and a label: Weekly review's three, the deck's own hrefs, and the calendar's two", () => {
     const three = renderToStaticMarkup(
-      <ViewToggle value="sheet" label="Deck view" views={[{ value: "board", label: "Board" }, { value: "sheet", label: "Sheet", href: "/own" }, { value: "cards", label: "Cards" }]} hrefFor={(v) => `/r?view=${v}`} />,
+      <ViewToggle value="sheet" label="Deck view" views={[{ value: "board", label: "Board" }, { value: "sheet", label: "List", href: "/own" }, { value: "cards", label: "Cards" }]} hrefFor={(v) => `/r?view=${v}`} />,
     );
     expect(three.match(/<a /g)).toHaveLength(3);
     expect(three).toContain('aria-label="Deck view"');
     expect(three).toContain('href="/own"');
     expect(three).toContain('href="/r?view=cards"');
-    expect(anchor(three, "Sheet")).toContain('aria-current="page"');
+    expect(anchor(three, "List")).toContain('aria-current="page"');
   });
 });
 
@@ -51,7 +52,7 @@ describe("ViewToggle, controlled mode", () => {
   it("renders two buttons whose aria-current matches the value, inside the same pill", () => {
     const html = renderToStaticMarkup(<ViewToggle value="board" onChange={() => {}} />);
     expect(html).toMatch(/^<div class="vs-switch" role="group" aria-label="View"/);
-    expect(html).toMatch(/<button type="button">Table<\/button>/);
+    expect(html).toMatch(/<button type="button">List<\/button>/);
     expect(html).toMatch(/<button type="button" aria-current="true">Board<\/button>/);
     expect(html).not.toContain("<a ");
   });
@@ -66,7 +67,7 @@ describe("ViewToggle, controlled mode", () => {
     };
     click("Board");
     expect(onChange).toHaveBeenLastCalledWith("board");
-    click("Table");
+    click("List");
     expect(onChange).toHaveBeenLastCalledWith("table");
   });
 });

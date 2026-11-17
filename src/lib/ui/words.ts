@@ -5,6 +5,11 @@ import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 // URLs, slugs, data-tour tokens, anchors, DB values and agent ids keep their old names;
 // only the words a person reads change.
 
+/** The names of the views every pick-one switch uses (Board first; the table / sheet view is always "List"). */
+export const VIEW_BOARD = "Board";
+export const VIEW_LIST = "List";
+export const VIEW_CARDS = "Cards";
+
 /** Ask questions of the firm's own data (the floating button and the page). */
 export const COPILOT_NAME = "Copilot";
 /** The background helpers that read, summarise and draft (was "Agents"). */
@@ -22,16 +27,44 @@ export const APPROVALS_NAME = "Approvals";
 /** The one page that replaces the Monday spreadsheet walk-through. */
 export const REVIEW_NAME = "Weekly review";
 /** The Weekly review's three views. */
-export const REVIEW_BOARD_VIEW = "Board";
-export const REVIEW_SHEET_VIEW = "Sheet";
+export const REVIEW_BOARD_VIEW = VIEW_BOARD;
+export const REVIEW_SHEET_VIEW = VIEW_LIST;
 /** The Weekly review view that deals one person's records as cue cards. */
-export const REVIEW_CARDS_VIEW = "Cards";
+export const REVIEW_CARDS_VIEW = VIEW_CARDS;
 /** The section where new work arrives: the page, tab title, rail group, phone bar and More sheet (Nov 12: was "Leads"). */
 export const INTAKE_NAME = "Intake";
 /** The rail's list row under Intake: the people who have asked about work. */
 export const INTAKE_LEADS_ROW = "Leads";
 /** Matters whose next step is the firm's (was "Our move"). */
 export const OUR_TURN = "Our turn";
+/** Column and field words shared by every list (Owner, Last contact, Next step). */
+export const OWNER_COLUMN = "Owner";
+export const LAST_CONTACT = "Last contact";
+export function lastContactAgo(days: number): string {
+  return days <= 0 ? "Last contact today" : `Last contact ${days} ${days === 1 ? "day" : "days"} ago`;
+}
+export const NEXT_STEP = "Next step";
+export const NEXT_STEPS = "Next steps";
+export const ADD_NEXT_STEP = "Add a next step";
+/** Buttons and short states, said once. */
+export const ADD_A_LEAD = "Add a lead";
+export const addLeadFor = (name: string) => `Add a lead for ${name}`;
+export const ADD_TO_TIMELINE = "Add to timeline";
+export const DELETE = "Delete";
+export const SAVING = "Saving…";
+export const LOADING = "Loading…";
+export const SAVED = "Saved.";
+export const CANCEL = "Cancel";
+export const yesVerb = (verb: string) => `Yes, ${verb.trim().toLowerCase()}`;
+/** Blank cell, no owner, a person the directory doesn't know. */
+export const BLANK = "—";
+export const UNASSIGNED = "Unassigned";
+export const TEAMMATE = "Teammate";
+export const SHOW_MORE = "Show more";
+/** A search box's placeholder. */
+export const searchPlaceholder = (what: string) => `Search ${what}`;
+/** "Showing 40 of 112" (re-exported by lib/ui/format.ts). */
+export const showingOf = (shown: number, total: number): string => "Showing " + shown + " of " + total;
 /** Hot, warm or cold (was "lane"). */
 export const TEMPERATURE_NAME = "Temperature";
 /** No hot/warm/cold level set or suggested (was "Not routed"). */
@@ -197,9 +230,9 @@ export const DECK_TITLE = "Needs you";
 export const dealHeader = (label: string) => `Today's deal · ${label}`;
 export const nextDealHeader = (label: string) => `Next deal · ${label}`;
 export const DECK_DEALT_NOW = "Dealt just now";
-export const DECK_VIEW_CARDS = "Cards";
-export const DECK_VIEW_LIST = "List";
-export const DECK_VIEW_BOARD = "Board";
+export const DECK_VIEW_CARDS = VIEW_CARDS;
+export const DECK_VIEW_LIST = VIEW_LIST;
+export const DECK_VIEW_BOARD = VIEW_BOARD;
 export const DECK_DEAL_NOW = "Deal them now";
 export const deckLaterArrivals = (n: number, label: string) => `${n} more at ${label}`;
 export const deckAllDecided = (label: string) => `All decided. Next deal ${label}.`;
@@ -313,7 +346,7 @@ export const DECK_FIRST_STEP = "First step:";
 export const DECK_REVIEW_HEAD = "Open to review.";
 export const DECK_REJECT_EYEBROW = "Reject this draft";
 export const DECK_REJECT_HELP = "The note is kept with the item. Nothing is sent.";
-export const DECK_CANCEL = "Cancel";
+export const DECK_CANCEL = CANCEL;
 export const DECK_REJECT_DRAFT = "Reject draft";
 export const DECK_HAND_EYEBROW = "Hand off";
 export const DECK_HAND_WHY = "Anything client-facing comes back to an approver for the yes.";
@@ -472,15 +505,15 @@ export const SHEET_MOVE_TO_STAGE = "Move to stage";
 export const sheetMoveLogged = (firstName: string) => `The move is logged on ${firstName}'s timeline.`;
 export const SHEET_FIND_PERSON = "Find a person";
 export const SHEET_NO_ONE_FOUND = "No one matches.";
-export const SHEET_NEXT_STEP = "Next step";
+export const SHEET_NEXT_STEP = NEXT_STEP;
 export const SHEET_DUE = "Due";
 export const SHEET_ENTER_ESC = "Enter to save · Esc to cancel";
 export const SHEET_NOTE_BUTTON = "+ Note";
 export const sheetNoteFor = (client: string) => `Add a note for ${client}`;
 export const SHEET_WHAT_HAPPENED = "What happened?";
 export const sheetNoteHint = (firstName: string) => `Goes on ${firstName}'s timeline as a note and counts as last contact.`;
-export const SHEET_ADD_NOTE = "Add note";
-export const SHEET_CANCEL = "Cancel";
+export const SHEET_ADD_NOTE = ADD_TO_TIMELINE;
+export const SHEET_CANCEL = CANCEL;
 export const SHEET_NO_SOURCE = "No source";
 export const SHEET_SOURCE_LABEL = "Source";
 export const SHEET_OVERDUE = "(overdue)";
@@ -685,7 +718,7 @@ export const welcomeCardOf = (n: number, total: number) => `Card ${n} of ${total
 export const LEADS_SELECT = "Select";
 export const LEADS_SELECT_DONE = "Done selecting";
 export const LEADS_SHOW_MORE = (step: number, left: number) => `Show ${step} more (${left} left)`;
-export const LEADS_SHOWING = (shown: number, total: number) => "Showing " + shown + " of " + total;
+export const LEADS_SHOWING = showingOf;
 export const LEADS_STAGE_FILTER = "Stage";
 export const LEADS_ANY_STAGE = "Every stage";
 export const LEADS_SUGGESTIONS = "Suggestions";
@@ -710,7 +743,7 @@ export const LEADS_ASSISTANT_COLUMN = "Assistant activity";
 export const LEADS_ASSISTANT_SUGGESTS_LTN = "Suggests Long-Term Nurture";
 export const LEADS_ASSISTANT_SUGGESTS_LTN_TITLE = "Unbooked by day 10. Moving the lead is your call; nothing changes by itself.";
 /** The one column that says whose turn it is. Sorted newest first. */
-export const LEADS_CONTACT_COLUMN = "Last contact";
+export const LEADS_CONTACT_COLUMN = LAST_CONTACT;
 export const LEADS_TOUCH_OUR_TURN = (date: string) => `${OUR_TURN} · ${date}`;
 export const LEADS_TOUCH_WAITING_ON_THEM = (date: string) => `Waiting on them · ${date}`;
 export const LEADS_TOUCH_NO_CONTACT = "No contact yet";

@@ -8,7 +8,6 @@ describe.each([
   "src/components/today/owner/owner-today.css",
   "src/components/shell/account-menu.css",
   "src/app/dashboard/intake/leads.css",
-  "src/components/view-toggle.css",
   "src/app/globals.css",
 ])("%s", (file) => {
   const css = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");

@@ -1,0 +1,86 @@
+import Link from "next/link";
+import type { PillTone } from "@/lib/ui/tones";
+
+/**
+ * One board column and one board card, in the Weekly review card's look: a bold name, one quiet line under it, the next step or key
+ * fact, and a due or age chip. A tone edge says why the card is there. Server-safe, no hooks.
+ *
+ * No button on every card: a move is the page's drag, or a small "⋯" `menu` the page passes in. A decision that already sits on a card
+ * (Done, Open) goes in `foot` as text.
+ */
+export function BoardColumn({
+  title,
+  titleHref,
+  count,
+  note,
+  empty,
+  ariaLabel,
+  children,
+  ...rest
+}: {
+  title: string;
+  titleHref?: string;
+  count: React.ReactNode;
+  note?: React.ReactNode;
+  empty?: string;
+  ariaLabel?: string;
+  children?: React.ReactNode;
+} & Omit<React.HTMLAttributes<HTMLElement>, "title">) {
+  return (
+    <section className="lx-board-col" aria-label={ariaLabel ?? title} {...rest}>
+      <header>
+        <span className="lx-board-title">{titleHref ? <Link href={titleHref}>{title}</Link> : title}</span>
+        <span className="lx-board-count">{count}</span>
+      </header>
+      {note}
+      {children ? <ul className="lx-board-cards">{children}</ul> : empty ? <p className="lx-board-empty">{empty}</p> : null}
+    </section>
+  );
+}
+
+export function BoardCard({
+  href,
+  title,
+  meta,
+  step,
+  chip,
+  menu,
+  foot,
+  tone,
+  id,
+  children,
+  ...rest
+}: {
+  href: string;
+  title: string;
+  meta?: React.ReactNode;
+  step?: React.ReactNode;
+  chip?: React.ReactNode;
+  menu?: React.ReactNode;
+  foot?: React.ReactNode;
+  tone?: PillTone;
+  id?: string;
+  children?: React.ReactNode;
+} & Omit<React.LiHTMLAttributes<HTMLLIElement>, "title">) {
+  return (
+    <li className="lx-board-card" data-tone={tone} id={id} {...rest}>
+      <div className="lx-board-card-top">
+        <span className="lx-board-card-title">
+          <Link href={href} className="lx-rowlink">
+            {title}
+          </Link>
+        </span>
+        {chip}
+      </div>
+      {meta ? <div className="lx-board-card-meta">{meta}</div> : null}
+      {step ? <div className="lx-board-card-step">{step}</div> : null}
+      {children}
+      {foot || menu ? (
+        <div className="lx-board-card-foot">
+          <span>{foot}</span>
+          {menu}
+        </div>
+      ) : null}
+    </li>
+  );
+}
