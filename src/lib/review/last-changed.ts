@@ -1,3 +1,4 @@
+import { AGENT_ACTOR } from "@/lib/stage-keeper/moves";
 import { civilDateIn } from "./build";
 import { shortDate } from "./format";
 import {
@@ -35,8 +36,7 @@ export const CHANGE_TYPES = [
 /** The columns the read selects (ids and the two stamp fields; no other payload key). */
 export const CHANGE_SELECT = "lead_id, matter_id, type, actor_type, actor_id, created_at, actor:payload->>actor, source:payload->>source";
 
-/** The Stage Keeper's stamp (`AGENT_ACTOR`, src/lib/stage-keeper/moves.ts) and the hired-matter sync's. */
-const STAGE_KEEPER_STAMP = "agent:stage-keeper";
+/** The hired-matter sync's stamp (the Stage Keeper's is `AGENT_ACTOR`, defined once in src/lib/stage-keeper/moves.ts). */
 const LAWMATICS_SYNC_STAMP = "lawmatics-sync";
 /** `payload.source` values the importers write on a record they created. */
 const IMPORT_SOURCES = ["lawmatics_import", "sheet_import", "import"];
@@ -72,7 +72,7 @@ function ms(iso: string): number {
 
 /** Who a change row is credited to. A stamp beats the actor type. */
 export function actorOf(row: Pick<ChangeRowIn, "type" | "actor_type" | "actor_id" | "actor" | "source">): ChangeActor {
-  if (row.actor === STAGE_KEEPER_STAMP) return { kind: "stage-keeper" };
+  if (row.actor === AGENT_ACTOR) return { kind: "stage-keeper" };
   if (row.actor === LAWMATICS_SYNC_STAMP || row.source === LAWMATICS_SYNC_STAMP) return { kind: "lawmatics-sync" };
   if (row.actor_type === "system" && CREATION_TYPES.includes(row.type) && row.source && IMPORT_SOURCES.includes(row.source)) return { kind: "import" };
   switch (row.actor_type) {
