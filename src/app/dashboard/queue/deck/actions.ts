@@ -21,7 +21,9 @@ import {
   DECK_MARKED_READ,
   DECK_NOT_YOURS,
   DECK_PICK_PERSON,
+  DECK_DONE_MESSAGE,
   DECK_REJECTED,
+  DONE_NOTE,
   DECK_REJECT_NOTE_NEEDED,
   DECK_SEND_OFF,
   DECK_SEND_RECONNECT,
@@ -120,6 +122,25 @@ export async function rejectCardAction(rawId: unknown, rawNote: unknown): Promis
   if (outcome.kind === "error") return { ok: false, error: outcome.error };
   revalidate();
   return { ok: true, message: DECK_REJECTED };
+}
+
+/**
+ * Done: the card is handled without approving. It resolves through the SAME reject path as Reject (so the routing rule
+ * and the role are re-resolved by `runQueueReview`), with the one fixed marker note. It never calls the approve core,
+ * makes no mailbox draft, changes no proposal link, generates no letter and sends nothing. Lectual staff previewing a
+ * firm are refused.
+ */
+export async function doneCardAction(rawId: unknown): Promise<DeckResult> {
+  await gate();
+  const id = cardIdOf(rawId);
+  if (!id) return { ok: false, error: DECK_FAILED };
+  const preview = await staffPreviewRefusal();
+  if (preview) return { ok: false, error: preview };
+  if (!(await cardCaller())) return { ok: false, error: "You don't have permission to approve or reject client communications." };
+  const outcome = await runQueueReview({ id, intent: "reject", note: DONE_NOTE });
+  if (outcome.kind === "error") return { ok: false, error: outcome.error };
+  revalidate();
+  return { ok: true, message: DECK_DONE_MESSAGE };
 }
 
 export async function handOffCardAction(rawId: unknown, rawTarget: unknown, rawNote: unknown): Promise<DeckResult> {

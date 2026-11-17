@@ -1,5 +1,6 @@
 import type { QueueItem } from "@/lib/queue/api";
-import { FROM_THEIR_EMAILS } from "@/lib/ui/words";
+import { DONE_OUTCOME_TEXT, FROM_THEIR_EMAILS } from "@/lib/ui/words";
+import { isDoneItem } from "@/lib/queue/done";
 import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
 import { markdownToPlainText } from "@/lib/markdown";
 
@@ -49,6 +50,11 @@ export const agentLabel = (agent: string) => AGENT_LABEL[agent] ?? agent;
 export const typeLabel = (type: string) =>
   type === "CLIENT_EMAIL" ? "Client email" : type === "BRIEFING" ? "Briefing" : type.replaceAll("_", " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
 
+/** The status pill of a queue item: Done (a reject carrying the Done marker) reads Done, never Rejected. */
+export function statusPill(item: Pick<QueueItem, "status" | "resolution_note">): { label: string; tone: string } {
+  return isDoneItem(item) ? { label: "Done", tone: "lx-pill-ok" } : STATUS_PILL[item.status];
+}
+
 export const STATUS_PILL: Record<QueueStatus, { label: string; tone: string }> = {
   pending: { label: "Waiting on you", tone: "lx-pill-warn" },
   approved: { label: "Approved", tone: "lx-pill-ok" },
@@ -59,7 +65,8 @@ export const STATUS_PILL: Record<QueueStatus, { label: string; tone: string }> =
  * What actually happened after approval. "Approved" alone made an unsent
  * message look handled, so every outcome says where the message is now.
  */
-export function outcomeText(resolved: string | undefined, send: string | undefined): { tone: "ok" | "warn" | "risk"; text: string } | null {
+export function outcomeText(resolved: string | undefined, send: string | undefined, done?: boolean): { tone: "ok" | "warn" | "risk"; text: string } | null {
+  if (resolved === "reject" && done) return { tone: "ok", text: DONE_OUTCOME_TEXT };
   if (resolved === "reject") return { tone: "risk", text: "Rejected. The note goes back to the drafting assistant — nothing was sent." };
   if (resolved !== "approve") return null;
   switch (send) {

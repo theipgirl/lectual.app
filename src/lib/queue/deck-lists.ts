@@ -1,10 +1,12 @@
 import type { QueueItem } from "@/lib/queue/api";
 import { currentHolder, decidedToday, laterUntil, type CardEvent, type CardState } from "@/lib/queue/deck";
+import { isDoneItem } from "@/lib/queue/done";
 import { mineItems } from "@/lib/queue/mine";
 import { canApproveItem, classifyQueueItem, type ApprovalRouting, type Viewer } from "@/lib/queue/routing";
 import { sameFirmDay } from "@/lib/deal/times";
 import {
   DECK_CHIP_APPROVED,
+  DECK_CHIP_DONE,
   DECK_CHIP_REJECTED,
   DECK_LIST_BACK_WITH_YOU,
   DECK_LIST_TAIL_CLIENT_EMAIL,
@@ -74,6 +76,10 @@ export function decidedRows(items: readonly QueueItem[], email: string | null, f
     if (i.status === "approved") {
       const tail = classifyQueueItem(i) === "internal_briefing" ? DECK_LIST_TAIL_INTERNAL : i.type === "CLIENT_EMAIL" ? DECK_LIST_TAIL_CLIENT_EMAIL : null;
       return { id: i.id, href: itemHref(i.id), title: i.headline, sub: deckListDecidedSub("Approved", fmt.time(at), tail), pill: DECK_CHIP_APPROVED, tone: "ok" };
+    }
+    if (isDoneItem(i)) {
+      const tail = classifyQueueItem(i) === "internal_briefing" ? DECK_LIST_TAIL_INTERNAL : null;
+      return { id: i.id, href: itemHref(i.id), title: i.headline, sub: deckListDecidedSub("Done", fmt.time(at), tail), pill: DECK_CHIP_DONE, tone: "ok" };
     }
     const note = clip(stripReceipt(i.resolution_note));
     return { id: i.id, href: itemHref(i.id), title: i.headline, sub: deckListDecidedSub("Rejected", fmt.time(at), note ? deckListQuote(note) : DECK_LIST_TAIL_NOTE_KEPT), pill: DECK_CHIP_REJECTED, tone: "crit" };

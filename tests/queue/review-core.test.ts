@@ -181,6 +181,20 @@ describe("runQueueReview: results", () => {
     expect(state.resolve).toHaveBeenCalledWith(expect.not.objectContaining({ note: expect.anything() }));
   });
 
+  it("a Done (reject with the marker) resolves with exactly that note and never approves, drafts or checks the proposal gate", async () => {
+    expect(await runQueueReview({ id: "q1", intent: "reject", note: "Done: handled without approving" })).toMatchObject({ kind: "resolved", intent: "reject" });
+    expect(state.resolve).toHaveBeenCalledWith(expect.objectContaining({ action: "reject", note: "Done: handled without approving" }));
+    expect(state.draft).not.toHaveBeenCalled();
+    expect(state.gate).not.toHaveBeenCalled();
+  });
+
+  it("a Done by someone the routing refuses is refused and resolves nothing", async () => {
+    state.item = followup();
+    state.routed = routed({ stalled_followup: U.caitlyn });
+    expect((await runQueueReview({ id: "q1", intent: "reject", note: "Done: handled without approving" })).kind).toBe("error");
+    expect(state.resolve).not.toHaveBeenCalled();
+  });
+
   it("a reject resolves with the note", async () => {
     expect(await runQueueReview({ id: "q1", intent: "reject", note: "wrong fee" })).toMatchObject({ kind: "resolved", intent: "reject" });
     expect(state.resolve).toHaveBeenCalledWith(expect.objectContaining({ action: "reject", note: "wrong fee" }));

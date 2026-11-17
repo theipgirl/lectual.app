@@ -246,6 +246,15 @@ export const DECK_REJECTED = "Rejected. The note goes back to the assistant. Not
 export const DECK_HANDED_OFF = "Handed off. It's on their cards now.";
 export const DECK_LATER_DONE = "Put off until the next deal.";
 export const DECK_SENT_BACK = "Sent back.";
+/** Done: a card handled without approving. The ONE marker note a Done resolve carries; every surface reads the outcome through it. */
+export const DONE_NOTE = "Done: handled without approving";
+export const DECK_DONE = "Done";
+export const DECK_SUB_DONE = "no approval";
+export const DECK_DONE_MESSAGE = "Done. Marked as handled. Nothing was approved or sent.";
+export const DECK_CHIP_DONE = "Done";
+export const deckDoneHolding = (seconds: number) => `Marking done in ${seconds}…`;
+export const DECK_DONE_HOLD_NOTE = "Nothing happens until the countdown ends. Done approves nothing and sends nothing.";
+export const DONE_OUTCOME_TEXT = "Done. Marked as handled without approving. Nothing was sent.";
 export const handedBy = (name: string) => `Handed to you by ${name}`;
 export const DECK_HANDED_NO_YES = "You can edit this and send it back. The yes stays with an approver.";
 export const DECK_CLOSER_LOOK = "This one needs a closer look before it can be approved.";
@@ -442,7 +451,7 @@ export const WAITING_ON_YOU_PARTIAL = "Approvals couldn't load, so only next ste
 export const deckWaiting = (age: string) => `Waiting ${age}`;
 export const deckWaitingTo = (name: string, age: string) => `Waiting to ${name} · ${age}`;
 export const deckWaitingBack = (label: string) => `Waiting back at ${label}`;
-export const deckDecidedAt = (what: "approved" | "rejected", time: string, noteKept: boolean) => `${what} ${time}${noteKept ? " · note kept" : ""}`;
+export const deckDecidedAt = (what: "approved" | "rejected" | "done", time: string, noteKept: boolean) => `${what} ${time}${noteKept ? " · note kept" : ""}`;
 export const DECK_FOR = "for";
 
 /* ── Owner view: the weekly review's editable Sheet ── */
@@ -593,7 +602,7 @@ export const deckListWith = (first: string) => `With ${first}`;
 /** The right-hand pill of a Later row: just when it comes back. Today is the bare time. */
 export const deckLaterTomorrow = (time: string) => `Tomorrow ${time}`;
 export const deckLaterOtherDay = (day: string, time: string) => `${day} ${time}`;
-export const deckListDecidedSub = (what: "Approved" | "Rejected", time: string, tail: string | null) => (tail ? `${what} ${time} · ${tail}` : `${what} ${time}`);
+export const deckListDecidedSub = (what: "Approved" | "Rejected" | "Done", time: string, tail: string | null) => (tail ? `${what} ${time} · ${tail}` : `${what} ${time}`);
 export const DECK_LIST_TAIL_CLIENT_EMAIL = "client email";
 export const DECK_LIST_TAIL_INTERNAL = "internal";
 export const DECK_LIST_TAIL_NOTE_KEPT = "note kept";
@@ -655,7 +664,7 @@ export const WELCOME_CARD_1_BODY =
   "Each card says who drafted it, who it is to, and the opening of the draft. Nothing on a card has been sent.";
 export const WELCOME_CARD_1_STEP = "when a card has a line at the bottom, it says what to check first.";
 export const WELCOME_CARD_2_TITLE = "The moves";
-export const WELCOME_CARD_2_BODY = `Yes approves after a 5-second hold you can undo. ${DECK_APPROVING_NEVER_SENDS} A client email becomes a draft in your firm's or your own mailbox, when one is connected. Nothing goes out until someone presses Send there. Reject needs a note. Later waits for your next deal; Hand off goes to a colleague. The arrows move between cards.`;
+export const WELCOME_CARD_2_BODY = `Yes approves after a 5-second hold you can undo. ${DECK_APPROVING_NEVER_SENDS} A client email becomes a draft in your firm's or your own mailbox, when one is connected. Nothing goes out until someone presses Send there. Reject needs a note. Done marks it handled without approving. Later waits for your next deal; Hand off goes to a colleague. The arrows move between cards.`;
 export const WELCOME_CARD_2_STEP = "try the arrows. They only move between cards, and nothing is stored.";
 export const WELCOME_CARD_3_TITLE = "Two deals a day";
 export const welcomeCard3Body = (first: string, second: string) =>
