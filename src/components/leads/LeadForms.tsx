@@ -168,7 +168,7 @@ export function NoteComposer({ leadId }: { leadId: string }) {
       </div>
       {kind === "email_sent" && <input className="lx-input" name="subject" placeholder="Subject" />}
       <textarea id="lx-note-body" className="lx-input" name="body" rows={3} placeholder="What happened? Use @name to tag a teammate." />
-      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={pending}>
           {pending ? SAVING : ADD_TO_TIMELINE}
         </button>

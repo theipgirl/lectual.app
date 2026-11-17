@@ -164,6 +164,9 @@ a.dk-move--open { font-size: var(--fs-3); }
 .dk-boardcard:hover { text-decoration: none; color: var(--body); }
 .dk-boardcard:hover .lx-board-card-title { text-decoration: underline; }
 .dk-boardcard:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; }
+/* An approval's headline is a sentence: it gets the card's whole width (two lines) and its chip sits on the line under it. */
+.dk-boardcard .lx-board-card-title { flex-basis: 100%; }
+.dk-boardcard .lx-board-card-top > .lx-pill { margin-left: 0; }
 
 /* Decided / Handed off lists and the side column's Later section */
 .dk-lists { gap: 16px; }
