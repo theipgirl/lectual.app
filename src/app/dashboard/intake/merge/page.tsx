@@ -5,7 +5,7 @@ import { getScopedClient } from "@/lib/db/scoped-client";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { listStages } from "@/lib/pipeline";
 import { listMemberDirectory } from "@/lib/members/directory";
-import { ListHeader, FilterChips, Chip } from "@/components/list-page";
+import { ListHeader } from "@/components/list-page";
 import { canMergeLeads } from "@/lib/leads/merge";
 import { mergeAvailable } from "@/lib/leads/live";
 import { COUNT_SOURCES, MOVE_COUNTS, STAY_COUNTS, leadName, loadMergeView, type Count, type MergeLeadRow } from "@/lib/leads/merge-load";
@@ -18,8 +18,7 @@ import {
   MERGE_COUNT_LABELS,
   MERGE_COUNT_UNAVAILABLE,
   MERGE_EMPTY_VALUE,
-  MERGE_KEEP_HEADING,
-  MERGE_KEEP_THIS,
+  MERGE_KEEP_INSTEAD,
   MERGE_KEEP_WHY,
   MERGE_KEEPING,
   MERGE_INTO_KEEPER,
@@ -151,7 +150,7 @@ export default async function MergeLeadsPage({ searchParams }: { searchParams: P
   const countText = (c: Count) => (c.status === "ok" ? String(c.count) : MERGE_COUNT_UNAVAILABLE);
   const side = (lead: MergeLeadRow, kept: boolean) => (
     <section className="lx-card mg-card" aria-label={leadName(lead)}>
-      <div className="lx-label">{kept ? MERGE_KEEPING : MERGE_INTO_KEEPER}</div>
+      <p className="lx-note">{kept ? MERGE_KEEPING : MERGE_INTO_KEEPER}</p>
       <h2 className="lx-h2">
         <Link href={`/dashboard/leads/${lead.id}/`}>{leadName(lead)}</Link>
       </h2>
@@ -159,7 +158,15 @@ export default async function MergeLeadsPage({ searchParams }: { searchParams: P
       <p className="lx-note">
         {MERGE_STAGE_LABEL}: {stageName(lead.current_stage_id)}
       </p>
-      {kept && <p className="lx-note">{MERGE_KEEP_WHY[view.why]}</p>}
+      {kept ? (
+        <p className="lx-note">{MERGE_KEEP_WHY[view.why]}</p>
+      ) : (
+        <div>
+          <Link href={mergeHref(keeper.id, loser.id, loser.id)} className="lx-btn lx-btn-sec lx-btn-sm">
+            {MERGE_KEEP_INSTEAD}
+          </Link>
+        </div>
+      )}
     </section>
   );
 
@@ -167,14 +174,6 @@ export default async function MergeLeadsPage({ searchParams }: { searchParams: P
     <div className="mg-page">
       {back}
       {header}
-      <FilterChips label={MERGE_KEEP_HEADING} as="nav">
-        <Chip href={mergeHref(keeper.id, loser.id, keeper.id)} active>
-          {MERGE_KEEP_THIS}: {keeperName}
-        </Chip>
-        <Chip href={mergeHref(keeper.id, loser.id, loser.id)}>
-          {MERGE_KEEP_THIS}: {loserName}
-        </Chip>
-      </FilterChips>
       <div className="mg-sides">
         {side(keeper, true)}
         {side(loser, false)}

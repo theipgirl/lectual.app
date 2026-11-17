@@ -2124,7 +2124,7 @@ any update or delete of a merged lead and any direct write of the merged columns
   page, so nothing changed there; the signed mailing address card still reads the keeper's own proposals.
 - **The merge screen** `/dashboard/intake/merge/?a=&b=&keep=` (page `notFound()` for anyone but owner/admin/senior_admin, signed out included,
   and before 0107). Both leads side by side; the keeper is suggested (a matter, else a Lawmatics id, else the older; `suggestKeeper`) and can
-  be swapped by a chip link; per-field radios only where the two differ (`MERGE_FIELDS`; default = the database's own rule); counts of what
+  be swapped by the "Keep this lead instead" link on the other card; per-field radios only where the two differ (`MERGE_FIELDS`; default = the database's own rule); counts of what
   moves and what stays for the lead being merged, each its own three-state read; a line per matter of the merged lead saying it moves. A matter
   id is "a lead and a matter can't be merged" with a link to the matter. Confirm is `InlineConfirm`; `mergeLeadsAction` -> `runMergeLeads`
   (`src/lib/leads/merge.ts`, deps injected) re-resolves the role BEFORE anything, builds `p_choices` only from known fields and sides, calls the
@@ -2136,5 +2136,7 @@ any update or delete of a merged lead and any direct write of the merged columns
   <name>." only when that id really is in the keeper's merged set (`mergeNotice`).
 - `lead_merged` (activity type, `ACTIVITY_TYPES_0107`) and the `merged` stop reason are hand-added; the timeline reads the row defensively
   (side, changed field NAMES, moved count; never a value).
+- **Design harness:** `scripts/design-harness/screens/merge.screen.tsx` renders the merge screen and the kept lead's page (after a merged lead's
+  link) at 1440 / 1280 / 375 with no sideways overflow.
 - **NOT verified:** a real database with 0107 (the payload keys of `lead_merged`, the counts jsonb, the refusal texts beyond their prefixes)
-  and a real browser at 1440 / 1280 / 375.
+  and a real browser (the harness is static markup in headless Chromium).
