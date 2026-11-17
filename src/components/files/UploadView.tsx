@@ -11,21 +11,23 @@ export function UploadView({
   error,
   onPick,
   inputKey,
+  inputId = "client-file-input",
 }: {
   busy: boolean;
   busyName?: string | null;
   error: string | null;
   onPick?: (file: File | null) => void;
   inputKey?: number;
+  inputId?: string;
 }) {
   return (
     <div style={{ display: "grid", gap: 6 }}>
-      <label className="lx-label" htmlFor="client-file-input">
+      <label className="lx-label" htmlFor={inputId}>
         Add a file
       </label>
       <input
         key={inputKey}
-        id="client-file-input"
+        id={inputId}
         className="lx-input"
         type="file"
         accept={FILE_PICKER_ACCEPT}

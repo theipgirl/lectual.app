@@ -302,7 +302,7 @@ export function ReviewPanel(props: PanelProps) {
         {open.kind === "lead" && canMove && closeStages.length > 0 && <LostNurture id={open.id} stages={closeStages} />}
       </section>
 
-      <ReviewDocuments open={open} documents={detail.documents} members={members} today={today} timeZone={timeZone} canWrite={canWrite} />
+      <ReviewDocuments open={open} documents={detail.documents} members={members} today={today} timeZone={timeZone} canWrite={canWrite} canUpload={canWrite} />
 
       {canWrite && (
         <section className="rv-panel-sec" id="rv-sec-note" aria-labelledby="rv-sec-note-h">
