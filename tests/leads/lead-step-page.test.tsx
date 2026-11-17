@@ -211,7 +211,7 @@ describe("Yes: the hold, Undo, and what is said afterwards", () => {
     expect(html).toContain("Approved. The draft is in Rayn's Outlook. Nothing is sent until Rayn presses Send.");
     const c = code("src/components/leads/NeedsYourYes.tsx");
     expect(c).not.toMatch(/Outlook/);
-    expect(c).toMatch(/say\(\{ tone: "ok", message: r\.message/);
+    expect(c).toMatch(/say\(noticeFor\(kind, r, itemId\)\)/);
   });
 
   it("Not this needs a reason: the form has a required field and the fixed sentence", () => {

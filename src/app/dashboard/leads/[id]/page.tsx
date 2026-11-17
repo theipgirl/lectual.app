@@ -50,6 +50,7 @@ import { TemperatureCard } from "@/components/leads/TemperatureCard";
 import { TopCard } from "@/components/leads/TopCard";
 import { TopCardFrame } from "@/components/leads/TopCardFrame";
 import { WhatLectualDid } from "@/components/leads/WhatLectualDid";
+import { OtherApprovals } from "@/components/leads/OtherApprovals";
 import { FourFacts } from "@/components/leads/FourFacts";
 import { loadLeadStepFacts, type LeadStepLoad } from "@/lib/lead-step/load";
 import { buildLeadStepView } from "@/lib/lead-step/view-model";
@@ -233,7 +234,15 @@ export default async function LeadPage({
   });
 
   // The engine's view: exactly one top card. A lead the engine couldn't read is the "couldn't load" card, never a calm one.
-  const step = stepLoad.status === "ok" ? buildLeadStepView(stepLoad.facts) : null;
+  // A view that can't be built is the same couldn't-load card, never the page's error screen.
+  let step: ReturnType<typeof buildLeadStepView> | null = null;
+  if (stepLoad.status === "ok") {
+    try {
+      step = buildLeadStepView(stepLoad.facts);
+    } catch {
+      step = null;
+    }
+  }
   const yoursId = step?.top.kind === "yours" ? step.top.taskId : null;
   const yoursTask = yoursId && stepLoad.status === "ok" && stepLoad.facts.tasks.status === "ok" ? stepLoad.facts.tasks.value.find((t) => t.id === yoursId) : undefined;
   const stepMembers = members.map((m) => ({ userId: m.userId, name: m.displayName ?? m.email ?? "Teammate" }));
@@ -276,7 +285,7 @@ export default async function LeadPage({
         ownerName={ownerName}
         lastInboundAt={lead.last_inbound_at}
         now={renderedAt}
-        hideLastHeard
+        hideLastHeard={!!step}
       />
 
       <div className="ls-top">
@@ -289,6 +298,7 @@ export default async function LeadPage({
             yoursDueDate={yoursTask?.dueAt ? yoursTask.dueAt.slice(0, 10) : null}
           />
         </TopCardFrame>
+        {step && <OtherApprovals queue={step.queue} />}
         <WhatLectualDid leadId={lead.id} did={step ? step.did : { status: "unavailable", text: LEAD_STEP_DID_UNAVAILABLE }} />
         {step && <FourFacts facts={step.facts} />}
       </div>

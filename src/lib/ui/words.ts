@@ -1172,7 +1172,6 @@ export const ADD_ANOTHER_NEXT_STEP = "Add another next step";
 
 // Lead page
 /** The lead page's top card controls, "What Lectual did" and the four facts (Sprint 9 Part 2). Wording of the card itself is in `// Lead step`. */
-export const LEAD_PAGE_TOP_LABEL = "Next step for this lead";
 export const LEAD_PAGE_FACTS_LABEL = "Where this lead stands";
 export const LEAD_PAGE_WHY = "Why:";
 export const LEAD_PAGE_CHECK_FIRST = "Check first:";
@@ -1183,7 +1182,6 @@ export const LEAD_PAGE_DONE_EDITING_YES = "Save or cancel your edit first, then 
 export const LEAD_PAGE_OPEN_IN_APPROVALS = "Open in Approvals";
 export const LEAD_PAGE_SEND_BACK_NOTE = "Note for them (optional)";
 export const LEAD_PAGE_SEND_BACK_GO = "Send this back";
-export const LEAD_PAGE_YES_HELD = "Held for a moment so you can undo. Nothing has been sent or saved yet.";
 export const LEAD_PAGE_ACTION_FAILED = "That didn't go through. Nothing was sent. Refresh to try again.";
 export const LEAD_PAGE_MARK_DONE = "Mark done";
 export const LEAD_PAGE_SNOOZE = "Snooze";
@@ -1194,5 +1192,11 @@ export const LEAD_PAGE_STEP_WHAT = "What happens next";
 export const LEAD_PAGE_STEP_DUE = "Due date";
 export const LEAD_PAGE_STEP_OWNER = "Assigned to";
 export const LEAD_PAGE_DID_ALL = (n: number) => `Show all (${n})`;
-export const LEAD_PAGE_DID_NO_UNDO_NOTE = "Undo is offered only for a stage move Lectual made.";
 export const LEAD_PAGE_APPROVALS_LINK = "See them in Approvals";
+export const LEAD_PAGE_YES_UNCONFIRMED = "We couldn't confirm that. Check Approvals before trying again. Nothing was sent.";
+export const LEAD_PAGE_STALE_DRAFT = "This client's status changed since the draft was queued, so it can't be approved from here. Open it in Approvals to decide.";
+export const LEAD_PAGE_ALSO_WAITING = "Also waiting on this lead";
+export const LEAD_PAGE_BRIEFINGS = "Internal briefings for this lead";
+export const leadPageQueued = (day: string) => `queued ${day}`;
+export const leadPageMoreInApprovals = (n: number) => `${n} more in Approvals`;
+export const leadStepTheyLastWrote = (day: string) => `They last wrote ${day}`;
