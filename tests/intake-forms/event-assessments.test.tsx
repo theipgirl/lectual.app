@@ -68,6 +68,9 @@ describe("Forms list: Event assessments (F15)", () => {
     expect(dd(story, "Started")).toBe("1");
     expect(dd(story, "Finished")).toBe("0 0.0%");
     expect(dd(story, "Typical time (median)")).toBe("—");
+    // Last taken: the newest card's start, in the firm's zone (the fake db has no profile: the standard zone).
+    expect(dd(urban, "Last taken")).toBe("Oct 18");
+    expect(dd(story, "Last taken")).toBe("Sep 11");
     expect(urban).toContain('href="/dashboard/forms?event=urban-golf-2026"');
     expect(story).toContain('href="/dashboard/forms?event=story2profit-2026"');
     // Most recently active first.
@@ -139,7 +142,7 @@ describe("Forms list: Event assessments (F15)", () => {
 describe("event page (F16)", () => {
   it("renders the performance numbers, the distribution blocks, option counts with card labels, the stored top gaps and the drop-off section", async () => {
     const html = await eventPage(newDb({ crm_booth_scorecard: boothTables() }), "urban-golf-2026");
-    expect(html).toContain('<h1 class="lx-h1">urban-golf-2026</h1>');
+    expect(html).toContain('<h1 class="lx-h1">Urban Golf 2026 <span class="ev-name-code">urban-golf-2026</span></h1>');
     const kpi = (label: string) => html.match(new RegExp(`${label.replace(/[()]/g, "\\$&")}</div><div class="ifm-kpi-value">([^<]*)</div>`))?.[1];
     expect(kpi("Started")).toBe("3");
     expect(kpi("Finished")).toBe("2");

@@ -1,4 +1,6 @@
 import { notFound } from "next/navigation";
+import { isEventCode } from "@/lib/intake-forms/event-name";
+import { getFirmTimeZone } from "@/lib/org/profile";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { hasRole } from "@/lib/auth/roles";
 import { canEditIntakeForm, listOrCreateIntakeForms, loadIntakeForm, loadIntakePackages } from "@/lib/intake-forms/store";
@@ -69,17 +71,18 @@ export default async function IntakeFormsPage({
   const canEdit = canEditIntakeForm(session.role);
 
   if (!sp.form && sp.event !== undefined) {
-    // One booth event. A code that is empty, or longer than any real one, is no event.
-    if (typeof sp.event !== "string" || sp.event.length === 0 || sp.event.length > 120) notFound();
-    return <EventPage code={sp.event} range={parseEventRange(sp.range)} />;
+    // One booth event. A code that is not shaped like one (letters, digits, - and _, at most 120) is no event.
+    if (!isEventCode(sp.event)) notFound();
+    return <EventPage code={sp.event} range={parseEventRange(sp.range)} role={session.role} />;
   }
 
   if (!sp.form) {
-    const [list, statRows, origin, events] = await Promise.all([
+    const [list, statRows, origin, events, timeZone] = await Promise.all([
       listOrCreateIntakeForms(session.org.name),
       loadSubmissionStatRows(null, 30),
       intakeOrigin(),
       loadBoothEventList(),
+      getFirmTimeZone(),
     ]);
     if (list.status === "ok" && list.value.length > 0) {
       const byForm = statRows.status === "ok" ? statsByForm(statRows.value.rows) : null;
@@ -110,7 +113,7 @@ export default async function IntakeFormsPage({
               };
             })}
           />
-          <EventAssessments read={events} />
+          <EventAssessments read={events} timeZone={timeZone} />
         </>
       );
     }

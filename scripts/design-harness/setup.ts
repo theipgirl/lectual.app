@@ -200,3 +200,43 @@ vi.mock("@/lib/intake/facts", async (orig) => {
   const o = await orig<typeof import("@/lib/intake/facts")>();
   return { ...o, loadTemperatureFacts: async (...a: Parameters<typeof o.loadTemperatureFacts>) => (state as { l2Facts?: Awaited<ReturnType<typeof o.loadTemperatureFacts>> }).l2Facts ?? o.loadTemperatureFacts(...a) };
 });
+
+// Forms page (screens/forms-owner.screen.tsx): the intake-forms loaders. Sample records come from `state.formsList` / `state.formRecord`.
+vi.mock("@/lib/intake-forms/store", async (orig) => ({
+  ...(await orig<typeof import("@/lib/intake-forms/store")>()),
+  listOrCreateIntakeForms: async () => ({ status: "ok", value: state.formsList ?? [] }),
+  loadIntakeForm: async () => ({ status: "ok", form: state.formRecord ?? null }),
+  loadIntakePackages: async () => ({ status: "ok", items: [] }),
+}));
+vi.mock("@/lib/intake-forms/load-performance", async (orig) => ({
+  ...(await orig<typeof import("@/lib/intake-forms/load-performance")>()),
+  loadSubmissionStatRows: async () => ({ status: "ok", value: { rows: (state as { formStatRows?: unknown[] }).formStatRows ?? [], capped: false } }),
+  // type-floor screens (Results / Performance tabs)
+  loadFunnel: async () => ({ status: "ok", value: { visited: 120, chat: 0, form: 48, started: 48, completed: 31, startRate: "40.0%", completeRate: "64.6%", capped: false } }),
+  loadIntakeList: async () => ({ status: "ok", value: (state as { formPeopleList?: never[] }).formPeopleList ?? [] }),
+}));
+vi.mock("@/lib/intake-forms/load-steps", async (orig) => {
+  const real = await orig<typeof import("@/lib/intake-forms/load-steps")>();
+  const { stepFunnel } = await import("@/lib/intake-forms/step-funnel");
+  return {
+    ...real,
+    loadStepFunnel: async (_id: string, _r: unknown, questions: { id: string; text: string }[]) => {
+      const people = Array.from({ length: 12 }, (_, i) => ({ id: `p${i}`, started_at: `2026-11-0${(i % 8) + 1}T14:00:00Z`, submitted_at: i % 3 ? `2026-11-0${(i % 8) + 1}T14:06:00Z` : null }));
+      const events = people.flatMap((p, i) => questions.slice(0, i % 3 ? questions.length : 2).map((q, k) => ({ submission_id: p.id, question_id: q.id, step_index: k, occurred_at: new Date(Date.parse(p.started_at) + (k + 1) * (20 + i * 3) * 1000).toISOString() })));
+      return { status: "ok", value: { ...stepFunnel({ questions, people, events } as never), capped: false } };
+    },
+    loadStoppedAt: async () => ({ status: "ok", value: {} }),
+    loadEarliestStep: async () => ({ status: "ok", value: "2026-11-01T00:00:00Z" }),
+  };
+});
+vi.mock("@/lib/intake-forms/origin", () => ({ intakeOrigin: async () => "https://app.example" }));
+vi.mock("@/lib/intake-forms/load-results", async (orig) => ({
+  ...(await orig<typeof import("@/lib/intake-forms/load-results")>()),
+  loadResultSubmissions: async () => ({ status: "ok", value: { rows: (state as { formResultRows?: never[] }).formResultRows ?? [], capped: false } }),
+  loadBoothEventList: async () => ({ status: "ok", value: { rows: (state as { boothList?: never[] }).boothList ?? [], capped: false } }),
+  loadBoothEvent: async () => ({ status: "ok", value: { rows: (state as { boothEventRows?: never[] }).boothEventRows ?? [], capped: false } }),
+  loadEventPeople: async () => {
+    const p = (state as { eventPeople?: { cards: never[]; leads: never[] } }).eventPeople ?? { cards: [], leads: [] };
+    return { status: "ok", value: { cards: p.cards, leads: p.leads, total: p.cards.length, over: false } };
+  },
+}));

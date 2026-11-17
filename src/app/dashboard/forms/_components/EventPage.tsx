@@ -16,6 +16,9 @@ import { assessmentResults } from "@/lib/intake-forms/results";
 import { AssessmentBlocks } from "./AssessmentBlocks";
 import { Unreadable } from "./IntakeDrawer";
 import { eventHref } from "./EventAssessments";
+import { EventPeople } from "./EventPeople";
+import { eventDisplayName } from "@/lib/intake-forms/event-name";
+import "./event.css";
 
 /**
  * `/dashboard/forms/?event=<code>`: one booth event's numbers, read-only. The
@@ -30,7 +33,7 @@ import { eventHref } from "./EventAssessments";
 
 const RANGE_LABEL = (r: EventRange) => (r === "all" ? "All time" : `${r} days`);
 
-export async function EventPage({ code, range, now = new Date() }: { code: string; range: EventRange; now?: Date }) {
+export async function EventPage({ code, range, role, now = new Date() }: { code: string; range: EventRange; role?: unknown; now?: Date }) {
   const read = await loadBoothEvent(code);
   if (read.status === "ok" && read.value.rows.length === 0) notFound();
 
@@ -42,8 +45,11 @@ export async function EventPage({ code, range, now = new Date() }: { code: strin
       <div className="lx-page-head">
         <div style={{ flex: 1, minWidth: 240 }}>
           <div className="lx-label">Event assessment</div>
-          <h1 className="lx-h1">{code}</h1>
-          <p className="lx-sub">Booth scorecards taken at this event. Read-only: nothing here changes a card or a lead.</p>
+          <h1 className="lx-h1">
+            {eventDisplayName(code)}{" "}
+            <span className="ev-name-code">{code}</span>
+          </h1>
+          <p className="lx-sub">Read-only: nothing here changes a card or a lead.</p>
         </div>
         <nav className="ifm-seg" aria-label="Date range">
           {EVENT_RANGES.map((r) => (
@@ -70,6 +76,7 @@ export async function EventPage({ code, range, now = new Date() }: { code: strin
   const variant = eventVariant(read.value.rows);
   const results = assessmentResults(rows.map(sampleFromBooth), boothCardQuestions(variant, "business"));
   const drop = dropOffByQuestion(rows, variant);
+  const people = await EventPeople({ code, range, role, now });
   const maxDrop = Math.max(0, ...drop.steps.map((s) => s.count));
 
   return (
@@ -124,6 +131,8 @@ export async function EventPage({ code, range, now = new Date() }: { code: strin
             </>
           )}
         </div>
+
+        {people}
       </div>
     </div>
   );

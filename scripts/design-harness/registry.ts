@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 
-export type Viewport = "desktop" | "phone";
+export type Viewport = "desktop" | "desktop1280" | "phone";
 
 export type Screen = {
   /** File name of the output (out/<id>.html, shots/<id>.png, pairs/<id>.png). */

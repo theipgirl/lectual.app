@@ -1,6 +1,10 @@
 import Link from "next/link";
+import { eventDisplayName } from "@/lib/intake-forms/event-name";
+import "./event.css";
 import { eventSummaries } from "@/lib/intake-forms/booth-results";
 import { formatDuration } from "@/lib/intake-forms/performance";
+import { shortDate } from "@/lib/campaigns/stops";
+import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
 import { EVENT_LIST_ROW_LIMIT, type loadBoothEventList } from "@/lib/intake-forms/load-results";
 
 /**
@@ -18,7 +22,7 @@ export function eventHref(code: string, range?: string) {
   return `/dashboard/forms/?event=${encodeURIComponent(code)}${range ? `&range=${range}` : ""}`;
 }
 
-export function EventAssessments({ read }: { read: Awaited<ReturnType<typeof loadBoothEventList>> }) {
+export function EventAssessments({ read, timeZone }: { read: Awaited<ReturnType<typeof loadBoothEventList>>; timeZone?: string }) {
   if (read.status === "unconfigured") {
     return (
       <p className="ifm-help">
@@ -49,12 +53,13 @@ export function EventAssessments({ read }: { read: Awaited<ReturnType<typeof loa
             <div className="ifl-main">
               <div className="ifl-title-row">
                 <Link href={eventHref(e.code)} className="ifl-name">
-                  {e.code}
+                  {eventDisplayName(e.code)}
                 </Link>
+                <span className="ev-name-code">{e.code}</span>
                 <span className="ifl-kind">Booth assessment</span>
               </div>
             </div>
-            <dl className="ifl-stats" aria-label={`${e.code}, all time`}>
+            <dl className="ifl-stats" aria-label={`${eventDisplayName(e.code)}, all time`}>
               <div>
                 <dt>Started</dt>
                 <dd>{e.started.toLocaleString("en-US")}</dd>
@@ -69,6 +74,10 @@ export function EventAssessments({ read }: { read: Awaited<ReturnType<typeof loa
               <div>
                 <dt>Typical time (median)</dt>
                 <dd>{formatDuration(e.medianMs)}</dd>
+              </div>
+              <div>
+                <dt>Last taken</dt>
+                <dd>{shortDate(e.latest || null, timeZone ?? DEFAULT_TIME_ZONE) || "\u2014"}</dd>
               </div>
             </dl>
             <div className="ifl-actions">

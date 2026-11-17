@@ -136,11 +136,11 @@ describe("drawnNav", () => {
     }
   });
 
-  it("owner: Today, Approvals (the deck), Weekly review, Proposals, Intake, Matters, Calendar; no Settings", () => {
+  it("owner: Today, Approvals (the deck), Weekly review, Proposals, Intake, Forms, Matters, Calendar; no Settings", () => {
     const drawn = drawnNav(visibleNav(ALL, "owner"), "owner");
-    expect(drawn.map((i) => i.slug)).toEqual(["", "queue", "review", "proposals", "intake", "matters", "calendar"]);
+    expect(drawn.map((i) => i.slug)).toEqual(["", "queue", "review", "proposals", "intake", "forms", "matters", "calendar"]);
     expect(drawn.find((i) => i.slug === "queue")?.href).toBe(DECK_PATH);
-    expect(drawnNav(visibleNav([], "owner"), "owner").map((i) => i.slug)).toEqual(["", "queue", "review", "quotes", "intake", "matters", "calendar"]);
+    expect(drawnNav(visibleNav([], "owner"), "owner").map((i) => i.slug)).toEqual(["", "queue", "review", "quotes", "intake", "forms", "matters", "calendar"]);
   });
 
   it("the owner rail: four rows and a More parent; Approvals opens the deck and stays active on the list and an item", () => {
@@ -148,7 +148,7 @@ describe("drawnNav", () => {
     const groups = railGroups(drawn, "/dashboard/queue/abc/", railTreeFor("owner")!);
     expect(groups.map((g) => g.map((e) => e.label))).toEqual([["Today", "Approvals", "Weekly review", "Proposals"], ["More"]]);
     expect(groups[0][1]).toMatchObject({ href: DECK_PATH, active: true, countKey: "queue" });
-    expect(groups[1][0].kids.map((k) => k.label)).toEqual(["Intake", "Matters", "Calendar"]);
+    expect(groups[1][0].kids.map((k) => k.label)).toEqual(["Intake", "Forms", "Matters", "Calendar"]);
     expect(groups[1][0].href).toBe("/dashboard/intake/");
   });
 
@@ -161,7 +161,7 @@ describe("drawnNav", () => {
     expect(bar.find((i) => i.slug === "queue")?.href).toBe(DECK_PATH);
     const sheet = moreSections(drawn, "/dashboard/review/", shell.moreGroups, shell.bar);
     expect(sheet.map((g) => g.label)).toEqual(["More"]);
-    expect(sheet[0].items.map((i) => i.label)).toEqual(["Intake", "Matters", "Calendar"]);
+    expect(sheet[0].items.map((i) => i.label)).toEqual(["Intake", "Forms", "Matters", "Calendar"]);
     for (const g of sheet) for (const i of g.items) expect(i.href).not.toMatch(/reports|settings/);
   });
 
