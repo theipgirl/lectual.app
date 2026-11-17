@@ -146,24 +146,27 @@
 
 .intake-root .intake-agent-chip {
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 5px;
   max-width: 100%;
   min-width: 0;
   padding: 2px 7px;
   border-radius: 5px;
-  background: var(--oxbg);
-  color: var(--ox);
+  /* The assistants' own colour (--asst-*, leads.css): green, never the oxblood tint of a person's pills. */
+  background: var(--asst-bg);
+  color: var(--asst-fg);
   font-family: var(--font-geist), system-ui, sans-serif;
   font-size: var(--lp-meta, 13px);
-  line-height: 1.4;
-  white-space: nowrap;
+  line-height: 1.35;
+  /* It may wrap to a second line; the tooltip holds the evidence. */
+  white-space: normal;
+  text-align: left;
 }
+.intake-root .intake-agent-chip > svg { margin-top: 3px; flex: none; }
 
 .intake-root .intake-agent-chip > span {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: break-word;
 }
 
 /* ---- Sprint 29: why a card is in its column, stage decisions, bulk select ---- */

@@ -65,12 +65,14 @@ describe("stacked cards under 640px (V1)", () => {
       ["src/app/dashboard/documents/page.tsx", ["Matter", "Status", "Updated"]],
       ["src/app/dashboard/queue/page.tsx", ["Client", "From", "Status", "Queued"]],
       ["src/components/proposal-list/ProposalsTable.tsx", ["Client", "Status", "Client response", "Fees"]],
-      ["src/app/dashboard/intake/_components/IntakeTable.tsx", ["Stage", "Temperature", "Source", "Owner", "Last touch", "Next step"]],
+      ["src/app/dashboard/intake/_components/IntakeTable.tsx", ["Stage", "Temperature", "Source", "Owner", "Next step"]],
     ];
     for (const [file, labels] of sources) {
       const src = read(file);
-      if (!file.includes("IntakeTable")) expect(src, file).toContain("lx-stack");
+      expect(src, file).toContain("lx-stack");
       for (const l of labels) expect(src, `${file} ${l}`).toContain(`data-label="${l}"`);
+      // The Leads columns whose labels come from the glossary (Item L2).
+      if (file.includes("IntakeTable")) expect(src).toContain("data-label={LEADS_CONTACT_COLUMN}");
     }
   });
 });

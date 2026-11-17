@@ -61,6 +61,7 @@ import BulkMoveBar from "./BulkMoveBar";
 import IntakeBoard from "./IntakeBoard";
 import IntakeControls from "./IntakeControls";
 import IntakeTable from "./IntakeTable";
+import CompareDialog, { type CompareTarget } from "./CompareDialog";
 
 /** How long the URL lags the controls, so typing in Search isn't one push per key. */
 const URL_SYNC_DELAY_MS = 300;
@@ -98,6 +99,7 @@ export default function IntakeWorkspace({
   duplicates = {},
   nurtureUnavailable = false,
   now: nowIso,
+  timeZone,
 }: {
   /** The rows of the server's set: the intake list, or the lost leads when `lostView`. */
   rows: IntakeRow[];
@@ -128,6 +130,8 @@ export default function IntakeWorkspace({
   /** The nurture read failed: the Nurture chip has no number and the board says so (never an empty nurture column). */
   nurtureUnavailable?: boolean;
   now: string;
+  /** The firm's time zone: the Last contact dates are its calendar days, as on the weekly review Sheet. */
+  timeZone?: string;
 }) {
   const [rows, setRows] = useState(initialRows);
   const [filters, setFilters] = useState(initialFilters);
@@ -138,6 +142,9 @@ export default function IntakeWorkspace({
   const [pinned, setPinned] = useState<string[]>([]);
   const [colExtra, setColExtra] = useState<Record<string, number>>({});
   const [showEmpty, setShowEmpty] = useState(false);
+  const [compare, setCompare] = useState<CompareTarget | null>(null);
+  const openCompare = useCallback((leadId: string, otherId: string, trigger: HTMLElement) => setCompare({ leadId, otherId, trigger }), []);
+  const closeCompare = useCallback(() => setCompare(null), []);
   const [, startTransition] = useTransition();
 
   const now = useMemo(() => new Date(nowIso), [nowIso]);
@@ -224,7 +231,7 @@ export default function IntakeWorkspace({
     return out;
   }, [movedIds, rows, stages, drawn]);
   const { sort } = viewState;
-  const sorted = useMemo(() => sortRows(filtered, sort.key, sort.dir), [filtered, sort]);
+  const sorted = useMemo(() => sortRows(filtered, sort.key, sort.dir, { now }), [filtered, sort, now]);
   const page = useMemo(() => pageSlice(sorted, viewState.show), [sorted, viewState.show]);
   const rowById = useCallback((id: string) => rows.find((r) => r.lead.id === id), [rows]);
 
@@ -236,8 +243,8 @@ export default function IntakeWorkspace({
   const nurtureColumn = useMemo(() => {
     if (!board || viewState.group !== "stage" || lostView || drawn === "nurture" || !nurtureStage) return null;
     const mine = rows.filter((r) => stages.find((s) => s.id === r.lead.current_stage_id)?.category === "nurture");
-    return { rows: sortRows(applyAll(mine), sort.key, sort.dir), stage: nurtureStage };
-  }, [board, viewState.group, lostView, drawn, nurtureStage, rows, stages, applyAll, sort]);
+    return { rows: sortRows(applyAll(mine), sort.key, sort.dir, { now }), stage: nurtureStage };
+  }, [board, viewState.group, lostView, drawn, nurtureStage, rows, stages, applyAll, sort, now]);
   // Lost stages are offered as a destination ONLY while the Lost set is shown (so a lead can be moved back out). Elsewhere,
   // moving a lead to Lost happens on the lead page or the weekly review, as before.
   const moveStages = useMemo(() => moveTargetStages(intakeStages, lostStages, lostView, nurtureStages), [intakeStages, lostStages, lostView, nurtureStages]);
@@ -414,7 +421,7 @@ export default function IntakeWorkspace({
   );
 
   return (
-    <div className="lp-root">
+    <div className="lp-root ix-leads">
       <ListHeader title={INTAKE_NAME} sub={leadsHeaderLine(drawn, sorted)} />
 
       <ListToolbar
@@ -554,6 +561,8 @@ export default function IntakeWorkspace({
             onToggleSelect={toggleSelect}
             duplicates={duplicates}
             movedOut={movedOut}
+            timeZone={timeZone}
+            onCompare={openCompare}
           />
         )
       ) : (
@@ -575,6 +584,7 @@ export default function IntakeWorkspace({
           notesUnavailable={notesUnavailable}
           duplicates={duplicates}
           movedOut={movedOut}
+          timeZone={timeZone}
           onSort={toggleSort}
           onSetLane={setLane}
           onAssign={assign}
@@ -584,8 +594,11 @@ export default function IntakeWorkspace({
           onClearFilters={filtersActive ? clearFilters : undefined}
           emptyAction={emptyContent}
           anyLeads={anyLeads}
+          onCompare={openCompare}
         />
       )}
+
+      <CompareDialog target={compare} onClose={closeCompare} />
     </div>
   );
 }

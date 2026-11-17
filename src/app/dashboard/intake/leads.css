@@ -4,6 +4,37 @@
    that has more columns than fit.
    ============================================================ */
 
+/* ---- colours: temperature levels and the assistants' own chips (Item L2) ----------------------------------------
+   Each pill carries its own background, so its text contrast holds on any page background. Measured text/background ratios:
+   light: hot 6.44, warm 5.66, cold 5.62, suggested (outlined, on #fffdf7) hot 7.71, warm 6.56, cold 6.72, assistant 5.85;
+   dark:  hot 8.50, warm 8.22, cold 7.86, suggested (outlined, on #1c1416) hot 10.66, warm 11.72, cold 10.65, assistant 7.93.
+   The dashboard has no dark theme (globals.css), so there is NO media-query dark block here: a dark-mode OS must not give dark pills
+   on the cream page. The dark values apply only under an explicit :root[data-theme="dark"], for when the shell gets one. */
+:root {
+  --tp-hot-fg: #a3141f; --tp-hot-bg: #fde3e1;
+  --tp-warm-fg: #8f4a00; --tp-warm-bg: #ffe9cf;
+  --tp-cold-fg: #1f5aa6; --tp-cold-bg: #dfeaf8;
+  --tp-outline-bg: #fffdf7;
+  --asst-fg: var(--ok, #43602f); --asst-bg: var(--okbg, rgba(67, 96, 47, 0.12));
+}
+:root[data-theme="dark"] {
+  --tp-hot-fg: #ffb4ac; --tp-hot-bg: #4a1a1c;
+  --tp-warm-fg: #ffc58a; --tp-warm-bg: #4a2c0a;
+  --tp-cold-fg: #a9c9f5; --tp-cold-bg: #17304f;
+  --tp-outline-bg: #1c1416;
+  --asst-fg: #b7d9a0; --asst-bg: #243a1a;
+}
+
+/* ---- one typeface (Item L2): no monospace anywhere on the Leads list and board ----------------------------------
+   Everything on this page that used the app's Courier (headers, dates, counts, chips) reads the same Geist stack. The
+   override is scoped to the Leads workspace (.ix-leads), so Matters, Pipeline, the lead page and the rest keep theirs. */
+.ix-leads.ix-leads {
+  --font-courier-prime: var(--font-geist), system-ui, sans-serif;
+  --font-jetbrains-mono: var(--font-geist), system-ui, sans-serif;
+  --font-mono: var(--font-geist), system-ui, sans-serif;
+  --mono: var(--font-geist), system-ui, sans-serif;
+}
+
 /* The page scrolls (the old rule made the table scroll inside itself). */
 .lx-page > .intake-root { flex: 0 0 auto; min-height: auto; display: flex; flex-direction: column; }
 .intake-root .lp-root { min-width: 0; }
@@ -14,48 +45,72 @@
 .ix-sets .lp-chip, .ix-filters .lp-chip { text-decoration: none; }
 .ix-chip-warn { border-color: var(--warn); color: var(--warn); }
 
-/* ---- the table ------------------------------------------------------ */
-.ix-table { --ix-cols: minmax(0, 1.8fr) minmax(0, 1.7fr) 104px minmax(0, 1fr) 112px minmax(0, 1.8fr) 40px; --ix-row-h: 60px; }
-.ix-table.ix-has-owner { --ix-cols: minmax(0, 1.8fr) minmax(0, 1.7fr) 104px minmax(0, 1fr) 52px 112px minmax(0, 1.8fr) 40px; }
-.ix-head, .ix-row { display: grid; grid-template-columns: var(--ix-cols); gap: 10px; align-items: center; padding: 0 16px; }
-.ix-head { min-height: 40px; border-bottom: 1px solid var(--line); font-family: var(--font-courier-prime), monospace; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mute); }
-.ix-head button { font: inherit; letter-spacing: inherit; text-transform: inherit; text-align: left; border: 0; background: transparent; padding: 0; color: var(--mute); cursor: pointer; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ix-head button[data-on] { color: var(--ox); }
-.ix-row { height: var(--ix-row-h); border-bottom: 1px solid var(--line); font-size: 13px; cursor: pointer; }
-.ix-row:hover { background: color-mix(in srgb, var(--ox) 4%, transparent); }
-.ix-cell { min-width: 0; overflow: hidden; }
-.ix-name { display: block; font-size: 14px; font-weight: 500; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: inherit; }
+/* ---- the table: the weekly review Sheet's table (Item L2) -------------------------------------------------------------
+   The list is the Sheet's own markup and classes (components/review/review-sheet-edit.css: .rse-card, .rse-scroll, .rse-tbl, the
+   colgroup widths, .rse-col-grip and .rse-col-tip for resizing, zebra rows, 15px cells, the header row) inside the same .rv-owner
+   wrapper those rules are scoped to. Only what the Leads page needs on top of it is here. The table scrolls inside .rse-scroll only if a
+   person makes it wider than the page; the page itself never scrolls sideways. */
+.ix-sheet { min-width: 0; max-width: 100%; }
+.ix-sheet .rse-card { overflow: visible; }
+/* No inner scroll unless the table is wider than the card: an overflow-x scroller would also clip, or add a scrollbar for, a menu
+   that opens below the last row (menus are absolutely positioned). */
+.ix-sheet .rse-scroll[data-scroll="false"] { overflow: visible; }
+/* Intake only (scoped through .ix-leads, the Sheet is untouched): the Sheet's 12px header, width tip and phone labels read 13px here. */
+.ix-leads .rv-owner .rse-tbl thead th, .ix-leads .rv-owner .rse-col-tip { font-size: 13px; }
+.ix-sheet .ix-sort { font: inherit; letter-spacing: inherit; text-transform: inherit; text-align: left; border: 0; background: transparent; padding: 0; color: inherit; cursor: pointer; }
+.ix-sheet .ix-sort[data-on] { color: var(--ox); }
+.ix-sheet .ix-sort:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; border-radius: 3px; }
+.ix-sheet .rse-tbl tbody tr.ix-row { cursor: pointer; }
+.ix-sheet .rse-tbl td { overflow-wrap: break-word; white-space: normal; }
+.ix-sheet .ix-stage-line .ix-marker { white-space: normal; overflow: visible; text-align: left; }
+.ix-sheet .rse-tbl td.ix-menu-td { text-align: right; padding-left: 4px; padding-right: 8px; }
+.ix-sheet .rse-tbl td.ix-lead-td { white-space: normal; overflow: visible; }
+/* A person's full name always shows: it wraps at its spaces and hyphens, to a second line when it must (never an ellipsis). */
+.ix-name { display: block; font-size: 15px; line-height: 1.35; white-space: normal; overflow-wrap: break-word; word-break: normal; hyphens: none; }
 .ix-sub { display: block; font-size: 13px; line-height: 1.4; color: var(--mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* A stage name is never cut with an ellipsis: the pill wraps to two lines at its words. */
 .ix-stage { display: inline-block; max-width: 100%; padding: 2px 8px; border-radius: 6px; background: var(--surface2); color: var(--ink2); font-size: 13px; line-height: 1.3; white-space: normal; overflow-wrap: normal; vertical-align: middle; }
 .ix-stage-warn { background: var(--warnbg); color: var(--warn); }
-.ix-touch { font-family: var(--font-courier-prime), monospace; font-size: 13px; white-space: nowrap; color: var(--mute); }
-.ix-touch[data-in] { color: var(--burg); }
-.ix-next { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 13px; line-height: 1.4; color: var(--ink2); overflow-wrap: anywhere; }
+/* The stage pill and the person's own markers (Needs attorney, Needs a stage, Possible duplicate) share one wrapping line. */
+.ix-stage-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-width: 0; }
+/* Last contact, in words, at the cell's own size. "Our turn" is the one risk colour on the row. */
+.ix-sheet .rse-tbl td.ix-touch { font-size: inherit; line-height: 1.4; color: var(--ink); }
+.ix-sheet .rse-tbl td.ix-touch[data-touch="none"], .ix-sheet .rse-tbl td.ix-touch[data-touch="activity-only"] { color: var(--mute); }
+.ix-sheet .rse-tbl td.ix-touch[data-in] { color: var(--burg); font-weight: 500; }
+.ix-touch { font-family: var(--font-geist), system-ui, sans-serif; font-size: 13px; line-height: 1.35; color: var(--mute); }
+.ix-touch[data-in] { color: var(--burg); font-weight: 500; }
+.ix-next { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.4; color: var(--ink2); overflow-wrap: anywhere; }
 .ix-next[data-urgent] { color: var(--ox); font-weight: 500; }
 .ix-next[data-muted] { color: var(--mute); }
-.ix-next-wrap { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ix-next-wrap { display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
 .ix-next-wrap .ix-next { flex: 1; min-width: 0; }
-.ix-err { padding: 6px 16px; font-size: 13px; color: var(--crit); background: var(--critbg); border-bottom: 1px solid var(--line); }
+.ix-sheet .rse-tbl td.ix-err { font-size: 13px; color: var(--crit); background: var(--critbg); }
 .ix-foot { padding: 10px 16px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; border-top: 1px solid var(--line); font-size: 13px; color: var(--mute); }
 .ix-more { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; }
 .ix-more:hover { border-color: var(--ox); color: var(--ox); }
+/* The Assistant activity column: the assistants' chips, stacked, in their own colour. */
+.ix-asst-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
 
 /* ---- pills, markers, small buttons ---------------------------------- */
-.ix-temp { display: inline-block; max-width: 100%; padding: 2px 9px; border-radius: 999px; border: 1px solid transparent; font-family: var(--font-geist), system-ui, sans-serif; font-size: 13px; line-height: 1.4; cursor: pointer; background: transparent; white-space: nowrap; }
-.ix-temp[data-tone="hot"] { background: var(--critbg); color: var(--crit); }
-.ix-temp[data-tone="warm"] { background: var(--warnbg); color: var(--warn); }
-.ix-temp[data-tone="cold"] { background: var(--oxbg); color: var(--ox); }
-.ix-temp[data-suggested] { opacity: 0.7; background: transparent; border-color: currentColor; }
+/* Temperature: hot red, warm orange, cold blue. A level a person set is FILLED. A level the system suggested is OUTLINED (dashed edge,
+   plain background) and says "suggested" in its words, so the two never look alike. Both wrap to two lines in a narrow column. */
+.ix-temp { display: inline-block; max-width: 100%; padding: 2px 9px; border-radius: 10px; border: 1.5px solid transparent; font-family: var(--font-geist), system-ui, sans-serif; font-size: 13px; line-height: 1.35; cursor: pointer; background: transparent; white-space: normal; text-align: left; }
+.ix-temp[data-tone="hot"] { background: var(--tp-hot-bg); color: var(--tp-hot-fg); }
+.ix-temp[data-tone="warm"] { background: var(--tp-warm-bg); color: var(--tp-warm-fg); }
+.ix-temp[data-tone="cold"] { background: var(--tp-cold-bg); color: var(--tp-cold-fg); }
+.ix-temp[data-suggested] { background: var(--tp-outline-bg); border-style: dashed; }
+.ix-temp[data-suggested][data-tone="hot"] { border-color: var(--tp-hot-fg); }
+.ix-temp[data-suggested][data-tone="warm"] { border-color: var(--tp-warm-fg); }
+.ix-temp[data-suggested][data-tone="cold"] { border-color: var(--tp-cold-fg); }
 .ix-temp-empty { color: transparent; border-radius: 6px; }
 .ix-row:hover .ix-temp-empty, .ix-temp-empty:focus-visible { color: var(--mute); border-color: var(--line); }
 .ix-icon-btn { border: 1px solid var(--line); background: var(--surface); color: var(--mute); border-radius: 6px; font-size: 15px; line-height: 1; padding: 5px 9px; cursor: pointer; min-width: 32px; }
 .ix-icon-btn:hover { color: var(--ox); border-color: var(--ox); }
 .ix-marker { display: inline-block; max-width: 100%; padding: 1px 7px; border-radius: 5px; background: var(--warnbg); color: var(--warn); font-size: 13px; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ix-marker-auto { background: var(--oxbg); color: var(--ox); }
-.ix-menu-h { display: block; padding: 6px 8px 2px; font-family: var(--font-courier-prime), monospace; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mute); }
+.ix-menu-h { display: block; padding: 6px 8px 2px; font-family: var(--font-geist), system-ui, sans-serif; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mute); }
 .ix-menu-scroll { max-height: 260px; overflow: auto; }
-.ix-time-chip { border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font-family: var(--font-courier-prime), monospace; font-size: 13px; color: var(--mute); }
+.ix-time-chip { border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font-family: var(--font-geist), system-ui, sans-serif; font-size: 13px; color: var(--mute); }
 
 /* ---- the board ------------------------------------------------------ */
 .intake-root, .intake-root .lp-root, .ix-boardwrap { min-width: 0; max-width: 100%; }
@@ -65,14 +120,14 @@
 .ix-col-head { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .ix-col-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; }
 .ix-col-name { font-size: 14px; font-weight: 500; line-height: 1.3; min-width: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: break-word; }
-.ix-col-count { font-family: var(--font-courier-prime), monospace; font-size: 13px; color: var(--mute); flex: none; }
+.ix-col-count { font-family: var(--font-geist), system-ui, sans-serif; font-size: 13px; color: var(--mute); flex: none; }
 .ix-col-badge { align-self: flex-start; padding: 1px 7px; border-radius: 5px; background: var(--warnbg); color: var(--warn); font-size: 13px; line-height: 1.4; }
 .ix-card { display: flex; flex-direction: column; gap: 4px; min-width: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--cream); padding: 8px 9px; cursor: grab; }
 .ix-card[data-selected] { border-color: var(--ox); background: var(--oxbg); }
 .ix-card-top { display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
-.ix-card-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 500; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: break-word; word-break: normal; hyphens: none; color: inherit; }
+.ix-card-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 500; line-height: 1.3; display: block; overflow-wrap: break-word; word-break: normal; hyphens: none; color: inherit; }
 .ix-card-foot { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.ix-card-foot .ix-touch { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ix-card-foot .ix-touch { flex: 1; min-width: 0; }
 .ix-empty-stages { margin-top: 8px; }
 .ix-empty-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .ix-empty-stage { border: 1px dashed var(--line); border-radius: 8px; padding: 6px 10px; font-size: 13px; color: var(--mute); min-width: 0; }
@@ -80,24 +135,17 @@
 .ix-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .ix-bulk-note { font-size: 13px; color: var(--warn); }
 
-/* ---- under 640px: each row is a card of about 120px ---------------- */
+/* ---- under 640px: the Sheet's stacked cards (.lx-stack draws each cell's label) ---------------------------------------- */
 @media (max-width: 640px) {
-  .ix-table { --ix-row-h: auto; }
-  .ix-table .ix-head { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); padding: 0; border: 0; }
-  .ix-row { height: auto; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "lead menu" "stage stage" "next next"; row-gap: 6px; padding: 10px 12px; font-size: 14px; }
-  .ix-table.ix-has-owner .ix-row { grid-template-columns: minmax(0, 1fr) auto; }
-  .ix-row > [data-col="lead"] { grid-area: lead; }
-  .ix-row > [data-col="menu"] { grid-area: menu; align-self: start; }
-  .ix-row > [data-col="stage"] { grid-area: stage; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-width: 0; overflow: hidden; }
-  .ix-row > [data-col="next"] { grid-area: next; }
-  .ix-row > [data-col="source"], .ix-row > [data-col="owner"], .ix-row > [data-col="temp"], .ix-row > [data-col="touch"] { display: none; }
-  .ix-row .ix-phone-meta { display: flex; margin-left: auto; flex: none; }
-  .ix-row > [data-col="stage"] .ix-stage, .ix-row > [data-col="stage"] .ix-marker { flex: 0 1 auto; min-width: 0; }
-  .ix-next { -webkit-line-clamp: 1; font-size: 14px; }
+  .ix-sheet .rse-scroll { overflow-x: visible; }
+  .ix-sheet .rse-tbl { min-width: 0; }
+  .ix-sheet .rse-tbl td:empty, .ix-sheet .rse-tbl td.ix-asst-td:not(:has(.intake-agent-chip)) { display: none; }
+  .ix-sheet .rse-tbl td.ix-lead-td { display: block; text-align: left; }
+  .ix-next { -webkit-line-clamp: 1; }
   .ix-sub, .ix-stage, .ix-marker { font-size: 14px; }
+  .ix-leads .rv-owner .rse-tbl td[data-label]::before { font-size: 13px; }
   .ix-board { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: minmax(0, 1fr); overflow-x: visible; }
 }
-.ix-phone-meta { display: none; align-items: center; gap: 8px; min-width: 0; }
 
 @media (pointer: coarse) { .ix-icon-btn, .ix-more { min-height: 44px; min-width: 44px; } }
 @media (max-width: 640px) { .intake-root .lp-toolbar-actions .lp-btn { padding: 0 6px; } .intake-root .lp-toolbar-actions { gap: 4px; } }
@@ -109,8 +157,10 @@
 .ix-sets > *, .ix-filters > * { flex: 0 0 auto; }
 @media (max-width: 640px) { .intake-root .lp-header .lp-sub { white-space: normal; overflow: visible; text-overflow: clip; text-wrap: wrap; } }
 
-.ix-marker-dup { background: var(--critbg); color: var(--crit); text-decoration: none; }
+/* The duplicate marker is a button that opens the compare panel. */
+.ix-marker-dup { background: var(--critbg); color: var(--crit); text-decoration: none; border: 0; font: inherit; font-size: 13px; line-height: 1.4; cursor: pointer; }
 .ix-marker-dup:hover { text-decoration: underline; }
+.ix-marker-dup:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; }
 .ix-marker-quiet { background: transparent; color: var(--mute); border: 1px dashed var(--line); }
 .ix-col-quiet { background: transparent; border-style: dashed; }
 .ix-col-quiet .ix-card { background: var(--surface); }
@@ -118,3 +168,28 @@
 .ix-subline { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .ix-subline .ix-sub { flex: 1 1 0; min-width: 3ch; }
 .ix-subline .ix-marker { flex: 0 0 auto; }
+
+/* ---- the compare panel ("Possible duplicate"): two records side by side, read only ---------------------------------- */
+.ix-cmp-backdrop { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(35, 8, 16, 0.42); }
+.ix-cmp-wrap { width: min(720px, 100%); max-height: 100%; overflow: auto; }
+.ix-cmp-panel { background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; box-shadow: var(--shadow); font-size: 14px; }
+.ix-cmp-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ix-cmp-title { margin: 0; font-size: 18px; font-weight: 500; line-height: 1.3; }
+.ix-cmp-close { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+.ix-cmp-close:hover { border-color: var(--ox); color: var(--ox); }
+.ix-cmp-close:focus-visible, .ix-cmp-link:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; }
+.ix-cmp-note, .ix-cmp-msg { margin: 8px 0 12px; font-size: 13px; line-height: 1.4; color: var(--mute); }
+.ix-cmp-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.ix-cmp-table th, .ix-cmp-table td { text-align: left; vertical-align: top; padding: 8px 10px 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
+.ix-cmp-table thead th { font-weight: 500; padding-top: 0; }
+.ix-cmp-table tbody th { width: 28%; font-weight: 400; font-size: 13px; color: var(--mute); }
+.ix-cmp-table td[data-failed] { color: var(--warn); }
+.ix-cmp-table tr[data-same] td { color: var(--ink); background: color-mix(in srgb, var(--ox) 4%, transparent); }
+.ix-cmp-links { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 14px; }
+.ix-cmp-link { color: var(--ox); font-size: 14px; text-decoration: underline; overflow-wrap: anywhere; }
+@media (max-width: 640px) { .ix-cmp-panel { padding: 14px; } .ix-cmp-table th, .ix-cmp-table td { font-size: 14px; } }
+
+/* Phone: the small controls and labels read 14px (after every base rule, so these win). */
+@media (max-width: 640px) {
+  .ix-marker-dup, .ix-temp, .ix-card .ix-touch, .ix-cmp-note, .ix-cmp-close, .ix-cmp-table tbody th { font-size: 14px; }
+}
