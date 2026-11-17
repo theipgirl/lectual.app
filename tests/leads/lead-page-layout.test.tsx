@@ -158,7 +158,8 @@ describe("P1: composer tabs", () => {
     expect(coarse(rd("src/app/globals.css"), /\.lx-segs button,/)).toBe(true);
     expect(coarse(rd("src/components/matters/matter-page.css"), /\.lx-board-move \.lp-btn \{ min-height: 44px; \}/)).toBe(true);
     const pq = rd("src/app/dashboard/proposals/proposals.css");
-    expect(coarse(pq, /\.pq-seg \{ min-height: 44px; \}/)).toBe(true);
+    // The filter chips are the shared .lp-chip (44px in globals), not a private control.
+    expect(pq).not.toMatch(/\.pq-seg\b/);
     // The collapsed consults strip is gone (Spec 8); its row buttons are 44px at every width.
     expect(pq).toMatch(/\.pq-row-actions \.lx-btn[^{]*\{ min-height: 44px;/);
   });

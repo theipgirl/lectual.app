@@ -178,7 +178,7 @@ describe("the list's Last activity cell", () => {
 
   it("a paid mark reads 'Marked paid', never 'Edited'", () => {
     const line = lastActivityLine({ ...base, event: staff({ step: "paid_marked", outcome: "marked" }) });
-    expect(line).toBe("Marked paid 3h ago · Dawn");
+    expect(line).toBe("Marked paid 3 h ago · Dawn");
     expect(line).not.toMatch(/Edited/);
   });
 
@@ -189,19 +189,19 @@ describe("the list's Last activity cell", () => {
     [{ step: "accepted_file_upload", outcome: "failed" }, "Proposal not uploaded to Lawmatics"],
     [{ step: "loe_file_upload", outcome: "uploaded" }, "Engagement letter uploaded to Lawmatics"],
   ])("%j reads %s", (payload, label) => {
-    expect(lastActivityLine({ ...base, event: staff(payload) })).toBe(`${label} 3h ago · Dawn`);
+    expect(lastActivityLine({ ...base, event: staff(payload) })).toBe(`${label} 3 h ago · Dawn`);
     expect(stepActivityLabel(payload)).toBe(label);
   });
 
   it("the system's own notice or note is not news: the acceptance stays the headline", () => {
     const system: ActivityEvent = { type: "edited", actor: "system", actor_user_id: null, created_at: "2026-10-21T15:00:00Z", payload: { step: "lawmatics_note", outcome: "added" } };
-    expect(lastActivityLine({ ...base, event: system })).toBe("Accepted by the client · 4h ago");
+    expect(lastActivityLine({ ...base, event: system })).toBe("Accepted by the client · 4 h ago");
   });
 
   it("an ordinary staff edit on a non-accepted row is still 'Edited', and a payload-less accepted event keeps the acceptance line", () => {
-    expect(lastActivityLine({ ...base, key: "draft", event: staff(undefined) })).toBe("Edited 3h ago · Dawn");
-    expect(lastActivityLine({ ...base, event: staff(undefined) })).toBe("Accepted by the client · 4h ago");
-    expect(lastActivityLine({ ...base, event: "unavailable" })).toBe("Accepted by the client · 4h ago");
+    expect(lastActivityLine({ ...base, key: "draft", event: staff(undefined) })).toBe("Edited 3 h ago · Dawn");
+    expect(lastActivityLine({ ...base, event: staff(undefined) })).toBe("Accepted by the client · 4 h ago");
+    expect(lastActivityLine({ ...base, event: "unavailable" })).toBe("Accepted by the client · 4 h ago");
   });
 });
 

@@ -17,7 +17,7 @@
 import { PROVIDER_LABEL, type MeetingProvider } from "@/lib/meetings/types";
 import { relativeTime } from "@/lib/relative-time";
 import { isConsultTitle } from "@/lib/calendar/outlook-parse";
-import { dayMonth } from "./list-labels";
+import { civilDay, formatDay, formatDayTime } from "@/lib/ui/dates";
 
 export type ConsultMeeting = {
   id: string;
@@ -77,11 +77,9 @@ export function meetingRowHref(id: string): string {
   return `/dashboard/meetings/${encodeURIComponent(id)}/?from=proposals`;
 }
 
-/** "Oct 28, 2:30 PM" in the firm's zone; "Date unknown" when the provider gave none. */
+/** "Oct 28, 2:30 PM" in the firm's zone (the year only when it is not this year); "Date unknown" when the provider gave none. */
 export function meetingWhen(iso: string | null, tz: string): string {
-  const t = iso ? Date.parse(iso) : NaN;
-  if (Number.isNaN(t)) return "Date unknown";
-  return new Intl.DateTimeFormat("en-US", { timeZone: tz, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(t));
+  return formatDayTime(iso, { tz }) ?? "Date unknown";
 }
 
 /** The meeting page's back link: only the exact value `proposals` (a string, or a repeated key's first) shows one. */
@@ -90,18 +88,15 @@ export function meetingBackHref(from: string | string[] | undefined): string | n
   return v === "proposals" ? "/dashboard/proposals/" : null;
 }
 
-/** "today", "yesterday", a weekday within the last week, else "21 Aug" — all in the firm's zone. */
+/** "today", "yesterday", else "Aug 21" ("Aug 21, 2025" in an earlier year), all in the firm's zone. No weekday. */
 export function consultWhen(iso: string | null, now: number, tz: string): string {
   if (!iso) return "date unknown";
   const t = Date.parse(iso);
   if (Number.isNaN(t)) return "date unknown";
-  const civil = (ms: number) => new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(ms));
-  const today = civil(now);
-  const day = civil(t);
-  if (day === today) return "today";
-  if (day === civil(now - 86_400_000)) return "yesterday";
-  if (now - t < 6 * 86_400_000) return new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "long" }).format(new Date(t));
-  return dayMonth(iso, tz);
+  const day = civilDay(t, tz);
+  if (day === civilDay(now, tz)) return "today";
+  if (day === civilDay(now - 86_400_000, tz)) return "yesterday";
+  return formatDay(t, { tz, now: new Date(now) }) ?? "date unknown";
 }
 
 /** "Zoom consult · 21 Aug · 41 min · transcript synced". The duration is left out when the provider gave none. */

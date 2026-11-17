@@ -4,7 +4,7 @@ import { ROWS, item, PACKAGES, renderListPage as render, rowOf, segments, type O
 /**
  * The Quotes & proposals page (Sprint 6, B): header and subtitle from the firm's packages, the
  * segment column and the "Out with clients" tile, the table's columns, the footer and the note,
- * and what each failed read does. Every failure has its own text; none of them is "$0.00",
+ * and what each failed read does. Every failure has its own text; none of them is "$0",
  * "No proposals yet" or an empty strip.
  */
 
@@ -46,9 +46,9 @@ describe("Proposals page", () => {
   });
 
   describe("segments and the Out with clients tile", () => {
-    it("shows the five segments with counts from the unfiltered set, under a Show label", async () => {
+    it("shows the five segments with counts from the unfiltered set, as filter chips under a Show label", async () => {
       const html = await go();
-      expect(html).toContain(">Show<");
+      expect(html).toContain('aria-label="Show"');
       expect(html).not.toContain(">Segments<");
       expect(segments(html)).toEqual(["Current:8", "Out with a client:1", "Drafts and blocked:3", "Accepted:1", "Paid:0", "Expired:2"]);
     });
@@ -57,7 +57,7 @@ describe("Proposals page", () => {
       const html = await go({ segment: "out" });
       expect(html).toContain("Client s1");
       for (const other of ["a1", "a2", "b1", "e1", "e2", "c1", "x1"]) expect(html).not.toContain(`Client ${other}<`);
-      expect(html).toMatch(/aria-current="page"[^>]*><span>Out with a client/);
+      expect(html).toMatch(/aria-current="page"[^>]*>Out with a client/);
       expect(html.match(/aria-current="page"/g)).toHaveLength(1);
       expect(segments(html)).toEqual(["Current:8", "Out with a client:1", "Drafts and blocked:3", "Accepted:1", "Paid:0", "Expired:2"]);
     });
@@ -79,29 +79,29 @@ describe("Proposals page", () => {
         item("d1"),
       ];
       const html = await go({}, { rows });
-      expect(html).toContain("$8,550.00");
+      expect(html).toContain("$8,550");
       expect(html).toContain("2 proposals are out with a client, counted at the cheapest package offered.");
       expect(html).toContain(">Open offers<");
     });
 
     it("one proposal out reads in the singular, as in the design", async () => {
       const html = await go({}, { rows: [item("s1", { status: "sent", offered: [{ name: "Concierge", legalAtSigningCents: 660_000, usptoAtFilingCents: 175_000 }] })] });
-      expect(html).toContain("$6,600.00");
+      expect(html).toContain("$6,600");
       expect(html).toContain("1 proposal is out with a client, counted at the cheapest package offered.");
     });
 
-    it("nothing out is a real $0.00 with its own sentence", async () => {
+    it("nothing out is a real $0 with its own sentence", async () => {
       const html = await go({}, { rows: [item("d1")] });
-      expect(html).toContain("$0.00");
+      expect(html).toContain("$0");
       expect(html).toContain("No proposals are out with a client.");
     });
 
-    it("a failed proposals read shows — and 'couldn't be loaded', never $0.00, and no counts", async () => {
+    it("a failed proposals read shows — and 'couldn't be loaded', never $0, and no counts", async () => {
       const html = await go({}, { rows: "fail" });
-      expect(html).not.toContain("$0.00");
+      expect(html).not.toContain("$0");
       expect(html).toContain("Open offers couldn&#x27;t be loaded.");
       expect(html).toContain('class="pq-out-figure">—<');
-      expect(html).not.toContain("pq-count");
+      expect(html).not.toContain("lp-chip-count");
     });
   });
 
@@ -111,9 +111,9 @@ describe("Proposals page", () => {
       const heads = [...html.slice(html.indexOf("<thead")).matchAll(/<th[^>]*>([^<]*)<\/th>/g)].map((m) => m[1]).slice(0, 5);
       expect(heads).toEqual(["Proposal", "Client", "Status", "Client response", "Fees"]);
       const row = rowOf(html, "Client s1<");
-      expect([...row.matchAll(/<span class="pq-fee-n">([^<]*)<\/span> <span class="pq-fee-l">([^<]*)<\/span>/g)].map((m) => `${m[1]} ${m[2]}`)).toEqual(["$4,950.00 at signing", "$700.00 at filing"]);
+      expect([...row.matchAll(/<span class="pq-fee-n">([^<]*)<\/span> <span class="pq-fee-l">([^<]*)<\/span>/g)].map((m) => `${m[1]} ${m[2]}`)).toEqual(["$4,950 at signing", "$700 at filing"]);
       expect(html.toLowerCase()).not.toContain("total");
-      expect(html).not.toContain("$5,650.00");
+      expect(html).not.toContain("$5,650");
     });
 
     it("renders the title with brands, the ref sub-line, expires and the last activity for the design's statuses", async () => {
@@ -134,7 +134,7 @@ describe("Proposals page", () => {
       expect(sent).toContain("Drafted by the intake agent from the consult");
       const acc = rowOf(html, "Maison Petra");
       expect(acc).toContain("ENHANCED signed · 2 classes");
-      expect(acc).toContain("Signed 9 Sep");
+      expect(acc).toContain("Signed Sep 9");
       const exp = rowOf(html, "Orin &amp; Hale");
       expect(exp).toContain("Portfolio renewal — ORIN &amp; HALE");
       expect(exp).toContain("Expired Sep 4");
@@ -147,7 +147,7 @@ describe("Proposals page", () => {
       expect(blocked).toContain("Name the package.");
       expect(blocked.match(/Name the package\./g)).toHaveLength(2); // the Status line's text and its title
       expect(blocked).not.toContain("No package offered yet");
-      expect(blocked).toContain("Updated 1d ago");
+      expect(blocked).toContain("Updated 1 day ago");
       expect(blocked).toContain("Sep 30");
     });
 
@@ -155,18 +155,18 @@ describe("Proposals page", () => {
       const events = new Map([["d1", { type: "edited", actor: "staff", actor_user_id: "u1", created_at: "2026-10-20T13:00:00Z" }]]);
       const directory = [{ userId: "u1", displayName: "Taylor McGhee", email: "t@firm.example", role: "owner" }];
       const withName = await go({}, { rows: [item("d1")], events, directory });
-      expect(rowOf(withName, "Client d1<")).toContain("Edited 3h ago · Taylor");
+      expect(rowOf(withName, "Client d1<")).toContain("Edited 3 h ago · Taylor");
       vi.resetModules();
       const noDirectory = await go({}, { rows: [item("d1")], events, directory: "fail" });
-      expect(rowOf(noDirectory, "Client d1<")).toContain("Edited 3h ago");
+      expect(rowOf(noDirectory, "Client d1<")).toContain("Edited 3 h ago");
       expect(rowOf(noDirectory, "Client d1<")).not.toContain("·  Taylor");
       expect(rowOf(noDirectory, "Client d1<")).not.toContain("u1");
     });
 
     it("a failed events read still renders every Last activity cell, with a derived line", async () => {
       const html = await go({}, { events: "fail" });
-      expect(html).toContain('class="pq-mono pq-activity-line"');
-      for (const id of ["a1", "a2", "s1"]) expect(rowOf(html, `Client ${id}<`)).toMatch(/pq-activity-line"[^>]*>Updated 1d ago</);
+      expect(html).toContain('class="pq-meta pq-activity-line"');
+      for (const id of ["a1", "a2", "s1"]) expect(rowOf(html, `Client ${id}<`)).toMatch(/pq-activity-line"[^>]*>Updated 1 day ago</);
       expect(rowOf(html, "Client e1<")).toContain("Stored status still says sent");
       // Blocked: the reason lives in Status only.
       expect(rowOf(html, "Client b1<")).toContain("Add the pay link before creating the link.");
@@ -204,7 +204,7 @@ describe("Proposals page", () => {
   describe("states", () => {
     it("a failed proposals read says it couldn't load, not that there are none", async () => {
       const html = await go({}, { rows: "fail" });
-      expect(html).toContain("Proposals couldn&#x27;t be loaded");
+      expect(html).toContain("Can&#x27;t show proposals right now");
       expect(html).not.toContain("No proposals yet");
       expect(html).not.toContain("<tbody");
     });

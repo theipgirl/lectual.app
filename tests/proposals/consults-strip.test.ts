@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement, type ReactNode } from "react";
 
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock("@/app/dashboard/proposals/transcript-actions", () => ({ draftProposalFromMeetingAction: vi.fn(), draftProposalFromUploadAction: vi.fn() }));
 
 import { ConsultsStrip } from "@/components/proposal-list/ConsultsStrip";
@@ -107,16 +108,16 @@ describe("the list's three states", () => {
     expect(html).not.toContain("Can&#x27;t show meetings");
   });
 
-  it("a capped list says it shows the newest N, linking to Meetings", () => {
+  it("a capped list says how many of the total are shown, with a Show more link to Meetings", () => {
     const rows = Array.from({ length: 5 }, (_, i) => row({ id: `m${i}`, title: `Client ${i}` }));
     const html = render(data(rows, {}, 3));
     expect(html.match(/class="pq-row"/g)).toHaveLength(5);
-    expect(html).toContain("Showing the newest 5.");
-    expect(html).toMatch(/<a[^>]*href="\/dashboard\/meetings\/?"[^>]*>See all in Meetings<\/a>/);
+    expect(html).toContain("Showing 5 of 8");
+    expect(html).toMatch(/<a[^>]*href="\/dashboard\/meetings\/?"[^>]*>Show more<\/a>/);
   });
 
   it("no cap note when nothing was cut off", () => {
-    expect(render(data([row()]))).not.toContain("Showing the newest");
+    expect(render(data([row()]))).not.toContain("Showing ");
   });
 });
 

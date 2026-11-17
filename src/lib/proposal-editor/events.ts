@@ -13,6 +13,7 @@
  * to a guess and never to an exception.
  */
 
+import { formatMoney } from "@/lib/ui/format";
 import { describeStepEvent } from "@/lib/proposals/paid";
 import { EVENT_WORDS } from "./vocabulary";
 import { describePayLinkEvent } from "./pay-link";
@@ -40,17 +41,9 @@ export type EventLine = {
   text?: string;
 };
 
-/** "$4,950", or "$4,950.50" when there are cents. */
+/** "$4,950", or "$4,950.50" when there are cents (the one staff money formatter). */
 export function formatDollars(cents: number): string {
-  if (!Number.isFinite(cents)) return "—";
-  const rounded = Math.round(cents);
-  const whole = rounded % 100 === 0;
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: whole ? 0 : 2,
-    maximumFractionDigits: whole ? 0 : 2,
-  }).format(rounded / 100);
+  return formatMoney(cents);
 }
 
 function clip(s: string, n = 70): string {

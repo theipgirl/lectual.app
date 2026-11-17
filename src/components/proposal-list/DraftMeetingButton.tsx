@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
+import { SAVING } from "@/lib/ui/words";
 import { draftProposalFromMeetingAction, type TranscriptDraftState } from "@/app/dashboard/proposals/transcript-actions";
 
 /**
@@ -16,15 +17,15 @@ export function DraftMeetingButton({ meetingId }: { meetingId: string }) {
     <form action={action} className="pq-cta">
       <input type="hidden" name="meetingId" value={meetingId} />
       <button type="submit" className="lx-btn lx-btn-pri" disabled={pending || !!state.ok}>
-        {pending ? "Drafting…" : state.ok ? "Drafted" : "Draft the proposal"}
+        {pending ? SAVING : state.ok ? "Drafted" : "Draft the proposal"}
       </button>
       {state.error && (
-        <p role="alert" className="lx-note pq-cta-msg" style={{ color: "var(--wine)" }}>
+        <p role="alert" className="pe-msg pe-msg-err pq-cta-msg">
           {state.error}
         </p>
       )}
       {state.notice && (
-        <p role="status" className="lx-note pq-cta-msg" style={{ color: "var(--ok)" }}>
+        <p role="status" className="pe-msg pe-msg-ok pq-cta-msg">
           {state.notice} {state.href && <Link href={state.href}>Open the draft</Link>}
         </p>
       )}

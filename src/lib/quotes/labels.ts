@@ -9,6 +9,7 @@ import {
 import type { QuoteStatus } from "./status";
 import type { QuoteEventType } from "./types";
 import { FIRM_TIME_ZONE } from "./firm-time";
+import { formatDay, formatDayTime } from "@/lib/ui/dates";
 
 /**
  * Display vocabulary for the quote surfaces. Pure, so the builder's client
@@ -155,7 +156,7 @@ export function formatShortFirmDate(value: string | null | undefined, tz: string
   if (!value) return "";
   const ms = Date.parse(value.replace(/^(\d{4}-\d{2}-\d{2}) /, "$1T").replace(/([+-]\d{2})$/, "$1:00"));
   if (Number.isNaN(ms)) return "";
-  return new Intl.DateTimeFormat("en-US", { timeZone: tz, month: "short", day: "numeric" }).format(new Date(ms));
+  return formatDay(new Date(ms), { tz }) ?? "";
 }
 
 /** "Sep 10, 4:02 PM" in the firm's zone — the activity log's time column. */
@@ -163,13 +164,7 @@ export function formatFirmStamp(value: string | null | undefined, tz: string = F
   if (!value) return "";
   const ms = Date.parse(value);
   if (Number.isNaN(ms)) return value;
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: tz,
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(ms));
+  return formatDayTime(new Date(ms), { tz }) ?? value;
 }
 
 /** "7 days" / "1 day" / "today" / "passed" — the expiry countdown's words. */

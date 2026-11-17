@@ -6,7 +6,7 @@ import type { OpensKind } from "@/lib/proposals/opens";
  */
 export function OpensLine({ opens }: { opens: { kind: OpensKind; text: string } }) {
   return (
-    <div className="pq-mono pq-sub pq-opens" data-opens={opens.kind}>
+    <div className="pq-meta pq-sub pq-opens" data-opens={opens.kind}>
       {opens.text}
     </div>
   );

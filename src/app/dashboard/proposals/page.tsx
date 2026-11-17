@@ -40,6 +40,10 @@ import { pageTitle } from "@/lib/ui/page-title";
 import { FEE_SENTENCE, PROPOSALS_ALL_PAID, PROPOSALS_NAME, PROPOSALS_PAID_UNREADABLE, PROPOSALS_SUBLINE, proposalsPaidAsideNote } from "@/lib/ui/words";
 import { emptySegmentSentence } from "@/lib/proposals/list-copy";
 import { DELETE_DONE } from "@/lib/proposal-editor/delete-proposal";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { LoadFailedCard, LoadFailedLine } from "@/components/ui/LoadFailed";
+import { Notice } from "@/components/ui/Notice";
 
 export const metadata: Metadata = { title: pageTitle(PROPOSALS_NAME) };
 
@@ -135,7 +139,7 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
   const preselected = leadsRead?.status === "ok" ? preselectedLeadId(sp.lead, leadsRead.leads) : "";
   const paste = canDraftFromTranscript
     ? draftBlock ? (
-        <p className="lx-note" style={{ margin: 0 }} data-draft-block={draftBlock}>
+        <p className="lx-note" data-draft-block={draftBlock}>
           {DRAFT_BLOCK_NOTE[draftBlock]}
           {draftBlock === "no-settings" && (
             <>
@@ -147,95 +151,80 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
       ) : leadsRead?.status === "ok" ? (
         <TranscriptDraft leads={leadsRead.leads} maxChars={MAX_PASTED_TRANSCRIPT_CHARS} defaultLeadId={preselected} />
       ) : (
-        <p className="lx-note" style={{ margin: 0 }}>
-          The leads couldn&apos;t be loaded just now, so this form isn&apos;t offered. Refresh to try again.
-        </p>
+        <LoadFailedLine>The leads couldn&apos;t be loaded just now, so this form isn&apos;t offered. Refresh to try again.</LoadFailedLine>
       )
     : null;
 
-  return (
-    <div className="pq-layout">
-      <SegmentColumn active={segment} counts={counts} out={out} />
+  const newProposal = canWrite ? (
+    <Link href="/dashboard/proposals/new/" className="lx-btn lx-btn-pri">
+      New proposal
+    </Link>
+  ) : null;
 
-      <div className="pq-main">
-        <div className="lx-page-head lx-page-head-list">
-          <div style={{ flex: 1, minWidth: 260 }}>
-            <h1 className="lx-h1" data-tour="proposals-head">{PROPOSALS_NAME}</h1>
-            <p className="lx-sub">{PROPOSALS_SUBLINE}</p>
-            {sp.deleted === "1" && (
-              <p className="lx-note" role="status" style={{ margin: "6px 0 0" }}>
-                {DELETE_DONE}
-              </p>
-            )}
-          </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+  return (
+    <>
+      <PageHeader
+        title={PROPOSALS_NAME}
+        tour="proposals-head"
+        sub={PROPOSALS_SUBLINE}
+        actions={
+          <>
             {role && PROPOSAL_ADMIN_ROLES.includes(role) && (
               <Link href="/dashboard/settings/proposals/" className="lx-btn lx-btn-sec">
                 Settings
               </Link>
             )}
-            {canWrite && (
-              <Link href="/dashboard/proposals/new/" className="lx-btn lx-btn-pri">
-                New proposal
-              </Link>
-            )}
-          </div>
+            {newProposal}
+          </>
+        }
+      />
+      {sp.deleted === "1" && (
+        <Notice tone="ok" role="status">
+          {DELETE_DONE}
+        </Notice>
+      )}
+
+      <SegmentColumn active={segment} counts={counts} out={out} />
+
+      {failed ? (
+        <LoadFailedCard what="proposals" />
+      ) : paidUnreadable ? (
+        <div data-paid="unreadable">
+          <LoadFailedCard what="paid proposals" body={PROPOSALS_PAID_UNREADABLE} />
         </div>
+      ) : rows.length === 0 ? (
+        <EmptyState
+          title={all.length === 0 ? "No proposals yet" : segment === "everything" && paidCount > 0 ? PROPOSALS_ALL_PAID : emptySegmentSentence(segment)}
+          action={all.length === 0 ? newProposal : undefined}
+        >
+          {all.length === 0 ? (
+            canWrite ? (
+              "Start one from a consult below, a lead, or with New proposal. It stays a draft until a named approver creates its client link."
+            ) : (
+              "When one is started it will be listed here."
+            )
+          ) : segment === "everything" && paidCount > 0 ? (
+            <Link href="/dashboard/proposals/?segment=paid">Show paid</Link>
+          ) : (
+            <Link href="/dashboard/proposals/">Show all</Link>
+          )}
+        </EmptyState>
+      ) : (
+        <ProposalsTable rows={rows} footerLeft={footerLeft} footerRight={FEE_SENTENCE} />
+      )}
 
-        {failed ? (
-          <div className="lx-card lx-empty-card">
-            <h2 className="lx-h2" style={{ fontSize: 25 }}>
-              Proposals couldn&apos;t be loaded
-            </h2>
-            <p className="lx-note" style={{ margin: 0 }}>
-              Can&apos;t show this right now. Refresh to try again.
-            </p>
-          </div>
-        ) : paidUnreadable ? (
-          <div className="lx-card lx-empty-card" role="status" data-paid="unreadable">
-            <h2 className="lx-h2" style={{ fontSize: 25 }}>
-              Paid proposals couldn&apos;t be listed
-            </h2>
-            <p className="lx-note" style={{ margin: 0 }}>
-              {PROPOSALS_PAID_UNREADABLE}
-            </p>
-          </div>
-        ) : rows.length === 0 ? (
-          <div className="lx-card lx-empty-card">
-            <h2 className="lx-h2" style={{ fontSize: 25 }}>
-              {all.length === 0 ? "No proposals yet" : segment === "everything" && paidCount > 0 ? PROPOSALS_ALL_PAID : emptySegmentSentence(segment)}
-            </h2>
-            <p className="lx-note" style={{ margin: 0 }}>
-              {all.length === 0 ? (
-                canWrite ? (
-                  "Start one from a consult below, a lead, or with New proposal. It stays a draft until a named approver creates its client link."
-                ) : (
-                  "When one is started it will be listed here."
-                )
-              ) : segment === "everything" && paidCount > 0 ? (
-                <Link href="/dashboard/proposals/?segment=paid">Show paid</Link>
-              ) : (
-                <Link href="/dashboard/proposals/">Show all</Link>
-              )}
-            </p>
-          </div>
-        ) : (
-          <ProposalsTable rows={rows} footerLeft={footerLeft} footerRight={FEE_SENTENCE} />
-        )}
+      <LegacyProposals items={legacy} />
 
-        <LegacyProposals items={legacy} />
-
-        <ConsultsStrip
-          data={strip}
-          canDraft={canDraftFromTranscript}
-          draftNote={draftBlock ? DRAFT_BLOCK_NOTE[draftBlock] : null}
-          paste={paste}
-          pasteOpen={preselected !== "" && !draftBlock}
-          sync={<SyncMeetingsControl control={syncControl(role, syncConns)} />}
-          leads={canDraftFromTranscript ? (leadsRead?.status === "ok" ? leadsRead.leads : null) : undefined}
-        />
-      </div>
-    </div>
+      <ConsultsStrip
+        data={strip}
+        canDraft={canDraftFromTranscript}
+        draftNote={draftBlock ? DRAFT_BLOCK_NOTE[draftBlock] : null}
+        paste={paste}
+        pasteOpen={preselected !== "" && !draftBlock}
+        sync={<SyncMeetingsControl control={syncControl(role, syncConns)} />}
+        leads={canDraftFromTranscript ? (leadsRead?.status === "ok" ? leadsRead.leads : null) : undefined}
+      />
+    </>
   );
 }
 
