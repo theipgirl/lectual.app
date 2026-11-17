@@ -40,3 +40,28 @@ Only questions that only these people can answer. No answer is guessed in the co
 | R6 | The five **follow-up email texts** (Day 1, 2, 4, 6, 7) and the **"last day" sentence** for the proposal email. | 7 | Not drafted; default template only after your OK |
 | R7 | The **over-time nudge** texts per client-waiting stage. | 8 | Task only, no email |
 | R8 | The **welcome email** and **questionnaire** used when a client is signed and paid: the current ones, unchanged? | 5 | The current ones |
+
+## Answers (Taylor, Nov 17, in this order, as given)
+
+How Taylor's reply lines were matched to the questions is our reading; items marked "(check)" should be confirmed.
+
+| # | Answer | What it means for the plan |
+|---|---|---|
+| T1 | "yes" | OK to apply 0103 and 0106 to lectual-prod (director applies; dev first as usual) |
+| T2 | "i will get the key" | Taylor gets the USPTO API key; the watcher stays "not switched on" until it is set |
+| T3 | "rebeccas" | Rebecca's Adobe Sign account (the firm's own, per-firm connection) |
+| T4 | "the custom lawmatics pay link" | The "invoice" is the firm's custom Lawmatics pay link on the proposal; Lectual creates no invoice |
+| T5 | "yes" | Signed and paid moves the lead to a `won` stage (a second named exception beside the hired-matter sync) |
+| T6 | "will get her access soon" | Dawn's access is coming; role/billing list still to set (check which) |
+| T7 | "owners can see what mailbox is connected" | Owners (only) may see whether a colleague's Outlook is connected; needs the small schema change |
+| T8 | (no answer) | Open |
+| C1 | "its in the SOP" | Stage list is in Caitlyn's SOP; read it from there (director holds the SOPs) |
+| C2 | "pending" | Open |
+| C3 | "pending" | Open |
+| C4 | "amor" | Follow-up tasks go to Amor (check: Amor's account/role in Lectual) |
+| C5 | (no answer) | Open (check) |
+| C6 | "zoom or fathom" | The Monday call is recorded in Zoom or Fathom; title and account still needed (check) |
+| C7 | "in the sop" | Roles are in the SOP |
+| C8 | "rayn her and rebecca" | Deadline alerts go to Rayn, Caitlyn and Rebecca (check: "her" = Caitlyn) |
+| R1–R7 | "will get with rebecca on these" | Open; Taylor will take them to Rebecca |
+| R8 | "the welcome email is in the trademarks@ email" | Use the welcome email as it stands in the trademarks@ mailbox; questionnaire still to confirm |
