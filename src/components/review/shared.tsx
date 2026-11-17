@@ -4,6 +4,8 @@ import { limitTags, rowTags } from "@/lib/review/tags";
 import type { ReviewRow } from "@/lib/review/buckets";
 import { reviewHref, type ReviewParams } from "@/lib/review/params";
 import { Pill } from "@/components/ui/Pill";
+import { REVIEW_SHOWS_PROPOSALS } from "@/lib/review/scope";
+import { lastChangedText } from "@/lib/review/last-changed";
 
 type Member = { userId: string; name: string };
 
@@ -15,6 +17,20 @@ export function openHref(params: ReviewParams, row: Pick<ReviewRow, "kind" | "id
   return reviewHref({ ...params, open: { kind: row.kind, id: row.id } });
 }
 
+/**
+ * The quiet "Changed by Caitlyn · Nov 16" line. Draws NOTHING when the last-change read failed (`lastChange` unset): a failed read is
+ * never "not changed", and the page's "Some details couldn't load" note names it. Name, date and the stamp only: no address, note or payload.
+ */
+export function LastChanged({ row, members, today }: { row: Pick<ReviewRow, "lastChange">; members: Member[]; today: string }) {
+  const text = lastChangedText(row.lastChange, new Map(members.map((m) => [m.userId, m.name])), today);
+  if (!text) return null;
+  return (
+    <span className="lx-note rv-changed" data-last-changed="">
+      {text}
+    </span>
+  );
+}
+
 export function Avatar({ name }: { name: string }) {
   return (
     <span className="rv-avatar" role="img" title={name} aria-label={name}>
@@ -24,7 +40,10 @@ export function Avatar({ name }: { name: string }) {
 }
 
 export function Tags({ row, today, max, skip }: { row: ReviewRow; today: string; max?: number; /** Tags the card already says elsewhere (the column heading, the meta line). */ skip?: ("waiting" | "expiry")[] }) {
-  const all = rowTags(row, today).filter((t) => !(skip?.includes("waiting") && t.text.startsWith("Waiting on ")) && !(skip?.includes("expiry") && row.proposalExpiry && t.text === row.proposalExpiry.text));
+  // A proposal's expiry is never drawn in the first wave (REVIEW_SHOWS_PROPOSALS), whatever `skip` says.
+  const all = rowTags(row, today).filter(
+    (t) => !(skip?.includes("waiting") && t.text.startsWith("Waiting on ")) && !(row.proposalExpiry && t.text === row.proposalExpiry.text && (!REVIEW_SHOWS_PROPOSALS || skip?.includes("expiry"))),
+  );
   const { shown, more } = limitTags(all, max ?? all.length);
   if (shown.length === 0) return null;
   return (

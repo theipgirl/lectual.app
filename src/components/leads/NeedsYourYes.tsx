@@ -11,10 +11,12 @@ import { MEANING_TONE } from "@/lib/ui/tones";
 import type { NeedsYesView } from "@/lib/lead-step/view-model";
 import { leadStepEditAction, leadStepNotThisAction, leadStepSendBackAction, leadStepYesAction } from "@/lib/lead-step/actions";
 import { holdSeconds, nextHold } from "./lead-step-hold";
+import { isDone, noticeFor, settle, toggleEdit, type ActionKind, type CardState, type Mode, type Outcome } from "./lead-step-card";
 import { useStepSay } from "./TopCardFrame";
 import {
   CANCEL,
   LEAD_PAGE_ACTION_FAILED,
+  LEAD_PAGE_YES_UNCONFIRMED,
   LEAD_PAGE_APPROVALS_LINK,
   LEAD_PAGE_CHECK_FIRST,
   LEAD_PAGE_DONE_EDITING_YES,
@@ -36,17 +38,13 @@ import {
   LEAD_STEP_TO,
   LEAD_STEP_YES,
   DECK_FIRST_STEP,
-  DECK_OPEN_DRAFT,
   SAVING,
 } from "@/lib/ui/words";
 
-type Mode = "idle" | "editing" | "rejecting" | "sending-back";
-type Outcome = { ok: true; message: string; webLink?: string | null } | { ok: false; error: string };
 
 /** The first lines of a draft are shown; the rest sit behind "Show the whole draft". Paragraphs are plain React text. */
 const SHOWN_PARAGRAPHS = 5;
 const paragraphs = (body: string): string[] => body.split(/\n{2,}|\n/).map((p) => p.trim()).filter(Boolean);
-const httpsOnly = (href: string | null | undefined): string | null => (href && /^https:\/\//i.test(href) ? href : null);
 
 /**
  * The top card when something needs a yes: the prepared item inline, with Yes / Edit / Not this. Every button is
@@ -55,10 +53,11 @@ const httpsOnly = (href: string | null | undefined): string | null => (href && /
  */
 export function NeedsYourYes({ leadId, view, initial }: { leadId: string; view: NeedsYesView; initial?: { mode?: Mode; holding?: number; outcome?: Outcome; body?: string; reason?: string } }) {
   const say = useStepSay();
-  const [mode, setMode] = useState<Mode>(initial?.mode ?? "idle");
+  const [card, setCard] = useState<CardState>({ mode: initial?.mode ?? "idle", body: initial?.body ?? view.email?.body ?? "", outcome: initial?.outcome ?? null });
+  const { mode, body, outcome } = card;
+  const setMode = (m: Mode) => setCard((c) => ({ ...c, mode: m }));
+  const setBody = (b: string) => setCard((c) => ({ ...c, body: b }));
   const [holding, setHolding] = useState<number | null>(initial?.holding ?? null);
-  const [outcome, setOutcome] = useState<Outcome | null>(initial?.outcome ?? null);
-  const [body, setBody] = useState(initial?.body ?? view.email?.body ?? "");
   const [reason, setReason] = useState(initial?.reason ?? "");
   const [note, setNote] = useState("");
   const [pending, startTransition] = useTransition();
@@ -75,19 +74,19 @@ export function NeedsYourYes({ leadId, view, initial }: { leadId: string; view: 
     [],
   );
 
-  const settle = (r: Outcome) => {
-    setOutcome(r);
-    if (!r.ok) return;
-    setMode("idle");
-    if (say) say({ tone: "ok", message: r.message, href: httpsOnly(r.webLink), hrefLabel: DECK_OPEN_DRAFT });
-  };
-  const run = (action: () => Promise<Outcome>) =>
+  // Only Yes, Not this and Send back end the card; a saved edit says its sentence and leaves the buttons. The approval
+  // link is built from `itemId`, captured here, before the page refresh can swap the card.
+  const itemId = view.itemId;
+  const run = (kind: ActionKind, action: () => Promise<Outcome>) =>
     startTransition(async () => {
+      let r: Outcome;
       try {
-        settle(await action());
+        r = await action();
       } catch {
-        settle({ ok: false, error: LEAD_PAGE_ACTION_FAILED });
+        r = { ok: false, error: kind === "yes" ? LEAD_PAGE_YES_UNCONFIRMED : LEAD_PAGE_ACTION_FAILED };
       }
+      setCard((c) => settle(c, kind, r));
+      if (r.ok && say) say(noticeFor(kind, r, itemId));
     });
 
   // The hold. Only the tick that ends it posts; Undo posts nothing at all.
@@ -102,7 +101,7 @@ export function NeedsYourYes({ leadId, view, initial }: { leadId: string; view: 
       if (!step.fire) return;
       if (timer.current) clearInterval(timer.current);
       timer.current = null;
-      run(() => leadStepYesAction(leadId, view.itemId));
+      run("yes", () => leadStepYesAction(leadId, view.itemId));
     }, 1000);
   };
   const undo = () => {
@@ -111,7 +110,7 @@ export function NeedsYourYes({ leadId, view, initial }: { leadId: string; view: 
     setHolding(nextHold({ holding: 1 }, "undo", seconds).state.holding);
   };
 
-  const done = outcome?.ok === true;
+  const done = isDone(card);
   const busy = pending || holding !== null || done;
   const editing = mode === "editing";
   const shown = view.email ? paragraphs(view.email.body) : [];
@@ -176,17 +175,14 @@ export function NeedsYourYes({ leadId, view, initial }: { leadId: string; view: 
           </label>
           <textarea id={bodyId} className="lx-input ls-draft" rows={Math.min(20, Math.max(8, body.split("\n").length + 2))} value={body} onChange={(e) => setBody(e.target.value)} />
           <div className="ls-act">
-            <button type="button" className="lx-btn lx-btn-sec" disabled={pending} onClick={() => run(() => leadStepEditAction(leadId, view.itemId, body))}>
+            <button type="button" className="lx-btn lx-btn-sec" disabled={pending} onClick={() => run("edit", () => leadStepEditAction(leadId, view.itemId, body))}>
               {pending ? SAVING : LEAD_PAGE_EDIT_SAVE}
             </button>
             <button
               type="button"
               className="lx-btn lx-btn-ghost"
               disabled={pending}
-              onClick={() => {
-                setBody(view.email?.body ?? "");
-                setMode("idle");
-              }}
+              onClick={() => setCard((c) => toggleEdit({ ...c, mode: "editing" }, view.email?.body ?? ""))}
             >
               {CANCEL}
             </button>
@@ -214,7 +210,7 @@ export function NeedsYourYes({ leadId, view, initial }: { leadId: string; view: 
         <ul className="ls-why" aria-label={LEAD_PAGE_WHY}>
           {view.why.map((w, i) => (
             <li key={i}>
-              <b>{w.checkFirst ? LEAD_PAGE_CHECK_FIRST : DECK_FIRST_STEP} </b>
+              {w.checkFirst ? <b>{LEAD_PAGE_CHECK_FIRST} </b> : i === 0 ? <b>{DECK_FIRST_STEP} </b> : null}
               {w.text.replace(/^(check first|first step):\s*/i, "")}
             </li>
           ))}
@@ -229,10 +225,10 @@ export function NeedsYourYes({ leadId, view, initial }: { leadId: string; view: 
           onSubmit={(e) => {
             e.preventDefault();
             if (!reason.trim()) {
-              setOutcome({ ok: false, error: LEAD_STEP_REASON_NEEDED });
+              setCard((c) => ({ ...c, outcome: { ok: false, error: LEAD_STEP_REASON_NEEDED } }));
               return;
             }
-            run(() => leadStepNotThisAction(leadId, view.itemId, reason));
+            run("not-this", () => leadStepNotThisAction(leadId, view.itemId, reason));
           }}
         >
           <label className="lx-label" htmlFor={reasonId}>
@@ -255,7 +251,7 @@ export function NeedsYourYes({ leadId, view, initial }: { leadId: string; view: 
           className="ls-reason"
           onSubmit={(e) => {
             e.preventDefault();
-            run(() => leadStepSendBackAction(leadId, view.itemId, note));
+            run("send-back", () => leadStepSendBackAction(leadId, view.itemId, note));
           }}
         >
           <label className="lx-label" htmlFor={noteId}>
@@ -292,7 +288,7 @@ export function NeedsYourYes({ leadId, view, initial }: { leadId: string; view: 
             </button>
           )}
           {view.actions.edit && view.email && (
-            <button type="button" className="lx-btn lx-btn-sec" disabled={busy} aria-expanded={editing} onClick={() => setMode(editing ? "idle" : "editing")}>
+            <button type="button" className="lx-btn lx-btn-sec" disabled={busy} aria-expanded={editing} onClick={() => setCard((c) => toggleEdit(c, view.email?.body ?? ""))}>
               {LEAD_STEP_EDIT}
             </button>
           )}
@@ -302,7 +298,7 @@ export function NeedsYourYes({ leadId, view, initial }: { leadId: string; view: 
             </button>
           )}
           {view.sendBack && (
-            <button type="button" className="lx-btn lx-btn-sec" disabled={busy} onClick={() => setMode("sending-back")}>
+            <button type="button" className="lx-btn lx-btn-sec" disabled={busy || editing} onClick={() => setMode("sending-back")}>
               {LEAD_STEP_SEND_BACK}
             </button>
           )}
@@ -335,7 +331,7 @@ export function NeedsYourYes({ leadId, view, initial }: { leadId: string; view: 
       {view.others && (
         <p className="ls-line ls-lined">
           {view.others}.{" "}
-          <Link className="lx-link" href="/dashboard/queue/">
+          <Link className="lx-link" href="/dashboard/queue/?who=all">
             {LEAD_PAGE_APPROVALS_LINK}
           </Link>
         </p>

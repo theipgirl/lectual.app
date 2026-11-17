@@ -49,7 +49,7 @@ export function MatterBoard(props: {
         key={m.id}
         id={matterCardId(m.id)}
         href={rc?.openHref ?? `/dashboard/matters/${m.id}/`}
-        scroll={rc ? false : undefined}
+        linkScroll={rc ? false : undefined}
         title={matterLabel(m)}
         tone={age.stale ? "risk" : needsReview ? "warn" : undefined}
         meta={owner && !rc ? `${m.matter_number} · ${owner}` : m.matter_number}

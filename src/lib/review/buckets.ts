@@ -1,6 +1,7 @@
 import type { Direction, Waiting } from "./waiting";
 import type { ContactKind } from "./contact";
 import type { ProposalExpiryTag } from "./proposal-expiry";
+import type { LastChange } from "./last-changed";
 
 /**
  * The weekly review's sections. Pure: rows in, buckets out. A row is in exactly ONE section, the
@@ -30,7 +31,10 @@ export type ReviewRow = {
   kind: ReviewKind;
   id: string;
   href: string;
+  /** The person's name first (a lead's company stands in only when there is no person's name). */
   client: string;
+  /** A lead's company, when the person's name leads and the company is a different thing. */
+  company?: string | null;
   mark: string | null;
   stageLabel: string | null;
   /** The current stage's id (the matter's docket stage, or the lead's pipeline stage), when known. */
@@ -53,6 +57,8 @@ export type ReviewRow = {
   lastDirection: Direction | null;
   /** YYYY-MM-DD in the firm's zone of the newest OUTBOUND contact (we emailed / called). Null = none recorded or unreadable (see `contactKnown`). */
   lastOutbound?: string | null;
+  /** What that newest outbound contact was: an email we sent or a call we logged. */
+  lastOutboundType?: ContactKind | null;
   /** Where the lead / matter came from (`referral_source`), if recorded. */
   source?: string | null;
   nextStep: ReviewNextStep | null;
@@ -62,6 +68,8 @@ export type ReviewRow = {
   proposalExpiry?: ProposalExpiryTag | null;
   /** Stored files plus (matters, Document Center firms) generated letters. Absent = not counted or the count failed: never drawn as 0. */
   documentCount?: number | null;
+  /** The newest change of the record (who, when). `undefined` = the read failed (no line is drawn); `null` = read, and no change row. */
+  lastChange?: LastChange | null;
 };
 
 export const BUCKET_KEYS = ["overdue", "week", "needs", "quiet", "uspto", "track"] as const;

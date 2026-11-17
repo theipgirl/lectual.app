@@ -5,6 +5,7 @@ import { loadActiveQueue, type QueueLoad } from "@/lib/queue/load";
 import { mineQueue } from "@/lib/queue/mine-load";
 import { orgHasModule } from "@/lib/org/modules";
 import { listLeads, type Lead } from "@/lib/pipeline";
+import { loadIntakeStageIds, withoutIntake } from "@/lib/matters/intake-ids";
 import { listMatters, listTasks, listUpcomingDeadlines, summarizeDocket } from "@/lib/matters";
 import { buildCalendarRows } from "@/lib/matters/calendar-rows";
 import { BAND_COPY } from "@/lib/matters/worklist";
@@ -88,7 +89,7 @@ export default async function TodayPage() {
     return <OwnerToday userId={session.user.id} role={session.role} email={session.user.email} metadata={session.user.user_metadata} />;
   }
   const now = new Date();
-  const [hasAgents, tz] = await Promise.all([orgHasModule("agents"), getFirmTimeZone()]);
+  const [hasAgents, tz, intakeIds] = await Promise.all([orgHasModule("agents"), getFirmTimeZone(), loadIntakeStageIds()]);
   const monthFloor = monthQueryFloor(now, tz);
 
   const [queueS, leadsS, mattersS, deadlinesS, tasksS, runsS, autopilotS, quotesS, connectionsS, submissionsS, closedS, membersS] =
@@ -135,7 +136,8 @@ export default async function TodayPage() {
   const closedDeadlines = closedS.status === "fulfilled" ? closedS.value : null;
   const members = membersS.status === "fulfilled" ? membersS.value : [];
 
-  const docket = matters ? summarizeDocket(matters, now) : null;
+  // Matters still in an intake stage are not on the Matters page, so they are not "open matters" here either.
+  const docket = matters ? summarizeDocket(withoutIntake(matters, intakeIds), now) : null;
   const rows = buildCalendarRows(deadlines ?? [], tasks ?? [], now);
   const overdue = rows.filter((r) => r.overdueDays > 0).length;
   const weekAgo = now.getTime() - 7 * 86_400_000;

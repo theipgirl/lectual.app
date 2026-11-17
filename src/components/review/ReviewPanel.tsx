@@ -1,3 +1,4 @@
+import { REVIEW_SHOWS_PROPOSALS } from "@/lib/review/scope";
 import Link from "next/link";
 import type { ReviewRow } from "@/lib/review/buckets";
 import type { DetailLoad } from "@/lib/review/detail-load";
@@ -22,7 +23,8 @@ import {
 import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadFailedLine } from "@/components/ui/LoadFailed";
 import { Pill } from "@/components/ui/Pill";
-import { ADD_TO_TIMELINE, BLANK, LAST_CONTACT, OWNER_COLUMN, TEAMMATE, UNASSIGNED, noneYet, ADD_ANOTHER_NEXT_STEP, ADD_NEXT_STEP } from "@/lib/ui/words";
+import { lastChangedText } from "@/lib/review/last-changed";
+import { ADD_TO_TIMELINE, BLANK, LAST_CHANGED_LABEL, LAST_CONTACT, OWNER_COLUMN, TEAMMATE, UNASSIGNED, noneYet, ADD_ANOTHER_NEXT_STEP, ADD_NEXT_STEP } from "@/lib/ui/words";
 import { ActForm } from "./ActForm";
 import { LostNurture } from "./LostNurture";
 import { PanelShell } from "./PanelShell";
@@ -107,6 +109,8 @@ export function ReviewPanel(props: PanelProps) {
   }
 
   const next = row.nextStep;
+  // No line when the last-change read failed (a failed read is never "not changed").
+  const changedLine = lastChangedText(row.lastChange, names, today);
   const due = next ? dueText(next.dueDate, today) : null;
   const stepNames = next ? who(next.assigneeId) : null;
   const otherSteps = detail.steps.ok ? detail.steps.items.filter((s) => s.id !== next?.id) : [];
@@ -123,6 +127,7 @@ export function ReviewPanel(props: PanelProps) {
     <PanelShell closeHref={closeHref} titleId={TITLE_ID} title={row.client}>
       <p className="lx-note rv-panel-kind">
         {open.kind === "lead" ? "Lead" : "Matter"}
+        {row.company ? ` · ${row.company}` : ""}
         {row.mark ? ` · ${row.mark}` : ""}
       </p>
 
@@ -134,6 +139,7 @@ export function ReviewPanel(props: PanelProps) {
         <Fact label={OWNER_COLUMN}>{who(detail.assignedTo) ?? UNASSIGNED}</Fact>
         <Fact label="Came from">{detail.cameFrom ?? BLANK}</Fact>
         <Fact label={LAST_CONTACT}>{lastContactText(row, today)}</Fact>
+        {changedLine && <Fact label={LAST_CHANGED_LABEL}>{changedLine}</Fact>}
         <Fact label="Waiting on">{row.waiting ? WAITING_LABEL[row.waiting] : BLANK}</Fact>
         <Fact label="USPTO deadline">
           {row.deadline ? (
@@ -145,7 +151,7 @@ export function ReviewPanel(props: PanelProps) {
             BLANK
           )}
         </Fact>
-        {row.proposalExpiry && (
+        {REVIEW_SHOWS_PROPOSALS && row.proposalExpiry && (
           <Fact label="Proposal">
             <Pill tone={row.proposalExpiry.expired ? "risk" : "mute"}>{row.proposalExpiry.text}</Pill>
           </Fact>

@@ -28,15 +28,17 @@ import { MovedOutNotice } from "@/components/matters/MovedOutNotice";
 import { loadMatterStages, type MatterStageRead } from "@/lib/matters/stages";
 import {
   defaultGroupChoice,
-  PHASE_GROUPS,
+  DRAWN_GROUPS,
   ALL_GROUPS,
+  intakeStageIds,
+  pastLoeView,
   boardStagesForChoice,
   filterByGroupChoice,
   firmHasPhases,
   parseGroupChoice,
   phaseGroupCounts,
 } from "@/lib/matters/phase-group";
-import { searchPlaceholder, BLANK, MATTERS_NAME, OWNER_COLUMN, TEAMMATE, UNASSIGNED, MATTER_GROUPS_NAV, MATTER_GROUP_ALL, MATTER_GROUP_EMPTY, MATTER_GROUP_LABEL, MATTER_PHASES_UNAVAILABLE, MATTER_STATUS_NAV } from "@/lib/ui/words";
+import { searchPlaceholder, BLANK, MATTERS_NAME, OWNER_COLUMN, TEAMMATE, UNASSIGNED, MATTER_GROUPS_NAV, MATTER_GROUP_ALL, MATTER_INTAKE_STAGES, MATTER_INTAKE_SHOW, MATTER_SHOWING_INTAKE, MATTER_BACK_TO_PAST_INTAKE, MATTER_ALL_INTAKE_BODY, MATTER_ALL_INTAKE_TITLE, MATTER_GROUP_EMPTY, MATTER_GROUP_LABEL, MATTER_PHASES_UNAVAILABLE, MATTER_STATUS_NAV } from "@/lib/ui/words";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import { matterIdsNeedingReview } from "./list-utils";
@@ -67,9 +69,9 @@ export const dynamic = "force-dynamic";
  * Filters are links (a filtered worklist is a shareable URL); the server
  * re-filters on navigation.
  */
-export default async function MattersPage({ searchParams }: { searchParams: Promise<{ seg?: string; q?: string; view?: string; group?: string; open?: string | string[] }> }) {
+export default async function MattersPage({ searchParams }: { searchParams: Promise<{ seg?: string; q?: string; view?: string; group?: string; intake?: string; open?: string | string[] }> }) {
   const rawParams = await searchParams;
-  const { seg: segRaw, q, view, group: groupRaw } = rawParams;
+  const { seg: segRaw, q, view, group: groupRaw, intake: intakeRaw } = rawParams;
   // No `view` opens the Board; the explicit list value (and any other value) is the list, as before.
   const boardView = mattersViewFromParam(view) === "board";
   const seg: SegmentKey = isSegment(segRaw) ? segRaw : "open";
@@ -106,18 +108,27 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
   const grouped = stageRead.status === "ok" && firmHasPhases(stageList);
   // The default group depends on the status chip (Pre-filing only while it holds a matter under that filter), so it is
   // worked out for every status once; a link that omits `group` means "the default for the status it names".
-  const groupCountsBySeg = new Map(SEGMENTS.map((s) => [s.key, phaseGroupCounts(filterBySegment(all, s.key, sets))]));
+  // Only matters past Signed LOE are drawn: a matter on an intake-phase stage is counted and named in one line instead.
+  const intakeView = grouped ? pastLoeView(all, stageList, intakeStageIds(stageList)) : null;
+  const pastLoe = intakeView ? intakeView.matters : all;
+  const groupCountsBySeg = new Map(SEGMENTS.map((s) => [s.key, phaseGroupCounts(filterBySegment(pastLoe, s.key, sets))]));
   const defaultFor = (s: SegmentKey) => defaultGroupChoice(groupCountsBySeg.get(s)!);
   const group = parseGroupChoice(groupRaw) ?? defaultFor(seg);
-  const inGroup = grouped ? filterByGroupChoice(all, group) : all;
+  // `?intake=1` (reached from the notice line) lists the matters still in intake stages, and nothing else.
+  const showIntake = !!intakeView && intakeRaw === "1";
+  const inGroup = showIntake ? intakeView.intake : grouped ? filterByGroupChoice(pastLoe, group) : all;
   const counts = new Map(SEGMENTS.map((s) => [s.key, filterBySegment(inGroup, s.key, sets).length]));
-  const groupCounts = phaseGroupCounts(filterBySegment(all, seg, sets));
+  const groupCounts = phaseGroupCounts(filterBySegment(pastLoe, seg, sets));
+  const drawableStages = intakeView ? intakeView.stages : stageList;
   // Four chips. Review only when the queue was reached; the bands stay as headings below.
   const segments = LIST_CHIPS.filter((s) => s.key !== "review" || queue.status === "ok");
 
   const shown = searchMatters(filterBySegment(inGroup, seg, sets), search);
-  const boardStages = grouped ? boardStagesForChoice(stageList, group, shown) : stageList;
+  const boardStages = showIntake ? stageList.filter((s) => !drawableStages.some((d) => d.id === s.id)) : grouped ? boardStagesForChoice(drawableStages, group, shown) : stageList;
   const bands = groupIntoBands(shown);
+  // The intake line is about the Open chip only; with a search it counts the matches only.
+  const stillInIntake = intakeView && seg === "open" ? searchMatters(filterBySegment(intakeView.intake, seg, sets), search).length : 0;
+  const everyMatterInIntake = !showIntake && !!intakeView && all.length > 0 && pastLoe.length === 0;
   const memberName = new Map(members.map((m) => [m.userId, m.displayName ?? m.email ?? TEAMMATE]));
   const leadOptions = leads.map((l) => ({
     id: l.id,
@@ -146,8 +157,9 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
   });
   const openRef = parseCardOpen(rawParams.open);
 
-  const href = (next: { seg?: string; q?: string; view?: string | null; group?: string }) => {
+  const href = (next: { seg?: string; q?: string; view?: string | null; group?: string; intake?: boolean }) => {
     const p = new URLSearchParams();
+    if (next.intake ?? showIntake) p.set("intake", "1");
     const g = next.group ?? group;
     const s = (next.seg ?? seg) as SegmentKey;
     if (grouped && g !== defaultFor(s)) p.set("group", g);
@@ -169,21 +181,21 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
           label: searchPlaceholder("matters"),
           placeholder: searchPlaceholder("matters"),
           defaultValue: search,
-          hidden: { ...(boardView ? {} : { view: MATTERS_LIST_VALUE }), ...(seg !== "open" ? { seg } : {}), ...(grouped && group !== defaultFor(seg) ? { group } : {}) },
+          hidden: { ...(boardView ? {} : { view: MATTERS_LIST_VALUE }), ...(seg !== "open" ? { seg } : {}), ...(grouped && group !== defaultFor(seg) ? { group } : {}), ...(showIntake ? { intake: "1" } : {}) },
           clearHref: href({ q: "" }),
         }}
         toggle={<ViewToggle value={boardView ? "board" : "table"} hrefFor={(next) => href({ view: next === "board" ? null : MATTERS_LIST_VALUE })} />}
         primary={<OpenMatterButton />}
       />
 
-      {grouped && (
+      {grouped && !showIntake && (
         <FilterChips as="nav" label={MATTER_GROUPS_NAV}>
-          {PHASE_GROUPS.map((g) => (
+          {DRAWN_GROUPS.map((g) => (
             <Chip key={g} href={href({ group: g })} active={group === g} count={groupCounts[g]}>
               {MATTER_GROUP_LABEL[g]}
             </Chip>
           ))}
-          <Chip href={href({ group: ALL_GROUPS })} active={group === ALL_GROUPS} count={PHASE_GROUPS.reduce((n, g) => n + groupCounts[g], 0)}>
+          <Chip href={href({ group: ALL_GROUPS })} active={group === ALL_GROUPS} count={DRAWN_GROUPS.reduce((n, g) => n + groupCounts[g], 0)}>
             {MATTER_GROUP_ALL}
           </Chip>
         </FilterChips>
@@ -195,6 +207,16 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
           </Chip>
         ))}
       </FilterChips>
+      {showIntake && (
+        <p role="status" className="lx-note lx-state-line">
+          {MATTER_SHOWING_INTAKE} <Link href={href({ intake: false })}>{MATTER_BACK_TO_PAST_INTAKE}</Link>
+        </p>
+      )}
+      {!showIntake && stillInIntake > 0 && (
+        <p role="status" className="lx-note lx-state-line">
+          {MATTER_INTAKE_STAGES(stillInIntake, !!search)} · <Link href={href({ intake: true })}>{MATTER_INTAKE_SHOW}</Link>
+        </p>
+      )}
       {phasesFailed && (
         <Notice tone="warn" role="status">
           {MATTER_PHASES_UNAVAILABLE}
@@ -215,10 +237,10 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
         <LoadFailedCard what="matters" />
       ) : boardView && shown.length > 0 ? (
         <>
-        {grouped && <MovedOutNotice />}
+        {grouped && !showIntake && <MovedOutNotice />}
         <MatterBoard
           stages={boardStages}
-          moveStages={stageList}
+          moveStages={showIntake ? stageList : drawableStages}
           collapseEmpty={grouped}
           matters={shown}
           canMove={!!role && MATTER_WRITE_ROLES.includes(role)}
@@ -233,6 +255,8 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
           <EmptyState title="No matters yet" action={<OpenMatterButton />}>
             A matter opens when a lead signs, or from the form above.
           </EmptyState>
+        ) : everyMatterInIntake ? (
+          <EmptyState title={MATTER_ALL_INTAKE_TITLE}>{MATTER_ALL_INTAKE_BODY}</EmptyState>
         ) : (
           <EmptyState title="Nothing matches">
             {grouped && !search ? MATTER_GROUP_EMPTY(group) : "Try another filter or search."}

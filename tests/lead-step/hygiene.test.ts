@@ -116,6 +116,7 @@ describe("the lead step engine", () => {
       "src/app/dashboard/leads/[id]/page.tsx",
       "src/components/leads/FourFacts.tsx",
       "src/components/leads/NeedsYourYes.tsx",
+      "src/components/leads/OtherApprovals.tsx",
       "src/components/leads/TopCard.tsx",
       "src/components/leads/WhatLectualDid.tsx",
     ]);

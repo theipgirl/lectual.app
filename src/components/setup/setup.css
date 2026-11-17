@@ -99,3 +99,19 @@
 .su-card-warn {
   color: var(--warn);
 }
+
+/* Team accounts and "Your setup": one block per person, each item with its own pill. Tokens only. */
+.su-accounts { padding: 18px; display: grid; gap: 12px; }
+.su-accounts-sub { margin: 0; }
+.su-acct-list, .su-acct-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.su-acct { padding: 12px 0; display: grid; gap: 6px; }
+.su-acct + .su-acct { border-top: 1px solid var(--line-2); }
+.su-acct-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.su-acct-name { font-weight: 500; color: var(--ink); font-size: var(--fs-3); }
+.su-acct-item { display: grid; grid-template-columns: 160px auto minmax(0, 1fr); gap: 10px; align-items: baseline; padding: 4px 0; }
+.su-acct-label { color: var(--ink); font-size: var(--fs-2); }
+.su-acct-text { margin: 0; }
+@media (max-width: 640px) {
+  .su-acct-item { grid-template-columns: minmax(0, 1fr) auto; }
+  .su-acct-text { grid-column: 1 / -1; }
+}
