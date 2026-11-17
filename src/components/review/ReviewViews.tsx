@@ -11,7 +11,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadFailedLine } from "@/components/ui/LoadFailed";
 import { Pill } from "@/components/ui/Pill";
 import type { PillTone } from "@/lib/ui/tones";
-import { Avatar, openHref, Tags, type Common } from "./shared";
+import { Avatar, DocTag, openHref, Tags, type Common } from "./shared";
 import "@/components/list-page/list-page.css";
 import "./review.css";
 import { ViewToggle } from "@/components/ViewToggle";
@@ -85,6 +85,7 @@ function ReviewCard({ row, bucket, today, canWrite, params, followUp }: Common &
         <span className="lx-board-card-step">{row.nextStep ? row.nextStep.title : "No next step"}</span>
         {followUp && <span className="rv-card-followup lx-note">{followUpText(row, today)}</span>}
         <Tags row={row} today={today} max={2} skip={["waiting", "expiry"]} />
+        <DocTag row={row} />
       </Link>
       <div className="rv-card-acts">
         {canWrite && row.nextStep && <DoneButton taskId={row.nextStep.id} />}

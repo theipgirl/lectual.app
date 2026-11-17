@@ -4,8 +4,8 @@ import { Pill } from "@/components/ui/Pill";
 import { MEANING_TONE } from "@/lib/ui/tones";
 
 /**
- * "Needs attorney · N": this lead has drafts sitting in the approval queue for
- * an attorney's review. The tooltip lists the headlines, one per line.
+ * "Awaiting approval · N": this lead has drafts sitting in the approval queue for
+ * review. The tooltip lists the headlines, one per line.
  *
  * Informational only — it does not open, approve or send anything; the queue
  * stays the one place a draft is resolved. Renders nothing for an empty list,

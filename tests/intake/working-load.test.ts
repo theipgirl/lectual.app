@@ -5,6 +5,7 @@ import {
   ACTIVITY_SELECT,
   CONSULT_MAX_PAGES,
   readConsultLeadIds,
+  readConsults,
   REAL_ACTIVITY_FILTER,
   approvalsFact,
   loadWorkingFacts,
@@ -253,7 +254,34 @@ describe("loadWorkingFacts", () => {
   it("consults: its own query (is_consult, linked, from now, lead_id only), never the calendar read", async () => {
     const { db, calls } = fakeDb(() => ({ data: [{ lead_id: "a" }], error: null }));
     expect([...(await readConsultLeadIds(db, NOW))!]).toEqual(["a"]);
-    expect(calls[0]).toMatchObject({ table: "crm_calendar_event", select: "lead_id", eq: ["is_consult", true], not: ["lead_id", "is", null], gte: ["starts_at", NOW.toISOString()] });
+    expect(calls[0]).toMatchObject({ table: "crm_calendar_event", select: "lead_id, starts_at", eq: ["is_consult", true], not: ["lead_id", "is", null], gte: ["starts_at", new Date(NOW.getTime() - 30 * 86_400_000).toISOString()] });
+  });
+
+  it("consults: the Working set keeps 'from now on', while the soonest-start map keeps today (firm day) onward and ignores earlier days", async () => {
+    const earlierToday = new Date(NOW.getTime() - 2 * 3_600_000).toISOString();
+    const yesterday = new Date(NOW.getTime() - 20 * 3_600_000).toISOString();
+    const later = new Date(NOW.getTime() + 5 * 86_400_000).toISOString();
+    const soon = new Date(NOW.getTime() + 3_600_000).toISOString();
+    const { db } = fakeDb(() => ({
+      data: [
+        { lead_id: "yest", starts_at: yesterday },
+        { lead_id: "today", starts_at: earlierToday },
+        { lead_id: "both", starts_at: later },
+        { lead_id: "both", starts_at: soon },
+      ],
+      error: null,
+    }));
+    const read = (await readConsults(db, NOW, "UTC"))!;
+    expect([...read.leadIds].sort()).toEqual(["both"]);
+    expect(Object.fromEntries(read.starts)).toEqual({ today: earlierToday, both: soon });
+    // The latest consult that already started (within 30 days) per lead, for the "consult held" state.
+    expect(Object.fromEntries(read.pastStarts)).toEqual({ yest: yesterday, today: earlierToday });
+  });
+
+  it("consults: a failed read gives no start map (loadWorkingFacts: unavailable, no consultStarts)", async () => {
+    const f = await loadWorkingFacts({ stages: [], leadIds: ["a"], approvals, mailboxOn: true }, deps({}, (c) => (c.table === "crm_calendar_event" ? "throw" : { data: [], error: null })));
+    expect(f.consults).toEqual({ status: "unavailable" });
+    expect(f.consultStarts).toBeUndefined();
   });
 
   it("consults: a busy calendar is paged, not marked unknown; only an exhausted page budget fails", async () => {

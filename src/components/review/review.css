@@ -174,3 +174,7 @@
   .rv-card-acts .lx-link, .rv-card-acts button.lx-link { min-height: 44px; display: inline-flex; align-items: center; }
   .rv-since { min-height: 44px; }
 }
+
+/* Documents (panel and deck): layout only. */
+.rv-doc-link { overflow-wrap: anywhere; color: var(--ox); font-weight: 500; }
+.rv-docs li { display: block; }

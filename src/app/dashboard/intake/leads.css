@@ -28,7 +28,7 @@
 /* A person's full name always shows: it wraps at its spaces and hyphens, to a second line when it must (never an ellipsis). */
 .ix-name { display: block; font-size: var(--fs-3); line-height: 1.35; white-space: normal; overflow-wrap: break-word; word-break: normal; hyphens: none; }
 .ix-sub { display: block; font-size: var(--fs-1); line-height: 1.4; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* The stage pill and the person's own markers (Needs attorney, Needs a stage, Possible duplicate) share one wrapping line. */
+/* The stage pill and the person's own markers (Awaiting approval, Needs a stage, Possible duplicate) share one wrapping line. */
 .ix-stage-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-width: 0; }
 .ix-pill-btn { border: 0; font: inherit; font-size: var(--fs-1); font-weight: 500; line-height: 1.4; cursor: pointer; }
 .ix-pill-btn:hover { text-decoration: underline; }

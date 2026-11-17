@@ -1,3 +1,4 @@
+import { documentsTag } from "@/lib/review/documents";
 import { initials } from "@/lib/review/format";
 import { limitTags, rowTags } from "@/lib/review/tags";
 import type { ReviewRow } from "@/lib/review/buckets";
@@ -34,6 +35,17 @@ export function Tags({ row, today, max, skip }: { row: ReviewRow; today: string;
         </Pill>
       ))}
       {more > 0 && <Pill>+{more}</Pill>}
+    </div>
+  );
+}
+
+/** "3 documents" on a card, only when the count is known and above 0. A failed count read leaves the field unset, so nothing is drawn. */
+export function DocTag({ row }: { row: Pick<ReviewRow, "documentCount"> }) {
+  const text = documentsTag(row.documentCount);
+  if (!text) return null;
+  return (
+    <div className="rv-tags">
+      <Pill>{text}</Pill>
     </div>
   );
 }

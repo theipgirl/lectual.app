@@ -89,6 +89,9 @@ describe("sets: membership and the chips", () => {
     const open = chipCountsWithin(rowsInSet(rows, data, "open"), reads);
     expect(working).toMatchObject({ decision: 1, needsAttorney: 2, agent: null });
     expect(open).toMatchObject({ decision: 2, needsAttorney: 2 });
+    // "nur" is in a nurture stage: a pending draft there is not counted.
+    const withN = { ...reads, approvals: { status: "ok", byLead: { a: [{ headline: "h" }], w: [{ headline: "h" }], nur: [{ headline: "h" }] } } as never };
+    expect(chipCountsWithin(rows, withN).needsAttorney).toBe(2) /* a, w; not nur */;
     expect(chipCountsWithin(rows, { ...reads, decisionsRead: false, approvals: { status: "unavailable" } })).toMatchObject({ decision: null, needsAttorney: null });
   });
 });

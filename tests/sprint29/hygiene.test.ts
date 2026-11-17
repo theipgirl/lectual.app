@@ -90,12 +90,11 @@ describe("scope: no migration, no dependency, no new unsafe HTML", () => {
   });
 });
 
-describe("ON HOLD: the new RPB intake board is not built", () => {
-  it("no Consult Held - Proposal in Progress name, and no new alias for the scheduled stages", () => {
-    for (const file of SRC.filter((f) => /\.(ts|tsx)$/.test(f))) expect(read(file), file).not.toMatch(/Proposal in Progress/i);
+describe("RPB intake board (Taylor, 2026-11-17: Consult Held – Proposal in Progress, Proposal Sent)", () => {
+  it("the new names lead their lists, the old names stay for other firms, and the scheduled stages gain no alias", () => {
     expect(DEFAULT_STAGE_NAMES["consult-scheduled"]).toEqual(["Consultation Scheduled", "Consult Scheduled", "Consult Booked", "Strategy Session Scheduled", "Discovery Call Scheduled"]);
-    expect(DEFAULT_STAGE_NAMES["consult-held"]).toEqual(["Consult Held", "Consultation Held", "Consult Completed"]);
-    expect(DEFAULT_STAGE_NAMES["post-consult-sent"]).toEqual(["Post Consultation Email Sent", "Post Consult Email Sent", "Post Consultation Follow Up"]);
+    expect(DEFAULT_STAGE_NAMES["consult-held"]).toEqual(["Consult Held – Proposal in Progress", "Consult Held", "Consultation Held", "Consult Completed"]);
+    expect(DEFAULT_STAGE_NAMES["post-consult-sent"]).toEqual(["Proposal Sent", "Post Consultation Email Sent", "Post Consult Email Sent", "Post Consultation Follow Up"]);
   });
 
   it("the milestone order is the Sprint 26 order, and the milestone stage names carry no board names", () => {
@@ -111,7 +110,8 @@ describe("ON HOLD: the new RPB intake board is not built", () => {
       "loe_sent",
       "paid",
     ]);
-    expect(JSON.stringify(MILESTONE_STAGE_NAMES)).not.toMatch(/Strategy Session Scheduled.*Proposal in Progress/i);
+    expect(MILESTONE_STAGE_NAMES.consult_held[0]).toBe("Consult Held – Proposal in Progress");
+    expect(MILESTONE_STAGE_NAMES.proposal_sent[0]).toBe("Proposal Sent");
   });
 });
 

@@ -948,3 +948,22 @@ export const staffInsideFirm = (firmName: string) => `Lectual staff · you are i
 export const MATTERS_NAME = "Matters";
 export const DOCUMENTS_NAME = "Documents";
 export const NEW_LETTER = "New letter";
+
+// Review documents
+/** The weekly review's detail panel and Cards deck: a record's documents, and the way to comment on one. */
+export const REVIEW_DOCS_TITLE = "Documents";
+export const REVIEW_DOCS_EMPTY = "No documents yet.";
+export const REVIEW_DOCS_OPEN_ALL = "Open all documents";
+export const REVIEW_DOCS_COMMENT = "Comment on a document";
+export const REVIEW_DOCS_COMMENT_HINT = "Your comment is added to the timeline.";
+export const REVIEW_DOCS_OPEN = "Open";
+export const reviewDocsMore = (n: number, capped = false) => (capped ? `+${n} or more` : `+${n} more`);
+export const REVIEW_DOCS_LOAD_FAILED = "Documents couldn't be loaded.";
+export const reviewDocsCount = (n: number) => `${n} ${n === 1 ? "document" : "documents"}`;
+
+// Leads: a booked consult in the Last contact cell
+export const LEADS_TOUCH_CONSULT_TODAY = (time: string) => `Consult today · ${time}`;
+export const LEADS_TOUCH_CONSULT_LATER = (date: string) => `Consult · ${date}`;
+export const LEADS_TOUCH_CONSULT_HELD = (date: string) => `${OUR_TURN} · consult ${date}`;
+export const LEADS_TOUCH_CONSULT_HELD_TITLE = "The consult was held and nothing has been sent since.";
+export const LEADS_TOUCH_CONSULT_TITLE = "A consult is booked on the calendar, so that is the next thing for this lead.";

@@ -100,7 +100,7 @@ describe("Chip and FilterChips", () => {
         </FilterChips>
         <FilterChips label="Filters">
           <Chip active onClick={() => {}}>
-            Needs attorney
+            Awaiting approval
           </Chip>
         </FilterChips>
       </>,
@@ -108,7 +108,7 @@ describe("Chip and FilterChips", () => {
     expect(html).toContain('aria-label="Filter x"');
     expect(html).toMatch(/<a [^>]*aria-current="page"[^>]*class="lp-chip lp-chip-on"|<a [^>]*class="lp-chip lp-chip-on"[^>]*aria-current="page"/);
     expect(html).toContain('<span class="lp-chip-count">4</span>');
-    expect(html).toMatch(/<button type="button" aria-pressed="true" class="lp-chip lp-chip-on">Needs attorney<\/button>/);
+    expect(html).toMatch(/<button type="button" aria-pressed="true" class="lp-chip lp-chip-on">Awaiting approval<\/button>/);
     expect(chipClass(false)).toBe("lp-chip");
   });
 });

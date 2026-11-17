@@ -143,7 +143,7 @@ export default async function IntakePage({
   const modules = await activeOrgModulesOrNull().catch(() => null);
   const mailboxOn = modules ? modules.includes("mailbox") : null;
   const [workingFacts, lostCount, lostLeads, nurtureExtra] = await Promise.all([
-    loadWorkingFacts({ leadIds: intakeLeads.map((l) => l.id), stages, approvals: pendingApprovals, mailboxOn: mailboxOn ?? false, mailboxUnknown: mailboxOn === null }),
+    loadWorkingFacts({ leadIds: intakeLeads.map((l) => l.id), stages, approvals: pendingApprovals, mailboxOn: mailboxOn ?? false, mailboxUnknown: mailboxOn === null, timeZone: firmZone }),
     readLostCount(stages),
     lostView ? listLostLeads(stages) : Promise.resolve<LostLeads | null>(null),
     readNurtureExtra(stages, new Set(intakeLeads.map((l) => l.id))),
@@ -216,6 +216,9 @@ export default async function IntakePage({
     factsByLeadId: factsRead.status === "ok" ? factsRead.byLead : undefined,
     agentMoveByLeadId: agentMoves.status === "ok" ? agentMoves.chips : undefined,
     decisionByLeadId: decisions.status === "ok" ? decisions.byLead : undefined,
+    // A failed or skipped consult read leaves the map out: Last contact then reads as it always did.
+    consultStartByLeadId: workingFacts.consultStarts ? Object.fromEntries(workingFacts.consultStarts) : undefined,
+    pastConsultStartByLeadId: workingFacts.pastConsultStarts ? Object.fromEntries(workingFacts.pastConsultStarts) : undefined,
     now,
   });
 

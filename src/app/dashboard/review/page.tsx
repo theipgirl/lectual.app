@@ -28,9 +28,10 @@ import { applyReviewFilters, olderHiddenCount, sinceSuspended, DEFAULT_REVIEW_VI
 import { criticalAlert, detailsNote } from "@/lib/review/notes";
 import { noticeFor } from "@/lib/review/notice";
 import { buildDeck, chosenPerson, deckPeople } from "@/lib/review/deck";
-import { loadLatestNote, loadReviewDetail } from "@/lib/review/detail-load";
+import { loadDeckDocuments, loadLatestNote, loadReviewDetail } from "@/lib/review/detail-load";
 import { pageTitle } from "@/lib/ui/page-title";
 import { QUEUE_APPROVE_ROLES } from "@/lib/queue/roles";
+import { FILE_UPLOAD_ROLES } from "@/lib/files/roles";
 import { REVIEW_NAME, REVIEW_SHOW_ALL, REVIEW_SHOWING_ALL, REVIEW_SINCE_LABEL, REVIEW_SINCE_SUSPENDED, reviewIntro, reviewOlderHidden } from "@/lib/ui/words";
 
 export const metadata: Metadata = { title: pageTitle(REVIEW_NAME) };
@@ -103,7 +104,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const rest = offBoard(buckets);
 
   // Cards: one person's deck, built from every row that passes the search and the kind chips (Whose is ignored: the picker is the person).
-  let cards: { people: ReturnType<typeof deckPeople>; personId: string | null; card: ReturnType<typeof buildDeck>[number] | null; pos: ReturnType<typeof meetingPosition>; note: Awaited<ReturnType<typeof loadLatestNote>> | null } | null = null;
+  let cards: { people: ReturnType<typeof deckPeople>; personId: string | null; card: ReturnType<typeof buildDeck>[number] | null; pos: ReturnType<typeof meetingPosition>; note: Awaited<ReturnType<typeof loadLatestNote>> | null; docs: Awaited<ReturnType<typeof loadDeckDocuments>> | null } | null = null;
   if (params.view === "cards") {
     const deckBuckets = reviewBuckets(applyReviewFilters(load.rows, { ...filterParams, who: "all" }, userId), load.today);
     let people = deckPeople(load.members, boardLanes(deckBuckets, load.members).map((l) => l.userId));
@@ -112,12 +113,17 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
     const deck = buildDeck(deckBuckets, load.members, personId);
     const cardPos = meetingPosition(deck.length, params.i);
     const card = cardPos ? deck[cardPos.index] : null;
-    cards = { people, personId, card, pos: cardPos, note: card ? await loadLatestNote({ kind: card.row.kind, id: card.row.id }) : null };
+    // The current card only: one small read of its own record's documents, not every row's.
+    const [cardNote, cardDocs] = card ? await Promise.all([loadLatestNote({ kind: card.row.kind, id: card.row.id }), loadDeckDocuments({ kind: card.row.kind, id: card.row.id })]) : [null, null];
+    cards = { people, personId, card, pos: cardPos, note: cardNote, docs: cardDocs };
   }
 
   // The detail panel: the record is read AGAIN through the scoped client; the review row only supplies the computed facts.
-  const panel = params.open
-    ? { detail: await loadReviewDetail(params.open), row: load.rows.find((r) => r.kind === params.open!.kind && r.id === params.open!.id) ?? null }
+  const panelDetail = params.open ? await loadReviewDetail(params.open) : null;
+  // A merged lead opened by URL shows its keeper (the loader followed the pointer).
+  const shownOpen = params.open && panelDetail?.status === "ok" ? { kind: params.open.kind, id: panelDetail.openId ?? params.open.id } : params.open;
+  const panel = params.open && panelDetail && shownOpen
+    ? { detail: panelDetail, row: load.rows.find((r) => r.kind === shownOpen.kind && r.id === shownOpen.id) ?? null }
     : null;
   const notice = noticeFor(sp.notice);
 
@@ -233,7 +239,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
       ) : params.view === "cards" && cards ? (
         <>
           <PersonChips people={cards.people} personId={cards.personId} params={params} />
-          <CardsDeck card={cards.card} pos={cards.pos} personId={cards.personId} personName={cards.people.find((p) => p.userId === cards.personId)?.name ?? null} note={cards.note} {...common} />
+          <CardsDeck card={cards.card} pos={cards.pos} personId={cards.personId} personName={cards.people.find((p) => p.userId === cards.personId)?.name ?? null} note={cards.note} docs={cards.docs} timeZone={load.timeZone} {...common} />
         </>
       ) : params.view === "sheet" ? (
         <>
@@ -257,15 +263,16 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           )}
         </>
       )}
-      {panel && params.open && (
+      {panel && shownOpen && (
         <ReviewPanel
-          open={params.open}
+          open={shownOpen}
           row={panel.row}
           detail={panel.detail}
           today={load.today}
           timeZone={load.timeZone}
           members={load.members}
           canWrite={canWrite}
+          canUpload={!!role && FILE_UPLOAD_ROLES.includes(role)}
           canMove={canMove}
           closeStages={load.closeStages}
           closeHref={reviewHref({ ...params, open: null })}

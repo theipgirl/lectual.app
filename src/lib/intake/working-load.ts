@@ -2,6 +2,7 @@ import "server-only";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { readProposalExpiries } from "@/lib/review/load";
 import type { LeadPendingApprovals } from "./pending-approvals";
+import { civilDay, DEFAULT_ZONE } from "@/lib/stage-keeper/format";
 import { isPastFirstContact, leadsWithLiveProposal, type FactSet, type WorkingFacts, type WorkingStage } from "./working";
 
 /**
@@ -36,6 +37,8 @@ export const ACTIVITY_MAX_PAGES = 10;
 export const LEAD_ID_CHUNK = 100;
 export const BOOTH_MAX_PAGES = 20;
 export const CONSULT_MAX_PAGES = 10;
+/** How far back a held consult still says "our turn" on the Leads list. */
+export const PAST_CONSULT_DAYS = 30;
 
 /** The activity types that are real contact, whoever made them. */
 export const REAL_ACTIVITY_TYPES = ["email_sent", "email_received", "call_logged", "note", "voice_note"] as const;
@@ -139,16 +142,30 @@ export async function readBoothLeadIds(db: WorkingDb): Promise<Set<string>> {
   throw new Error("booth read exceeded its page budget");
 }
 
-/** Lead ids with a booked (future) consult. Throws when a page fails; before lectual 0098 (no columns) it is `null`. */
-export async function readConsultLeadIds(db: WorkingDb, now: Date): Promise<Set<string> | null> {
-  const found = new Set<string>();
+/**
+ * Booked consults, from ONE paged read: the lead ids with a consult from now on (the Working rule) and, for the Last-contact cell,
+ * each lead's SOONEST consult starting today (the firm's calendar day) or later. The query reaches back 30 days (for the held-consult state), so a consult
+ * earlier today still counts in any zone; the Working set keeps its own "from now on" test, applied here in JS.
+ * Throws when a page fails; before lectual 0098 (no columns) it is `null`.
+ */
+export async function readConsults(
+  db: WorkingDb,
+  now: Date,
+  timeZone: string = DEFAULT_ZONE,
+): Promise<{ leadIds: Set<string>; starts: Map<string, string>; pastStarts: Map<string, string> } | null> {
+  const leadIds = new Set<string>();
+  const starts = new Map<string, string>();
+  // Each lead's LATEST consult that already started, within the last 30 days (the Last-contact cell's "consult held" state).
+  const pastStarts = new Map<string, string>();
+  const today = civilDay(now.toISOString(), timeZone);
+  const lower = new Date(now.getTime() - PAST_CONSULT_DAYS * 86_400_000).toISOString();
   for (let i = 0; i < CONSULT_MAX_PAGES; i++) {
     const { data, error } = await db
       .from("crm_calendar_event")
-      .select("lead_id")
+      .select("lead_id, starts_at")
       .eq("is_consult", true)
       .not("lead_id", "is", null)
-      .gte("starts_at", now.toISOString())
+      .gte("starts_at", lower)
       .order("starts_at")
       .range(i * ACTIVITY_PAGE, i * ACTIVITY_PAGE + ACTIVITY_PAGE - 1);
     if (error) {
@@ -157,10 +174,34 @@ export async function readConsultLeadIds(db: WorkingDb, now: Date): Promise<Set<
       throw new Error("consult read failed");
     }
     const rows = data ?? [];
-    for (const r of rows) if (typeof r.lead_id === "string") found.add(r.lead_id);
-    if (rows.length < ACTIVITY_PAGE) return found;
+    for (const r of rows) {
+      if (typeof r.lead_id !== "string") continue;
+      const at = typeof r.starts_at === "string" ? Date.parse(r.starts_at) : NaN;
+      if (!Number.isFinite(at)) {
+        // No usable start: the old read counted the row, so the Working rule still does.
+        if (typeof r.starts_at !== "string") leadIds.add(r.lead_id);
+        continue;
+      }
+      if (at >= now.getTime()) leadIds.add(r.lead_id);
+      else {
+        const known = pastStarts.get(r.lead_id);
+        if (!known || at > Date.parse(known)) pastStarts.set(r.lead_id, r.starts_at as string);
+      }
+      const day = civilDay(r.starts_at as string, timeZone);
+      if (today && day && day >= today) {
+        const known = starts.get(r.lead_id);
+        if (!known || at < Date.parse(known)) starts.set(r.lead_id, r.starts_at as string);
+      }
+    }
+    if (rows.length < ACTIVITY_PAGE) return { leadIds, starts, pastStarts };
   }
   throw new Error("consult read exceeded its page budget");
+}
+
+/** Lead ids with a booked (future) consult. Throws when a page fails; before lectual 0098 (no columns) it is `null`. */
+export async function readConsultLeadIds(db: WorkingDb, now: Date): Promise<Set<string> | null> {
+  const read = await readConsults(db, now);
+  return read ? read.leadIds : null;
 }
 
 /** The queue's three states as a fact set: no queue connected means nothing can be pending. */
@@ -191,7 +232,7 @@ async function settle(read: () => Promise<FactSet>): Promise<FactSet> {
  * consults exist only with it; off = `skipped`, not "no consult").
  */
 export async function loadWorkingFacts(
-  opts: { leadIds: readonly string[]; stages: readonly WorkingStage[]; approvals: LeadPendingApprovals; mailboxOn: boolean; /** The firm's module list could not be read: consults are unavailable, not skipped. */ mailboxUnknown?: boolean },
+  opts: { leadIds: readonly string[]; stages: readonly WorkingStage[]; approvals: LeadPendingApprovals; mailboxOn: boolean; /** The firm's module list could not be read: consults are unavailable, not skipped. */ mailboxUnknown?: boolean; /** The firm's time zone: "today" for the soonest-consult map. */ timeZone?: string },
   deps?: WorkingFactsDeps,
 ): Promise<WorkingFacts> {
   let d = deps;
@@ -206,17 +247,22 @@ export async function loadWorkingFacts(
   const live = d;
   const { leadIds } = opts;
 
+  let consultStarts: ReadonlyMap<string, string> | undefined;
+  let pastConsultStarts: ReadonlyMap<string, string> | undefined;
   const [activity, proposals, consults, booth] = await Promise.all([
     settle(async () => ({ status: "ok", leadIds: await readRealActivityLeadIds(live.db, leadIds, (to) => isPastFirstContact(to, opts.stages)) })),
     settle(async () => ({ status: "ok", leadIds: leadsWithLiveProposal(await live.readProposals(leadIds)) })),
     settle(async (): Promise<FactSet> => {
       if (opts.mailboxUnknown) return { status: "unavailable" };
       if (!opts.mailboxOn) return { status: "skipped" };
-      const ids = await readConsultLeadIds(live.db, live.now);
-      return ids ? { status: "ok", leadIds: ids } : { status: "skipped" };
+      const read = await readConsults(live.db, live.now, opts.timeZone);
+      if (!read) return { status: "skipped" };
+      consultStarts = read.starts;
+      pastConsultStarts = read.pastStarts;
+      return { status: "ok", leadIds: read.leadIds };
     }),
     settle(async () => ({ status: "ok", leadIds: await readBoothLeadIds(live.db) })),
   ]);
 
-  return { activity, approvals: approvalsFact(opts.approvals), proposals, consults, booth };
+  return { activity, approvals: approvalsFact(opts.approvals), proposals, consults, booth, ...(consultStarts ? { consultStarts } : {}), ...(pastConsultStarts ? { pastConsultStarts } : {}) };
 }

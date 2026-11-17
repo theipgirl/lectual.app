@@ -15,10 +15,10 @@ import type { SourceSignal, StageOpt } from "./types";
  * contributes nothing at all. The value is a stage NAME resolved against the firm's own stages
  * with `resolveStage`, so a firm that has no such stage gets "unmapped", never a guess.
  */
-export const EMAIL_STAGE_TABLE: Partial<Record<EmailType, { label: string; stageName: string }>> = {
+export const EMAIL_STAGE_TABLE: Partial<Record<EmailType, { label: string; stageName: string | readonly string[] }>> = {
   "strategy-session-link": { label: "Strategy session link", stageName: "Potential New Client" },
   "discovery-call": { label: "Discovery call", stageName: "Consultation Scheduled" },
-  "post-consult": { label: "Post-consultation", stageName: "Post Consultation Email Sent" },
+  "post-consult": { label: "Post-consultation", stageName: ["Proposal Sent", "Post Consultation Email Sent"] },
   "loe-invoice": { label: "LOE and invoice", stageName: "LOE & Invoice Sent" },
 };
 
@@ -83,7 +83,9 @@ export function emailSignalFor(mail: readonly StoredMail[], stages: readonly Sta
   }
   const entry = EMAIL_STAGE_TABLE[newestMail!.type as EmailType]!;
   const wording = `${entry.label} email`;
-  const resolved = resolveStage(entry.stageName, stages);
+  // First candidate the firm has wins (RPB renamed "Post Consultation Email Sent" to "Proposal Sent", 2026-11-17).
+  const names = typeof entry.stageName === "string" ? [entry.stageName] : entry.stageName;
+  const resolved = names.map((n) => resolveStage(n, stages)).find((r) => r.ok) ?? resolveStage(names[0], stages);
   if (!resolved.ok) return { kind: "unmapped", wording };
   return { kind: "stage", stageId: resolved.stage.id, stageName: resolved.stage.name, wording, date: newestMail!.at };
 }

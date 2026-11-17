@@ -1,6 +1,7 @@
 import type { ReviewRow } from "@/lib/review/buckets";
 import { lastContactText, shortDate } from "@/lib/review/format";
 import { sheetSections, waitingCell } from "@/lib/review/sheet";
+import { documentsTag } from "@/lib/review/documents";
 import { contactWords } from "@/lib/review/contact";
 import { EDITABLE_COLUMNS, cellEditable, type SheetEditRow, type SheetPerms } from "@/lib/review/sheet-edit";
 import { roleLabel } from "@/lib/auth/roles";
@@ -28,6 +29,7 @@ function toSheetRow(r: ReviewRow, href: string, today: string): SheetEditRow {
     waitingText: waitingCell(r, (d) => shortDate(d, today)),
     contactIsDate: r.contactKnown && !!r.lastContact,
     contactText: r.contactKnown && r.lastContact ? shortDate(r.lastContact.date, today) : lastContactText(r, today),
+    documentsText: documentsTag(r.documentCount),
     contactTitle: r.contactKnown && r.lastContact ? lastContactText(r, today) : r.lastContact ? contactWords(r.lastContact.type) : null,
   };
 }

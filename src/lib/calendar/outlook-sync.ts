@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ConnectionRow } from "@/lib/mailbox/sync";
 import { ProviderError, hasCalendarScope } from "@/lib/mailbox/providers";
 import { isDatabaseUpdateNeeded } from "./outlook-errors";
+import { firmSendersFrom } from "@/lib/mailbox/firm-sender";
 import {
   buildLeadIndex,
   normaliseGraphEvent,
@@ -327,6 +328,7 @@ export async function syncOrgCalendars(
 
     const leadIndex = buildLeadIndex(args.leads ?? []);
     const firmAddresses = new Set(mine.map((c) => c.email.trim().toLowerCase()));
+    const firmSenders = firmSendersFrom(mine.map((c) => c.email));
     const window = calendarWindow(deps.now);
     let attemptedFailed = 0;
 
@@ -344,7 +346,7 @@ export async function syncOrgCalendars(
         const accessToken = await deps.getAccessToken(conn);
         const read = await readCalendarView({ accessToken, window, fetchImpl: deps.fetchImpl });
         const stored = read.events
-          .map((e) => normaliseGraphEvent(e, { leadIndex, firmAddresses }))
+          .map((e) => normaliseGraphEvent(e, { leadIndex, firmAddresses, firmSenders }))
           .filter((e): e is NormalisedEvent => e !== null);
         const work = await writeConnection(deps, conn, read, stored, window);
         if (work.kind === "database-update-needed") {
