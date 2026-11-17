@@ -503,6 +503,7 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
                 requests={canSendIntake ? intakeRequests.requests : intakeRequests.requests.map((r) => ({ ...r, token: "" }))}
                 formReady={intakeRequests.formReady}
                 canSend={canSendIntake}
+                tz={tz}
               />
             )
           ) : intakeRequests.status === "unavailable" ? (
@@ -520,6 +521,7 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
             directory={members === null ? null : members.map((m) => ({ userId: m.userId, name: m.displayName ?? m.email ?? "" }))}
             canUpload={FILE_UPLOAD_ROLES.includes(session.role)}
             canDelete={FILE_DELETE_ROLES.includes(session.role)}
+            tz={tz}
           />
 
           {canSeeBilling(session.role) ? (

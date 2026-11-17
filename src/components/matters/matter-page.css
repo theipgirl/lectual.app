@@ -39,3 +39,4 @@
 .mx-anywhere { overflow-wrap: anywhere; }
 .mx-min0 { min-width: 0; }
 .mx-basis-full { flex-basis: 100%; }
+.mx-self-start { justify-self: start; }

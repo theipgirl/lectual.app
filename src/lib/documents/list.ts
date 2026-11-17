@@ -4,6 +4,8 @@
  * Pure helpers only; the page reads through the scoped client.
  */
 
+import { toneFor, type PillTone } from "@/lib/ui/tones";
+
 export const DOC_TYPE_LABEL: Record<string, string> = {
   opinion_letter: "Opinion letter",
   trademark_clearance: "Preliminary trademark clearance",
@@ -20,14 +22,14 @@ export const DOC_KIND: Record<string, string> = {
   loe_general: "LOE",
 };
 
-export type DocStatusView = { label: string; tone: string };
+export type DocStatusView = { label: string; tone: PillTone };
 
 /** queued = drafted and waiting in the approval queue; generated = approved and filed; failed = the file couldn't be made. */
 export function docStatus(status: string): DocStatusView {
-  if (status === "queued") return { label: "Waiting on approval", tone: "lx-pill-warn" };
-  if (status === "generated") return { label: "Approved · filed", tone: "lx-pill-ok" };
-  if (status === "failed") return { label: "Couldn't generate", tone: "lx-pill-risk" };
-  return { label: status, tone: "lx-pill-mute" };
+  if (status === "queued") return { label: "Waiting on approval", tone: toneFor("needsPerson") };
+  if (status === "generated") return { label: "Approved · filed", tone: toneFor("done") };
+  if (status === "failed") return { label: "Couldn't generate", tone: toneFor("wrong") };
+  return { label: status, tone: toneFor("neutral") };
 }
 
 export const DOC_FILTERS = [

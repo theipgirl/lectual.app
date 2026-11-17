@@ -932,3 +932,5 @@ export const SCORED_ASSESSMENTS = "Scored assessments";
 
 // Area B (Matters, Pipeline, Documents, Files)
 export const MATTERS_NAME = "Matters";
+export const DOCUMENTS_NAME = "Documents";
+export const NEW_LETTER = "New letter";

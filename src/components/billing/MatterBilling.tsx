@@ -1,6 +1,7 @@
 import { resolveFirmSession } from "@/lib/firm/session";
 import { canSeeBilling } from "@/lib/billing/can-see";
 import { loadMatterInvoices } from "@/lib/billing/load";
+import { getFirmTimeZone } from "@/lib/org/profile";
 import { BillingCard } from "./BillingCard";
 
 /**
@@ -12,5 +13,5 @@ export async function MatterBilling({ lawmaticsId }: { lawmaticsId: string | nul
   const session = await resolveFirmSession();
   if (session.kind !== "ok" || !canSeeBilling(session.role)) return null;
   const read = await loadMatterInvoices(lawmaticsId);
-  return <BillingCard read={read} />;
+  return <BillingCard read={read} tz={await getFirmTimeZone()} />;
 }

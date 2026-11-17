@@ -2,7 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { DOC_FILTERS, DOC_KIND, DOC_TYPE_LABEL, docStatus, isDocFilter, type DocFilter } from "@/lib/documents/list";
-import { relativeTime } from "@/lib/relative-time";
+import { formatRelative } from "@/lib/ui/dates";
+import { getFirmTimeZone } from "@/lib/org/profile";
+import { EmptyState, LoadFailedCard, Notice, PageHeader, Pill, SheetCard, SheetScroll, SheetTable } from "@/components/ui";
+import { Chip, FilterChips } from "@/components/list-page/Chips";
+import { BLANK, noneYet } from "@/lib/ui/words";
+import "@/components/documents/documents.css";
 import { orgHasModule } from "@/lib/org/modules";
 import type { Metadata } from "next";
 import { matterDisplayTitle } from "@/lib/matters/display-title";
@@ -30,6 +35,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   // without Document Center (or whose module list can't be read) gets the same not-found as any unknown page.
   if (!(await orgHasModule("document-center").catch(() => false))) notFound();
   const supabase = await getScopedClient();
+  const tz = await getFirmTimeZone();
 
   const { data, error } = await supabase
     .from("crm_document_draft")
@@ -47,105 +53,102 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
 
   return (
     <>
-      <div className="lx-page-head">
-        <div style={{ flex: 1, minWidth: 260 }}>
-          <div className="lx-label">Matter files</div>
-          <h1 className="lx-h1">Documents</h1>
-          <p className="lx-sub">
-            Every letter drafted for a matter, on the matter it belongs to. Nothing leaves the firm until an attorney approves it in the queue.
-          </p>
-        </div>
-        <Link href="/dashboard/documents/new/" className="lx-btn lx-btn-pri">
-          New letter
-        </Link>
-      </div>
-
-      <nav aria-label="Filter documents" className="lx-chips">
-        {DOC_FILTERS.map((x) => (
-          <Link key={x.key} href={x.key === "all" ? "/dashboard/documents/" : `/dashboard/documents/?f=${x.key}`} aria-current={filter === x.key ? "page" : undefined}>
-            {x.label}
-            <span className="lx-chip-count">{count(x.key)}</span>
+      <PageHeader
+        title={DOCUMENTS_NAME}
+        sub="Every letter drafted for a matter, on the matter it belongs to. Nothing leaves the firm until an attorney approves it in the queue."
+        actions={
+          <Link href="/dashboard/documents/new/" className="lx-btn lx-btn-pri">
+            New letter
           </Link>
+        }
+      />
+
+      <FilterChips as="nav" label="Filter documents">
+        {DOC_FILTERS.map((x) => (
+          <Chip key={x.key} href={x.key === "all" ? "/dashboard/documents/" : `/dashboard/documents/?f=${x.key}`} active={filter === x.key} count={count(x.key)}>
+            {x.label}
+          </Chip>
         ))}
-      </nav>
+      </FilterChips>
 
       {!error && listCutNotice(all.length) && (
-        <p className="lx-banner lx-banner-warn" role="status" style={{ margin: 0 }}>
+        <Notice tone="warn" role="status">
           {listCutNotice(all.length)}
-        </p>
+        </Notice>
       )}
 
       {error ? (
-        <div className="lx-card lx-empty-card">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>Documents couldn&apos;t be loaded</h2>
-          <p className="lx-note" style={{ margin: 0 }}>Can&apos;t show this right now. Refresh to try again.</p>
-        </div>
+        <LoadFailedCard what="documents" />
       ) : rows.length === 0 ? (
-        <div className="lx-card lx-empty-card">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>{all.length === 0 ? "No documents yet" : "Nothing matches"}</h2>
-          <p className="lx-note" style={{ margin: 0 }}>
-            {all.length === 0 ? "Engagement and opinion letters drafted for a matter show up here." : "Try another filter."}
-          </p>
-        </div>
+        all.length === 0 ? (
+          <EmptyState action={<Link href="/dashboard/documents/new/" className="lx-btn lx-btn-pri">New letter</Link>}>
+            {noneYet("documents", "Engagement and opinion letters drafted for a matter show up here.")}
+          </EmptyState>
+        ) : (
+          <EmptyState title="Nothing matches">Try another filter.</EmptyState>
+        )
       ) : (
-        <div className="lx-card" style={{ overflow: "auto" }}>
-          <table className="lx-tbl lx-stack">
-            <thead>
-              <tr>
-                <th>Document</th>
-                <th>Matter</th>
-                <th>Status</th>
-                <th>Updated</th>
-                <th aria-label="Actions" />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((d) => {
-                const m = matterById.get(d.matter_id);
-                const st = docStatus(d.status);
-                return (
-                  <tr key={d.id}>
-                    <td className="pri">
-                      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                        <span className="lx-doc-kind" aria-hidden="true">{DOC_KIND[d.doc_type] ?? "DOC"}</span>
-                        <div style={{ minWidth: 0 }}>
-                          <div>{DOC_TYPE_LABEL[d.doc_type] ?? d.doc_type}</div>
-                          {d.file_name && <div className="lx-note lx-num">{d.file_name}</div>}
+        <SheetCard>
+          <SheetScroll>
+            <SheetTable minWidth={760}>
+              <thead>
+                <tr>
+                  <th>Document</th>
+                  <th>Matter</th>
+                  <th>Status</th>
+                  <th>Updated</th>
+                  <th aria-label="Actions" />
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((d) => {
+                  const m = matterById.get(d.matter_id);
+                  const st = docStatus(d.status);
+                  return (
+                    <tr key={d.id}>
+                      <td className="pri">
+                        <div className="doc-kind-cell">
+                          <span className="lx-doc-kind" aria-hidden="true">{DOC_KIND[d.doc_type] ?? "DOC"}</span>
+                          <div className="doc-kind-text">
+                            <div>{DOC_TYPE_LABEL[d.doc_type] ?? d.doc_type}</div>
+                            {d.file_name && <div className="lx-note">{d.file_name}</div>}
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td data-label="Matter">
-                      {m ? (
-                        <Link href={`/dashboard/matters/${m.id}/`}>{matterDisplayTitle(m).title}</Link>
-                      ) : (
-                        <span className="lx-note">—</span>
-                      )}
-                      {m && <div className="lx-note lx-num">{m.matter_number}{m.owner_name ? ` · ${m.owner_name}` : ""}</div>}
-                    </td>
-                    <td data-label="Status">
-                      <span className={`lx-pill ${st.tone}`}>{st.label}</span>
-                      {d.status === "failed" && <div className="lx-note" style={{ marginTop: 4 }}>{failureReason(d.error_message)}</div>}
-                    </td>
-                    <td className="lx-num" data-label="Updated">{relativeTime(d.updated_at)}</td>
-                    <td className="lx-stack-actions" data-label="Actions" style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                      {d.status === "queued" && d.queue_item_id && (
-                        <Link href={`/dashboard/queue/${d.queue_item_id}/`} className="lx-btn lx-btn-sec lx-btn-sm">
-                          Review
-                        </Link>
-                      )}
-                      {d.status === "failed" && d.queue_item_id && <RetryButton draftId={d.id} />}
-                      {d.status === "generated" && (
-                        <a href={`/dashboard/documents/${d.id}/download/`} className="lx-btn lx-btn-sec lx-btn-sm">
-                          Download
-                        </a>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      </td>
+                      <td data-label="Matter">
+                        {m ? <Link href={`/dashboard/matters/${m.id}/`}>{matterDisplayTitle(m).title}</Link> : BLANK}
+                        {m && (
+                          <div className="lx-note">
+                            {m.matter_number}
+                            {m.owner_name ? ` · ${m.owner_name}` : ""}
+                          </div>
+                        )}
+                      </td>
+                      <td data-label="Status">
+                        <Pill tone={st.tone}>{st.label}</Pill>
+                        {d.status === "failed" && <div className="lx-note">{failureReason(d.error_message)}</div>}
+                      </td>
+                      <td data-label="Updated">{formatRelative(d.updated_at, { tz }) ?? BLANK}</td>
+                      <td className="lx-stack-actions doc-actions">
+                        {d.status === "queued" && d.queue_item_id && (
+                          <Link href={`/dashboard/queue/${d.queue_item_id}/`} className="lx-btn lx-btn-sec lx-btn-sm">
+                            Review
+                          </Link>
+                        )}
+                        {d.status === "failed" && d.queue_item_id && <RetryButton draftId={d.id} />}
+                        {d.status === "generated" && (
+                          <a href={`/dashboard/documents/${d.id}/download/`} className="lx-btn lx-btn-sec lx-btn-sm">
+                            Download
+                          </a>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </SheetTable>
+          </SheetScroll>
+        </SheetCard>
       )}
     </>
   );
