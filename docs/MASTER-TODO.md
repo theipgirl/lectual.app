@@ -10,11 +10,13 @@ Omi checked 2026-11-12: no related open items (Omi is read-only from the cloud s
 
 ### Taylor
 
-- [ ] **Decide how Claude can reach the test address** (Vercel puts its own login in front of every preview, including a domain tied to a branch):
-      A) repoint ALL previews at lectual-dev, then turn Vercel Authentication off for previews; B) a separate small Vercel project for the
-      test only, with this branch as its production branch (recommended: nothing else is exposed).
-- [ ] Supabase lectual-dev, Authentication, URL Configuration: Site URL `https://connector-test.lectual.app`, and add `https://connector-test.lectual.app/**` to Redirect URLs.
-- [ ] Vercel `lectual-app` (or the new test project): add the lectual-dev `SUPABASE_SERVICE_ROLE_KEY` for this branch's previews (a secret: paste it in Vercel only).
+- [x] Decided 2026-11-17: **B**, a separate small Vercel project for the test. Done: `lectual-conn` (Vercel Authentication off, lectual-dev data only, builds only
+      this branch, no service-role key set so anything that needs it fails loudly). Its public address is
+      `https://lectual-conn-git-claude-eloquent-babbage-ba7e6l-theipgirl.vercel.app`. Delete the project when the test is over.
+- [ ] Supabase lectual-dev, Authentication, URL Configuration: Site URL `https://lectual-conn-git-claude-eloquent-babbage-ba7e6l-theipgirl.vercel.app`, and add
+      `https://lectual-conn-git-claude-eloquent-babbage-ba7e6l-theipgirl.vercel.app/**` to Redirect URLs. (Replaces the connector-test.lectual.app step: that address
+      stays on `lectual-app` and is still behind Vercel's login; remove it there if you like.)
+- [ ] No dev service-role key is needed any more for the test (the connector never reads it).
 - [ ] Tell me which login to test with on dev (`taylormcghee93@gmail.com` is not a member of any dev firm), or say "create one in hartwell-ip".
 - [ ] **Previews point at lectual-prod.** In Vercel `lectual-app`, the general Preview and Development settings `NEXT_PUBLIC_SUPABASE_URL` / `_ANON_KEY` are
       `qpbogzkdpynhhqmaradu`, which is lectual-prod (the note on them says lectual-dev). Check which project the Preview `SUPABASE_SERVICE_ROLE_KEY` belongs to and repoint all previews at lectual-dev.
