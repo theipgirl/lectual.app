@@ -16,7 +16,7 @@ describe("rail sections fail closed on modules", () => {
     expect(navItemAllowed(mail, ["mailbox"], "viewer")).toBe(true);
   });
 
-  it("gates My Mail on `mailbox` and Agents on `agents`", () => {
+  it("gates Mail on `mailbox` and Agents on `agents`", () => {
     expect(navItemBySlug("mail")?.module).toBe("mailbox");
     expect(navItemBySlug("agents")?.module).toBe("agents");
   });
@@ -41,11 +41,11 @@ describe("rail tree (design/Rail.dc.html)", () => {
 
   it("drops module-gated children for a firm without the module", () => {
     const shown = labels(railGroups(visibleNav([], "owner"), "/dashboard/"));
-    expect(shown).not.toContain("My Mail");
+    expect(shown).not.toContain("Mail");
     expect(shown).not.toContain("Assistants");
     expect(shown).toContain("Approvals");
     const withAll = labels(railGroups(visibleNav(["mailbox", "agents"], "owner"), "/dashboard/"));
-    expect(withAll).toContain("My Mail");
+    expect(withAll).toContain("Mail");
     expect(withAll).toContain("Assistants");
   });
 
@@ -187,5 +187,23 @@ describe("railGroups takes an optional tree (Phase 1 owner view)", () => {
     const more = railGroups(visibleNav([], "owner"), "/dashboard/matters/", tree)[1][0];
     expect(more).toMatchObject({ href: "/dashboard/intake/?view=table", childActive: true, countKey: null });
     expect(more.kids.map((k) => k.key)).toEqual(["intake", "matters", "brain"]);
+  });
+});
+
+describe("one icon per section (design Area G)", () => {
+  it("no two built sections share an icon", () => {
+    const rows = NAV.filter((i) => i.built !== false && !["portals"].includes(i.slug));
+    const byIcon = new Map<string, string[]>();
+    for (const r of rows) byIcon.set(r.icon, [...(byIcon.get(r.icon) ?? []), r.slug]);
+    const shared = [...byIcon.values()].filter((slugs) => slugs.length > 1);
+    expect(shared).toEqual([]);
+  });
+
+  it("the section names come from the glossary", () => {
+    const label = (slug: string) => NAV.find((i) => i.slug === slug)?.label;
+    expect(label("mail")).toBe("Mail");
+    expect(label("forms")).toBe("Forms");
+    expect(label("quotes")).toBe("Proposals");
+    expect(label("proposals")).toBe("Proposals");
   });
 });

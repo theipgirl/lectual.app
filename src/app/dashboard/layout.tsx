@@ -29,7 +29,7 @@ import { DealTimesDialog } from "@/components/deck/DealTimesDialog";
 import { parseDealTimes } from "@/lib/deal/person-times";
 import { parseDeckSeen } from "@/lib/deal/nudge";
 import { loadDealNudge } from "@/lib/queue/deal-nudge-load";
-import { dealReadyLine } from "@/lib/ui/words";
+import { dealReadyLine, staffInsideFirm } from "@/lib/ui/words";
 import { friendlyZoneLabel } from "@/lib/org/firm-form";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { YourNameDialog } from "@/components/account/YourNameDialog";
@@ -93,19 +93,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <NavProgress />
       </Suspense>
       {actingAsStaff && (
-        <div
-          role="status"
-          style={{
-            background: "var(--warn)",
-            color: "var(--cream)",
-            fontSize: 13.5,
-            padding: "7px 26px",
-            fontFamily: "var(--mono)",
-            letterSpacing: ".08em",
-          }}
-        >
-          Lectual staff · you are inside {org.name}, a firm you are not a member of. This visit
-          is logged.
+        <div role="status" className="lx-staff-bar">
+          {staffInsideFirm(org.name)}
         </div>
       )}
       <header className={shell.variant === "owner" ? "lx-top lx-top--owner" : "lx-top"}>
@@ -113,7 +102,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <FirmWordmark org={org} />
         </div>
         {shell.variant !== "owner" && <SectionLabel />}
-        <div style={{ flex: 1 }} />
+        <div className="lx-top-spacer" />
         <NotificationBell />
         <AccountMenu
           initials={initialsOf(displayName)}

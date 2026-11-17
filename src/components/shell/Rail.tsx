@@ -7,6 +7,7 @@ import { ICON, RAIL_PIN_COOKIE, isNavActive, navItemBySlug, railCountFor, railGr
 import { RAIL_COUNT_TITLE } from "@/lib/intake/counts";
 import { navTourToken } from "@/lib/onboarding/tour";
 import { closeRailOnEscape, releaseRailFocus } from "@/lib/rail-behaviour";
+import { Icon as GlyphIcon } from "@/components/ui/Icon";
 import { MORE_NAME, OWNER_VIEW_NAME } from "@/lib/ui/words";
 import type { QueueLoadStatus } from "@/lib/queue/load";
 import "./owner-shell.css";
@@ -33,7 +34,6 @@ type Props = {
 };
 
 const PIN = "M9 4h6M12 4v6M7 10h10l-1 5H8zM12 15v5";
-const CHEVRON = "M6 9l6 6 6-6";
 
 function Icon({ d, size }: { d: string; size: number }) {
   return (
@@ -163,7 +163,7 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
                       {count && <span className={`lx-rail-count${count === "!" ? " is-alert" : ""}`}>{count}</span>}
                       {owner && entry.kids.length > 0 && (
                         <span className="lx-rail-chev">
-                          <Icon d={CHEVRON} size={13} />
+                          <GlyphIcon name="chevron-down" size={13} />
                         </span>
                       )}
                     </Link>

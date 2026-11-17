@@ -63,7 +63,7 @@ describe("404 pages (F14)", () => {
     const html = renderToStaticMarkup(createElement(DashboardNotFound));
     expect(html).toMatch(/<h1[^>]*>[^<]+<\/h1>/);
     expect(html).toMatch(/<a [^>]*href="\/dashboard\/"[^>]*class="lx-btn lx-btn-pri"|<a [^>]*class="lx-btn lx-btn-pri"[^>]*href="\/dashboard\/"/);
-    expect(html).toContain(">Go back</button>");
+    expect(html).toContain("Go back</button>");
   });
 
   it("the public 404 links to /", async () => {
@@ -71,7 +71,7 @@ describe("404 pages (F14)", () => {
     const html = renderToStaticMarkup(createElement(NotFound));
     expect(html).toMatch(/<h1[^>]*>[^<]+<\/h1>/);
     expect(html).toMatch(/href="\/"/);
-    expect(html).toContain(">Go back</button>");
+    expect(html).toContain("Go back</button>");
   });
 
   it("carries no development copy", async () => {
@@ -84,8 +84,9 @@ describe("404 pages (F14)", () => {
 
   it("uses the existing button and heading classes", () => {
     const src = readFileSync(path.join(root, "src/app/dashboard/not-found.tsx"), "utf8");
-    expect(src).toContain("lx-h2");
+    expect(src).toContain("lx-h1");
     expect(src).toContain("lx-btn lx-btn-pri");
-    expect(readFileSync(path.join(root, "src/components/shell/GoBackButton.tsx"), "utf8")).toContain("lx-btn lx-btn-sec");
+    // The back control is the one back link look (`← Go back`), not a second button style.
+    expect(readFileSync(path.join(root, "src/components/shell/GoBackButton.tsx"), "utf8")).toContain('className="lx-back"');
   });
 });
