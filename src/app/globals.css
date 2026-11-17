@@ -747,6 +747,12 @@ select:not([multiple]):not([size]):disabled {
 .lx-head-details { margin: 0; font-size: var(--fs-2); color: var(--muted); }
 .lx-head .lx-sub { margin: 2px 0 0; }
 .lx-head .lx-head-actions { margin-top: 8px; }
+/* A header whose view switch (and buttons) sit at the right, on the title row: Approvals and the Weekly review, like the toolbar on Intake and Matters. */
+@media (min-width: 641px) {
+  .lx-page-head.lx-head.lx-head-split { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; align-items: start; }
+  .lx-page-head.lx-head.lx-head-split > :not(.lx-head-actions) { grid-column: 1; }
+  .lx-page-head.lx-head.lx-head-split > .lx-head-actions { grid-column: 2; grid-row: 1 / span 3; justify-self: end; margin-top: 0; }
+}
 
 @media (max-width: 900px) {
   .lx-split {
@@ -866,7 +872,7 @@ select:not([multiple]):not([size]):disabled {
   justify-content: flex-end;
 }
 .lx-toggle.on i { background: var(--cream); }
-.lx-toggle:disabled { cursor: default; opacity: 0.7; }
+.lx-toggle:disabled { cursor: default; opacity: 0.5; }
 .lx-lv button { flex: 1; }
 .lx-lv button:disabled { cursor: default; }
 .lx-dot {

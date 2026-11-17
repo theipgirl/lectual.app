@@ -9,7 +9,7 @@
 .dk-h1 { margin: 0; }
 .dk-sub { margin: 0; }
 .dk-wide-head { display: flex; flex-direction: column; gap: 6px; }
-.dk-titlerow { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.dk-titlerow { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .dk-count { font-size: var(--fs-1); color: var(--muted); font-variant-numeric: tabular-nums; }
 
 /* The left list card */
@@ -37,9 +37,6 @@ a.dk-side-row:hover { background: var(--well); text-decoration: none; color: var
 .dk-zone-title { margin: 0; }
 .dk-zone-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 .dk-meta { font-size: var(--fs-2); color: var(--body); }
-.dk-deal-btn { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 12px; border-radius: var(--r-pill); border: 1px solid var(--line); background: var(--card); color: var(--ink); font: 500 var(--fs-2) var(--sans); white-space: nowrap; text-decoration: none; }
-.dk-deal-btn:hover { text-decoration: none; color: var(--ink); background: var(--paper); }
-.dk-deal-btn:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; }
 .dk-deal-btn svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
 .dk-phone-switch { display: none; }
 .dk-more3 { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: var(--r-pill); background: var(--card); border: 1px solid var(--line); font-size: var(--fs-2); font-weight: 600; color: var(--ink); }
@@ -66,7 +63,7 @@ a.dk-side-row:hover { background: var(--well); text-decoration: none; color: var
 .dk-arrow { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: var(--r-pill); border: 1px solid var(--line); background: var(--card); color: var(--ink); text-decoration: none; padding: 0; }
 .dk-arrow:hover { text-decoration: none; color: var(--ink); background: var(--well); }
 .dk-arrow:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; }
-.dk-arrow[aria-disabled="true"] { opacity: 0.35; pointer-events: none; }
+.dk-arrow[aria-disabled="true"] { opacity: 0.5; pointer-events: none; }
 .dk-card a.dk-arrow { color: var(--ink); }
 .dk-mini { display: none; flex-direction: column; gap: 4px; padding: 12px 14px; }
 .dk-mini small { font-size: var(--fs-1); color: var(--muted); }
@@ -85,7 +82,7 @@ a.dk-side-row:hover { background: var(--well); text-decoration: none; color: var
 .dk-move { box-sizing: border-box; min-height: 60px; border-radius: var(--r-md); border: 1px solid var(--line-3); background: var(--card); color: var(--ink); font: 600 var(--fs-3) var(--sans); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; text-decoration: none; text-align: center; line-height: 1.15; padding: 0 6px; }
 .dk-move:hover:not(:disabled) { text-decoration: none; color: var(--ink); background: var(--paper); }
 .dk-move small { font-size: var(--fs-1); font-weight: 400; color: var(--muted); }
-.dk-move:disabled { opacity: 0.45; cursor: not-allowed; }
+.dk-move:disabled { opacity: 0.5; cursor: not-allowed; }
 .dk-move--reject { border-color: var(--line-wine); color: var(--wine); }
 .dk-move--reject:hover:not(:disabled) { color: var(--wine); background: var(--tint-wine); }
 .dk-move--yes,
@@ -93,7 +90,7 @@ a.dk-move--yes { width: 100%; background: var(--ox); border-color: var(--ox); co
 .dk-move--yes small { color: var(--blush); }
 .dk-move--yes:hover:not(:disabled),
 a.dk-move--yes:hover { background: var(--ox-hover); border-color: var(--ox-hover); color: var(--cream); }
-.dk-move--yes:disabled { opacity: 0.45; }
+.dk-move--yes:disabled { opacity: 0.5; }
 a.dk-move--open { font-size: var(--fs-3); }
 .dk-move--primary { background: var(--ox); border-color: var(--ox); color: var(--cream); }
 .dk-move--primary:hover:not(:disabled) { background: var(--ox-hover); color: var(--cream); }
@@ -123,7 +120,7 @@ a.dk-move--open { font-size: var(--fs-3); }
 .dk-choice[aria-pressed="true"] { background: var(--cream); color: var(--ink); border-color: var(--cream); }
 .dk-choice[aria-pressed="true"] small { color: var(--body); }
 .dk-choice[aria-pressed="true"]:disabled { opacity: 1; cursor: default; }
-.dk-choice:disabled { opacity: 0.6; cursor: not-allowed; }
+.dk-choice:disabled { opacity: 0.5; cursor: not-allowed; }
 .dk-choice:focus-visible { outline: 2px solid var(--cream); outline-offset: 2px; }
 .dk-after-msg { font-size: var(--fs-3); font-weight: 600; line-height: 1.4; margin: 0; }
 .dk-after-link { font-size: var(--fs-2); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }

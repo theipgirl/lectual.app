@@ -454,7 +454,7 @@
 .pe-door-action { margin-top: auto; padding-top: 6px; }
 .pe-door .pq-rows-scroll { max-height: 320px; }
 .pe-start-row { display: block; width: 100%; text-align: left; background: none; font: inherit; cursor: pointer; }
-.pe-start-row:disabled { opacity: 0.6; cursor: progress; }
+.pe-start-row:disabled { opacity: 0.5; cursor: progress; }
 @media (max-width: 900px) { .pe-doors, .pe-doors[data-doors="2"] { grid-template-columns: minmax(0, 1fr); } }
 
 /* Engagement letter section of the editor (Sprint 6). Tokens only. */

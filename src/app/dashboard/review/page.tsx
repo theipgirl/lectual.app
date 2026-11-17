@@ -136,7 +136,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
       <PageHeader
         title={REVIEW_NAME}
         tour="review-head"
-        className="rv-head"
+        className="rv-head lx-head-split"
         sub={buckets.total === 0 ? reviewSubline(buckets) : reviewIntro(buckets.total)}
         actions={
           sheetPerms && sheetPerms !== READ_ONLY_PERMS ? (

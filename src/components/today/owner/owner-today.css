@@ -4,7 +4,7 @@
 /* Page: one column, 18px apart. */
 .ot-page { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 .ot-top { display: flex; flex-direction: column; gap: 6px; }
-.ot-date { font-size: var(--fs-3); color: var(--body); margin: 0; }
+.ot-top .lx-sub { font-size: var(--fs-3); color: var(--body); }
 .ot-count { font-size: var(--fs-1); line-height: 1.4; color: var(--muted); font-variant-numeric: tabular-nums; }
 .ot-only-narrow { display: none; }
 .ot-only-narrow-block { display: none !important; }
@@ -80,7 +80,7 @@ a.ot-row-title:hover { text-decoration: underline; }
   .ot-chips { flex-wrap: nowrap; }
   .ot-only-narrow { display: initial; }
   .ot-page { gap: 14px; }
-  .ot-date { display: none; }
+  .ot-top .lx-sub { display: none; }
 
   .ot-hero { flex-direction: column; align-items: stretch; gap: 10px; padding: 18px; background: var(--card); color: var(--ink); border: 1px solid var(--line); }
   .ot-hero-main.ot-only-narrow { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }

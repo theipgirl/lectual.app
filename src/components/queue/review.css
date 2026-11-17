@@ -119,7 +119,7 @@
   .lx-app:has(.lx-top--owner) .lx-qi .lx-review-actions .lx-btn-danger { order: 1; }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-review-actions .lx-btn-sec { order: 0; grid-column: 1 / -1; }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-review-actions .lx-btn-sec:disabled { display: none; }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-review-actions .lx-btn:disabled { opacity: 0.45; }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-review-actions .lx-btn:disabled { opacity: 0.5; }
 }
 
 

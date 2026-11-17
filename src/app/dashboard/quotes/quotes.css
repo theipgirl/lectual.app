@@ -63,7 +63,7 @@
 .qb-switch[aria-checked="true"] { background: var(--ox); }
 .qb-switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: var(--r-pill); background: var(--card); box-shadow: var(--shadow); transition: left 0.12s; }
 .qb-switch[aria-checked="true"]::after { left: 16px; }
-.qb-switch:disabled { cursor: default; opacity: 0.6; }
+.qb-switch:disabled { cursor: default; opacity: 0.5; }
 
 /* ── the line table (an editable grid of rows, not a data table) ── */
 .qb-table { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; }
@@ -119,7 +119,7 @@
 }
 .qb-lib-item:hover:not(:disabled) { border-color: var(--ox); background: var(--tint-ox); }
 .qb-lib-item:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; }
-.qb-lib-item:disabled { cursor: default; opacity: 0.7; }
+.qb-lib-item:disabled { cursor: default; opacity: 0.5; }
 .qb-lib-item[data-gov="true"] { color: var(--warn); }
 .qb-lib-label { flex: 1; min-width: 0; }
 .qb-lib-price { color: var(--muted); font-size: var(--fs-1); font-variant-numeric: tabular-nums; }

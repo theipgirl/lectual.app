@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PageHeader } from "@/components/ui/PageHeader";
 import type { Role } from "@/lib/auth/roles";
 import { aiConfigured } from "@/lib/ai/claude";
 import { orgHasModule } from "@/lib/org/modules";
@@ -119,14 +120,17 @@ export async function OwnerToday({
 
   return (
     <div className="ot-page">
-      <div className="ot-top">
-        <h1 className="lx-h1">
-          Good {greeting(hourInZone(now, tz))}
-          {greetingSuffix(firstName)}.
-        </h1>
-        <p className="ot-date">{longDate(now, tz)}</p>
-        {!firstName && <AddNameLink />}
-      </div>
+      <PageHeader
+        className="ot-top"
+        title={
+          <>
+            Good {greeting(hourInZone(now, tz))}
+            {greetingSuffix(firstName)}.
+          </>
+        }
+        sub={longDate(now, tz)}
+        actions={!firstName ? <AddNameLink /> : undefined}
+      />
 
       <section className="ot-hero" aria-labelledby="ot-cards-h" data-state={hero.state}>
         <h2 id="ot-cards-h" className="lx-label ot-only-narrow">

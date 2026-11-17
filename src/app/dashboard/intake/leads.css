@@ -53,13 +53,13 @@
 .ix-cell-btn[data-empty] { color: var(--muted); }
 .ix-cell-btn-compact { padding: 1px 4px; }
 .ix-cell-btn:hover { border-color: var(--line); }
-.ix-cell-btn:disabled { cursor: progress; opacity: 0.6; }
+.ix-cell-btn:disabled { cursor: progress; opacity: 0.5; }
 
 /* ---- temperature: an own palette (--tp-*), the shared pill shape ---------- */
 /* A level a person set is FILLED. A level the system suggested is OUTLINED (dashed edge, plain background) and says "suggested" in its words, so the two
    never look alike. Both wrap to two lines in a narrow column. */
 .ix-temp { display: inline-block; max-width: 100%; padding: 2px 8px; border-radius: var(--r-pill); border: 0; font-size: var(--fs-1); font-weight: 500; line-height: 1.4; cursor: pointer; background: var(--well); color: var(--body); white-space: normal; text-align: left; }
-.ix-temp:disabled { cursor: progress; opacity: 0.6; }
+.ix-temp:disabled { cursor: progress; opacity: 0.5; }
 /* The same pill the rest of the app draws: hot is risk, warm is warn, cold is mute. "Suggested" is a word in the text, not a dashed edge. */
 .ix-temp[data-tone="hot"] { background: var(--tint-wine); color: var(--wine); }
 .ix-temp[data-tone="warm"] { background: var(--tint-warn); color: var(--warn); }
@@ -128,7 +128,7 @@
 /* ---- time chip and the time dialog ---- */
 .ix-time-wrap { display: inline-flex; min-width: 0; flex: 0 0 auto; }
 .ix-time-btn { gap: 4px; cursor: pointer; flex: 0 0 auto; }
-.ix-time-btn:disabled { cursor: progress; opacity: 0.6; }
+.ix-time-btn:disabled { cursor: progress; opacity: 0.5; }
 .ix-time-err { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-1); }
 .ix-menu-ox { color: var(--ox); }
 .ix-time-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }

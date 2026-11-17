@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PageHeader } from "@/components/ui/PageHeader";
 import "./deck.css";
 import {
   APPROVALS_NAME,
@@ -88,21 +89,25 @@ export function DeckFrame({
   if (view !== "cards") {
     return (
       <div className="dk-frame dk-frame--wide">
-        <div className="dk-wide-head">
-          <div className="dk-titlerow">
-            <h1 className="lx-h1 dk-h1">{APPROVALS_NAME}</h1>
-            {switcher("")}
-          </div>
-          {wideSub && <p className="lx-sub dk-sub">{wideSub}</p>}
-          {canChangeDealTimes && <DealTimesButton />}
-        </div>
+        <PageHeader
+          className="dk-wide-head lx-head-split"
+          title={APPROVALS_NAME}
+          titleClassName="dk-h1"
+          sub={wideSub || undefined}
+          actions={
+            <>
+              {switcher("")}
+              {canChangeDealTimes && <DealTimesButton />}
+            </>
+          }
+        />
         {children}
       </div>
     );
   }
 
   const dealBtn = (
-    <Link href={dealNowHref} className="dk-deal-btn">
+    <Link href={dealNowHref} className="lx-btn lx-btn-sec dk-deal-btn">
       <DealIcon />
       {laterArrivals > 0 ? DECK_DEAL_NOW : DECK_DEAL_NEW}
     </Link>
@@ -110,14 +115,18 @@ export function DeckFrame({
   return (
     <div className="dk-frame dk-frame--cards">
       <div className="dk-left">
-        <div className="dk-pagehead">
-          <div className="dk-head-row">
-            <h1 className="lx-h1 dk-h1">{DECK_PAGE_TITLE}</h1>
-            {switcher("")}
-          </div>
-          <p className="lx-sub dk-sub">{DECK_PAGE_SUB}</p>
-          {canChangeDealTimes && <DealTimesButton />}
-        </div>
+        <PageHeader
+          className="dk-pagehead lx-head-split"
+          title={DECK_PAGE_TITLE}
+          titleClassName="dk-h1"
+          sub={DECK_PAGE_SUB}
+          actions={
+            <>
+              {switcher("")}
+              {canChangeDealTimes && <DealTimesButton />}
+            </>
+          }
+        />
         <DeckSide rows={side ?? []} failed={sideFailed} note={sideNote} later={sideLater} decidedFailed={sideDecidedFailed} />
         {laterArrivals > 0 && dealLabel && (
           <section className="lx-card dk-arrived" aria-label={deckArrivedTitle(dealLabel)}>

@@ -22,6 +22,7 @@ export function PageHeader({
   actions,
   tour,
   className,
+  titleClassName,
 }: {
   title: React.ReactNode;
   sub?: React.ReactNode;
@@ -31,12 +32,14 @@ export function PageHeader({
   actions?: React.ReactNode;
   tour?: string;
   className?: string;
+  /** An extra class on the h1, beside `lx-h1` (a page that styles its own title). */
+  titleClassName?: string;
 }) {
   return (
     <header className={`lx-page-head lx-head${className ? ` ${className}` : ""}`}>
       {back ? <BackLink href={back.href} label={back.label} /> : null}
       <div className="lx-head-title">
-        <h1 className="lx-h1" data-tour={tour}>
+        <h1 className={titleClassName ? `lx-h1 ${titleClassName}` : "lx-h1"} data-tour={tour}>
           {title}
         </h1>
         {count !== undefined && count !== null ? <span className="lx-head-count">{count}</span> : null}
