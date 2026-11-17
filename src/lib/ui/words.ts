@@ -1,4 +1,5 @@
 import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
+import {  } from "@/lib/ui/words";
 // The glossary: ONE name per thing, as a firm sees it. Every firm-facing string that
 // names one of these things imports it from here (tests/ui/words.test.ts and
 // tests/ui/no-build-words.test.ts hold that line). Pure: no imports from components.
@@ -580,7 +581,7 @@ export const LETTER_READ_ONLY_NOTE = "You can read the letters. An owner, admin 
 export const LETTER_FIELDS_HEADING = "Merge fields you can use";
 export const LETTER_FIELDS_NOTE = "Write a field in double braces, for example {{client_name}}. Anything else in braces is refused.";
 export const LETTER_APPROVAL_NOTE = "Approving makes this the letter new proposals attach. An approved version can't be edited; a change is a new draft.";
-export const LETTER_NO_APPROVERS = "No one is named yet. Name approvers under Client proposals, or no letter can be approved.";
+export const LETTER_NO_APPROVERS = `No one is named yet. Name approvers under ${PROPOSAL_SETTINGS_NAME}, or no letter can be approved.`;
 export function letterApproversLine(names: string): string {
   return `Can approve: ${names}.`;
 }
@@ -973,3 +974,5 @@ export const LEADS_TOUCH_CONSULT_TITLE = "A consult is booked on the calendar, s
 export const SEARCHING = "Searching…";
 /** A list cut off at its cap where the real total is not known: "Showing 200 of 200+". */
 export const showingAtLeast = (shown: number): string => showingOf(shown, shown) + "+";
+/** The Forms results table heading. */
+export const ALL_FORMS = `All ${FORMS_NAME.toLowerCase()}`;

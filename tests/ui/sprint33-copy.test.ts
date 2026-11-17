@@ -19,7 +19,7 @@ describe("F17: queue item, notifications, calendar, meetings copy", () => {
   it("Notifications has no Inbox eyebrow and the new error sentence", () => {
     const src = read("src/app/dashboard/notifications/page.tsx");
     expect(src).not.toContain('<div className="lx-label">Inbox</div>');
-    expect(src).toContain('<LoadFailedCard what="notifications"');
+    expect(src).toContain('<LoadFailedCard role="alert" what="notifications"');
     expect(src).not.toContain("This isn&apos;t the same as having none");
   });
 

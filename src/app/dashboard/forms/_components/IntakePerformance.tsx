@@ -9,7 +9,7 @@ import { getFirmTimeZone } from "@/lib/org/profile";
 import { IntakeDrawer, Unreadable, FIT_TONE, STATUS_TONE } from "./IntakeDrawer";
 import { StepMedians, StoppedAtCell } from "./StepTables";
 import { Pill, SheetCard, SheetScroll, SheetTable } from "@/components/ui";
-import { LAST_CONTACT, showingAtLeast } from "@/lib/ui/words";
+import { ALL_FORMS, LAST_CONTACT, showingAtLeast } from "@/lib/ui/words";
 
 /**
  * The Performance tab (server-rendered, handed to the workspace as a slot).
@@ -159,8 +159,8 @@ export async function IntakePerformance({
 
           <StepMedians state={steps} range={range} />
 
-          <SheetCard as="section" className="ifm-table-card" aria-label="All intakes">
-            <h2 className="ifm-title ifm-table-title">All intakes</h2>
+          <SheetCard as="section" className="ifm-table-card" aria-label={ALL_FORMS}>
+            <h2 className="ifm-title ifm-table-title">{ALL_FORMS}</h2>
             {list.status !== "ok" ? (
               <div className="ifm-pad-x">
                 <Unreadable what="Intakes" unconfigured={list.status === "unconfigured"} />

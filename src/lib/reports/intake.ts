@@ -1,5 +1,5 @@
 import "server-only";
-import { OUR_TURN } from "@/lib/ui/words";
+import { OUR_TURN, PROPOSALS_NAME } from "@/lib/ui/words";
 import { INTAKE_NAME } from "@/lib/ui/words";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { listLeads, listStages } from "@/lib/pipeline";
@@ -89,7 +89,7 @@ export async function loadIntakeReport(period: ReportPeriod): Promise<IntakeRepo
     { label: INTAKE_NAME, sub: "Every potential client not yet signed", href: intakeListHref(), count: pnc ? pnc.length : null },
     { label: "Intake forms", sub: "Public intake and custom forms", href: "/dashboard/forms/", count: null },
     {
-      label: "Quotes & proposals",
+      label: PROPOSALS_NAME,
       sub: "Sent and awaiting signature",
       href: "/dashboard/quotes/",
       count: quotesSent.status === "ok" ? quotesSent.quotes.length : null,

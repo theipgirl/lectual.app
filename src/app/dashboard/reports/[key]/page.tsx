@@ -14,6 +14,7 @@ import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 import { EmptyState, Notice, PageHeader } from "@/components/ui";
 import { ViewToggle } from "@/components/ViewToggle";
+import { MAIL_NAME } from "@/lib/ui/words";
 
 export async function generateMetadata({ params }: { params: Promise<{ key: string }> }): Promise<Metadata> {
   const { key } = await params;
@@ -31,7 +32,7 @@ type ReportData = { kpis: Metric[]; waiting: WaitingItem[]; links: LinkTile[]; b
  */
 const REPORT_COPY: Record<ReportKey, { sub: string; waitingTitle: string; waitingEmpty: string }> = {
   communication: {
-    sub: "How fast the firm answers, where messages come from, and what's still waiting on a reply across intake, My Mail, campaigns and SMS.",
+    sub: `How fast the firm answers, where messages come from, and what's still waiting on a reply across intake, ${MAIL_NAME}, campaigns and SMS.`,
     waitingTitle: "Waiting on the firm",
     waitingEmpty: "Nothing is waiting on a reply right now.",
   },
