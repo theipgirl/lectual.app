@@ -10,13 +10,13 @@
   min-height: 0;
   min-width: 0;
   --lp-row-h: 46px;
-  /* Sentence-like sub-lines and meta lines: 13px, 14px on a phone. Courier stays for dates, counts and uppercase labels. */
-  --lp-meta: 13px;
+  /* Sentence-like sub-lines and meta lines: the type scale's smallest step (13px, 14px on a phone). No monospace anywhere. */
+  --lp-meta: var(--fs-1);
   --lp-gap: 12px;
-  --lp-radius: 10px;
-  --lp-tint: color-mix(in srgb, var(--ox) 10%, transparent);
-  --lp-warn-tint: color-mix(in srgb, var(--warn) 12%, transparent);
-  --lp-risk-tint: color-mix(in srgb, var(--wine) 12%, transparent);
+  --lp-radius: var(--r-md);
+  --lp-tint: var(--tint-ox);
+  --lp-warn-tint: var(--tint-warn);
+  --lp-risk-tint: var(--tint-wine);
   display: flex;
   flex-direction: column;
   gap: var(--lp-gap);
@@ -31,7 +31,7 @@
   row-gap: 2px;
 }
 .lp-header .lx-h1 { margin: 0; }
-.lp-header .lp-count { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.lp-header .lp-count { font-family: var(--sans); font-variant-numeric: tabular-nums; font-size: var(--fs-2); color: var(--muted); }
 .lp-header .lp-sub { flex-basis: 100%; margin: 0; }
 
 /* ---- toolbar: search, view toggle, primary action, More ---- */
@@ -45,45 +45,51 @@
 .lp-toolbar-actions { display: contents; }
 .lp-btn-icon, .lp-label-short { display: none; }
 .lp-search { display: flex; align-items: center; gap: 6px; flex: 0 1 380px; min-width: 220px; }
-.lp-search .lx-input { flex: 1; min-width: 0; height: 36px; }
+.lp-search .lx-input { flex: 1; min-width: 0; height: var(--ctl-h); }
+/* Same look and height as .lx-btn .lx-btn-sec / .lx-btn-pri: ONE button style, 38px at the top of a page. */
 .lp-search-submit,
 .lp-btn {
-  height: 36px;
-  padding: 0 14px;
-  border-radius: 9px;
+  height: var(--ctl-h);
+  padding: 0 16px;
+  border-radius: var(--r-md);
   border: 1px solid var(--line);
   background: var(--card);
-  color: var(--body);
+  color: var(--ink);
   display: inline-flex;
   align-items: center;
   gap: 8px;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--fs-2);
+  font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
   text-decoration: none;
 }
 .lp-search-submit:hover,
-.lp-btn:hover { color: var(--ink); text-decoration: none; }
-.lp-btn-primary { background: var(--ox); border-color: var(--ox); color: var(--cream); font-weight: 500; }
-.lp-btn-primary:hover { background: var(--ox-hover); color: var(--cream); }
+.lp-btn:hover { background: var(--well); color: var(--ink); text-decoration: none; }
+.lp-btn-primary,
+.lp-btn.lp-btn-primary { background: var(--ox); border-color: transparent; color: var(--cream); font-weight: 500; }
+.lp-btn-primary:hover,
+.lp-btn.lp-btn-primary:hover { background: var(--ox-hover); color: var(--cream); }
+/* One text-link style (see .lx-link in globals.css). */
 .lp-clear {
   border: 0;
   background: transparent;
   padding: 0 4px;
   font: inherit;
-  font-size: 13px;
-  color: var(--ox);
+  font-size: var(--fs-2);
+  color: var(--wine);
   cursor: pointer;
-  text-decoration: underline;
+  text-decoration: none;
   white-space: nowrap;
 }
+.lp-clear:hover { text-decoration: underline; }
 
 /* ---- filter chips ---- */
 .lp-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
 .lp-chip {
-  height: 32px;
-  padding: 0 12px;
+  height: var(--ctl-h);
+  padding: 0 14px;
   border-radius: 8px;
   border: 1px solid var(--line);
   background: var(--card);
@@ -92,14 +98,14 @@
   align-items: center;
   gap: 7px;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--fs-2);
   cursor: pointer;
   white-space: nowrap;
   text-decoration: none;
 }
 .lp-chip:hover { color: var(--ink); text-decoration: none; }
-.lp-chip-on { border-color: var(--ox); background: var(--lp-tint); color: var(--ox); }
-.lp-chip-count { font-family: var(--mono); font-size: 13px; opacity: 0.8; }
+.lp-chip-on { border-color: var(--ox); background: var(--lp-tint); color: var(--ox); font-weight: 500; }
+.lp-chip-count { font-family: var(--sans); font-variant-numeric: tabular-nums; font-size: var(--fs-1); opacity: 0.8; }
 .lp-chips-end { margin-left: auto; }
 .lp-link-button {
   border: 0;
@@ -107,7 +113,7 @@
   padding: 0;
   font: inherit;
   font-family: var(--sans);
-  font-size: var(--lp-meta, 13px);
+  font-size: var(--lp-meta, var(--fs-1));
   color: var(--wine);
   cursor: pointer;
 }
@@ -128,7 +134,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-pop);
 }
 .lp-pop-item {
   display: flex;
@@ -137,7 +143,7 @@
   text-align: left;
   width: 100%;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--fs-1);
   padding: 7px 8px;
   border-radius: 6px;
   border: 0;
@@ -164,7 +170,7 @@
   border-radius: 8px;
   background: var(--lp-warn-tint);
   color: var(--body);
-  font-size: 13px;
+  font-size: var(--fs-1);
 }
 
 /* ---- table: panel, header strip, rows ---- */
@@ -173,7 +179,7 @@
   min-height: 0;
   min-width: 0;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--r-lg);
   background: var(--card);
   overflow: hidden;
   display: flex;
@@ -186,19 +192,20 @@
   padding: 10px 18px;
   border-bottom: 1px solid var(--line);
   background: var(--well);
-  font-family: var(--mono);
-  font-size: 12.5px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-family: var(--sans);
+  font-size: var(--fs-1);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--muted);
   position: sticky;
   top: 0;
   z-index: 2;
 }
 .lp-row { min-height: var(--lp-row-h); border-bottom: 1px solid var(--line); }
-.lp-row-grid { display: grid; gap: 12px; align-items: center; padding: 0 18px; font-size: 13px; }
-.lp-legend { font-family: var(--sans); font-size: var(--lp-meta, 13px); line-height: 1.4; letter-spacing: 0; text-transform: none; color: var(--muted); }
-.lp-foot { padding: 10px 18px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; border-top: 1px solid var(--line); font-family: var(--sans); font-size: var(--lp-meta, 13px); color: var(--muted); }
+.lp-row-grid { display: grid; gap: 12px; align-items: center; padding: 0 18px; font-size: var(--fs-1); }
+.lp-legend { font-family: var(--sans); font-size: var(--lp-meta, var(--fs-1)); line-height: 1.4; letter-spacing: 0; text-transform: none; color: var(--muted); }
+.lp-foot { padding: 10px 18px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; border-top: 1px solid var(--line); font-family: var(--sans); font-size: var(--lp-meta, var(--fs-1)); color: var(--muted); }
 .lp-empty {
   margin: 18px;
   border: 1px dashed var(--line);
@@ -206,7 +213,7 @@
   padding: 22px;
   text-align: center;
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--fs-1);
   display: grid;
   gap: 10px;
   justify-items: center;
@@ -221,15 +228,15 @@
   background: var(--well);
   color: var(--body);
   font-family: var(--sans);
-  font-size: var(--lp-meta, 13px);
+  font-size: var(--lp-meta, var(--fs-1));
   line-height: 1.4;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 /* A stage name is a name: it wraps instead of being cut off (Leads table and cards, Matters). */
-/* A days-in-stage pill is a count: Courier, like the plain "7d" beside it. */
-.lp-pill-num { font-family: var(--mono); }
+/* A days-in-stage pill is a count: tabular digits, never a monospace face. */
+.lp-pill-num { font-family: var(--sans); font-variant-numeric: tabular-nums; }
 .lp-pill-wrap { white-space: normal; overflow: visible; text-overflow: clip; }
 .lp-pill-warn { background: var(--lp-warn-tint); color: var(--warn); }
 .lp-pill-risk { background: var(--lp-risk-tint); color: var(--wine); }
@@ -244,7 +251,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--fs-1);
 }
 
 @media (max-width: 640px) {
@@ -278,10 +285,11 @@
   .lp-table-min .lp-row-grid > [data-label]::before {
     content: attr(data-label);
     flex: 0 0 auto;
-    font-family: var(--mono);
-    font-size: 12.5px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
+    font-family: var(--sans);
+    font-size: var(--fs-1);
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
     color: var(--muted);
     text-align: left;
   }
@@ -296,7 +304,7 @@
 
 /* ---- Compact top under 640px (Sprint 34): one row of buttons, one scrolling row of chips ---- */
 @media (max-width: 640px) {
-  .lp-root { --lp-gap: 8px; --lp-meta: 14px; }
+  .lp-root { --lp-gap: 8px; }
   .lp-header { row-gap: 0; }
   .lp-toolbar { flex-wrap: wrap; gap: 6px; }
   .lp-toolbar-spacer { display: none; }
@@ -308,14 +316,23 @@
   .lp-label-short { display: inline; }
   .lp-label-long { display: none; }
   .lp-toolbar .lp-btn,
-  .lp-toolbar .lp-search-submit { padding: 0 10px; font-size: 13px; }
+  .lp-toolbar .lp-search-submit { padding: 0 10px; font-size: var(--fs-1); }
   .lp-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
   .lp-chip { flex: 0 0 auto; white-space: nowrap; }
 }
 
-/* ---- Matters sub-line: the matter number is Courier, the client and the note are Geist ---- */
-.lp-root .mt-sub { font-family: var(--sans); font-size: var(--lp-meta, 13px); line-height: 1.4; }
+/* ---- Matters sub-line: the matter number and the note are all Geist ---- */
+.lp-root .mt-sub { font-family: var(--sans); font-size: var(--lp-meta, var(--fs-1)); line-height: 1.4; }
 .lp-root .mt-sub .lx-num { font-size: inherit; }
 
 /* A popover wrapper is a flex item of a no-wrap chip strip: it must not shrink, or its chip spills out over the next one. */
 .lp-chips > .lp-pop, .lp-chips > .lp-chip { flex: 0 0 auto; }
+
+/* ---- More menu: action items and the danger tone ---- */
+.lp-pop-item-danger { color: var(--wine); }
+.lp-pop-item-danger:hover { background: var(--tint-wine); }
+.lp-pop-item:disabled { opacity: 0.5; cursor: default; }
+.lp-pop-item { min-height: 36px; }
+@media (pointer: coarse), (max-width: 640px) {
+  .lp-pop-item { min-height: 44px; }
+}

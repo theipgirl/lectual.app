@@ -113,7 +113,7 @@ describe("the merged control styling", () => {
 
   it("the older .lx-view-toggle anchor rules stay only for Reports' period control (not a view switch)", () => {
     const globals = read("src/app/globals.css");
-    expect(globals).toContain(".lx-view-toggle a.on { background: var(--card);");
+    expect(globals).toContain(".lx-view-toggle a.on { background: var(--ox);");
     expect(globals).not.toContain(".lx-view-toggle button");
   });
 });

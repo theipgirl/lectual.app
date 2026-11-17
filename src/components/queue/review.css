@@ -9,7 +9,7 @@
 .lx-rv-item { padding: 6px 8px; border-radius: 8px; color: var(--body); font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; background: var(--well); }
 .lx-rv-item[data-check-first="true"] { background: var(--cream); border: 1px solid var(--warn); color: var(--ink); }
 .lx-rv-tag { display: inline-block; margin-right: 6px; color: var(--warn); font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
-.lx-rv-more > summary { cursor: pointer; color: var(--ox); font-size: 13px; padding: 4px 0; }
+.lx-rv-more > summary { cursor: pointer; color: var(--ox); font-size: var(--fs-1); padding: 4px 0; }
 .lx-rv-more > summary:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; border-radius: 4px; }
 .lx-rv-more[open] > summary { margin-bottom: 6px; }
 
@@ -91,7 +91,7 @@
   .lx-app:has(.lx-top--owner) .lx-qi .lx-qi-status { order: 7; justify-self: start; }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-qi-owner { order: 7; margin: 0; font-size: 14px; }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-qi-facts { order: 8; font-size: 14px; row-gap: 6px; }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-qi-facts dt { font-family: var(--mono); font-size: 13px; letter-spacing: 0; text-transform: none; color: var(--muted); }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-qi-facts dt { font-family: var(--mono); font-size: var(--fs-1); letter-spacing: 0; text-transform: none; color: var(--muted); }
 
   /* Messages after the cards. */
   .lx-app:has(.lx-top--owner) .lx-qi .lx-review > p { order: 20; margin: 0; }
@@ -114,8 +114,8 @@
 
 /* Legibility pass (founder, Nov 10): the pill and the note input on the owner phone item. */
 @media (max-width: 900px) {
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-qi-status { font-size: 13px; }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-note-label span { font-size: 13px; }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-qi-status { font-size: var(--fs-1); }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-note-label span { font-size: var(--fs-1); }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-note-input { font-size: 16px; }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-review-actions .lx-btn { font-size: 16px; }
 }

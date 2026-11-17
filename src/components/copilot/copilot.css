@@ -79,7 +79,7 @@
 }
 .cpl-status {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--fs-1);
   color: var(--muted);
 }
 
@@ -170,7 +170,7 @@
 .cpl-footnote {
   flex: 1;
   min-width: 0;
-  font-size: 13px;
+  font-size: var(--fs-1);
   color: var(--muted);
 }
 .cpl-ghost {
@@ -461,7 +461,7 @@ body:has([data-save-bar]) .cpd-launcher { bottom: 86px; }
 }
 .cpw-heading {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--fs-1);
   font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--ink);
@@ -474,7 +474,7 @@ body:has([data-save-bar]) .cpd-launcher { bottom: 86px; }
   border-radius: 999px;
   padding: 6px 14px;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--fs-1);
   cursor: pointer;
 }
 .cpw-new:hover {
@@ -543,7 +543,7 @@ body:has([data-save-bar]) .cpd-launcher { bottom: 86px; }
 }
 .cpw-note {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--fs-1);
   color: var(--muted);
 }
 .cpw-error {

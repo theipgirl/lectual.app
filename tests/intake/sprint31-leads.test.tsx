@@ -186,8 +186,8 @@ describe("the table starts on the first screen (768px tall)", () => {
   it("the shared stylesheet stacks no strips: the header, toolbar and chips are compact rows", () => {
     const css = readFileSync("src/components/list-page/list-page.css", "utf8");
     expect(css).toMatch(/\.lp-root \{[^}]*gap: var\(--lp-gap\)/);
-    expect(css).toMatch(/\.lp-chip \{[^}]*height: 32px/);
-    expect(css).toMatch(/\.lp-search \.lx-input \{[^}]*height: 36px/);
+    expect(css).toMatch(/\.lp-chip \{[^}]*height: var\(--ctl-h\)/);
+    expect(css).toMatch(/\.lp-search \.lx-input \{[^}]*height: var\(--ctl-h\)/);
     expect(css).toContain("--lp-row-h: 46px");
   });
 });

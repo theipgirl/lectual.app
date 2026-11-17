@@ -5,24 +5,12 @@
    ============================================================ */
 
 /* ---- colours: temperature levels and the assistants' own chips (Item L2) ----------------------------------------
-   Each pill carries its own background, so its text contrast holds on any page background. Measured text/background ratios:
-   light: hot 6.44, warm 5.66, cold 5.62, suggested (outlined, on #fffdf7) hot 7.71, warm 6.56, cold 6.72, assistant 5.85;
-   dark:  hot 8.50, warm 8.22, cold 7.86, suggested (outlined, on #1c1416) hot 10.66, warm 11.72, cold 10.65, assistant 7.93.
-   The dashboard has no dark theme (globals.css), so there is NO media-query dark block here: a dark-mode OS must not give dark pills
-   on the cream page. The dark values apply only under an explicit :root[data-theme="dark"], for when the shell gets one. */
+   Each pill carries its own background, so its text contrast holds on any page background. The temperature colours
+   (--tp-hot-fg / -bg, --tp-warm-*, --tp-cold-*, --tp-outline-bg) are defined once in globals.css. The app is light-only:
+   there is no dark block here or anywhere else. */
 :root {
-  --tp-hot-fg: #a3141f; --tp-hot-bg: #fde3e1;
-  --tp-warm-fg: #8f4a00; --tp-warm-bg: #ffe9cf;
-  --tp-cold-fg: #1f5aa6; --tp-cold-bg: #dfeaf8;
-  --tp-outline-bg: #fffdf7;
-  --asst-fg: var(--ok, #43602f); --asst-bg: var(--okbg, rgba(67, 96, 47, 0.12));
-}
-:root[data-theme="dark"] {
-  --tp-hot-fg: #ffb4ac; --tp-hot-bg: #4a1a1c;
-  --tp-warm-fg: #ffc58a; --tp-warm-bg: #4a2c0a;
-  --tp-cold-fg: #a9c9f5; --tp-cold-bg: #17304f;
-  --tp-outline-bg: #1c1416;
-  --asst-fg: #b7d9a0; --asst-bg: #243a1a;
+  --asst-fg: var(--ok);
+  --asst-bg: var(--tint-ok);
 }
 
 /* ---- one typeface (Item L2): no monospace anywhere on the Leads list and board ----------------------------------
@@ -56,7 +44,7 @@
    that opens below the last row (menus are absolutely positioned). */
 .ix-sheet .rse-scroll[data-scroll="false"] { overflow: visible; }
 /* Intake only (scoped through .ix-leads, the Sheet is untouched): the Sheet's 12px header, width tip and phone labels read 13px here. */
-.ix-leads .rv-owner .rse-tbl thead th, .ix-leads .rv-owner .rse-col-tip { font-size: 13px; }
+.ix-leads .rv-owner .rse-tbl thead th, .ix-leads .rv-owner .rse-col-tip { font-size: var(--fs-1); }
 .ix-sheet .ix-sort { font: inherit; letter-spacing: inherit; text-transform: inherit; text-align: left; border: 0; background: transparent; padding: 0; color: inherit; cursor: pointer; }
 .ix-sheet .ix-sort[data-on] { color: var(--ox); }
 .ix-sheet .ix-sort:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; border-radius: 3px; }
@@ -67,9 +55,9 @@
 .ix-sheet .rse-tbl td.ix-lead-td { white-space: normal; overflow: visible; }
 /* A person's full name always shows: it wraps at its spaces and hyphens, to a second line when it must (never an ellipsis). */
 .ix-name { display: block; font-size: 15px; line-height: 1.35; white-space: normal; overflow-wrap: break-word; word-break: normal; hyphens: none; }
-.ix-sub { display: block; font-size: 13px; line-height: 1.4; color: var(--mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ix-sub { display: block; font-size: var(--fs-1); line-height: 1.4; color: var(--mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* A stage name is never cut with an ellipsis: the pill wraps to two lines at its words. */
-.ix-stage { display: inline-block; max-width: 100%; padding: 2px 8px; border-radius: 6px; background: var(--surface2); color: var(--ink2); font-size: 13px; line-height: 1.3; white-space: normal; overflow-wrap: normal; vertical-align: middle; }
+.ix-stage { display: inline-block; max-width: 100%; padding: 2px 8px; border-radius: 6px; background: var(--surface2); color: var(--ink2); font-size: var(--fs-1); line-height: 1.3; white-space: normal; overflow-wrap: normal; vertical-align: middle; }
 .ix-stage-warn { background: var(--warnbg); color: var(--warn); }
 /* The stage pill and the person's own markers (Needs attorney, Needs a stage, Possible duplicate) share one wrapping line. */
 .ix-stage-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-width: 0; }
@@ -77,16 +65,16 @@
 .ix-sheet .rse-tbl td.ix-touch { font-size: inherit; line-height: 1.4; color: var(--ink); }
 .ix-sheet .rse-tbl td.ix-touch[data-touch="none"], .ix-sheet .rse-tbl td.ix-touch[data-touch="activity-only"] { color: var(--mute); }
 .ix-sheet .rse-tbl td.ix-touch[data-in] { color: var(--burg); font-weight: 500; }
-.ix-touch { font-family: var(--font-geist), system-ui, sans-serif; font-size: 13px; line-height: 1.35; color: var(--mute); }
+.ix-touch { font-family: var(--font-geist), system-ui, sans-serif; font-size: var(--fs-1); line-height: 1.35; color: var(--mute); }
 .ix-touch[data-in] { color: var(--burg); font-weight: 500; }
 .ix-next { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.4; color: var(--ink2); overflow-wrap: anywhere; }
 .ix-next[data-urgent] { color: var(--ox); font-weight: 500; }
 .ix-next[data-muted] { color: var(--mute); }
 .ix-next-wrap { display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
 .ix-next-wrap .ix-next { flex: 1; min-width: 0; }
-.ix-sheet .rse-tbl td.ix-err { font-size: 13px; color: var(--crit); background: var(--critbg); }
-.ix-foot { padding: 10px 16px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; border-top: 1px solid var(--line); font-size: 13px; color: var(--mute); }
-.ix-more { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+.ix-sheet .rse-tbl td.ix-err { font-size: var(--fs-1); color: var(--crit); background: var(--critbg); }
+.ix-foot { padding: 10px 16px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; border-top: 1px solid var(--line); font-size: var(--fs-1); color: var(--mute); }
+.ix-more { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px; padding: 6px 12px; font: inherit; font-size: var(--fs-1); cursor: pointer; }
 .ix-more:hover { border-color: var(--ox); color: var(--ox); }
 /* The Assistant activity column: the assistants' chips, stacked, in their own colour. */
 .ix-asst-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
@@ -94,7 +82,7 @@
 /* ---- pills, markers, small buttons ---------------------------------- */
 /* Temperature: hot red, warm orange, cold blue. A level a person set is FILLED. A level the system suggested is OUTLINED (dashed edge,
    plain background) and says "suggested" in its words, so the two never look alike. Both wrap to two lines in a narrow column. */
-.ix-temp { display: inline-block; max-width: 100%; padding: 2px 9px; border-radius: 10px; border: 1.5px solid transparent; font-family: var(--font-geist), system-ui, sans-serif; font-size: 13px; line-height: 1.35; cursor: pointer; background: transparent; white-space: normal; text-align: left; }
+.ix-temp { display: inline-block; max-width: 100%; padding: 2px 9px; border-radius: 10px; border: 1.5px solid transparent; font-family: var(--font-geist), system-ui, sans-serif; font-size: var(--fs-1); line-height: 1.35; cursor: pointer; background: transparent; white-space: normal; text-align: left; }
 .ix-temp[data-tone="hot"] { background: var(--tp-hot-bg); color: var(--tp-hot-fg); }
 .ix-temp[data-tone="warm"] { background: var(--tp-warm-bg); color: var(--tp-warm-fg); }
 .ix-temp[data-tone="cold"] { background: var(--tp-cold-bg); color: var(--tp-cold-fg); }
@@ -106,11 +94,11 @@
 .ix-row:hover .ix-temp-empty, .ix-temp-empty:focus-visible { color: var(--mute); border-color: var(--line); }
 .ix-icon-btn { border: 1px solid var(--line); background: var(--surface); color: var(--mute); border-radius: 6px; font-size: 15px; line-height: 1; padding: 5px 9px; cursor: pointer; min-width: 32px; }
 .ix-icon-btn:hover { color: var(--ox); border-color: var(--ox); }
-.ix-marker { display: inline-block; max-width: 100%; padding: 1px 7px; border-radius: 5px; background: var(--warnbg); color: var(--warn); font-size: 13px; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ix-marker { display: inline-block; max-width: 100%; padding: 1px 7px; border-radius: 5px; background: var(--warnbg); color: var(--warn); font-size: var(--fs-1); line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ix-marker-auto { background: var(--oxbg); color: var(--ox); }
 .ix-menu-h { display: block; padding: 6px 8px 2px; font-family: var(--font-geist), system-ui, sans-serif; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mute); }
 .ix-menu-scroll { max-height: 260px; overflow: auto; }
-.ix-time-chip { border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font-family: var(--font-geist), system-ui, sans-serif; font-size: 13px; color: var(--mute); }
+.ix-time-chip { border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font-family: var(--font-geist), system-ui, sans-serif; font-size: var(--fs-1); color: var(--mute); }
 
 /* ---- the board ------------------------------------------------------ */
 .intake-root, .intake-root .lp-root, .ix-boardwrap { min-width: 0; max-width: 100%; }
@@ -120,8 +108,8 @@
 .ix-col-head { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .ix-col-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; }
 .ix-col-name { font-size: 14px; font-weight: 500; line-height: 1.3; min-width: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: break-word; }
-.ix-col-count { font-family: var(--font-geist), system-ui, sans-serif; font-size: 13px; color: var(--mute); flex: none; }
-.ix-col-badge { align-self: flex-start; padding: 1px 7px; border-radius: 5px; background: var(--warnbg); color: var(--warn); font-size: 13px; line-height: 1.4; }
+.ix-col-count { font-family: var(--font-geist), system-ui, sans-serif; font-size: var(--fs-1); color: var(--mute); flex: none; }
+.ix-col-badge { align-self: flex-start; padding: 1px 7px; border-radius: 5px; background: var(--warnbg); color: var(--warn); font-size: var(--fs-1); line-height: 1.4; }
 .ix-card { display: flex; flex-direction: column; gap: 4px; min-width: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--cream); padding: 8px 9px; cursor: grab; }
 .ix-card[data-selected] { border-color: var(--ox); background: var(--oxbg); }
 .ix-card-top { display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
@@ -130,10 +118,10 @@
 .ix-card-foot .ix-touch { flex: 1; min-width: 0; }
 .ix-empty-stages { margin-top: 8px; }
 .ix-empty-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.ix-empty-stage { border: 1px dashed var(--line); border-radius: 8px; padding: 6px 10px; font-size: 13px; color: var(--mute); min-width: 0; }
+.ix-empty-stage { border: 1px dashed var(--line); border-radius: 8px; padding: 6px 10px; font-size: var(--fs-1); color: var(--mute); min-width: 0; }
 .ix-empty-stage[data-over] { border-color: var(--ox); color: var(--ox); }
 .ix-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.ix-bulk-note { font-size: 13px; color: var(--warn); }
+.ix-bulk-note { font-size: var(--fs-1); color: var(--warn); }
 
 /* ---- under 640px: the Sheet's stacked cards (.lx-stack draws each cell's label) ---------------------------------------- */
 @media (max-width: 640px) {
@@ -143,7 +131,7 @@
   .ix-sheet .rse-tbl td.ix-lead-td { display: block; text-align: left; }
   .ix-next { -webkit-line-clamp: 1; }
   .ix-sub, .ix-stage, .ix-marker { font-size: 14px; }
-  .ix-leads .rv-owner .rse-tbl td[data-label]::before { font-size: 13px; }
+  .ix-leads .rv-owner .rse-tbl td[data-label]::before { font-size: var(--fs-1); }
   .ix-board { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: minmax(0, 1fr); overflow-x: visible; }
 }
 
@@ -158,7 +146,7 @@
 @media (max-width: 640px) { .intake-root .lp-header .lp-sub { white-space: normal; overflow: visible; text-overflow: clip; text-wrap: wrap; } }
 
 /* The duplicate marker is a button that opens the compare panel. */
-.ix-marker-dup { background: var(--critbg); color: var(--crit); text-decoration: none; border: 0; font: inherit; font-size: 13px; line-height: 1.4; cursor: pointer; }
+.ix-marker-dup { background: var(--critbg); color: var(--crit); text-decoration: none; border: 0; font: inherit; font-size: var(--fs-1); line-height: 1.4; cursor: pointer; }
 .ix-marker-dup:hover { text-decoration: underline; }
 .ix-marker-dup:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; }
 .ix-marker-quiet { background: transparent; color: var(--mute); border: 1px dashed var(--line); }
@@ -175,14 +163,14 @@
 .ix-cmp-panel { background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; box-shadow: var(--shadow); font-size: 14px; }
 .ix-cmp-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .ix-cmp-title { margin: 0; font-size: 18px; font-weight: 500; line-height: 1.3; }
-.ix-cmp-close { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+.ix-cmp-close { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px; padding: 6px 12px; font: inherit; font-size: var(--fs-1); cursor: pointer; }
 .ix-cmp-close:hover { border-color: var(--ox); color: var(--ox); }
 .ix-cmp-close:focus-visible, .ix-cmp-link:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; }
-.ix-cmp-note, .ix-cmp-msg { margin: 8px 0 12px; font-size: 13px; line-height: 1.4; color: var(--mute); }
+.ix-cmp-note, .ix-cmp-msg { margin: 8px 0 12px; font-size: var(--fs-1); line-height: 1.4; color: var(--mute); }
 .ix-cmp-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .ix-cmp-table th, .ix-cmp-table td { text-align: left; vertical-align: top; padding: 8px 10px 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
 .ix-cmp-table thead th { font-weight: 500; padding-top: 0; }
-.ix-cmp-table tbody th { width: 28%; font-weight: 400; font-size: 13px; color: var(--mute); }
+.ix-cmp-table tbody th { width: 28%; font-weight: 400; font-size: var(--fs-1); color: var(--mute); }
 .ix-cmp-table td[data-failed] { color: var(--warn); }
 .ix-cmp-table tr[data-same] td { color: var(--ink); background: color-mix(in srgb, var(--ox) 4%, transparent); }
 .ix-cmp-links { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 14px; }

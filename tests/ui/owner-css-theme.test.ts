@@ -1,13 +1,19 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-/** A forced light theme must stay light on a dark OS: the dark values sit behind :not([data-theme="light"]) and a [data-theme="dark"] twin. */
-describe.each(["src/components/deck/deck.css", "src/components/shell/owner-shell.css", "src/components/today/owner/owner-today.css"])("%s", (file) => {
-  const css = readFileSync(file, "utf8");
-  it("guards its dark colours with the repo's theme convention", () => {
-    const media = css.match(/@media \(prefers-color-scheme: dark\) \{([\s\S]*?)\n\}/g) ?? [];
-    expect(media.length).toBeGreaterThan(0);
-    for (const m of media) expect(m).toContain(':root:not([data-theme="light"])');
-    expect(css).toContain(':root[data-theme="dark"]');
+/** The app is light-only: none of the shared or owner-view stylesheets may carry a dark-mode block (it used to guard dark values behind data-theme). */
+describe.each([
+  "src/components/deck/deck.css",
+  "src/components/shell/owner-shell.css",
+  "src/components/today/owner/owner-today.css",
+  "src/components/shell/account-menu.css",
+  "src/app/dashboard/intake/leads.css",
+  "src/components/view-toggle.css",
+  "src/app/globals.css",
+])("%s", (file) => {
+  const css = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  it("has no dark-mode block", () => {
+    expect(css).not.toContain("prefers-color-scheme");
+    expect(css).not.toContain('data-theme="dark"');
   });
 });

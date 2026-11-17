@@ -7,17 +7,18 @@
  */
 
 .cph-hero {
-  --cp-mist: #9C949B;
-  --cp-blush: #C7ADB2;
-  --cp-rose: #B26A72;
-  --cp-wine: #6A1F2B;
-  --cp-deep: #230810;
-  --cp-rail: #3A1218;
-  --cp-pill: #F6F0E3;
-  --cp-glass: rgba(30, 8, 13, 0.72);
-  --cp-glass-line: rgba(253, 247, 235, 0.1);
-  --cp-text: #F6EDE4;
-  --cp-text-soft: rgba(246, 237, 228, 0.72);
+  /* Aliases of the shared tokens in globals.css (--hero-*, --ox, --ox-deep, --rail-ink, --paper). */
+  --cp-mist: var(--hero-mist);
+  --cp-blush: var(--rail-ink);
+  --cp-rose: var(--hero-rose);
+  --cp-wine: var(--ox);
+  --cp-deep: var(--ox-deep);
+  --cp-rail: var(--hero-rail);
+  --cp-pill: var(--paper);
+  --cp-glass: var(--hero-glass);
+  --cp-glass-line: var(--hero-glass-line);
+  --cp-text: var(--hero-text);
+  --cp-text-soft: var(--hero-text-2);
 
   position: relative;
   isolation: isolate;

@@ -29,7 +29,7 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  font-size: 13px;
+  font-size: var(--fs-1);
   font-weight: 600;
   background: var(--well);
   color: var(--muted);
@@ -125,7 +125,7 @@
   margin: 0;
 }
 .ifm-help {
-  font-size: 13px;
+  font-size: var(--fs-1);
   line-height: 18px;
   color: var(--muted);
   margin: 0;
@@ -135,7 +135,7 @@
   color: var(--muted);
 }
 .ifm-err {
-  font-size: 13px;
+  font-size: var(--fs-1);
   line-height: 18px;
   color: var(--wine);
 }
@@ -801,7 +801,7 @@ textarea.ifm-input {
   border-radius: 6px;
   background: #fff;
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: var(--fs-1);
   color: var(--ink);
   outline: none;
 }
@@ -817,7 +817,7 @@ textarea.ifm-input {
   background: var(--ink);
   color: #f1e3da;
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: var(--fs-1);
   line-height: 20px;
   white-space: pre-wrap;
   word-break: break-all;
@@ -855,7 +855,7 @@ textarea.ifm-input {
   align-items: center;
   gap: 6px;
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: var(--fs-1);
   color: var(--ink);
 }
 .ifm-domain button {
@@ -916,7 +916,7 @@ textarea.ifm-input {
   align-items: center;
   gap: 6px;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--fs-1);
   color: var(--body);
   cursor: pointer;
   border: 0;
@@ -1110,7 +1110,7 @@ textarea.ifm-input {
   gap: 5px;
 }
 .ifm-pv-label {
-  font-size: 13px;
+  font-size: var(--fs-1);
   font-weight: 500;
 }
 .ifm-pv-req {
@@ -1278,7 +1278,7 @@ textarea.ifm-input {
 }
 .ifm-kpi-arrow span {
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: var(--fs-1);
   color: var(--ink);
   font-weight: 700;
 }
@@ -1399,7 +1399,7 @@ textarea.ifm-input {
   gap: 14px;
 }
 .ifm-answers dt {
-  font-size: 13px;
+  font-size: var(--fs-1);
   color: var(--muted);
 }
 .ifm-answers dd {
@@ -1460,7 +1460,7 @@ textarea.ifm-input {
 .ifm-back {
   display: inline-block;
   margin-bottom: 6px;
-  font-size: 13px;
+  font-size: var(--fs-1);
   font-weight: 600;
   color: var(--ox);
   text-decoration: none;
@@ -1740,7 +1740,7 @@ textarea.ifm-input {
   gap: 6px;
 }
 .ifm-asm-sub {
-  font-size: 13px;
+  font-size: var(--fs-1);
   min-height: 34px;
 }
 .ifm-asm-preview {
@@ -1880,7 +1880,7 @@ textarea.ifm-input {
   white-space: pre-wrap;
 }
 .ifr-answers .ifr-meta {
-  font-size: 13px;
+  font-size: var(--fs-1);
   color: var(--muted);
   white-space: nowrap;
 }
@@ -2010,7 +2010,7 @@ textarea.ifm-input {
   border-radius: 8px;
   border: 1px solid var(--pv-line);
   background: var(--pv-field);
-  font-size: 13px;
+  font-size: var(--fs-1);
   line-height: 18px;
 }
 .ifm-pv-choice-opt input {
@@ -2114,7 +2114,7 @@ textarea.ifm-input {
   align-items: center;
 }
 .ifl-chan-url {
-  font-size: 13px;
+  font-size: var(--fs-1);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2132,7 +2132,7 @@ textarea.ifm-input {
 }
 .ifl-create-hint {
   display: block;
-  font-size: 13px;
+  font-size: var(--fs-1);
   color: var(--muted);
 }
 @media (max-width: 700px) {
@@ -2150,9 +2150,9 @@ textarea.ifm-input {
    Placed last so it wins over the sizes above. ───────────────────────────────────────────────────── */
 .ifm-caps { font-size: 12px; } /* uppercase label, was 11.5px */
 :is(.ifl-root, .ifm-root) :is(.ifm-count, .ifm-private, .ifm-q-pack, .ifm-badge, .ifl-link, .ifl-copy, .ifl-stats dt, .ifl-stats dd small, .ifl-kind, .ifr-bucket, .ifm-slug-prefix, .ifq-url) {
-  font-size: 13px; /* were 11.5 to 12.5px */
+  font-size: var(--fs-1); /* were 11.5 to 12.5px */
 }
-.ifq-url { font-size: 13px; }
+.ifq-url { font-size: var(--fs-1); }
 /* A fact that appears only here is never cut: the share link (and its "Not live yet" line) and the channel links wrap. */
 .ifl-link span { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
 .ifl-link { align-items: flex-start; }

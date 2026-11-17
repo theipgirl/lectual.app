@@ -290,8 +290,11 @@ describe("the stylesheets", () => {
 
   it("draws the hero with radial gradients in the five palette colours, defined once", () => {
     expect(page).toContain("radial-gradient");
+    // The palette is defined once, as tokens in globals.css (--hero-mist, --rail-ink, --hero-rose, --ox, --ox-deep); the hero only aliases them.
+    const globals = readFileSync("src/app/globals.css", "utf8").toUpperCase();
     for (const colour of ["#9C949B", "#C7ADB2", "#B26A72", "#6A1F2B", "#230810"]) {
-      expect(page.match(new RegExp(colour, "g"))).toHaveLength(1);
+      expect(globals.match(new RegExp(colour, "g"))).toHaveLength(1);
+      expect(page.toUpperCase()).not.toContain(colour);
       expect(chat.toUpperCase()).not.toContain(colour);
     }
   });

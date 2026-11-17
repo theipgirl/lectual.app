@@ -86,7 +86,7 @@
 
 .rc-chosen {
   margin-top: 6px;
-  font-size: 13px;
+  font-size: var(--fs-1);
   color: var(--ok);
 }
 

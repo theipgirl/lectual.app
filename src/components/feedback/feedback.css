@@ -48,7 +48,7 @@
 .fb-error {
   margin: 0;
   color: var(--wine);
-  font-size: 13px;
+  font-size: var(--fs-1);
 }
 .fb-sent {
   margin: 0;

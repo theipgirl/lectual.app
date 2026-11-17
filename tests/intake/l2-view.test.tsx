@@ -59,9 +59,9 @@ describe("source guards", () => {
 
 describe("css rules", () => {
   const css = readFileSync("src/app/dashboard/intake/leads.css", "utf8");
-  it("has no prefers-color-scheme block (the dashboard has no dark theme; a dark OS must not get dark pills on the cream page)", () => {
+  it("has no dark block at all (the dashboard is light-only; a dark OS must not get dark pills on the cream page)", () => {
     expect(css).not.toContain("prefers-color-scheme");
-    expect(css).toContain(':root[data-theme="dark"]');
+    expect(css).not.toContain('data-theme="dark"');
   });
   it("the card scrolls by default and is overflow visible only after a measurement said the table fits", () => {
     const table = readFileSync("src/app/dashboard/intake/_components/IntakeTable.tsx", "utf8");
@@ -94,22 +94,20 @@ describe("one typeface and the colours (CSS)", () => {
     const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
     return (x + 0.05) / (y + 0.05);
   };
-  const tokens = (scope: RegExp) => {
-    const m = scope.exec(css);
+  // The temperature colours are defined once, in globals.css :root (light only). The assistant chip uses the shared --ok and --tint-ok.
+  const globals = readFileSync("src/app/globals.css", "utf8");
+  const tokens = () => {
+    const m = /:root \{([\s\S]*?)\n\}/.exec(globals);
     if (!m) throw new Error("scope");
-    return Object.fromEntries([...m[1].matchAll(/--([a-z-]+): (#[0-9a-f]{6})/g)].map((x) => [x[1], x[2]]));
+    return Object.fromEntries([...m[1].matchAll(/--([a-z-]+):\s*(#[0-9a-f]{6})/g)].map((x) => [x[1], x[2]]));
   };
-  for (const [name, scope] of [
-    ["light", /\n:root \{([^}]*)\}/],
-    ["dark", /\n:root\[data-theme="dark"\] \{([^}]*)\}/],
-  ] as const) {
-    it(`temperature and assistant text reaches 4.5:1 on its own background (${name}), filled and outlined`, () => {
-      const t = tokens(scope);
-      for (const tone of ["hot", "warm", "cold"]) {
-        expect(ratio(t[`tp-${tone}-fg`], t[`tp-${tone}-bg`]), `${tone} filled`).toBeGreaterThanOrEqual(4.5);
-        expect(ratio(t[`tp-${tone}-fg`], t["tp-outline-bg"]), `${tone} outlined`).toBeGreaterThanOrEqual(4.5);
-      }
-      if (name === "dark") expect(ratio(t["asst-fg"], t["asst-bg"])).toBeGreaterThanOrEqual(4.5);
-    });
-  }
+  it("temperature text reaches 4.5:1 on its own background (light), filled and outlined", () => {
+    const t = tokens();
+    for (const tone of ["hot", "warm", "cold"]) {
+      expect(ratio(t[`tp-${tone}-fg`], t[`tp-${tone}-bg`]), `${tone} filled`).toBeGreaterThanOrEqual(4.5);
+      expect(ratio(t[`tp-${tone}-fg`], t["card"]), `${tone} outlined`).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(css).toContain("--asst-fg: var(--ok)");
+    expect(css).toContain("--asst-bg: var(--tint-ok)");
+  });
 });

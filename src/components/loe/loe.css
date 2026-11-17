@@ -6,7 +6,7 @@
 .loe-version { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 0; border-top: 1px solid var(--line-2); font-size: 14px; color: var(--body); }
 .loe-version:first-child { border-top: 0; }
 .loe-version-name { color: var(--ink); font-weight: 500; }
-.loe-version-when { color: var(--muted); font-size: 13px; }
+.loe-version-when { color: var(--muted); font-size: var(--fs-1); }
 .loe-form { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .loe-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .loe-body { font-family: var(--mono); font-size: 14px; line-height: 1.55; min-height: 280px; width: 100%; resize: vertical; box-sizing: border-box; }

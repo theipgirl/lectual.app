@@ -10,8 +10,8 @@
 
 .rv-owner .rse-root { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .rv-owner .rse-wrap { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
-.rv-owner .rse-keys { margin: 0; display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; justify-content: flex-end; font-family: var(--sans); font-size: 13px; line-height: 1.4; color: var(--muted); white-space: nowrap; }
-.rv-owner .rse-key { display: inline-flex; align-items: center; height: 22px; padding: 0 6px; border-radius: 5px; border: 1px solid var(--line); background: var(--card); font-family: var(--sans); font-size: 13px; color: var(--ink); }
+.rv-owner .rse-keys { margin: 0; display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; justify-content: flex-end; font-family: var(--sans); font-size: var(--fs-1); line-height: 1.4; color: var(--muted); white-space: nowrap; }
+.rv-owner .rse-key { display: inline-flex; align-items: center; height: 22px; padding: 0 6px; border-radius: 5px; border: 1px solid var(--line); background: var(--card); font-family: var(--sans); font-size: var(--fs-1); color: var(--ink); }
 
 .rv-owner .rse-card { padding: 0; overflow: visible; border-radius: 18px; }
 /* Wider than the content area: the table scrolls sideways inside its card; Client is never squeezed. */
@@ -47,10 +47,10 @@
 
 /* The next-step editor: text and due date in the cell. */
 .rv-owner .rse-next-ed { display: flex; flex-direction: column; gap: 6px; min-width: 0; cursor: default; }
-.rv-owner .rse-ed-label { font-size: 13px; color: var(--muted); }
+.rv-owner .rse-ed-label { font-size: var(--fs-1); color: var(--muted); }
 .rv-owner .rse-ed-due { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.rv-owner .rse-ed-hint { font-size: 13px; line-height: 1.4; color: var(--muted); }
-.rv-owner .rse-ed-error { margin: 0; font-size: 13px; color: var(--ox); }
+.rv-owner .rse-ed-hint { font-size: var(--fs-1); line-height: 1.4; color: var(--muted); }
+.rv-owner .rse-ed-error { margin: 0; font-size: var(--fs-1); color: var(--ox); }
 .rv-owner .rse-in, .rv-owner .rse-tbl .rse-in { width: 100%; box-shadow: none; outline: none; height: 36px; border: 1px solid var(--line); border-radius: 9px; padding: 0 10px; font: 15px var(--sans); color: var(--ink); background: var(--card); }
 .rv-owner .rse-in:focus-visible, .rv-owner .rse-tbl .rse-in:focus-visible { outline: 2px solid var(--ox); outline-offset: 0; }
 .rv-owner .rse-in-date, .rv-owner .rse-tbl .rse-in-date { width: 140px; }
@@ -63,7 +63,7 @@
 .rv-owner .rse-pop { position: absolute; z-index: 8; top: calc(100% - 2px); left: 4px; min-width: 230px; width: max-content; max-width: 340px; padding: 8px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow-lift); display: flex; flex-direction: column; gap: 2px; text-align: left; white-space: normal; }
 .rv-owner .rse-pop-list { display: flex; flex-direction: column; gap: 2px; max-height: 300px; overflow: auto; }
 .rv-owner .rse-pop-eyebrow { padding: 4px 10px; font-family: var(--mono); font-size: 12px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--muted); }
-.rv-owner .rse-pop-foot { margin: 0; padding: 4px 10px; font-size: 13px; line-height: 1.4; color: var(--muted); }
+.rv-owner .rse-pop-foot { margin: 0; padding: 4px 10px; font-size: var(--fs-1); line-height: 1.4; color: var(--muted); }
 .rv-owner .rse-opt { display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 10px; border-radius: 9px; border: 0; background: transparent; font: 15px var(--sans); color: var(--ink); text-align: left; white-space: nowrap; cursor: pointer; }
 .rv-owner .rse-opt:hover, .rv-owner .rse-opt:focus-visible { background: color-mix(in srgb, var(--well) 60%, transparent); outline: none; }
 .rv-owner .rse-opt.sel { background: var(--well); font-weight: 600; }

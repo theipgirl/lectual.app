@@ -55,14 +55,17 @@ describe("one view switch (D1)", () => {
     const hits = files.filter((f) => f.endsWith(".css") && f !== "src/components/view-toggle.css" && read(f).includes(".vs-switch"));
     expect(hits).toEqual([]);
     const css = read("src/components/view-toggle.css");
-    expect(css).toContain("--view-switch-on: #550e1a");
+    expect(css).not.toContain("--view-switch-on");
+    expect(css).toContain("background: var(--ox)");
     expect(css).toContain(":focus-visible");
     expect(css).toContain("(pointer: coarse)");
     expect(css).toContain("min-height: 44px");
     expect(css).toContain("var(--cream)");
-    // no colour literal except the one token's own value (and its dark pair)
+    // no colour literal at all: the chosen fill is --ox, the one chosen colour
     const literals = [...css.matchAll(/#[0-9a-f]{3,8}\b/gi)].map((m) => m[0].toLowerCase());
-    expect(literals.sort()).toEqual(["#4a0c17", "#550e1a"]);
+    expect(literals).toEqual([]);
+    expect(css).not.toContain("prefers-color-scheme");
+    expect(css).not.toContain("data-theme");
   });
 
   it("every page that switches views goes through <ViewToggle>", () => {

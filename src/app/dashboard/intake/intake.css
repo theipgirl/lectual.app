@@ -12,25 +12,19 @@
    ============================================================ */
 
 .intake-root {
-  --ink: #2a1216;
-  --ink2: #4a2a2e;
-  --mute: #7a5a5e;
-  --ground: #f6f0e3;
-  --surface: #fffdf7;
-  --surface2: #f1e8d8;
-  --line: rgba(42, 18, 22, 0.13);
-  --ox: #6a1f2b;
-  --burg: #8e2733;
-  --blush: #efd9dc;
-  --cream: #fdf7eb;
-  --ok: #43602f;
-  --warn: #7c5312;
-  --crit: #8e2733;
-  --okbg: rgba(67, 96, 47, 0.12);
-  --warnbg: rgba(124, 83, 18, 0.12);
-  --critbg: rgba(142, 39, 51, 0.12);
-  --oxbg: rgba(106, 31, 43, 0.1);
-  --shadow: 0 1px 2px rgba(20, 4, 8, 0.05), 0 12px 28px -22px rgba(20, 4, 8, 0.4);
+  /* Aliases of the shared tokens in globals.css (the identical copies of --ink, --ox, --line, --cream, --ok, --warn,
+     --blush and --shadow are gone). Area A renames these consumers to the shared tokens and deletes the aliases. */
+  --ink2: var(--body);
+  --mute: var(--muted);
+  --ground: var(--paper);
+  --surface: var(--card);
+  --surface2: var(--well);
+  --burg: var(--wine);
+  --crit: var(--wine);
+  --okbg: var(--tint-ok);
+  --warnbg: var(--tint-warn);
+  --critbg: var(--tint-wine);
+  --oxbg: var(--tint-ox);
   --rowh: 46px;
 
   background: var(--ground);
@@ -236,7 +230,7 @@
   border: 1px solid var(--ox);
   border-radius: 10px;
   background: var(--cream);
-  font-size: 13px;
+  font-size: var(--fs-1);
   color: var(--ink);
 }
 

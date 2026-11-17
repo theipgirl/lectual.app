@@ -77,7 +77,7 @@
 }
 .lx-mail-preview {
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--fs-1);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

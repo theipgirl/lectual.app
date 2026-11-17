@@ -3,7 +3,7 @@ import "./view-toggle.css";
 
 /**
  * THE view-style switch of the app (D1, Taylor's choice, the Approvals deck's look): one cream pill holding the options, the chosen one
- * filled dark burgundy (`--view-switch-on`) with light text, the others plain dark text. Every page that switches how the SAME records are
+ * filled with the standard burgundy (`--ox`) with light text, the others plain dark text. Every page that switches how the SAME records are
  * drawn (Approvals and the deck, Weekly review, Intake, Matters, Calendar) uses this and nothing else; a test fails on a second one.
  *
  * Two modes, picked by which prop is passed:

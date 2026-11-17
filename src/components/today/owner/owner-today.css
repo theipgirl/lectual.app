@@ -1,50 +1,19 @@
-/* Owner Today, after the approved Today board. Tokens only; every new colour has a light and a dark value. */
+/* Owner Today, after the approved Today board. Tokens only; colours are aliases of the shared tokens (light only). */
 :root {
-  --ot-deck-bg: #550e1a;
-  --ot-deck-ink: #fdf7eb;
-  --ot-hero-sub: #efd9dc;
+  /* Aliases of the shared tokens in globals.css (the app is light-only). Area C removes them and uses the tokens directly. */
+  --ot-deck-bg: var(--deep);
+  --ot-deck-ink: var(--cream);
+  --ot-hero-sub: var(--blush);
   --ot-dot: var(--ox);
-  --ot-today: #550e1a;
-  --ot-consult-tint: rgba(106, 31, 43, 0.09);
-  --ot-deadline-tint: rgba(124, 83, 18, 0.13);
-  --ot-consult-dot: #6a1f2b;
-  --ot-deadline-dot: #7c5312;
-  --ot-risk-bg: rgba(106, 31, 43, 0.12);
-  --ot-risk-ink: #6a1f2b;
-  --ot-warn-bg: rgba(124, 83, 18, 0.12);
-  --ot-warn-ink: #7c5312;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --ot-deck-bg: #6a1f2b;
-    --ot-deck-ink: #fdf7eb;
-    --ot-hero-sub: #efd9dc;
-    --ot-dot: #e0a9b1;
-    --ot-today: #e0a9b1;
-    --ot-consult-tint: rgba(224, 169, 177, 0.14);
-    --ot-deadline-tint: rgba(214, 168, 92, 0.16);
-    --ot-consult-dot: #e0a9b1;
-    --ot-deadline-dot: #d6a85c;
-    --ot-risk-bg: rgba(224, 169, 177, 0.16);
-    --ot-risk-ink: #e0a9b1;
-    --ot-warn-bg: rgba(214, 168, 92, 0.16);
-    --ot-warn-ink: #d6a85c;
-  }
-}
-:root[data-theme="dark"] {
-  --ot-deck-bg: #6a1f2b;
-  --ot-deck-ink: #fdf7eb;
-  --ot-hero-sub: #efd9dc;
-  --ot-dot: #e0a9b1;
-  --ot-today: #e0a9b1;
-  --ot-consult-tint: rgba(224, 169, 177, 0.14);
-  --ot-deadline-tint: rgba(214, 168, 92, 0.16);
-  --ot-consult-dot: #e0a9b1;
-  --ot-deadline-dot: #d6a85c;
-  --ot-risk-bg: rgba(224, 169, 177, 0.16);
-  --ot-risk-ink: #e0a9b1;
-  --ot-warn-bg: rgba(214, 168, 92, 0.16);
-  --ot-warn-ink: #d6a85c;
+  --ot-today: var(--ox);
+  --ot-consult-tint: var(--tint-ox);
+  --ot-deadline-tint: var(--tint-warn);
+  --ot-consult-dot: var(--ox);
+  --ot-deadline-dot: var(--warn);
+  --ot-risk-bg: var(--tint-wine);
+  --ot-risk-ink: var(--wine);
+  --ot-warn-bg: var(--tint-warn);
+  --ot-warn-ink: var(--warn);
 }
 
 /* Page: one column, 18px apart. */
@@ -53,7 +22,7 @@
 .ot-h1 { font-family: var(--serif); font-weight: 400; font-size: 44px; line-height: 1.05; letter-spacing: -0.01em; color: var(--ink); margin: 0; }
 .ot-date { font-size: 15px; color: var(--body); margin: 0; }
 .ot-mono, .ot-sub { font-family: var(--mono); }
-.ot-sub { font-size: 13px; line-height: 1.4; color: var(--muted); }
+.ot-sub { font-size: var(--fs-1); line-height: 1.4; color: var(--muted); }
 .ot-only-narrow { display: none; }
 .ot-only-narrow-block { display: none !important; }
 .ot-link { color: var(--ox); text-decoration: underline; text-underline-offset: 2px; font-size: 14px; }
@@ -85,7 +54,7 @@
 .ot-row-title, .ot-line { display: block; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ot-row-title { font-size: 15px; white-space: normal; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.3; color: var(--ink); text-decoration: none; }
 a.ot-row-title:hover { text-decoration: underline; }
-.ot-pill { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 999px; font-size: 13px; white-space: nowrap; background: var(--well); color: var(--body); flex: 0 0 auto; }
+.ot-pill { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 999px; font-size: var(--fs-1); white-space: nowrap; background: var(--well); color: var(--body); flex: 0 0 auto; }
 .ot-pill-risk { background: var(--ot-risk-bg); color: var(--ot-risk-ink); font-weight: 600; }
 .ot-pill-warn { background: var(--ot-warn-bg); color: var(--ot-warn-ink); }
 .ot-empty, .ot-note, .ot-foot { margin: 8px 0 0; }
@@ -105,11 +74,11 @@ a.ot-row-title:hover { text-decoration: underline; }
 .ot-day { display: flex; flex-direction: column; gap: 6px; min-height: 124px; padding: 9px; border-radius: 12px; background: var(--paper); border: 1px solid var(--line-2); color: var(--ink); text-decoration: none; min-width: 0; }
 .ot-day:hover { text-decoration: none; border-color: var(--ot-dot); }
 .ot-day[aria-current="date"] { border: 2px solid var(--ot-today); background: var(--card); padding: 8px; }
-.ot-day-date { font-size: 13px; font-weight: 600; color: var(--ink); }
+.ot-day-date { font-size: var(--fs-1); font-weight: 600; color: var(--ink); }
 .ot-day-date .ot-mono { font-weight: 400; font-size: 12px; color: var(--muted); text-transform: uppercase; }
 .ot-day-items { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.ot-item { display: flex; flex-direction: column; gap: 1px; padding: 5px 8px; border-radius: 8px; font-size: 13px; line-height: 1.3; color: var(--ink); overflow-wrap: anywhere; }
-.ot-item b { font-family: var(--mono); font-weight: 400; font-size: 13px; color: var(--body); }
+.ot-item { display: flex; flex-direction: column; gap: 1px; padding: 5px 8px; border-radius: 8px; font-size: var(--fs-1); line-height: 1.3; color: var(--ink); overflow-wrap: anywhere; }
+.ot-item b { font-family: var(--mono); font-weight: 400; font-size: var(--fs-1); color: var(--body); }
 .ot-item-consult { background: var(--ot-consult-tint); }
 .ot-item-deadline { background: var(--ot-deadline-tint); }
 .ot-day-dots { display: none; }
@@ -126,7 +95,7 @@ a.ot-row-title:hover { text-decoration: underline; }
 .ot-chip:hover { border-color: var(--ot-dot); text-decoration: none; }
 
 @media (max-width: 900px) {
-  .ot-day-items .ot-item { font-size: 13px; }
+  .ot-day-items .ot-item { font-size: var(--fs-1); }
 }
 
 /* Phone (375 wide): h1 32, a plain "Your cards" card, a dot strip for the week, then Ask Copilot, consults, deadlines, proposals. */
@@ -154,8 +123,8 @@ a.ot-row-title:hover { text-decoration: underline; }
   .ot-week { gap: 4px; }
   .ot-day { min-height: 64px; padding: 5px 2px; align-items: center; text-align: center; gap: 4px; }
   .ot-day[aria-current="date"] { padding: 4px 2px; }
-  .ot-day-date { display: flex; flex-direction: column; align-items: center; font-size: 13px; line-height: 1.2; }
-  .ot-day-date .ot-mono { font-size: 13px; text-transform: none; }
+  .ot-day-date { display: flex; flex-direction: column; align-items: center; font-size: var(--fs-1); line-height: 1.2; }
+  .ot-day-date .ot-mono { font-size: var(--fs-1); text-transform: none; }
   .ot-day-items { display: none; }
   .ot-day-dots { display: flex; gap: 3px; min-height: 7px; justify-content: center; flex-wrap: wrap; }
 
@@ -183,7 +152,7 @@ a.ot-row-title:hover { text-decoration: underline; }
   .ot-row-title { font-size: 16px; }
   .ot-sub { font-size: 14px; }
   .ot-link { font-size: 15px; }
-  .ot-pill { font-size: 13px; }
+  .ot-pill { font-size: var(--fs-1); }
   .ot-eyebrow { font-size: 12px; }
   .ot-copilot input { font-size: 16px; }
 }

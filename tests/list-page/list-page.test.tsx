@@ -176,10 +176,10 @@ describe("list-page.css", () => {
     expect(css).not.toMatch(/rgba?\(/);
   });
 
-  it("sets no text below 12.5px", () => {
+  it("sets no text below 13px: sizes are the type-scale tokens, never a px literal under the floor", () => {
     const sizes = [...css.matchAll(/font-size:\s*([\d.]+)px/g)].map((m) => Number(m[1]));
-    expect(sizes.length).toBeGreaterThan(5);
-    for (const size of sizes) expect(size).toBeGreaterThanOrEqual(12.5);
+    for (const size of sizes) expect(size).toBeGreaterThanOrEqual(13);
+    expect([...css.matchAll(/font-size:\s*var\(--fs-\d\)/g)].length).toBeGreaterThan(5);
   });
 
   it("gives one row height, pill and spacing to both pages", () => {
