@@ -57,7 +57,7 @@ describe("roles", () => {
 describe("the People section", () => {
   it("lists one card per scorecard of this firm, newest first, with name, business, zoned time, score, temperature and a lead link", async () => {
     const html = await eventPage(newDb(tables()), "owner");
-    const section = html.slice(html.indexOf('aria-label="People at this event"'));
+    const section = html.slice(html.indexOf('aria-label="People who took this assessment"'));
     expect(section.match(/<li class="ifm-card ev-person"/g)).toHaveLength(4);
     expect(section.indexOf("=Ada")).toBeLessThan(section.indexOf("Bo Marsh"));
     expect(section).toContain("Quill Studio");
@@ -101,7 +101,7 @@ describe("the People section", () => {
     for (const role of ["viewer", "social_media", undefined, "mystery"]) {
       const db = newDb(tables());
       const html = await eventPage(db, role);
-      expect(html).not.toContain("People at this event");
+      expect(html).not.toContain("People who took this assessment");
       expect(html).not.toContain("Download CSV");
       expect(db.selects.some(([t]) => t === "crm_lead")).toBe(false);
       expect(html).toContain("Performance");
