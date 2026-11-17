@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { eventDisplayName } from "@/lib/intake-forms/event-name";
+import "./event.css";
 import { eventSummaries } from "@/lib/intake-forms/booth-results";
 import { formatDuration } from "@/lib/intake-forms/performance";
 import { shortDate } from "@/lib/campaigns/stops";
@@ -50,12 +52,13 @@ export function EventAssessments({ read, timeZone }: { read: Awaited<ReturnType<
             <div className="ifl-main">
               <div className="ifl-title-row">
                 <Link href={eventHref(e.code)} className="ifl-name">
-                  {e.code}
+                  {eventDisplayName(e.code)}
                 </Link>
+                <span className="ev-name-code">{e.code}</span>
                 <span className="ifl-kind">Booth assessment</span>
               </div>
             </div>
-            <dl className="ifl-stats" aria-label={`${e.code}, all time`}>
+            <dl className="ifl-stats" aria-label={`${eventDisplayName(e.code)}, all time`}>
               <div>
                 <dt>Started</dt>
                 <dd>{e.started.toLocaleString("en-US")}</dd>

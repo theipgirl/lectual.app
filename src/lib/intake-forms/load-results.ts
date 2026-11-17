@@ -6,6 +6,7 @@ import type { RangeDays } from "./performance";
 import type { ResultSubmission } from "./results";
 import type { AssessmentSubmissionRow } from "./assessment-samples";
 import { isMissingTableError } from "./store";
+import type { EventCardRow, EventLeadRow } from "./event-people";
 
 /**
  * The Results tab, the event page, the Forms list's event rows and the CSV
@@ -150,6 +151,54 @@ export async function loadBoothEvent(eventCode: string): Promise<Load<{ rows: Bo
           .range(from, to),
       EVENT_ROW_LIMIT,
     );
+  } catch (error) {
+    return { status: "unavailable", error };
+  }
+}
+
+// ── one event's people ───────────────────────────────────────────────────────
+
+const LEAD_CHUNK = 80;
+
+/**
+ * One event's scorecards (newest first, all time) and the leads they belong to,
+ * for the event page's People and its CSV. Scoped client only. Any failed read
+ * (cards or leads) is `unavailable` as a whole, never a list with blank people;
+ * a lead that simply isn't returned (deleted, not visible) stays a missing lead.
+ * `max` cards are read; `total` is how many cards the event has up to that
+ * ceiling, `over` is true when there were more. Leads are read only for the
+ * `show` newest cards (the page shows 200; the CSV shows all).
+ */
+export async function loadEventPeople(
+  eventCode: string,
+  opts: { contact: boolean; max: number; show: number; since?: string },
+): Promise<Load<{ cards: EventCardRow[]; leads: EventLeadRow[]; total: number; over: boolean }>> {
+  try {
+    const supabase = await getScopedClient();
+    const read = await readPages<EventCardRow>(
+      (from, to) => {
+        let q = supabase
+          .from("crm_booth_scorecard")
+          .select("id, lead_id, score, band, temperature, created_at, completed_at, gaps")
+          .eq("event_code", eventCode);
+        if (opts.since) q = q.gte("created_at", opts.since);
+        return q.order("created_at", { ascending: false }).order("id", { ascending: true }).range(from, to);
+      },
+      opts.max + 1,
+    );
+    if (read.status !== "ok") return read;
+    const over = read.value.rows.length > opts.max;
+    const all = read.value.rows.slice(0, opts.max);
+    const shown = all.slice(0, opts.show);
+    const ids = [...new Set(shown.map((c) => c.lead_id))];
+    const columns = opts.contact ? "id, first_name, last_name, business_name, email, phone" : "id, first_name, last_name, business_name";
+    const leads: EventLeadRow[] = [];
+    for (let i = 0; i < ids.length; i += LEAD_CHUNK) {
+      const { data, error } = await supabase.from("crm_lead").select(columns).in("id", ids.slice(i, i + LEAD_CHUNK));
+      if (error) return { status: "unavailable", error };
+      leads.push(...((data ?? []) as unknown as EventLeadRow[]));
+    }
+    return { status: "ok", value: { cards: shown, leads, total: all.length, over } };
   } catch (error) {
     return { status: "unavailable", error };
   }

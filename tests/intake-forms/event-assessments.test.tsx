@@ -142,7 +142,7 @@ describe("Forms list: Event assessments (F15)", () => {
 describe("event page (F16)", () => {
   it("renders the performance numbers, the distribution blocks, option counts with card labels, the stored top gaps and the drop-off section", async () => {
     const html = await eventPage(newDb({ crm_booth_scorecard: boothTables() }), "urban-golf-2026");
-    expect(html).toContain('<h1 class="lx-h1">urban-golf-2026</h1>');
+    expect(html).toContain('<h1 class="lx-h1">Urban Golf 2026<span class="ev-name-code">urban-golf-2026</span></h1>');
     const kpi = (label: string) => html.match(new RegExp(`${label.replace(/[()]/g, "\\$&")}</div><div class="ifm-kpi-value">([^<]*)</div>`))?.[1];
     expect(kpi("Started")).toBe("3");
     expect(kpi("Finished")).toBe("2");

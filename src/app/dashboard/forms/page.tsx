@@ -72,7 +72,7 @@ export default async function IntakeFormsPage({
   if (!sp.form && sp.event !== undefined) {
     // One booth event. A code that is empty, or longer than any real one, is no event.
     if (typeof sp.event !== "string" || sp.event.length === 0 || sp.event.length > 120) notFound();
-    return <EventPage code={sp.event} range={parseEventRange(sp.range)} />;
+    return <EventPage code={sp.event} range={parseEventRange(sp.range)} role={session.role} />;
   }
 
   if (!sp.form) {
