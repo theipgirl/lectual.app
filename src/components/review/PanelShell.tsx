@@ -11,7 +11,21 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), selec
  * rendered from `?open=`; this only adds the keyboard: focus moves in, Tab wraps, Esc follows the close link (so Back
  * and Esc do the same thing), and focus returns to where it was.
  */
-export function PanelShell({ closeHref, titleId, children }: { closeHref: string; titleId: string; children: ReactNode }) {
+export function PanelShell({
+  closeHref,
+  titleId,
+  children,
+  placement = "drawer",
+}: {
+  closeHref: string;
+  titleId: string;
+  children: ReactNode;
+  /**
+   * Sprint 10: "centre" draws the same frame as a card centred over the dimmed page (Intake and Matters' opened card).
+   * The default, "drawer", is the Weekly review's drawer and renders exactly as before.
+   */
+  placement?: "drawer" | "centre";
+}) {
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
@@ -43,9 +57,9 @@ export function PanelShell({ closeHref, titleId, children }: { closeHref: string
     };
   }, []);
   return (
-    <div className="rv-panel-wrap">
+    <div className={placement === "centre" ? "rv-panel-wrap rv-panel-wrap-centre" : "rv-panel-wrap"}>
       <Link href={closeHref} className="rv-panel-backdrop" tabIndex={-1} aria-hidden="true" scroll={false} />
-      <aside ref={ref} className="rv-panel" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
+      <aside ref={ref} className={placement === "centre" ? "rv-panel rv-panel-centre" : "rv-panel"} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
         {children}
       </aside>
     </div>
