@@ -424,6 +424,7 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                         <Link href={row.openHref} className="rse-client" scroll={false}>
                           {row.client}
                         </Link>
+                        {row.documentsText && <span className="lx-note rv-sub">{row.documentsText}</span>}
                       </td>
                       <td data-label="Mark">{row.mark ?? <span className="rse-dash">—</span>}</td>
                       <td data-label="Status">
