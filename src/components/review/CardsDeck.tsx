@@ -1,3 +1,4 @@
+import { cardSubline } from "@/lib/review/format";
 import Link from "next/link";
 import { BUCKET_COPY } from "@/lib/review/buckets";
 import type { DeckCard, DeckPerson } from "@/lib/review/deck";
@@ -96,9 +97,7 @@ export function CardsDeck({
           </Link>
         </h2>
         <p className="lx-note rv-big-meta">
-          {row.kind === "lead" ? "Lead" : "Matter"}
-          {row.mark ? ` · ${row.mark}` : ""}
-          {row.stageLabel ? ` · ${row.stageLabel}` : ""}
+          {cardSubline(row)}
         </p>
         <p className="rv-big-step">{row.nextStep ? row.nextStep.title : "No next step"}</p>
         {due && (

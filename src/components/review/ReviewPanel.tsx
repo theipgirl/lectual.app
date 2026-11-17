@@ -1,3 +1,4 @@
+import { REVIEW_SHOWS_PROPOSALS } from "@/lib/review/scope";
 import Link from "next/link";
 import type { ReviewRow } from "@/lib/review/buckets";
 import type { DetailLoad } from "@/lib/review/detail-load";
@@ -123,6 +124,7 @@ export function ReviewPanel(props: PanelProps) {
     <PanelShell closeHref={closeHref} titleId={TITLE_ID} title={row.client}>
       <p className="lx-note rv-panel-kind">
         {open.kind === "lead" ? "Lead" : "Matter"}
+        {row.company ? ` · ${row.company}` : ""}
         {row.mark ? ` · ${row.mark}` : ""}
       </p>
 
@@ -145,7 +147,7 @@ export function ReviewPanel(props: PanelProps) {
             BLANK
           )}
         </Fact>
-        {row.proposalExpiry && (
+        {REVIEW_SHOWS_PROPOSALS && row.proposalExpiry && (
           <Fact label="Proposal">
             <Pill tone={row.proposalExpiry.expired ? "risk" : "mute"}>{row.proposalExpiry.text}</Pill>
           </Fact>

@@ -30,7 +30,10 @@ export type ReviewRow = {
   kind: ReviewKind;
   id: string;
   href: string;
+  /** The person's name first (a lead's company stands in only when there is no person's name). */
   client: string;
+  /** A lead's company, when the person's name leads and the company is a different thing. */
+  company?: string | null;
   mark: string | null;
   stageLabel: string | null;
   /** The current stage's id (the matter's docket stage, or the lead's pipeline stage), when known. */
@@ -53,6 +56,8 @@ export type ReviewRow = {
   lastDirection: Direction | null;
   /** YYYY-MM-DD in the firm's zone of the newest OUTBOUND contact (we emailed / called). Null = none recorded or unreadable (see `contactKnown`). */
   lastOutbound?: string | null;
+  /** What that newest outbound contact was: an email we sent or a call we logged. */
+  lastOutboundType?: ContactKind | null;
   /** Where the lead / matter came from (`referral_source`), if recorded. */
   source?: string | null;
   nextStep: ReviewNextStep | null;

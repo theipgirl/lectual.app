@@ -50,3 +50,31 @@ export function followUpText(row: { contactKnown: boolean; lastOutbound?: string
   const ago = !Number.isFinite(n) || n < 0 ? "" : n === 0 ? " · today" : n === 1 ? " · 1 day" : ` · ${n} days`;
   return `Last followed up ${shortDate(row.lastOutbound, today)}${ago}`;
 }
+
+const SENT_WORD: Partial<Record<ContactKind, string>> = { email_sent: "email", call_logged: "call" };
+
+/**
+ * The card's timeline line: the newest thing SENT OUT for the record (an email we sent or a call we logged), as
+ * "Sent Nov 11 · email". `days` (the Waiting-on-client cards) adds how long ago: "Sent Nov 4 · email · 5 days".
+ * Fixed sentences for nothing sent and for an unreadable history; never "nothing sent" for a failed read.
+ */
+export function sentText(
+  row: { contactKnown: boolean; lastOutbound?: string | null; lastOutboundType?: ContactKind | null },
+  today: string,
+  opts: { days?: boolean } = {},
+): string {
+  if (!row.contactKnown) return "Sent: couldn't load";
+  if (!row.lastOutbound) return "Nothing sent yet";
+  const word = row.lastOutboundType ? SENT_WORD[row.lastOutboundType] : undefined;
+  let text = `Sent ${shortDate(row.lastOutbound, today)}${word ? ` · ${word}` : ""}`;
+  if (opts.days) {
+    const n = daysBetween(row.lastOutbound, today);
+    if (Number.isFinite(n) && n >= 0) text += n === 0 ? " · today" : n === 1 ? " · 1 day" : ` · ${n} days`;
+  }
+  return text;
+}
+
+/** The quiet line under a card's name: "Lead · Acme Inc · Fold · Consult held". The company shows only when it is not the name. */
+export function cardSubline(row: { kind: "lead" | "matter"; company?: string | null; mark: string | null; stageLabel: string | null }): string {
+  return [row.kind === "lead" ? "Lead" : "Matter", row.company, row.mark, row.stageLabel].filter(Boolean).join(" · ");
+}

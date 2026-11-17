@@ -84,6 +84,7 @@ export function BoardCard({
   foot,
   tone,
   id,
+  linkScroll,
   children,
   className,
   ...rest
@@ -97,6 +98,8 @@ export function BoardCard({
   foot?: React.ReactNode;
   tone?: PillTone;
   id?: string;
+  /** false keeps the page where it is when the title link opens a panel (the Weekly review). Omitted = Link's default. */
+  linkScroll?: boolean;
   children?: React.ReactNode;
 } & Omit<React.LiHTMLAttributes<HTMLLIElement>, "title">) {
   // A card with a menu but no foot line puts the menu beside its chip (or its name) so no empty strip is left at the foot.
@@ -105,7 +108,7 @@ export function BoardCard({
     <li className={["lx-board-card", className].filter(Boolean).join(" ")} data-tone={tone} id={id} {...rest}>
       <div className="lx-board-card-top">
         <span className="lx-board-card-title">
-          <Link href={href} className="lx-rowlink">
+          <Link href={href} className="lx-rowlink" {...(linkScroll === undefined ? {} : { scroll: linkScroll })}>
             {title}
           </Link>
         </span>

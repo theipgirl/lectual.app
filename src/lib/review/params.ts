@@ -57,7 +57,7 @@ export function isMine(row: ReviewRow, userId: string | null): boolean {
 export function matchesSearch(row: ReviewRow, q: string): boolean {
   const term = q.trim().toLowerCase();
   if (!term) return true;
-  return `${row.client} ${row.mark ?? ""}`.toLowerCase().includes(term);
+  return `${row.client} ${row.company ?? ""} ${row.mark ?? ""}`.toLowerCase().includes(term);
 }
 
 /**

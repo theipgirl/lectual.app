@@ -42,6 +42,7 @@ function SheetSection({ id, title, rows, today, members, params }: Common & { id
                       <Link href={openHref(params, r)} className="lx-rowlink" scroll={false}>
                         {r.client}
                       </Link>
+                      {r.company && <span className="lx-note rv-sub">{r.company}</span>}
                       {documentsTag(r.documentCount) && <span className="lx-note rv-sub">{documentsTag(r.documentCount)}</span>}
                     </td>
                     <td data-label="Mark">{r.mark ?? <span className="lx-note">{BLANK}</span>}</td>

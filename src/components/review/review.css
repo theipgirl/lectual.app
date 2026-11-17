@@ -44,28 +44,19 @@
 .rv-strip-when { font-size: inherit; color: inherit; }
 .rv-strip-note { margin: 0; }
 
-/* Board: one lane (a filled column) per person, split in two lists */
-.rv-board { display: grid; gap: 14px; }
-.rv-person { padding: 12px 14px; min-width: 0; }
-.rv-person-name { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; font-family: var(--sans); font-size: var(--fs-4); font-weight: 600; color: var(--ink); }
-.rv-count { font-size: var(--fs-1); font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
-.rv-colh { margin: 0; padding: 0; }
-.rv-halves { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
-.rv-half { display: grid; gap: 8px; align-content: start; min-width: 0; }
-.rv-half[data-half="client"] { border-left: 1px dashed var(--line); padding-left: 14px; }
-.rv-cards { display: flex; flex-direction: column; gap: 8px; }
+/* Board: the shared Board kit's column per person, wrapping into rows (never a sideways scroll), each holding two lists */
+.rv-board.lx-board { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 12px; overflow: visible; padding-bottom: 0; align-items: start; }
+.rv-board .lx-board-col { min-width: 0; flex: none; }
+.rv-lane-load { margin: -4px 0 0; font-size: var(--fs-2); }
+.rv-lane-head { list-style: none; margin: 6px 0 0; padding: 0; display: block; }
+.rv-lane-head[data-half="client"] { padding-top: 10px; border-top: 1px dashed var(--line); }
+.rv-board .lx-board-empty { font-size: var(--fs-2); }
 .rv-avatar { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 32px; height: 32px; border-radius: var(--r-pill); background: var(--tint-ox); color: var(--ox); font-size: var(--fs-1); font-weight: 600; }
 
-/* The review card: the shared board card, the whole top one link, Done and Open as text links below */
-.rv-card { padding: 0; grid-template-rows: 1fr auto; min-height: 0; overflow: hidden; }
-.rv-card-link { display: grid; gap: 4px; align-content: start; padding: 10px 12px 4px 14px; color: inherit; text-decoration: none; min-width: 0; }
-.rv-card-link:hover { text-decoration: none; }
-.rv-card-link:hover .lx-board-card-title { text-decoration: underline; }
-.rv-card-link:focus-visible { outline: 2px solid var(--ox); outline-offset: -2px; }
-.rv-card-link .lx-board-card-top { align-items: center; }
-.rv-card-link .lx-board-card-meta { display: block; }
-.rv-card-followup { display: block; font-size: var(--fs-2); }
-.rv-card-acts { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; justify-content: flex-end; padding: 0 14px 8px; position: relative; z-index: 1; }
+/* The review card: the kit's board card; the timeline line (newest thing sent) and Done / Open sit under it */
+.rv-card { min-width: 0; }
+.rv-card-sent { display: block; font-size: var(--fs-2); }
+.rv-card-acts { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; justify-content: flex-end; position: relative; z-index: 1; }
 .rv-card-acts .lx-link { font-size: var(--fs-2); }
 .rv-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 
@@ -154,8 +145,6 @@
 .rv-note-box > summary::-webkit-details-marker { display: none; }
 
 @media (max-width: 900px) {
-  .rv-halves { grid-template-columns: 1fr; }
-  .rv-half[data-half="client"] { border-left: 0; padding-left: 0; border-top: 1px dashed var(--line); padding-top: 10px; }
   .rv-strips, .rv-rest { grid-template-columns: 1fr; }
   .rv-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -168,8 +157,6 @@
   .rv-big { padding: 18px 16px; }
   .rv-big-step { font-size: var(--fs-4); }
   .rv-handto { flex-wrap: wrap; }
-  /* Done and Open sit on their own row, so the step and follow-up lines keep the full width. */
-  .rv-card-acts { padding: 0 14px 8px; }
 }
 /* A text link on a card is a 44px tap target on a touch screen or a phone. */
 @media (pointer: coarse), (max-width: 640px) {

@@ -4,6 +4,7 @@ import { limitTags, rowTags } from "@/lib/review/tags";
 import type { ReviewRow } from "@/lib/review/buckets";
 import { reviewHref, type ReviewParams } from "@/lib/review/params";
 import { Pill } from "@/components/ui/Pill";
+import { REVIEW_SHOWS_PROPOSALS } from "@/lib/review/scope";
 
 type Member = { userId: string; name: string };
 
@@ -24,7 +25,10 @@ export function Avatar({ name }: { name: string }) {
 }
 
 export function Tags({ row, today, max, skip }: { row: ReviewRow; today: string; max?: number; /** Tags the card already says elsewhere (the column heading, the meta line). */ skip?: ("waiting" | "expiry")[] }) {
-  const all = rowTags(row, today).filter((t) => !(skip?.includes("waiting") && t.text.startsWith("Waiting on ")) && !(skip?.includes("expiry") && row.proposalExpiry && t.text === row.proposalExpiry.text));
+  // A proposal's expiry is never drawn in the first wave (REVIEW_SHOWS_PROPOSALS), whatever `skip` says.
+  const all = rowTags(row, today).filter(
+    (t) => !(skip?.includes("waiting") && t.text.startsWith("Waiting on ")) && !(row.proposalExpiry && t.text === row.proposalExpiry.text && (!REVIEW_SHOWS_PROPOSALS || skip?.includes("expiry"))),
+  );
   const { shown, more } = limitTags(all, max ?? all.length);
   if (shown.length === 0) return null;
   return (

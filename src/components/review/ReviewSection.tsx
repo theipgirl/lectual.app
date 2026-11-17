@@ -1,3 +1,5 @@
+import { REVIEW_SHOWS_PROPOSALS } from "@/lib/review/scope";
+import { cardSubline } from "@/lib/review/format";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { BUCKET_COPY, type BucketKey, type ReviewRow } from "@/lib/review/buckets";
@@ -47,10 +49,9 @@ export function ReviewTable({ rows, today, members, canWrite, params }: Omit<Sec
                     {r.client}
                   </Link>
                   <div className="lx-note">
-                    {r.kind === "lead" ? "Lead" : "Matter"}
-                    {r.mark ? ` · ${r.mark}` : ""}
+                    {cardSubline({ ...r, stageLabel: null })}
                   </div>
-                  {r.proposalExpiry && <Pill tone={r.proposalExpiry.expired ? "risk" : "mute"}>{r.proposalExpiry.text}</Pill>}
+                  {REVIEW_SHOWS_PROPOSALS && r.proposalExpiry && <Pill tone={r.proposalExpiry.expired ? "risk" : "mute"}>{r.proposalExpiry.text}</Pill>}
                 </td>
                 <td data-label="Stage">
                   {r.stageLabel ? <Pill>{r.stageLabel}</Pill> : <span className="lx-note">{BLANK}</span>}

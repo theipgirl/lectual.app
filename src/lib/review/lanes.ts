@@ -1,4 +1,4 @@
-import type { BucketKey, ReviewBuckets, ReviewRow } from "./buckets";
+import { bucketOf, type BucketKey, type ReviewBuckets, type ReviewRow } from "./buckets";
 
 /**
  * The board, from the buckets. Pure.
@@ -113,4 +113,30 @@ export type Kpis = { overdue: number; week: number; needs: number; uspto: number
 
 export function kpis(buckets: ReviewBuckets): Kpis {
   return { overdue: buckets.counts.overdue, week: buckets.counts.week, needs: buckets.counts.needs, uspto: buckets.counts.uspto };
+}
+
+/** How much a person holds: every card in the lane, and how many of them are overdue or due this week (the buckets the KPI strip counts). */
+export type LaneLoad = { total: number; overdue: number; week: number };
+
+export function laneLoad(lane: Pick<Lane, "our" | "client">, today: string): LaneLoad {
+  const load: LaneLoad = { total: 0, overdue: 0, week: 0 };
+  for (const row of [...lane.our, ...lane.client]) {
+    load.total += 1;
+    const b = bucketOf(row, today);
+    if (b === "overdue") load.overdue += 1;
+    else if (b === "week") load.week += 1;
+  }
+  return load;
+}
+
+/** "3 overdue · 4 due this week", or null when neither applies. */
+export function laneLoadText(load: LaneLoad): string | null {
+  const parts = [load.overdue > 0 ? `${load.overdue} overdue` : null, load.week > 0 ? `${load.week} due this week` : null].filter(Boolean);
+  return parts.length ? parts.join(" · ") : null;
+}
+
+/** "Rayn · 12" (and the split, for the column's accessible name). */
+export function laneLabel(name: string, load: LaneLoad): string {
+  const split = laneLoadText(load);
+  return `${name} · ${load.total}${split ? `, ${split}` : ""}`;
 }

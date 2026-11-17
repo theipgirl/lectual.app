@@ -161,12 +161,13 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
   const contactKnown = input.sources.activity === "ok";
 
   const contactOf = (list: readonly ContactActivity[] | undefined) => {
-    if (!contactKnown) return { lastContact: null, direction: null, lastOutbound: null };
+    if (!contactKnown) return { lastContact: null, direction: null, lastOutbound: null, lastOutboundType: null };
     const { last, direction, lastOutbound } = summarizeContact(list ?? [], now, input.firmSenders);
     return {
       lastContact: last ? { date: civilDateIn(last.at, timeZone), type: last.type } : null,
       direction,
       lastOutbound: lastOutbound ? civilDateIn(lastOutbound.at, timeZone) : null,
+      lastOutboundType: lastOutbound ? lastOutbound.type : null,
     };
   };
 
@@ -181,7 +182,7 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
       imported: Boolean(m.lawmatics_id || m.lawmatics_synced_at),
       now,
     });
-    const { lastContact, direction, lastOutbound } = contactOf(activityByMatter.get(m.id));
+    const { lastContact, direction, lastOutbound, lastOutboundType } = contactOf(activityByMatter.get(m.id));
     const display = matterDisplayTitle(m);
     const client = m.owner_name?.trim() || display.title;
     rows.push({
@@ -203,6 +204,7 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
       lastContact,
       lastDirection: direction,
       lastOutbound,
+      lastOutboundType,
       source: m.referral_source?.trim() || null,
       waiting: waitingOn({
         withUspto: stageIsWithUspto(m.stage),
@@ -229,15 +231,18 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
       lastStageChangeAt: input.lastStageChange?.get(l.id) ?? null,
       now,
     });
-    const { lastContact, direction, lastOutbound } = contactOf(activityByLead.get(l.id));
+    const { lastContact, direction, lastOutbound, lastOutboundType } = contactOf(activityByLead.get(l.id));
     const full = `${l.first_name ?? ""} ${l.last_name ?? ""}`.trim();
-    const client = l.business_name?.trim() || full || l.email || "Unnamed lead";
+    // The person's name first; the company is the sub-line, and stands in only when there is no person's name.
+    const company = l.business_name?.trim() || null;
+    const client = full || company || l.email || "Unnamed lead";
     rows.push({
       key: `l-${l.id}`,
       kind: "lead",
       id: l.id,
       href: `/dashboard/leads/${l.id}/`,
       client,
+      company: full && company && company.toLowerCase() !== full.toLowerCase() ? company : null,
       mark: l.mark_text?.trim() || null,
       stageLabel: stageName.has(l.current_stage_id) ? stageDisplayName(stageName.get(l.current_stage_id) as string) : null,
       stageId: l.current_stage_id,
@@ -249,6 +254,7 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
       lastContact,
       lastDirection: direction,
       lastOutbound,
+      lastOutboundType,
       source: l.referral_source?.trim() || null,
       waiting: waitingOn({
         withUspto: false,

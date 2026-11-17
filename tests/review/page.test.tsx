@@ -19,7 +19,7 @@ const rows = [
   row({ key: "c", client: "Needs Co", waiting: "us", nextStep: null }),
   row({ key: "d", client: "Office Co", waiting: "uspto", nextStep: null, deadline: { dueDate: "2026-11-20", title: "Response" } }),
   row({ key: "e", client: "Fine Co", stageLabel: "Application Filed", waiting: null }),
-  row({ key: "f", client: "Client Co", assignedTo: "u-rayn", waiting: "client", lastOutbound: "2026-10-28", proposalExpiry: { text: "Proposal expires Nov 11", expiresOn: "2026-11-11", expired: false } }),
+  row({ key: "f", client: "Client Co", assignedTo: "u-rayn", waiting: "client", lastOutbound: "2026-10-28", lastOutboundType: "email_sent", proposalExpiry: { text: "Proposal expires Nov 11", expiresOn: "2026-11-11", expired: false } }),
   row({ key: "g", client: "Lapsed Co", kind: "lead", id: "00000000-0000-4000-8000-0000000000d1", assignedTo: "u-rayn", waiting: "client", lastOutbound: null, proposalExpiry: { text: "Proposal expired Oct 28", expiresOn: "2026-10-28", expired: true } }),
   row({ key: "h", client: "Approve Co", waiting: "approval", nextStep: step("2026-12-30", "u-rayn") }),
 ];
@@ -78,39 +78,42 @@ describe("Weekly review page", () => {
     expect(html).toContain("rv-kpis");
   });
 
-  it("Waiting-on-client cards say when we last followed up, and 'No follow-up recorded' when unknown", async () => {
+  it("every card carries the timeline line (newest thing sent); Waiting-on-client cards add how long ago", async () => {
     mock(ok());
     const html = await render();
     const client = html.slice(html.indexOf('data-half="client"'));
-    expect(client).toContain("Last followed up Oct 28 · 5 days");
-    expect(client).toContain("No follow-up recorded");
-    // Our-move cards never carry the follow-up line.
+    expect(client).toContain("Sent Oct 28 · email · 5 days");
+    expect(client).toContain("Nothing sent yet");
+    // An Our-turn card has the line too, without the day count.
     const our = html.slice(html.indexOf('data-half="our"'), html.indexOf('data-half="client"'));
-    expect(our).not.toContain("Last followed up");
+    expect(our).toContain("rv-card-sent");
+    expect(our).not.toMatch(/Sent [A-Z][a-z]{2} \d+ · (email|call) · \d+ days?/);
   });
 
-  it("Proposals out strip: soonest last day first, expired in the risk style, each linking to the panel", async () => {
+  it("a failed contact read says the sent line couldn't load, never 'Nothing sent yet'", async () => {
+    mock(ok({ rows: [row({ key: "x", client: "Unread Co", waiting: "us", contactKnown: false, lastContact: null, lastOutbound: null, nextStep: step("2026-10-30", "u-rayn") })] }));
+    const html = await render();
+    expect(html).toContain("Sent: couldn&#x27;t load");
+    expect(html).not.toContain("Nothing sent yet");
+  });
+
+  it("Proposals are not part of the first wave: no Proposals out strip and no expiry tag anywhere, but the cards still draw", async () => {
     mock(ok());
     const html = await render();
-    const strip = html.slice(html.indexOf('data-strip="proposals"'), html.indexOf('data-strip="person"'));
-    expect(strip).toContain("Proposals out");
-    expect(strip.indexOf("Lapsed Co")).toBeLessThan(strip.indexOf("Client Co"));
-    expect(strip).toContain("Expired Oct 28");
-    expect(strip).toContain("Last day Nov 11");
-    expect(strip).toMatch(/lx-pill lx-pill-risk[^>]*>Lapsed Co[\s\S]*rv-strip-when rv-deadline-soon">Expired Oct 28/);
-    expect(strip).toMatch(/href="[^"]*open=lead%3A/);
+    expect(html).not.toContain("Proposals out");
+    expect(html).not.toContain('data-strip="proposals"');
+    expect(html).not.toMatch(/Proposal expire/);
+    expect(html).toContain("Client Co");
+    const sheet = await render({ view: "sheet" });
+    expect(sheet).not.toMatch(/Proposal expire/);
   });
 
-  it("Proposals out says it couldn't load when the proposals read failed, never 'No proposals out'", async () => {
-    mock(ok({ failed: ["proposals"] }));
+  it("each person's column says how much they hold, split into overdue and due this week", async () => {
+    mock(ok());
     const html = await render();
-    expect(html).toContain("Proposals couldn&#x27;t load");
-    expect(html).not.toContain("No proposals out");
-  });
-
-  it("an empty proposals read says none are out", async () => {
-    mock(ok({ rows: rows.map((r) => ({ ...r, proposalExpiry: null })) }));
-    expect(await render()).toContain("No proposals out.");
+    expect(html).toContain('aria-label="Rayn · 4, 1 overdue"');
+    expect(html).toContain('aria-label="Rebecca · 1, 1 due this week"');
+    expect(html).toMatch(/data-lane-load[^>]*>1 overdue</);
   });
 
   it("Waiting on Rebecca lists her next steps and approvals; hidden when there is no Rebecca", async () => {
@@ -211,7 +214,7 @@ describe("Weekly review page", () => {
     expect(html).toContain(">Done<");
     expect(html).not.toContain("Set next step");
     expect(html).not.toContain("<details class=\"rv-act\"");
-    for (const m of html.matchAll(/<a class="rv-card-link"[\s\S]*?<\/a>/g)) {
+    for (const m of html.matchAll(/<a class="lx-rowlink"[\s\S]*?<\/a>/g)) {
       expect(m[0]).not.toMatch(/<form|<button|<input|<select|<textarea/);
     }
   });
@@ -221,12 +224,14 @@ describe("Weekly review page", () => {
     const html = await render({ view: "sheet", q: "co" });
     expect(html).toMatch(/class="lx-rowlink" href="[^"]*view=sheet[^"]*open=matter%3A/);
     const board = await render({ kind: "matters" });
-    expect(board).toMatch(/class="rv-card-link" href="[^"]*kind=matters[^"]*open=matter%3A/);
+    expect(board).toMatch(/class="lx-rowlink" href="[^"]*kind=matters[^"]*open=matter%3A/);
   });
 
   it("at most two tags then +N (a board card leaves out the tags its column and meta line already say)", async () => {
     const r = row({ key: "t", client: "Tag Co", waiting: "us", nextStep: step("2026-10-30", "u-rayn"), deadline: { dueDate: "2026-11-10", title: null }, proposalExpiry: { text: "Proposal expires Nov 4", expiresOn: "2026-11-04", expired: false } });
-    expect(renderToStaticMarkup(<Tags row={r} today={TODAY} max={2} />)).toContain("+1");
+    expect(renderToStaticMarkup(<Tags row={r} today={TODAY} max={1} />)).toContain("+1");
+    // The proposal expiry is never drawn in the first wave, so two tags fit in two.
+    expect(renderToStaticMarkup(<Tags row={r} today={TODAY} max={2} />)).not.toContain("+1");
     mock(ok({ rows: [r] }));
     const html = await render();
     expect(html).toContain("USPTO deadline");

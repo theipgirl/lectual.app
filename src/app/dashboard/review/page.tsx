@@ -9,7 +9,7 @@ import { ListSearch, ListToolbar } from "@/components/list-page/ListToolbar";
 import { Chip, FilterChips } from "@/components/list-page/Chips";
 import "@/components/list-page/list-page.css";
 import { ReviewSection } from "@/components/review/ReviewSection";
-import { KpiStrip, ProposalsOutStrip, ReviewBoard, ViewSwitch, WaitingOnStrip } from "@/components/review/ReviewViews";
+import { KpiStrip, ReviewBoard, ViewSwitch, WaitingOnStrip } from "@/components/review/ReviewViews";
 import { SheetView } from "@/components/review/SheetView";
 import { SheetSaveStatus } from "@/components/review/SheetSaveStatus";
 import { loadSheetStages } from "@/lib/review/sheet-edit-load";
@@ -23,7 +23,7 @@ import { CAN_MOVE_STAGE, CAN_WRITE_LEAD } from "@/lib/pipeline/leads";
 import { loadReview } from "@/lib/review/load";
 import { reviewBuckets, reviewSubline } from "@/lib/review/buckets";
 import { boardLanes, kpis, meetingPosition, offBoard } from "@/lib/review/lanes";
-import { proposalsOut, reviewPerson, waitingOnPerson } from "@/lib/review/strips";
+import { reviewPerson, waitingOnPerson } from "@/lib/review/strips";
 import { applyReviewFilters, olderHiddenCount, sinceSuspended, DEFAULT_REVIEW_VIEW, parseReviewParams, reviewHref, type ReviewParams } from "@/lib/review/params";
 import { criticalAlert, detailsNote } from "@/lib/review/notes";
 import { noticeFor } from "@/lib/review/notice";
@@ -88,7 +88,6 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
     const stages = canWrite || moveLead ? await loadSheetStages() : { matter: null, lead: null };
     sheetPerms = canWrite || writeLead ? { writeMatter: canWrite, writeLead, moveLead, matterStages: canWrite ? stages.matter : null, leadStages: moveLead ? stages.lead : null } : READ_ONLY_PERMS;
   }
-  const proposalsKnown = !load.failed.includes("proposals");
   const approvalsKnown = !load.failed.includes("approvals");
   // An approver sees the strip about THEM ("Waiting on you"); anyone else sees it about the review person, as before.
   const isApprover = !!role && !!userId && QUEUE_APPROVE_ROLES.includes(role);
@@ -96,7 +95,6 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const olderHidden = olderHiddenCount(load.rows, params, userId);
   const strips = (
     <div className="rv-strips">
-      <ProposalsOutStrip owner={owner} items={proposalsOut(shown, load.today)} known={proposalsKnown} params={params} />
       {person && <WaitingOnStrip owner={owner} firstName={person.firstName} you={isApprover} personId={person.userId} rows={waitingOnPerson(shown, person.userId)} approvalsKnown={approvalsKnown} params={params} />}
     </div>
   );
