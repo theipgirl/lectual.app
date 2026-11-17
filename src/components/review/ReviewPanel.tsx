@@ -21,7 +21,7 @@ import {
 import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadFailedLine } from "@/components/ui/LoadFailed";
 import { Pill } from "@/components/ui/Pill";
-import { BLANK, OWNER_COLUMN, TEAMMATE, UNASSIGNED, noneYet } from "@/lib/ui/words";
+import { ADD_TO_TIMELINE, BLANK, LAST_CONTACT, OWNER_COLUMN, TEAMMATE, UNASSIGNED, noneYet } from "@/lib/ui/words";
 import { ActForm } from "./ActForm";
 import { LostNurture } from "./LostNurture";
 import { PanelShell } from "./PanelShell";
@@ -132,7 +132,7 @@ export function ReviewPanel(props: PanelProps) {
         </Fact>
         <Fact label={OWNER_COLUMN}>{who(detail.assignedTo) ?? UNASSIGNED}</Fact>
         <Fact label="Came from">{detail.cameFrom ?? BLANK}</Fact>
-        <Fact label="Last contact">{lastContactText(row, today)}</Fact>
+        <Fact label={LAST_CONTACT}>{lastContactText(row, today)}</Fact>
         <Fact label="Waiting on">{row.waiting ? WAITING_LABEL[row.waiting] : BLANK}</Fact>
         <Fact label="USPTO deadline">
           {row.deadline ? (
@@ -285,7 +285,7 @@ export function ReviewPanel(props: PanelProps) {
           <h3 id="rv-sec-note-h" className="lx-label">
             Log what happened
           </h3>
-          <ActForm action={logWhatHappenedAction} submit="Add to timeline">
+          <ActForm action={logWhatHappenedAction} submit={ADD_TO_TIMELINE}>
             {hidden}
             <textarea className="lx-input" name="body" rows={3} placeholder="A short note for the timeline" aria-label="What happened" required />
           </ActForm>

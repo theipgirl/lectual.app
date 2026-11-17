@@ -6,7 +6,7 @@ import { deadlineIsSoon, dueText, lastContactText, shortDate } from "@/lib/revie
 import { DoneButton } from "./DoneButton";
 import { Pill } from "@/components/ui/Pill";
 import { SheetCard, SheetScroll, SheetTable } from "@/components/ui/SheetTable";
-import { BLANK, OWNER_COLUMN, TEAMMATE } from "@/lib/ui/words";
+import { BLANK, LAST_CONTACT, OWNER_COLUMN, TEAMMATE } from "@/lib/ui/words";
 import { openHref, type Common } from "./shared";
 import "@/components/list-page/list-page.css";
 import "./review.css";
@@ -57,7 +57,7 @@ export function ReviewTable({ rows, today, members, canWrite, params }: Omit<Sec
                   <span className="lx-note rv-sub">{r.stageDays !== null ? `${r.stageDays}d in stage` : r.stageNote ?? ""}</span>
                 </td>
                 <td data-label={OWNER_COLUMN}>{who(r.assignedTo) ?? <span className="lx-note">{BLANK}</span>}</td>
-                <td data-label="Last contact">{lastContactText(r, today)}</td>
+                <td data-label={LAST_CONTACT}>{lastContactText(r, today)}</td>
                 <td data-label="Next step">
                   {r.nextStep && due ? (
                     <>

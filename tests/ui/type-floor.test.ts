@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import { describe, expect, it } from "vitest";
-import { ceilingCheck, cssFiles, phoneBlocks, pxFontSizes, read, stripCssComments, tsxFiles } from "./_design-scan";
+import { ceilingCheck, cssFiles, phoneBlocks, pxFontSizes, read, staleCeilings, stripCssComments, tsxFiles } from "./_design-scan";
 
 /**
  * Type floor (design items 15, 16, 31): no readable text under 13px (14px at or under 640px), the 13px floor is written as the token
@@ -12,40 +12,17 @@ import { ceilingCheck, cssFiles, phoneBlocks, pxFontSizes, read, stripCssComment
  *   e  ANY TSX inline fontSize (sizes come from classes and tokens, never typed in place)
  * A file that is not listed has a ceiling of 0.
  */
-const A: Record<string, number> = {
-  "src/app/dashboard/intake/intake.css": 1,
-  "src/app/dashboard/intake/leads.css": 1,
-  "src/app/dashboard/intake/reconcile/reconcile.css": 5,
-};
-const B: Record<string, number> = {
-};
+const A: Record<string, number> = {};
+const B: Record<string, number> = {};
 const C: Record<string, number> = {};
-const D: Record<string, number> = {
-  "src/app/dashboard/intake/_components/AddLeadDialog.tsx": 4,
-  "src/components/intake/TimeEntryDialog.tsx": 5,
-};
+const D: Record<string, number> = {};
+/** What is left is outside the firm workspace's own pages, so it stays as it is: */
 const E: Record<string, number> = {
-  "src/app/dashboard/intake/_components/AddLeadDialog.tsx": 6,
-  "src/app/dashboard/intake/_components/LeadsNotices.tsx": 1,
-  "src/app/dashboard/leads/[id]/page.tsx": 3,
+  // The bare-domain 404 (outside the signed-in workspace; no area owns it).
   "src/app/not-found.tsx": 1,
-  "src/components/answers/AnswersCard.tsx": 1,
-  "src/components/intake/TimeChip.tsx": 6,
-  "src/components/intake/TimeEntryDialog.tsx": 7,
-  "src/components/leads/ConsultDetailsForm.tsx": 1,
-  "src/components/leads/ConsultDetailsSection.tsx": 1,
-  "src/components/leads/LeadProposalsCard.tsx": 1,
-  "src/components/leads/NeedsAttentionCard.tsx": 1,
-  "src/components/leads/SequencesCard.tsx": 1,
-  "src/components/leads/TemperatureCard.tsx": 1,
-  "src/components/leads/WaitingOnRebecca.tsx": 1,
+  // Rendered on the public /q/[token] page: the design job does not restyle public pages (FOUNDATION-PLAN section 0).
   "src/components/proposal/QuoteDocument.tsx": 1,
   "src/components/proposal/Receipt.tsx": 1,
-  "src/components/reconcile/ApplyBar.tsx": 2,
-  "src/components/reconcile/Explanation.tsx": 1,
-  "src/components/reconcile/NotInLectual.tsx": 1,
-  "src/components/reconcile/ReconcilePreview.tsx": 1,
-  "src/components/voice/VoiceNoteRecorder.tsx": 7,
 };
 
 function measure() {
@@ -78,6 +55,8 @@ describe("type floor", () => {
   it("c: the 13px floor is the token, not a literal, beyond the ceilings", () => expect(ceilingCheck(m.c, C)).toEqual([]));
   it("d: no inline fontSize under 13px beyond the ceilings", () => expect(ceilingCheck(m.d, D)).toEqual([]));
   it("e: no font size typed in place in a component beyond the ceilings", () => expect(ceilingCheck(m.e, E)).toEqual([]));
+  it("no ceiling is higher than what is measured", () =>
+    expect([...staleCeilings(m.a, A), ...staleCeilings(m.b, B), ...staleCeilings(m.c, C), ...staleCeilings(m.d, D), ...staleCeilings(m.e, E)]).toEqual([]));
   it("the shared stylesheet itself is clean", () => {
     for (const f of ["src/app/globals.css", "src/components/list-page/list-page.css", "src/components/view-toggle.css"]) {
       expect(m.a[f] ?? 0, `${f} (a)`).toBe(0);

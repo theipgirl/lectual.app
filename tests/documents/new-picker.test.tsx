@@ -160,8 +160,8 @@ describe("D1/D4: reuse and gates", () => {
     }
     const files = (dir: string): string[] => readdirSync(dir).flatMap((n) => (statSync(join(dir, n)).isDirectory() ? files(join(dir, n)) : [join(dir, n)]));
     const copies = files("src").filter((f) => /showingLine|Showing \$\{/.test(read(f)));
-    // The picker's own two files and the Skills picker (an older, separate card); nothing under documents.
-    expect(copies.sort()).toEqual(["src/components/proposal-editor/WhoIsThisFor.tsx", "src/components/skills/SkillPicker.tsx", "src/lib/proposals/new-picker.ts"]);
+    // The picker's own two files; nothing under documents. (The Skills picker now draws the shared ShowingCount, design rollout item 14.)
+    expect(copies.sort()).toEqual(["src/components/proposal-editor/WhoIsThisFor.tsx", "src/lib/proposals/new-picker.ts"]);
   });
 
   it("the module gate is still the segment layout's, and reads go through the scoped helpers only", () => {

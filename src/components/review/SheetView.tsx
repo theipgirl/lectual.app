@@ -9,7 +9,7 @@ import { SheetEdit } from "./SheetEdit";
 import type { SheetPerms } from "@/lib/review/sheet-edit";
 import { SheetCard, SheetScroll, SheetTable } from "@/components/ui/SheetTable";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { BLANK, OWNER_COLUMN, TEAMMATE, UNASSIGNED } from "@/lib/ui/words";
+import { BLANK, LAST_CONTACT, OWNER_COLUMN, TEAMMATE, UNASSIGNED } from "@/lib/ui/words";
 import "@/components/list-page/list-page.css";
 import "./review.css";
 
@@ -59,7 +59,7 @@ function SheetSection({ id, title, rows, today, members, params }: Common & { id
                     <td data-label={OWNER_COLUMN}>{lane ? names.get(lane) ?? TEAMMATE : UNASSIGNED}</td>
                     <td data-label="Waiting on">{waitingCell(r, (d) => shortDate(d, today))}</td>
                     <td data-label="Source">{r.source ?? <span className="lx-note">{BLANK}</span>}</td>
-                    <td data-label="Last contact">{lastContactText(r, today)}</td>
+                    <td data-label={LAST_CONTACT}>{lastContactText(r, today)}</td>
                   </tr>
                 );
               })}

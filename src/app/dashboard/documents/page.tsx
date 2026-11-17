@@ -15,7 +15,7 @@ import { pageTitle } from "@/lib/ui/page-title";
 import { DOCUMENT_LIST_LIMIT, failureReason, listCutNotice } from "@/lib/documents/failure-reason";
 import { RetryButton } from "@/components/documents/RetryButton";
 
-export const metadata: Metadata = { title: pageTitle("Documents") };
+export const metadata: Metadata = { title: pageTitle(DOCUMENTS_NAME) };
 
 export const dynamic = "force-dynamic";
 

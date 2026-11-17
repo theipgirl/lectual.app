@@ -77,6 +77,19 @@ export function count<T>(rows: T[]): number {
   return rows.length;
 }
 
+/**
+ * The other half of the ratchet, added at integration: a ceiling above what is measured excuses nothing and must be lowered (or
+ * removed at 0), so a table only ever lists what is really left.
+ */
+export function staleCeilings(measured: Record<string, number>, ceiling: Record<string, number>): string[] {
+  const stale: string[] = [];
+  for (const [f, max] of Object.entries(ceiling)) {
+    const n = measured[f] ?? 0;
+    if (max > n) stale.push(`${f}: ceiling ${max}, measured ${n} (lower it${n === 0 ? " by removing the entry" : ""})`);
+  }
+  return stale;
+}
+
 /** Drop zero entries so a ceiling table lists only files that still have offenders. */
 export function ceilingCheck(measured: Record<string, number>, ceiling: Record<string, number>): string[] {
   const bad: string[] = [];

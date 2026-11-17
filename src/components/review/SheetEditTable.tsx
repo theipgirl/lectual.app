@@ -72,6 +72,7 @@ import {
   SHEET_MOVE_TO_STAGE,
   SHEET_NEXT_STEP,
   SHEET_NO_ONE_FOUND,
+  LAST_CONTACT,
   SHEET_NO_SOURCE,
   SHEET_NOTE_BUTTON,
   SHEET_NOTE_NOT_SAVED,
@@ -115,7 +116,7 @@ const HEADS: { col: SheetEditColumn; label: string }[] = [
   { col: "court", label: OWNER_COLUMN },
   { col: "waiting", label: "Waiting on" },
   { col: "source", label: "Source" },
-  { col: "contact", label: "Last contact" },
+  { col: "contact", label: LAST_CONTACT },
 ];
 
 const ACTIONS: Record<SheetActionName, (prev: ReviewActionState, form: FormData) => Promise<ReviewActionState>> = {
@@ -563,7 +564,7 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                           <span>{row.source ?? BLANK}</span>
                         )}
                       </td>
-                      <td data-label="Last contact" className="rse-locked" title={row.contactTitle ?? undefined}>
+                      <td data-label={LAST_CONTACT} className="rse-locked" title={row.contactTitle ?? undefined}>
                         {row.contactText}
                       </td>
                       {editing && (

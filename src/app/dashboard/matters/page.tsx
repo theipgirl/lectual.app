@@ -36,7 +36,7 @@ import {
   parseGroupChoice,
   phaseGroupCounts,
 } from "@/lib/matters/phase-group";
-import { searchPlaceholder, BLANK, OWNER_COLUMN, TEAMMATE, UNASSIGNED, MATTER_GROUPS_NAV, MATTER_GROUP_ALL, MATTER_GROUP_EMPTY, MATTER_GROUP_LABEL, MATTER_PHASES_UNAVAILABLE, MATTER_STATUS_NAV } from "@/lib/ui/words";
+import { searchPlaceholder, BLANK, MATTERS_NAME, OWNER_COLUMN, TEAMMATE, UNASSIGNED, MATTER_GROUPS_NAV, MATTER_GROUP_ALL, MATTER_GROUP_EMPTY, MATTER_GROUP_LABEL, MATTER_PHASES_UNAVAILABLE, MATTER_STATUS_NAV } from "@/lib/ui/words";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import { matterIdsNeedingReview } from "./list-utils";
@@ -47,7 +47,7 @@ import { MATTER_TYPE_LABEL } from "./labels";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 
-export const metadata: Metadata = { title: pageTitle("Matters") };
+export const metadata: Metadata = { title: pageTitle(MATTERS_NAME) };
 
 export const dynamic = "force-dynamic";
 
@@ -128,7 +128,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
 
   return (
     <div className="lp-root">
-      <ListHeader title="Matters" tour="matters-head" sub={mattersSubtitle(boardView ? "board" : "table")} />
+      <ListHeader title={MATTERS_NAME} tour="matters-head" sub={mattersSubtitle(boardView ? "board" : "table")} />
 
       <ListToolbar
         search={{

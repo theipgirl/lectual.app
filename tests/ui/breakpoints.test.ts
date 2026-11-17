@@ -13,7 +13,7 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 const BASELINE: Record<string, number> = {
-  "src/app/globals.css": 0,
+  // The public intake page (src/app/i) is out of the design job's scope.
   "src/app/i/intake-public.css": 1,
 };
 const counts: Record<string, number> = {};
@@ -27,5 +27,8 @@ for (const file of walk(join(process.cwd(), "src"))) {
 describe("breakpoints", () => {
   it("no file adds an off-scale breakpoint", () => {
     for (const [file, n] of Object.entries(counts)) expect(n, file).toBeLessThanOrEqual(BASELINE[file] ?? 0);
+  });
+  it("no baseline is higher than what is measured", () => {
+    for (const [file, max] of Object.entries(BASELINE)) expect(counts[file] ?? 0, `${file}: lower its baseline`).toBe(max);
   });
 });

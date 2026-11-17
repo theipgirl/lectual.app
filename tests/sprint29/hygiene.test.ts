@@ -78,7 +78,8 @@ describe("scope: no migration, no dependency, no new unsafe HTML", () => {
 
   it("the CSS this sprint added uses tokens only", () => {
     const intake = read("src/app/dashboard/intake/intake.css");
-    const block = intake.slice(intake.indexOf("Sprint 29: why a card is in its column"));
+    // The design rollout removed the unused "why a card is in its column" rules; the bulk select rules are what this sprint's CSS is now.
+    const block = intake.slice(intake.indexOf("bulk select on the board"));
     expect(block.length).toBeGreaterThan(200);
     expect(block).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(/);
     expect(read("src/components/queue/review.css")).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(/);
