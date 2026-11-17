@@ -20,6 +20,7 @@ export function BoardColumn({
   empty,
   ariaLabel,
   children,
+  className,
   ...rest
 }: {
   title: string;
@@ -36,6 +37,7 @@ export function BoardColumn({
   ariaLabel?: string;
   children?: React.ReactNode;
 } & Omit<React.HTMLAttributes<HTMLElement>, "title">) {
+  const colClass = ["lx-board-col", className].filter(Boolean).join(" ");
   const header = (
     <header>
       <span className="lx-board-title">
@@ -54,7 +56,7 @@ export function BoardColumn({
   const body = Children.toArray(children).length > 0 ? <ul className="lx-board-cards">{children}</ul> : empty ? <p className="lx-board-empty">{empty}</p> : null;
   if (as === "details") {
     return (
-      <details className="lx-board-col" aria-label={ariaLabel ?? title} {...(rest as React.HTMLAttributes<HTMLDetailsElement>)}>
+      <details className={colClass} aria-label={ariaLabel ?? title} {...(rest as React.HTMLAttributes<HTMLDetailsElement>)}>
         <summary>{header}</summary>
         {note}
         {body}
@@ -63,7 +65,7 @@ export function BoardColumn({
     );
   }
   return (
-    <section className="lx-board-col" aria-label={ariaLabel ?? title} {...rest}>
+    <section className={colClass} aria-label={ariaLabel ?? title} {...rest}>
       {header}
       {note}
       {body}
@@ -83,6 +85,7 @@ export function BoardCard({
   tone,
   id,
   children,
+  className,
   ...rest
 }: {
   href: string;
@@ -97,7 +100,7 @@ export function BoardCard({
   children?: React.ReactNode;
 } & Omit<React.LiHTMLAttributes<HTMLLIElement>, "title">) {
   return (
-    <li className="lx-board-card" data-tone={tone} id={id} {...rest}>
+    <li className={["lx-board-card", className].filter(Boolean).join(" ")} data-tone={tone} id={id} {...rest}>
       <div className="lx-board-card-top">
         <span className="lx-board-card-title">
           <Link href={href} className="lx-rowlink">

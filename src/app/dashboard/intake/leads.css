@@ -58,15 +58,12 @@
 /* ---- temperature: an own palette (--tp-*), the shared pill shape ---------- */
 /* A level a person set is FILLED. A level the system suggested is OUTLINED (dashed edge, plain background) and says "suggested" in its words, so the two
    never look alike. Both wrap to two lines in a narrow column. */
-.ix-temp { display: inline-block; max-width: 100%; padding: 2px 9px; border-radius: var(--r-pill); border: 1.5px solid transparent; font-size: var(--fs-1); font-weight: 500; line-height: 1.35; cursor: pointer; background: transparent; white-space: normal; text-align: left; }
+.ix-temp { display: inline-block; max-width: 100%; padding: 2px 8px; border-radius: var(--r-pill); border: 0; font-size: var(--fs-1); font-weight: 500; line-height: 1.4; cursor: pointer; background: var(--well); color: var(--body); white-space: normal; text-align: left; }
 .ix-temp:disabled { cursor: progress; opacity: 0.6; }
-.ix-temp[data-tone="hot"] { background: var(--tp-hot-bg); color: var(--tp-hot-fg); }
-.ix-temp[data-tone="warm"] { background: var(--tp-warm-bg); color: var(--tp-warm-fg); }
-.ix-temp[data-tone="cold"] { background: var(--tp-cold-bg); color: var(--tp-cold-fg); }
-.ix-temp[data-suggested] { background: var(--tp-outline-bg); border-style: dashed; }
-.ix-temp[data-suggested][data-tone="hot"] { border-color: var(--tp-hot-fg); }
-.ix-temp[data-suggested][data-tone="warm"] { border-color: var(--tp-warm-fg); }
-.ix-temp[data-suggested][data-tone="cold"] { border-color: var(--tp-cold-fg); }
+/* The same pill the rest of the app draws: hot is risk, warm is warn, cold is mute. "Suggested" is a word in the text, not a dashed edge. */
+.ix-temp[data-tone="hot"] { background: var(--tint-wine); color: var(--wine); }
+.ix-temp[data-tone="warm"] { background: var(--tint-warn); color: var(--warn); }
+.ix-temp[data-tone="cold"] { background: var(--well); color: var(--body); }
 .ix-temp-empty { color: transparent; border-radius: var(--r-pill); }
 .ix-row:hover .ix-temp-empty, .ix-temp-empty:focus-visible { color: var(--muted); border-color: var(--line); }
 .ix-menu-h { display: block; padding: 6px 8px 2px; }
@@ -78,7 +75,6 @@
 .intake-root, .intake-root .lp-root, .ix-boardwrap { min-width: 0; max-width: 100%; }
 .ix-board { min-width: 0; }
 .lx-board-col[data-over] { border-color: var(--ox); background: var(--tint-ox); }
-.ix-col-quiet { background: transparent; border: 1px dashed var(--line); }
 .ix-col-more { list-style: none; }
 .ix-col-more .lx-showing { margin: 0; }
 .ix-card { cursor: grab; }
@@ -102,13 +98,11 @@
   .ix-next { -webkit-line-clamp: 1; }
   .intake-root .lp-toolbar-actions .lp-btn { padding: 0 6px; }
   .intake-root .lp-toolbar-actions { gap: 4px; }
-  .ix-sets, .ix-filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
-  .ix-sets .lp-chip, .ix-filters .lp-chip, .ix-filters .lp-chips { flex: 0 0 auto; white-space: nowrap; }
-  .ix-filters .lp-chips-end { margin-left: 0; white-space: nowrap; }
+  .ix-sets, .ix-filters { flex-wrap: wrap; }
+  .ix-filters .lp-chips-end { margin-left: 0; }
   .intake-root .lp-header .lp-sub { white-space: normal; overflow: visible; text-overflow: clip; text-wrap: wrap; }
 }
-@media (pointer: coarse), (max-width: 640px) { .ix-cell-btn, .ix-temp, .ix-pill-btn { min-height: 44px; } }
-.ix-sets > *, .ix-filters > * { flex: 0 0 auto; }
+@media (pointer: coarse), (max-width: 640px) { .ix-cell-btn, button.ix-temp, .ix-pill-btn { min-height: 44px; } }
 
 .ix-subline { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .ix-subline .ix-sub { flex: 1 1 0; min-width: 3ch; }

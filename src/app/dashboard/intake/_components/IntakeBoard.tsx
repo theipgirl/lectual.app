@@ -96,7 +96,6 @@ export default function IntakeBoard({
             title={column.label}
             count={column.count}
             ariaLabel={`${column.label}, ${column.count} leads`}
-            className={`lx-board-col${column.quiet ? " ix-col-quiet" : ""}`}
             data-over={over === column.key ? "" : undefined}
             note={
               <>

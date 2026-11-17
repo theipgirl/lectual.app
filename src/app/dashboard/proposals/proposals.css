@@ -287,8 +287,8 @@
 .pe-who-row:hover { background: var(--card); border-color: var(--line); }
 .pe-who-row[aria-current] { background: var(--card); border-color: var(--ox); }
 .pe-who-name { grid-column: 1; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
-.pe-who-sub { grid-column: 1; color: var(--muted); font-size: 0.875em; min-width: 0; overflow-wrap: anywhere; }
-.pe-who-mark { grid-column: 2; grid-row: 1; color: var(--ox); font-size: 0.8125em; font-weight: 600; }
+.pe-who-sub { grid-column: 1; color: var(--muted); font-size: var(--fs-1); min-width: 0; overflow-wrap: anywhere; }
+.pe-who-mark { grid-column: 2; grid-row: 1; color: var(--ox); font-size: var(--fs-1); font-weight: 600; }
 .pe-who a:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; border-radius: 4px; }
 .pe-filled-from { line-height: 1.5; }
 .pe-consult-use { display: grid; gap: 8px; }

@@ -25,8 +25,17 @@ const E: Record<string, number> = {
   "src/components/proposal/Receipt.tsx": 1,
 };
 
+/** em / rem font sizes in CSS (a page's base is 15px, so 13px is 0.8667em and 14px is 0.9333em). */
+function relativeFontSizes(css: string): number[] {
+  return [...css.matchAll(/font-size:\s*([\d.]+)(?:r?em)\b/g)].map((m) => Number(m[1])).filter((n) => n > 0);
+}
+const EM_13 = 13 / 15 - 0.001;
+const EM_14 = 14 / 15 - 0.001;
+const F: Record<string, number> = {};
+const G: Record<string, number> = {};
+
 function measure() {
-  const a: Record<string, number> = {}, b: Record<string, number> = {}, c: Record<string, number> = {}, d: Record<string, number> = {}, e: Record<string, number> = {};
+  const a: Record<string, number> = {}, b: Record<string, number> = {}, c: Record<string, number> = {}, d: Record<string, number> = {}, e: Record<string, number> = {}, f2: Record<string, number> = {}, g: Record<string, number> = {};
   for (const f of cssFiles()) {
     const css = stripCssComments(read(f));
     const all = pxFontSizes(css);
@@ -36,6 +45,10 @@ function measure() {
     if (na) a[f] = na;
     if (nb) b[f] = nb;
     if (nc) c[f] = nc;
+    const nf = relativeFontSizes(css).filter((n) => n < EM_13).length;
+    const ng = relativeFontSizes(phoneBlocks(css)).filter((n) => n < EM_14).length;
+    if (nf) f2[f] = nf;
+    if (ng) g[f] = ng;
   }
   for (const f of tsxFiles()) {
     const src = read(f).replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
@@ -44,7 +57,7 @@ function measure() {
     const small = sizes.filter((n) => n > 0 && n < 13).length;
     if (small) d[f] = small;
   }
-  return { a, b, c, d, e };
+  return { a, b, c, d, e, f: f2, g };
 }
 
 describe("type floor", () => {
@@ -55,8 +68,10 @@ describe("type floor", () => {
   it("c: the 13px floor is the token, not a literal, beyond the ceilings", () => expect(ceilingCheck(m.c, C)).toEqual([]));
   it("d: no inline fontSize under 13px beyond the ceilings", () => expect(ceilingCheck(m.d, D)).toEqual([]));
   it("e: no font size typed in place in a component beyond the ceilings", () => expect(ceilingCheck(m.e, E)).toEqual([]));
+  it("f: no em/rem CSS font size under 13px (0.8667em of 15px) beyond the ceilings", () => expect(ceilingCheck(m.f, F)).toEqual([]));
+  it("g: no em/rem CSS font size under 14px (0.9333em) inside a phone block beyond the ceilings", () => expect(ceilingCheck(m.g, G)).toEqual([]));
   it("no ceiling is higher than what is measured", () =>
-    expect([...staleCeilings(m.a, A), ...staleCeilings(m.b, B), ...staleCeilings(m.c, C), ...staleCeilings(m.d, D), ...staleCeilings(m.e, E)]).toEqual([]));
+    expect([...staleCeilings(m.a, A), ...staleCeilings(m.b, B), ...staleCeilings(m.c, C), ...staleCeilings(m.d, D), ...staleCeilings(m.e, E), ...staleCeilings(m.f, F), ...staleCeilings(m.g, G)]).toEqual([]));
   it("the shared stylesheet itself is clean", () => {
     for (const f of ["src/app/globals.css", "src/components/list-page/list-page.css", "src/components/view-toggle.css"]) {
       expect(m.a[f] ?? 0, `${f} (a)`).toBe(0);

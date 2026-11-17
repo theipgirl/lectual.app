@@ -232,16 +232,15 @@
   .lp-toolbar { flex-wrap: wrap; gap: 6px; }
   .lp-toolbar-spacer { display: none; }
   .lp-toolbar > :not(.lp-search) { flex: 0 0 auto; }
-  /* The Table | Board toggle, More and the primary action share ONE row that scrolls rather than wraps. */
-  .lp-toolbar-actions { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; flex: 1 1 100%; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  /* The view switch, More and the primary action wrap onto a second row rather than scrolling out of sight. */
+  .lp-toolbar-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; flex: 1 1 100%; max-width: 100%; }
   .lp-toolbar-actions > * { flex: 0 0 auto; }
   .lp-btn-icon { display: inline; margin-right: 4px; }
   .lp-label-short { display: inline; }
   .lp-label-long { display: none; }
   .lp-toolbar .lp-btn,
   .lp-toolbar .lp-search-submit { padding: 0 10px; font-size: var(--fs-1); }
-  .lp-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
-  .lp-chip { flex: 0 0 auto; white-space: nowrap; }
+  .lp-chips { flex-wrap: wrap; }
 }
 
 /* ---- Matters sub-line: the matter number and the note are all Geist ---- */

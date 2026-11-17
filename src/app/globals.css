@@ -1266,6 +1266,11 @@ button.lx-back { background: none; border: 0; padding: 0; font-family: inherit; 
 .lx-board { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; align-items: flex-start; }
 .lx-board-col { flex: 1 0 220px; min-width: 220px; background: var(--well); border-radius: var(--r-lg); padding: 12px; display: grid; gap: 10px; align-content: start; }
 .lx-board-empty-row { margin-top: 8px; }
+/* Phones: one full-width column per screen, the next one peeking in so it is clear there is more. */
+@media (max-width: 640px) {
+  .lx-board { scroll-snap-type: x mandatory; scroll-padding-inline: 0; }
+  .lx-board-col { flex: 0 0 calc(100% - 28px); min-width: 0; scroll-snap-align: start; }
+}
 .lx-board-col > header, .lx-board-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; }
 .lx-board-title { font-weight: 600; color: var(--ink); font-size: var(--fs-2); }
 .lx-board-title a { color: inherit; }
@@ -1915,8 +1920,7 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
   .lx-page-head .lx-btn,
   .lx-head-actions .lx-btn { white-space: nowrap; }
   .lx-head-actions { flex-wrap: nowrap; gap: 6px; }
-  .lx-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
-  .lx-chips a { flex: 0 0 auto; white-space: nowrap; }
+  .lx-chips { flex-wrap: wrap; }
 }
 
 /* A button that reads as an inline link (opens Send feedback). */
