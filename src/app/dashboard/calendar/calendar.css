@@ -1,0 +1,3 @@
+/* Calendar: the few rules the shared calendar classes do not cover. Tokens only. */
+.lx-cal-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.lx-cal-consult { font-size: var(--fs-1); font-weight: 600; margin-right: 4px; }

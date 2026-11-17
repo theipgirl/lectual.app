@@ -62,7 +62,7 @@ describe("compact page tops under 640px (Sprint 34 B)", () => {
   });
 
   it("all eight pages draw their top with the shared header classes", () => {
-    const shared = /lx-page-head|<ListHeader/;
+    const shared = /lx-page-head|<ListHeader|<PageHeader/;
     for (const f of [
       "src/app/dashboard/page.tsx",
       "src/app/dashboard/intake/_components/IntakeWorkspace.tsx",
