@@ -603,6 +603,20 @@ ran), intake triage failed on one truncated answer, and Run now could not be cli
 - **`callClaude` checks `stop_reason` before parsing** (`readStructuredResponse`); the SDK's `parse()` parsed first, so a
   max_tokens cut-off surfaced as "Failed to parse structured output". `AiOutputError.kind` is refusal/truncated/shape, and a
   list agent skips the one item (`isUnusableModelAnswer`). Intake triage asks for 16000 tokens.
+- **Cron times (vercel.json, 8 entries, run times in New York all year):** each of the four morning jobs has TWO entries, one UTC hour apart:
+  the winter entry (EST, UTC-5) lawmatics-matters `8 9`, meetings-import `38 9`, mailbox-sync `53 9`, agents `23 10`, and a summer entry
+  (EDT, UTC-4) one hour earlier: `8 8`, `38 8`, `53 8`, `23 9`. They run at about 4:08, 4:38, 4:53 and 5:23 AM America/New_York all year
+  (the agents finish by about 5:28 AM, before the 7:00 AM deal). Keep that order (hired matters and meetings before the mail sync's Stage
+  Keeper, the mail sync before the agents).
+- **The guard is `shouldRunNow(job, now)`** (`src/lib/cron/ny-hour.ts`, pure, `Intl` with `America/New_York`, no dependency), called in each of
+  the four ROUTE HANDLERS (only there, so Run now and the actions that share the underlying functions are unaffected) right after the
+  `CRON_SECRET` check and before any read: it lets the tick through only when the New York HOUR of `now` is the job's (4 for lawmatics-matters,
+  meetings-import and mailbox-sync; 5 for agents). Otherwise the route answers 200 `{ skipped: "not this hour" }` and does nothing (no client, no
+  read). It is the hour, never the minute: on Hobby a cron fires anywhere in its scheduled hour (`23 10` may run at 10:59), a New York hour is one
+  whole UTC hour, and the two entries are exactly one UTC hour apart, so exactly one of the pair works each day, jitter included.
+  `tests/cron/ny-hour.test.ts` walks every day of 2026 and 2027 (both transition days of each year included) at :00, :59 and the scheduled minute
+  of each entry; `tests/cron/routes.test.ts` covers the four routes. Never change one entry of a pair without the other.
+- **KNOWN LIMIT:** A firm west of Pacific time (e.g. Pacific/Honolulu) gets its agents run before local midnight in summer, so its morning brief is dated the previous day; not handled (no such firm today).
 - **Run now's button stacks above the card footer** (`.lx-agent-slot-run` has `position: relative; z-index: 1`). It shares
   the footer's grid cell and comes first in the markup, so without that the footer took every click.
 

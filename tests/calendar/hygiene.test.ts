@@ -60,7 +60,7 @@ describe("Sprint 15 hygiene", () => {
     const route = fs.readFileSync("src/app/api/cron/mailbox-sync/route.ts", "utf8");
     expect(route).not.toMatch(/calendar/i);
     const cron = JSON.parse(fs.readFileSync("vercel.json", "utf8")) as { crons?: Array<{ path: string }> };
-    expect(cron.crons?.filter((c) => c.path.includes("mailbox-sync"))).toHaveLength(1);
+    expect(cron.crons?.filter((c) => c.path.includes("mailbox-sync"))).toHaveLength(2);
     expect(fs.readFileSync("src/app/globals.css", "utf8")).not.toMatch(/lx-consult|outlook/i);
   });
 

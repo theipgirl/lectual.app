@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import { fakeAdmin, type Recorded } from "../mailbox/fake-db";
 
 /** The cron route goes through runAllAgents, so a paused firm is skipped end to end. */
@@ -24,6 +24,13 @@ vi.mock("@/lib/agents/deps", () => ({
 const { GET } = await import("@/app/api/cron/agents/route");
 
 describe("agents cron", () => {
+  // The route only works in its New York hour (5:23 AM EDT here).
+  beforeAll(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-07-15T09:23:00Z"));
+  });
+  afterAll(() => vi.useRealTimers());
+
   it("runs the firm that is on and nothing for the paused firm", async () => {
     const res = await GET(new Request("https://x/api/cron/agents/", { headers: { authorization: "Bearer s3cret" } }) as never);
     const body = await res.json();

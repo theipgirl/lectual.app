@@ -52,7 +52,7 @@ credential (and revokes the Zoom grant at Zoom); meetings already imported stay.
 - `MAILBOX_TOKEN_KEY` (already required for mailboxes): seals Fathom keys and Zoom tokens under
   their own HKDF context, `lectual-meetings`.
 - `CRON_SECRET` (already required): protects `/api/cron/meetings-import/`, scheduled daily in
-  `vercel.json` (11:48 UTC).
+  `vercel.json` (about 4:38 AM New York all year: two entries, 08:38 and 09:38 UTC, and the route runs only in the 4 AM New York hour).
 - Zoom (optional until wanted): create a **General app, user-managed** in the Zoom App Marketplace
   (marketplace.zoom.us → Develop → Build App).
   - Redirect URL and allow-list: `https://<host>/api/meetings/zoom/callback/` (trailing slash; or
