@@ -7,7 +7,7 @@ vi.mock("@/lib/queue/load", () => ({ loadActiveQueue: async () => ({ status: "ok
 vi.mock("@/lib/queue/mine-load", () => ({ mineQueue: async () => ({ status: "ok", items: [] }) }));
 vi.mock("@/lib/nav-counts", () => ({ loadRailCounts: async () => ({}) }));
 vi.mock("@/lib/org/profile", () => ({ getFirmTimeZone: async () => "America/New_York" }));
-vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }) }));
+vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }), headers: async () => new Headers() }));
 vi.mock("next/navigation", () => ({
   redirect: (to: string) => {
     throw new Error(`redirect:${to}`);

@@ -1,3 +1,4 @@
+import { SCORED_ASSESSMENT } from "@/lib/ui/words";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -44,7 +45,7 @@ export async function EventPage({ code, range, role, now = new Date() }: { code:
       </Link>
       <div className="lx-page-head">
         <div style={{ flex: 1, minWidth: 240 }}>
-          <div className="lx-label">Event assessment</div>
+          <div className="lx-label">{SCORED_ASSESSMENT}</div>
           <h1 className="lx-h1">
             {eventDisplayName(code)}{" "}
             <span className="ev-name-code">{code}</span>
@@ -84,9 +85,9 @@ export async function EventPage({ code, range, role, now = new Date() }: { code:
       {header}
       <div className="ifm-perf">
         <h2 className="ifm-title">Performance</h2>
-        <div className="ifm-stats" role="group" aria-label="Booth cards at this event">
+        <div className="ifm-stats" role="group" aria-label="Assessments taken">
           {[
-            { label: "Started", value: stats.started.toLocaleString("en-US"), sub: "Gave contact details at the booth" },
+            { label: "Started", value: stats.started.toLocaleString("en-US"), sub: "Gave contact details" },
             { label: "Finished", value: stats.finished.toLocaleString("en-US"), sub: "Completed the card" },
             { label: "Completion rate", value: stats.completionRate, sub: "Of those who started" },
             { label: "Typical time (median)", value: formatDuration(stats.medianMs), sub: "From contact details to the last answer" },
@@ -101,7 +102,7 @@ export async function EventPage({ code, range, role, now = new Date() }: { code:
         {read.value.capped && <p className="ifm-help">{`Numbers cover the latest ${EVENT_ROW_LIMIT.toLocaleString("en-US")} cards.`}</p>}
 
         <h2 className="ifm-title">Results</h2>
-        <AssessmentBlocks results={results} who={range === "all" ? "at this event" : `at this event in the last ${range} days`} />
+        <AssessmentBlocks results={results} who={range === "all" ? "" : `in the last ${range} days`} />
 
         <h2 className="ifm-title">Drop-off by question</h2>
         <div className="ifm-card ifr-block">
@@ -109,12 +110,12 @@ export async function EventPage({ code, range, role, now = new Date() }: { code:
             <p className="ifm-help">Everyone who gave contact details finished the card in this range.</p>
           ) : !drop.recorded ? (
             <p className="ifm-help">
-              {`${drop.unfinished.toLocaleString("en-US")} ${drop.unfinished === 1 ? "card was" : "cards were"} started and not finished. Answers are saved when a card is finished, so where people stopped isn't recorded for these cards.`}
+              {`${drop.unfinished.toLocaleString("en-US")} ${drop.unfinished === 1 ? "assessment was" : "assessments were"} started and not finished. Answers are saved only when one is finished, so where people stopped isn't recorded for these.`}
             </p>
           ) : (
             <>
               <p className="ifm-help">
-                {`${drop.unfinished.toLocaleString("en-US")} ${drop.unfinished === 1 ? "card was" : "cards were"} started and not finished. Each is counted at the first question it has no answer for.`}
+                {`${drop.unfinished.toLocaleString("en-US")} ${drop.unfinished === 1 ? "assessment was" : "assessments were"} started and not finished. Each is counted at the first question it has no answer for.`}
               </p>
               <ul className="ifr-bars" aria-label="Unfinished cards by the question they stopped at">
                 {drop.steps.map((s) => (

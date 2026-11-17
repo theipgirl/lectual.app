@@ -876,3 +876,6 @@ export const MERGE_POINTER_UNREADABLE = "This lead couldn't be checked just now,
 export const MERGE_RULE_LEAD_UNREADABLE = "The lead couldn't be read, so this action was skipped.";
 /** The lead page when its own timeline rows (suggestions, proposals from email) couldn't be read. */
 export const MERGE_OWN_ROWS_UNAVAILABLE = "Suggestions and proposals from email couldn't be loaded. Refresh to try again.";
+/** An assessment that is scored (the booth card or the firm's assessment page), on the Forms list, its results page and the lead's Answers card. */
+export const SCORED_ASSESSMENT = "Scored assessment";
+export const SCORED_ASSESSMENTS = "Scored assessments";

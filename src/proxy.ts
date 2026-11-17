@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { frameAncestors, frameTarget } from "@/lib/intake-forms/frame-policy";
 import { safeNext } from "@/lib/auth/safe-next";
+import { RETURN_PATH_HEADER, dashboardReturnPath } from "@/lib/auth/return-path";
 import { readFrameDomains } from "@/lib/intake-forms/frame-lookup";
 
 /**
@@ -71,8 +72,21 @@ async function applyFramePolicy(request: NextRequest, response: NextResponse): P
   if (policy) response.headers.set("Content-Security-Policy", policy);
 }
 
+/**
+ * Pass the request on, with the dashboard page's own path + query in RETURN_PATH_HEADER (a layout cannot read its
+ * URL, and the sign-in redirect needs it). A value sent by the browser is always dropped first. Built at the moment
+ * of the call so the refreshed session cookies Supabase just wrote onto the request are carried too.
+ */
+function passOn(request: NextRequest): NextResponse {
+  const headers = new Headers(request.headers);
+  headers.delete(RETURN_PATH_HEADER);
+  const back = dashboardReturnPath(request.nextUrl.pathname, request.nextUrl.search);
+  if (back) headers.set(RETURN_PATH_HEADER, back);
+  return NextResponse.next({ request: { headers } });
+}
+
 async function refreshSession(request: NextRequest): Promise<NextResponse> {
-  let response = NextResponse.next({ request });
+  let response = passOn(request);
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -84,7 +98,7 @@ async function refreshSession(request: NextRequest): Promise<NextResponse> {
       getAll: () => request.cookies.getAll(),
       setAll: (toSet) => {
         toSet.forEach(({ name, value }) => request.cookies.set(name, value));
-        response = NextResponse.next({ request });
+        response = passOn(request);
         toSet.forEach(({ name, value, options }) =>
           response.cookies.set(name, value, options),
         );
