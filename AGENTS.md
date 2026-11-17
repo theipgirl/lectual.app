@@ -1544,6 +1544,25 @@ and a Follow-Up stage; a lead that has a matter shows once, as the matter). Ever
   "+N", the bucket's left border, equal height; columns `minmax(260px, 1fr)`; lane headers carry an avatar, the name and the count. Tokens only, light and dark.
 - Leads DO have an assignee (`crm_lead.assigned_to`), so a lead row shows it and the board uses it. Snooze, move-stage and Lost / Nurture are now in the detail panel (above). `createTask` and `completeTask` write no timeline row today, so neither does this page.
 
+### Documents on the review (no schema)
+The managing attorney opens a record's application or opinion letter from the Weekly review and comments on it without a call. Read and link only: no upload, no delete, nothing sends.
+- **Panel section "Documents"** (`ReviewDocuments.tsx`, in `?open=matter:<uuid>` and `?open=lead:<uuid>`, just above "Log what happened"). It is fed by `loadDocumentsRead` from `src/lib/files/read.ts`, the
+  Documents & files card's own loader, called from `loadReviewDetail` AFTER the record was read through RLS (a foreign or missing id is `missing` and no document read is made). A matter lists its OWN files
+  and, only for a firm with `document-center` (an unreadable module list fails closed), its generated letters as a separate read; a lead lists its OWN files (merged leads' files stay on the lead page).
+  Newest first, at most 8 then "+N more" (`PANEL_DOC_MAX`), each with name, kind ("File · PDF" / "Letter · Opinion letter"), date and who (member directory, else "A teammate"). A plain anchor opens the EXISTING
+  download route (`/dashboard/files/<id>/download/`) or letter route (`/dashboard/documents/<id>/download/`). File names are React text.
+- **States, never collapsed** (`documentsView`, `src/lib/review/documents.ts`, pure): files and letters each ok / failed (`FILES_ERROR_LINE`, `LETTERS_ERROR_LINE`, the card's own sentences) and files also not-set-up
+  (`FILE_MESSAGES.notSetUp`). "No documents yet." only when every read that was made succeeded and found nothing.
+- **"Open all documents"** is a plain `<a>` to the page's card, `/dashboard/<matters|leads>/<id>/#documents` (`id="documents"` was added to `DocumentsCard`'s section; no layout change). **"Comment on a document"**
+  (write roles only) is an anchor to the panel's existing "Log what happened" section (`id="rv-sec-note"`); the note lands on the timeline as before. No new action or table.
+- **Counts** are an OPTIONAL source named "documents" (`OPTIONAL_SOURCES`). `readDocumentCounts` (`load.ts`) does one batched read per table and chunk of `CHUNK` ids (`countFilesByParent`, `countLettersByMatter`, in
+  `files/read.ts` beside the loader so `crm_file` is read in one module) for every matter and lead the review asks about, not only the rows a filter shows. Letters are counted only with `document-center`. A failed read, or an
+  unreadable module list (the letters would be undercounted), leaves `documentCount` unset on every row and adds "documents" to "Some details couldn't load (...)". A missing `crm_file` table counts as zero files (there is
+  no table to hold any). The tag (`documentsTag`) shows only a known count above 0, never "0 documents": board cards and the Cards deck (`DocTag`), the Sheet and the owner's editable Sheet (client cell).
+- **Cards deck**: the big card lists up to 3 newest documents and "+N more" (`DECK_DOC_MAX`, `DeckDocuments`). It reads the CURRENT card's record only, through the same loader as the panel (`loadDeckDocuments`: one small read of
+  up to 100 files and 100 letters for that one record, of which three are drawn), not every row. A thrown read says "couldn't be loaded", never "No documents yet.".
+- Words: the `// Review documents` block at the end of `src/lib/ui/words.ts`. Tests: `tests/review/documents.test.tsx`. Not verified in a real browser: a download opened from the panel (the 303 to a signed URL), the `#rv-sec-note` jump inside the drawer, and focus.
+
 ## Sign-in links a scanner can't spend (2026-11-05, no schema)
 RPB's Check Point Harmony filter (like Microsoft Safe Links) opens every emailed link, which used up the one-time magic link (`otp_expired`).
 - **`/auth/confirm/`** (`src/app/auth/confirm/`): the Magic Link / Invite email templates point here (`?token_hash={{ .TokenHash }}&type=email|invite`).
