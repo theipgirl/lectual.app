@@ -26,6 +26,10 @@ export const AI_TOOLS_GROUP = "AI tools";
 export const APPROVALS_NAME = "Approvals";
 /** The one page that replaces the Monday spreadsheet walk-through. */
 export const REVIEW_NAME = "Weekly review";
+/** Section and page names said once (item 22): the mailbox section, the proposal settings page, the forms list. */
+export const MAIL_NAME = "Mail";
+export const PROPOSAL_SETTINGS_NAME = "Proposal settings";
+export const FORMS_NAME = "Forms";
 /** The Weekly review's three views. */
 export const REVIEW_BOARD_VIEW = VIEW_BOARD;
 export const REVIEW_SHEET_VIEW = VIEW_LIST;
@@ -322,7 +326,7 @@ export const DECK_FAILED = "That didn't go through. Nothing was sent. Refresh to
 export const DECK_PICK_PERSON = "Choose who to hand it to.";
 export const DECK_BAD_PERSON = "That person can't take approvals. Choose someone else on your team.";
 /* Deck page, card, side list, list and board (owner view fidelity rebuild). */
-export const DECK_PAGE_TITLE = "Your deal";
+export const DECK_PAGE_TITLE = APPROVALS_NAME;
 /** Shared by the deck intro and the welcome deal's card 2. */
 export const DECK_APPROVING_NEVER_SENDS = "Approving never sends.";
 export const DECK_PAGE_SUB = `${DECK_APPROVING_NEVER_SENDS} A client email becomes a draft; a person presses Send.`;
