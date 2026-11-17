@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Notice } from "@/components/ui/Notice";
 import { notFound } from "next/navigation";
 import { currentRole } from "@/lib/auth/current-role";
 import {
@@ -157,7 +158,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
           <span className="lx-note">{stepsRead.error ? BLANK : `${steps.length} step${steps.length === 1 ? "" : "s"}`}</span>
         </header>
         {stepsRead.error ? (
-          <p className="lx-note lx-campaigns-inlineerror">{stepsRead.error}</p>
+          <Notice tone="risk" role="alert">{stepsRead.error}</Notice>
         ) : steps.length === 0 ? (
           <>
             <p className="lx-note lx-campaigns-pad">
@@ -249,7 +250,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
           </p>
         )}
         {enrollmentsRead.error ? (
-          <p className="lx-note lx-campaigns-inlineerror">{enrollmentsRead.error}</p>
+          <Notice tone="risk" role="alert">{enrollmentsRead.error}</Notice>
         ) : enrollments.length === 0 ? (
           <p className="lx-note lx-campaigns-pad-end">
             Nobody is enrolled yet.

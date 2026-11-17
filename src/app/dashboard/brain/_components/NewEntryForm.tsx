@@ -1,5 +1,6 @@
 "use client";
 
+import { Notice } from "@/components/ui/Notice";
 import { useActionState, useState } from "react";
 import { SIGNAL_IDS, SIGNAL_LABEL, type SignalId } from "@/lib/stage-keeper/signals";
 import { SAVING } from "@/lib/ui/words";
@@ -111,7 +112,7 @@ export default function NewEntryForm({
           {pending ? SAVING : "Create entry"}
         </button>
 
-        {state.error && <p role="alert" className="lx-brain-error">{state.error}</p>}
+        {state.error && <Notice tone="risk" role="alert">{state.error}</Notice>}
       </form>
     </details>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import { Notice } from "@/components/ui/Notice";
 import { useActionState } from "react";
 import type { ClaimEntry } from "@/lib/brain";
 import { Pill } from "@/components/ui/Pill";
@@ -70,7 +71,7 @@ export default function ClaimRow({ claim, canReview }: { claim: ClaimEntry; canR
         </div>
       )}
 
-      {error && <p role="alert" className="lx-brain-error">{error}</p>}
+      {error && <Notice tone="risk" role="alert">{error}</Notice>}
     </li>
   );
 }

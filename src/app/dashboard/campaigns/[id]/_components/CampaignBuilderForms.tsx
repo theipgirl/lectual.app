@@ -1,5 +1,6 @@
 "use client";
 
+import { Notice } from "@/components/ui/Notice";
 import { useActionState, useState } from "react";
 import {
   addStarterStepsAction,
@@ -28,9 +29,9 @@ import { ADDABLE_STEP_TYPES, START_NEEDS_STEP, START_UNREADABLE, stepTypeLabel }
 function Err({ state }: { state: ActionState }) {
   if (state.error) {
     return (
-      <p role="alert" className="lx-note lx-campaigns-error">
+      <Notice tone="risk" role="alert">
         {state.error}
-      </p>
+      </Notice>
     );
   }
   if (state.message) {

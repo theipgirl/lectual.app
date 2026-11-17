@@ -1,5 +1,6 @@
 "use client";
 
+import { Notice } from "@/components/ui/Notice";
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { LoadFailedLine } from "@/components/ui/LoadFailed";
@@ -57,9 +58,9 @@ function ChatRow({ id, title, updatedAt, now, tz, open }: { id: string; title: s
         </span>
       )}
       {error && (
-        <p className="cpw-error" role="alert">
+        <Notice tone="risk" role="alert">
           {error}
-        </p>
+        </Notice>
       )}
     </li>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import { Notice } from "@/components/ui/Notice";
 import { useActionState } from "react";
 import { SAVING } from "@/lib/ui/words";
 import { proposeClaimAction, type ActionState } from "../actions";
@@ -40,7 +41,7 @@ export default function ProposeClaimForm() {
           {pending ? SAVING : "Propose claim"}
         </button>
 
-        {state.error && <p role="alert" className="lx-brain-error">{state.error}</p>}
+        {state.error && <Notice tone="risk" role="alert">{state.error}</Notice>}
       </form>
     </details>
   );

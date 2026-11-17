@@ -1,5 +1,6 @@
 "use client";
 
+import { Notice } from "@/components/ui/Notice";
 import { useActionState } from "react";
 import type { BrainEntry } from "@/lib/brain";
 import { markdownToPlainText } from "@/lib/markdown";
@@ -78,7 +79,7 @@ export default function EntryRow({ entry, canManage }: { entry: BrainEntry; canM
         </details>
       )}
 
-      {error && <p role="alert" className="lx-brain-error">{error}</p>}
+      {error && <Notice tone="risk" role="alert">{error}</Notice>}
     </li>
   );
 }

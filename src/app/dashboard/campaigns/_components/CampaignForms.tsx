@@ -1,5 +1,6 @@
 "use client";
 
+import { Notice } from "@/components/ui/Notice";
 import { useActionState, useState } from "react";
 import { Dialog } from "@/components/ui/Dialog";
 import { SAVING } from "@/lib/ui/words";
@@ -8,9 +9,9 @@ import type { ActionState } from "@/app/dashboard/campaigns/errors";
 
 function Err({ state }: { state: ActionState }) {
   return state.error ? (
-    <p role="alert" className="lx-note lx-campaigns-error">
+    <Notice tone="risk" role="alert">
       {state.error}
-    </p>
+    </Notice>
   ) : null;
 }
 
