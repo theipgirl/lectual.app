@@ -63,6 +63,9 @@ const fieldSchemas = {
   WORKSHEET_REPLY_TO: z.string().optional(),
   WORKSHEET_ALLOWED_ORIGINS: z.string().optional(),
   WORKSHEET_LAWMATICS_SYNC: z.string().optional(),
+  // USPTO TSDR status reader (src/lib/uspto/). One deployment-wide key from the USPTO API Key Manager, sent in the
+  // USPTO-API-KEY header. Read ONLY by src/lib/uspto/config.ts. Unset = "not-set-up". Never logged.
+  USPTO_TSDR_API_KEY: z.string().optional(),
   // LawPay (AffiniPay) partner OAuth app — docs/lawpay-setup.md. All optional:
   // unset = "Connect LawPay" is disabled with an explanation, and payments are
   // recorded manually. The firm signs in to ITS OWN LawPay account; there is
