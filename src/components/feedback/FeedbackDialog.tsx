@@ -67,7 +67,7 @@ export function FeedbackDialogView({ state, onType, onText, onSend, onClose, onK
         }
       >
         {sent ? (
-          <p role="status">{FEEDBACK_MESSAGES.sent}</p>
+          <p role="status" style={{ margin: 0 }}>{FEEDBACK_MESSAGES.sent}</p>
         ) : (
           <div className="fb-body">
             <label className="lx-field">
@@ -98,7 +98,7 @@ export function FeedbackDialogView({ state, onType, onText, onSend, onClose, onK
                 {`${state.description.length.toLocaleString("en-US")} / ${FEEDBACK_MAX_CHARS.toLocaleString("en-US")}`}
               </span>
             </label>
-            <p className="lx-note">{FEEDBACK_DISCLOSURE}</p>
+            <p className="lx-note" style={{ margin: 0 }}>{FEEDBACK_DISCLOSURE}</p>
             {state.error && (
               <p role="alert" className="lx-note fb-error">
                 {state.error}

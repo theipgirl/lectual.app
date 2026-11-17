@@ -88,7 +88,7 @@ describe("Run now controls: running and blocked", () => {
     const html = await controls({}, { run: { enabled: false } });
     expect(runButton(html)).toContain("disabled");
     expect(runButton(html)).toContain('aria-describedby="run-reason-intake-triage"');
-    expect(html).toContain('<p id="run-reason-intake-triage" class="lx-note">Switch the assistant on first.</p>');
+    expect(html).toContain('<p id="run-reason-intake-triage" class="lx-note" style="margin:0">Switch the assistant on first.</p>');
   });
 
   it("the unreadable Autopilot reason is the warn note", async () => {

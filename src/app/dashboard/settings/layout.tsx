@@ -46,7 +46,7 @@ export default async function SettingsLayout({ children }: { children: React.Rea
       <aside className="lx-side" aria-label="Settings">
         <div className="lx-label">Settings</div>
         <SettingsNav tabs={tabs} />
-        <p className="lx-note">
+        <p className="lx-note" style={{ margin: 0 }}>
           {`Firm-wide settings need ${ADMIN_TIER_PHRASE}. Your own mailbox is always yours to connect.`}
         </p>
       </aside>

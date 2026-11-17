@@ -55,10 +55,10 @@ export function ConnectLawmatics({ reconnect }: { reconnect: boolean }) {
           aria-describedby="lawmatics-token-help"
         />
       </label>
-      <p id="lawmatics-token-help" className="lx-note">
+      <p id="lawmatics-token-help" className="lx-note" style={{ margin: 0 }}>
         {LAWMATICS_TOKEN_HELP}
       </p>
-      <p className="lx-note">
+      <p className="lx-note" style={{ margin: 0 }}>
         We check the token with one read-only request, then store it encrypted. No one at your firm can see it again, including you.
         Lectual only ever reads from Lawmatics; it never changes anything there.
       </p>
@@ -115,7 +115,7 @@ function Section({ title, count, omitted, open, children }: { title: string; cou
         {title} <span className="lx-chip-count">{count}</span>
       </summary>
       <ul className="lx-list">{children}</ul>
-      {omitted ? <p className="lx-note">…and {omitted} more, not listed here. They are counted above and included in the import.</p> : null}
+      {omitted ? <p className="lx-note" style={{ margin: 0 }}>…and {omitted} more, not listed here. They are counted above and included in the import.</p> : null}
     </details>
   );
 }
@@ -195,7 +195,7 @@ export function FindPerson({ preview }: { preview: PreviewView }) {
           ))}
         </ul>
       ) : null}
-      {searching && preview.peopleTruncated ? <p className="lx-note">The search covers the first {preview.people.length} people of this pull only.</p> : null}
+      {searching && preview.peopleTruncated ? <p className="lx-note" style={{ margin: 0 }}>The search covers the first {preview.people.length} people of this pull only.</p> : null}
     </div>
   );
 }
@@ -204,7 +204,7 @@ export function FindPerson({ preview }: { preview: PreviewView }) {
 export function PreviewBody({ p, action, pending }: { p: PreviewView; action: (formData: FormData) => void; pending: boolean }) {
   return (
   <>
-    <p className="lx-note">
+    <p className="lx-note" style={{ margin: 0 }}>
       Read {p.counts.prospects} records and {p.counts.contacts} contacts from Lawmatics. Nothing has been written yet.
     </p>
     <Notices truncated={p.truncated} truncatedReason={p.truncatedReason} includeDropped={p.includeDropped} includeDroppedReason={p.includeDroppedReason} />
@@ -219,7 +219,7 @@ export function PreviewBody({ p, action, pending }: { p: PreviewView; action: (f
         ["skipped", p.totals.skipped],
       ]}
     />
-    <p className="lx-note" data-summary-line>
+    <p className="lx-note" style={{ margin: 0 }} data-summary-line>
       {`${p.totals.skipped} skipped, ${p.totals.stageDecision} need a stage decision.`}
     </p>
     <FindPerson preview={p} />
@@ -362,7 +362,7 @@ export function MattersImport() {
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
-      <p className="lx-note">
+      <p className="lx-note" style={{ margin: 0 }}>
         Links your existing matters to their Lawmatics records and fills in blanks: the Lawmatics id, referral source, notes, opened date. It never creates a matter and never overwrites a value someone entered here.
       </p>
       <form action={previewAction}>
@@ -448,7 +448,7 @@ export function HiredMattersSync() {
   const [state, action, pending] = useActionState<HiredSyncState, FormData>(syncHiredMattersAction, {});
   return (
     <form action={action} style={{ display: "grid", gap: 10 }}>
-      <p className="lx-note">
+      <p className="lx-note" style={{ margin: 0 }}>
         People marked Hired in Lawmatics get a matter here automatically every day. This button does it now for your firm. It only reads from
         Lawmatics, and it never changes a matter that is already linked.
       </p>

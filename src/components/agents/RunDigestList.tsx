@@ -9,14 +9,14 @@ import type { RunDigest } from "@/lib/agents/digest";
 export function RunDigestList({ digest, paused }: { digest: RunDigest; paused: boolean }) {
   if (digest.status === "unavailable") {
     return (
-      <p className="lx-note" role="alert" style={{ color: "var(--warn)" }}>
+      <p className="lx-note" role="alert" style={{ margin: 0, color: "var(--warn)" }}>
         Can&apos;t show what the assistants did right now. Refresh to try again.
       </p>
     );
   }
   if (digest.lines.length === 0 && digest.failures.length === 0) {
     return (
-      <p className="lx-note">
+      <p className="lx-note" style={{ margin: 0 }}>
         {paused
           ? `Assistants are paused, so none ran in the last ${digest.windowHours} hours.`
           : `No assistant ran in the last ${digest.windowHours} hours.`}

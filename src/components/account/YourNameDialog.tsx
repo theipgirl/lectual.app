@@ -55,7 +55,7 @@ export function YourNameDialogView({ first, last, error, saving, onFirst, onLast
             <span className="lx-label">Last name</span>
             <input ref={lastRef} className="lx-input" name="last" maxLength={NAME_MAX} autoComplete="family-name" value={last} onChange={(e) => onLast(e.target.value)} disabled={saving} />
           </label>
-          <p className="lx-note">Your colleagues see this name, and Today greets you with it.</p>
+          <p className="lx-note" style={{ margin: 0 }}>Your colleagues see this name, and Today greets you with it.</p>
           {error && (
             <p role="alert" className="lx-note fb-error">
               {error}

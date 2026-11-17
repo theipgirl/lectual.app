@@ -111,7 +111,7 @@ export function DisconnectLawPayButton({ merchant }: { merchant: string }) {
             <h2 id="lp-dc-title" className="lx-modal-title">
               Disconnect {merchant}?
             </h2>
-            <p className="lx-note" style={{ color: "var(--body)" }}>
+            <p className="lx-note" style={{ margin: 0, color: "var(--body)" }}>
               Lectual revokes its access at LawPay, deletes the stored credentials and forgets which accounts you chose. Clients stop seeing a
               card form on their proposals. Payments already recorded stay on their quotes.
             </p>

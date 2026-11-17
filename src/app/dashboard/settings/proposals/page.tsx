@@ -84,7 +84,7 @@ export default async function ProposalSettingsPage() {
     <>
       {head}
       {!settings && (
-        <p className="lx-note">
+        <p className="lx-note" style={{ margin: 0 }}>
           Nothing is saved yet. The values below are the defaults a new proposal uses until you save. Name at least one person who may create client links, or no one can.
         </p>
       )}
@@ -92,7 +92,7 @@ export default async function ProposalSettingsPage() {
         <div className="pe-card-head-row">
           <div className="pe-card-head">
             <h2 className="pe-h">{LETTER_SETTINGS_LINK}</h2>
-            <p className="lx-note pe-hint">{LETTER_SETTINGS_LINK_NOTE}</p>
+            <p className="lx-note pe-hint" style={{ margin: 0 }}>{LETTER_SETTINGS_LINK_NOTE}</p>
           </div>
           <Link className="lx-btn lx-btn-sec lx-btn-sm" href="/dashboard/settings/proposals/engagement-letter/">
             Open

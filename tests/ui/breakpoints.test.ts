@@ -13,14 +13,14 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 const BASELINE: Record<string, number> = {
-    "src/app/dashboard/forms/_components/event.css": 1,
+  "src/app/dashboard/forms/_components/event.css": 1,
   "src/app/dashboard/forms/forms.css": 5,
   "src/app/dashboard/proposals/proposals.css": 12,
   "src/app/globals.css": 0,
   "src/app/i/intake-public.css": 1,
-    "src/components/deck/deck.css": 1,
-    "src/components/review/review.css": 1,
-  };
+  "src/components/deck/deck.css": 1,
+  "src/components/review/review.css": 1,
+};
 const counts: Record<string, number> = {};
 for (const file of walk(join(process.cwd(), "src"))) {
   const css = readFileSync(file, "utf8");

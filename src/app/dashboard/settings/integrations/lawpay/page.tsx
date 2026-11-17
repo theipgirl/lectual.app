@@ -68,7 +68,7 @@ export default async function LawPayPage({
       <>
         {header}
         <section className="lx-card lx-pad">
-          <p className="lx-note">
+          <p className="lx-note" style={{ margin: 0 }}>
             {ADMIN_TIER_PHRASE}{" "}can connect LawPay and choose the firm&apos;s payment accounts.
           </p>
         </section>
@@ -122,7 +122,7 @@ export default async function LawPayPage({
         {conn && (
           <details className="lx-disclosure">
             <summary>Details</summary>
-            <p className="lx-note">
+            <p className="lx-note" style={{ margin: 0 }}>
               {conn.last_verified_at ? `Checked ${relativeTime(conn.last_verified_at, undefined, tz)}. ` : ""}
               {conn.mode === "test" ? "Test mode: cards are charged against LawPay's test credentials, and no real money moves." : "Live mode: cards are charged for real."}
             </p>
@@ -143,7 +143,7 @@ export default async function LawPayPage({
             <span className="lx-btn lx-btn-pri" aria-disabled="true" style={{ opacity: 0.5, cursor: "not-allowed", justifySelf: "start" }}>
               Connect LawPay
             </span>
-            <p className="lx-note">
+            <p className="lx-note" style={{ margin: 0 }}>
               {LAWPAY_NOT_ISSUED}{" "}You don&apos;t need to do anything, and you&apos;ll never be asked to paste a LawPay key.
             </p>
           </div>
@@ -153,7 +153,7 @@ export default async function LawPayPage({
             <a href="/api/lawpay/connect/" className="lx-btn lx-btn-pri" style={{ justifySelf: "start" }}>
               Connect LawPay
             </a>
-            <p className="lx-note">
+            <p className="lx-note" style={{ margin: 0 }}>
               You&apos;ll sign in to LawPay and approve Lectual. Lectual never sees your LawPay password, and card numbers never touch Lectual.
             </p>
           </div>
@@ -221,7 +221,7 @@ export default async function LawPayPage({
                 {choices.length > 0 ? (
                   <MapAccountForm kind={kind} choices={choices} current={current?.provider_account_id ?? null} />
                 ) : (
-                  <p className="lx-note">
+                  <p className="lx-note" style={{ margin: 0 }}>
                     LawPay lists no {kind === "trust" ? "trust" : "non-trust"} account in {conn.mode} mode for this merchant.
                   </p>
                 )}
@@ -231,7 +231,7 @@ export default async function LawPayPage({
         </>
       )}
 
-      <p className="lx-upl">
+      <p className="lx-upl" style={{ margin: 0 }}>
         {NOT_A_LAW_FIRM_DISCLAIMER}{" "}
         Which account a payment belongs in is your firm&apos;s decision; Lectual only follows the mapping you set here.
       </p>

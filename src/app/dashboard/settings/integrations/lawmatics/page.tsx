@@ -74,11 +74,11 @@ export default async function LawmaticsPage() {
         {conn && !active && (
           <Notice tone="risk">Lawmatics stopped accepting this token. Paste a new one to keep importing.</Notice>
         )}
-        {conn?.last_error && active && <p className="lx-note lxi-help-problem">{integrationErrorLine(conn.status, conn.last_error)}</p>}
+        {conn?.last_error && active && <p className="lx-note lxi-help-problem" style={{ margin: 0 }}>{integrationErrorLine(conn.status, conn.last_error)}</p>}
         {canManage ? (
           (!conn || !active) && <ConnectLawmatics reconnect={!!conn} />
         ) : (
-          <p className="lx-note">{ADMIN_TIER_PHRASE} can connect Lawmatics and run imports.</p>
+          <p className="lx-note" style={{ margin: 0 }}>{ADMIN_TIER_PHRASE} can connect Lawmatics and run imports.</p>
         )}
         {canManage && conn && active && (
           <details className="lx-disclosure-inline">
@@ -95,7 +95,7 @@ export default async function LawmaticsPage() {
               <h2 className="lx-h2">
                 Clients
               </h2>
-              <p className="lx-note">
+              <p className="lx-note" style={{ margin: 0 }}>
                 Lawmatics records become leads. Anyone already here is matched by Lawmatics id, then email, and updated rather than duplicated.
               </p>
             </div>
@@ -124,7 +124,7 @@ export default async function LawmaticsPage() {
             <h2 className="lx-h2">
               LOE fields
             </h2>
-            <p className="lx-note">
+            <p className="lx-note" style={{ margin: 0 }}>
               Off unless you switch it on. When a proposal is marked paid, the engagement letter&apos;s figures are written to the matter&apos;s custom fields in
               Lawmatics, so a Lawmatics automation can build the e-sign draft from them. The legal fee and the USPTO fees go in separate fields. Nothing here moves a
               stage or sends anything.

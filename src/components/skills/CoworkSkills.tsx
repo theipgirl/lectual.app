@@ -10,7 +10,7 @@ export function CoworkSkills() {
       <h2 id="cowork-skills-title" className="lx-h2">
         In Claude (Cowork plugin)
       </h2>
-      <p className="lx-note">
+      <p className="lx-note" style={{ margin: 0 }}>
         These run in Claude, not in this app. Nothing on this page starts them.
       </p>
       <ul className="lx-list">

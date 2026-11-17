@@ -167,7 +167,7 @@ export default async function BrainPage({
           </>
         }
       />
-      <p className="lx-note">{FIRM_NOTES_PURPOSE}</p>
+      <p className="lx-note" style={{ margin: 0 }}>{FIRM_NOTES_PURPOSE}</p>
 
       {loadFailed ? (
         <LoadFailedCard what="your firm notes" />
@@ -195,7 +195,7 @@ export default async function BrainPage({
           {tab === "knowledge" && (
           <div className="lx-brain-collections">
             <h2 className="lx-h2">Knowledge</h2>
-            <p className="lx-note">{knowledgeHelp(role)}</p>
+            <p className="lx-note" style={{ margin: 0 }}>{knowledgeHelp(role)}</p>
             {canManageEntries && <NewEntryForm stages={stageChoices} ruledSignals={ruledSignals} />}
             {usedCategories.length === 0 ? (
               <EmptyState title="No firm notes yet">
@@ -233,7 +233,7 @@ export default async function BrainPage({
           {tab === "claims" && (
           <div className="lx-brain-collections">
             <h2 className="lx-h2">Claim library</h2>
-            <p className="lx-note">{claimsHelp(role)}</p>
+            <p className="lx-note" style={{ margin: 0 }}>{claimsHelp(role)}</p>
             {canPropose && <ProposeClaimForm />}
             <p className="lx-brain-fine">
               Approved/forbidden status here is an attorney-advertising compliance aid for this firm&apos;s

@@ -39,7 +39,7 @@ export function RoleTable() {
           </tbody>
         </SheetTable>
       </SheetScroll>
-      <p className="lx-note lx-pad">{CLERK_NOTE}</p>
+      <p className="lx-note lx-pad" style={{ margin: 0 }}>{CLERK_NOTE}</p>
     </SheetCard>
   );
 }

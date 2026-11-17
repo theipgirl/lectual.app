@@ -94,7 +94,7 @@ export function FirmProfileForm(props: {
         <h2 id="firm-booking-h" className="lx-h2" style={{ gridColumn: "1 / -1" }}>
           Booking links and nurture
         </h2>
-        <p className="lx-note" style={{ gridColumn: "1 / -1" }}>
+        <p className="lx-note" style={{ margin: 0, gridColumn: "1 / -1" }}>
           {TEMPERATURE_NAME}{" "}decides the next step shown on a lead&apos;s page: Hot → a strategy session, Warm → a discovery call,
           Cold → your nurture campaign. These are links and buttons for your team; nothing is sent to a client
           automatically.
@@ -156,7 +156,7 @@ export function FirmProfileForm(props: {
           {state.error && <span role="alert" className="lx-note" style={{ color: "var(--wine)" }}>{state.error}</span>}
         </div>
       ) : (
-        <p className="lx-note">{ADMIN_TIER_PHRASE} can edit the firm profile.</p>
+        <p className="lx-note" style={{ margin: 0 }}>{ADMIN_TIER_PHRASE} can edit the firm profile.</p>
       )}
 
       {props.canEdit && dirty && (

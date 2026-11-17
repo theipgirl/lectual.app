@@ -36,7 +36,7 @@ export default async function ApprovalSettingsPage() {
     return (
       <>
         {head}
-        <p className="lx-note">{notReadyYet("Approval assignments")}</p>
+        <p className="lx-note" style={{ margin: 0 }}>{notReadyYet("Approval assignments")}</p>
       </>
     );
   }
@@ -64,7 +64,7 @@ export default async function ApprovalSettingsPage() {
     <>
       {head}
       {loaded.dropped > 0 && (
-        <p role="status" className="lx-note">
+        <p role="status" className="lx-note" style={{ margin: 0 }}>
           {loaded.dropped === 1 ? "One saved assignment" : `${loaded.dropped} saved assignments`} no longer name a valid person and {loaded.dropped === 1 ? "is" : "are"} ignored. Those go to the usual approvers until you save.
         </p>
       )}

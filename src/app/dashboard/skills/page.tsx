@@ -79,7 +79,7 @@ export default async function SkillsPage({ searchParams }: { searchParams: Promi
       />
 
       {!canRun && (
-        <p className="lx-note">
+        <p className="lx-note" style={{ margin: 0 }}>
           Your role can&apos;t run skills. You can read what each one does.
         </p>
       )}

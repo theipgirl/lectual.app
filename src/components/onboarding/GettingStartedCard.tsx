@@ -32,7 +32,7 @@ export async function GettingStartedCard() {
         <h2 id="getting-started-h" className="lx-h3">
           {heading}
         </h2>
-        <p className="lx-sub">
+        <p className="lx-sub" style={{ margin: 0 }}>
           Short guided tours of the screens you use.
         </p>
       </div>

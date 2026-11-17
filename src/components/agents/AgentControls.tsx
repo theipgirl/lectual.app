@@ -109,7 +109,7 @@ export function AgentControls(props: {
           {autonomyHint(agent, autonomy)}
         </div>
         {saveState.error && (
-          <p role="alert" className="lx-note" style={{ color: "var(--wine)" }}>
+          <p role="alert" className="lx-note" style={{ color: "var(--wine)", margin: "6px 0 0" }}>
             {saveState.error}
           </p>
         )}
@@ -133,7 +133,7 @@ export function AgentControls(props: {
       {((!decision.canRun && showRun) || result) && (
         <div style={{ gridColumn: "1 / -1", display: "grid", gap: 4 }}>
           {!decision.canRun && showRun && (
-            <p id={reasonId} className="lx-note" style={decision.tone === "warn" ? { color: "var(--warn)" } : undefined}>
+            <p id={reasonId} className="lx-note" style={{ margin: 0, ...(decision.tone === "warn" ? { color: "var(--warn)" } : {}) }}>
               {decision.reason}
             </p>
           )}
@@ -141,7 +141,7 @@ export function AgentControls(props: {
             <p
               role={result.alert ? "alert" : "status"}
               className="lx-note"
-              style={result.alert ? { color: "var(--wine)" } : undefined}
+              style={{ margin: 0, ...(result.alert ? { color: "var(--wine)" } : {}) }}
             >
               {result.text}
             </p>

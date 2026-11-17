@@ -117,7 +117,7 @@ export function FlowList({ tracks, doneIds, picks, modulesUnreadable }: Props) {
           Some guides couldn&apos;t be checked, so they are hidden for now. Reload the page to try again.
         </Notice>
       )}
-      <p className="lx-sub">
+      <p className="lx-sub" style={{ margin: 0 }}>
         {`${total.done} of ${total.total} guides done`}
       </p>
       {tracks.map((track, i) => (
@@ -127,7 +127,7 @@ export function FlowList({ tracks, doneIds, picks, modulesUnreadable }: Props) {
               <h2 id={`gs-${track.id}`} className="lx-h2">
                 {track.title}
               </h2>
-              <p className="lx-note">
+              <p className="lx-note" style={{ margin: 0 }}>
                 {track.summary}
               </p>
             </div>

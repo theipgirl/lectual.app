@@ -46,18 +46,18 @@ export function SkillPicker({ skill, term, groups }: { skill: Skill; term: strin
           </a>
         )}
       </form>
-      <p className="lx-note">
+      <p className="lx-note" style={{ margin: 0 }}>
         Search {skill.picks.length > 1 ? "by name, mark or number" : skill.picks[0] === "lead" ? "by name, business or email" : "by mark, matter number or client"}.
       </p>
       {groups.map((g) => (
         <div key={g.kind} style={{ display: "grid", gap: 4 }}>
           {showHeadings && <div className="lx-label">{KIND_HEADING[g.kind]}</div>}
           {g.read.status === "failed" ? (
-            <p className="lx-note" role="alert" style={{ color: "var(--warn)" }}>
+            <p className="lx-note" role="alert" style={{ margin: 0, color: "var(--warn)" }}>
               We couldn&apos;t load your {KIND_PLURAL[g.kind]}.
             </p>
           ) : g.read.shown.length === 0 ? (
-            <p className="lx-note">
+            <p className="lx-note" style={{ margin: 0 }}>
               {term ? `No matches for "${term}".` : `No ${KIND_PLURAL[g.kind]} on file yet.`}
             </p>
           ) : (
@@ -71,7 +71,7 @@ export function SkillPicker({ skill, term, groups }: { skill: Skill; term: strin
                   </li>
                 ))}
               </ul>
-              <p className="lx-note">
+              <p className="lx-note" style={{ margin: 0 }}>
                 {g.read.total > g.read.shown.length
                   ? `${showingOf(g.read.shown.length, g.read.total)}. Type a narrower search to find the one you want.`
                   : `${showingOf(g.read.shown.length, g.read.total)}.`}

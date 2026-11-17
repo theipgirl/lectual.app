@@ -72,12 +72,12 @@ export default async function ServiceLibraryPage() {
               <NewServiceItemForm />
             </details>
           ) : (
-            <p className="lx-note">{SERVICE_LIBRARY_READ_ONLY}</p>
+            <p className="lx-note" style={{ margin: 0 }}>{SERVICE_LIBRARY_READ_ONLY}</p>
           )}
           <section className="lx-card lx-pad" style={{ display: "grid", gap: 8 }}>
             <h2 className="lx-h2">Services</h2>
             {active.length === 0 ? (
-              <p className="lx-note">{noneYet("services", canEdit ? "Add your standing offerings above so quotes are built by picking, not retyping." : undefined)}</p>
+              <p className="lx-note" style={{ margin: 0 }}>{noneYet("services", canEdit ? "Add your standing offerings above so quotes are built by picking, not retyping." : undefined)}</p>
             ) : (
               <ul className="lx-list">
                 {active.map((item) => (

@@ -9,18 +9,18 @@ import { ceilingCheck, cssFiles, read, stripCssComments, tsxFiles } from "./_des
  */
 const MONO = /var\(--mono\)|monospace|courier|--font-courier-prime|--font-mono|jetbrains/i;
 const CSS: Record<string, number> = {
-    "src/app/dashboard/campaigns/campaigns.css": 1,
-    "src/app/dashboard/forms/forms.css": 13,
+  "src/app/dashboard/campaigns/campaigns.css": 1,
+  "src/app/dashboard/forms/forms.css": 13,
   "src/app/dashboard/intake/intake.css": 2,
   "src/app/dashboard/intake/reconcile/reconcile.css": 1,
   "src/app/dashboard/proposals/proposals.css": 14,
   "src/app/dashboard/quotes/quotes.css": 20,
-    "src/components/deck/deck.css": 17,
+  "src/components/deck/deck.css": 17,
   "src/components/loe/loe.css": 3,
   "src/components/queue/review.css": 2,
   "src/components/review/review-sheet-edit.css": 5,
   "src/components/review/review.css": 8,
-    "src/components/shell/account-menu.css": 3,
+  "src/components/shell/account-menu.css": 3,
   "src/components/shell/owner-shell.css": 2,
   "src/components/today/owner/owner-today.css": 3,
 };

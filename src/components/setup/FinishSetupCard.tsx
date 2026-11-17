@@ -37,9 +37,9 @@ export function FinishSetupView({ checklist }: { checklist: SetupChecklist }) {
         <h2 id="finish-setup-h" className="lx-h3">
           {`Finish setting up · ${checklist.doneCount} of ${checklist.total}`}
         </h2>
-        {next && <p className="lx-sub">{`Next: ${next.label}`}</p>}
+        {next && <p className="lx-sub" style={{ margin: 0 }}>{`Next: ${next.label}`}</p>}
         {unchecked > 0 && (
-          <p className="lx-note su-card-warn">
+          <p className="lx-note su-card-warn" style={{ margin: 0 }}>
             {`${unchecked} couldn't be checked`}
           </p>
         )}

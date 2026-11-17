@@ -18,7 +18,7 @@ export function SkillCard({ skill, card }: { skill: Skill; card: CardMode }) {
           Reads · {skill.reads}
         </div>
       </div>
-      <p style={{ color: "var(--body)", lineHeight: 1.5 }}>{skill.does}</p>
+      <p style={{ margin: 0, color: "var(--body)", lineHeight: 1.5 }}>{skill.does}</p>
       <div>
         <Pill tone="mute">{DRAFTS_ONLY}</Pill>
       </div>
@@ -26,7 +26,7 @@ export function SkillCard({ skill, card }: { skill: Skill; card: CardMode }) {
         {card.mode === "picker" ? (
           <>
             <SkillPicker skill={skill} term={card.term} groups={card.groups} />
-            <p className="lx-note">
+            <p className="lx-note" style={{ margin: 0 }}>
               Opens {skill.lands}.
               {skill.extra && (
                 <>
@@ -37,7 +37,7 @@ export function SkillCard({ skill, card }: { skill: Skill; card: CardMode }) {
             </p>
           </>
         ) : card.mode === "unavailable" ? (
-          <p className="lx-note">
+          <p className="lx-note" style={{ margin: 0 }}>
             Not switched on for this firm.
           </p>
         ) : null}

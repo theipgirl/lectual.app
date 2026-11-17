@@ -205,11 +205,11 @@ export default async function AgentsPage() {
             canResume={canResumeAutopilot(session.role)}
           />
         ) : autopilot.status === "missing" ? (
-          <p className="lx-note">
+          <p className="lx-note" style={{ margin: 0 }}>
             The all-assistants switch isn&apos;t set up for your firm yet. Each assistant follows its own switch.
           </p>
         ) : (
-          <p className="lx-note" role="alert" style={{ color: "var(--warn)" }}>
+          <p className="lx-note" role="alert" style={{ margin: 0, color: "var(--warn)" }}>
             We couldn&apos;t read whether assistants are paused. Until we can, none of them run.
           </p>
         )}
@@ -271,7 +271,7 @@ export default async function AgentsPage() {
                 )}
               </div>
               {agent === "stage-keeper" && settingsKnown && (
-                <p className="lx-note" style={{ gridColumn: "1 / -1" }}>
+                <p className="lx-note" style={{ margin: 0, gridColumn: "1 / -1" }}>
                   {agentMoves.status === "ok" ? (
                     <Link href={AGENT_MOVES_TODAY_HREF}>{`${agentMoves.movedToday} ${agentMoves.movedToday === 1 ? "lead" : "leads"} moved today`}</Link>
                   ) : (
@@ -280,7 +280,7 @@ export default async function AgentsPage() {
                 </p>
               )}
               {settingsKnown && ready.tone !== "ok" && ready.label !== "Off" && (
-                <p className="lx-note">
+                <p className="lx-note" style={{ margin: 0 }}>
                   {ready.reason}
                 </p>
               )}
@@ -345,7 +345,7 @@ export default async function AgentsPage() {
           </h2>
           <span className="lx-kpi-value">{estimate ? estimate.hours : BLANK}</span>
         </div>
-        <p className="lx-note">
+        <p className="lx-note" style={{ margin: 0 }}>
           {estimate
             ? `This month, estimated from completed agent tasks using ${estimateAssumption(minutes)}. An estimate from your firm's own minutes per task, not a measurement.`
             : "The run log couldn't be read, so there is no estimate right now."}

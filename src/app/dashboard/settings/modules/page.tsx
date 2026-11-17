@@ -79,7 +79,7 @@ export default async function ModulesPage() {
           );
         })}
       </section>
-      <p className="lx-note">
+      <p className="lx-note" style={{ margin: 0 }}>
         Integrations with your own accounts, like Lawmatics, don&apos;t need to be switched on by Lectual: connect them in Integrations.
       </p>
     </>

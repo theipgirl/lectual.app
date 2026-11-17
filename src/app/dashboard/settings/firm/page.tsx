@@ -58,7 +58,7 @@ export default async function FirmProfilePage() {
           canEdit={hasRole(session.role, "senior_admin")}
         />
       )}
-      <p className="lx-note">
+      <p className="lx-note" style={{ margin: 0 }}>
         The firm&apos;s account name ({session.org.name}) and its web address are set by Lectual. <FeedbackLink>Ask us</FeedbackLink> to change them.
       </p>
     </>
