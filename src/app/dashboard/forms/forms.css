@@ -49,8 +49,9 @@
 .ifm-card {
   background: var(--card);
   border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 24px;
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
+  padding: var(--pad-card);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -58,7 +59,7 @@
 }
 .ifm-title {
   font-family: var(--sans);
-  font-size: 16px;
+  font-size: var(--fs-4);
   line-height: 24px;
   font-weight: 600;
   color: var(--ink);
@@ -104,7 +105,7 @@
   flex-wrap: wrap;
 }
 .ifm-field-label {
-  font-size: 14px;
+  font-size: var(--fs-2);
   line-height: 20px;
   font-weight: 500;
   color: var(--ink);
@@ -150,7 +151,6 @@
   font-size: 14px;
   line-height: 20px;
   color: var(--ink);
-  outline: none;
 }
 textarea.ifm-input {
   resize: vertical;
@@ -221,33 +221,6 @@ textarea.ifm-input {
 }
 .ifm-switch:disabled {
   opacity: 0.6;
-}
-
-/* chips */
-.ifm-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.ifm-chip {
-  height: 32px;
-  padding: 0 12px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font: inherit;
-  font-size: 14px;
-  cursor: pointer;
-  white-space: nowrap;
-  background: var(--card);
-  color: var(--body);
-  border: 1px solid var(--line-3);
-}
-.ifm-chip.on {
-  background: var(--ox);
-  color: var(--cream);
-  border-color: var(--ox);
 }
 
 /* checklist */
@@ -321,37 +294,6 @@ textarea.ifm-input {
 .ifm-checklist-items li.bad .ifm-check-label {
   color: var(--wine);
   font-weight: 500;
-}
-.ifm-live-banner {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  border-radius: 12px;
-  background: var(--tint-ok);
-  border: 1px solid var(--line-ok);
-  color: var(--ok);
-}
-.ifm-live-text {
-  flex: 1;
-  min-width: 0;
-  font-size: 14px;
-  line-height: 20px;
-  font-weight: 500;
-  color: var(--ok);
-  overflow-wrap: anywhere;
-}
-.ifm-live-copy {
-  height: 32px;
-  padding: 0 12px;
-  border-radius: 8px;
-  border: 0;
-  background: var(--ok);
-  color: var(--cream);
-  font: inherit;
-  font-size: 13.5px;
-  font-weight: 500;
-  cursor: pointer;
 }
 
 /* mode cards */
@@ -629,7 +571,6 @@ textarea.ifm-input {
   background: var(--card);
   font-size: var(--fs-1);
   color: var(--ink);
-  outline: none;
 }
 .ifm-hex:focus {
   border-color: var(--ox);
@@ -665,7 +606,6 @@ textarea.ifm-input {
   min-width: 160px;
   height: 28px;
   border: 0;
-  outline: none;
   background: transparent;
   font: inherit;
   font-size: 14px;
@@ -1787,7 +1727,7 @@ textarea.ifm-input {
     text-wrap: wrap;
   }
   :is(.ifl-root, .ifm-root) :is(
-      .lx-btn, .ifm-help, .ifm-err, .ifm-live-copy, .ifm-hex, .ifm-code, .ifm-domain, .ifm-kpi-arrow span,
+      .lx-btn, .ifm-help, .ifm-err, .ifm-hex, .ifm-code, .ifm-domain, .ifm-kpi-arrow span,
       .ifm-answers dt, .ifm-asm-sub, .ifr-meta, .ifl-toggle, .ifl-chan-url, .ifl-create-hint,
       .ifm-count, .ifm-private, .ifm-q-pack, .ifl-link, .ifl-copy, .ifl-stats dt, .ifl-stats dd small, .ifl-kind,
       .ifr-bucket, .ifm-slug-prefix, .ifq-url
@@ -1805,3 +1745,9 @@ textarea.ifm-input {
 .ifm-pad-x { padding: 0 24px 20px; margin: 0; }
 .ifm-basis-full { flex-basis: 100%; }
 .ifl-list-gap { margin-top: 12px; }
+
+/* Touch and phones: the form's own small controls get a 44px target. */
+@media (pointer: coarse), (max-width: 640px) {
+  .ifm-icon-btn, .ifm-add, .ifl-copy, .ifl-toggle, .ifm-link, .ifm-domain button, .ifm-input { min-height: 44px; }
+  .ifm-icon-btn, .ifm-domain button { min-width: 44px; }
+}

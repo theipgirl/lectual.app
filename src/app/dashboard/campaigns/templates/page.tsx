@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { currentRole } from "@/lib/auth/current-role";
 import { AUTOMATION_ADMIN_ROLES, listTemplates } from "@/lib/automation";
 import { relativeTime } from "@/lib/relative-time";
@@ -78,7 +77,7 @@ export default async function CampaignTemplatesPage() {
                       <td className="lx-note" data-label="Variables">
                         {variables.length === 0 ? BLANK : variables.map((v) => `{{${String(v)}}}`).join(", ")}
                       </td>
-                      <td data-label="Updated">{relativeTime(template.updated_at, Date.now(), tz)}</td>
+                      <td data-label="Updated">{relativeTime(template.updated_at, undefined, tz)}</td>
                     </tr>
                   );
                 })}

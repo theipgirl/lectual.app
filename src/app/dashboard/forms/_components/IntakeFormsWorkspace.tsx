@@ -33,6 +33,7 @@ import { isChoice, questionType } from "@/lib/intake-forms/choice";
 import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 import { Icon, Notice, PageHeader, PageTabs, Pill, Toast } from "@/components/ui";
 import { MoreMenu } from "@/components/list-page/MoreMenu";
+import { Chip, FilterChips } from "@/components/list-page/Chips";
 import { formatDay } from "@/lib/ui/dates";
 import { FORMS_NAME, SAVING } from "@/lib/ui/words";
 import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
@@ -396,19 +397,15 @@ export function IntakeFormsWorkspace(props: Props) {
             {archived ? (
               <Notice tone="mute">Archived: the link doesn&apos;t take new people. Its leads and numbers are kept. Restore it from the Forms list.</Notice>
             ) : allDone ? (
-              <div className="ifm-live-banner">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6" />
-                </svg>
-                <div className="ifm-live-text">
-                  {live && !dirty ? `Live at ${publicUrl.replace(/^https?:\/\//, "")}` : "Ready to go live. Save to publish."}
-                </div>
+              <Notice tone="ok">
+                <Icon name="check" size={18} />
+                <span className="ifm-grow">{live && !dirty ? `Live at ${publicUrl.replace(/^https?:\/\//, "")}` : "Ready to go live. Save to publish."}</span>
                 {live && !dirty && (
-                  <button type="button" className="ifm-live-copy" onClick={() => copy(publicUrl, "Link copied")}>
+                  <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={() => copy(publicUrl, "Link copied")}>
                     Copy
                   </button>
                 )}
-              </div>
+              </Notice>
             ) : (
               <div className="ifm-card ifm-checklist">
                 <div className="ifm-checklist-head">
@@ -535,17 +532,14 @@ export function IntakeFormsWorkspace(props: Props) {
 
               <div className="ifm-field">
                 <span className="ifm-field-label">Start from an IP pack.</span>
-                <div className="ifm-chips">
+                <FilterChips label="IP packs">
                   {IP_TYPES.map((p) => {
                     const on = config.packs.includes(p);
                     return (
-                      <button key={p} type="button" className={`ifm-chip${on ? " on" : ""}`} aria-pressed={on} onClick={() => onPack(p)}>
-                        {on && CHECK}
-                        {p}
-                      </button>
+                      <Chip key={p} active={on} pressed={on} onClick={() => onPack(p)}>{p}</Chip>
                     );
                   })}
-                </div>
+                </FilterChips>
               </div>
 
               {config.questions.length > 0 ? (
@@ -706,27 +700,23 @@ export function IntakeFormsWorkspace(props: Props) {
                   <span className="ifm-private">{LOCK} Only you see this</span>
                 </span>
                 <span className="ifm-help">IP type</span>
-                <div className="ifm-chips">
+                <FilterChips label="IP type">
                   {IP_TYPES.map((p) => {
                     const on = config.fitIp.includes(p);
                     return (
-                      <button key={p} type="button" className={`ifm-chip${on ? " on" : ""}`} aria-pressed={on} onClick={() => edit((c) => ({ fitIp: on ? c.fitIp.filter((x) => x !== p) : IP_TYPES.filter((x) => x === p || c.fitIp.includes(x)) }))}>
-                        {p}
-                      </button>
+                      <Chip key={p} active={on} pressed={on} onClick={() => edit((c) => ({ fitIp: on ? c.fitIp.filter((x) => x !== p) : IP_TYPES.filter((x) => x === p || c.fitIp.includes(x)) }))}>{p}</Chip>
                     );
                   })}
-                </div>
+                </FilterChips>
                 <span className="ifm-help">Jurisdiction</span>
-                <div className="ifm-chips">
+                <FilterChips label="Jurisdiction">
                   {JURS.map((p) => {
                     const on = config.fitJur.includes(p);
                     return (
-                      <button key={p} type="button" className={`ifm-chip${on ? " on" : ""}`} aria-pressed={on} onClick={() => edit((c) => ({ fitJur: on ? c.fitJur.filter((x) => x !== p) : JURS.filter((x) => x === p || c.fitJur.includes(x)) }))}>
-                        {p}
-                      </button>
+                      <Chip key={p} active={on} pressed={on} onClick={() => edit((c) => ({ fitJur: on ? c.fitJur.filter((x) => x !== p) : JURS.filter((x) => x === p || c.fitJur.includes(x)) }))}>{p}</Chip>
                     );
                   })}
-                </div>
+                </FilterChips>
                 <textarea
                   className={`ifm-input${err("fit") ? " bad" : ""}`}
                   rows={4}

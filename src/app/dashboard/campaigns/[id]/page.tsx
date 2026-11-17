@@ -36,7 +36,7 @@ import {
 import "../campaigns.css";
 import type { Metadata } from "next";
 import { recordPageTitle } from "@/lib/ui/page-title";
-import { PageHeader, SheetCard, SheetScroll, SheetTable } from "@/components/ui";
+import { PageHeader, SheetScroll, SheetTable } from "@/components/ui";
 import { formatDayTime } from "@/lib/ui/dates";
 import { BLANK } from "@/lib/ui/words";
 import { campaignLoadError } from "@/lib/campaigns/load-errors";
@@ -312,7 +312,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
                               : formatDayTime(enrollment.next_step_at, { tz }) ?? BLANK
                             : "Ready to run"}
                       </td>
-                      <td data-label="Enrolled">{relativeTime(enrollment.enrolled_at, Date.now(), tz)}</td>
+                      <td data-label="Enrolled">{relativeTime(enrollment.enrolled_at, undefined, tz)}</td>
                       {canOperate && (
                         <td className="lx-stack-actions">
                           <EnrollmentActions

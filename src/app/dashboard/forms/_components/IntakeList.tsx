@@ -207,7 +207,6 @@ export function IntakeList({
                     <InlineConfirm
                       label="Archive"
                       question={`Archive “${i.name}”? Its link stops taking new people. Its leads and numbers are kept.`}
-                      confirmLabel="Archive"
                       className="lx-btn lx-btn-sm lx-btn-ghost"
                       pending={pending}
                       onConfirm={() => run(() => setIntakeArchivedAction(i.id, true), false)}

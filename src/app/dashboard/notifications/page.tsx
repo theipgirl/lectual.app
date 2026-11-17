@@ -57,7 +57,7 @@ export default async function NotificationsPage({
   }
   const names = loaded ? await loadActorNames() : {};
   const tz = await getFirmTimeZone();
-  const rows = loaded ? toRowViews(loaded.rows, names, Date.now(), tz) : [];
+  const rows = loaded ? toRowViews(loaded.rows, names, undefined, tz) : [];
   const anyUnread = rows.some((row) => row.unread);
 
   return (

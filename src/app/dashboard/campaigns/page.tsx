@@ -134,7 +134,7 @@ export default async function CampaignsPage() {
                     <td className="num" data-label="Enrolled">
                       {activeEnrolledBySequence.get(sequence.id) ?? 0}
                     </td>
-                    <td data-label="Updated">{relativeTime(sequence.updated_at, Date.now(), tz)}</td>
+                    <td data-label="Updated">{relativeTime(sequence.updated_at, undefined, tz)}</td>
                   </tr>
                 ))}
               </tbody>

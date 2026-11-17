@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useActionState, useRef, useState } from "react";
 import { InlineConfirm } from "@/components/ui/InlineConfirm";
 import { SavedNote } from "@/components/ui/SavedNote";
-import { SAVING, BLANK } from "@/lib/ui/words";
+import { SAVING } from "@/lib/ui/words";
 import "./meetings.css";
 import { draftFollowUpAction, draftProposalAction, linkMeetingAction, type ActionState } from "@/app/dashboard/meetings/actions";
 import {

@@ -82,7 +82,7 @@ export default async function MeetingPage({
         back={backToProposals ? { href: backToProposals, label: "Proposals" } : { href: "/dashboard/meetings/", label: "Meetings" }}
         title={m.title}
         details={`${PROVIDER_LABEL[m.provider]} · ${formatWhen(m.started_at, tz)} · ${formatDuration(m.duration_seconds)}`}
-        sub={`Imported ${relativeTime(m.imported_at, Date.now(), tz)}`}
+        sub={`Imported ${relativeTime(m.imported_at, undefined, tz)}`}
         actions={
           m.share_url ? (
             <a href={m.share_url} target="_blank" rel="noopener noreferrer" className="lx-btn lx-btn-sec">
