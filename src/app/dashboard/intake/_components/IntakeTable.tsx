@@ -304,7 +304,8 @@ export default function IntakeTable({
 
                       <td className="rse-next-td" data-col="next" data-label={NEXT_STEP}>
                         <div className="ix-next-wrap">
-                          <span className="ix-next" data-urgent={step.urgent ? "" : undefined} data-muted={step.muted ? "" : undefined} title={step.text}>
+                          {/* Amber only on a person's own note; the sentences the page writes (waiting on, consult held) read the same on every row. */}
+                          <span className="ix-next" data-urgent={step.urgent && row.latestNote?.trim() ? "" : undefined} data-muted={step.muted ? "" : undefined} title={step.text}>
                             {step.text}
                           </span>
                           {showTimeChip(time?.byLeadId[lead.id], time?.running ?? null, lead.id, time === null) && (

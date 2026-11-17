@@ -13,9 +13,9 @@ export const LIST_CHIPS: readonly { key: SegmentKey; label: string }[] = [
   { key: "closed", label: "Closed" },
 ];
 
-/** "3. Filed" -> "Filed". The code is an ordering aid, not part of the stage's name. */
+/** "3. Filed" -> "Filed", "5b. Waiting" -> "Waiting", "oa. 4. Office Action" -> "Office Action". The code is an ordering aid, not part of the stage's name. */
 export function stageDisplayName(label: string): string {
-  return label.replace(/^\s*\d+\s*[.)]\s*/, "").trim() || label;
+  return label.replace(/^\s*(?:[a-z0-9]{1,3}\s*[.)]\s+)+/i, "").trim() || label;
 }
 
 export function mattersSubtitle(view: "table" | "board"): string {

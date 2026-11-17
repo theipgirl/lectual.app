@@ -228,6 +228,25 @@ a:focus-visible {
 .lx-pad-grid { padding: var(--pad-card); display: grid; gap: 10px; }
 /* A boxed group of fields (consult marks) and the dashed "suggested, not decided" marks (temperature). */
 .lx-fieldset { border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--pad-card); margin: 0; display: grid; gap: 10px; min-width: 0; }
+/* A file input: the "Choose file" button is the shared secondary button. */
+input[type="file"].lx-input { padding: 6px 8px; font-size: var(--fs-2); color: var(--body); }
+input[type="file"].lx-input::file-selector-button {
+  font: inherit;
+  font-size: var(--fs-2);
+  font-weight: 500;
+  height: var(--ctl-h);
+  padding: 0 14px;
+  margin-right: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--card);
+  color: var(--ink);
+  cursor: pointer;
+}
+input[type="file"].lx-input:disabled::file-selector-button { cursor: default; opacity: 0.5; }
+/* A pill with a note under it, in one table cell (the cell is a flex row on a phone, so side by side would clip the pill). */
+.lx-cell-stack { display: grid; gap: 4px; justify-items: start; min-width: 0; }
+@media (max-width: 640px) { .lx-stack td > .lx-cell-stack { justify-items: end; text-align: right; } }
 .lx-pill-suggested { border: 1px dashed currentColor; background: transparent; font-style: italic; }
 .lx-suggest-rule { border-left: 3px dashed var(--line); padding-left: 12px; }
 .lx-upl {
@@ -1308,6 +1327,7 @@ button.lx-back { background: none; border: 0; padding: 0; font-family: inherit; 
 .lx-board-card-title a { color: inherit; }
 .lx-board-card-title a:hover { text-decoration: underline; }
 .lx-board-card-top > .lx-pill, .lx-board-card-top > .lp-pill { margin-left: auto; flex: 0 0 auto; }
+.lx-board-note { margin: 0; font-size: var(--fs-1); color: var(--muted); }
 .lx-board-card-meta { font-size: var(--fs-1); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lx-board-card-step { font-size: var(--fs-2); color: var(--body); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .lx-board-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 24px; }

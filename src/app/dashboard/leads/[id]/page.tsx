@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { stageDisplayName } from "@/lib/matters/list-view";
 import { notFound, redirect } from "next/navigation";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { resolveFirmSession } from "@/lib/firm/session";
@@ -203,7 +204,8 @@ export default async function LeadPage({
     practice_area: lead.practice_area,
   };
 
-  const stageName = stages.find((s) => s.id === lead.current_stage_id)?.name ?? null;
+  const stageRaw = stages.find((s) => s.id === lead.current_stage_id)?.name ?? null;
+  const stageName = stageRaw === null ? null : stageDisplayName(stageRaw);
   const owner = lead.assigned_to ? members.find((m) => m.userId === lead.assigned_to) : undefined;
   const ownerName = owner ? (owner.displayName ?? owner.email ?? null) : null;
   const showAttention = needsAttention({

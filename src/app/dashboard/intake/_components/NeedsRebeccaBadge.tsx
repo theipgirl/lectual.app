@@ -14,7 +14,7 @@ import { MEANING_TONE } from "@/lib/ui/tones";
 export default function NeedsRebeccaBadge({ pending }: { pending: LeadPendingApproval[] }) {
   if (pending.length === 0) return null;
   return (
-    <Pill tone={MEANING_TONE.needsPerson} title={needsRebeccaTitle(pending)}>
+    <Pill tone={MEANING_TONE.needsPerson} wrap title={needsRebeccaTitle(pending)}>
       {needsRebeccaLabel(pending.length)}
     </Pill>
   );

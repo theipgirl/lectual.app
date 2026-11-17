@@ -1,5 +1,6 @@
 "use client";
 
+import { stageDisplayName } from "@/lib/matters/list-view";
 import { useActionState, useState } from "react";
 import { closeLeadAction, type ReviewActionState } from "@/app/dashboard/review/actions";
 import { InlineConfirm } from "@/components/ui/InlineConfirm";
@@ -34,7 +35,7 @@ export function LostNurture({ id, stages }: { id: string; stages: CloseStage[] }
           <select className="lx-input" aria-label="Move this lead to" value={chosen.id} onChange={(e) => setStageId(e.target.value)}>
             {stages.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.name}
+                {stageDisplayName(s.name)}
               </option>
             ))}
           </select>

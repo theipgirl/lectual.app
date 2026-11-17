@@ -131,7 +131,7 @@ export function AnswersCard({ read, tz = FIRM_TIME_ZONE }: { read: AnswersRead; 
     <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }} aria-label={TITLE}>
       <div>
         <div className="lx-label">Staff only</div>
-        <h2 className="lx-h2">
+        <h2 className="lx-h3">
           {TITLE}
         </h2>
       </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { stageDisplayName } from "@/lib/matters/list-view";
 import { useActionState, useState, type ReactNode } from "react";
 import { Field as UiField, Notice, SavedNote, LoadFailedLine } from "@/components/ui";
 import { ADD_NEXT_STEP, SAVED, SAVING } from "@/lib/ui/words";
@@ -106,7 +107,7 @@ export function StageSelect({ matterId, stageId, stages }: { matterId: string; s
       name="stageId"
       label="Docket stage"
       value={stageId ?? ""}
-      options={[{ value: "", label: "No stage yet", disabled: true }, ...stages.map((s) => ({ value: s.id, label: `${s.code}. ${s.label}` }))]}
+      options={[{ value: "", label: "No stage yet", disabled: true }, ...stages.map((s) => ({ value: s.id, label: stageDisplayName(s.label) }))]}
     />
   );
 }

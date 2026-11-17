@@ -253,7 +253,7 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
 
       {age.stale && (
         <Notice tone="warn">
-          This matter has sat in <b>{matter.stage?.label}</b> for {age.days} days, past the point the firm usually moves it.
+          This matter has sat in <b>{matter.stage ? stageDisplayName(matter.stage.label) : null}</b> for {age.days} days, past the point the firm usually moves it.
         </Notice>
       )}
 

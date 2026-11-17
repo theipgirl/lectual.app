@@ -44,6 +44,7 @@ const AGENT_LABEL: Record<string, string> = {
   "inbox-summary": "Inbox summary",
   "document-center": "Document Center",
   "welcome-client": "Welcome",
+  welcome: "Welcome",
   "filing-followup": "Filing follow-up",
 };
 export const agentLabel = (agent: string) => AGENT_LABEL[agent] ?? agent;

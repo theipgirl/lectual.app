@@ -81,7 +81,7 @@ export function DocumentsCard({
 
   return (
     <section id="documents" className="lx-card lx-pad fl-card" aria-label={DOCS_TITLE}>
-      <h2 className="lx-h2">{DOCS_TITLE}</h2>
+      <h2 className="lx-h3">{DOCS_TITLE}</h2>
       <p className="lx-note">{INTERNAL_NOTE}</p>
       {files.status === "unavailable" && (
         <Notice tone="warn" role="alert">

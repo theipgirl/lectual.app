@@ -125,8 +125,10 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
                         )}
                       </td>
                       <td data-label="Status">
-                        <Pill tone={st.tone}>{st.label}</Pill>
-                        {d.status === "failed" && <div className="lx-note">{failureReason(d.error_message)}</div>}
+                        <div className="lx-cell-stack">
+                          <Pill tone={st.tone} wrap>{st.label}</Pill>
+                          {d.status === "failed" && <div className="lx-note">{failureReason(d.error_message)}</div>}
+                        </div>
                       </td>
                       <td data-label="Updated">{formatRelative(d.updated_at, { tz }) ?? BLANK}</td>
                       <td className="lx-stack-actions doc-actions">

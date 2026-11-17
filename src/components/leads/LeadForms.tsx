@@ -1,5 +1,6 @@
 "use client";
 
+import { stageDisplayName } from "@/lib/matters/list-view";
 import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createLeadAction, type CreateLeadState } from "@/app/dashboard/leads/actions";
@@ -68,7 +69,7 @@ export function NewLeadForm({ stages }: { stages: { id: string; name: string }[]
           <option value="">First stage</option>
           {stages.map((s) => (
             <option key={s.id} value={s.id}>
-              {s.name}
+              {stageDisplayName(s.name)}
             </option>
           ))}
         </select>
@@ -91,7 +92,7 @@ export function StageSelect({ leadId, stageId, stages }: { leadId: string; stage
       <select name="stageId" className="lx-input" defaultValue={stageId} aria-label="Stage" onChange={(e) => e.currentTarget.form?.requestSubmit()} disabled={pending}>
         {stages.map((s) => (
           <option key={s.id} value={s.id}>
-            {s.name}
+            {stageDisplayName(s.name)}
           </option>
         ))}
       </select>

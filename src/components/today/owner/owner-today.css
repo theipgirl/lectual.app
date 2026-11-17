@@ -128,5 +128,6 @@ a.ot-row-title:hover { text-decoration: underline; }
 @media (pointer: coarse), (max-width: 640px) {
   .ot-hero .ot-start { min-height: 44px; }
   .ot-more { min-height: 44px; align-items: center; }
-  .ot-row-title { min-height: 44px; }
+  /* 44px tap area without a tall empty gap above the date line: padding out, margin back in. */
+  .ot-row-title { padding: 12px 0; margin: -12px 0; }
 }

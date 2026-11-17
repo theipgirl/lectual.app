@@ -130,7 +130,7 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
               count={isFailed ? BLANK : count}
               note={
                 <>
-                  <p className="lx-board-card-meta">{COLUMN_HINT[column]}</p>
+                  <p className="lx-board-note">{COLUMN_HINT[column]}</p>
                   {isFailed && <LoadFailedLine role="alert" refresh={false}>Can&apos;t show this column right now.</LoadFailedLine>}
                 </>
               }

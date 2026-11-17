@@ -32,6 +32,9 @@ describe("pure helpers", () => {
     expect(stageDisplayName("3. Filed")).toBe("Filed");
     expect(stageDisplayName("12) Preparing")).toBe("Preparing");
     expect(stageDisplayName("Filed")).toBe("Filed");
+    expect(stageDisplayName("5b. Waiting on Client Specimen")).toBe("Waiting on Client Specimen");
+    expect(stageDisplayName("oa. 4. Office Action Response")).toBe("Office Action Response");
+    expect(stageDisplayName("1. Signed LOE / Deposit Received")).toBe("Signed LOE / Deposit Received");
   });
   it("has exactly four chips", () => {
     expect(LIST_CHIPS.map((c) => c.label)).toEqual(["Open", "Needs your review", "Unassigned", "Closed"]);
