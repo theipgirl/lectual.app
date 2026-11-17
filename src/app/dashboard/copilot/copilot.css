@@ -22,7 +22,7 @@
 
   position: relative;
   isolation: isolate;
-  border-radius: 18px;
+  border-radius: var(--r-lg);
   overflow: hidden;
   min-height: 560px;
   padding: 36px 20px 32px;
@@ -43,7 +43,7 @@
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: linear-gradient(180deg, rgba(35, 8, 16, 0.5), rgba(35, 8, 16, 0.3));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ox-deep) 50%, transparent), color-mix(in srgb, var(--ox-deep) 30%, transparent));
 }
 
 @keyframes cph-drift {
@@ -113,14 +113,14 @@
   flex-direction: column;
   gap: 8px;
   padding: 18px;
-  border-radius: 14px;
+  border-radius: var(--r-lg);
   background: var(--cp-glass);
   border: 1px solid var(--cp-glass-line);
   color: var(--cp-text);
   text-decoration: none;
 }
 .cph-stat:hover {
-  background: rgba(48, 14, 20, 0.86);
+  background: color-mix(in srgb, var(--cp-glass) 85%, var(--cp-text));
   color: var(--cp-text);
   text-decoration: none;
 }
@@ -129,10 +129,8 @@
   outline-offset: 2px;
 }
 .cph-stat-label {
-  font-family: var(--mono);
-  font-size: 11.5px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-size: var(--fs-1);
+  font-weight: 500;
   color: var(--cp-text-soft);
 }
 .cph-stat-value {
@@ -142,7 +140,7 @@
   letter-spacing: -0.02em;
 }
 .cph-stat-note {
-  font-size: 14px;
+  font-size: var(--fs-2);
   line-height: 1.45;
   color: var(--cp-text-soft);
 }
@@ -155,7 +153,7 @@
     font-size: 32px;
   }
 }
-@media (max-width: 560px) {
+@media (max-width: 640px) {
   .cph-stats {
     grid-template-columns: 1fr;
   }

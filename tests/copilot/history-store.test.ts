@@ -148,10 +148,10 @@ describe("C4: re-opening a chat", () => {
 describe("dates and the delete confirmation", () => {
   const now = Date.parse("2026-10-22T12:00:00Z");
   it("relative dates", () => {
-    expect(relativeDate("2026-10-22T11:59:40Z", now)).toBe("Just now");
+    expect(relativeDate("2026-10-22T11:59:40Z", now)).toBe("just now");
     expect(relativeDate("2026-10-22T11:55:00Z", now)).toBe("5 min ago");
     expect(relativeDate("2026-10-22T09:00:00Z", now)).toBe("3 h ago");
-    expect(relativeDate("2026-10-21T09:00:00Z", now)).toBe("Yesterday");
+    expect(relativeDate("2026-10-21T09:00:00Z", now)).toBe("1 day ago");
     expect(relativeDate("2026-10-18T12:00:00Z", now)).toBe("4 days ago");
     expect(relativeDate("2026-09-03T12:00:00Z", now)).toBe("Sep 3");
     expect(relativeDate("2025-09-03T12:00:00Z", now)).toBe("Sep 3, 2025");

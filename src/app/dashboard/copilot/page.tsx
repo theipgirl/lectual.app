@@ -12,6 +12,8 @@ import { getScopedClient } from "@/lib/db/scoped-client";
 import { listConversations, loadConversation, type ListResult } from "@/lib/copilot/history-store";
 import { exchangesFromMessages } from "@/lib/copilot/history-pure";
 import type { Exchange } from "@/lib/copilot/client";
+import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { CopilotWorkspace } from "@/components/copilot/CopilotWorkspace";
 import { StatCards } from "./stat-cards";
 import "./copilot.css";
@@ -82,6 +84,7 @@ export default async function CopilotPage(props?: { searchParams?: Promise<{ c?:
 
   let landing: React.ReactNode = null;
   let greeting = "";
+  let firmZone = DEFAULT_TIME_ZONE;
   if (configured && session?.kind === "ok") {
     const now = new Date();
     const [tzS, membersS, mattersS, deadlinesS, queueS] = await Promise.allSettled([
@@ -91,7 +94,8 @@ export default async function CopilotPage(props?: { searchParams?: Promise<{ c?:
       listUpcomingDeadlines({ withinDays: DEADLINE_WINDOW_DAYS }),
       loadActiveQueue(),
     ]);
-    const tz = tzS.status === "fulfilled" ? tzS.value : "America/New_York";
+    const tz = tzS.status === "fulfilled" ? tzS.value : DEFAULT_TIME_ZONE;
+    firmZone = tz;
     const members = membersS.status === "fulfilled" ? membersS.value : [];
     greeting = copilotGreeting(
       hourInZone(now, tz),
@@ -135,16 +139,12 @@ export default async function CopilotPage(props?: { searchParams?: Promise<{ c?:
           greeting={greeting}
           stats={landing}
           now={new Date().getTime()}
+          timeZone={firmZone}
         />
       ) : (
-        <div className="lx-card lx-empty-card">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            Copilot isn&apos;t switched on for your firm yet
-          </h2>
-          <p className="lx-note" style={{ margin: 0 }}>
-            Lectual will turn it on. Nothing here is broken: there is simply nothing to ask yet.
-          </p>
-        </div>
+        <EmptyState title="Copilot isn't switched on for your firm yet">
+          Lectual will turn it on. Nothing here is broken: there is simply nothing to ask yet.
+        </EmptyState>
       )}
 
       <div className="lx-upl">
