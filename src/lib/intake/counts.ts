@@ -12,11 +12,12 @@
  * not become leads yet, so it is usually a different number. Each says what it
  * counts, from the strings below, instead of one pretending to be the other.
  */
+import { INTAKE_NAME } from "@/lib/ui/words";
 export const INTAKE_PRACTICE_AREA_FILTER = "practice_area.is.null,practice_area.ilike.%trademark%";
 
 /** Tooltip on a rail badge, keyed by nav slug. */
 export const RAIL_COUNT_TITLE: Readonly<Record<string, string>> = {
-  intake: "Trademark leads in a lead stage, consult stages included (the Leads list)",
+  intake: `Trademark leads in a lead stage, consult stages included (the ${INTAKE_NAME} list)`,
   matters: "Open matters",
 };
 

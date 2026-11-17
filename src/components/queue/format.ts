@@ -1,5 +1,5 @@
 import type { QueueItem } from "@/lib/queue/api";
-import { DONE_OUTCOME_TEXT, FROM_THEIR_EMAILS } from "@/lib/ui/words";
+import { DECK_CHIP_DONE, DONE_OUTCOME_TEXT, FROM_THEIR_EMAILS } from "@/lib/ui/words";
 import { isDoneItem } from "@/lib/queue/done";
 import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
 import { markdownToPlainText } from "@/lib/markdown";
@@ -52,7 +52,7 @@ export const typeLabel = (type: string) =>
 
 /** The status pill of a queue item: Done (a reject carrying the Done marker) reads Done, never Rejected. */
 export function statusPill(item: Pick<QueueItem, "status" | "resolution_note">): { label: string; tone: string } {
-  return isDoneItem(item) ? { label: "Done", tone: "lx-pill-ok" } : STATUS_PILL[item.status];
+  return isDoneItem(item) ? { label: DECK_CHIP_DONE, tone: "lx-pill-ok" } : STATUS_PILL[item.status];
 }
 
 export const STATUS_PILL: Record<QueueStatus, { label: string; tone: string }> = {

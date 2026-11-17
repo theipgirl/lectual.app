@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { qitem, U } from "./routing-fixtures";
+import { REJECT_NOTE_IS_DONE_MARKER } from "@/lib/ui/words";
 
 /**
  * The approval deck's actions (src/app/dashboard/queue/deck/actions.ts): behind `role-views` (notFound), the caller
@@ -183,6 +184,19 @@ describe("Lectual staff viewing as the firm (no membership: the fold would drop 
     expect(await A.returnCardAction("q1", "")).toEqual({ ok: false, error: PREVIEW_ONLY });
     expect(state.record).not.toHaveBeenCalled();
     expect(state.notify).not.toHaveBeenCalled();
+  });
+});
+
+describe("a typed Reject note can't be the Done marker", () => {
+  it("refuses the marker (and with a receipt line) without calling the core; a doneCardAction still sends it", async () => {
+    for (const note of ["Done: handled without approving", "  Done: handled without approving \n", "Done: handled without approving\nReceipt: sha256 0123456789ab"]) {
+      state.core.mockClear();
+      expect(await A.rejectCardAction("q1", note)).toEqual({ ok: false, error: REJECT_NOTE_IS_DONE_MARKER });
+      expect(state.core).not.toHaveBeenCalled();
+    }
+    state.core.mockResolvedValue({ kind: "resolved", intent: "reject" });
+    expect((await A.doneCardAction("q1")).ok).toBe(true);
+    expect(state.core).toHaveBeenCalledWith({ id: "q1", intent: "reject", note: "Done: handled without approving" });
   });
 });
 

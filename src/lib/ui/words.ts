@@ -252,6 +252,10 @@ export const DECK_DONE = "Done";
 export const DECK_SUB_DONE = "no approval";
 export const DECK_DONE_MESSAGE = "Done. Marked as handled. Nothing was approved or sent.";
 export const DECK_CHIP_DONE = "Done";
+/** A typed Reject note may not be the Done marker: it would read as Done everywhere. */
+export const REJECT_NOTE_IS_DONE_MARKER = "Write your own reason for rejecting. That wording is kept for Done.";
+/** The Done button's tooltip while the editor is open. */
+export const DECK_EDITING_DONE = "Close the editor first, then mark it done.";
 export const deckDoneHolding = (seconds: number) => `Marking done in ${seconds}…`;
 export const DECK_DONE_HOLD_NOTE = "Nothing happens until the countdown ends. Done approves nothing and sends nothing.";
 export const DONE_OUTCOME_TEXT = "Done. Marked as handled without approving. Nothing was sent.";
@@ -321,7 +325,8 @@ export const DECK_CHOICE_YOU_PRESS = "You press it yourself";
 export const DECK_COULDNT_LOAD = "Couldn't load";
 export const DECK_TRY_AGAIN = "Try again";
 export const DECK_NOT_CONNECTED = "Not connected";
-export const deckClean = (approved: number, rejected: number, waiting: number) => `${approved} approved · ${rejected} rejected · ${waiting} waiting`;
+export const deckClean = (approved: number, rejected: number, waiting: number, done = 0) =>
+  `${approved} approved · ${rejected} rejected${done > 0 ? ` · ${done} done` : ""} · ${waiting} waiting`;
 export const DECK_LIST_FOOT = "Opening an item shows today's item page, where you can edit, approve or reject it.";
 export const DECK_BOARD_SUB = "Every approval by where it stands. Drag is not offered: each move is a button on the card.";
 export const deckListSub = (waiting: number, inDeal: number, arrived: number, label: string) =>

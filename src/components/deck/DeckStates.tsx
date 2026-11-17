@@ -2,7 +2,7 @@ import { queueUnavailableCopy, type QueueUnavailableState } from "@/components/q
 import { DECK_COULDNT_LOAD, DECK_NOT_CONNECTED, DECK_TRY_AGAIN, deckClean } from "@/lib/ui/words";
 
 /** All decided: the one cream check on the second state fill. Two lines, "All decided." then the next deal. */
-export function DeckClean({ headline, approved, rejected, waiting }: { headline: string; approved: number; rejected: number; waiting: number }) {
+export function DeckClean({ headline, approved, rejected, done, waiting }: { headline: string; approved: number; rejected: number; done: number; waiting: number }) {
   const cut = headline.indexOf(". ");
   const first = cut >= 0 ? headline.slice(0, cut + 1) : headline;
   const rest = cut >= 0 ? headline.slice(cut + 2) : null;
@@ -22,7 +22,7 @@ export function DeckClean({ headline, approved, rejected, waiting }: { headline:
           </>
         ) : null}
       </p>
-      <p className="dk-clean-sub">{deckClean(approved, rejected, waiting)}</p>
+      <p className="dk-clean-sub">{deckClean(approved, rejected, waiting, done)}</p>
     </section>
   );
 }

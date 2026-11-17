@@ -57,7 +57,7 @@ import {
   DECK_SEND_BACK,
   DECK_SEND_NOW,
   DECK_SKIP,
-  DECK_YES, DECK_EDITING_YES,
+  DECK_YES, DECK_EDITING_YES, DECK_EDITING_DONE,
   deckPosition,
   handedBy,
   DECK_DONE,
@@ -375,7 +375,7 @@ export function ApprovalCard(props: ApprovalCardProps) {
               </button>
             )}
             {props.canYes && (
-              <button type="button" className="dk-move" disabled={busy || editing} title={editing ? DECK_EDITING_YES : undefined} onClick={() => startHold("done")}>
+              <button type="button" className="dk-move" disabled={busy || editing} title={editing ? DECK_EDITING_DONE : undefined} onClick={() => startHold("done")}>
                 {DECK_DONE}
                 <small>{DECK_SUB_DONE}</small>
               </button>

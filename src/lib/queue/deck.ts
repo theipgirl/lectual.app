@@ -147,6 +147,11 @@ export type CloserLookFlags = {
   linkedProposalPassed?: boolean;
 };
 
+/** The linked-proposal gate as the deck's flags need it. Only a pass for a proposal whose link is ON ("sent") waives CHECK FIRST; Saved ("approved") keeps "Open to review". */
+export function linkGateFlags(g: { ok: boolean; proposal?: { status: string } | null }): { failed: boolean; passedWithProposal: boolean } {
+  return { failed: !g.ok, passedWithProposal: g.ok && g.proposal?.status === "sent" };
+}
+
 export type CloserReason = "check-first" | "draft-issue" | "stale" | "linked-proposal";
 
 export type DeckCard = {

@@ -27,6 +27,7 @@ import {
   type CloserLookFlags,
   type Deck,
   type DeckCard,
+  linkGateFlags,
 } from "@/lib/queue/deck";
 import type { QueueItem } from "@/lib/queue/api";
 import { DeckSeenMark } from "@/components/deck/DeckSeenMark";
@@ -99,9 +100,9 @@ async function closerLookFlags(items: readonly QueueItem[]): Promise<Record<stri
     items.slice(0, FLAG_CHECK_LIMIT).map(async (item) => {
       const [stale, gate] = await Promise.all([
         checkDraftStaleness(item).then(stalenessRequiresConfirm, () => true),
-        // Three outcomes: passed with a real linked proposal, refused, or unreadable. Only the first is a pass.
+        // Three outcomes: passed with a real linked proposal whose link is on, refused, or unreadable. Only the first is a pass.
         gateLinkedProposal(item.id).then(
-          (g) => ({ failed: !g.ok, passedWithProposal: g.ok && g.proposal !== null }),
+          linkGateFlags,
           () => ({ failed: true, passedWithProposal: false }),
         ),
       ]);
@@ -363,7 +364,7 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
       side,
       allDone ? DECK_META_ALL_DECIDED : deckLeft(0, 0),
       allDone ? (
-        <DeckClean headline={empty.headline} approved={decided.filter((i) => i.status === "approved").length} rejected={decided.filter((i) => outcomeOf(i) === "rejected").length} waiting={0} />
+        <DeckClean headline={empty.headline} approved={decided.filter((i) => i.status === "approved").length} rejected={decided.filter((i) => outcomeOf(i) === "rejected").length} done={decided.filter((i) => outcomeOf(i) === "done").length} waiting={0} />
       ) : (
         <DeckEmpty headline={"headline" in empty ? empty.headline : ""} details={"details" in empty ? empty.details : []} />
       ),

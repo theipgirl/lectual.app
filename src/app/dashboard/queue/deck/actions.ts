@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { orgHasModule } from "@/lib/org/modules";
 import { QUEUE_EDIT_ROLES } from "@/lib/queue/roles";
 import { classifyQueueItem } from "@/lib/queue/routing";
+import { isDoneNote } from "@/lib/queue/done";
 import { runQueueReview, type ReviewOutcome } from "@/lib/queue/review-core";
 import { recordCardEvent } from "@/lib/queue/card-state";
 import { cardCaller, cardContext, staffPreviewRefusal, cardIdOf, cardNoteOf, noticeHandedTo, readCardItem, sendCardBack } from "@/lib/queue/card-moves";
@@ -24,6 +25,7 @@ import {
   DECK_DONE_MESSAGE,
   DECK_REJECTED,
   DONE_NOTE,
+  REJECT_NOTE_IS_DONE_MARKER,
   DECK_REJECT_NOTE_NEEDED,
   DECK_SEND_OFF,
   DECK_SEND_RECONNECT,
@@ -117,6 +119,7 @@ export async function rejectCardAction(rawId: unknown, rawNote: unknown): Promis
   if (!id) return { ok: false, error: DECK_FAILED };
   const note = cardNoteOf(rawNote);
   if (!note) return { ok: false, error: DECK_REJECT_NOTE_NEEDED };
+  if (isDoneNote(note)) return { ok: false, error: REJECT_NOTE_IS_DONE_MARKER };
   if (!(await cardCaller())) return { ok: false, error: "You don't have permission to approve or reject client communications." };
   const outcome = await runQueueReview({ id, intent: "reject", note });
   if (outcome.kind === "error") return { ok: false, error: outcome.error };

@@ -31,4 +31,3 @@ export function outcomeOf(item: Pick<QueueItem, "status" | "resolution_note">): 
   return isDoneItem(item) ? "done" : "rejected";
 }
 
-export const OUTCOME_LABEL: Record<Outcome, string> = { approved: "Approved", rejected: "Rejected", done: "Done" };
