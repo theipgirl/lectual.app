@@ -1,7 +1,7 @@
 import "server-only";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { loadDocumentsRead } from "@/lib/files/read";
-import { mergedSetFor } from "@/lib/leads/live";
+import { mergedSetFor, resolveLeadId } from "@/lib/leads/live";
 import type { RecordDocuments } from "./documents";
 import { listMatterStages } from "@/lib/matters/stages";
 import { activeOrgModulesOrNull } from "@/lib/org/modules";
@@ -19,6 +19,8 @@ export type DetailStep = { id: string; title: string; dueDate: string | null; as
 export type DetailLoad =
   | {
       status: "ok";
+      /** The record actually shown: a merged lead opened by id is followed to its keeper (as the lead page does). */
+      openId: string;
       currentStageId: string | null;
       assignedTo: string | null;
       cameFrom: string | null;
@@ -31,12 +33,20 @@ export type DetailLoad =
   | { status: "missing" }
   | { status: "unavailable" };
 
-export async function loadReviewDetail(ref: OpenRef): Promise<DetailLoad> {
+export async function loadReviewDetail(asked: OpenRef): Promise<DetailLoad> {
   let db;
   try {
     db = await getScopedClient();
   } catch {
     return { status: "unavailable" };
+  }
+  let ref = asked;
+  if (asked.kind === "lead") {
+    // A merged lead (lectual 0107) is not a record of its own: show the lead it was merged into. An unreadable pointer is "unavailable", never a guess.
+    const followed = await resolveLeadId(db, asked.id);
+    if (followed.status === "not-found") return { status: "missing" };
+    if (followed.status === "unavailable") return { status: "unavailable" };
+    ref = { kind: "lead", id: followed.id };
   }
   const column = ref.kind === "matter" ? "matter_id" : "lead_id";
 
@@ -83,7 +93,7 @@ export async function loadReviewDetail(ref: OpenRef): Promise<DetailLoad> {
     activityS.status === "fulfilled" && !activityS.value.error ? { ok: true, items: (activityS.value.data ?? []) as ActivityIn[] } : { ok: false };
   const stages: Extract<DetailLoad, { status: "ok" }>["stages"] = stagesS.status === "fulfilled" ? { ok: true, options: stagesS.value } : { ok: false };
 
-  return { status: "ok", currentStageId, assignedTo, cameFrom, steps, activity, stages, documents };
+  return { status: "ok", openId: ref.id, currentStageId, assignedTo, cameFrom, steps, activity, stages, documents };
 }
 
 export type LatestNote = { status: "ok"; text: string | null } | { status: "unavailable" };

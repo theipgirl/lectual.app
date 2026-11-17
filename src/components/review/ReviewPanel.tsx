@@ -35,6 +35,8 @@ export type PanelProps = {
   members: Member[];
   /** The role can write matters and leads (next steps, notes, assignment). */
   canWrite: boolean;
+  /** FILE_UPLOAD_ROLES, decided by the page like the lead and matter pages do. */
+  canUpload?: boolean;
   /** The role can also move a LEAD's stage. */
   canMove: boolean;
   closeStages: CloseStage[];
@@ -79,7 +81,7 @@ function fullPage(open: OpenRef): string {
 
 /** One record's detail, read again through the scoped client by the page. Read-only roles see the same facts with no form. */
 export function ReviewPanel(props: PanelProps) {
-  const { open, row, detail, today, timeZone, members, canWrite, canMove, closeStages, closeHref } = props;
+  const { open, row, detail, today, timeZone, members, canWrite, canMove, closeStages, closeHref, canUpload = false } = props;
   const names = new Map(members.map((m) => [m.userId, m.name]));
   const who = (id: string | null) => (id ? names.get(id) ?? "Teammate" : null);
 
@@ -302,7 +304,7 @@ export function ReviewPanel(props: PanelProps) {
         {open.kind === "lead" && canMove && closeStages.length > 0 && <LostNurture id={open.id} stages={closeStages} />}
       </section>
 
-      <ReviewDocuments open={open} documents={detail.documents} members={members} today={today} timeZone={timeZone} canWrite={canWrite} />
+      <ReviewDocuments open={open} documents={detail.documents} members={members} today={today} timeZone={timeZone} canWrite={canWrite} canUpload={canUpload} />
 
       {canWrite && (
         <section className="rv-panel-sec" id="rv-sec-note" aria-labelledby="rv-sec-note-h">
