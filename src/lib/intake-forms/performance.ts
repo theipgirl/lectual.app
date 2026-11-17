@@ -119,7 +119,7 @@ export function formatIntakeTime(iso: string, tz: string = FIRM_TIME_ZONE): stri
   }).format(d);
 }
 
-export function intakeTableRows(rows: SubmissionListRow[], now = undefined, tz: string = FIRM_TIME_ZONE): IntakeTableRow[] {
+export function intakeTableRows(rows: SubmissionListRow[], now = Date.now(), tz: string = FIRM_TIME_ZONE): IntakeTableRow[] {
   return rows.map((r) => {
     const c = parseContact(r.contact);
     return {
