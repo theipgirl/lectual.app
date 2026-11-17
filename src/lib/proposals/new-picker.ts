@@ -1,6 +1,7 @@
 import type { RecordKind } from "@/lib/skills/catalog";
 import { leadRecord, matterRecord, normalizeTerm, pickRecords, SEARCH_MAX, type PickRecord } from "@/lib/skills/pick";
 import { leadOptionLabel, type LeadLabelRow } from "./lead-label";
+import { showingOf } from "@/lib/ui/words";
 
 /**
  * The "Who is this for?" picker on New proposal. PURE: it takes the two list
@@ -141,9 +142,9 @@ export function buildPicker(input: { kind: RecordKind; term: string; leads: List
   };
 }
 
-/** "Showing 8 of 30." / "Showing 3 of 3." */
+/** "Showing 8 of 30" / "Showing 3 of 3" (the one "Showing N of M" sentence, from the glossary). */
 export function showingLine(shown: number, total: number): string {
-  return `Showing ${shown} of ${total}.`;
+  return showingOf(shown, total);
 }
 
 /* ─────────────────────────── Spec 9: the proposal type ─────────────────── */

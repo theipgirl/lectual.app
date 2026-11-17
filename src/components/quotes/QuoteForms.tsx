@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { createQuoteAction } from "@/app/dashboard/quotes/actions";
 import { generateTermsAction, saveTermsAction, updateDetailsAction } from "@/app/dashboard/quotes/[id]/actions";
 import type { ActionState } from "@/app/dashboard/quotes/errors";
+import { SAVING, OPTIONAL } from "@/lib/ui/words";
 
 /**
  * The quote pages' client forms: New quote, the header details and the
@@ -97,7 +98,7 @@ export function NewQuoteForm({ options }: { options: ClientPickerOptions }) {
       </label>
       <div style={{ gridColumn: "1 / -1", display: "flex", gap: 10, alignItems: "center" }}>
         <button type="submit" className="lx-btn lx-btn-pri" disabled={pending}>
-          {pending ? "Creating…" : "Create draft"}
+          {pending ? SAVING : "Create draft"}
         </button>
         <Err state={state} />
       </div>
@@ -126,7 +127,7 @@ export function QuoteDetailsForm(props: { quoteId: string; title: string; introB
       </label>
       <div style={{ gridColumn: "1 / -1", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <button type="submit" className="lx-btn lx-btn-sec" disabled={pending}>
-          {pending ? "Saving…" : "Save details"}
+          {pending ? SAVING : "Save details"}
         </button>
         {state.saved && !pending && !state.error && (
           <span className="lx-note" style={{ color: "var(--ok)" }}>
@@ -185,11 +186,11 @@ export function TermsEditor(props: { quoteId: string; termsBody: string | null; 
             <input className="lx-input" name="clientName" required maxLength={200} defaultValue={props.defaultClientName} />
           </label>
           <label className="lx-field">
-            <span className="lx-label">Signing entity (optional)</span>
+            <span className="lx-label">Signing entity<span className="lx-optional"> {OPTIONAL}</span></span>
             <input className="lx-input" name="entityName" maxLength={200} placeholder="e.g. Acme Holdings LLC" />
           </label>
           <label className="lx-field">
-            <span className="lx-label">Mark (optional)</span>
+            <span className="lx-label">Mark<span className="lx-optional"> {OPTIONAL}</span></span>
             <input className="lx-input" name="markText" maxLength={200} placeholder="e.g. ACME" defaultValue={props.defaultMark ?? ""} />
           </label>
           <div style={{ gridColumn: "1 / -1", display: "flex", gap: 10, alignItems: "center" }}>
@@ -217,7 +218,7 @@ export function TermsEditor(props: { quoteId: string; termsBody: string | null; 
         />
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <button type="submit" className="lx-btn lx-btn-pri" disabled={saving}>
-            {saving ? "Saving…" : "Save terms"}
+            {saving ? SAVING : "Save terms"}
           </button>
           {saveState.saved && !saving && !saveState.error && (
             <span className="lx-note" style={{ color: "var(--ok)" }}>

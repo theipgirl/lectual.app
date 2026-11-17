@@ -11,6 +11,7 @@ import type { ActionState } from "@/app/dashboard/quotes/errors";
 import { CHARGE_AT_LABEL, KIND_LABEL, QUOTE_LINE_KINDS, chargeAtLabel, chargeAtOptionsFor, kindLabel } from "@/lib/quotes/labels";
 import { centsToInput, formatCents } from "@/lib/quotes/money";
 import type { ServiceItemRow } from "@/lib/quotes/types";
+import { SAVING, OPTIONAL } from "@/lib/ui/words";
 
 /**
  * The service library's forms. The library is the firm's standing price list
@@ -76,7 +77,7 @@ function ItemFields({ item, disabled }: { item?: ServiceItemRow; disabled: boole
         <input className="lx-input lx-num" name="amount" inputMode="decimal" required defaultValue={item ? centsToInput(item.unit_amount_cents) : ""} placeholder="0.00" disabled={disabled} />
       </label>
       <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
-        <span className="lx-label">Description (optional)</span>
+        <span className="lx-label">Description<span className="lx-optional"> {OPTIONAL}</span></span>
         <input className="lx-input" name="description" maxLength={2000} defaultValue={item?.description ?? ""} disabled={disabled} />
       </label>
     </>
@@ -97,7 +98,7 @@ export function NewServiceItemForm() {
       <ItemFields disabled={pending} />
       <div style={{ gridColumn: "1 / -1", display: "flex", gap: 10, alignItems: "center" }}>
         <button type="submit" className="lx-btn lx-btn-pri" disabled={pending}>
-          {pending ? "Adding…" : "Add service"}
+          {pending ? SAVING : "Add service"}
         </button>
         <Err state={state} />
       </div>
@@ -158,7 +159,7 @@ export function ServiceItemRowEditor({ item, canEdit }: { item: ServiceItemRow; 
           <ItemFields item={item} disabled={updating} />
           <div style={{ gridColumn: "1 / -1", display: "flex", gap: 10, alignItems: "center" }}>
             <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={updating}>
-              {updating ? "Saving…" : "Save"}
+              {updating ? SAVING : "Save"}
             </button>
             <Err state={updateState} />
           </div>

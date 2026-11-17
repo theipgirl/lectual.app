@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { reconcilePaymentAction, recordPaymentAction } from "@/app/dashboard/quotes/[id]/actions";
 import type { ActionState } from "@/app/dashboard/quotes/errors";
 import { formatCents } from "@/lib/quotes/money";
+import { SAVING, OPTIONAL } from "@/lib/ui/words";
 
 export type PanelPayment = {
   id: string;
@@ -137,12 +138,12 @@ function RecordForm({ quoteId, currency }: { quoteId: string; currency: string }
         </label>
       </fieldset>
       <label className="lx-field" style={{ display: "grid", gap: 4 }}>
-        <span className="lx-label">Note (optional)</span>
+        <span className="lx-label">Note<span className="lx-optional"> {OPTIONAL}</span></span>
         <input name="note" className="lx-input" maxLength={300} placeholder="e.g. check #1042" />
       </label>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={pending}>
-          {pending ? "Recording…" : "Record payment"}
+          {pending ? SAVING : "Record payment"}
         </button>
         {state.error && (
           <span role="alert" className="lx-note" style={{ color: "var(--wine)" }}>

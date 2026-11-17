@@ -4,15 +4,16 @@ import Link from "next/link";
 import { useState } from "react";
 import type { ProposalStatus } from "@/lib/proposals/types";
 import { deleteProposalAction, resetAcceptanceAction, reviseAction, sendAction, unapproveAction, withdrawAction } from "@/app/dashboard/proposals/[id]/actions";
-import { DELETE_CONFIRM, DELETE_LABEL, moreMenuItems, moreMenuLabel, type MoreMenuItem } from "@/lib/proposal-editor/delete-proposal";
-import Popover from "@/components/list-page/Popover";
+import { DELETE_CONFIRM, DELETE_LABEL, moreMenuItems, type MoreMenuItem } from "@/lib/proposal-editor/delete-proposal";
+import { MoreMenu as MoreButton, type MoreItem } from "@/components/list-page/MoreMenu";
 import { NOT_EMAILED } from "@/lib/consult-proposal/manual-email";
 import { BUTTON_WORDS, LINK_NOT_LIVE_YET } from "@/lib/proposal-editor/vocabulary";
-import { RESET_CONFIRM, RESET_CONFIRM_BUTTON, RESET_LABEL, RESET_PENDING } from "@/lib/proposal-editor/reset-acceptance";
+import { RESET_CONFIRM, RESET_CONFIRM_BUTTON, RESET_LABEL } from "@/lib/proposal-editor/reset-acceptance";
 import { SAVE_FIRST_SENTENCE } from "@/lib/proposal-editor/unsaved";
 import { ActionForm, Outcome } from "./ActionForm";
 import { useUnsaved } from "./UnsavedGuard";
 import { PostConsultEmail } from "./PostConsultEmail";
+import { CANCEL, COPIED, SAVING, yesVerb } from "@/lib/ui/words";
 
 /**
  * The lifecycle buttons for one version. What is SHOWN follows the status; the
@@ -82,7 +83,7 @@ export function Lifecycle({
                 disabled={pending || unsaved}
                 aria-describedby={blockedBy ? unsavedId : undefined}
               >
-                {pending ? BUTTON_WORDS.turningOnLink : BUTTON_WORDS.turnOnLink}
+                {pending ? SAVING : BUTTON_WORDS.turnOnLink}
               </button>
               {blockedBy && (
                 <span className="lx-note" id={unsavedId} role="note">
@@ -117,7 +118,7 @@ export function Lifecycle({
             <>
               {hidden}
               <button type="submit" className="lx-btn lx-btn-sec" disabled={pending} title={`Starts version ${version + 1} as a draft`}>
-                {pending ? "Creating…" : BUTTON_WORDS.startNewVersion}
+                {pending ? SAVING : BUTTON_WORDS.startNewVersion}
               </button>
               <Outcome state={state} pending={pending} />
             </>
@@ -154,7 +155,7 @@ function CopyLink({ url }: { url: string }) {
   return (
     <div className="pe-link">
       <button type="button" className="lx-btn lx-btn-sec" onClick={copy}>
-        {copied === "yes" ? "Copied" : "Copy client link"}
+        {copied === "yes" ? COPIED : "Copy client link"}
       </button>
       <a className="lx-btn lx-btn-sec" href={url} target="_blank" rel="noopener noreferrer">
         Open
@@ -187,38 +188,10 @@ function MoreMenu({
   // One confirm open at a time: choosing another item replaces the one showing.
   const [confirming, setConfirming] = useState<MoreMenuItem | null>(null);
   const label: Record<MoreMenuItem, string> = { withdraw: BUTTON_WORDS.withdraw, reset: RESET_LABEL, delete: DELETE_LABEL };
+  const moreItems: MoreItem[] = items.map((item) => ({ label: label[item], onSelect: () => setConfirming(item), ...(item === "reset" ? {} : { tone: "danger" as const }) }));
   return (
     <div className="pe-more-menu">
-      <Popover
-        label={moreMenuLabel(items)}
-        align="left"
-        width={190}
-        trigger={({ onClick, ref, ...aria }) => (
-          <button {...aria} ref={ref} type="button" onClick={onClick} className="lx-btn lx-btn-sec">
-            {moreMenuLabel(items)}
-            <span aria-hidden> ▾</span>
-          </button>
-        )}
-      >
-        {(close) => (
-          <>
-            {items.map((item) => (
-              <button
-                key={item}
-                type="button"
-                role="menuitem"
-                className="lp-pop-item"
-                onClick={() => {
-                  setConfirming(item);
-                  close();
-                }}
-              >
-                <span className="lp-pop-text">{label[item]}…</span>
-              </button>
-            ))}
-          </>
-        )}
-      </Popover>
+      <MoreButton items={moreItems} align="left" />
       {(confirming === "withdraw" || confirming === "reset") && (
         <ActionForm key={confirming} action={confirming === "reset" ? resetAcceptanceAction : withdrawAction} className="pe-act pe-confirm">
           {({ state, pending }) => {
@@ -227,19 +200,19 @@ function MoreMenu({
               <>
                 <input type="hidden" name="proposalId" value={proposalId} />
                 {reset && <input type="hidden" name="updatedAt" value={updatedAt} />}
-                <p className="lx-note" role="alert" style={{ margin: 0 }}>
+                <span className="lx-note lx-inline-confirm" role="alert">
                   {reset
                     ? RESET_CONFIRM
                     : status === "sent"
                       ? "Withdraw this version? The client’s link will stop opening it."
                       : "Withdraw this version? It can’t be brought back."}
-                </p>
-                <button type="submit" className="lx-btn lx-btn-danger" disabled={pending}>
-                  {reset ? (pending ? RESET_PENDING : RESET_CONFIRM_BUTTON) : pending ? "Withdrawing…" : "Yes, withdraw"}
-                </button>
-                <button type="button" className="lx-btn lx-btn-sec" onClick={() => setConfirming(null)} disabled={pending}>
-                  Cancel
-                </button>
+                  <button type="submit" className="lx-btn lx-btn-danger lx-btn-sm" disabled={pending}>
+                    {pending ? SAVING : reset ? RESET_CONFIRM_BUTTON : yesVerb("withdraw")}
+                  </button>
+                  <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={() => setConfirming(null)} disabled={pending}>
+                    {CANCEL}
+                  </button>
+                </span>
                 <Outcome state={state} pending={pending} />
               </>
             );
@@ -258,15 +231,15 @@ export function DeleteConfirm({ proposalId, onCancel }: { proposalId: string; on
       {({ state, pending }) => (
         <>
           <input type="hidden" name="proposalId" value={proposalId} />
-          <p className="lx-note" role="alert" style={{ margin: 0 }}>
+          <span className="lx-note lx-inline-confirm" role="alert">
             {DELETE_CONFIRM}
-          </p>
-          <button type="submit" className="lx-btn lx-btn-danger" disabled={pending}>
-            {pending ? "Deleting…" : DELETE_LABEL}
-          </button>
-          <button type="button" className="lx-btn lx-btn-sec" onClick={onCancel} disabled={pending}>
-            Cancel
-          </button>
+            <button type="submit" className="lx-btn lx-btn-danger lx-btn-sm" disabled={pending}>
+              {pending ? SAVING : yesVerb("delete")}
+            </button>
+            <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={onCancel} disabled={pending}>
+              {CANCEL}
+            </button>
+          </span>
           <Outcome state={state} pending={pending} />
         </>
       )}

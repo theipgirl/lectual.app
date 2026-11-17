@@ -175,8 +175,8 @@ describe("the picker, with nothing chosen", () => {
     const html = await render({ leads: [lead(1), lead(2)], matters: [matter(1)] });
     const p = picker(html);
     expect(p).toContain("Who is this for?");
-    expect(p).toMatch(/<a href="\/dashboard\/proposals\/new\/\?kind=lead"[^>]*aria-current="page"[^>]*>Leads</);
-    expect(p).toMatch(/<a href="\/dashboard\/proposals\/new\/\?kind=matter"(?![^>]*aria-current)[^>]*>Matters</);
+    expect(p).toMatch(/<a [^>]*aria-current="page"[^>]*href="\/dashboard\/proposals\/new\/?\?kind=lead"[^>]*>Leads</);
+    expect(p).toMatch(/<a (?![^>]*aria-current)[^>]*href="\/dashboard\/proposals\/new\/?\?kind=matter"[^>]*>Matters</);
     expect(p).toMatch(/<input[^>]*type="search"[^>]*aria-label="Search leads"/);
     expect(p).toContain('<a href="/dashboard/proposals/new/?blank=1" class="pe-who-blank">Start blank</a>');
     // A row is a form posting ONLY the id (and the type), never a link that carries it into a second form.
@@ -184,7 +184,7 @@ describe("the picker, with nothing chosen", () => {
     expect(p.match(/data-start-row/g)).toHaveLength(2);
     expect(p).toContain("Create draft");
     expect(hrefs(p).some((x) => x.includes("?lead="))).toBe(false);
-    expect(text(p)).toContain("Showing 2 of 2.");
+    expect(text(p)).toContain("Showing 2 of 2");
   });
 
   it("no brand name, package or pay-link field is drawn anywhere", async () => {
@@ -197,7 +197,7 @@ describe("the picker, with nothing chosen", () => {
   it("?kind=matter shows the matters, and only the matters; a row posts the matter id", async () => {
     const html = await render({ search: { kind: "matter" }, leads: [lead(1)], matters: [matter(1), matter(2)] });
     const p = picker(html);
-    expect(p).toMatch(/\?kind=matter"[^>]*aria-current="page"/);
+    expect(p).toMatch(/aria-current="page"[^>]*href="[^"]*\?kind=matter"/);
     expect(p).toContain("MARK1");
     expect(p).not.toContain("Pat1");
     expect(idsPosted(p, "matterId")).toEqual([uuid(1001), uuid(1002)]);
@@ -210,13 +210,13 @@ describe("the picker, with nothing chosen", () => {
     expect(picker(html)).not.toContain("MARK1");
   });
 
-  it("more than 8 matches draw exactly 8, in the order read, and say 'Showing 8 of 12.'", async () => {
+  it("more than 8 matches draw exactly 8, in the order read, and say 'Showing 8 of 12'", async () => {
     const html = await render({ leads: Array.from({ length: 12 }, (_, i) => lead(i + 1)) });
     const p = picker(html);
     expect(p.match(/data-start-row/g)).toHaveLength(8);
     expect(p.indexOf("Pat1 ")).toBeLessThan(p.indexOf("Pat2 "));
     expect(p).not.toContain("Pat9 ");
-    expect(text(p)).toContain("Showing 8 of 12.");
+    expect(text(p)).toContain("Showing 8 of 12");
   });
 
   it("a search narrows the list and is shown again in the box; it stays on the picker (door=scratch)", async () => {
@@ -224,7 +224,7 @@ describe("the picker, with nothing chosen", () => {
     const p = picker(html);
     expect(p).toMatch(/<input[^>]*name="q"[^>]*value="pat2"/);
     expect(input(html, "door")).toContain('value="scratch"');
-    expect(text(p)).toContain("Showing 2 of 2.");
+    expect(text(p)).toContain("Showing 2 of 2");
     expect(idsPosted(p, "leadId")).toEqual([uuid(102), uuid(120)]);
     expect(p).not.toContain("Pat1 ");
   });

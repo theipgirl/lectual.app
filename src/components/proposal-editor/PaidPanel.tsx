@@ -3,6 +3,9 @@
 import { markPaidAction, retryUploadAction, undoPaidAction } from "@/app/dashboard/proposals/[id]/paid-actions";
 import type { PaidPanelView } from "@/lib/proposals/paid-view";
 import { ActionForm, Outcome } from "./ActionForm";
+import { SAVING } from "@/lib/ui/words";
+import { InlineConfirm } from "@/components/ui/InlineConfirm";
+import { Pill } from "@/components/ui/Pill";
 
 /**
  * Payment and follow-up for one ACCEPTED version: the paid line, Mark paid / Undo for the
@@ -15,22 +18,23 @@ import { ActionForm, Outcome } from "./ActionForm";
 export function PaidPanel({ proposalId, view }: { proposalId: string; view: PaidPanelView }) {
   const hidden = <input type="hidden" name="proposalId" value={proposalId} />;
   const unreadable = view.marker.state === "unreadable";
+  const undoFormId = `pe-undo-paid-${proposalId}`;
 
   return (
     <section className="lx-card pe-card pe-paid" aria-label="Payment and follow-up">
       <header className="pe-card-head">
-        <h2 className="pe-h">Payment</h2>
+        <h2 className="lx-h3">Payment</h2>
       </header>
 
       <div className="pe-paid-line">
-        <span className={`lx-pill lx-pill-${view.marker.tone}`}>{view.marker.label}</span>
+        <Pill tone={view.marker.tone}>{view.marker.label}</Pill>
         {view.showMark && (
           <ActionForm action={markPaidAction} className="pe-paid-act">
             {({ state, pending }) => (
               <>
                 {hidden}
                 <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={pending}>
-                  {pending ? "Marking…" : "Mark paid"}
+                  {pending ? SAVING : "Mark paid"}
                 </button>
                 <Outcome state={state} pending={pending} />
               </>
@@ -38,13 +42,18 @@ export function PaidPanel({ proposalId, view }: { proposalId: string; view: Paid
           </ActionForm>
         )}
         {view.showUndo && (
-          <ActionForm action={undoPaidAction} className="pe-paid-act" confirm="Undo the paid mark? An engagement letter draft that was queued stays in the approval queue.">
+          <ActionForm action={undoPaidAction} className="pe-paid-act" id={undoFormId}>
             {({ state, pending }) => (
               <>
                 {hidden}
-                <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
-                  {pending ? "Undoing…" : "Undo"}
-                </button>
+                <InlineConfirm
+                  label="Undo"
+                  tone="primary"
+                  className="lx-btn lx-btn-sec lx-btn-sm"
+                  question="Undo the paid mark? An engagement letter draft that was queued stays in the approval queue."
+                  pending={pending}
+                  onConfirm={() => (document.getElementById(undoFormId) as HTMLFormElement | null)?.requestSubmit()}
+                />
                 <Outcome state={state} pending={pending} />
               </>
             )}
@@ -88,7 +97,7 @@ export function PaidPanel({ proposalId, view }: { proposalId: string; view: Paid
                       {hidden}
                       <input type="hidden" name="step" value={line.retry!} />
                       <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
-                        {pending ? "Trying…" : "Retry"}
+                        {pending ? SAVING : "Retry"}
                       </button>
                       <Outcome state={state} pending={pending} />
                     </>

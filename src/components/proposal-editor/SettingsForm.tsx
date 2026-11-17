@@ -11,6 +11,7 @@ import { IncludesFields } from "./IncludesFields";
 import { NewOfferSection } from "./NewOfferSection";
 import type { NewOffer } from "@/lib/proposals/new-offer";
 import { PackagePricesSection, type SettingsPackageValues } from "./PackagePricesForm";
+import { SAVING } from "@/lib/ui/words";
 
 export type SettingsMember = { userId: string; name: string; email: string | null; role: string };
 
@@ -35,7 +36,7 @@ export function SettingsForm({ members, values, packages, newOffer = null }: { m
         <>
           <section className="lx-card pe-card">
             <header className="pe-card-head">
-              <h2 className="pe-h">{SETTINGS_APPROVERS_HEADING}</h2>
+              <h2 className="lx-h3">{SETTINGS_APPROVERS_HEADING}</h2>
               <p className="lx-note pe-hint">
                 Only these people can save a proposal and create its client link, and no link opens for a client until one of them has. The database enforces this, whatever a person’s role. Up to 10.
               </p>
@@ -70,7 +71,7 @@ export function SettingsForm({ members, values, packages, newOffer = null }: { m
 
           <section className="lx-card pe-card">
             <header className="pe-card-head">
-              <h2 className="pe-h">Links and notifications</h2>
+              <h2 className="lx-h3">Links and notifications</h2>
             </header>
             <div className="lx-form-grid">
               <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
@@ -82,7 +83,7 @@ export function SettingsForm({ members, values, packages, newOffer = null }: { m
 
           <section className="lx-card pe-card">
             <header className="pe-card-head">
-              <h2 className="pe-h">Standard “what’s included” table</h2>
+              <h2 className="lx-h3">Standard “what’s included” table</h2>
               <p className="lx-note pe-hint">Copied into each new proposal, where it can be edited. The substantive office action response is never listed.</p>
             </header>
             <IncludesFields initial={values.includes} editable />
@@ -94,7 +95,7 @@ export function SettingsForm({ members, values, packages, newOffer = null }: { m
 
           <div className="pe-save">
             <button type="submit" className="lx-btn lx-btn-pri" disabled={pending}>
-              {pending ? "Saving…" : "Save proposal settings"}
+              {pending ? SAVING : "Save proposal settings"}
             </button>
             <Outcome state={state} pending={pending} />
           </div>
