@@ -3,6 +3,27 @@
 One list across sessions. Each session adds its action items here and checks them against Omi.
 Newest section first. Tick an item when it is done; don't delete it.
 
+## 2026-11-17: marketing site redesign, three mockups to choose from
+
+Recap: `docs/recaps/2026-11-17-marketing-site-redesign-mockups.md`. Omi cross-check: this is the open Omi item "Review the new website"
+(Oct 12); the related open Omi item "Develop a marketing strategy and roadmap" (Oct 1) is not covered by this work.
+
+### Taylor
+- [ ] Open the three mockups on a laptop and a phone and pick one (or name the parts to combine):
+      A First light https://claude.ai/artifact/7YunU3tNn613D93cxdd2VY ·
+      B The docket https://claude.ai/artifact/UZ2SsTDCBJtVnEYEc4fMQH ·
+      C The gate https://claude.ai/artifact/EpMgu2jw9oewyXftK7TaS8
+- [ ] Say whether the redesign covers only `/firms/`, or also the front door (`/`, the dusk-sky page) and the founder side.
+- [ ] Decide Astro or Next.js. Claude's recommendation: stay on Next.js (reasons in the recap).
+- [ ] If A or C is chosen: OK a new entry in `lectual/brain/decisions.md` replacing 2026-08-03-01 (the marketing typefaces change).
+- [ ] Read the new connective lines in the chosen mockup ("While the firm sleeps." and the per-stage sentences) and keep, reword or cut them.
+- [ ] Copy this session's recap into the Obsidian second brain. This cloud session still can't reach the vault (no folder is shared through
+      the desktop app: Settings, Claude Code, Remote Control).
+
+### Claude, after the pick
+- [ ] Write the short design for the chosen direction, then build it in `theipgirl/lectual` `src/app/(marketing)/` on a branch (no deploy without Taylor's OK).
+- [ ] Check the chosen mockup in Safari, with a trackpad, with reduced motion and with JavaScript off before building on it.
+
 ## 2026-11-12 (night): merged #29, #30, #31; letter version 2 waiting for approval
 
 ### Taylor
