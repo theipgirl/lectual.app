@@ -30,9 +30,6 @@ const TODO_BY_AREA: Record<string, { area: string; count: number }> = {
   "src/app/dashboard/forms/_components/StepTables.tsx": { area: "E", count: 2 },
   "src/app/dashboard/forms/_components/IntakePerformance.tsx": { area: "E", count: 1 },
   "src/app/dashboard/forms/_components/WhereTheyCameFrom.tsx": { area: "E", count: 1 },
-  "src/app/dashboard/agents/page.tsx": { area: "F", count: 1 },
-  "src/app/dashboard/settings/team/page.tsx": { area: "F", count: 1 },
-  "src/components/settings/RoleTable.tsx": { area: "F", count: 1 },
 };
 const EXEMPT = new Set([
   "src/components/ui/SheetTable.tsx",
