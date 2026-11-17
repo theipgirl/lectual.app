@@ -56,7 +56,7 @@ export function attendeeCopy(input: WorksheetInput, ctx: { now: Date; bookingUrl
   const lines = [
     `Hi ${first},`,
     "",
-    `Thank you for joining ${WORKSHEET_EVENT.name} with RPB Law Firm. Here is a copy of the worksheet you filled in, so you can keep it.`,
+    `Thank you for joining ${WORKSHEET_EVENT.name} with RPB Law Firm. Here is a copy of Your IP Portfolio you filled in, so you can keep it.`,
     "",
     worksheetSummary(input, ctx.now),
     "",

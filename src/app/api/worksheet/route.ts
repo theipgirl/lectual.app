@@ -5,7 +5,6 @@ import { syncIntakeCompletion, syncIntakeStart } from "@/lib/intake-forms/lawmat
 import { intakeSalt } from "@/lib/intake-forms/secrets";
 import { SlidingWindowThrottle } from "@/lib/intake-forms/spam";
 import { sendInternalMail } from "@/lib/mail/internal-mail";
-import { bookingLinkFor } from "@/lib/worksheet/booking-link-live";
 import { fullName } from "@/lib/worksheet/answers";
 import {
   DEFAULT_ALLOWED_ORIGINS,
@@ -77,7 +76,7 @@ export async function POST(req: NextRequest): Promise<Response> {
         complete: (handle, token, answers, mode, now) => completeStartedIntake(handle, token, answers, mode, now),
         recordEvent: (handle, kind) => recordIntakeEvent(handle, kind, null),
         mail: sendInternalMail,
-        bookingLinkFor,
+        // Personal Lawmatics booking links are off (firm owner, Nov 17): every email uses the RPB Law Firm sessions page.
         lawmatics: async (handle, submissionId, input, noteBody) => {
           const contact = {
             name: fullName(input),
