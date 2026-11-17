@@ -189,12 +189,14 @@ describe("the read, three-state (acceptance 3)", () => {
   });
   afterEach(() => vi.restoreAllMocks());
 
-  function mockAll(world: ReturnType<typeof makeWorld>) {
+  // Each module path is mocked exactly once per test (a second vi.doMock for the same path raced the first and made
+  // two tests flaky), so a test that needs a different answer passes it in here.
+  function mockAll(world: ReturnType<typeof makeWorld>, over: { matterLeadId?: string; directoryFails?: boolean } = {}) {
     vi.doMock("@/lib/db/scoped-client", () => ({ getScopedClient: vi.fn(async () => world.client) }));
     vi.doMock("@/lib/org/modules", () => ({ orgHasModule: vi.fn(async () => false), activeOrgModulesOrNull: vi.fn(async () => []) }));
-    vi.doMock("@/lib/matters", () => ({ listMatters: vi.fn(async () => [{ id: MATTER, status: "open", lead_id: null, title: "Acme", owner_name: "Acme", matter_number: "TM-1", stage_id: null, type: "TM" }]) }));
+    vi.doMock("@/lib/matters", () => ({ listMatters: vi.fn(async () => [{ id: MATTER, status: "open", lead_id: over.matterLeadId ?? null, title: "Acme", owner_name: "Acme", matter_number: "TM-1", stage_id: null, type: "TM" }]) }));
     vi.doMock("@/lib/pipeline", () => ({ listLeads: vi.fn(async () => []), listStages: vi.fn(async () => []) }));
-    vi.doMock("@/lib/members/directory", () => ({ listMemberDirectory: vi.fn(async () => []) }));
+    vi.doMock("@/lib/members/directory", () => ({ listMemberDirectory: vi.fn(async () => { if (over.directoryFails) throw new Error("x"); return []; }) }));
     vi.doMock("@/lib/queue/load", () => ({ loadActiveQueue: vi.fn(async () => ({ status: "unconfigured" })) }));
     vi.doMock("@/lib/queue/lead-pending", () => ({ loadPendingApprovalsByLead: vi.fn(async () => ({ status: "ok", byLead: {} })) }));
     vi.doMock("@/lib/org/profile", () => ({ getFirmTimeZone: vi.fn(async () => TZ) }));
@@ -222,8 +224,7 @@ describe("the read, three-state (acceptance 3)", () => {
 
   it("a failed team-names read draws no line for a person's change, but keeps an automatic one", async () => {
     const world = makeWorld({ tables: seedTables({ crm_activity: [act({})] }) });
-    mockAll(world);
-    vi.doMock("@/lib/members/directory", () => ({ listMemberDirectory: vi.fn(async () => { throw new Error("x"); }) }));
+    mockAll(world, { directoryFails: true });
     const { loadReview } = await import("../../src/lib/review/load");
     const r = await loadReview(NOW);
     expect(r.status === "ok" && r.failed).toContain("team names");
@@ -232,8 +233,7 @@ describe("the read, three-state (acceptance 3)", () => {
 
   it("a matter also shows a change filed on its lead", async () => {
     const world = makeWorld({ tables: seedTables({ crm_activity: [act({ matter_id: null, lead_id: LEAD, created_at: "2026-11-15T15:00:00Z" })] }) });
-    mockAll(world);
-    vi.doMock("@/lib/matters", () => ({ listMatters: vi.fn(async () => [{ id: MATTER, status: "open", lead_id: LEAD, title: "Acme", owner_name: "Acme", matter_number: "TM-1", stage_id: null, type: "TM" }]) }));
+    mockAll(world, { matterLeadId: LEAD });
     const { loadReview } = await import("../../src/lib/review/load");
     const r = await loadReview(NOW);
     expect(r.status === "ok" && r.rows[0].lastChange).toMatchObject({ date: "2026-11-15" });
