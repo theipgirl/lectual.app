@@ -4,8 +4,9 @@ import type { Decisions, ReconcileRow } from "@/lib/reconcile/types";
 import { ConfidenceBadge } from "./ConfidenceBadge";
 import { EvidenceBlock } from "./EvidenceBlock";
 import { SourceCell } from "./SourceCell";
+import { mattersListHref } from "@/lib/matters/list-href";
 
-export const MATTERS_HREF = "/dashboard/matters/";
+export const MATTERS_HREF = mattersListHref();
 
 type Pickable = { id: string; name: string };
 

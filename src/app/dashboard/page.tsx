@@ -42,6 +42,8 @@ import { pageTitle } from "@/lib/ui/page-title";
 import { ASSISTANTS_NAME, OUR_TURN } from "@/lib/ui/words";
 import { OwnerToday } from "@/components/today/OwnerToday";
 import { NO_PREVIEW, previewFor, viewFor } from "@/lib/views";
+import { intakeListHref } from "@/lib/intake/list-href";
+import { mattersListHref } from "@/lib/matters/list-href";
 
 export const metadata: Metadata = { title: pageTitle("Today") };
 
@@ -214,8 +216,8 @@ export default async function TodayPage() {
       <div className="lx-kpis">
         <Kpi label="Waiting on you" value={queueValue} sub="drafts to approve" href="/dashboard/queue/" failed={queueFailed} />
         <Kpi label="Overdue" value={deadlines === null && tasks === null ? null : overdue} sub="deadlines and tasks past due" href="/dashboard/calendar/" />
-        <Kpi label={OUR_TURN} value={docket ? docket.waitingOn.firm : null} sub={docket ? `of ${docket.open} open matters` : ""} href="/dashboard/matters/?group=all&seg=firm" />
-        <Kpi label="New leads" value={newLeads ? newLeads.length : null} sub="in the last 7 days" href="/dashboard/intake/" />
+        <Kpi label={OUR_TURN} value={docket ? docket.waitingOn.firm : null} sub={docket ? `of ${docket.open} open matters` : ""} href={mattersListHref("group=all&seg=firm")} />
+        <Kpi label="New leads" value={newLeads ? newLeads.length : null} sub="in the last 7 days" href={intakeListHref()} />
       </div>
 
       {queue.status === "unavailable" && (
@@ -239,7 +241,7 @@ export default async function TodayPage() {
           <section className="lx-card lx-aside">
             <div className="lx-label">This month</div>
             <div className="lx-task" style={{ padding: "2px 0" }}>
-              <Link href="/dashboard/matters/?group=all">Matters opened</Link>
+              <Link href={mattersListHref("group=all")}>Matters opened</Link>
               <span className="lx-num">{opened ?? "—"}</span>
             </div>
             <div className="lx-task" style={{ padding: "2px 0" }}>
@@ -295,12 +297,12 @@ export default async function TodayPage() {
               <>
                 {(["firm", "client", "uspto", "court"] as const).filter((w) => w !== "court" || docket.waitingOn.court > 0).map((w) => (
                   <div key={w} className="lx-task" style={{ padding: "2px 0" }}>
-                    <Link href={`/dashboard/matters/?group=all&seg=${w}`}>{BAND_COPY[w].label}</Link>
+                    <Link href={mattersListHref(`group=all&seg=${w}`)}>{BAND_COPY[w].label}</Link>
                     <span className="lx-num">{docket.waitingOn[w]}</span>
                   </div>
                 ))}
                 {docket.stalled.length > 0 && (
-                  <Link href="/dashboard/matters/?group=all&seg=stalled" className="lx-note">
+                  <Link href={mattersListHref("group=all&seg=stalled")} className="lx-note">
                     {docket.stalled.length} gone quiet →
                   </Link>
                 )}

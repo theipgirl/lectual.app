@@ -10,6 +10,7 @@ import { isInPeriod, isInPreviousPeriod, isInWindow, type ReportPeriod } from ".
 import { isWaitingOnUs, leadLabel, waitingSince } from "./leads";
 import { oldestFirst, type LinkTile, type WaitingItem } from "./waiting";
 import { relativeTime } from "@/lib/relative-time";
+import { intakeListHref } from "@/lib/intake/list-href";
 
 export type IntakeReport = {
   kpis: Metric[];
@@ -84,7 +85,7 @@ export async function loadIntakeReport(period: ReportPeriod): Promise<IntakeRepo
     : [];
 
   const links: LinkTile[] = [
-    { label: INTAKE_NAME, sub: "Every potential client not yet signed", href: "/dashboard/intake/", count: pnc ? pnc.length : null },
+    { label: INTAKE_NAME, sub: "Every potential client not yet signed", href: intakeListHref(), count: pnc ? pnc.length : null },
     { label: "Intake forms", sub: "Public intake and custom forms", href: "/dashboard/forms/", count: null },
     {
       label: "Quotes & proposals",

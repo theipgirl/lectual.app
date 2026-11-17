@@ -16,7 +16,7 @@ describe("the phone bar (F6)", () => {
   it("starts on Today: Today, Intake, Approvals, Mail with the mailbox module", () => {
     expect(MOBILE_BAR).toEqual(["", "intake", "queue", "mail", "matters"]);
     expect(bar(ALL).map((i) => i.label)).toEqual(["Today", "Intake", "Approvals", "Mail"]);
-    expect(bar(ALL).map((i) => i.href)).toEqual(["/dashboard/", "/dashboard/intake/", "/dashboard/queue/", "/dashboard/mail/"]);
+    expect(bar(ALL).map((i) => i.href)).toEqual(["/dashboard/", "/dashboard/intake/?view=table", "/dashboard/queue/", "/dashboard/mail/"]);
   });
 
   it("Matters takes Mail's slot without the mailbox module, and never offers Mail in the sheet either (fails closed)", () => {

@@ -486,7 +486,7 @@ describe("computeIntakeKpis", () => {
 });
 
 describe("parseIntakeViewState", () => {
-  it("defaults to the table grouped by stage", () => {
+  it("defaults to the Board grouped by stage (no view in the address)", () => {
     expect(parseIntakeViewState({})).toEqual(DEFAULT_VIEW_STATE);
   });
 
@@ -513,8 +513,8 @@ describe("parseIntakeViewState", () => {
   it("writes ?set= and ?show= only when they are not the defaults (and ?show= only on the table)", () => {
     const base = { ...DEFAULT_VIEW_STATE };
     expect(intakeQueryString(EMPTY_INTAKE_FILTERS, { ...base, set: "open" })).toBe("set=open");
-    expect(intakeQueryString(EMPTY_INTAKE_FILTERS, { ...base, show: 75 })).toBe("show=75");
-    expect(intakeQueryString(EMPTY_INTAKE_FILTERS, { ...base, view: "board", show: 75 })).toBe("view=board");
+    expect(intakeQueryString(EMPTY_INTAKE_FILTERS, { ...base, view: "table", show: 75 })).toBe("view=table&show=75");
+    expect(intakeQueryString(EMPTY_INTAKE_FILTERS, { ...base, view: "board", show: 75 })).toBe("");
     expect(intakeQueryString({ ...EMPTY_INTAKE_FILTERS, suggest: true }, base)).toBe("suggest=1");
     expect(parseIntakeFilters({ suggest: "1" }).suggest).toBe(true);
   });
@@ -522,28 +522,28 @@ describe("parseIntakeViewState", () => {
   it("falls back rather than rendering nothing for a value it doesn't know", () => {
     // ?view=kanban should show the list, not a blank screen.
     expect(parseIntakeViewState({ view: "kanban", group: "temperature" })).toEqual(
-      DEFAULT_VIEW_STATE,
+      { ...DEFAULT_VIEW_STATE, view: "table" },
     );
   });
 });
 
 describe("intakeQueryString / intakeHref", () => {
-  it("leaves the default view out of the URL entirely", () => {
+  it("leaves the default view (the Board) out of the URL entirely", () => {
     expect(intakeQueryString(EMPTY_INTAKE_FILTERS, DEFAULT_VIEW_STATE)).toBe("");
     expect(intakeHref(EMPTY_INTAKE_FILTERS, DEFAULT_VIEW_STATE)).toBe("/dashboard/intake/");
   });
 
-  it("spells out a board, and its grouping only when it isn't the default", () => {
+  it("leaves the board out of the address, and writes its grouping only when it isn't the default", () => {
     expect(intakeHref(EMPTY_INTAKE_FILTERS, { view: "board", group: "stage", sort: DEFAULT_SORT, set: "working", show: 25 })).toBe(
-      "/dashboard/intake/?view=board",
+      "/dashboard/intake/",
     );
     expect(intakeHref(EMPTY_INTAKE_FILTERS, { view: "board", group: "owner", sort: DEFAULT_SORT, set: "working", show: 25 })).toBe(
-      "/dashboard/intake/?view=board&group=owner",
+      "/dashboard/intake/?group=owner",
     );
   });
 
-  it("drops the grouping on the table, where it changes nothing a reader can see", () => {
-    expect(intakeQueryString(EMPTY_INTAKE_FILTERS, { view: "table", group: "owner", sort: DEFAULT_SORT, set: "working", show: 25 })).toBe("");
+  it("drops the grouping on the table, where it changes nothing a reader can see (the list always writes its view)", () => {
+    expect(intakeQueryString(EMPTY_INTAKE_FILTERS, { view: "table", group: "owner", sort: DEFAULT_SORT, set: "working", show: 25 })).toBe("view=table");
   });
 
   it("carries the filters alongside the view, so a saved board stays filtered", () => {
@@ -551,7 +551,7 @@ describe("intakeQueryString / intakeHref", () => {
       { ...EMPTY_INTAKE_FILTERS, source: ["UGW"], temp: "hot" },
       { view: "board", group: "owner", sort: DEFAULT_SORT, set: "working", show: 25 },
     );
-    expect(href).toBe("/dashboard/intake/?source=UGW&temp=hot&view=board&group=owner");
+    expect(href).toBe("/dashboard/intake/?source=UGW&temp=hot&group=owner");
 
     // And it round-trips: the saved link parses back to what was saved.
     const params = Object.fromEntries(new URLSearchParams(href.split("?")[1]));
@@ -602,7 +602,7 @@ describe("the sort in the URL", () => {
     const filters = { ...EMPTY_INTAKE_FILTERS, source: ["UGW"], temp: "none" as const, q: "ada" };
     const state = { set: "working" as const, show: 25, view: "board" as const, group: "owner" as const, sort: { key: "temperature" as const, dir: "asc" as const } };
     const href = intakeHref(filters, state);
-    expect(href).toBe("/dashboard/intake/?source=UGW&temp=none&q=ada&view=board&group=owner&sort=temperature&dir=asc");
+    expect(href).toBe("/dashboard/intake/?source=UGW&temp=none&q=ada&group=owner&sort=temperature&dir=asc");
     const record = searchParamsToRecord(new URLSearchParams(href.split("?")[1]));
     expect(parseIntakeFilters(record)).toEqual(filters);
     expect(parseIntakeViewState(record)).toEqual(state);
@@ -610,8 +610,8 @@ describe("the sort in the URL", () => {
 
   it("keeps the sort on the table and on both boards", () => {
     const sort = { key: "owner" as const, dir: "desc" as const };
-    expect(intakeQueryString(EMPTY_INTAKE_FILTERS, { ...DEFAULT_VIEW_STATE, view: "table", group: "stage", sort })).toBe("sort=owner&dir=desc");
-    expect(intakeQueryString(EMPTY_INTAKE_FILTERS, { ...DEFAULT_VIEW_STATE, view: "board", group: "stage", sort })).toBe("view=board&sort=owner&dir=desc");
+    expect(intakeQueryString(EMPTY_INTAKE_FILTERS, { ...DEFAULT_VIEW_STATE, view: "table", group: "stage", sort })).toBe("view=table&sort=owner&dir=desc");
+    expect(intakeQueryString(EMPTY_INTAKE_FILTERS, { ...DEFAULT_VIEW_STATE, view: "board", group: "stage", sort })).toBe("sort=owner&dir=desc");
   });
 });
 

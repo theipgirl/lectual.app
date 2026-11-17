@@ -55,7 +55,7 @@ function render(leads: Lead[], params: IntakeSearchParams = {}, reads: Reads = {
       intakeStages={intakeStages(STAGES)}
       members={MEMBERS}
       initialFilters={parseIntakeFilters(params)}
-      initialViewState={parseIntakeViewState(params)}
+      initialViewState={parseIntakeViewState({ view: "table", ...params })}
       time={{ weekStartIso: NOW.toISOString(), byLeadId: {}, running: null }}
       now={NOW.toISOString()}
       {...(reads as object)}

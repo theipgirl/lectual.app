@@ -9,6 +9,7 @@ import { comparisonFields, unavailableMetric, type Metric } from "./metric";
 import { isInPeriod, isInPreviousPeriod, type ReportPeriod } from "./period";
 import { oldestFirst, type LinkTile, type WaitingItem } from "./waiting";
 import { relativeTime } from "@/lib/relative-time";
+import { mattersListHref } from "@/lib/matters/list-href";
 
 export type MattersReport = {
   kpis: Metric[];
@@ -39,7 +40,7 @@ export async function loadMattersReport(period: ReportPeriod): Promise<MattersRe
       kpis: [{ ...failed, label: "Open matters" }, { ...failed, label: "Waiting on us" }, { ...failed, label: "USPTO deadlines · 30 days" }, { ...failed, label: "Registrations" }],
       waiting: [],
       links: [
-        { label: "All matters", sub: "The full worklist, grouped by client", href: "/dashboard/matters/?group=all", count: null },
+        { label: "All matters", sub: "The full worklist, grouped by client", href: mattersListHref("group=all"), count: null },
         { label: "Pipeline", sub: "Every client from intake to registration", href: "/dashboard/pipeline/", count: null },
         { label: "Documents", sub: "Filings, specimens and letters", href: "/dashboard/documents/", count: null },
       ],
@@ -100,7 +101,7 @@ export async function loadMattersReport(period: ReportPeriod): Promise<MattersRe
   const waiting = [...overdueItems, ...waitingItems];
 
   const links: LinkTile[] = [
-    { label: "All matters", sub: "The full worklist, grouped by client", href: "/dashboard/matters/?group=all", count: docket.open },
+    { label: "All matters", sub: "The full worklist, grouped by client", href: mattersListHref("group=all"), count: docket.open },
     { label: "Pipeline", sub: "Every client from intake to registration", href: "/dashboard/pipeline/", count: null },
     { label: "Documents", sub: "Filings, specimens and letters", href: "/dashboard/documents/", count: null },
     ...(needsReview.length > 0

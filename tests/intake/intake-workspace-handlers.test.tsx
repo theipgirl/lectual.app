@@ -113,7 +113,7 @@ function mount(params: Record<string, string> = {}) {
     intakeStages: intakeStages(STAGES),
     members: MEMBERS,
     initialFilters: parseIntakeFilters(params),
-    initialViewState: parseIntakeViewState(params),
+    initialViewState: parseIntakeViewState({ view: "table", ...params }),
     time: null,
     now: NOW.toISOString(),
   };

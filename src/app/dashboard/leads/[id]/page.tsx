@@ -62,6 +62,7 @@ import { listLeadEnrollments } from "@/lib/automation/drips";
 import { AUTOMATION_STAFF_ROLES } from "@/lib/automation/rules";
 import { enrollmentStatusLabel, enrollmentStatusTone } from "@/lib/campaigns/steps";
 import { shortDate, stopLine } from "@/lib/campaigns/stops";
+import { intakeListHref } from "@/lib/intake/list-href";
 
 /** Tab title: the lead's name through the scoped getter; "Lead" when the read fails or finds nothing. */
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -213,7 +214,7 @@ export default async function LeadPage({
 
   return (
     <>
-      <Link href="/dashboard/intake/" className="lx-back">
+      <Link href={intakeListHref()} className="lx-back">
         ← {INTAKE_NAME}
       </Link>
       <div className="lx-page-head">

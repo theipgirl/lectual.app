@@ -1,4 +1,6 @@
 import type { OrgModule } from "@/lib/org/modules";
+import { INTAKE_LIST_PATH } from "@/lib/intake/list-href";
+import { MATTERS_LIST_PATH } from "@/lib/matters/list-href";
 import { hasRole, type Role } from "@/lib/auth/roles";
 import { AI_TOOLS_GROUP, APPROVALS_NAME, ASSISTANTS_NAME, COPILOT_NAME, FIRM_NOTES_NAME, INTAKE_LEADS_ROW, INTAKE_NAME, REVIEW_NAME, SHORTCUTS_NAME } from "@/lib/ui/words";
 
@@ -15,6 +17,11 @@ export type NavItem = {
   /** Shorter name when shown under its parent in the rail ("Leads" under the Intake group). */
   railLabel?: string;
   href: string;
+  /**
+   * Where a LINK to this section goes, when that is not its bare `href`. Intake and Matters open on the Board with no `view`, so their
+   * rail and phone links carry the explicit list value. `href` stays bare: it is what `isNavActive` matches the pathname against.
+   */
+  linkHref?: string;
   /** SVG path data, drawn at 24×24 with a 1.5 stroke (design/Rail.dc.html). */
   icon: string;
   /** Firm must hold this module or the section does not exist for it. */
@@ -65,14 +72,14 @@ export const NAV: readonly NavItem[] = [
   // No module: each firm imports only from the Fathom / Zoom account it connected itself (lectual 0081).
   { slug: "meetings", label: "Meetings", href: "/dashboard/meetings/", icon: ICON.video, step: 7 },
   { slug: "calendar", label: "Calendar", href: "/dashboard/calendar/", icon: ICON.cal, step: 6 },
-  { slug: "intake", label: INTAKE_NAME, railLabel: INTAKE_LEADS_ROW, href: "/dashboard/intake/", also: ["/dashboard/leads/"], icon: ICON.users, step: 6 },
+  { slug: "intake", label: INTAKE_NAME, railLabel: INTAKE_LEADS_ROW, href: "/dashboard/intake/", linkHref: INTAKE_LIST_PATH, also: ["/dashboard/leads/"], icon: ICON.users, step: 6 },
   { slug: "forms", label: "Forms", railLabel: "Forms", href: "/dashboard/forms/", icon: ICON.file, step: 7 },
   { slug: "quotes", label: "Quotes & proposals", href: "/dashboard/quotes/", icon: ICON.file, step: 7 },
   // The client trademark proposal (brand names x marks x classes, a named approver, a /p/<token> page). Opt-in per firm.
   { slug: "proposals", label: "Client proposals", railLabel: "Proposals", href: "/dashboard/proposals/", icon: ICON.send, module: "proposals", step: 7 },
   // One board from referral to registration (src/lib/lifecycle). No module: it reads only the firm's own leads and matters.
   { slug: "pipeline", label: "Pipeline", href: "/dashboard/pipeline/", icon: ICON.bars, step: 7 },
-  { slug: "matters", label: "Matters", railLabel: "All matters", href: "/dashboard/matters/", icon: ICON.case, step: 6 },
+  { slug: "matters", label: "Matters", railLabel: "All matters", href: "/dashboard/matters/", linkHref: MATTERS_LIST_PATH, icon: ICON.case, step: 6 },
   { slug: "documents", label: "Documents", href: "/dashboard/documents/", icon: ICON.file, step: 6 },
   { slug: "portals", label: "Client portals", href: "/dashboard/portals/", icon: ICON.users, step: 6, built: false },
   { slug: "copilot", label: COPILOT_NAME, href: "/dashboard/copilot/", icon: ICON.spark, step: 7 },
@@ -191,6 +198,11 @@ export function navItemBySlug(slug: string): NavItem | undefined {
   return NAV.find((item) => item.slug === slug);
 }
 
+/** The address a link to this section uses (its list value for Intake and Matters). */
+export function navLinkHref(item: NavItem): string {
+  return item.linkHref ?? item.href;
+}
+
 /** Whether `pathname` is inside `item`'s section. */
 export function isNavActive(pathname: string, item: NavItem): boolean {
   const path = pathname.endsWith("/") ? pathname : `${pathname}/`;
@@ -222,11 +234,11 @@ export function railGroups(visible: readonly NavItem[], pathname: string, tree: 
       if ("slug" in node) {
         const item = bySlug.get(node.slug);
         if (!item) return [];
-        return [{ key: item.slug || "today", label: item.label, icon: item.icon, href: item.href, active: isNavActive(pathname, item), childActive: false, countKey: item.slug, kids: [] }];
+        return [{ key: item.slug || "today", label: item.label, icon: item.icon, href: navLinkHref(item), active: isNavActive(pathname, item), childActive: false, countKey: item.slug, kids: [] }];
       }
       const kids = node.kids.flatMap((slug) => {
         const item = bySlug.get(slug);
-        return item ? [{ key: item.slug, label: item.railLabel ?? item.label, icon: item.icon, href: item.href, active: isNavActive(pathname, item), countKey: item.slug }] : [];
+        return item ? [{ key: item.slug, label: item.railLabel ?? item.label, icon: item.icon, href: navLinkHref(item), active: isNavActive(pathname, item), countKey: item.slug }] : [];
       });
       if (kids.length === 0) return [];
       // The parent opens its list; with no list child of its own, its first visible child.
@@ -288,7 +300,7 @@ export function mobileBarItems(visible: readonly NavItem[], pathname: string, ba
   const labels = bar ? bar.labels : MOBILE_LABEL;
   return slugs.flatMap((slug) => {
     const item = bySlug.get(slug);
-    return item ? [{ slug, label: labels[slug] ?? item.label, icon: item.icon, href: item.href, active: isNavActive(pathname, item), countKey: slug }] : [];
+    return item ? [{ slug, label: labels[slug] ?? item.label, icon: item.icon, href: navLinkHref(item), active: isNavActive(pathname, item), countKey: slug }] : [];
   });
 }
 
@@ -322,7 +334,7 @@ export function moreSections(visible: readonly NavItem[], pathname: string, grou
       label: group.label,
       items: group.slugs.flatMap((slug) => {
         const item = bySlug.get(slug);
-        return item && !inBar.has(slug) ? [{ slug, label: item.label, href: item.href, active: isNavActive(pathname, item) }] : [];
+        return item && !inBar.has(slug) ? [{ slug, label: item.label, href: navLinkHref(item), active: isNavActive(pathname, item) }] : [];
       }),
     }));
   if (groups) return sectionsOf(groups).filter((g) => g.items.length > 0);

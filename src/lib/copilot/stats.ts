@@ -4,6 +4,7 @@
  * never drawn as 0, and an unreachable queue is never "all caught up" — the
  * same rule as Today's tiles.
  */
+import { mattersListHref } from "@/lib/matters/list-href";
 
 export type StatRead = { status: "ok"; value: number } | { status: "unavailable" } | { status: "unconfigured" };
 
@@ -18,8 +19,8 @@ export type StatCardData = {
 };
 
 const CARDS: Array<Pick<StatCardData, "id" | "label" | "href"> & { note: string; unconfiguredNote?: string }> = [
-  { id: "open", label: "Open matters", href: "/dashboard/matters/?group=all", note: "on the docket right now" },
-  { id: "stalled", label: "Stalled matters", href: "/dashboard/matters/?group=all&seg=stalled", note: "past their stage's threshold" },
+  { id: "open", label: "Open matters", href: mattersListHref("group=all"), note: "on the docket right now" },
+  { id: "stalled", label: "Stalled matters", href: mattersListHref("group=all&seg=stalled"), note: "past their stage's threshold" },
   { id: "deadlines", label: "Deadlines, next 14 days", href: "/dashboard/calendar/", note: "open, including any overdue" },
   {
     id: "approvals",

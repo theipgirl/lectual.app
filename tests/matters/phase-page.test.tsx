@@ -123,9 +123,9 @@ describe("phase groups on the Matters page", () => {
   });
 
   it("the links keep the group, status, view and search; the default group is left out of the URL", async () => {
-    const html = await render({ matters: sample(), read: ok, params: { group: "post", seg: "unassigned", view: "board", q: "x" } });
-    expect(html).toMatch(/href="\/dashboard\/matters\/?\?group=intake&amp;seg=unassigned&amp;q=x&amp;view=board"/);
-    expect(html).toMatch(/href="\/dashboard\/matters\/?\?seg=unassigned&amp;q=x&amp;view=board"[^>]*>Pre-filing/);
+    const html = await render({ matters: sample(), read: ok, params: { group: "post", seg: "unassigned", view: "table", q: "x" } });
+    expect(html).toMatch(/href="\/dashboard\/matters\/?\?group=intake&amp;seg=unassigned&amp;q=x&amp;view=table"/);
+    expect(html).toMatch(/href="\/dashboard\/matters\/?\?seg=unassigned&amp;q=x&amp;view=table"[^>]*>Pre-filing/);
     expect(html).toContain('name="group" value="post"');
   });
 

@@ -90,7 +90,7 @@ describe("F5: Matters list", () => {
   });
 
   it("has an Open a matter header button, stage without a code, no Status column, In stage always, and a Review link", async () => {
-    const html = await render({ queue: ok, matters: [m({ status: "on_hold" })] });
+    const html = await render({ queue: ok, matters: [m({ status: "on_hold" })], view: "table" });
     expect(html).toContain("Open a matter</span>");
     expect(html).toContain('aria-label="Open a matter"');
     expect(html).toContain('id="open-matter"');
@@ -117,7 +117,9 @@ describe("F5: Matters list", () => {
   });
 
   it("the sub-line follows the view", async () => {
-    expect(await render({ queue: ok, matters: [m()] })).toContain(mattersSubtitle("table"));
+    // No view in the address is the Board; the explicit list value is the list.
+    expect(await render({ queue: ok, matters: [m()] })).toContain(mattersSubtitle("board"));
+    expect(await render({ queue: ok, matters: [m()], view: "table" })).toContain(mattersSubtitle("table"));
     expect(await render({ queue: ok, matters: [m()], view: "board" })).toContain(mattersSubtitle("board"));
   });
 });

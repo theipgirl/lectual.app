@@ -38,6 +38,7 @@ import { MATTER_GROUPS_NAV, MATTER_GROUP_ALL, MATTER_GROUP_EMPTY, MATTER_GROUP_L
 import { resolveFirmSession } from "@/lib/firm/session";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import { matterIdsNeedingReview } from "./list-utils";
+import { MATTERS_LIST_VALUE, mattersViewFromParam } from "@/lib/matters/list-href";
 import { LIST_CHIPS, mattersSubtitle, reviewHref, reviewItemByMatter, stageDisplayName, statusNote } from "@/lib/matters/list-view";
 import { OPEN_MATTER_PANEL_ID, OpenMatterButton } from "@/components/matters/OpenMatterButton";
 import { MATTER_TYPE_LABEL } from "./labels";
@@ -55,7 +56,8 @@ export const dynamic = "force-dynamic";
  */
 export default async function MattersPage({ searchParams }: { searchParams: Promise<{ seg?: string; q?: string; view?: string; group?: string }> }) {
   const { seg: segRaw, q, view, group: groupRaw } = await searchParams;
-  const boardView = view === "board";
+  // No `view` opens the Board; the explicit list value (and any other value) is the list, as before.
+  const boardView = mattersViewFromParam(view) === "board";
   const seg: SegmentKey = isSegment(segRaw) ? segRaw : "open";
   const search = (q ?? "").trim().slice(0, 80);
 
@@ -116,7 +118,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
     if (s !== "open") p.set("seg", s);
     const term = next.q ?? search;
     if (term) p.set("q", term);
-    const v = next.view === undefined ? (boardView ? "board" : null) : next.view;
+    const v = next.view === undefined ? (boardView ? null : MATTERS_LIST_VALUE) : next.view;
     if (v) p.set("view", v);
     const qs = p.toString();
     return `/dashboard/matters/${qs ? `?${qs}` : ""}`;
@@ -131,10 +133,10 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
           label: "Search matters",
           placeholder: "Mark, number, owner or serial",
           defaultValue: search,
-          hidden: { ...(boardView ? { view: "board" } : {}), ...(seg !== "open" ? { seg } : {}), ...(grouped && group !== defaultFor(seg) ? { group } : {}) },
+          hidden: { ...(boardView ? {} : { view: MATTERS_LIST_VALUE }), ...(seg !== "open" ? { seg } : {}), ...(grouped && group !== defaultFor(seg) ? { group } : {}) },
           clearHref: href({ q: "" }),
         }}
-        toggle={<ViewToggle value={boardView ? "board" : "table"} hrefFor={(next) => href({ view: next === "board" ? "board" : null })} />}
+        toggle={<ViewToggle value={boardView ? "board" : "table"} hrefFor={(next) => href({ view: next === "board" ? null : MATTERS_LIST_VALUE })} />}
         primary={<OpenMatterButton />}
       />
 

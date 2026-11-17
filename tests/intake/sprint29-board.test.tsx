@@ -124,7 +124,7 @@ function render(params: IntakeSearchParams = {}, props: Props = {}) {
       intakeStages={intakeStages(STAGES)}
       members={[]}
       initialFilters={parseIntakeFilters(params)}
-      initialViewState={parseIntakeViewState(params)}
+      initialViewState={parseIntakeViewState({ view: "table", ...params })}
       time={null}
       now={NOW.toISOString()}
       agentMoves={{ status: "ok", truncated: false }}

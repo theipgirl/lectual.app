@@ -51,31 +51,31 @@ describe("Matters page header", () => {
     expect(head.indexOf(">Board<")).toBeLessThan(head.indexOf(">List<"));
   });
 
-  it("links the table to no view param and the board to ?view=board", async () => {
+  it("links the list to ?view=table and the board to the bare address (the Board is the default)", async () => {
     const head = pageHead(await render());
-    expect(anchor(head, "List")).toMatch(/href="\/dashboard\/matters\/?"/);
-    expect(anchor(head, "List")).not.toContain("view=");
-    expect(anchor(head, "Board")).toMatch(/href="\/dashboard\/matters\/?\?view=board"/);
+    expect(anchor(head, "List")).toMatch(/href="\/dashboard\/matters\/?\?view=table"/);
+    expect(anchor(head, "Board")).toMatch(/href="\/dashboard\/matters\/?"/);
+    expect(anchor(head, "Board")).not.toContain("view=");
   });
 
-  it("marks the table current by default and the board when ?view=board", async () => {
-    const table = pageHead(await render());
+  it("marks the board current by default (and for ?view=board) and the list for ?view=table", async () => {
+    for (const board of [pageHead(await render()), pageHead(await render({ view: "board" }))]) {
+      expect(anchor(board, "Board")).toContain('aria-current="page"');
+      expect(anchor(board, "List")).not.toContain("aria-current");
+    }
+    const table = pageHead(await render({ view: "table" }));
     expect(anchor(table, "List")).toContain('aria-current="page"');
     expect(anchor(table, "Board")).not.toContain("aria-current");
-
-    const board = pageHead(await render({ view: "board" }));
-    expect(anchor(board, "Board")).toContain('aria-current="page"');
-    expect(anchor(board, "List")).not.toContain("aria-current");
   });
 
   it("keeps the segment and the search term when switching view", async () => {
     const head = pageHead(await render({ seg: "court", q: "acme" }));
     expect(anchor(head, "List")).toMatch(/href="[^"]*seg=court/);
     expect(anchor(head, "List")).toMatch(/q=acme/);
-    expect(anchor(head, "List")).not.toContain("view=");
+    expect(anchor(head, "List")).toContain("view=table");
     expect(anchor(head, "Board")).toMatch(/seg=court/);
     expect(anchor(head, "Board")).toMatch(/q=acme/);
-    expect(anchor(head, "Board")).toContain("view=board");
+    expect(anchor(head, "Board")).not.toContain("view=");
   });
 
   it("orders the search (with its Search button), then the toggle, and carries the shared class set", async () => {
@@ -96,8 +96,10 @@ describe("Matters page header", () => {
   });
 
   it("keeps view and seg as hidden fields on the search form", async () => {
-    const head = pageHead(await render({ seg: "court", view: "board" }));
-    expect(head).toMatch(/<input type="hidden" name="view" value="board"/);
+    const head = pageHead(await render({ seg: "court", view: "table" }));
+    expect(head).toMatch(/<input type="hidden" name="view" value="table"/);
+    // On the Board (no view) nothing is carried: the bare address is the Board.
+    expect(pageHead(await render({ seg: "court" }))).not.toMatch(/name="view"/);
     expect(head).toMatch(/<input type="hidden" name="seg" value="court"/);
   });
 });

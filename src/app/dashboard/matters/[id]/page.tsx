@@ -75,6 +75,7 @@ import "@/components/matters/matter-page.css";
 import { stageDisplayName } from "@/lib/matters/list-view";
 import { recordPageTitle } from "@/lib/ui/page-title";
 import { matterDisplayTitle } from "@/lib/matters/display-title";
+import { mattersListHref } from "@/lib/matters/list-href";
 
 export const dynamic = "force-dynamic";
 
@@ -184,7 +185,7 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
 
   return (
     <>
-      <Link href="/dashboard/matters/" className="lx-back">
+      <Link href={mattersListHref()} className="lx-back">
         ← Matters
       </Link>
       <div className="lx-page-head" data-tour="matter-head">

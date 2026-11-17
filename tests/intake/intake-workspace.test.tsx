@@ -91,7 +91,7 @@ function render(leads: Lead[], params: IntakeSearchParams = {}, extra: { viewSta
       intakeStages={intakeStages(STAGES)}
       members={MEMBERS}
       initialFilters={parseIntakeFilters(params)}
-      initialViewState={extra.viewState ?? parseIntakeViewState(params)}
+      initialViewState={extra.viewState ?? parseIntakeViewState({ view: "table", ...params })}
       time={null}
       now={NOW.toISOString()}
     />,

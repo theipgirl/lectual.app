@@ -39,6 +39,7 @@ import {
 import { MergeForm } from "./MergeForm";
 import "../leads.css";
 import "./merge.css";
+import { intakeListHref } from "@/lib/intake/list-href";
 
 export const metadata: Metadata = { title: pageTitle(MERGE_LEADS_TITLE) };
 export const dynamic = "force-dynamic";
@@ -105,7 +106,7 @@ export default async function MergeLeadsPage({ searchParams }: { searchParams: P
 
   const header = <ListHeader title={MERGE_LEADS_TITLE} sub={MERGE_LEADS_SUB} />;
   const back = (
-    <Link href="/dashboard/intake/" className="lx-back">
+    <Link href={intakeListHref()} className="lx-back">
       ← {MERGE_BACK}
     </Link>
   );

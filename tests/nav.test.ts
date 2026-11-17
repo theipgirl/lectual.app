@@ -55,7 +55,7 @@ describe("rail tree (design/Rail.dc.html)", () => {
     expect(intake.childActive).toBe(true);
     expect(intake.kids.find((k) => k.label === "Leads")?.active).toBe(true);
     expect(intake.active).toBe(false);
-    expect(intake.href).toBe("/dashboard/intake/");
+    expect(intake.href).toBe("/dashboard/intake/?view=table");
   });
 
   it("marks Today active only on the home page", () => {
@@ -74,8 +74,8 @@ describe("rail tree (design/Rail.dc.html)", () => {
     const hrefs = Object.fromEntries(groups.flat().filter((x) => x.kids.length).map((e) => [e.label, e.href]));
     expect(hrefs).toEqual({
       Communication: "/dashboard/mail/",
-      Intake: "/dashboard/intake/",
-      "Active matters": "/dashboard/matters/",
+      Intake: "/dashboard/intake/?view=table",
+      "Active matters": "/dashboard/matters/?view=table",
       "AI tools": "/dashboard/copilot/",
     });
     for (const e of groups.flat()) expect(e.href).not.toMatch(/\/reports\//);
@@ -185,7 +185,7 @@ describe("railGroups takes an optional tree (Phase 1 owner view)", () => {
     const tree = [[{ slug: "" }, { slug: "agents" }], [{ label: "More", icon: "M0 0", kids: ["intake", "matters", "brain"] }]];
     expect(railGroups(visibleNav([], "owner"), "/dashboard/matters/", tree).map((g) => g.map((e) => e.key))).toEqual([["today"], ["More"]]);
     const more = railGroups(visibleNav([], "owner"), "/dashboard/matters/", tree)[1][0];
-    expect(more).toMatchObject({ href: "/dashboard/intake/", childActive: true, countKey: null });
+    expect(more).toMatchObject({ href: "/dashboard/intake/?view=table", childActive: true, countKey: null });
     expect(more.kids.map((k) => k.key)).toEqual(["intake", "matters", "brain"]);
   });
 });
