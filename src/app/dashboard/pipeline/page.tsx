@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { loadPipeline } from "@/lib/lifecycle/load";
@@ -7,9 +6,8 @@ import { ListHeader } from "@/components/list-page/ListHeader";
 import { ListToolbar } from "@/components/list-page/ListToolbar";
 import { Chip, FilterChips } from "@/components/list-page/Chips";
 import "@/components/list-page/list-page.css";
-import { BoardCard, LoadFailedLine, Notice, Pill } from "@/components/ui";
+import { BoardCard, BoardColumn, LoadFailedLine, Notice, Pill, ShowingCount } from "@/components/ui";
 import { BLANK, CANT_SHOW, PIPELINE_VIEW_ONLY, TEAMMATE, UNASSIGNED, columnEmpty, searchPlaceholder } from "@/lib/ui/words";
-import { showingOf } from "@/lib/ui/format";
 import "./pipeline.css";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
@@ -121,47 +119,26 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
         {columns.map(({ column, count, cards }) => {
           const isFailed = failed(column);
           const shownCards = cards.slice(0, CARDS_PER_COLUMN);
-          const body = (
-            <>
-              {isFailed ? (
-                <LoadFailedLine refresh={false}>Can&apos;t show this column right now.</LoadFailedLine>
-              ) : cards.length === 0 ? (
-                <p className="lx-board-empty">{q || owner ? "Nothing matches." : columnEmpty(COLUMN_NOUN[column])}</p>
-              ) : (
-                <ul className="lx-board-cards">
-                  {shownCards.map((c) => (
-                    <Card key={c.key} c={c} />
-                  ))}
-                </ul>
-              )}
-              {!isFailed && cards.length > CARDS_PER_COLUMN && (
-                <p className="lx-note lx-showing">{showingOf(CARDS_PER_COLUMN, cards.length)}. Search to narrow.</p>
-              )}
-            </>
-          );
-          const header = (
-            <header>
-              <span className="lx-board-title">
-                <Link href={PRE.includes(column) ? LEADS_BOARD_HREF : MATTERS_BOARD_HREF} data-column-link={column}>
-                  {COLUMN_LABEL[column]}
-                </Link>
-              </span>
-              <span className="lx-board-count">{isFailed ? BLANK : count}</span>
-            </header>
-          );
-          const hint = <p className="lx-board-card-meta">{COLUMN_HINT[column]}</p>;
-          return column === "closed" ? (
-            <details key={column} className="lx-board-col pl-closed" aria-label={COLUMN_LABEL[column]}>
-              <summary>{header}</summary>
-              {hint}
-              {body}
-            </details>
-          ) : (
-            <section key={column} className="lx-board-col" aria-label={COLUMN_LABEL[column]}>
-              {header}
-              {hint}
-              {body}
-            </section>
+          return (
+            <BoardColumn
+              key={column}
+              title={COLUMN_LABEL[column]}
+              titleHref={PRE.includes(column) ? LEADS_BOARD_HREF : MATTERS_BOARD_HREF}
+              titleLinkProps={{ "data-column-link": column }}
+              as={column === "closed" ? "details" : "section"}
+              className={column === "closed" ? "pl-closed" : undefined}
+              count={isFailed ? BLANK : count}
+              note={
+                <>
+                  <p className="lx-board-card-meta">{COLUMN_HINT[column]}</p>
+                  {isFailed && <LoadFailedLine refresh={false}>Can&apos;t show this column right now.</LoadFailedLine>}
+                </>
+              }
+              empty={isFailed ? undefined : q || owner ? "Nothing matches." : columnEmpty(COLUMN_NOUN[column])}
+              foot={isFailed ? null : <ShowingCount shown={CARDS_PER_COLUMN} total={cards.length} />}
+            >
+              {isFailed ? null : shownCards.map((c) => <Card key={c.key} c={c} />)}
+            </BoardColumn>
           );
         })}
       </div>
