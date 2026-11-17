@@ -26,7 +26,7 @@ export function UploadPanel({
           <label className="lx-label" htmlFor="reconcile-sheet">
             Intake sheet (CSV, up to 5 MB)
           </label>
-          <input id="reconcile-sheet" name="sheet" type="file" accept=".csv,text/csv" required />
+          <input id="reconcile-sheet" className="lx-input" name="sheet" type="file" accept=".csv,text/csv" required />
         </div>
         <button type="submit" className="lx-btn lx-btn-pri" disabled={busy}>
           {busy ? "Reading the sheet" : "Compare with the app"}

@@ -79,6 +79,19 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   };
 }
 
+/** The one plain line of record facts under the name: each fact once (a business name that is also the mark is shown once). */
+function leadDetailsLine(lead: { business_name?: string | null; email?: string | null; phone?: string | null; mark_text?: string | null }): string {
+  const seen = new Set<string>();
+  const parts: string[] = [];
+  for (const raw of [lead.business_name, lead.email, lead.phone, lead.mark_text]) {
+    const part = raw?.trim();
+    if (!part || seen.has(part.toLowerCase())) continue;
+    seen.add(part.toLowerCase());
+    parts.push(part);
+  }
+  return parts.join(" · ");
+}
+
 export default async function LeadPage({
   params,
   searchParams,
@@ -222,7 +235,7 @@ export default async function LeadPage({
         back={{ href: intakeListHref(), label: INTAKE_NAME }}
         title={name}
         tour="lead-head"
-        details={[lead.business_name, lead.email, lead.phone, lead.mark_text].filter(Boolean).join(" · ")}
+        details={leadDetailsLine(lead)}
         actions={
           <>
             <ContactActions phone={lead.phone} email={lead.email} />

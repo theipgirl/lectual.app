@@ -76,7 +76,7 @@ import {
   DECK_DEALT_NOW,
   DECK_DECIDED_UNREAD,
   DECK_EVENTS_UNREAD,
-  DECK_NOTHING_HERE,
+  DECK_BOARD_EMPTY,
   DECK_TAG_INTERNAL,
   NOT_SWITCHED_ON,
   dealHeader,
@@ -297,7 +297,7 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
     const columns: BoardColumn[] = [
       {
         title: DECK_COL_NEEDS_YES,
-        empty: DECK_NOTHING_HERE,
+        empty: DECK_BOARD_EMPTY,
         cards: deck.cards.map((c) => {
           const [badge, tone]: [string, BoardCard["badgeTone"]] = c.tag.kind === "internal" ? [DECK_BADGE_INTERNAL, "plain"] : c.closerLook.length > 0 && c.canYes ? [DECK_BADGE_REVIEW, "ox"] : [DECK_BADGE_YES, "warn"];
           return card(c.item, badge, tone, c.handedToMe ? `From ${nameOf(c.handedToMe.by)}` : waitingText(c.item.created_at, now));
@@ -305,19 +305,19 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
       },
       {
         title: DECK_COL_HANDED_OFF,
-        empty: DECK_NOTHING_HERE,
+        empty: DECK_BOARD_EMPTY,
         note: movesUnavailable,
         cards: deck.handedOff.map((c) => card(c.item, nameOf(c.holder.userId), "line", deckWaitingTo(nameOf(c.holder.userId), ageText(c.holder.at, now)))),
       },
       {
         title: DECK_COL_LATER,
-        empty: DECK_NOTHING_HERE,
+        empty: DECK_BOARD_EMPTY,
         note: movesUnavailable,
         cards: deck.later.map((c) => card(c.item, deal.next.label, "line", deckWaitingBack(deal.next.label))),
       },
       {
         title: DECK_COL_DECIDED,
-        empty: DECK_NOTHING_HERE,
+        empty: DECK_BOARD_EMPTY,
         note: decidedReadable ? null : DECK_DECIDED_UNREAD,
         cards: decided.map((i) => card(i, decidedChip(i), decidedTone(i) === "crit" ? "risk" : "ok", decidedSub(i, queuedLabel(i.resolved_at, now, tz)))),
       },

@@ -8,6 +8,7 @@ import { Chip, FilterChips } from "@/components/list-page/Chips";
 import "@/components/list-page/list-page.css";
 import { BoardCard, BoardColumn, LoadFailedLine, Notice, Pill, ShowingCount } from "@/components/ui";
 import { BLANK, CANT_SHOW, PIPELINE_VIEW_ONLY, TEAMMATE, UNASSIGNED, columnEmpty, searchPlaceholder } from "@/lib/ui/words";
+import { stageDisplayName } from "@/lib/matters/list-view";
 import "./pipeline.css";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
@@ -30,7 +31,7 @@ function Card({ c }: { c: PipelineCard }) {
     <BoardCard
       href={c.href}
       title={c.client}
-      meta={[c.mark, c.ref, c.stageLabel].filter(Boolean).join(" · ")}
+      meta={[c.mark, c.ref, c.stageLabel ? stageDisplayName(c.stageLabel) : null].filter(Boolean).join(" · ")}
       chip={c.ageLabel ? <Pill num>{c.ageLabel}</Pill> : undefined}
       foot={c.ownerName ?? (c.ownerId ? TEAMMATE : UNASSIGNED)}
     />

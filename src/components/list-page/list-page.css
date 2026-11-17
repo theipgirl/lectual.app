@@ -229,12 +229,16 @@
 /* ---- Compact top under 640px (Sprint 34): one row of buttons, one scrolling row of chips ---- */
 @media (max-width: 640px) {
   .lp-root { --lp-gap: 10px; }
+  /* The page scrolls as a whole on a phone: the board or table is never squeezed to a short window of its own, so the last card is reachable above the bar. */
+  .lp-root { flex: 0 0 auto; }
   .lp-toolbar { flex-wrap: wrap; gap: 6px; }
   .lp-toolbar-spacer { display: none; }
   .lp-toolbar > :not(.lp-search) { flex: 0 0 auto; }
   /* The view switch, More and the primary action wrap onto a second row rather than scrolling out of sight. */
   .lp-toolbar-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; flex: 1 1 100%; max-width: 100%; }
+  .lp-toolbar > .lp-toolbar-actions { flex: 1 1 100%; }
   .lp-toolbar-actions > * { flex: 0 0 auto; }
+  /* The Board | List switch has a row of its own (its rule is with the switch, in globals.css); Select, More and the primary action sit on the next row. */
   .lp-btn-icon { display: inline; margin-right: 4px; }
   .lp-label-short { display: inline; }
   .lp-label-long { display: none; }

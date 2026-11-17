@@ -61,7 +61,7 @@ describe("Leads list: header labels fit their default column", () => {
 
   it("the table still fits 1280 with the rail open (954px) without the Owner column", () => {
     expect(tableMinWidth(COL_ORDER.filter((c) => c !== "owner"), {})).toBeLessThanOrEqual(948);
-    expect(MENU_COL_WIDTH + NEXT_MIN_WIDTH).toBe(202);
+    expect(MENU_COL_WIDTH + NEXT_MIN_WIDTH).toBe(178);
   });
 
   it("the headers rely on wrapping at words, so the CSS must keep it and must not break inside a word", () => {

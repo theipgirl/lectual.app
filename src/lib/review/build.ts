@@ -1,6 +1,7 @@
 import { stageAgeDisplay } from "@/lib/lifecycle/stage-age";
 import { matterDisplayTitle } from "@/lib/matters/display-title";
 import { isOpenMatter } from "@/lib/matters/docket-summary";
+import { stageDisplayName } from "@/lib/matters/list-view";
 import { normalizeStageName } from "@/lib/lawmatics/stage-map";
 import type { MatterWaitingOn } from "@/lib/matters/stage-rules";
 import { newEnquiryStage } from "@/lib/pipeline/new-enquiry";
@@ -187,7 +188,7 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
       href: `/dashboard/matters/${m.id}/`,
       client,
       mark: display.title !== client ? display.title : null,
-      stageLabel: m.stage ? m.stage.label : null,
+      stageLabel: m.stage ? stageDisplayName(m.stage.label) : null,
       stageId: m.stage_id ?? null,
       stageCode: m.stage ? m.stage.code : null,
       matterType: m.type ?? null,
@@ -235,7 +236,7 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
       href: `/dashboard/leads/${l.id}/`,
       client,
       mark: l.mark_text?.trim() || null,
-      stageLabel: stageName.get(l.current_stage_id) ?? null,
+      stageLabel: stageName.has(l.current_stage_id) ? stageDisplayName(stageName.get(l.current_stage_id) as string) : null,
       stageId: l.current_stage_id,
       stageDays: age.days,
       stageNote: age.days === null ? age.label : null,

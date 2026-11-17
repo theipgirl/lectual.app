@@ -116,7 +116,7 @@ export function DeckFrame({
     <div className="dk-frame dk-frame--cards">
       <div className="dk-left">
         <PageHeader
-          className="dk-pagehead lx-head-split"
+          className="dk-pagehead"
           title={DECK_PAGE_TITLE}
           titleClassName="dk-h1"
           sub={DECK_PAGE_SUB}

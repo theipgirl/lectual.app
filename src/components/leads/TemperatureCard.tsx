@@ -8,15 +8,16 @@ import {
   type LeadSequenceState,
 } from "@/app/dashboard/leads/[id]/sequence-actions";
 import { LANES, LANE_LABEL, suggestionLine, type LaneView, type NextStep } from "@/lib/leads/lane";
-import { temperatureLabel, type EffectiveTemperature } from "@/lib/intake/effective-temperature";
+import type { EffectiveTemperature } from "@/lib/intake/effective-temperature";
+import { temperaturePill } from "@/lib/intake/temperature-pill";
 import { LtnSuggestion } from "@/components/intake/LtnSuggestion";
-import { SAVING } from "@/lib/ui/words";
+import { NOT_RATED, SAVING } from "@/lib/ui/words";
 import { SavedNote } from "@/components/ui/SavedNote";
 
 /**
  * The lead page's ONE temperature card (intake SOP Stage 2), the twin of the
  * Intake table's Temperature column: the chip (a person's is solid, a derived
- * one is dashed and says "Suggested"), the reason, what the activity says now
+ * one says "suggested" in the same pill, no dashes), the reason, what the activity says now
  * when a person's lane has gone stale, the triage SUGGESTION labelled as one,
  * who set the lane and when, the control to set or clear it, the next step the
  * lane points at, and the Long-Term Nurture suggestion.
@@ -47,6 +48,8 @@ export function TemperatureCard(props: {
   const [laneState, laneAction, lanePending] = useActionState<LeadSequenceState, FormData>(setLeadLaneAction, {});
   const [nurtureState, nurtureAction, nurturePending] = useActionState<LeadSequenceState, FormData>(addToNurtureAction, {});
   const suggestion = suggestionLine(view);
+  // The one temperature pill the Intake list and board use: filled for a person's level, "Hot · suggested" (no dashes) for a derived one.
+  const pill = temperaturePill(temperature);
 
   return (
     <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }} aria-labelledby="temperature-heading">
@@ -55,9 +58,10 @@ export function TemperatureCard(props: {
           Temperature
         </h2>
         <span
-          className={`lx-pill ${temperature.value === "hot" ? "lx-pill-risk" : temperature.value === "warm" ? "lx-pill-warn" : "lx-pill-mute"}${person ? "" : " lx-pill-suggested"}`}
+          className={`lx-pill ${temperature.value === "hot" ? "lx-pill-risk" : temperature.value === "warm" ? "lx-pill-warn" : "lx-pill-mute"}`}
+          {...(pill?.suggested ? { "data-suggested": "", "aria-label": pill.ariaLabel } : {})}
         >
-          {temperatureLabel(temperature)}
+          {pill ? pill.text : NOT_RATED}
         </span>
         {person && (
           <span className="lx-note">

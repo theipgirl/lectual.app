@@ -96,6 +96,10 @@
   .ix-sheet .sheet-tbl td:empty, .ix-sheet .sheet-tbl td.ix-asst-td:not(:has(.intake-agent-chip)) { display: none; }
   .ix-sheet .sheet-tbl td.ix-lead-td { display: block; text-align: left; }
   .ix-next { -webkit-line-clamp: 1; }
+  /* The row's "..." sits beside the name at the top right of its card, not alone at the foot. */
+  .ix-sheet .sheet-tbl.lx-stack tr { position: relative; }
+  .ix-sheet .sheet-tbl td.ix-lead-td { padding-right: 52px; }
+  .ix-sheet .sheet-tbl td.ix-menu-td { position: absolute; top: 4px; right: 4px; width: auto; padding: 0; }
   .intake-root .lp-toolbar-actions .lp-btn { padding: 0 6px; }
   .intake-root .lp-toolbar-actions { gap: 4px; }
   .ix-sets, .ix-filters { flex-wrap: wrap; }

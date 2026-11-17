@@ -99,6 +99,8 @@ export function BoardCard({
   id?: string;
   children?: React.ReactNode;
 } & Omit<React.LiHTMLAttributes<HTMLLIElement>, "title">) {
+  // A card with a menu but no foot line puts the menu beside its chip (or its name) so no empty strip is left at the foot.
+  const menuRow = Boolean(menu && !foot && chip);
   return (
     <li className={["lx-board-card", className].filter(Boolean).join(" ")} data-tone={tone} id={id} {...rest}>
       <div className="lx-board-card-top">
@@ -107,12 +109,19 @@ export function BoardCard({
             {title}
           </Link>
         </span>
-        {chip}
+        {chip && menuRow ? null : chip}
+        {menu && !foot && !chip ? menu : null}
       </div>
       {meta ? <div className="lx-board-card-meta">{meta}</div> : null}
       {step ? <div className="lx-board-card-step">{step}</div> : null}
+      {menuRow ? (
+        <div className="lx-board-card-chiprow">
+          {chip}
+          {menu}
+        </div>
+      ) : null}
       {children}
-      {foot || menu ? (
+      {foot ? (
         <div className="lx-board-card-foot">
           <span>{foot}</span>
           {menu}

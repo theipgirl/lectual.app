@@ -230,23 +230,23 @@ a:focus-visible {
 .lx-fieldset { border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--pad-card); margin: 0; display: grid; gap: 10px; min-width: 0; }
 /* A file input: the "Choose file" button is the shared secondary button. */
 input[type="file"].lx-input { padding: 6px 8px; font-size: var(--fs-2); color: var(--body); }
-input[type="file"].lx-input::file-selector-button {
+input[type="file"]::file-selector-button {
   font: inherit;
   font-size: var(--fs-2);
   font-weight: 500;
   height: var(--ctl-h);
   padding: 0 14px;
   margin-right: 12px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-3);
   border-radius: var(--r-md);
   background-color: var(--card);
   color: var(--ink);
   cursor: pointer;
 }
-input[type="file"].lx-input:disabled::file-selector-button { cursor: default; opacity: 0.5; }
+input[type="file"]:hover:not(:disabled)::file-selector-button { background-color: var(--well); }
+input[type="file"]:disabled::file-selector-button { cursor: default; opacity: 0.5; }
 /* A pill with a note under it, in one table cell (the cell is a flex row on a phone, so side by side would clip the pill). */
 .lx-cell-stack { display: grid; gap: 4px; justify-items: start; min-width: 0; }
-.lx-pill-suggested { border: 1px dashed currentColor; background: transparent; font-style: italic; }
 .lx-suggest-rule { border-left: 3px dashed var(--line); padding-left: 12px; }
 .lx-upl {
   display: flex;
@@ -831,7 +831,7 @@ select:not([multiple]):not([size]):disabled {
 .lx-agent.off .lx-agent-head,
 .lx-agent.off .lx-agent-desc,
 .lx-agent.off .lx-agent-slot-autonomy {
-  opacity: 0.62;
+  opacity: 0.86;
 }
 .lx-agent-head { grid-area: head; }
 .lx-agent-toggle { grid-area: toggle; }
@@ -1321,15 +1321,18 @@ button.lx-back { background: none; border: 0; padding: 0; font-family: inherit; 
 .lx-board-card[data-tone="mute"] { box-shadow: inset 3px 0 0 var(--muted); }
 .lx-board-card[data-tone="ok"] { box-shadow: inset 3px 0 0 var(--ok); }
 .lx-board-card[data-tone="ox"] { box-shadow: inset 3px 0 0 var(--ox); }
-.lx-board-card-top { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
-.lx-board-card-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-3); font-weight: 600; color: var(--ink); }
+.lx-board-card-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; min-width: 0; }
+/* The name wraps to two lines (never cut to a few letters); a chip that does not fit beside it drops to its own line under it. */
+.lx-board-card-title { flex: 1 1 9em; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; font-size: var(--fs-3); font-weight: 600; color: var(--ink); }
 .lx-board-card-title a { color: inherit; }
 .lx-board-card-title a:hover { text-decoration: underline; }
-.lx-board-card-top > .lx-pill, .lx-board-card-top > .lp-pill { margin-left: auto; flex: 0 0 auto; }
+.lx-board-card-top > .lx-pill, .lx-board-card-top > .lp-pill { margin-left: auto; flex: 0 0 auto; max-width: 100%; }
 .lx-board-note { margin: 0; font-size: var(--fs-1); color: var(--muted); }
-.lx-board-card-meta { font-size: var(--fs-1); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lx-board-card-meta { font-size: var(--fs-1); color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .lx-board-card-step { font-size: var(--fs-2); color: var(--body); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .lx-board-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 24px; }
+.lx-board-card-chiprow { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.lx-board-card-top > .lx-board-move { margin-left: auto; flex: 0 0 auto; align-self: center; }
 .lx-board-menu { width: 28px; height: 28px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--muted); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .lx-board-menu:hover { background: var(--well); color: var(--ink); }
 /* The card's title link covers the whole card (.lx-rowlink::after); the menu and the foot's own links and buttons sit above it. */
@@ -1404,7 +1407,7 @@ span.lx-tag { padding-right: 10px; }
   min-width: 0;
 }
 a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
-.lx-cal-item.is-deadline { border-left-color: var(--ox); background: var(--tint-ox); }
+.lx-cal-item.is-deadline { border-left-color: var(--muted); background: var(--well); }
 .lx-cal-item.is-event { border-left-color: var(--ok); background: var(--tint-ok); }
 .lx-cal-item.is-task { border-left-color: var(--warn); background: var(--tint-warn); }
 .lx-cal-item.is-overdue { border-left-color: var(--wine); background: var(--tint-wine); color: var(--wine); }
@@ -1422,7 +1425,7 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
 .lx-cal-empty { color: var(--muted); font-size: var(--fs-1); text-align: center; padding-top: 6px; }
 .lx-cal-key { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin: 0 4px 0 10px; vertical-align: -1px; }
 .lx-cal-key:first-child { margin-left: 0; }
-.lx-cal-key.is-deadline { background: var(--ox); }
+.lx-cal-key.is-deadline { background: var(--muted); }
 .lx-cal-key.is-event { background: var(--ok); }
 .lx-cal-key.is-task { background: var(--warn); }
 .lx-cal-key.is-overdue { background: var(--wine); }
@@ -1431,7 +1434,7 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
   .lx-cal-day { min-height: 64px; padding: 4px 3px; }
   .lx-cal-month .lx-cal-item { font-size: 0; padding: 0; height: 6px; border-left-width: 0; border-radius: 3px; }
   .lx-cal-month .lx-cal-time { display: none; }
-  .lx-cal-month .lx-cal-item.is-deadline { background: var(--ox); }
+  .lx-cal-month .lx-cal-item.is-deadline { background: var(--muted); }
   .lx-cal-month .lx-cal-item.is-event { background: var(--ok); }
   .lx-cal-month .lx-cal-item.is-task { background: var(--warn); }
   .lx-cal-month .lx-cal-item.is-overdue { background: var(--wine); }
@@ -1939,16 +1942,19 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
   .lx-board { scroll-snap-type: x mandatory; }
   .lx-board-col { flex: 0 0 calc(100% - 28px); min-width: 0; scroll-snap-align: start; }
   .lx-page-head-list .lx-label { display: none; }
+  /* The sub-line wraps (up to three lines) instead of ending in "...". */
   .lx-page-head .lx-sub,
   .lp-header .lp-sub {
     margin: 2px 0 0;
     font-size: var(--fs-2);
     line-height: 1.4;
     max-width: 100%;
-    white-space: nowrap;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
     overflow: hidden;
-    text-overflow: ellipsis;
-    text-wrap: nowrap;
+    text-wrap: pretty;
   }
   .lx-page-head .lx-btn,
   .lx-head-actions .lx-btn { white-space: nowrap; }
@@ -1956,6 +1962,10 @@ a.lx-cal-item:hover { text-decoration: none; filter: brightness(0.97); }
   .lx-chips { flex-wrap: wrap; }
   /* A pick-one switch with long options (the consult outcome) wraps inside the screen instead of widening its card. */
   .vs-switch { flex-wrap: wrap; height: auto; min-height: var(--ctl-h); }
+  /* A view switch (Cards | List | Board) is never broken into a blob: it keeps one row; what sits beside it wraps instead. */
+  .vs-switch[data-view-switch] { flex-wrap: nowrap; }
+  .lp-toolbar-actions > .vs-switch { flex: 1 1 100%; justify-content: stretch; }
+  .lp-toolbar-actions > .vs-switch > * { flex: 1 1 0; }
   .vs-switch:has(> :nth-child(4)) { border-radius: var(--r-lg); }
 }
 

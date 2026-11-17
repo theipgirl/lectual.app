@@ -201,7 +201,7 @@ a.dk-move--open { font-size: var(--fs-3); }
   .dk-left { display: none; }
   .dk-zone { border: 0; border-radius: 0; background: transparent; padding: 0; margin: 0; }
   .dk-zone-col { width: 100%; gap: 10px; }
-  .dk-phone-switch { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .dk-phone-switch { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
   .dk-zone-head { display: block; }
   .dk-zone-meta { flex-direction: row; justify-content: space-between; align-items: center; width: 100%; margin-top: 6px; }
   .dk-zone-meta .dk-deal-btn { display: none; }

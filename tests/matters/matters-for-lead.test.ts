@@ -78,7 +78,7 @@ describe("LeadMattersLine", () => {
     expect(html).toMatch(/href="\/dashboard\/matters\/m-1\/?"/);
     expect(html).toMatch(/href="\/dashboard\/matters\/m-2\/?"/);
     expect(html).toContain(">SANKOFA</a>");
-    expect(text(html)).toContain("TM-2026-0001 · 3. Awaiting filing");
+    expect(text(html)).toContain("TM-2026-0001 · Awaiting filing");
     expect(html).not.toContain("No matters yet.");
   });
 

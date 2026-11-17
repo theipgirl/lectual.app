@@ -2,7 +2,7 @@ import Link from "next/link";
 import { LoadFailedLine } from "@/components/ui/LoadFailed";
 import { Pill } from "@/components/ui/Pill";
 import { SheetCard, SheetScroll, SheetTable } from "@/components/ui/SheetTable";
-import { BLANK, DECK_DECIDED_UNREAD, DECK_FOR, DECK_NOTHING_HERE } from "@/lib/ui/words";
+import { BLANK, DECK_DECIDED_UNREAD, DECK_FOR, DECK_LIST_EMPTY } from "@/lib/ui/words";
 import { chipPillTone, type BoardCard, type ListRow } from "./deck-rows";
 
 /** Everything waiting, as a table (a stack of cards on a phone: the sheet table kit's own phone rule). */
@@ -12,7 +12,7 @@ export function DeckList({ rows, decidedReadable }: { rows: ListRow[]; decidedRe
       {!decidedReadable && <LoadFailedLine refresh={false}>{DECK_DECIDED_UNREAD}</LoadFailedLine>}
       {rows.length === 0 ? (
         <div className="lx-card lx-state-card">
-          <p className="lx-note">{DECK_NOTHING_HERE}</p>
+          <p className="lx-note">{DECK_LIST_EMPTY}</p>
         </div>
       ) : (
         <SheetCard>
