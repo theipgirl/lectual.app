@@ -10,6 +10,10 @@ import { SyncMeetingsControl } from "@/components/meetings/SyncMeetingsButton";
 import { canSyncMeetings, syncControl } from "@/lib/meetings/sync-access";
 import { reconnectSentence } from "@/lib/meetings/reconnect-copy";
 import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
+import { getFirmTimeZone } from "@/lib/org/profile";
+import { EmptyState, LoadFailedCard, Notice, PageHeader, Pill, SheetCard, SheetScroll, SheetTable } from "@/components/ui";
+import { Chip, FilterChips } from "@/components/list-page/Chips";
+import { BLANK } from "@/lib/ui/words";
 
 export const metadata: Metadata = { title: pageTitle("Meetings") };
 
@@ -41,6 +45,7 @@ export default async function MeetingsPage({ searchParams }: { searchParams: Pro
   );
   const connected = conns.ok ? conns.connections : [];
   const canManage = canSyncMeetings(session.role);
+  const tz = await getFirmTimeZone();
 
   const href = (next: { provider?: string | null; link?: string | null }) => {
     const p = new URLSearchParams();
@@ -61,80 +66,68 @@ export default async function MeetingsPage({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <div className="lx-page-head lx-page-head-list">
-        <div style={{ flex: 1, minWidth: 260 }}>
-          <div className="lx-label">Communication</div>
-          <h1 className="lx-h1" data-tour="meetings-head">Meetings</h1>
-          <p className="lx-sub">Consults and calls recorded in Fathom or Zoom, with the summary, the transcript and the client they were about.</p>
-        </div>
-        <div className="lx-head-actions">
-          <SyncMeetingsControl control={syncControl(session.role, conns.ok ? connected : null)} />
-          {(connected.length > 0 || !canSyncMeetings(session.role)) && (
-            <Link href="/dashboard/settings/integrations/meetings/" className="lx-btn lx-btn-sec lx-btn-sm">
-              {connected.length ? "Manage sources" : "Connect Fathom or Zoom"}
-            </Link>
-          )}
-        </div>
-      </div>
+      <PageHeader
+        title="Meetings"
+        tour="meetings-head"
+        sub="Consults and calls recorded in Fathom or Zoom, with the summary, the transcript and the client they were about."
+        actions={
+          <>
+            <SyncMeetingsControl control={syncControl(session.role, conns.ok ? connected : null)} />
+            {(connected.length > 0 || !canSyncMeetings(session.role)) && (
+              <Link href="/dashboard/settings/integrations/meetings/" className="lx-btn lx-btn-sec">
+                {connected.length ? "Manage sources" : "Connect Fathom or Zoom"}
+              </Link>
+            )}
+          </>
+        }
+      />
 
-      <nav aria-label="Filter meetings" className="lx-chips">
+      <FilterChips as="nav" label="Filter meetings">
         {chips.map((c) => (
-          <Link key={c.key} href={c.to} aria-current={c.on ? "page" : undefined}>
+          <Chip key={c.key} href={c.to} active={c.on}>
             {c.label}
-          </Link>
+          </Chip>
         ))}
-      </nav>
+      </FilterChips>
 
       {conns.ok && connected.some((c) => c.status !== "active") && (
-        <div role="alert" className="lx-banner lx-banner-risk">
+        <Notice tone="risk" role="alert">
           {reconnectSentence(connected.filter((c) => c.status !== "active").map((c) => PROVIDER_LABEL[c.provider]))}{" "}
           {canManage ? <Link href="/dashboard/settings/integrations/meetings/">Reconnect</Link> : `${ADMIN_TIER_PHRASE} can reconnect it.`}
-        </div>
+        </Notice>
       )}
 
       {read.status === "unavailable" ? (
-        <div className="lx-card lx-empty-card">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>Meetings couldn&apos;t be loaded</h2>
-          <p className="lx-note" style={{ margin: 0 }}>Can&apos;t show this right now. Refresh to try again.</p>
-        </div>
+        <LoadFailedCard what="meetings" />
       ) : meetings.length === 0 ? (
-        <div className="lx-card lx-empty-card">
-          {filtered ? (
-            <>
-              <h2 className="lx-h2" style={{ fontSize: 25 }}>Nothing matches</h2>
-              <p className="lx-note" style={{ margin: 0 }}>Try another filter.</p>
-            </>
-          ) : connected.length > 0 ? (
-            <>
-              <h2 className="lx-h2" style={{ fontSize: 25 }}>No meetings imported yet</h2>
-              <p className="lx-note" style={{ margin: 0 }}>
-                {connected.map((c) => PROVIDER_LABEL[c.provider]).join(" and ")} {connected.length > 1 ? "are" : "is"} connected. New recordings come in once a
-                day{canManage ? ", or press Import recent meetings in Settings → Integrations → Meetings" : ""}.
-              </p>
-            </>
-          ) : (
-            <>
-              <h2 className="lx-h2" style={{ fontSize: 25 }}>Bring in your consult recordings</h2>
-              <p className="lx-note" style={{ margin: 0 }}>
-                Connect your firm&apos;s Fathom account (with an API key from Fathom → Settings → API Access) or sign in to Zoom. Each recorded meeting
-                arrives with its summary and transcript, and is filed on the client whose email was on the invite.
-              </p>
-              {canManage ? (
-                <div>
-                  <Link href="/dashboard/settings/integrations/meetings/" className="lx-btn lx-btn-pri lx-btn-sm">
-                    Connect Fathom or Zoom
-                  </Link>
-                </div>
+        filtered ? (
+          <EmptyState title="Nothing matches">Try another filter.</EmptyState>
+        ) : connected.length > 0 ? (
+          <EmptyState title="No meetings imported yet">
+            {connected.map((c) => PROVIDER_LABEL[c.provider]).join(" and ")} {connected.length > 1 ? "are" : "is"} connected. New recordings come in once a day
+            {canManage ? ", or press Import recent meetings in Settings → Integrations → Meetings" : ""}.
+          </EmptyState>
+        ) : (
+          <EmptyState
+            title="Bring in your consult recordings"
+            action={
+              canManage ? (
+                <Link href="/dashboard/settings/integrations/meetings/" className="lx-btn lx-btn-pri">
+                  Connect Fathom or Zoom
+                </Link>
               ) : (
-                <p className="lx-note" style={{ margin: 0 }}>{ADMIN_TIER_PHRASE} can connect it in Settings → Integrations.</p>
-              )}
-            </>
-          )}
-        </div>
+                <p className="lx-note">{ADMIN_TIER_PHRASE} can connect it in Settings → Integrations.</p>
+              )
+            }
+          >
+            Connect your firm&apos;s Fathom account (with an API key from Fathom → Settings → API Access) or sign in to Zoom. Each recorded meeting arrives with
+            its summary and transcript, and is filed on the client whose email was on the invite.
+          </EmptyState>
+        )
       ) : (
-        <section className="lx-card" aria-label="Meetings">
-          <div style={{ overflow: "auto" }}>
-            <table className="lx-tbl">
+        <SheetCard as="section" aria-label="Meetings">
+          <SheetScroll>
+            <SheetTable minWidth={760}>
               <thead>
                 <tr>
                   <th>When</th>
@@ -151,8 +144,8 @@ export default async function MeetingsPage({ searchParams }: { searchParams: Pro
                   const shown = m.attendees.slice(0, 3).map((a) => a.name || a.email).join(", ");
                   return (
                     <tr key={m.id}>
-                      <td className="lx-num" style={{ whiteSpace: "nowrap" }}>
-                        {formatWhen(m.started_at)}
+                      <td data-label="When">
+                        {formatWhen(m.started_at, tz)}
                         <div className="lx-note">{formatDuration(m.duration_seconds)}</div>
                       </td>
                       <td className="pri">
@@ -160,28 +153,28 @@ export default async function MeetingsPage({ searchParams }: { searchParams: Pro
                           {m.title}
                         </Link>
                       </td>
-                      <td>{PROVIDER_LABEL[m.provider]}</td>
-                      <td>
-                        {shown || <span className="lx-note">—</span>}
+                      <td data-label="Source">{PROVIDER_LABEL[m.provider]}</td>
+                      <td data-label="Attendees">
+                        {shown || <span className="lx-note">{BLANK}</span>}
                         {m.attendees.length > 3 && <span className="lx-note"> +{m.attendees.length - 3}</span>}
                       </td>
-                      <td>
+                      <td data-label="Client">
                         {client ? (
                           <Link href={m.lead_id ? `/dashboard/leads/${m.lead_id}/` : `/dashboard/matters/${m.matter_id}/`}>{client}</Link>
                         ) : m.suggested_lead_id || m.suggested_matter_id ? (
-                          <span className="lx-pill lx-pill-warn">Suggested</span>
+                          <Pill tone="warn">Suggested</Pill>
                         ) : (
                           <span className="lx-note">Not linked</span>
                         )}
                       </td>
-                      <td>{m.has_transcript ? <span className="lx-pill lx-pill-ok">Yes</span> : <span className="lx-note">No</span>}</td>
+                      <td data-label="Transcript">{m.has_transcript ? <Pill tone="ok">Yes</Pill> : <span className="lx-note">No</span>}</td>
                     </tr>
                   );
                 })}
               </tbody>
-            </table>
-          </div>
-        </section>
+            </SheetTable>
+          </SheetScroll>
+        </SheetCard>
       )}
     </>
   );

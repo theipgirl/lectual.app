@@ -1,0 +1,5 @@
+/* Notifications: the few rules the shared classes do not cover. Tokens only. */
+.lx-bell-msg { margin: 0; padding: 14px 16px; }
+.lx-bell-head-end { justify-content: flex-end; }
+.lx-notif-list-full { max-height: none; }
+.lx-notif-error { color: var(--wine); }

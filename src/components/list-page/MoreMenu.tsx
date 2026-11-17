@@ -14,11 +14,11 @@ export type MoreItem =
  * "More": the rare actions of a page. A link item is a plain link, so its URL and its role gating stay exactly where the page
  * decided them. An action item is a button. Always labelled "More", always the same secondary button. An empty list draws nothing.
  */
-export function MoreMenu({ items, label = MORE_NAME, align = "right" }: { items: readonly MoreItem[]; label?: string; align?: "left" | "right" }) {
+export function MoreMenu({ items, label = MORE_NAME, align = "right", ariaLabel }: { items: readonly MoreItem[]; label?: string; align?: "left" | "right"; ariaLabel?: string }) {
   if (items.length === 0) return null;
   return (
     <Popover
-      label="More actions"
+      label={ariaLabel ?? "More actions"}
       align={align}
       width={200}
       trigger={({ onClick, ref, ...aria }) => (

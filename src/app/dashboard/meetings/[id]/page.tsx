@@ -11,9 +11,23 @@ import { PROVIDER_LABEL } from "@/lib/meetings/types";
 import { DraftFollowUpButton, DraftProposalButton, LinkMeetingForm } from "@/components/meetings/MeetingForms";
 import type { Metadata } from "next";
 import { meetingBackHref } from "@/lib/proposals/consult-row";
-import { pageTitle } from "@/lib/ui/page-title";
+import { recordPageTitle } from "@/lib/ui/page-title";
+import { getFirmTimeZone } from "@/lib/org/profile";
+import { BackLink } from "@/components/ui/PageHeader";
+import { LoadFailedCard } from "@/components/ui/LoadFailed";
+import { PageHeader } from "@/components/ui";
+import "@/components/meetings/meetings.css";
 
-export const metadata: Metadata = { title: pageTitle("Meeting") };
+/** Tab title: the meeting's own title through the scoped getter; "Meeting" when the read fails or finds nothing. */
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  return {
+    title: await recordPageTitle(async () => {
+      const read = await getMeeting(id);
+      return read.status === "ok" ? (read.meeting?.title ?? null) : null;
+    }, "Meeting"),
+  };
+}
 
 export const dynamic = "force-dynamic";
 
@@ -39,18 +53,14 @@ export default async function MeetingPage({
   if (read.status === "unavailable") {
     return (
       <>
-        <Link href="/dashboard/meetings/" className="lx-back">
-          ← Meetings
-        </Link>
-        <div className="lx-card lx-empty-card">
-          <h1 className="lx-h2" style={{ fontSize: 25 }}>This meeting couldn&apos;t be loaded</h1>
-          <p className="lx-note" style={{ margin: 0 }}>Can&apos;t show this right now. Refresh to try again.</p>
-        </div>
+        <BackLink href={backToProposals ?? "/dashboard/meetings/"} label={backToProposals ? "Proposals" : "Meetings"} />
+        <LoadFailedCard what="this meeting" />
       </>
     );
   }
   const m = read.meeting;
   if (!m) notFound();
+  const tz = await getFirmTimeZone();
 
   const canWrite = CAN_WRITE_LEAD.includes(session.role);
   const [hasAgents, hasProposals, leads, matters, labels] = await Promise.all([
@@ -68,46 +78,37 @@ export default async function MeetingPage({
 
   return (
     <>
-      {backToProposals && (
-        <Link href={backToProposals} className="lx-back">
-          ← Back to Proposals
-        </Link>
-      )}
-      <Link href="/dashboard/meetings/" className="lx-back">
-        ← Meetings
-      </Link>
-      <div className="lx-page-head">
-        <div style={{ flex: 1, minWidth: 260 }}>
-          <div className="lx-label">
-            {PROVIDER_LABEL[m.provider]} · {formatWhen(m.started_at)} · {formatDuration(m.duration_seconds)}
-          </div>
-          <h1 className="lx-h1">{m.title}</h1>
-          <p className="lx-note" style={{ margin: "6px 0 0" }}>Imported {relativeTime(m.imported_at)}</p>
-        </div>
-        {m.share_url && (
-          <a href={m.share_url} target="_blank" rel="noopener noreferrer" className="lx-btn lx-btn-sec lx-btn-sm">
-            Open in {PROVIDER_LABEL[m.provider]} ↗
-          </a>
-        )}
-      </div>
+      <PageHeader
+        back={backToProposals ? { href: backToProposals, label: "Proposals" } : { href: "/dashboard/meetings/", label: "Meetings" }}
+        title={m.title}
+        details={`${PROVIDER_LABEL[m.provider]} · ${formatWhen(m.started_at, tz)} · ${formatDuration(m.duration_seconds)}`}
+        sub={`Imported ${relativeTime(m.imported_at, undefined, tz)}`}
+        actions={
+          m.share_url ? (
+            <a href={m.share_url} target="_blank" rel="noopener noreferrer" className="lx-btn lx-btn-sec">
+              Open in {PROVIDER_LABEL[m.provider]} ↗
+            </a>
+          ) : undefined
+        }
+      />
 
       <div className="lx-split">
         <div className="lx-col">
-          <section className="lx-card" style={{ padding: 18 }} aria-labelledby="summary-title">
-            <h2 id="summary-title" className="lx-h2" style={{ fontSize: 23, marginBottom: 10 }}>
+          <section className="lx-card lx-pad lx-meet-card" aria-labelledby="summary-title">
+            <h2 id="summary-title" className="lx-h3">
               Summary
             </h2>
             {m.summary ? (
               <p className="lx-summary">{m.summary}</p>
             ) : (
-              <p className="lx-note" style={{ margin: 0 }}>
+              <p className="lx-note">
                 {PROVIDER_LABEL[m.provider]}{" "}didn&apos;t provide a summary for this meeting.
               </p>
             )}
           </section>
 
-          <section className="lx-card" style={{ padding: 18 }} aria-labelledby="transcript-title">
-            <h2 id="transcript-title" className="lx-h2" style={{ fontSize: 23, marginBottom: 10 }}>
+          <section className="lx-card lx-pad lx-meet-card" aria-labelledby="transcript-title">
+            <h2 id="transcript-title" className="lx-h3">
               Transcript
             </h2>
             {m.transcript.length > 0 ? (
@@ -123,14 +124,14 @@ export default async function MeetingPage({
                 ))}
               </div>
             ) : (
-              <p className="lx-note" style={{ margin: 0 }}>
+              <p className="lx-note">
                 No transcript yet. {PROVIDER_LABEL[m.provider]} may still be processing it; the next import picks it up.
               </p>
             )}
           </section>
         </div>
 
-        <aside className="lx-card lx-aside" style={{ width: 340 }}>
+        <aside className="lx-card lx-aside">
           <div className="lx-label">Client</div>
           {canWrite ? (
             // The form carries the "Linked to ..." text itself, so the linked state and its Change button are one thing.
@@ -149,13 +150,13 @@ export default async function MeetingPage({
               note={m.link_source === "auto" ? "Filed automatically from an attendee's email." : "Linked by your team."}
             />
           ) : m.lead_id || m.matter_id ? (
-            <div style={{ display: "grid", gap: 4 }}>
+            <div className="lx-meet-links">
               {m.lead_id && <Link href={`/dashboard/leads/${m.lead_id}/`}>{labels.leads.get(m.lead_id) ?? "Lead"}</Link>}
               {m.matter_id && <Link href={`/dashboard/matters/${m.matter_id}/`}>{labels.matters.get(m.matter_id) ?? "Matter"}</Link>}
               <span className="lx-note">{m.link_source === "auto" ? "Filed automatically from an attendee's email." : "Linked by your team."}</span>
             </div>
           ) : (
-            <p className="lx-note" style={{ margin: 0 }}>Not linked to a lead or matter.</p>
+            <p className="lx-note">Not linked to a lead or matter.</p>
           )}
 
           {canWrite && hasAgents && (
@@ -171,13 +172,13 @@ export default async function MeetingPage({
             <ul className="lx-attendees">
               {m.attendees.map((a, i) => (
                 <li key={`${a.email ?? a.name}-${i}`}>
-                  <span style={{ color: "var(--ink)" }}>{a.name || a.email}</span>
+                  <span className="lx-meet-attendee">{a.name || a.email}</span>
                   {a.email && a.name && <span className="lx-note">{a.email}</span>}
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="lx-note" style={{ margin: 0 }}>
+            <p className="lx-note">
               {m.provider === "zoom" ? "Zoom doesn't list attendees for recordings." : "No attendees recorded."}
             </p>
           )}

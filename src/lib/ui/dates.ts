@@ -139,3 +139,17 @@ export function formatRelative(input: DateInput | null | undefined, opts: { tz: 
   }
   return formatDay(input, opts);
 }
+
+const LONG_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"] as const;
+
+/** "September 2026" for a civil day ("YYYY-MM-DD"); null for anything else. */
+export function formatMonthYear(civil: string): string | null {
+  const c = parseCivil(civil);
+  return c ? `${LONG_MONTHS[c.m - 1]} ${c.y}` : null;
+}
+
+/** "Sep 20" for a civil day, never with a year; null for anything else. */
+export function formatMonthDay(civil: string): string | null {
+  const c = parseCivil(civil);
+  return c ? `${MONTHS[c.m - 1]} ${c.d}` : null;
+}

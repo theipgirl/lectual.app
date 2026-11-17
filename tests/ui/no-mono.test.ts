@@ -10,9 +10,8 @@ import { ceilingCheck, cssFiles, read, stripCssComments, tsxFiles } from "./_des
 const MONO = /var\(--mono\)|monospace|courier|--font-courier-prime|--font-mono|jetbrains/i;
 const CSS: Record<string, number> = {
   "src/app/dashboard/brain/brain.css": 1,
-  "src/app/dashboard/campaigns/campaigns.css": 1,
   "src/app/dashboard/copilot/copilot.css": 1,
-  "src/app/dashboard/forms/forms.css": 13,
+  "src/app/dashboard/forms/forms.css": 1,
   "src/app/dashboard/intake/intake.css": 2,
   "src/app/dashboard/intake/reconcile/reconcile.css": 1,
   "src/components/copilot/copilot.css": 4,

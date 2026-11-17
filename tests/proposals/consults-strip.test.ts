@@ -225,7 +225,7 @@ describe("which meetings are listed, and the meeting page's back link", () => {
   it("the meeting page builds the link from meetingBackHref only", () => {
     const src = readFileSync(path.join(__dirname, "../../src/app/dashboard/meetings/[id]/page.tsx"), "utf8");
     expect(src).toContain("meetingBackHref((await searchParams)?.from)");
-    expect(src).toContain("← Back to Proposals");
+    expect(src).toContain('label: "Proposals"');
     expect(src).not.toMatch(/href=\{[^}]*searchParams/);
   });
 });

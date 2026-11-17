@@ -54,7 +54,6 @@ describe("stacked cards under 640px (V1)", () => {
   it("the minimum widths apply only above the stacking widths", () => {
     expect(globals).toMatch(/@media \(min-width: 641px\) \{\s*\.lx-band \.lx-tbl \{ table-layout: fixed; min-width: 760px; \}/);
     expect(listPage).toMatch(/@media \(min-width: 641px\) \{\s*\.lp-table-min \{ min-width: 1000px; \}/);
-    expect(read("src/app/dashboard/forms/forms.css")).toMatch(/@media \(min-width: 641px\) \{\s*\.ifm-tbl \{\s*min-width: 760px;/);
     for (const f of ["src/app/dashboard/documents/page.tsx", "src/app/dashboard/intake/_components/IntakeTable.tsx"]) expect(read(f), f).not.toMatch(/minWidth:\s*(720|1000|MIN_TABLE_WIDTH)/);
   });
 
@@ -153,7 +152,7 @@ describe("the Copilot launcher and a sticky Save bar (P4)", () => {
     expect(media(copilot, "max-width: 640px")).toContain("body:has([data-save-bar]) .cpd-launcher { display: none; }");
   });
   it("the sticky Unsaved changes bar is marked", () => {
-    expect(read("src/app/dashboard/forms/_components/IntakeFormsWorkspace.tsx")).toContain('className="ifm-unsaved" data-save-bar');
+    expect(read("src/app/dashboard/forms/_components/IntakeFormsWorkspace.tsx")).toContain('className="lx-unsaved" data-save-bar');
   });
   it("the Esc hint shows only from 900px up", () => {
     expect(copilot).toMatch(/\.cpd-kbd \{\s*display: none;/);

@@ -29,6 +29,8 @@
  *                 booked but not yet held is not detectable.
  */
 
+import { formatDay } from "@/lib/ui/dates";
+
 export const STOP_REASONS = [
   "signed",
   "paid",
@@ -191,16 +193,10 @@ export function latest(values: ReadonlyArray<string | null | undefined>): string
   return best;
 }
 
-/** "Oct 3" in the firm's zone (a bad zone falls back to UTC rather than throwing). */
+/** "Oct 3" in the firm's zone ("Oct 3, 2025" for another year). A bad zone falls back to UTC rather than throwing. */
 export function shortDate(iso: string | null, timeZone?: string): string {
-  const t = ms(iso);
-  if (t === null) return "";
-  const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
-  try {
-    return new Intl.DateTimeFormat("en-US", { ...opts, timeZone }).format(new Date(t));
-  } catch {
-    return new Intl.DateTimeFormat("en-US", { ...opts, timeZone: "UTC" }).format(new Date(t));
-  }
+  if (ms(iso) === null) return "";
+  return formatDay(iso, { tz: timeZone ?? "UTC" }) ?? formatDay(iso, { tz: "UTC" }) ?? "";
 }
 
 /** "Campaign stopped — signed quote, Oct 3". A stopped row with no recorded reason still says it stopped. */

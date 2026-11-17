@@ -14,8 +14,6 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 const BASELINE: Record<string, number> = {
   "src/app/dashboard/copilot/copilot.css": 1,
-  "src/app/dashboard/forms/_components/event.css": 1,
-  "src/app/dashboard/forms/forms.css": 5,
   "src/app/globals.css": 0,
   "src/app/i/intake-public.css": 1,
   "src/components/copilot/copilot.css": 1,

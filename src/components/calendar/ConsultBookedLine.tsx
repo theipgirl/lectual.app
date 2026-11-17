@@ -1,4 +1,5 @@
 import type { OutlookCalendarEvent, OutlookRead } from "@/lib/calendar/outlook-read";
+import "./calendar.css";
 import { formatEventWhen, joinHref } from "@/lib/calendar/outlook-format";
 
 /**
@@ -19,14 +20,14 @@ export function ConsultBookedView({
 }) {
   if (read.status === "database-update-needed") {
     return (
-      <p className="lx-note" style={{ margin: 0 }}>
+      <p className="lx-note">
         Consult bookings from Outlook aren&apos;t switched on for your firm yet. Lectual will turn them on.
       </p>
     );
   }
   if (read.status === "unavailable") {
     return (
-      <p className="lx-note" style={{ margin: 0 }} role="status">
+      <p className="lx-note" role="status">
         We couldn&apos;t check whether a consult is booked. This doesn&apos;t mean there isn&apos;t one.
       </p>
     );
@@ -36,11 +37,10 @@ export function ConsultBookedView({
   const Wrapper = bare ? "div" : "section";
   return (
     <Wrapper
-      className={bare ? undefined : "lx-card"}
-      style={{ padding: bare ? 0 : "12px 18px", display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}
+      className={bare ? "lx-booked" : "lx-card lx-booked lx-booked-card"}
       aria-label="Consult booked"
     >
-      <b style={{ color: "var(--ink)" }}>Consult booked</b>
+      <b className="lx-booked-title">Consult booked</b>
       <span className="lx-note">
         {" · "}
         {formatEventWhen(read.event, timeZone)}
@@ -48,7 +48,7 @@ export function ConsultBookedView({
       {join && (
         <>
           <span className="lx-note">{" · "}</span>
-          <a href={join} target="_blank" rel="noopener noreferrer" style={{ fontWeight: 500, color: "var(--ox)" }}>
+          <a href={join} target="_blank" rel="noopener noreferrer" className="lx-cal-join">
             Join
           </a>
         </>

@@ -1,5 +1,6 @@
 import { describeNotification, type NotificationIcon } from "@/lib/notifications/describe";
-import { relativeTime } from "@/lib/relative-time";
+import { formatRelative } from "@/lib/ui/dates";
+import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
 
 /** One notification as the bell and the page draw it: strings only, safe to hand to a client component. */
 export type NotificationRowView = {
@@ -30,7 +31,7 @@ export function firstNameOf(member: { displayName: string | null; email: string 
 }
 
 /** `names` maps user id to a first name; a missing actor reads as "Someone", never a uuid. */
-export function toRowViews(rows: RowLike[], names: Record<string, string>, now = Date.now()): NotificationRowView[] {
+export function toRowViews(rows: RowLike[], names: Record<string, string>, now = Date.now(), tz: string = DEFAULT_TIME_ZONE): NotificationRowView[] {
   return rows.map((row) => {
     const described = describeNotification(row, { actorName: row.actor_id ? (names[row.actor_id] ?? null) : null });
     return {
@@ -40,7 +41,7 @@ export function toRowViews(rows: RowLike[], names: Record<string, string>, now =
       label: described.label,
       sentence: described.sentence,
       href: described.href,
-      when: relativeTime(row.created_at, now),
+      when: formatRelative(row.created_at, { tz, now: new Date(now) }) ?? "never",
     };
   });
 }

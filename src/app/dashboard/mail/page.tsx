@@ -9,6 +9,9 @@ import { MAILBOX_ACTIVITY_SOURCE } from "@/lib/mailbox/apply";
 import { PROVIDER_LABEL } from "@/lib/mailbox/providers";
 import { groupMailByDay, mailTime, toMailRows, type MailActivity } from "@/lib/mailbox/my-mail";
 import { relativeTime } from "@/lib/relative-time";
+import { getFirmTimeZone } from "@/lib/org/profile";
+import { EmptyState, LoadFailedCard, Notice, PageHeader, PageTabs } from "@/components/ui";
+import { MAIL_NAME, noneYet } from "@/lib/ui/words";
 import { ProviderMark } from "@/components/mailbox/ProviderMark";
 import { loadLiveInbox, loadLiveMessage, loadStoredMessage, type ReadState } from "@/lib/mailbox/read-message";
 import { liveMailReadDeps } from "@/lib/mailbox/read-message-live";
@@ -21,7 +24,7 @@ import type { Metadata } from "next";
 import { matterDisplayTitle } from "@/lib/matters/display-title";
 import { pageTitle } from "@/lib/ui/page-title";
 
-export const metadata: Metadata = { title: pageTitle("My Mail") };
+export const metadata: Metadata = { title: pageTitle(MAIL_NAME) };
 
 export const dynamic = "force-dynamic";
 
@@ -36,10 +39,8 @@ function ConnectMailbox() {
           <path d="M3.5 7l8.5 6 8.5-6" />
         </svg>
       </div>
-      <h1 className="lx-h2" style={{ fontSize: 30, textAlign: "center" }}>
-        Connect your mailbox
-      </h1>
-      <p className="lx-sub" style={{ textAlign: "center", maxWidth: 480, margin: 0 }}>
+      <h1 className="lx-h1 lx-connect-title">Connect your mailbox</h1>
+      <p className="lx-sub lx-connect-sub">
         Connect your Gmail or Outlook account to bring in email from your clients and link it to their leads and matters.
       </p>
       <Link href={INTEGRATIONS} className="lx-btn lx-btn-pri">
@@ -49,8 +50,8 @@ function ConnectMailbox() {
   );
 }
 
-async function PaneLoader({ state, backHref }: { state: Promise<ReadState>; backHref: string }) {
-  return <MailReadingPane state={await state} backHref={backHref} />;
+async function PaneLoader({ state, backHref, timeZone, listLabel }: { state: Promise<ReadState>; backHref: string; timeZone: string; listLabel: string }) {
+  return <MailReadingPane state={await state} backHref={backHref} timeZone={timeZone} listLabel={listLabel} />;
 }
 
 /**
@@ -69,11 +70,7 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
   const list = await listConnections();
   if (!list.ok) {
     // Unknown is not "none": never tell someone to connect a mailbox they may already have.
-    return (
-      <div role="alert" className="lx-banner lx-banner-risk">
-        We couldn&apos;t load your mailbox connections, so we can&apos;t show your mail right now. Try again shortly.
-      </div>
-    );
+    return <LoadFailedCard what="your mail" body="We couldn't load your mailbox connections, so we can't show your mail right now. Refresh to try again." />;
   }
   const connections = list.connections.filter((c) => c.status !== "revoked");
   if (connections.length === 0) return <ConnectMailbox />;
@@ -106,7 +103,8 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
     matters: new Map((matters ?? []).map((m) => [m.id, matterDisplayTitle(m).title] as [string, string])),
   };
   const now = new Date();
-  const groups = groupMailByDay(toMailRows(activity, names), now);
+  const tz = await getFirmTimeZone();
+  const groups = groupMailByDay(toMailRows(activity, names), now, tz);
   const providerOf = new Map(connections.map((c) => [c.id, c.provider] as const));
   const needsReconnect = connections.filter((c) => c.status === "reauth");
 
@@ -144,17 +142,15 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
     <div className="lx-split">
       <aside className="lx-side lx-mail-side" aria-label="Mailboxes">
         <div className="lx-label">Folders</div>
-        <nav style={{ display: "grid", gap: 2 }}>
+        <nav className="lx-mail-nav">
           {folderLinks.map((l) => (
             <Link key={l.key} href={l.href} className="lx-fi" aria-current={l.current ? "page" : undefined}>
               {l.label}
             </Link>
           ))}
         </nav>
-        <div className="lx-label" style={{ marginTop: 8 }}>
-          Mailboxes
-        </div>
-        <nav style={{ display: "grid", gap: 2 }}>
+        <div className="lx-label lx-mail-side-gap">Mailboxes</div>
+        <nav className="lx-mail-nav">
           <Link href={boxLink("all").href} className="lx-fi" aria-current={!selected ? "page" : undefined}>
             All mailboxes
           </Link>
@@ -162,7 +158,7 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
             <Link key={c.id} href={boxLink(c.id).href} className="lx-fi lx-fi-box" aria-current={selected?.id === c.id ? "page" : undefined} title={c.email}>
               <ProviderMark provider={c.provider} size={14} />
               <span className="lx-fi-text">{c.email}</span>
-              {c.status === "reauth" && <span className="lx-fi-n" style={{ color: "var(--wine)" }}>!</span>}
+              {c.status === "reauth" && <span className="lx-fi-n lx-mail-reauth">!</span>}
             </Link>
           ))}
         </nav>
@@ -172,50 +168,45 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
       </aside>
 
       <div className="lx-col">
-        <div className="lx-page-head lx-page-head-list">
-          <div style={{ flex: 1, minWidth: 240 }}>
-            <div className="lx-label">{selected ? `${PROVIDER_LABEL[selected.provider]} · ${selected.email}` : `${connections.length} mailbox${connections.length === 1 ? "" : "es"}`}</div>
-            <h1 className="lx-h1">My Mail</h1>
-            <p className="lx-sub">{inboxTab ? "The newest messages in the mailbox, read live. Nothing here is saved." : "Mail with your clients, already linked to their lead or matter. Everything else stays in your inbox."}</p>
-          </div>
-        </div>
+        <PageHeader
+          title={MAIL_NAME}
+          details={selected ? `${PROVIDER_LABEL[selected.provider]} · ${selected.email}` : `${connections.length} mailbox${connections.length === 1 ? "" : "es"}`}
+          sub={inboxTab ? "The newest messages in the mailbox, read live. Nothing here is saved." : "Mail with your clients, already linked to their lead or matter. Everything else stays in your inbox."}
+        />
 
         {needsReconnect.length > 0 && (
-          <div role="alert" className="lx-banner lx-banner-risk">
+          <Notice tone="risk" role="alert">
             {needsReconnect.map((c) => c.email).join(", ")} {needsReconnect.length === 1 ? "needs" : "need"} reconnecting before new mail can come in.{" "}
             <Link href={INTEGRATIONS}>Reconnect</Link>
-          </div>
+          </Notice>
         )}
 
         <MailFolderSelect select={folderSelect(navLinks)} />
 
-        <div className="lx-mail-tabs" role="navigation" aria-label="Mail views">
-          <Link href={href({ tab: null, m: null, live: null })} className="lx-btn lx-btn-sm lx-btn-sec" aria-current={!inboxTab ? "page" : undefined}>
-            Client mail
-          </Link>
-          <Link href={href({ tab: "inbox", m: null, live: null, f: null })} className="lx-btn lx-btn-sm lx-btn-sec" aria-current={inboxTab ? "page" : undefined}>
-            Inbox
-          </Link>
-        </div>
+        <PageTabs
+          label="Mail views"
+          tabs={[
+            { href: href({ tab: null, m: null, live: null }), label: "Client mail", current: !inboxTab },
+            { href: href({ tab: "inbox", m: null, live: null, f: null }), label: "Inbox", current: inboxTab },
+          ]}
+        />
 
         <div className="lx-mail-wrap" data-pane={paneOpen ? "open" : undefined}>
           {inbox ? (
-            <LiveInboxList state={inbox} now={now} openHref={(id) => href({ box: inbox.status === "ok" ? inbox.mailbox.id : selected?.id ?? null, live: id, m: null })} />
+            <LiveInboxList state={inbox} now={now} timeZone={tz} openHref={(id) => href({ box: inbox.status === "ok" ? inbox.mailbox.id : selected?.id ?? null, live: id, m: null })} />
           ) : (
             <>
         {error ? (
-          <div className="lx-card lx-empty-card lx-mail-list">
-            <h2 className="lx-h2" style={{ fontSize: 25 }}>Mail couldn&apos;t be loaded</h2>
-            <p className="lx-note" style={{ margin: 0 }}>Can&apos;t show this right now. Refresh to try again.</p>
+          <div className="lx-mail-list">
+            <LoadFailedCard what="your mail" />
           </div>
         ) : groups.length === 0 ? (
-          <div className="lx-card lx-empty-card lx-mail-list">
-            <h2 className="lx-h2" style={{ fontSize: 25 }}>{sent ? "Nothing sent to clients yet" : "No client mail yet"}</h2>
-            <p className="lx-note" style={{ margin: 0 }}>
+          <div className="lx-mail-list">
+            <EmptyState title={sent ? "Nothing sent to clients yet" : noneYet("client mail")}>
               {connections.every((c) => !c.last_synced_at)
                 ? "The first sync hasn't run yet. It pulls the last 30 days, and then keeps checking for new mail."
-                : `Last checked ${relativeTime(connections.map((c) => c.last_synced_at ?? "").sort().at(-1) ?? now.toISOString())}. Only mail with your leads and clients shows here.`}
-            </p>
+                : `Last checked ${relativeTime(connections.map((c) => c.last_synced_at ?? "").sort().at(-1) ?? now.toISOString(), now.getTime(), tz)}. Only mail with your leads and clients shows here.`}
+            </EmptyState>
           </div>
         ) : (
           <div className="lx-card lx-mail lx-mail-list">
@@ -239,7 +230,7 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
                         )}
                       </span>
                       <span className="lx-mail-meta">
-                        <span className="lx-num">{mailTime(r.at, now)}</span>
+                        <span className="lx-num">{mailTime(r.at, now, tz)}</span>
                         {r.link && (
                           <a href={r.link} target="_blank" rel="noreferrer noopener" className="lx-note">
                             Open in {providerOf.get(r.connectionId ?? "") === "google" ? "Gmail" : "Outlook"} ↗
@@ -257,7 +248,7 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
           )}
           {paneState && (
             <Suspense fallback={<MailPaneLoading />}>
-              <PaneLoader state={paneState} backHref={backHref} />
+              <PaneLoader state={paneState} backHref={backHref} timeZone={tz} listLabel={inboxTab ? "Inbox" : "Client mail"} />
             </Suspense>
           )}
         </div>

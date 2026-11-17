@@ -165,7 +165,7 @@ describe("event page (F16)", () => {
   it("filter links work: All time, 7, 30, 90 days, each keeping event=<code>", async () => {
     const html = await eventPage(newDb({ crm_booth_scorecard: boothTables() }), "urban-golf-2026", 30);
     const nav = html.slice(html.indexOf('aria-label="Date range"'));
-    const links = [...nav.matchAll(/<a class="(on)?" (?:aria-current="page" )?href="([^"]+)">([^<]+)<\/a>/g)].map((m) => [m[3], m[2], m[1]]);
+    const links = [...nav.matchAll(/<a (aria-current="page" )?href="([^"]+)">([^<]+)<\/a>/g)].map((m) => [m[3], m[2], m[1] ? "on" : ""]);
     expect(links.map((l) => l[0])).toEqual(["All time", "7 days", "30 days", "90 days"]);
     expect(links.map((l) => l[1])).toEqual([
       "/dashboard/forms?event=urban-golf-2026&range=all",

@@ -2,6 +2,7 @@ import { SCORED_ASSESSMENT, SCORED_ASSESSMENTS, notReadyPlural } from "@/lib/ui/
 import Link from "next/link";
 import { eventDisplayName } from "@/lib/intake-forms/event-name";
 import "./event.css";
+import { Notice } from "@/components/ui/Notice";
 import { eventSummaries } from "@/lib/intake-forms/booth-results";
 import { formatDuration } from "@/lib/intake-forms/performance";
 import { shortDate } from "@/lib/campaigns/stops";
@@ -33,9 +34,9 @@ export function EventAssessments({ read, timeZone }: { read: Awaited<ReturnType<
   }
   if (read.status === "unavailable") {
     return (
-      <div role="status" className="lx-banner lx-banner-warn" style={{ fontSize: 14 }}>
+      <Notice tone="warn" role="status">
         {`${SCORED_ASSESSMENTS} couldn't be loaded. Refresh to try again.`}
-      </div>
+      </Notice>
     );
   }
   const events = eventSummaries(read.value.rows);
@@ -43,12 +44,12 @@ export function EventAssessments({ read, timeZone }: { read: Awaited<ReturnType<
   return (
     <section className="ifl-root ife-section" aria-label={SCORED_ASSESSMENTS}>
       <div className="ife-head">
-        <h2 className="lx-h2" style={{ fontSize: 23 }}>
+        <h2 className="lx-h2">
           {SCORED_ASSESSMENTS}
         </h2>
         <span className="ifm-help">Taken on the firm&apos;s assessment page or at an event. Read-only, all time.</span>
       </div>
-      <div className="ifl-list" style={{ marginTop: 12 }}>
+      <div className="ifl-list ifl-list-gap">
         {events.map((e) => (
           <article key={e.code} className="lx-card ifl-item">
             <div className="ifl-main">

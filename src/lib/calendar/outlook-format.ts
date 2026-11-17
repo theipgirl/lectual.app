@@ -1,16 +1,10 @@
-/** "Thu, Oct 22, 2:00 PM" in the firm's zone; an all-day event shows its date only (it is stored at UTC midnight). */
+import { formatDay, formatDayTime } from "@/lib/ui/dates";
+import { BLANK } from "@/lib/ui/words";
+
+/** "Oct 22, 2:00 PM" in the firm's zone; an all-day event shows its date only (it is stored at UTC midnight). */
 export function formatEventWhen(event: { starts_at: string; all_day: boolean | null }, timeZone: string): string {
-  if (event.all_day) {
-    return new Date(event.starts_at).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
-  }
-  return new Date(event.starts_at).toLocaleString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone,
-  });
+  if (event.all_day) return formatDay(event.starts_at.slice(0, 10), { tz: timeZone }) ?? BLANK;
+  return formatDayTime(event.starts_at, { tz: timeZone }) ?? BLANK;
 }
 
 /** The meeting link, only when it is an https URL (the column's own check says the same). */

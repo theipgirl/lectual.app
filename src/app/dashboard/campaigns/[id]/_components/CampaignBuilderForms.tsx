@@ -15,6 +15,7 @@ import {
 } from "@/app/dashboard/campaigns/[id]/actions";
 import type { ActionState } from "@/app/dashboard/campaigns/errors";
 import { STARTER_STEPS } from "@/lib/campaigns/steps";
+import { SAVING } from "@/lib/ui/words";
 import { ADDABLE_STEP_TYPES, START_NEEDS_STEP, START_UNREADABLE, stepTypeLabel } from "@/lib/campaigns/steps";
 
 /**
@@ -27,14 +28,14 @@ import { ADDABLE_STEP_TYPES, START_NEEDS_STEP, START_UNREADABLE, stepTypeLabel }
 function Err({ state }: { state: ActionState }) {
   if (state.error) {
     return (
-      <p role="alert" className="lx-note" style={{ color: "var(--wine)", margin: 0 }}>
+      <p role="alert" className="lx-note lx-campaigns-error">
         {state.error}
       </p>
     );
   }
   if (state.message) {
     return (
-      <p role="status" className="lx-note" style={{ color: "var(--ok)", margin: 0 }}>
+      <p role="status" className="lx-note lx-saved">
         {state.message}
       </p>
     );
@@ -59,17 +60,17 @@ export function EditSequenceForm({ sequenceId, name, description }: { sequenceId
   return (
     <form action={action} className="lx-form-grid">
       <Hidden values={{ sequenceId }} />
-      <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
+      <label className="lx-field lx-campaigns-wide">
         <span className="lx-label">Name</span>
         <input className="lx-input" name="name" required maxLength={200} defaultValue={name} />
       </label>
-      <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
+      <label className="lx-field lx-campaigns-wide">
         <span className="lx-label">Description</span>
         <input className="lx-input" name="description" maxLength={500} defaultValue={description} />
       </label>
-      <div style={{ gridColumn: "1 / -1", display: "flex", gap: 10, alignItems: "center" }}>
+      <div className="lx-campaigns-wide lx-campaigns-actions">
         <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
-          {pending ? "Saving…" : "Save"}
+          {pending ? SAVING : "Save"}
         </button>
         <Err state={state} />
       </div>
@@ -91,13 +92,13 @@ export function ToggleSequenceButton({
   const blockedReason = !active && (stepCount === null ? START_UNREADABLE : stepCount === 0 ? START_NEEDS_STEP : null);
   const reasonId = `start-reason-${sequenceId}`;
   return (
-    <form action={action} style={{ display: "inline-flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+    <form action={action} className="lx-campaigns-toggle">
       <Hidden values={{ sequenceId, nextActive: String(!active) }} />
       <button type="submit" className={active ? "lx-btn lx-btn-sec" : "lx-btn lx-btn-pri"} disabled={pending || !!blockedReason} aria-describedby={blockedReason ? reasonId : undefined}>
-        {pending ? "Working…" : active ? "Pause campaign" : "Start campaign"}
+        {pending ? SAVING : active ? "Pause campaign" : "Start campaign"}
       </button>
       {blockedReason && (
-        <p id={reasonId} className="lx-note" style={{ margin: 0 }}>
+        <p id={reasonId} className="lx-note">
           {blockedReason}
         </p>
       )}
@@ -130,7 +131,7 @@ export function AddStepForm({ sequenceId, templates }: { sequenceId: string; tem
         <input className="lx-input" name="delayHours" type="number" min={0} step={1} defaultValue={0} />
         <span className="lx-note">Hours after the previous step (or after enrolling, for the first step)</span>
       </label>
-      <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
+      <label className="lx-field lx-campaigns-wide">
         <span className="lx-label">Email template (for an Email step)</span>
         <select className="lx-input" name="templateId" defaultValue="">
           <option value="">{templates.length === 0 ? "No templates yet — add one in Email templates" : "Choose a template"}</option>
@@ -141,13 +142,13 @@ export function AddStepForm({ sequenceId, templates }: { sequenceId: string; tem
           ))}
         </select>
       </label>
-      <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
+      <label className="lx-field lx-campaigns-wide">
         <span className="lx-label">Task title (for an Internal task step)</span>
         <input className="lx-input" name="taskTitle" maxLength={200} placeholder="Optional — defaults to a generic follow-up" />
       </label>
-      <div style={{ gridColumn: "1 / -1", display: "flex", gap: 10, alignItems: "center" }}>
+      <div className="lx-campaigns-wide lx-campaigns-actions">
         <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
-          {pending ? "Adding…" : "Add step"}
+          {pending ? SAVING : "Add step"}
         </button>
         <Err state={state} />
       </div>
@@ -161,7 +162,7 @@ export function DeleteStepButton({ sequenceId, stepId }: { sequenceId: string; s
     <form action={action}>
       <Hidden values={{ sequenceId, stepId }} />
       <button type="submit" className="lx-btn lx-btn-ghost lx-btn-sm" disabled={pending} title="Remove this step">
-        {pending ? "Removing…" : "Remove"}
+        {pending ? SAVING : "Remove"}
       </button>
       {state.error && <Err state={state} />}
     </form>
@@ -175,9 +176,9 @@ export type LeadOption = { id: string; label: string; hasEmail: boolean };
 export function EnrollLeadForm({ sequenceId, leads }: { sequenceId: string; leads: LeadOption[] }) {
   const [state, action, pending] = useActionState<ActionState, FormData>(enrollLeadAction, {});
   return (
-    <form action={action} style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+    <form action={action} className="lx-campaigns-enroll">
       <Hidden values={{ sequenceId }} />
-      <label className="lx-field" style={{ minWidth: 260, flex: 1 }}>
+      <label className="lx-field lx-campaigns-enroll-pick">
         <span className="lx-label">Enroll a lead</span>
         <select className="lx-input" name="leadId" defaultValue="" required>
           <option value="" disabled>
@@ -192,7 +193,7 @@ export function EnrollLeadForm({ sequenceId, leads }: { sequenceId: string; lead
         </select>
       </label>
       <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending || leads.length === 0}>
-        {pending ? "Enrolling…" : "Enroll"}
+        {pending ? SAVING : "Enroll"}
       </button>
       <Err state={state} />
     </form>
@@ -220,8 +221,8 @@ export function EnrollmentActions({
 
   const hidden = { sequenceId, enrollmentId };
   return (
-    <div style={{ display: "grid", gap: 6, justifyItems: "flex-end" }}>
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
+    <div className="lx-campaigns-actions-col">
+      <div className="lx-campaigns-actions-row">
         {status === "active" && canRun && (
           // With no steps left (the sequence was emptied or shortened under
           // it) running closes the enrollment out instead of leaving it
@@ -237,7 +238,7 @@ export function EnrollmentActions({
           <form action={pauseFormAction}>
             <Hidden values={hidden} />
             <button type="submit" className="lx-btn lx-btn-ghost lx-btn-sm" disabled={pausing}>
-              {pausing ? "…" : "Pause"}
+              {pausing ? SAVING : "Pause"}
             </button>
           </form>
         )}
@@ -245,7 +246,7 @@ export function EnrollmentActions({
           <form action={resumeFormAction}>
             <Hidden values={hidden} />
             <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={resuming}>
-              {resuming ? "…" : "Resume"}
+              {resuming ? SAVING : "Resume"}
             </button>
           </form>
         )}
@@ -258,7 +259,7 @@ export function EnrollmentActions({
               disabled={stopping}
               title="Stop this campaign for this lead. It's recorded with your name, and can't be restarted."
             >
-              {stopping ? "…" : "Stop"}
+              {stopping ? SAVING : "Stop"}
             </button>
           </form>
         )}
@@ -297,7 +298,7 @@ export function StarterSteps({ sequenceId, templates }: { sequenceId: string; te
     <form action={action} className="lx-campaigns-starter">
       <Hidden values={{ sequenceId }} />
       <h3 className="lx-h3">A good way to start</h3>
-      <p className="lx-note" style={{ margin: 0 }}>
+      <p className="lx-note">
         Three steps, added as drafts. Nothing is sent or enrolled, and the campaign stays paused until you start it.
       </p>
       <ol className="lx-campaigns-starter-list">
@@ -317,9 +318,9 @@ export function StarterSteps({ sequenceId, templates }: { sequenceId: string; te
           </li>
         ))}
       </ol>
-      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+      <div className="lx-campaigns-actions">
         <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={pending || !!reason} aria-describedby={reason ? "starter-reason" : undefined}>
-          {pending ? "Adding…" : "Add these steps"}
+          {pending ? SAVING : "Add these steps"}
         </button>
         {reason && (
           <span id="starter-reason" className="lx-note">

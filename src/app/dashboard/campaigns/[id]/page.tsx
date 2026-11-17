@@ -35,10 +35,19 @@ import {
 } from "./_components/CampaignBuilderForms";
 import "../campaigns.css";
 import type { Metadata } from "next";
-import { pageTitle } from "@/lib/ui/page-title";
+import { recordPageTitle } from "@/lib/ui/page-title";
+import { PageHeader, SheetScroll, SheetTable } from "@/components/ui";
+import { formatDayTime } from "@/lib/ui/dates";
+import { BLANK } from "@/lib/ui/words";
 import { campaignLoadError } from "@/lib/campaigns/load-errors";
 
-export const metadata: Metadata = { title: pageTitle("Campaign") };
+/** Tab title: the campaign's name through the scoped getter; "Campaign" when the read fails or finds nothing. */
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  return {
+    title: await recordPageTitle(async () => (UUID_RE.test(id) ? ((await getSequence(id))?.name ?? null) : null), "Campaign"),
+  };
+}
 
 export const dynamic = "force-dynamic";
 
@@ -127,20 +136,13 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
 
   return (
     <>
-      <Link href="/dashboard/campaigns/" className="lx-back">
-        ← Campaigns
-      </Link>
-
-      <div className="lx-page-head">
-        <div style={{ flex: 1, minWidth: 260 }}>
-          <div className="lx-label" style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <span className={`lx-pill ${sequenceStatusTone(sequence.active)}`}>{sequenceStatusLabel(sequence.active)}</span>
-          </div>
-          <h1 className="lx-h1">{sequence.name}</h1>
-          {sequence.description && <p className="lx-sub">{sequence.description}</p>}
-        </div>
-        {canManage && <ToggleSequenceButton sequenceId={sequence.id} active={sequence.active} stepCount={stepsRead.error ? null : steps.length} />}
-      </div>
+      <PageHeader
+        back={{ href: "/dashboard/campaigns/", label: "Campaigns" }}
+        title={sequence.name}
+        details={<span className={`lx-pill ${sequenceStatusTone(sequence.active)}`}>{sequenceStatusLabel(sequence.active)}</span>}
+        sub={sequence.description || undefined}
+        actions={canManage ? <ToggleSequenceButton sequenceId={sequence.id} active={sequence.active} stepCount={stepsRead.error ? null : steps.length} /> : undefined}
+      />
 
       {canManage && (
         <details className="lx-card lx-disclosure">
@@ -152,13 +154,13 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
       <section className="lx-card lx-band">
         <header className="lx-band-head">
           <h2 className="lx-h2">Steps</h2>
-          <span className="lx-note">{stepsRead.error ? "—" : `${steps.length} step${steps.length === 1 ? "" : "s"}`}</span>
+          <span className="lx-note">{stepsRead.error ? BLANK : `${steps.length} step${steps.length === 1 ? "" : "s"}`}</span>
         </header>
         {stepsRead.error ? (
           <p className="lx-note lx-campaigns-inlineerror">{stepsRead.error}</p>
         ) : steps.length === 0 ? (
           <>
-            <p className="lx-note" style={{ padding: "0 18px 14px" }}>
+            <p className="lx-note lx-campaigns-pad">
               No steps yet. {canManage ? "Add the first one below." : "An admin hasn't added any yet."}
             </p>
             {canManage && !templatesFailed && <StarterSteps sequenceId={sequence.id} templates={templateOptions} />}
@@ -183,9 +185,9 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
                             Template: <strong>{template.name}</strong> — {template.subject}
                           </>
                         ) : templatesFailed && step.template_id ? (
-                          <span style={{ color: "var(--wine)" }}>Couldn&apos;t load the template library to show this step&apos;s template.</span>
+                          <span className="lx-campaigns-error">Couldn&apos;t load the template library to show this step&apos;s template.</span>
                         ) : (
-                          <span style={{ color: "var(--wine)" }}>No template attached — this step can&apos;t run yet.</span>
+                          <span className="lx-campaigns-error">No template attached — this step can&apos;t run yet.</span>
                         )}
                       </div>
                     )}
@@ -206,9 +208,9 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
           </ol>
         )}
         {canManage && (
-          <div style={{ padding: "0 18px 18px" }}>
+          <div className="lx-campaigns-pad-end">
             {templatesFailed && (
-              <p className="lx-note" style={{ color: "var(--wine)", margin: "0 0 8px" }}>
+              <p className="lx-note lx-campaigns-error lx-campaigns-gap">
                 The template library couldn&apos;t be loaded, so email steps can&apos;t be added right now. Try again shortly.
               </p>
             )}
@@ -221,22 +223,22 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
         <header className="lx-band-head">
           <h2 className="lx-h2">Enrolled</h2>
           <span className="lx-note">
-            {enrollmentsRead.error ? "—" : `${enrollments.length} lead${enrollments.length === 1 ? "" : "s"}`}{" "}· this is also this
+            {enrollmentsRead.error ? BLANK : `${enrollments.length} lead${enrollments.length === 1 ? "" : "s"}`}{" "}· this is also this
             campaign&apos;s activity
           </span>
         </header>
         {canOperate &&
           (leadsFailed || enrollmentsRead.error ? (
-            <p className="lx-note lx-campaigns-inlineerror" style={{ paddingBottom: 14 }}>
+            <p className="lx-note lx-campaigns-inlineerror lx-campaigns-pad-bottom">
               {leadsFailed
                 ? "Leads couldn't be loaded, so leads can't be enrolled right now. Refresh to try again."
                 : "Who's already enrolled couldn't be loaded, so leads can't be enrolled right now. Try again shortly."}
             </p>
           ) : (
-            <div style={{ padding: "0 18px 14px" }}>
+            <div className="lx-campaigns-pad">
               <EnrollLeadForm sequenceId={sequence.id} leads={leadOptions} />
               {clientsUnavailable && (
-                <p className="lx-note" style={{ margin: "8px 0 0" }}>
+                <p className="lx-note lx-campaigns-gap-top">
                   Couldn&apos;t check which leads are already clients, so this list may include some. Enrolling one of them will be
                   refused.
                 </p>
@@ -244,19 +246,19 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
             </div>
           ))}
         {!sequence.active && enrollments.length > 0 && (
-          <p className="lx-note" style={{ padding: "0 18px 14px", margin: 0 }}>
+          <p className="lx-note lx-campaigns-pad">
             This campaign is paused — no steps run until it&apos;s started again.
           </p>
         )}
         {enrollmentsRead.error ? (
           <p className="lx-note lx-campaigns-inlineerror">{enrollmentsRead.error}</p>
         ) : enrollments.length === 0 ? (
-          <p className="lx-note" style={{ padding: "0 18px 18px" }}>
+          <p className="lx-note lx-campaigns-pad-end">
             Nobody is enrolled yet.
           </p>
         ) : (
-          <div style={{ overflow: "auto" }}>
-            <table className="lx-tbl" style={{ minWidth: 720 }}>
+          <SheetScroll>
+            <SheetTable minWidth={720}>
               <thead>
                 <tr>
                   <th>Lead</th>
@@ -264,7 +266,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
                   <th>Step</th>
                   <th>Next</th>
                   <th>Enrolled</th>
-                  {canOperate && <th />}
+                  {canOperate && <th aria-label="Actions" />}
                 </tr>
               </thead>
               <tbody>
@@ -280,39 +282,39 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
                             but this row also carries the actions in the last
                             column, and the overlay would swallow every click on
                             them. */}
-                        <Link href={`/dashboard/leads/${enrollment.lead_id}/`} style={{ color: "var(--ink)", fontWeight: 500 }}>
+                        <Link href={`/dashboard/leads/${enrollment.lead_id}/`} className="lx-campaigns-lead">
                           {lead ? leadDisplayName(lead) : leadsFailed ? "Lead (name couldn't be loaded)" : "Lead no longer visible"}
                         </Link>
                         {lead?.email && <div className="lx-note">{lead.email}</div>}
                       </td>
-                      <td className="wrap">
+                      <td className="wrap" data-label="Status">
                         <span className={`lx-pill ${enrollmentStatusTone(enrollment.status)}`}>{enrollmentStatusLabel(enrollment.status)}</span>
                         {enrollment.status === "stopped" && (
                           // The recorded reason, in the firm's words of the
                           // SOP: "Campaign stopped — signed quote, Oct 3".
-                          <div className="lx-note" style={{ marginTop: 4 }}>
+                          <div className="lx-note lx-campaigns-stopline">
                             {stopLine({ reason: enrollment.stop_reason, at: enrollment.stopped_at }, tz)}
                           </div>
                         )}
                       </td>
-                      <td className="lx-num">
+                      <td data-label="Step">
                         {enrollment.current_step} / {steps.length}
                         {enrollment.current_step >= steps.length && steps.length > 0 && enrollment.status === "active" ? (
                           <span className="lx-note"> · done, closing out</span>
                         ) : null}
                       </td>
-                      <td className="lx-note">
+                      <td className="lx-note" data-label="Next">
                         {enrollment.status !== "active"
-                          ? "—"
+                          ? BLANK
                           : enrollment.next_step_at
                             ? due
                               ? "Due now"
-                              : new Date(enrollment.next_step_at).toLocaleString()
+                              : formatDayTime(enrollment.next_step_at, { tz }) ?? BLANK
                             : "Ready to run"}
                       </td>
-                      <td className="lx-num">{relativeTime(enrollment.enrolled_at)}</td>
+                      <td data-label="Enrolled">{relativeTime(enrollment.enrolled_at, undefined, tz)}</td>
                       {canOperate && (
-                        <td>
+                        <td className="lx-stack-actions">
                           <EnrollmentActions
                             sequenceId={sequence.id}
                             enrollmentId={enrollment.id}
@@ -326,8 +328,8 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
                   );
                 })}
               </tbody>
-            </table>
-          </div>
+            </SheetTable>
+          </SheetScroll>
         )}
       </section>
 
