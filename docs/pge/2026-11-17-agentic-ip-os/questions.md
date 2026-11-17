@@ -90,3 +90,10 @@ How Taylor's reply lines were matched to the questions is our reading; items mar
 
 ### Still open after Taylor's answers (director's reading, Nov 17)
 T6 (Dawn's role), T8, T10, T11, C2 (now S2-2), C3, C5, C6 (account and title; "zoom or fathom" only), C9 (Amor), C10 (paste the welcome text), R1 to R7, the questionnaire half of R8, and S2-1 to S2-11.
+
+## Added Nov 17 (first reply, Sprint 7)
+
+| # | Question | Who | Until answered |
+|---|---|---|---|
+| R9 | The **first-reply template** for a new enquiry, and whether Rayn may clear first replies | Rebecca / Caitlyn | No first reply is drafted |
+| C11 | The firm's **booking link** for consults | Caitlyn | Draft says "[booking link]" with a CHECK FIRST |

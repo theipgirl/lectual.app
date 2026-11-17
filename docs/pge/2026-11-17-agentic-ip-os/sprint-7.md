@@ -16,7 +16,13 @@ Once a proposal is out, nobody has to remember to chase it: on Day 1, 2, 4, 6 an
 4. **The morning brief's stalled-lead follow-up** skips a lead that has a live proposal on this schedule (one chase at a time).
 5. **Long-Term Nurture suggestion.** A lead whose newest proposal expired (valid 7 days) and stayed silent through the grace period (about two weeks; exact number from `questions.md`, held in one constant) with no clear no gets a suggestion card "Move to Long-Term Nurture" (the Stage Keeper's suggestion pattern: `ai_insight`, `signal_key`, Accept through `moveLeadStage`, Dismiss). Never moved automatically. Lost is never suggested from silence (decision 8).
 6. **Duplicates.** `src/lib/intake/duplicates.ts` also matches the same phone number (digits only, last 10, at least 10 digits; extensions and short numbers ignored) and also looks at nurture and lost leads (a compact `live(...)` read of id, names, email, phone for those stages, paged). The marker says what matched and where: "Possible duplicate · same phone · Lost lead".
-7. **Proposal email states the last day.** `renderProposalEmail` and `renderGeneralProposalEmail` gain a `{last_day}` slot: the proposal's `expires_on` in the firm's zone ("Friday, November 20"). The fee total is not in the email (decision 10); a test pins that no money figure appears in the rendered body. The firm's saved template gets the slot only if Rebecca approves the sentence (`questions.md`); the default template carries it.
+8. **First reply to a new enquiry (Taylor, Nov 17: "add the first reply to sprint 7").** When a new lead arrives (intake form, worksheet, or a mailbox-matched enquiry) and nobody at the firm has replied, the assistant drafts the first reply for approval, using the lead's own intake answers.
+   - Runs in an existing agent (intake triage, which already reads new leads; no new agent name). Created once per lead, keyed on a `queue_drafted` marker `<lead id>:first-reply`, never on a rerun.
+   - Wording from a firm-approved first-reply template (Rebecca or Caitlyn supplies it; `questions.md`), with only facts the person gave filled in (name, mark or business, what they want protected, launch date if stated). No fee, no legal advice, no class or filing recommendation; a question the person asked is acknowledged and offered for the consult, never answered. The booking link is the firm's own, from settings; none set = the draft says "[booking link]" and carries a CHECK FIRST.
+   - Not drafted when: a firm reply already exists on the lead (`email_sent`, or firm-sent cc via `firm-sender.ts`); a consult is already booked; the lead is not in the new-enquiry stage; the thread is sensitive; the lead is merged (follow the keeper); or the lead has no real email. A failed read of any of these makes no draft (fail closed).
+   - Approval kind: a client email, attorney-only unless Rebecca says Rayn may clear first replies (Sprint 4's explicit-marker rule; `questions.md`).
+   - Sprint 9's lead page shows it in "Needs your yes" once it exists (today that card reports the gap).
+9. **Proposal email states the last day.** `renderProposalEmail` and `renderGeneralProposalEmail` gain a `{last_day}` slot: the proposal's `expires_on` in the firm's zone ("Friday, November 20"). The fee total is not in the email (decision 10); a test pins that no money figure appears in the rendered body. The firm's saved template gets the slot only if Rebecca approves the sentence (`questions.md`); the default template carries it.
 
 **Out**
 - Sequence stopping on reply (decision 6: no build). Any send. Lost moves by an assistant. Lawmatics thank-you / nurture emails (decision 14: they are the firm's approved Lawmatics emails; nothing to build). Manual lead entry (decision 9: already in Lectual).
@@ -38,7 +44,8 @@ Once a proposal is out, nobody has to remember to chase it: on Day 1, 2, 4, 6 an
 7. Duplicates: same phone in two formats matches; a 7-digit number never matches; a Lost lead with the same email is shown with "Lost lead"; merged leads never match.
 8. A failed nurture/lost read shows open-lead duplicates as today and a note that older leads weren't checked; never "no duplicates".
 9. The rendered proposal email includes the last day in the firm's zone and no dollar amount.
-10. Tests, lint, build.
+10. First reply: a new form lead with no firm reply gets exactly one draft (two runs make one); a lead with a firm reply, a booked consult, a sensitive thread or no email gets none; a failed read makes none; the draft has no fee figure and no legal-advice phrase and never answers a question the person asked.
+11. Tests, lint, build.
 
 ## New schema
 None planned. Markers are `crm_activity` rows; tasks use `crm_task`. If the agent cannot insert `crm_task` org-fenced without a new grant, stop and add the next free migration number.
@@ -55,7 +62,7 @@ None planned. Markers are `crm_activity` rows; tasks use `crm_task`. If the agen
 
 ## Dependencies and blockers
 - Sprint 4 (who clears the drafts; Rayn's Outlook).
-- Rebecca: the five follow-up texts, the last-day sentence, whether Rayn may clear proposal follow-ups. Caitlyn: Amor's account and role (C9), the exact grace period (C5) (`questions.md`). Sprint 2's `on_hold` stage (Undecided / Questions) is skipped by this schedule.
+- Rebecca: the five follow-up texts, the last-day sentence, whether Rayn may clear proposal follow-ups. Caitlyn: Amor's account and role (C9), the exact grace period (C5) (`questions.md`). Rebecca or Caitlyn: the first-reply template and whether Rayn may clear it; the firm's booking link. Sprint 2's `on_hold` stage (Undecided / Questions) is skipped by this schedule.
 
 ## Models and evaluator
 - Generator: **Opus** for email wording and the routing change; **Sonnet** for the schedule, duplicates and UI.
