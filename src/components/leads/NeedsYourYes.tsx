@@ -35,6 +35,7 @@ import {
   LEAD_STEP_SUBJECT,
   LEAD_STEP_TO,
   LEAD_STEP_YES,
+  DECK_FIRST_STEP,
   DECK_OPEN_DRAFT,
   SAVING,
 } from "@/lib/ui/words";
@@ -213,7 +214,7 @@ export function NeedsYourYes({ leadId, view, initial }: { leadId: string; view: 
         <ul className="ls-why" aria-label={LEAD_PAGE_WHY}>
           {view.why.map((w, i) => (
             <li key={i}>
-              {w.checkFirst ? <b>{LEAD_PAGE_CHECK_FIRST} </b> : null}
+              <b>{w.checkFirst ? LEAD_PAGE_CHECK_FIRST : DECK_FIRST_STEP} </b>
               {w.text.replace(/^(check first|first step):\s*/i, "")}
             </li>
           ))}

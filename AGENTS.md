@@ -2192,3 +2192,21 @@ Exactly one matter or none; the owner's name alone never matches.
 - **Weekly review** reads `payload->>from` and `payload->>party` only (`readContactActivity`) and the firm's mailbox addresses through the
   scoped client (`readFirmSenders`; failure = none known): an `email_received` from a firm address is ours, a USPTO one is a "USPTO notice"
   (last contact, no direction). `contactKindOf` / `summarizeContact` in `src/lib/review/contact.ts` are the rule.
+
+## Lead page: where Lectual does the step (Sprint 9 Part 2, no schema)
+The top of `/dashboard/leads/<id>/` is drawn from the engine in `src/lib/lead-step/` (Part 1): `loadLeadStepFacts` -> `buildLeadStepView`. The page decides nothing.
+Nothing here sends: a Yes makes a DRAFT through the existing approve core. Order under the status row: top card (`TopCardFrame` > `TopCard`), "What Lectual did", the four facts, then today's page
+(Needs attention for what the top card does not cover, composer, Timeline, one-line sections, Documents & files with upload, the side column), all unchanged.
+- **One top card** (`src/components/leads/TopCard.tsx`): needs-yes (`NeedsYourYes`, client), has-it, yours, not-prepared, approvals-off, quiet, couldn't-load. A lead the engine couldn't read is the
+  couldn't-load card, never a calm one. A role that can't say yes sees the same card with no buttons (the engine's `actions`).
+- **Yes** is a 5-second client hold with Undo (`lead-step-hold.ts`, pure; the deck's `HoldToast`). Only the tick that ends the hold posts `leadStepYesAction`; Undo posts nothing. The sentence after Yes
+  is whatever the action returned, shown by `TopCardFrame` (which survives the revalidation that may swap the card). **Not this** needs a reason (1 to 200 characters). **Edit** is a small inline editor
+  that saves through `leadStepEditAction` (the queue's save path); the queue's `ReviewPanel` is NOT reused because its Approve would skip the hold and this page's checks. **Send back** is `leadStepSendBackAction`.
+- **Yours to do** uses the existing next-step actions (`completeNextStepAction`, `snoozeNextStepAction`, `updateNextStepAction`, `setNextStepAction`), drawn only for `CAN_WRITE_LEAD`; they refresh the page themselves
+  because those actions revalidate the review pages, not this one.
+- **What Lectual did** (`WhatLectualDid`): Undo only where the view offers it (the Stage Keeper's `undoAgentMoveAction`); a failed read is "Couldn't load", never "Nothing yet"; a cut list says so.
+- **Replaced on the page:** the "Waiting on attorney review" list (`WaitingOnRebecca`) and its pending-approvals read (the top card shows the item inline and links the rest to Approvals), and the status row's
+  "Last contact" item (the Last contact fact says it, with who wrote last). **Kept because the top card doesn't cover them:** the booked-consult line, proposals from client email, and the stage-suggestion cards
+  (Accept / Dismiss). `needsAttention`'s `approvals` input is optional now.
+- Styles: `src/components/leads/lead-step.css` (`ls-` classes, tokens only). Harness: `scripts/design-harness/screens/lead-step.screen.tsx` (five states at 1440 / 1280 / 375).
+- NOT verified: a real browser against the running app, a real Yes against a real queue, keyboard use of the Snooze menu.
