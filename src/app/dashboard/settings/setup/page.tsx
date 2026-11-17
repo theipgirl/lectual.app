@@ -9,6 +9,8 @@ import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 import { SETUP_NAME } from "@/lib/ui/words";
 import { PageHeader } from "@/components/ui";
+import { TeamAccountsView } from "@/components/setup/TeamAccounts";
+import { loadFirstUsers } from "@/lib/setup/first-users-load";
 
 export const metadata: Metadata = { title: pageTitle(SETUP_NAME) };
 
@@ -24,7 +26,8 @@ export default async function SetupPage() {
   const session = await resolveFirmSession({ signInNext: SETUP_PATH });
   if (session.kind !== "ok" || !canSeeSetup(session.role)) notFound();
 
-  const checklist = setupChecklist(await loadSetupState());
+  const [state, accounts] = await Promise.all([loadSetupState(), loadFirstUsers({ id: session.user.id, role: session.role })]);
+  const checklist = setupChecklist(state);
 
   return (
     <>
@@ -40,6 +43,7 @@ export default async function SetupPage() {
         actions={<GoToIntegrationsLink />}
       />
       <SetupChecklistView checklist={checklist} />
+      <TeamAccountsView data={accounts} />
     </>
   );
 }

@@ -159,6 +159,15 @@ export function hasSendScope(provider: MailboxProvider, scopes: readonly string[
   return scopes.some((s) => typeof s === "string" && normaliseScope(provider, s.trim()) === SEND_SCOPE.toLowerCase());
 }
 
+/**
+ * True when a connection's STORED scopes let Lectual write a draft into its Drafts folder (Microsoft `Mail.ReadWrite`,
+ * which every Outlook connection is required to grant). A missing or unreadable list reads as "not granted".
+ */
+export function hasDraftScope(provider: MailboxProvider, scopes: readonly string[] | null | undefined): boolean {
+  if (provider !== "microsoft" || !Array.isArray(scopes)) return false;
+  return scopes.some((s) => typeof s === "string" && normaliseScope(provider, s.trim()) === "mail.readwrite");
+}
+
 export function missingScopes(provider: MailboxProvider, granted: string[]): string[] {
   const have = new Set(granted.map((s) => normaliseScope(provider, s)));
   return CONFIG[provider].required.filter((r) => !have.has(r));
