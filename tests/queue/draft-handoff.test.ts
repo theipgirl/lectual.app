@@ -17,7 +17,7 @@ import {
   type QueueKind,
 } from "@/lib/queue/routing";
 import { approvePlan, approvedTextMatches, draftAssignment, draftToNote, makeDraftDecision, postedConnectionAllowed, readyToDraft, retryPassDecision, shaFromDraftToNote } from "@/lib/queue/draft-handoff";
-import { eventTrust, trustedEvents, type CardEvent, type EventTrust } from "@/lib/queue/deck";
+import { DRAFT_TO_CLOCK_SKEW_MS, eventTrust, trustedEvents, type CardEvent, type EventTrust } from "@/lib/queue/deck";
 import { shownBodySha256 } from "@/lib/queue/shown-text";
 import { drafterOutlookLine } from "@/lib/queue/drafter-outlook";
 import { describeNotification } from "@/lib/notifications/describe";
@@ -239,6 +239,12 @@ describe("Acceptance 6: only the current draft_to target can make the draft", ()
     // An unknown address for the writer can't be checked: dropped.
     const noEmails: EventTrust = { status: "known", roles: new Map(members.map((m) => [m.userId, m.role])), routing: {} };
     expect(trustedEvents([passTo(U.rebecca)], [approved()], noEmails)).toEqual([]);
+  });
+  it("clock skew: a pass stamped by the database up to 2 minutes before the queue's resolved_at still counts; 3 minutes before does not", () => {
+    const at = (ms: number) => new Date(Date.parse(RESOLVED_AT) + ms).toISOString();
+    expect(trustedEvents([passTo(U.rebecca, RAYN, BODY, { createdAt: at(-30_000) })], [approved()], known())).toHaveLength(1);
+    expect(trustedEvents([passTo(U.rebecca, RAYN, BODY, { createdAt: at(-DRAFT_TO_CLOCK_SKEW_MS) })], [approved()], known())).toHaveLength(1);
+    expect(trustedEvents([passTo(U.rebecca, RAYN, BODY, { createdAt: at(-180_000) })], [approved()], known())).toEqual([]);
   });
   it("a drafted event counts only from the current target; a forged drafted doesn't block her", () => {
     const events = [passTo(U.rebecca), ev("drafted", OTHER_CLERK, { createdAt: "2026-11-20T10:01:00Z" })];

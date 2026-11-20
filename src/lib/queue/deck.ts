@@ -93,6 +93,9 @@ export function viewEventTrust(view: { routing: ApprovalRouting; members: readon
  * Sprint 4: a `draft_to` counts only from the member who approved the item (address = `resolved_by`), written at or after
  * `resolved_at`, and only to a current staff member; a `drafted` only from the current draft_to target.
  */
+/** Allowed difference between the queue service's clock (`resolved_at`) and the database's (`created_at`). */
+export const DRAFT_TO_CLOCK_SKEW_MS = 2 * 60 * 1000;
+
 type FoldItem = RoutableItem & { id: string } & Partial<Pick<QueueItem, "status" | "resolved_by" | "resolved_at">>;
 
 export function trustedEvents(events: readonly CardEvent[], items: readonly FoldItem[], trust: EventTrust): CardEvent[] {
@@ -135,7 +138,9 @@ export function trustedEvents(events: readonly CardEvent[], items: readonly Fold
       if (item.status !== "approved" || !by || !actorEmail || actorEmail.trim().toLowerCase() !== by) continue;
       const resolvedAt = item.resolved_at ? Date.parse(item.resolved_at) : NaN;
       const writtenAt = Date.parse(e.createdAt);
-      if (!Number.isFinite(resolvedAt) || !Number.isFinite(writtenAt) || writtenAt < resolvedAt) continue;
+      // `resolved_at` is stamped by the queue service's clock and `created_at` by the database's: allow a small skew so a
+      // pass written right after approving isn't dropped. A row written well before approval is still left out.
+      if (!Number.isFinite(resolvedAt) || !Number.isFinite(writtenAt) || writtenAt < resolvedAt - DRAFT_TO_CLOCK_SKEW_MS) continue;
       drafters.set(e.queueItemId, e.targetUserId);
       out.push(e);
     } else if (e.kind === "drafted") {

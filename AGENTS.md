@@ -2367,7 +2367,7 @@ their own click). Contract: `docs/pge/2026-11-17-agentic-ip-os/sprint-4.md`. App
   Known limit: the page can't tell a failed pass from a pre-0112 fallback that drafted in the approver's own mailbox (the queue item doesn't record
   which), so the card shows for both and says to use it only if no draft was made; before 0112 the click says passing isn't switched on.
 - **The fold** (`trustedEvents`): a `draft_to` counts only from the member who APPROVED the item (their address = `resolved_by`, from the member
-  directory via `EventTrust.emails`), written at or after `resolved_at`, to a current staff member. A newer draft_to from another attorney or the owner,
+  directory via `EventTrust.emails`), written no more than 2 minutes before `resolved_at` (`DRAFT_TO_CLOCK_SKEW_MS`: the queue stamps `resolved_at`, the database stamps `created_at`) or after it, to a current staff member. A newer draft_to from another attorney or the owner,
   or one written before approval, is dropped. A `drafted` counts only from the current draft_to target. Neither is a hand-off.
 - **"Make the draft in my Outlook"** (`makeDraftInMyOutlook`, `src/lib/queue/make-draft.ts`, the ONE core; the item page's `makeDraftAction`): session
   re-resolved (staff previewing refused), item re-read (approved CLIENT_EMAIL), events and routing re-read and folded with trust (unknown trust or
