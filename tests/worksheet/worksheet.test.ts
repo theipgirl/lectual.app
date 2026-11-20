@@ -314,7 +314,7 @@ describe("attendee HTML email", () => {
     const expected = [
       "Hi Ana,",
       "",
-      "Thank you for joining The Trademark Master Class with RPB Law Firm. Here is a copy of the worksheet you filled in, so you can keep it.",
+      "Thank you for joining The Trademark Master Class with RPB Law Firm. Here is a copy of Your IP Portfolio you filled in, so you can keep it.",
       "",
       worksheetSummary(v, now),
       "",

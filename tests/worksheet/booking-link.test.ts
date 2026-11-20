@@ -129,9 +129,9 @@ describe("personal booking link in the attendee email", () => {
     if (!p.ok) throw new Error("bad body");
     const m = attendeeCopy(p.value, { now: new Date("2026-11-17T23:30:00Z") });
     const h = (x: string) => createHash("sha256").update(x).digest("hex");
-    // Hashes taken from the unchanged code at origin/main before this change.
-    expect(h(m.text)).toBe("854fa9e3064b16a70254e3f5efae74b19853aa6e15de35b26fc1ba707f2ceb73");
-    expect(h(m.html!)).toBe("76cf7a74f19643767c65c0ed0285ab429e8b0e6b1d48cd2717b718f5c55016f4");
+    // Pre-change hashes, re-taken after Rebecca's Nov 17 wording ("a copy of Your IP Portfolio you filled in"); that sentence is the only difference.
+    expect(h(m.text)).toBe("ff1f153b47fe978c0d41a7e2af183c15e7c30ff67f16ac3e5081ca02002a8ad5");
+    expect(h(m.html!)).toBe("ee19f2994c66d0c1c5394e318c32d80ba7ad92d81d2b152cb3f1b53fdd9bf715");
   });
 });
 
