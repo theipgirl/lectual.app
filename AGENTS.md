@@ -2341,33 +2341,54 @@ their own click). Contract: `docs/pge/2026-11-17-agentic-ip-os/sprint-4.md`. App
   one today**: the USPTO watcher (Sprint 3 Part B) is not built yet, and the monthly filing update (`filing-followup`) stays attorney-only
   (questions.md R4 default). `flagsLegalAdvice` still wins over every marker, and `runQueueReview` re-runs `approvalRefusal` on the item AS
   RE-READ (with the approved text) right before resolving, so an edit that adds advice is refused before anything is resolved or drafted.
+- **The markers are not a security boundary on their own.** Any queue writer can set the `agent` string, including a Cowork skill's
+  `queue_draft` call to lawmatics-mcp; for a marked item only the legal-advice phrase list then stands between a law clerk and the approval.
+  So the markers stay limited to Lectual's OWN drafting paths, and each path is reviewed (its template has no advice) before it sets one.
 - **Routing to the clerk** is the existing Settings -> Approvals form; `canApproveItem` is unchanged (routed to a person: that person or the admin
   tier). With empty routing every role's rights equal `canApproveQueue` (pinned for all 10 roles x every kind).
 - **"Drafts go to"** is `approval_routing.drafter` in the same jsonb (`DRAFTER_KEY`): `parseDrafter` keeps it only for a current member in a staff
   role (`eligibleDrafters`); `parseApprovalRouting` skips the key (never counted as dropped); `withApprovalRouting(pricing, routing, drafter?)` keeps
   the stored one when the third argument is left out, so a routing-only save never drops it. Settings shows the drafter's Outlook state only when it
   is the viewer's own (`drafterOutlookLine`), else "Only <name> can see this." `RoutingLoad.ok` and `QueueViewContext` carry `drafter`.
-- **Approve with a drafter set** (`approvePlan`, `src/lib/queue/draft-handoff.ts`, pure): a CLIENT_EMAIL approved by someone who is NOT the drafter,
-  with the routing READ, is `pass`; everything else (no drafter, the drafter approving, a failed routing read, another type) is today's path, byte for
-  byte (no `handoff` key, no extra resolve field: pinned). On `pass`: Lectual staff (`actingAsStaff`) are refused before anything; the resolve call
-  carries `mailbox_draft: false` (`skipMailboxDraft`, **NOT verified against lawmatics-mcp**; if the queue drafts anyway, `send` says so, nothing is
-  passed on and no second draft is made: `handoff.status = "queue-drafted"`); NO `draftInMyMailbox`; one `draft_to` card event (target the drafter,
-  note `approved-text sha256 <64 hex>`, never the text) and one bell notice (`source: "draft_to"`, ids and a clipped headline; "Rebecca approved an
-  email · Make the draft"). The insert refused with 23514 / 22P02 (before lectual 0112, `isKindNotSetUpError`, by code and only for the two new kinds)
-  falls back to the APPROVER'S OWN mailbox only and the page says passing isn't switched on (`?pass=off`); any other failure makes no draft anywhere
-  (`send=pass-failed`).
-- **The fold** (`trustedEvents`): a `draft_to` counts only from someone `canApproveItem` allows for the item and only to a current staff member; a
-  `drafted` only from the current draft_to target. Neither is a hand-off (`currentHolder` ignores both).
+- **The approve plan** (`approvePlan`, `src/lib/queue/draft-handoff.ts`, pure), for a CLIENT_EMAIL with the routing READ and a drafter set: the drafter
+  approving is `self` (the queue is asked not to draft, so the only mailbox draft is her own personal one, `draftInMyMailbox`); anyone else is `pass`.
+  No drafter, another type, or a failed routing read is `today`, unchanged except that EVERY approve now sends the text it re-read and re-classified as
+  `final_body` (S7: a colleague's save landing between the re-read and the resolve is never what gets approved).
+- **`pass`:** Lectual staff (`actingAsStaff`) refused before anything; the approve receipt ("Receipt: sha256 <12 hex>") is ALWAYS on the resolution
+  note; the resolve call carries `mailbox_draft: false` (if the queue drafts anyway, `send` says so, nothing is passed on and no second draft is made:
+  `handoff.status = "queue-drafted"`); NO `draftInMyMailbox`; `passToDrafter` (`review-core.ts`, the one pass write) records one `draft_to` (target the
+  drafter, note `approved-text sha256 <64 hex>`, never the text) and one bell notice (`source: "draft_to"`, ids and a clipped headline; "Rebecca
+  approved an email · Make the draft"). Before lectual 0112 (`isKindNotSetUpError`: code AND message, 23514 naming `queue_card_event_kind_check` or
+  22P02 "invalid input value for enum" naming the kind; anything else is a plain failure) it falls back to the APPROVER'S OWN mailbox only and the page
+  says passing isn't switched on (`?pass=off`); any other failure makes no draft anywhere (`send=pass-failed`). The full page, the deck and the lead
+  page's Yes all say `passedToDrafter(name)` / `PASS_FAILED` (`afterYesSentence`).
+- **"Pass to <drafter>" (S3):** the approved item page offers the APPROVER a retry (`RetryPassCard` -> `retryPassAction` -> `retryPassToDrafter`, same
+  `passToDrafter` write): only the approver (`resolved_by`), only while no trusted draft_to exists, only when the receipt still names the current text.
+  Known limit: the page can't tell a failed pass from a pre-0112 fallback that drafted in the approver's own mailbox (the queue item doesn't record
+  which), so the card shows for both and says to use it only if no draft was made; before 0112 the click says passing isn't switched on.
+- **The fold** (`trustedEvents`): a `draft_to` counts only from the member who APPROVED the item (their address = `resolved_by`, from the member
+  directory via `EventTrust.emails`), written at or after `resolved_at`, to a current staff member. A newer draft_to from another attorney or the owner,
+  or one written before approval, is dropped. A `drafted` counts only from the current draft_to target. Neither is a hand-off.
 - **"Make the draft in my Outlook"** (`makeDraftInMyOutlook`, `src/lib/queue/make-draft.ts`, the ONE core; the item page's `makeDraftAction`): session
   re-resolved (staff previewing refused), item re-read (approved CLIENT_EMAIL), events and routing re-read and folded with trust (unknown trust or
   unreadable events = "couldn't check"; before 0112 = `NOT_SWITCHED_ON`), caller must be the CURRENT target, the item's current text must hash to the
-  draft_to sha (and agree with a resolution-note receipt if there is one: an edit after approval refuses), a drafted item does nothing. The draft goes
-  through `draftInMyOwnOutlook` (`my-mailbox.ts`): the caller's scoped read of their own personal, active Microsoft connection with `Mail.ReadWrite`
-  (`hasDraftScope`); a posted `connection_id` is only COMPARED with it (another person's id is refused, never used). Then a `drafted` event.
+  draft_to sha AND the receipt must be there and agree (an edit after approval, even with a re-issued draft_to, refuses), a drafted item does nothing.
+  Then the caller's own Outlook is checked (`myOutlookDraftAccess(posted)`: their scoped read, `user_id` = the session user, personal, active,
+  Microsoft, `Mail.ReadWrite`; a posted `connection_id` that isn't theirs is refused before anything is written). **Claim first (S8):** the `drafted`
+  row is written BEFORE the Graph call; 0112's one-`drafted`-per-item unique index refuses a second click (23505, read as "already drafted"), a failed
+  claim is a refusal, and a Graph failure after the claim writes nothing more and says "The draft couldn't be made. Ask Lectual." (no silent retry).
+  Without 0112's index two truly concurrent clicks are not stopped by the database.
 - **Ready to draft (N)** (`loadReadyToDraft`, `ready-load.ts`): on Approvals (a link to `?status=approved&who=ready` and a row marker) and the deck (a
-  link), drawn only when the read worked and found some. Every one of these reads (and the item page's card) runs only while the firm HAS a drafter
+  link), drawn only when the read worked and found some. Every one of these reads (and the item page's cards) runs only while the firm HAS a drafter
   set, so a firm without one reads and renders exactly what it did before. Known limit: removing the drafter hides the list for anyone still holding
   a draft_to until one is set again.
-- **NOT verified:** lectual 0103's real `kind` column (CHECK, enum or free text; the lectual repo wasn't reachable), so whether 0112 is needed for the
-  kinds is inferred; `docs/pge/2026-11-17-agentic-ip-os/0112-proposed.sql.txt` holds the proposal and its isolation cases (not on lectual-dev). Also
-  unverified: lawmatics-mcp honouring `mailbox_draft: false`, a real Graph draft, a real browser.
+- **Decision for the director (S5): a routing read that fails** keeps today's path (the queue's channel, else the approver's own mailbox) and makes no
+  hand-off, so firms without a drafter are unchanged. The contract's alternative is "no draft, left for a person": safer for a firm WITH a drafter
+  (nothing lands in the attorney's mailbox on a bad read) but it changes every firm's approve whenever the settings read fails.
+- **Before any firm is switched on (S6):** all of the "no draft in the approver's mailbox" behaviour rests on lawmatics-mcp honouring
+  `mailbox_draft: false` on resolve, which is NOT verified. Verify it against lawmatics-mcp first; until then a `pass` or `self` approve may still be
+  drafted by the queue in the firm's Outlook (the app then reports `queue-drafted` and passes nothing on).
+- **NOT verified:** lectual 0103's real `kind` column (CHECK, enum or free text, and the CHECK's name; the lectual repo wasn't reachable), so whether
+  0112 is needed for the kinds is inferred; `docs/pge/2026-11-17-agentic-ip-os/0112-proposed.sql.txt` holds the proposal (its helper lives in the
+  unexposed `private` schema and refuses any org but the caller's) and its isolation cases (not on lectual-dev). Also unverified: lawmatics-mcp and
+  `mailbox_draft: false`, the queue's `resolved_at` clock against the database's `created_at` (the fold compares them), a real Graph draft, a real browser.

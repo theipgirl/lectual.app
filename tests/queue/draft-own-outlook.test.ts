@@ -27,7 +27,7 @@ vi.mock("@/lib/db/scoped-client", () => ({
       order: () => q,
       then: (resolve: (v: unknown) => void) => resolve({ data: state.scopedError ? null : state.rows, error: state.scopedError }),
     };
-    return { from: () => q };
+    return { from: () => q, auth: { getUser: async () => ({ data: { user: { id: "user-rayn" } } }) } };
   }),
 }));
 vi.mock("@/lib/db/admin", () => ({
@@ -66,7 +66,8 @@ beforeEach(() => {
 describe("Acceptance 7: the caller's own connection, from the scoped read", () => {
   it("drafts with the scoped read's own personal, active connection and the org it returned", async () => {
     expect(await draftInMyOwnOutlook({ draft: DRAFT })).toEqual({ ok: true, id: "AAMk-2", webLink: "https://outlook.office.com/d/2" });
-    expect(state.filters).toEqual(expect.arrayContaining([["scope", "personal"], ["status", "active"]]));
+    // N4: the session's own user id is a filter too, beside RLS.
+    expect(state.filters).toEqual(expect.arrayContaining([["scope", "personal"], ["status", "active"], ["user_id", "user-rayn"]]));
     expect(state.adminReads).toEqual([{ id: "conn-rayn", org: "org-1" }]);
     expect(state.create).toHaveBeenCalledWith("microsoft", { accessToken: "token", draft: DRAFT });
   });
@@ -116,6 +117,7 @@ const SPRINT_FILES = [
   "src/lib/queue/ready-load.ts",
   "src/lib/queue/drafter-outlook.ts",
   "src/components/queue/MakeDraftCard.tsx",
+  "src/components/queue/RetryPassCard.tsx",
 ];
 
 describe("Acceptance 9 and the sprint's hygiene greps", () => {
@@ -146,12 +148,22 @@ describe("Acceptance 9 and the sprint's hygiene greps", () => {
 });
 
 describe("Acceptance 10: before lectual 0112 is detected by error code, only for the new kinds", () => {
-  it("23514 (kind CHECK) or 22P02 (enum) on draft_to / drafted is not set up; on an old kind it stays a failure", async () => {
+  it("N2: the code AND the message must name the kind CHECK (23514) or the enum value (22P02); anything else stays a failure", async () => {
     const { isKindNotSetUpError } = await import("@/lib/queue/card-state");
-    expect(isKindNotSetUpError("draft_to", { code: "23514" })).toBe(true);
-    expect(isKindNotSetUpError("drafted", { code: "22P02" })).toBe(true);
-    expect(isKindNotSetUpError("draft_to", { code: "42501" })).toBe(false);
-    expect(isKindNotSetUpError("handoff", { code: "23514" })).toBe(false);
-    expect(isKindNotSetUpError("draft_to", { message: "check constraint" })).toBe(false);
+    const check = 'new row for relation "queue_card_event" violates check constraint "queue_card_event_kind_check"';
+    expect(isKindNotSetUpError("draft_to", { code: "23514", message: check })).toBe(true);
+    expect(isKindNotSetUpError("drafted", { code: "22P02", message: 'invalid input value for enum queue_card_event_kind: "drafted"' })).toBe(true);
+    // Code alone is not enough.
+    expect(isKindNotSetUpError("draft_to", { code: "23514" })).toBe(false);
+    expect(isKindNotSetUpError("drafted", { code: "22P02" })).toBe(false);
+    // Another CHECK (0112's own shape check) is a failure, not "not switched on".
+    expect(isKindNotSetUpError("draft_to", { code: "23514", message: 'violates check constraint "queue_card_event_draft_shape_check"' })).toBe(false);
+    // A 22P02 from a bad uuid is a failure.
+    expect(isKindNotSetUpError("draft_to", { code: "22P02", message: 'invalid input syntax for type uuid: "x"' })).toBe(false);
+    // The enum message naming the OTHER new kind doesn't count for this one.
+    expect(isKindNotSetUpError("draft_to", { code: "22P02", message: 'invalid input value for enum k: "drafted"' })).toBe(false);
+    expect(isKindNotSetUpError("draft_to", { code: "42501", message: check })).toBe(false);
+    expect(isKindNotSetUpError("handoff", { code: "23514", message: check })).toBe(false);
+    expect(isKindNotSetUpError("draft_to", { message: check })).toBe(false);
   });
 });

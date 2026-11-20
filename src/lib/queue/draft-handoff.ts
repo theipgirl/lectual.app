@@ -18,13 +18,18 @@ import { shownBodySha256, SHOWN_SHA256 } from "@/lib/queue/shown-text";
  * The events given to these functions must already be folded by `trustedEvents` (deck.ts), so a forged draft_to is out.
  */
 
-export type ApprovePlan = "today" | "pass";
+/**
+ * `today`: no drafter set (or the routing couldn't be read), or not a client email: unchanged.
+ * `self`:  the drafter approves: the queue is asked not to draft, so the only mailbox draft is her own personal one.
+ * `pass`:  someone else approves: no mailbox draft anywhere; a draft_to passes it to the drafter.
+ */
+export type ApprovePlan = "today" | "self" | "pass";
 
 /** What the approve path does about the mailbox draft. `drafter` null = no "Drafts go to" set (or it couldn't be read). */
 export function approvePlan(args: { approverId: string; drafter: string | null | undefined; itemType: string }): ApprovePlan {
   if (args.itemType !== "CLIENT_EMAIL") return "today";
-  if (!args.drafter || args.drafter === args.approverId) return "today";
-  return "pass";
+  if (!args.drafter) return "today";
+  return args.drafter === args.approverId ? "self" : "pass";
 }
 
 /* ─────────────── the receipt carried on draft_to ─────────────── */
@@ -49,15 +54,27 @@ export function receiptFromNote(note: string | null | undefined): string | null 
 
 /**
  * Is the item's CURRENT text the text that was approved? The current `final_body ?? draft_body` must hash to the sha256
- * on the draft_to, and when the resolution note carries a receipt, that receipt must agree too. An edit after approval
- * (or a draft_to that carries no hash) is a no.
+ * on the draft_to, AND the approve receipt on the resolution note (always written when the plan is `pass`) must be there
+ * and agree. An edit after approval, a draft_to that carries no hash, or a missing receipt is a no.
  */
 export function approvedTextMatches(item: Pick<QueueItem, "final_body" | "draft_body" | "resolution_note">, sha: string | null): boolean {
   if (!sha) return false;
   const current = shownBodySha256(item.final_body ?? item.draft_body);
   if (current !== sha) return false;
   const receipt = receiptFromNote(item.resolution_note);
-  return receipt === null || sha.startsWith(receipt);
+  return receipt !== null && sha.startsWith(receipt);
+}
+
+/** True when the item's current text is the text its approve receipt names (the receipt must be there). */
+export function receiptMatchesCurrent(item: Pick<QueueItem, "final_body" | "draft_body" | "resolution_note">): boolean {
+  const receipt = receiptFromNote(item.resolution_note);
+  return receipt !== null && shownBodySha256(item.final_body ?? item.draft_body).startsWith(receipt);
+}
+
+/** Did this member approve the item? `resolved_by` is the approver's session address. Case-insensitive. */
+export function approvedBy(item: Pick<QueueItem, "status" | "resolved_by">, email: string | null | undefined): boolean {
+  const by = (item.resolved_by ?? "").trim().toLowerCase();
+  return item.status === "approved" && !!by && !!email && email.trim().toLowerCase() === by;
 }
 
 /* ─────────────── who holds the draft ─────────────── */
@@ -86,6 +103,38 @@ export function readyToDraft<T extends Pick<QueueItem, "id" | "status" | "type">
 }
 
 /* ─────────────── may this person make the draft? ─────────────── */
+
+/* ─────────────── retry a failed pass (S3) ─────────────── */
+
+export type RetryPassRefusal = "preview" | "not-yours" | "not-approved" | "no-drafter" | "not-switched-on" | "couldnt-check" | "already-passed" | "changed";
+
+/**
+ * "Pass to <drafter>" again, after a pass that didn't go through. Only the person who approved the item (their address is
+ * `resolved_by`), only for an approved client email, only while the firm's drafter is someone else, only while NO trusted
+ * draft_to exists, and only when the approve receipt is there and still names the current text.
+ */
+export function retryPassDecision(args: {
+  actingAsStaff: boolean;
+  callerId: string | null;
+  callerRole: Role | null;
+  callerEmail: string | null;
+  item: Pick<QueueItem, "id" | "status" | "type" | "final_body" | "draft_body" | "resolution_note" | "resolved_by"> | null;
+  drafter: string | null;
+  state: CardState;
+  trustKnown: boolean;
+}): { ok: true; drafter: string } | { ok: false; reason: RetryPassRefusal } {
+  if (args.actingAsStaff) return { ok: false, reason: "preview" };
+  if (!args.callerId || !args.callerRole || !QUEUE_EDIT_ROLES.includes(args.callerRole)) return { ok: false, reason: "not-yours" };
+  if (!args.item) return { ok: false, reason: "couldnt-check" };
+  if (args.item.status !== "approved" || args.item.type !== "CLIENT_EMAIL") return { ok: false, reason: "not-approved" };
+  if (!approvedBy(args.item, args.callerEmail)) return { ok: false, reason: "not-yours" };
+  if (!args.drafter || args.drafter === args.callerId) return { ok: false, reason: "no-drafter" };
+  if (args.state.status === "not-set-up") return { ok: false, reason: "not-switched-on" };
+  if (args.state.status !== "ok" || !args.trustKnown) return { ok: false, reason: "couldnt-check" };
+  if (draftAssignment(args.state.events, args.item.id)) return { ok: false, reason: "already-passed" };
+  if (!receiptMatchesCurrent(args.item)) return { ok: false, reason: "changed" };
+  return { ok: true, drafter: args.drafter };
+}
 
 export type DraftRefusal =
   | "preview" // Lectual staff viewing as the firm

@@ -168,6 +168,16 @@ describe("the after-Yes sentence comes from the approve core's own result", () =
     for (const s of [W.LEAD_STEP_DRAFT_IN_QUEUE_MAILBOX, W.LEAD_STEP_APPROVED_NO_DRAFT, W.LEAD_STEP_APPROVED_DRAFT_FAILED, W.LEAD_STEP_APPROVED_MANUAL]) expect(s).not.toMatch(/Outlook/);
   });
 
+  it("Sprint 4 S4: passed to the drafter reads passedToDrafter(name) with no warning; a failed pass reads PASS_FAILED as a warning", async () => {
+    const DRAFTER = "00000000-0000-4000-8000-0000000000d1";
+    const routing = vi.fn(async () => ({ status: "ok" as const, routing: {}, members: [{ userId: DRAFTER, role: "law_clerk" as const, displayName: "Rayn", email: null }] }));
+    const passed = deps({ routing, review: vi.fn(async () => resolved({ send: "passed", provider: null, webLink: null, draftId: null, handoff: { status: "passed", drafter: DRAFTER } })) });
+    expect(await runLeadStepYes(passed, LEAD, ITEM, SHA)).toEqual({ ok: true, message: W.passedToDrafter("Rayn"), webLink: null, warn: false });
+    const failed = deps({ routing, review: vi.fn(async () => resolved({ send: "pass-failed", provider: null, webLink: null, draftId: null, handoff: { status: "failed", drafter: DRAFTER } })) });
+    expect(await runLeadStepYes(failed, LEAD, ITEM, SHA)).toEqual({ ok: true, message: W.PASS_FAILED, webLink: null, warn: true });
+    expect(afterYesSentence(resolved({ send: "passed", provider: null }) as never, "CLIENT_EMAIL")).toBe(W.passedToDrafter("the drafter"));
+  });
+
   it("the action returns that sentence", async () => {
     const d = deps({ review: vi.fn(async () => resolved({ send: "none", provider: null, webLink: null })) });
     expect(await runLeadStepYes(d, LEAD, ITEM, SHA)).toEqual({ ok: true, message: W.LEAD_STEP_APPROVED_NO_DRAFT, webLink: null, warn: true });

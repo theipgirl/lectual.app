@@ -114,6 +114,16 @@ export async function requireFirmReviewer(allowed: Role[], verb: string): Promis
   return { email: user.email, userId: user.id, role };
 }
 
+/**
+ * The one pass write (the approve path and the approver's "Pass to <drafter>" retry): one `draft_to` to the drafter with
+ * the approved text's sha256, then the bell (ids and a clipped headline only; notify() never throws).
+ */
+export async function passToDrafter(args: { orgId: string; itemId: string; drafter: string; approvedText: string; approverId: string; item: { id: string; headline: string } }) {
+  const passed = await recordCardEvent({ orgId: args.orgId, queueItemId: args.itemId, kind: "draft_to", targetUserId: args.drafter, note: draftToNote(args.approvedText) });
+  if (passed.ok) await notify({ userId: args.drafter, kind: NOTIFICATION_KIND_FOR.approval_needed, actorId: args.approverId, payload: cardNoticePayload("draft_to", args.item) });
+  return passed;
+}
+
 export async function runQueueReview(input: ReviewInput): Promise<ReviewOutcome> {
   const id = input.id;
   const intent = input.intent;
@@ -239,7 +249,8 @@ export async function runQueueReview(input: ReviewInput): Promise<ReviewOutcome>
         });
         if (again) return { kind: "error", error: again };
       }
-      const receipt = input.withReceipt ? approvalReceipt(approvedText) : null;
+      // A pass to the drafter always carries the receipt: "Make the draft" requires it and checks it against the text.
+      const receipt = input.withReceipt || plan === "pass" ? approvalReceipt(approvedText) : null;
       const approvalNote = [note, staleNote, receipt].filter(Boolean).join("\n") || null;
 
       // The proposal link goes live now, BEFORE the queue item is resolved: resolving can itself create the mailbox
@@ -254,17 +265,18 @@ export async function runQueueReview(input: ReviewInput): Promise<ReviewOutcome>
         }
       }
 
-      // With requireShown, the text whose hash matched is sent as the final body, so an edit a colleague saves after the
-      // re-check is never what the drafter sends. Without it, behaviour is unchanged (the queue reads its own final_body).
+      // The text that was re-read and re-classified is sent as the final body on EVERY approve, so an edit a colleague
+      // saves after the re-read is never what gets approved (or drafted).
       const resolved = await resolveQueueItem({
         orgKey: qKey,
         id,
         action: "approve",
         resolvedBy,
         ...(approvalNote ? { note: approvalNote } : {}),
-        ...(input.requireShown ? { finalBody: approvedText } : {}),
-        // Passing to the drafter: the queue must not draft it in any mailbox either.
-        ...(plan === "pass" ? { skipMailboxDraft: true } : {}),
+        finalBody: approvedText,
+        // A drafter is set: the queue must not draft it in any mailbox. On `pass` nobody's mailbox gets it now; on `self`
+        // the only draft is the drafter's own personal one, below. NOT verified that lawmatics-mcp honours this.
+        ...(plan === "pass" || plan === "self" ? { skipMailboxDraft: true } : {}),
       });
       sendStatus = resolved.send;
       webLink = resolved.sendResult?.webLink ?? null;
@@ -296,12 +308,10 @@ export async function runQueueReview(input: ReviewInput): Promise<ReviewOutcome>
           // The queue drafted it although asked not to: never a second draft, and nothing passed on.
           handoff = { status: "queue-drafted", drafter };
         } else {
-          const passed = await recordCardEvent({ orgId: passOrgId, queueItemId: id, kind: "draft_to", targetUserId: drafter, note: draftToNote(approvedText) });
+          const passed = await passToDrafter({ orgId: passOrgId, itemId: id, drafter, approvedText, approverId: caller.userId, item });
           if (passed.ok) {
             handoff = { status: "passed", drafter };
             sendStatus = "passed";
-            // The bell tells the drafter (ids and a clipped headline only). notify() never throws.
-            await notify({ userId: drafter, kind: NOTIFICATION_KIND_FOR.approval_needed, actorId: caller.userId, payload: cardNoticePayload("draft_to", item) });
           } else if (passed.reason === "not-set-up") {
             // Before lectual 0112: today's behaviour, and ONLY the approver's own mailbox.
             handoff = { status: "not-switched-on", drafter };

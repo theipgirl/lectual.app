@@ -56,16 +56,26 @@ export function currentHolder(events: readonly CardEvent[], itemId: string): Hol
  * and the routing, with the same `canApproveItem` the actions use. `unknown` (the routing or the member list could not
  * be read) keeps the old behaviour: every event is trusted, so a failed read never hides a card.
  */
-export type EventTrust = { status: "known"; roles: ReadonlyMap<string, Role>; routing: ApprovalRouting } | { status: "unknown" };
+export type EventTrust =
+  | {
+      status: "known";
+      roles: ReadonlyMap<string, Role>;
+      routing: ApprovalRouting;
+      /** Sprint 4: each member's address, to tell who approved an item (`resolved_by`). Missing = a draft_to can't be checked. */
+      emails?: ReadonlyMap<string, string>;
+    }
+  | { status: "unknown" };
 
 /** The trust input from a routing load (`loadApprovalRouting`): known only when the routing AND its member list were read. */
-export function eventTrust(routed: { status: "ok"; routing: ApprovalRouting; members: readonly { userId: string; role: Role }[] } | { status: "failed" }): EventTrust {
+export function eventTrust(routed: { status: "ok"; routing: ApprovalRouting; members: readonly { userId: string; role: Role; email?: string | null }[] } | { status: "failed" }): EventTrust {
   if (routed.status !== "ok") return { status: "unknown" };
-  return { status: "known", roles: new Map(routed.members.map((m) => [m.userId, m.role])), routing: routed.routing };
+  const emails = new Map<string, string>();
+  for (const m of routed.members) if (m.email) emails.set(m.userId, m.email);
+  return { status: "known", roles: new Map(routed.members.map((m) => [m.userId, m.role])), routing: routed.routing, emails };
 }
 
 /** The same, from the Approvals pages' view context (`loadQueueViewContext`): a failed routing or member read is unknown. */
-export function viewEventTrust(view: { routing: ApprovalRouting; members: readonly { userId: string; role: Role }[] | null; routingFailed: boolean }): EventTrust {
+export function viewEventTrust(view: { routing: ApprovalRouting; members: readonly { userId: string; role: Role; email?: string | null }[] | null; routingFailed: boolean }): EventTrust {
   return view.routingFailed || !view.members ? { status: "unknown" } : eventTrust({ status: "ok", routing: view.routing, members: view.members });
 }
 
@@ -80,10 +90,12 @@ export function viewEventTrust(view: { routing: ApprovalRouting; members: readon
  * Events are folded in the order given (the database order); two rows with the same `created_at` keep that order.
  * `later` rows only ever change their own actor's deck and are kept. With trust `unknown` nothing is dropped. With trust
  * `known`, a hand-off or return for an item not in `items` can't be checked and is dropped. Idempotent.
- * Sprint 4: a `draft_to` counts only from someone who may approve the item and only to a current staff member; a
- * `drafted` only from the current draft_to target.
+ * Sprint 4: a `draft_to` counts only from the member who approved the item (address = `resolved_by`), written at or after
+ * `resolved_at`, and only to a current staff member; a `drafted` only from the current draft_to target.
  */
-export function trustedEvents(events: readonly CardEvent[], items: readonly (RoutableItem & { id: string })[], trust: EventTrust): CardEvent[] {
+type FoldItem = RoutableItem & { id: string } & Partial<Pick<QueueItem, "status" | "resolved_by" | "resolved_at">>;
+
+export function trustedEvents(events: readonly CardEvent[], items: readonly FoldItem[], trust: EventTrust): CardEvent[] {
   if (trust.status !== "known") return [...events];
   const byId = new Map(items.map((i) => [i.id, i]));
   const holders = new Map<string, Holder | null>();
@@ -112,12 +124,18 @@ export function trustedEvents(events: readonly CardEvent[], items: readonly (Rou
       holders.set(e.queueItemId, null);
       out.push(e);
     } else if (e.kind === "draft_to") {
-      // Only someone who may approve the item passes it to a drafter (the approve path writes it as the approver), and
-      // only to a current staff member. A forged draft_to (any staff member can insert a row) is left out.
+      // Only the person who APPROVED the item passes it to a drafter (the approve path writes it as the approver, after
+      // resolving): the writer's address must be the item's `resolved_by`, the row no older than `resolved_at`, and the
+      // target a current staff member. Anything else (another attorney, a row written before approval, a forged row) is left out.
       if (!e.targetUserId) continue;
       const targetRole = trust.roles.get(e.targetUserId);
       if (!targetRole || !QUEUE_EDIT_ROLES.includes(targetRole)) continue;
-      if (!mayApprove(e.actorId, item)) continue;
+      const actorEmail = trust.emails?.get(e.actorId);
+      const by = (item.resolved_by ?? "").trim().toLowerCase();
+      if (item.status !== "approved" || !by || !actorEmail || actorEmail.trim().toLowerCase() !== by) continue;
+      const resolvedAt = item.resolved_at ? Date.parse(item.resolved_at) : NaN;
+      const writtenAt = Date.parse(e.createdAt);
+      if (!Number.isFinite(resolvedAt) || !Number.isFinite(writtenAt) || writtenAt < resolvedAt) continue;
       drafters.set(e.queueItemId, e.targetUserId);
       out.push(e);
     } else if (e.kind === "drafted") {
@@ -130,7 +148,7 @@ export function trustedEvents(events: readonly CardEvent[], items: readonly (Rou
 }
 
 /** `trustedEvents` over a card-event read; a read that failed or isn't set up is returned as it is. */
-export function trustedCardState(state: CardState, items: readonly (RoutableItem & { id: string })[], trust: EventTrust): CardState {
+export function trustedCardState(state: CardState, items: readonly FoldItem[], trust: EventTrust): CardState {
   return state.status === "ok" ? { status: "ok", events: trustedEvents(state.events, items, trust) } : state;
 }
 

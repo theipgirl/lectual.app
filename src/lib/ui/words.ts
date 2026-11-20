@@ -703,8 +703,16 @@ export const makeDraftIntro = (approverName: string) =>
   `${approverName} approved this email. Make the draft in your own Outlook, check it there and press Send. Nothing has reached the client yet.`;
 export const MAKE_DRAFT_DONE = "The draft is in your Outlook Drafts. Open it there and press Send. Nothing has reached the client yet.";
 export const MAKE_DRAFT_ALREADY = "This one is already drafted in your Outlook. Nothing else was made.";
-export const MAKE_DRAFT_DONE_NOT_MARKED =
-  "The draft is in your Outlook Drafts, but Lectual couldn't mark it as drafted. Don't press the button again: open Drafts in Outlook.";
+/** The claim (the drafted mark) was written first, then the draft failed: no silent retry, a person checks it. */
+export const MAKE_DRAFT_CLAIMED_FAILED = "The draft couldn't be made. Ask Lectual.";
+export const MAKE_DRAFT_CLAIMED_RECONNECT = "The draft couldn't be made because your Outlook needs reconnecting. Reconnect it, then ask Lectual.";
+/* S3: the approver retries a pass that didn't go through. */
+export const passToDrafterButton = (name: string) => `Pass to ${name}`;
+export const RETRY_PASS_INTRO =
+  "This approved email hasn't been passed to the drafter. If passing it didn't go through, pass it again. Use this only if no draft of it was made anywhere.";
+export const RETRY_PASS_NOT_YOURS = "Only the person who approved this email can pass it on.";
+export const RETRY_PASS_NO_DRAFTER = "There's no one else to pass this to. Check Drafts go to in Approval settings.";
+export const RETRY_PASS_ALREADY = "This email has already been passed on. Nothing else was done.";
 export const MAKE_DRAFT_NOT_YOURS = "This email isn't waiting on your draft. Refresh to see what's left.";
 export const MAKE_DRAFT_NOT_APPROVED = "Only an approved client email can be drafted from here.";
 export const MAKE_DRAFT_CHANGED = "This email changed after it was approved, so no draft was made. Ask for it to be approved again.";
@@ -715,7 +723,6 @@ export const MAKE_DRAFT_NO_OUTLOOK = "Connect your own Outlook to make drafts he
 export const MAKE_DRAFT_NOT_OUTLOOK = "Only a Gmail mailbox is connected. Connect your own Outlook to make drafts here.";
 export const MAKE_DRAFT_NEEDS_PERMISSION = "Reconnect your Outlook and allow it to save drafts.";
 export const MAKE_DRAFT_OUTLOOK_UNREAD = "Couldn't check your Outlook. Refresh to try again.";
-export const MAKE_DRAFT_RECONNECT = "Your Outlook needs reconnecting before a draft can be made. Nothing was made.";
 export const CONNECT_OUTLOOK_LINK = "Connect Outlook";
 export const DRAFTED_IN_OUTLOOK = "Drafted in your Outlook.";
 /** The approve outcome when the email was passed to the drafter. */

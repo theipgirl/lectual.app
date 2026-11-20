@@ -14,7 +14,7 @@ import type { Role } from "@/lib/auth/roles";
 import { cardIdOf, cardNoteOf, sendCardBack } from "@/lib/queue/card-moves";
 import { sendBackNoteTooLong } from "@/lib/queue/handed";
 import { isDoneNote } from "@/lib/queue/done";
-import { makeDraftInMyOutlook } from "@/lib/queue/make-draft";
+import { makeDraftInMyOutlook, retryPassToDrafter } from "@/lib/queue/make-draft";
 import { DECK_FAILED, REJECT_NOTE_IS_DONE_MARKER, SEND_BACK_NOTE_TOO_LONG } from "@/lib/ui/words";
 
 export type ReviewState = { error?: string };
@@ -138,4 +138,15 @@ export async function makeDraftAction(_prev: MakeDraftState, formData: FormData)
   revalidatePath("/dashboard/queue/");
   revalidatePath(`/dashboard/queue/${id}/`);
   return { message: made.message, webLink: made.webLink };
+}
+
+/** "Pass to <drafter>" (S3): the approver passes an approved email on again after a pass that didn't go through. */
+export async function retryPassAction(_prev: MakeDraftState, formData: FormData): Promise<MakeDraftState> {
+  const id = cardIdOf(formData.get("id"));
+  if (!id) return { error: DECK_FAILED };
+  const passed = await retryPassToDrafter({ id });
+  if (!passed.ok) return { error: passed.error };
+  revalidatePath("/dashboard/queue/");
+  revalidatePath(`/dashboard/queue/${id}/`);
+  return { message: passed.message };
 }

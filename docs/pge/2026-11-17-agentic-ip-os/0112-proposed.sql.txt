@@ -19,8 +19,12 @@
 --     The attorney's approve then falls back to today's behaviour for HER OWN mailbox only (never a third person's), and the
 --     page says passing to the drafter isn't switched on yet.
 --   * IF 0103 HAS NO CHECK AND NO ENUM ON `kind`: the two kinds already insert, this file is not needed for the kinds, and the
---     app works without it. The policy part below (target required, drafted only for oneself) is then still recommended,
---     because the app's fold (`trustedEvents`) is the only thing standing between a forged row and the Ready list.
+--     app works without it. Parts 2 to 4 (target = the firm's configured drafter, writer an approver role or routed, drafted
+--     only for oneself, one drafted per item as the double-click claim) are then still needed: without part 4 two concurrent
+--     "Make the draft" clicks are not stopped by the database, and without parts 2 and 3 the app's fold (`trustedEvents`) is
+--     the only thing standing between a forged row and the Ready list.
+--   * The app recognises "before 0112" only by code AND message: 23514 naming `queue_card_event_kind_check`, or 22P02 "invalid
+--     input value for enum" naming the new kind (card-state.ts `isKindNotSetUpError`).
 --
 -- Why (decision 3b): when the attorney approves a client email and the firm's "Drafts go to" is someone else, the card passes
 -- to that person (`draft_to`, target = the drafter, note = 'approved-text sha256 <64 hex>') and they make the draft in their OWN
@@ -47,36 +51,66 @@ alter table public.queue_card_event
   );
 
 -- 3. Who may insert them. 0103's insert policy (staff of the row's org) stays; this adds, for the new kinds only:
---    * draft_to: the target is a current member of the SAME org (no cross-firm target);
---    * drafted:  only for oneself (actor_id is auth.uid() by the trigger, so the row can only be the caller's own), and only
---                when the newest draft_to on that item names the caller.
---    RESTRICTIVE, so it narrows 0103's permissive policy and widens nothing. Check 0103's role list and helper names
---    (`current_org_id()`, `crm_org_member`) before copying; this file uses the names the app's generated types show.
-create or replace function public.queue_card_event_draft_ok(p_org uuid, p_item text, p_kind text, p_target uuid)
+--    * draft_to: the TARGET is the firm's configured drafter (client_proposal_setting.pricing->'approval_routing'->>'drafter',
+--                the same setting the app reads), and the WRITER holds owner / admin / senior_admin / attorney or is named as a
+--                value in that firm's approval_routing (a routed approver). Same org only.
+--    * drafted:  only for oneself (actor_id is auth.uid() by the trigger), and only when the newest draft_to on that item
+--                (newest by created_at, then id) names the caller.
+--    RESTRICTIVE, so it narrows 0103's permissive policy and widens nothing.
+--
+--    The helper is SECURITY DEFINER (it reads crm_org_member, client_proposal_setting and other rows of queue_card_event that
+--    RLS would hide), so it lives in `private`, a schema PostgREST does NOT expose (check `pgrst.db_schemas` / the API
+--    settings: only `public` and `graphql_public` should be listed). It is not callable as an RPC. Its first statement refuses
+--    any org but the caller's own active one, so even a direct call can't answer about another firm. `authenticated` gets
+--    USAGE on the schema and EXECUTE on this one function only because the policy expression runs as the caller.
+create schema if not exists private;
+revoke all on schema private from public, anon;
+grant usage on schema private to authenticated;
+
+create or replace function private.queue_card_event_draft_ok(p_org uuid, p_item text, p_kind text, p_target uuid)
 returns boolean
-language sql
+language plpgsql
 stable
 security definer
 set search_path = ''
 as $$
-  select case
-    when p_kind = 'draft_to' then exists (
+declare
+  v_routing jsonb;
+  v_newest_target uuid;
+begin
+  if p_org is distinct from public.current_org_id() then
+    return false;
+  end if;
+
+  if p_kind = 'draft_to' then
+    select s.pricing -> 'approval_routing' into v_routing
+    from public.client_proposal_setting s
+    where s.org_id = p_org;
+    if v_routing is null or p_target is null or p_target::text is distinct from (v_routing ->> 'drafter') then
+      return false;
+    end if;
+    -- The writer: an approver role in this firm, or a person the firm routes approvals to.
+    return exists (
       select 1 from public.crm_org_member m
-      where m.org_id = p_org and m.user_id = p_target
-        and m.role::text in ('owner', 'admin', 'senior_admin', 'attorney', 'intake', 'paralegal', 'law_clerk', 'clerk')
-    )
-    when p_kind = 'drafted' then (
-      select e.target_user_id = auth.uid()
-      from public.queue_card_event e
-      where e.org_id = p_org and e.queue_item_id = p_item and e.kind = 'draft_to'
-      order by e.created_at desc
-      limit 1
-    ) is true
-    else true
-  end
+      where m.org_id = p_org and m.user_id = auth.uid()
+        and (
+          m.role::text in ('owner', 'admin', 'senior_admin', 'attorney')
+          or exists (select 1 from jsonb_each_text(v_routing) r where r.value = auth.uid()::text)
+        )
+    );
+  elsif p_kind = 'drafted' then
+    select e.target_user_id into v_newest_target
+    from public.queue_card_event e
+    where e.org_id = p_org and e.queue_item_id = p_item and e.kind = 'draft_to'
+    order by e.created_at desc, e.id desc
+    limit 1;
+    return v_newest_target is not null and v_newest_target = auth.uid();
+  end if;
+  return true;
+end
 $$;
-revoke all on function public.queue_card_event_draft_ok(uuid, text, text, uuid) from public, anon;
-grant execute on function public.queue_card_event_draft_ok(uuid, text, text, uuid) to authenticated;
+revoke all on function private.queue_card_event_draft_ok(uuid, text, text, uuid) from public, anon;
+grant execute on function private.queue_card_event_draft_ok(uuid, text, text, uuid) to authenticated;
 
 drop policy if exists queue_card_event_draft_kinds on public.queue_card_event;
 create policy queue_card_event_draft_kinds on public.queue_card_event
@@ -85,31 +119,50 @@ create policy queue_card_event_draft_kinds on public.queue_card_event
   to authenticated
   with check (
     kind not in ('draft_to', 'drafted')
-    or (org_id = public.current_org_id() and public.queue_card_event_draft_ok(org_id, queue_item_id, kind, target_user_id))
+    or (org_id = public.current_org_id() and private.queue_card_event_draft_ok(org_id, queue_item_id, kind, target_user_id))
   );
+
+-- 4. One `drafted` per item: the app writes it BEFORE it makes the Outlook draft (a claim), so two clicks make at most one
+--    draft. The second insert answers 23505, which the app reads as "already drafted".
+create unique index if not exists queue_card_event_one_drafted
+  on public.queue_card_event (org_id, queue_item_id)
+  where kind = 'drafted';
 
 commit;
 
 -- Notes for the reviewer:
 --   * `queue_item_id` is typed `string` in the app's types; it is the lawmatics-mcp queue's id (not a uuid FK). If 0103 made it
---     uuid, change `p_item text` to uuid.
---   * Postgres cannot check from here that the draft_to's ACTOR may approve the item (the queue lives in lawmatics-mcp, outside
---     this database). The app's fold does: a draft_to counts only when `canApproveItem` says its actor may approve the item, and a
---     drafted only from the current target (src/lib/queue/deck.ts `trustedEvents`). The policy above stops the cross-firm and
---     someone-else's-drafted cases the database CAN see.
+--     uuid, change `p_item text` to uuid. `id` is assumed to be 0103's primary key (the drafted subquery breaks created_at ties
+--     on it); use 0103's real key column if it is named differently.
+--   * The kind CHECK must keep the name `queue_card_event_kind_check`: the app recognises "before 0112" by that name in the
+--     23514 message (src/lib/queue/card-state.ts `KIND_CHECK_NAME`). If 0103 named it differently, keep 0103's name here AND
+--     in the app, or 0112's absence reads as a plain failure (safe, but the fallback to the approver's own mailbox is lost).
+--   * Postgres cannot check from here that the draft_to's writer APPROVED the item (the queue lives in lawmatics-mcp, outside
+--     this database). The app's fold does: a draft_to counts only when its writer's address is the item's `resolved_by` and it was
+--     written at or after `resolved_at`; a drafted only from the current target (src/lib/queue/deck.ts `trustedEvents`). The
+--     policy above stops what the database CAN see: another firm, a target that isn't the firm's drafter, a writer who is
+--     neither an approver role nor routed, and someone else's drafted.
 --   * No new table and no new column: "Drafts go to" lives in client_proposal_setting.pricing.approval_routing.drafter
 --     (questions.md T8: firms without the Proposals feature can't save it).
 --
 -- Tenant-isolation cases to add to lectual `tests/tenant-isolation.test.ts` (the gate lives there):
 --   1. A member of firm B inserts a `draft_to` for firm A's org_id (or with firm A's active org claim but no membership): refused.
---   2. A member of firm A inserts a `draft_to` whose target is a member of firm B only: refused.
---   3. A `draft_to` with target_user_id null: refused (23514).
---   4. A member of firm A inserts a `drafted` on an item whose newest draft_to names ANOTHER user: refused.
---   5. The draft_to target inserts a `drafted` for that item: allowed; actor_id comes back as their own auth.uid() and created_at
---      the database's own (an actor_id or created_at in the insert is permission denied, as for 0103).
---   6. A `drafted` with a target_user_id: refused (23514).
---   7. Firm B reads no firm A rows of either kind (0103's select policy, re-asserted for the new kinds).
---   8. 'handoff', 'later', 'returned' inserts behave exactly as before (regression).
---   9. A kind outside the five: refused (23514).
---  10. `proconfig` of queue_card_event_draft_ok is exactly `search_path=""`; `public` and anon have no EXECUTE.
+--   2. A member of firm A inserts a `draft_to` whose target is not firm A's configured drafter (another member of A, or a member
+--      of firm B): refused. With no drafter configured, every draft_to is refused.
+--   3. A paralegal / law_clerk / intake / clerk of firm A who is NOT a value in approval_routing inserts a draft_to: refused. The
+--      same person named as a routing value: allowed. An attorney of firm A: allowed.
+--   4. A `draft_to` with target_user_id null: refused (23514).
+--   5. A member of firm A inserts a `drafted` on an item whose newest draft_to names ANOTHER user: refused. Two draft_to rows with
+--      the same created_at: the one with the larger id decides.
+--   6. The draft_to target inserts a `drafted`: allowed; actor_id comes back as their own auth.uid() and created_at the database's
+--      own (an actor_id or created_at in the insert is permission denied, as for 0103). A SECOND `drafted` for the same item: 23505.
+--   7. A `drafted` with a target_user_id: refused (23514).
+--   8. Firm B reads no firm A rows of either kind (0103's select policy, re-asserted for the new kinds).
+--   9. 'handoff', 'later', 'returned' inserts behave exactly as before (regression).
+--  10. A kind outside the five: refused (23514), and the message names `queue_card_event_kind_check`.
+--  11. Direct call as an RPC: `POST /rest/v1/rpc/queue_card_event_draft_ok` as a member of firm B (any arguments, firm A's org id
+--      included) is NOT FOUND (the `private` schema is not exposed); `select private.queue_card_event_draft_ok('<firm A org>', ...)`
+--      from SQL as firm B's member returns false; as anon it is permission denied (no USAGE on `private`, no EXECUTE).
+--  12. `proconfig` of private.queue_card_event_draft_ok is exactly `search_path=""`; `public` and anon have no EXECUTE; nothing
+--      of it exists in `public`.
 -- =====================================================================================================================

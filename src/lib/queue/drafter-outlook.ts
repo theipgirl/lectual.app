@@ -13,7 +13,7 @@ import {
  * (a colleague's personal Outlook is invisible by RLS), so for anyone else it is "Only <first name> can see this".
  * Pure. A failed read is "couldn't check", never "not connected".
  */
-export function drafterOutlookLine(args: { drafterName: string; isSelf: boolean; access: MyOutlookDraftAccess | null }): string {
+export function drafterOutlookLine(args: { drafterName: string; isSelf: boolean; access: MyOutlookDraftAccess | "not-yours" | null }): string {
   if (!args.isSelf) {
     const first = args.drafterName.trim().split(/\s+/)[0] || null;
     return `${onlyCanSeeThis(first && !first.includes("@") ? first : null)}.`;

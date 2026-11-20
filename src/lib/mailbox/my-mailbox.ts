@@ -129,11 +129,17 @@ export async function sendFromMyOutlook(args: { draftId: string; recipient: stri
 async function myOwnOutlookRow(): Promise<{ ok: true; row: { id: string; org_id: string; scopes: unknown } | null; anyOther: boolean } | { ok: false }> {
   try {
     const supabase = await getScopedClient();
+    // The session's own user: RLS already shows a personal row only to its owner, and the filter says so as well.
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user?.id) return { ok: false };
     const { data, error } = await supabase
       .from("mailbox_connection")
       .select("id, org_id, provider, scopes")
       .eq("scope", "personal")
       .eq("status", "active")
+      .eq("user_id", user.id)
       .order("created_at", { ascending: true });
     if (error) return { ok: false };
     const rows = (data ?? []) as { id: string; org_id: string; provider: string; scopes: unknown }[];
@@ -151,10 +157,15 @@ function draftAccessOf(mine: Awaited<ReturnType<typeof myOwnOutlookRow>>): MyOut
   return hasDraftScope("microsoft", scopes) ? "ready" : "needs-permission";
 }
 
-/** Can "Make the draft in my Outlook" run for the signed-in person? A failed read is `unavailable`, never "no mailbox". */
-export async function myOutlookDraftAccess(): Promise<MyOutlookDraftAccess> {
+/**
+ * Can "Make the draft in my Outlook" run for the signed-in person? A failed read is `unavailable`, never "no mailbox".
+ * A connection id the browser posted that is not the caller's own is `not-yours` (checked before anything is written).
+ */
+export async function myOutlookDraftAccess(postedConnectionId?: unknown): Promise<MyOutlookDraftAccess | "not-yours"> {
   if (!rootKeyOrNull()) return "unavailable";
-  return draftAccessOf(await myOwnOutlookRow());
+  const mine = await myOwnOutlookRow();
+  if (!postedConnectionAllowed(postedConnectionId, mine.ok && mine.row ? mine.row.id : null)) return "not-yours";
+  return draftAccessOf(mine);
 }
 
 export type OwnOutlookDraft =

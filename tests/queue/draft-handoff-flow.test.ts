@@ -24,13 +24,15 @@ const state = vi.hoisted(() => ({
   record: vi.fn(),
   notify: vi.fn(),
   cardState: null as unknown,
+  access: "ready" as string,
 }));
+const EMAIL: Record<string, string> = {};
 
 vi.mock("@/lib/db/scoped-client", () => ({
-  getScopedClient: vi.fn(async () => ({ auth: { getUser: async () => ({ data: { user: { id: state.userId, email: "who@example.com" } } }) } })),
+  getScopedClient: vi.fn(async () => ({ auth: { getUser: async () => ({ data: { user: { id: state.userId, email: EMAIL[state.userId] ?? "who@example.com" } } }) } })),
 }));
 vi.mock("@/lib/firm/session", () => ({
-  resolveFirmSession: vi.fn(async () => ({ kind: "ok", role: state.role, actingAsStaff: state.actingAsStaff, user: { id: state.userId, email: "who@example.com" }, org: { id: "org-1" } })),
+  resolveFirmSession: vi.fn(async () => ({ kind: "ok", role: state.role, actingAsStaff: state.actingAsStaff, user: { id: state.userId, email: EMAIL[state.userId] ?? "who@example.com" }, org: { id: "org-1" } })),
 }));
 vi.mock("@/lib/org/profile", () => ({ getFirmTimeZone: vi.fn(async () => "America/New_York") }));
 vi.mock("@/lib/queue/audit-context", () => ({ loadAuditContext: vi.fn(async () => ({ signOff: "The Team", teamSignOff: "The Team", memberNames: [] })) }));
@@ -49,6 +51,7 @@ vi.mock("@/lib/documents/approve-hook", () => ({ generateApprovedDocument: vi.fn
 vi.mock("@/lib/mailbox/my-mailbox", () => ({
   draftInMyMailbox: (...a: unknown[]) => state.draftMine(...a),
   draftInMyOwnOutlook: (...a: unknown[]) => state.draftOwnOutlook(...a),
+  myOutlookDraftAccess: vi.fn(async (posted?: unknown) => (posted && posted !== "conn-rayn" ? "not-yours" : state.access)),
 }));
 vi.mock("@/lib/queue/card-state", () => ({
   recordCardEvent: (...a: unknown[]) => state.record(...a),
@@ -58,14 +61,15 @@ vi.mock("@/lib/notifications/core", () => ({ notify: (...a: unknown[]) => state.
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 const { runQueueReview } = await import("@/lib/queue/review-core");
-const { makeDraftInMyOutlook } = await import("@/lib/queue/make-draft");
+const { makeDraftInMyOutlook, retryPassToDrafter } = await import("@/lib/queue/make-draft");
 
 const members = [
-  { userId: U.rebecca, role: "attorney", displayName: "Rebecca", email: null },
-  { userId: RAYN, role: "law_clerk", displayName: "Rayn", email: null },
-  { userId: U.caitlyn, role: "paralegal", displayName: "Caitlyn", email: null },
-  { userId: U.viewer, role: "viewer", displayName: "Vic", email: null },
+  { userId: U.rebecca, role: "attorney", displayName: "Rebecca", email: "rebecca@example.com" },
+  { userId: RAYN, role: "law_clerk", displayName: "Rayn", email: "rayn@example.com" },
+  { userId: U.caitlyn, role: "paralegal", displayName: "Caitlyn", email: "caitlyn@example.com" },
+  { userId: U.viewer, role: "viewer", displayName: "Vic", email: "vic@example.com" },
 ];
+for (const m of members) EMAIL[m.userId] = m.email;
 const routed = (routing: object, drafter: string | null) => ({ status: "ok", routing, members, dropped: 0, settingsExist: true, drafter });
 const notice = (item: { id: string }) => ({ queue_id: item.id });
 
@@ -82,6 +86,7 @@ beforeEach(() => {
   state.record.mockReset().mockResolvedValue({ ok: true });
   state.notify.mockReset().mockResolvedValue(undefined);
   state.cardState = { status: "ok", events: [] };
+  state.access = "ready";
 });
 
 describe("Acceptance 5: the attorney approves with a drafter set", () => {
@@ -91,7 +96,8 @@ describe("Acceptance 5: the attorney approves with a drafter set", () => {
     expect(state.draftMine).not.toHaveBeenCalled();
     expect(state.draftOwnOutlook).not.toHaveBeenCalled();
     expect(state.resolve).toHaveBeenCalledTimes(1);
-    expect(state.resolve.mock.calls[0][0]).toMatchObject({ action: "approve", skipMailboxDraft: true });
+    // S2: a pass always carries the approve receipt; S7: the re-read text is the final body.
+    expect(state.resolve.mock.calls[0][0]).toMatchObject({ action: "approve", skipMailboxDraft: true, finalBody: BODY, note: `Receipt: sha256 ${shownBodySha256(BODY).slice(0, 12)}` });
     expect(state.record).toHaveBeenCalledTimes(1);
     expect(state.record.mock.calls[0][0]).toEqual({ orgId: "org-1", queueItemId: "q1", kind: "draft_to", targetUserId: RAYN, note: `approved-text sha256 ${shownBodySha256(BODY)}` });
     expect(state.notify).toHaveBeenCalledTimes(1);
@@ -139,7 +145,7 @@ describe("Acceptance 10: before lectual 0112 (the event is refused)", () => {
 });
 
 describe("Item 6 and acceptance 4: unchanged paths", () => {
-  it("the drafter approving herself is today's path (her own mailbox), no draft_to", async () => {
+  it("S5 (changed on purpose): the drafter approving herself drafts in her own mailbox only: the queue is asked not to draft, no draft_to", async () => {
     state.role = "law_clerk";
     state.userId = RAYN;
     state.item = qitem({ id: "q1", agent: ROUTINE_MARKER.client_reminder.agent, headline: "Reminder", draft_body: BODY });
@@ -147,14 +153,15 @@ describe("Item 6 and acceptance 4: unchanged paths", () => {
     const out = await runQueueReview({ id: "q1", intent: "approve" });
     expect(out).toEqual({ kind: "resolved", intent: "approve", send: "mailbox-microsoft", webLink: "https://outlook.office.com/d/1", draftId: "AAMk-1", provider: "microsoft" });
     expect(state.record).not.toHaveBeenCalled();
-    expect(state.resolve.mock.calls[0][0]).not.toHaveProperty("skipMailboxDraft");
+    expect(state.resolve.mock.calls[0][0]).toMatchObject({ skipMailboxDraft: true });
+    expect(state.draftMine).toHaveBeenCalledTimes(1);
   });
 
-  it("no drafter set: byte-identical outcome and resolve call to today's (no handoff key, no flag)", async () => {
+  it("no drafter set: today's outcome, no handoff key, no skip flag (S7 adds only the re-read final body)", async () => {
     state.routed = routed({}, null);
     const out = await runQueueReview({ id: "q1", intent: "approve" });
     expect(out).toEqual({ kind: "resolved", intent: "approve", send: "mailbox-microsoft", webLink: "https://outlook.office.com/d/1", draftId: "AAMk-1", provider: "microsoft" });
-    expect(state.resolve.mock.calls[0][0]).toEqual({ orgKey: "firm-key", id: "q1", action: "approve", resolvedBy: "who@example.com" });
+    expect(state.resolve.mock.calls[0][0]).toEqual({ orgKey: "firm-key", id: "q1", action: "approve", resolvedBy: "rebecca@example.com", finalBody: BODY });
     expect(state.record).not.toHaveBeenCalled();
   });
 
@@ -207,7 +214,18 @@ describe("Acceptance 2: re-classified on approve", () => {
 
 /* ─────────────── Make the draft ─────────────── */
 
-const approvedItem = (over: object = {}) => qitem({ id: "q1", status: "approved", agent: ROUTINE_MARKER.uspto_notice.agent, draft_body: BODY, ...over });
+const approvedItem = (over: object = {}) =>
+  qitem({
+    id: "q1",
+    status: "approved",
+    agent: ROUTINE_MARKER.uspto_notice.agent,
+    draft_body: BODY,
+    final_body: BODY,
+    resolved_by: "rebecca@example.com",
+    resolved_at: "2026-11-20T09:59:00Z",
+    resolution_note: `Receipt: sha256 ${shownBodySha256(BODY).slice(0, 12)}`,
+    ...over,
+  });
 const passEvent = (actor = U.rebecca, target = RAYN) => ({
   queueItemId: "q1",
   kind: "draft_to",
@@ -226,21 +244,42 @@ describe("Acceptances 6 to 8 through makeDraftInMyOutlook", () => {
     state.cardState = { status: "ok", events: [passEvent()] };
   });
 
-  it("Rayn makes the draft through her own Outlook with the approved text, then a drafted event", async () => {
+  it("Rayn makes the draft through her own Outlook with the approved text; the drafted claim is written FIRST", async () => {
+    const order: string[] = [];
+    state.record.mockImplementation(async () => (order.push("claim"), { ok: true }));
+    state.draftOwnOutlook.mockImplementation(async () => (order.push("draft"), { ok: true, id: "AAMk-2", webLink: null }));
     const out = await makeDraftInMyOutlook({ id: "q1" });
     expect(out.ok).toBe(true);
-    expect(state.draftOwnOutlook).toHaveBeenCalledTimes(1);
+    expect(order).toEqual(["claim", "draft"]);
     expect(state.draftOwnOutlook.mock.calls[0][0]).toEqual({ draft: { to: "ana@example.com", subject: "Next steps", body: BODY }, postedConnectionId: undefined });
     expect(state.record).toHaveBeenCalledWith({ orgId: "org-1", queueItemId: "q1", kind: "drafted" });
     expect(state.draftMine).not.toHaveBeenCalled();
   });
 
-  it("a posted connection id is handed to the own-Outlook helper only to be compared (another person's is refused there)", async () => {
-    state.draftOwnOutlook.mockResolvedValue({ ok: false, reason: "not-yours" });
+  it("another person's posted connection id is refused before anything is claimed or drafted", async () => {
     const out = await makeDraftInMyOutlook({ id: "q1", postedConnectionId: "conn-of-rebecca" });
-    expect(out.ok).toBe(false);
-    expect(state.draftOwnOutlook.mock.calls[0][0]).toMatchObject({ postedConnectionId: "conn-of-rebecca" });
+    expect(out).toEqual({ ok: false, error: expect.stringMatching(/isn't waiting on your draft/) });
     expect(state.record).not.toHaveBeenCalled();
+    expect(state.draftOwnOutlook).not.toHaveBeenCalled();
+  });
+
+  it("S8: two concurrent clicks make at most one draft (the second claim is refused by the one-drafted-per-item index)", async () => {
+    let claims = 0;
+    state.record.mockImplementation(async () => (++claims === 1 ? { ok: true } : { ok: false, reason: "conflict" }));
+    const [a, b] = await Promise.all([makeDraftInMyOutlook({ id: "q1" }), makeDraftInMyOutlook({ id: "q1" })]);
+    expect(state.draftOwnOutlook).toHaveBeenCalledTimes(1);
+    expect([a.ok, b.ok].sort()).toEqual([false, true]);
+    expect([a, b].find((r) => !r.ok)).toEqual({ ok: false, error: "This one is already drafted in your Outlook. Nothing else was made." });
+  });
+
+  it("S8: a claim that can't be written is a refusal (nothing drafted); a draft that fails after the claim says ask Lectual and writes nothing more", async () => {
+    state.record.mockResolvedValue({ ok: false, reason: "failed" });
+    expect((await makeDraftInMyOutlook({ id: "q1" })).ok).toBe(false);
+    expect(state.draftOwnOutlook).not.toHaveBeenCalled();
+    state.record.mockReset().mockResolvedValue({ ok: true });
+    state.draftOwnOutlook.mockResolvedValue({ ok: false, reason: "failed" });
+    expect(await makeDraftInMyOutlook({ id: "q1" })).toEqual({ ok: false, error: "The draft couldn't be made. Ask Lectual." });
+    expect(state.record).toHaveBeenCalledTimes(1);
   });
 
   it("Rebecca, another clerk, a viewer and Lectual staff are refused with fixed sentences; nothing is drafted or written", async () => {
@@ -280,7 +319,7 @@ describe("Acceptances 6 to 8 through makeDraftInMyOutlook", () => {
   });
 
   it("acceptance 9 (no usable Outlook): the sentence, nothing written anywhere", async () => {
-    state.draftOwnOutlook.mockResolvedValue({ ok: false, reason: "no-mailbox" });
+    state.access = "no-mailbox";
     expect(await makeDraftInMyOutlook({ id: "q1" })).toEqual({ ok: false, error: "Connect your own Outlook to make drafts here." });
     expect(state.record).not.toHaveBeenCalled();
   });
@@ -294,5 +333,39 @@ describe("Acceptances 6 to 8 through makeDraftInMyOutlook", () => {
     state.routed = { status: "failed" };
     expect((await makeDraftInMyOutlook({ id: "q1" })).ok).toBe(false);
     expect(state.draftOwnOutlook).not.toHaveBeenCalled();
+  });
+});
+
+describe("S3: Pass to <drafter> after a pass that didn't go through", () => {
+  beforeEach(() => {
+    state.item = approvedItem();
+    state.role = "attorney";
+    state.userId = U.rebecca;
+    state.cardState = { status: "ok", events: [] };
+  });
+
+  it("the approver passes it again: one draft_to with the receipt hash, one bell notice, no mailbox draft", async () => {
+    expect(await retryPassToDrafter({ id: "q1" })).toEqual({ ok: true, message: expect.stringMatching(/passed to Rayn/), webLink: null });
+    expect(state.record).toHaveBeenCalledWith({ orgId: "org-1", queueItemId: "q1", kind: "draft_to", targetUserId: RAYN, note: `approved-text sha256 ${shownBodySha256(BODY)}` });
+    expect(state.notify).toHaveBeenCalledTimes(1);
+    expect(state.draftMine).not.toHaveBeenCalled();
+    expect(state.draftOwnOutlook).not.toHaveBeenCalled();
+  });
+
+  it("refused for anyone but the approver, while a trusted draft_to exists, after an edit, and for staff previewing", async () => {
+    state.userId = U.caitlyn;
+    state.role = "paralegal";
+    expect(await retryPassToDrafter({ id: "q1" })).toEqual({ ok: false, error: "Only the person who approved this email can pass it on." });
+    state.userId = U.rebecca;
+    state.role = "attorney";
+    state.cardState = { status: "ok", events: [passEvent()] };
+    expect(await retryPassToDrafter({ id: "q1" })).toEqual({ ok: false, error: "This email has already been passed on. Nothing else was done." });
+    state.cardState = { status: "ok", events: [] };
+    state.item = approvedItem({ final_body: `${BODY}\nedited` });
+    expect((await retryPassToDrafter({ id: "q1" })).ok).toBe(false);
+    state.item = approvedItem();
+    state.actingAsStaff = true;
+    expect((await retryPassToDrafter({ id: "q1" })).ok).toBe(false);
+    expect(state.record).not.toHaveBeenCalled();
   });
 });

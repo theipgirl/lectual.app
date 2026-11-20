@@ -43,7 +43,8 @@ import {
   SEND_BACK_DONE,
   makeDraftIntro,
 } from "@/lib/ui/words";
-import { approvedTextMatches, draftAssignment } from "@/lib/queue/draft-handoff";
+import { approvedBy, approvedTextMatches, draftAssignment, receiptMatchesCurrent } from "@/lib/queue/draft-handoff";
+import { RetryPassCard } from "@/components/queue/RetryPassCard";
 import { myOutlookDraftAccess } from "@/lib/mailbox/my-mailbox";
 import { MakeDraftCard, type MakeDraftView } from "@/components/queue/MakeDraftCard";
 import { INTEGRATIONS_PATH } from "@/lib/setup/routes";
@@ -141,11 +142,18 @@ export default async function QueueItemPage({
   // draft_to target (trusted events only) sees the card; a failed read is "couldn't check" for the configured drafter.
   // Read only while the firm has a drafter set, so a firm without one renders exactly as before.
   let makeDraft: { intro: string; view: MakeDraftView } | null = null;
+  let retryPass: { drafterName: string } | null = null;
   if (view.drafter && resolved && item.status === "approved" && item.type === "CLIENT_EMAIL" && view.viewer && editRole) {
     const trust = viewEventTrust(view);
     const events = trustedCardState(await loadCardState([item.id]), [item], trust);
     if (events.status === "ok" && trust.status === "known") {
       const a = draftAssignment(events.events, item.id);
+      const me = (view.members ?? []).find((m) => m.userId === view.viewer?.userId);
+      // S3: the approver may pass it again when no trusted draft_to exists (a pass that didn't go through) and the
+      // receipt still names the text. The action checks all of it again.
+      if (!a && view.drafter !== view.viewer.userId && approvedBy(item, me?.email) && receiptMatchesCurrent(item) && drafterMember) {
+        retryPass = { drafterName: memberName(drafterMember) };
+      }
       if (a && a.target === view.viewer.userId) {
         const by = (view.members ?? []).find((m) => m.userId === a.by);
         const intro = makeDraftIntro(by ? memberName(by) : A_TEAMMATE);
@@ -158,6 +166,7 @@ export default async function QueueItemPage({
             "not-outlook": { kind: "blocked", sentence: MAKE_DRAFT_NOT_OUTLOOK, connect: INTEGRATIONS_PATH },
             "needs-permission": { kind: "blocked", sentence: MAKE_DRAFT_NEEDS_PERMISSION, connect: INTEGRATIONS_PATH },
             unavailable: { kind: "blocked", sentence: MAKE_DRAFT_OUTLOOK_UNREAD, connect: null },
+            "not-yours": { kind: "blocked", sentence: MAKE_DRAFT_OUTLOOK_UNREAD, connect: null },
           };
           makeDraft = { intro, view: access === "ready" ? { kind: "ready" } : blocked[access] };
         }
@@ -193,6 +202,7 @@ export default async function QueueItemPage({
             </Notice>
           )}
           {makeDraft && <MakeDraftCard id={item.id} intro={makeDraft.intro} view={makeDraft.view} />}
+          {retryPass && <RetryPassCard id={item.id} drafterName={retryPass.drafterName} />}
           {returned === "1" && (
             <Notice role="status" tone="ok">
               {SEND_BACK_DONE}

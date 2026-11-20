@@ -16,8 +16,8 @@ import {
   type ApprovalRouting,
   type QueueKind,
 } from "@/lib/queue/routing";
-import { approvePlan, approvedTextMatches, draftAssignment, draftToNote, makeDraftDecision, postedConnectionAllowed, readyToDraft, shaFromDraftToNote } from "@/lib/queue/draft-handoff";
-import { trustedEvents, type CardEvent, type EventTrust } from "@/lib/queue/deck";
+import { approvePlan, approvedTextMatches, draftAssignment, draftToNote, makeDraftDecision, postedConnectionAllowed, readyToDraft, retryPassDecision, shaFromDraftToNote } from "@/lib/queue/draft-handoff";
+import { eventTrust, trustedEvents, type CardEvent, type EventTrust } from "@/lib/queue/deck";
 import { shownBodySha256 } from "@/lib/queue/shown-text";
 import { drafterOutlookLine } from "@/lib/queue/drafter-outlook";
 import { describeNotification } from "@/lib/notifications/describe";
@@ -157,7 +157,8 @@ describe("Item 5: the drafter setting in approval_routing", () => {
 
 describe("Items 6 and 7: who makes the draft when someone approves", () => {
   it("approver = drafter: today's path; approver != drafter: pass, for client emails only", () => {
-    expect(approvePlan({ approverId: RAYN, drafter: RAYN, itemType: "CLIENT_EMAIL" })).toBe("today");
+    // S5 (changed on purpose): the drafter approving herself is `self` (the queue is asked not to draft; her own mailbox is).
+    expect(approvePlan({ approverId: RAYN, drafter: RAYN, itemType: "CLIENT_EMAIL" })).toBe("self");
     expect(approvePlan({ approverId: U.rebecca, drafter: RAYN, itemType: "CLIENT_EMAIL" })).toBe("pass");
     expect(approvePlan({ approverId: U.rebecca, drafter: RAYN, itemType: "BRIEFING" })).toBe("today");
   });
@@ -176,7 +177,10 @@ describe("Items 6 and 7: who makes the draft when someone approves", () => {
 /* ─────────────── the fold and the draft decision ─────────────── */
 
 const BODY = "Hi Ana,\n\nYour mark was published on Nov 3.\n\nBest,\nThe Team";
-const approved = (over: Parameters<typeof qitem>[0] = {}) => routine("uspto_notice", { id: "a1", status: "approved", draft_body: BODY, ...over });
+const RECEIPT = (text: string) => `Receipt: sha256 ${shownBodySha256(text).slice(0, 12)}`;
+const RESOLVED_AT = "2026-11-20T09:59:00Z";
+const approved = (over: Parameters<typeof qitem>[0] = {}) =>
+  routine("uspto_notice", { id: "a1", status: "approved", draft_body: BODY, final_body: BODY, resolved_by: "rebecca@example.com", resolved_at: RESOLVED_AT, resolution_note: RECEIPT(BODY), ...over });
 const ev = (kind: CardEvent["kind"], actorId: string, over: Partial<CardEvent> = {}): CardEvent => ({
   queueItemId: "a1",
   kind,
@@ -187,8 +191,8 @@ const ev = (kind: CardEvent["kind"], actorId: string, over: Partial<CardEvent> =
   createdAt: "2026-11-20T10:00:00Z",
   ...over,
 });
-const known = (routing: ApprovalRouting = {}): EventTrust => ({ status: "known", roles: new Map(members.map((m) => [m.userId, m.role])), routing });
-const passTo = (actor: string, target = RAYN, text = BODY) => ev("draft_to", actor, { targetUserId: target, note: draftToNote(text) });
+const known = (routing: ApprovalRouting = {}): EventTrust => eventTrust({ status: "ok", routing, members });
+const passTo = (actor: string, target = RAYN, text = BODY, over: Partial<CardEvent> = {}) => ev("draft_to", actor, { targetUserId: target, note: draftToNote(text), ...over });
 const decide = (args: Partial<Parameters<typeof makeDraftDecision>[0]> & { events?: CardEvent[] }) => {
   const item = args.item === undefined ? approved() : args.item;
   const events = args.events ?? [passTo(U.rebecca)];
@@ -215,25 +219,39 @@ describe("Acceptance 6: only the current draft_to target can make the draft", ()
     expect(decide({ actingAsStaff: true })).toEqual({ ok: false, reason: "preview" });
   });
   it("a forged draft_to from a non-approver is ignored by the fold", () => {
-    // Another clerk (not an approver, nothing routed to them) passes it to themselves.
     const forged = [passTo(OTHER_CLERK, OTHER_CLERK)];
     expect(trustedEvents(forged, [approved()], known())).toEqual([]);
     expect(decide({ callerId: OTHER_CLERK, events: forged })).toEqual({ ok: false, reason: "not-yours" });
-    // A draft_to to a viewer is dropped too, even from an approver.
+    // A draft_to to a viewer is dropped too, even from the approver.
     expect(trustedEvents([passTo(U.rebecca, U.viewer)], [approved()], known())).toEqual([]);
   });
+  it("S2: a newer draft_to from ANOTHER attorney (or the owner) is ignored: only the approver's counts", () => {
+    const later = { createdAt: "2026-11-20T11:00:00Z" };
+    const events = [passTo(U.rebecca), passTo(U.taylor, OTHER_CLERK, BODY, later)];
+    expect(trustedEvents(events, [approved()], known())).toHaveLength(1);
+    expect(draftAssignment(trustedEvents(events, [approved()], known()), "a1")?.target).toBe(RAYN);
+    expect(decide({ events })).toMatchObject({ ok: true, already: false });
+    expect(decide({ events, callerId: OTHER_CLERK })).toEqual({ ok: false, reason: "not-yours" });
+  });
+  it("S2: a draft_to written before approval (or on an item not yet approved) is ignored", () => {
+    expect(trustedEvents([passTo(U.rebecca, RAYN, BODY, { createdAt: "2026-11-20T09:00:00Z" })], [approved()], known())).toEqual([]);
+    expect(trustedEvents([passTo(U.rebecca)], [approved({ status: "pending", resolved_by: null, resolved_at: null })], known())).toEqual([]);
+    // An unknown address for the writer can't be checked: dropped.
+    const noEmails: EventTrust = { status: "known", roles: new Map(members.map((m) => [m.userId, m.role])), routing: {} };
+    expect(trustedEvents([passTo(U.rebecca)], [approved()], noEmails)).toEqual([]);
+  });
   it("a drafted event counts only from the current target; a forged drafted doesn't block her", () => {
-    const events = [passTo(U.rebecca), ev("drafted", OTHER_CLERK)];
+    const events = [passTo(U.rebecca), ev("drafted", OTHER_CLERK, { createdAt: "2026-11-20T10:01:00Z" })];
     expect(trustedEvents(events, [approved()], known())).toHaveLength(1);
     expect(decide({ events })).toMatchObject({ ok: true, already: false });
   });
   it("a second click on a drafted item does nothing", () => {
     expect(decide({ events: [passTo(U.rebecca), ev("drafted", RAYN, { createdAt: "2026-11-20T10:05:00Z" })] })).toEqual({ ok: true, already: true });
   });
-  it("routed to Rayn, an item passed by Rayn's routed approval counts (she may approve it)", () => {
-    const item = approved();
-    expect(trustedEvents([passTo(RAYN, OTHER_CLERK)], [item], known({ uspto_notice: RAYN }))).toHaveLength(1);
-    expect(trustedEvents([passTo(RAYN, OTHER_CLERK)], [item], known({}))).toHaveLength(0);
+  it("routed to Rayn: when SHE approved, her own pass to another drafter counts; written by someone else it doesn't", () => {
+    const hers = approved({ resolved_by: "rayn@example.com" });
+    expect(trustedEvents([passTo(RAYN, OTHER_CLERK)], [hers], known({ uspto_notice: RAYN }))).toHaveLength(1);
+    expect(trustedEvents([passTo(U.rebecca, OTHER_CLERK)], [hers], known({ uspto_notice: RAYN }))).toHaveLength(0);
   });
   it("a pending or non-email item, before 0112 and an unreadable state are refused with their own reasons", () => {
     expect(decide({ item: approved({ status: "pending" }) })).toEqual({ ok: false, reason: "not-approved" });
@@ -261,12 +279,39 @@ describe("Acceptance 8: the drafted body is the approved text (receipt hash)", (
     expect(shaFromDraftToNote(note)).toBe(shownBodySha256(BODY));
     expect(shaFromDraftToNote("please check")).toBeNull();
   });
-  it("an edit after approval refuses the draft; a matching resolution receipt is required to agree", () => {
+  it("an edit after approval refuses the draft; the receipt must be there and agree", () => {
     expect(decide({ item: approved({ final_body: `${BODY}\nP.S.` }) })).toEqual({ ok: false, reason: "changed" });
     expect(decide({ events: [ev("draft_to", U.rebecca, { targetUserId: RAYN, note: "no hash" })] })).toEqual({ ok: false, reason: "changed" });
     const sha = shownBodySha256(BODY);
-    expect(approvedTextMatches(approved({ resolution_note: `ok\nReceipt: sha256 ${sha.slice(0, 12)}` }), sha)).toBe(true);
+    expect(approvedTextMatches(approved(), sha)).toBe(true);
     expect(approvedTextMatches(approved({ resolution_note: "Receipt: sha256 000000000000" }), sha)).toBe(false);
+    // S2: no receipt at all is refused too.
+    expect(approvedTextMatches(approved({ resolution_note: null }), sha)).toBe(false);
+  });
+  it("S2: a text edited after approval PLUS a re-issued draft_to (hashing the edited text) is refused", () => {
+    const edited = `${BODY}\nEdited after approval.`;
+    const item = approved({ final_body: edited });
+    const events = [passTo(U.rebecca), passTo(U.rebecca, RAYN, edited, { createdAt: "2026-11-20T11:00:00Z" })];
+    expect(decide({ item, events })).toEqual({ ok: false, reason: "changed" });
+  });
+});
+
+describe("S3: retry a failed pass", () => {
+  const base = { actingAsStaff: false, callerId: U.rebecca, callerRole: "attorney" as Role, callerEmail: "rebecca@example.com", drafter: RAYN, trustKnown: true };
+  const retry = (over: Partial<Parameters<typeof retryPassDecision>[0]> = {}) => retryPassDecision({ ...base, item: approved(), state: { status: "ok", events: [] }, ...over });
+  it("only the approver, only while no trusted draft_to exists, only with the receipt naming the current text", () => {
+    expect(retry()).toEqual({ ok: true, drafter: RAYN });
+    expect(retry({ callerId: U.taylor, callerRole: "owner", callerEmail: "taylor@example.com" })).toEqual({ ok: false, reason: "not-yours" });
+    expect(retry({ state: { status: "ok", events: trustedEvents([passTo(U.rebecca)], [approved()], known()) } })).toEqual({ ok: false, reason: "already-passed" });
+    expect(retry({ item: approved({ final_body: `${BODY}\nlater` }) })).toEqual({ ok: false, reason: "changed" });
+    expect(retry({ item: approved({ resolution_note: null }) })).toEqual({ ok: false, reason: "changed" });
+    expect(retry({ drafter: U.rebecca })).toEqual({ ok: false, reason: "no-drafter" });
+    expect(retry({ drafter: null })).toEqual({ ok: false, reason: "no-drafter" });
+    expect(retry({ state: { status: "not-set-up" } })).toEqual({ ok: false, reason: "not-switched-on" });
+    expect(retry({ state: { status: "unavailable" } })).toEqual({ ok: false, reason: "couldnt-check" });
+    expect(retry({ trustKnown: false })).toEqual({ ok: false, reason: "couldnt-check" });
+    expect(retry({ actingAsStaff: true })).toEqual({ ok: false, reason: "preview" });
+    expect(retry({ item: approved({ status: "pending" }) })).toEqual({ ok: false, reason: "not-approved" });
   });
 });
 
@@ -274,7 +319,7 @@ describe("Ready to draft (N)", () => {
   it("lists the approved client emails passed to the viewer and not drafted; nothing when the events weren't read", () => {
     const items = [approved(), approved({ id: "a2" }), approved({ id: "a3" })];
     const events = trustedEvents(
-      [passTo(U.rebecca), { ...passTo(U.rebecca), queueItemId: "a2" }, { ...ev("drafted", RAYN), queueItemId: "a2" }, { ...passTo(U.rebecca, OTHER_CLERK), queueItemId: "a3" }],
+      [passTo(U.rebecca), { ...passTo(U.rebecca), queueItemId: "a2" }, { ...ev("drafted", RAYN, { createdAt: "2026-11-20T10:02:00Z" }), queueItemId: "a2" }, { ...passTo(U.rebecca, OTHER_CLERK), queueItemId: "a3" }],
       items,
       known(),
     );
