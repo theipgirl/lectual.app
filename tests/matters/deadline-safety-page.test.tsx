@@ -129,14 +129,14 @@ describe("AT4/AT5: the close guard and the override action (scoped client, befor
     fd.set("matterId", "matter-1");
     fd.set("status", "closed");
     const res = await updateMatterStatusAction({}, fd);
-    expect(res.error).toBe("This matter can't be closed while it has an open USPTO deadline: Office Action response (due 2026-12-03). Close the deadline out first, or an attorney can close the matter with a reason.");
+    expect(res.error).toBe("This matter can't be closed while it has an open deadline: Office Action response (due 2026-12-03). Close the deadline out first, or an attorney can close the matter with a reason.");
     expect(matterStatus()).toBe("open");
   });
 
   it("AT5: a paralegal posting the override form is refused; nothing is read or written past the role", async () => {
     h.db = createFakeDb({ tables: seedFiled([openOa]) });
     const res = await overrideAction("paralegal", { matterId: "matter-1", reason: "Because", confirm: "yes" });
-    expect(res.error).toBe("Only an attorney can close a matter that still has an open USPTO deadline.");
+    expect(res.error).toBe("Only an attorney can close a matter that still has an open deadline.");
     expect(matterStatus()).toBe("open");
     expect(overrideRows()).toHaveLength(0);
     expect(h.db.froms).not.toContain("crm_matter_deadline");

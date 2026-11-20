@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { checkClose, runCloseOverride, OVERRIDE_NOT_RECORDED, OVERRIDE_ROLE_REFUSAL, type OverrideDeps } from "@/lib/matters/close-guard";
+import { CLOSE_OVERRIDE_UNRECORDED } from "@/lib/ui/words";
 import { CLOSE_GUARD_UNREADABLE } from "@/lib/matters/deadline-safety";
 
 const oa = { id: "d1", kind: "office_action_response", title: null, due_date: "2026-12-01", status: "open" };
@@ -26,6 +27,10 @@ function deps(over: Partial<OverrideDeps> & { type?: string; status?: string; op
     }),
     restoreStatus: vi.fn(async (prev: string) => {
       log.push(`restore:${prev}`);
+      return true;
+    }),
+    reportUnrecorded: vi.fn(() => {
+      log.push("reported");
     }),
     logOverride: vi.fn(async () => {
       log.push("timeline");
@@ -105,6 +110,16 @@ describe("AT5: the override needs an override role and a reason, and records one
     const { d, log } = deps({ callOverride: vi.fn(async () => "missing" as const), logOverride: vi.fn(async () => false) });
     expect(await runCloseOverride("Reason", d)).toEqual({ ok: false, error: OVERRIDE_NOT_RECORDED });
     expect(log).toEqual(["readMatter", "readDeadlines", "close", "restore:open"]);
+  });
+
+  it("before 0110, a failed timeline entry AND a failed restore: the distinct 'closed, reason not recorded' sentence, reported once", async () => {
+    for (const restore of [vi.fn(async () => false), vi.fn(async () => Promise.reject(new Error("db")))]) {
+      const { d, log } = deps({ callOverride: vi.fn(async () => "missing" as const), logOverride: vi.fn(async () => false), restoreStatus: restore });
+      expect(await runCloseOverride("Reason", d)).toEqual({ ok: false, error: CLOSE_OVERRIDE_UNRECORDED });
+      expect(CLOSE_OVERRIDE_UNRECORDED).toBe("The matter was closed, but the reason couldn't be recorded. Tell Lectual.");
+      expect(d.reportUnrecorded).toHaveBeenCalledTimes(1);
+      expect(log).toContain("reported");
+    }
   });
 
   it("the database refusing the caller (42501) is the role refusal; nothing else is written", async () => {

@@ -57,13 +57,39 @@ export function isUsptoDeadlineKind(kind: string): boolean {
   return (USPTO_DEADLINE_KINDS as readonly string[]).includes(kind);
 }
 
-/** The open deadlines that block a close: every open one on a TM matter (R1 default), else the USPTO kinds. Soonest first. */
-export function guardedDeadlines<T extends GuardDeadline>(matterType: string | null | undefined, deadlines: readonly T[]): T[] {
-  const tm = (matterType ?? "TM") === "TM";
+/**
+ * The open deadlines that block a close: every open one on a TM matter (R1 default), else the USPTO kinds. Soonest
+ * first. `matterType` may be several types (the stored one and the one being written): if ANY of them is TM the TM rule
+ * applies, so changing the type in the same write cannot dodge the guard (lectual 0110 uses `old.type` OR `new.type`).
+ */
+export function guardedDeadlines<T extends GuardDeadline>(matterType: string | null | undefined | readonly (string | null | undefined)[], deadlines: readonly T[]): T[] {
+  const types = Array.isArray(matterType) ? matterType : [matterType as string | null | undefined];
+  const tm = types.length === 0 || types.some((t) => (t ?? "TM") === "TM");
   return deadlines
     .filter((d) => d.status === "open" && (tm || isUsptoDeadlineKind(d.kind)))
     .sort((a, b) => a.due_date.localeCompare(b.due_date) || a.id.localeCompare(b.id));
 }
+
+/**
+ * Open deadlines that count only because the matter is a TM: changing a TM matter's type away from TM would stop
+ * them blocking a close (the two-step TM -> CR -> close path). The type change is refused while any exist.
+ */
+export function typeChangeUnguards<T extends GuardDeadline>(fromType: string | null | undefined, toType: string | null | undefined, deadlines: readonly T[]): T[] {
+  if ((fromType ?? "TM") !== "TM" || (toType ?? "TM") === "TM") return [];
+  const before = new Set(guardedDeadlines(fromType, deadlines).map((d) => d.id));
+  const after = new Set(guardedDeadlines(toType, deadlines).map((d) => d.id));
+  return guardedDeadlines(fromType, deadlines).filter((d) => before.has(d.id) && !after.has(d.id));
+}
+
+export function typeChangeRefusal(deadlines: readonly GuardDeadline[]): string {
+  return `This matter can't stop being a trademark matter while it has an open deadline: ${guardedNames(deadlines)}. Close the deadline out first.`;
+}
+
+/** lectual 0110's trigger refused a type change (its text is never shown). */
+export const TYPE_CHANGE_DATABASE = "This matter can't stop being a trademark matter while it has an open deadline. Close the deadline out first.";
+
+/** Said when a type change away from TM could not check the deadlines. */
+export const TYPE_CHANGE_UNREADABLE = "Couldn't check this matter's deadlines, so its type wasn't changed. Refresh and try again.";
 
 function labelOf(d: GuardDeadline): string {
   const t = d.title?.trim();
@@ -84,14 +110,14 @@ export function guardedNames(deadlines: readonly GuardDeadline[]): string {
 
 /** The fixed refusal, naming the deadline. */
 export function closeRefusal(deadlines: readonly GuardDeadline[]): string {
-  return `This matter can't be closed while it has an open USPTO deadline: ${guardedNames(deadlines)}. Close the deadline out first, or an attorney can close the matter with a reason.`;
+  return `This matter can't be closed while it has an open deadline: ${guardedNames(deadlines)}. Close the deadline out first, or an attorney can close the matter with a reason.`;
 }
 
 /** Said when the deadlines could not be read: the close is refused, never allowed on a guess. */
 export const CLOSE_GUARD_UNREADABLE = "Couldn't check this matter's deadlines, so it wasn't closed. Refresh and try again.";
 
 /** Said when the database's own guard refused the write (lectual 0110's trigger), without naming text from the database. */
-export const CLOSE_GUARD_DATABASE = "This matter can't be closed while it has an open USPTO deadline. Close the deadline out first, or an attorney can close the matter with a reason.";
+export const CLOSE_GUARD_DATABASE = "This matter can't be closed while it has an open deadline. Close the deadline out first, or an attorney can close the matter with a reason.";
 
 /**
  * Who may close past the guard. Rebecca's answer (questions.md R2) is not in yet; until it is, the owner and
@@ -117,7 +143,7 @@ export function parseOverrideReason(raw: unknown): { ok: true; reason: string } 
 /** The 0110 trigger's refusal, recognised by its prefix only (its text is never shown). */
 export function isCloseGuardRefusal(err: unknown): boolean {
   const message = (err as { message?: unknown } | null)?.message;
-  return typeof message === "string" && message.includes("matter_close_open_deadline");
+  return typeof message === "string" && (message.includes("matter_close_open_deadline") || message.includes("matter_type_change_open_deadline"));
 }
 
 /** lectual 0110's override function is not there yet (42883 / PGRST202): the app's own override path runs instead. */

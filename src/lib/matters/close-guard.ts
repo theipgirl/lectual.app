@@ -13,6 +13,7 @@ import {
   parseOverrideReason,
   type GuardDeadline,
 } from "./deadline-safety";
+import { CLOSE_OVERRIDE_UNRECORDED } from "@/lib/ui/words";
 
 export type GuardMatterRead =
   | { status: "ok"; matter: { type: string | null; status: string } }
@@ -59,7 +60,7 @@ export async function checkClose(deps: CloseReadDeps): Promise<CloseCheck> {
   return read;
 }
 
-export const OVERRIDE_ROLE_REFUSAL = "Only an attorney can close a matter that still has an open USPTO deadline.";
+export const OVERRIDE_ROLE_REFUSAL = "Only an attorney can close a matter that still has an open deadline.";
 export const OVERRIDE_NOT_RECORDED = "Couldn't record the reason, so the matter wasn't closed. Try again.";
 export const OVERRIDE_FAILED = "Couldn't close this matter. Nothing was changed. Try again.";
 
@@ -72,8 +73,13 @@ export type OverrideDeps = CloseReadDeps & {
   callOverride: (reason: string) => Promise<OverrideCall>;
   /** Before 0110: the plain status write (there is no trigger yet). True when the row was closed. */
   closeDirect: () => Promise<boolean>;
-  /** Puts the status back when the timeline entry could not be written on the pre-0110 path. */
-  restoreStatus: (previous: string) => Promise<void>;
+  /**
+   * Puts the status back when the timeline entry could not be written on the pre-0110 path. Fenced on the row still
+   * being `closed`; true only when exactly that one row was put back (an error or 0 rows is false).
+   */
+  restoreStatus: (previous: string) => Promise<boolean>;
+  /** Called when the restore failed too: the matter is closed with no recorded reason. Logs the matter id only. */
+  reportUnrecorded: () => void;
   /** The timeline entry (`matter_updated`, change `close_override`). True when it was written. */
   logOverride: (payload: { reason: string; deadline_ids: string[]; from_status: string; recorded: "override_row" | "timeline" }) => Promise<boolean>;
 };
@@ -119,8 +125,15 @@ export async function runCloseOverride(rawReason: unknown, deps: OverrideDeps): 
   if (!(await deps.closeDirect())) return { ok: false, error: OVERRIDE_FAILED };
   const logged = await deps.logOverride({ reason: parsed.reason, deadline_ids: ids, from_status: read.previousStatus, recorded: "timeline" }).catch(() => false);
   if (!logged) {
-    await deps.restoreStatus(read.previousStatus).catch(() => undefined);
-    return { ok: false, error: OVERRIDE_NOT_RECORDED };
+    let restored = false;
+    try {
+      restored = await deps.restoreStatus(read.previousStatus);
+    } catch {
+      restored = false;
+    }
+    if (restored) return { ok: false, error: OVERRIDE_NOT_RECORDED };
+    deps.reportUnrecorded();
+    return { ok: false, error: CLOSE_OVERRIDE_UNRECORDED };
   }
   return { ok: true, overridden: true };
 }

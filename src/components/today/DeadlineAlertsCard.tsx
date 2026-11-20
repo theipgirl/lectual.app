@@ -9,6 +9,8 @@ import { deadlineCardGroups, isRecipient, type AlertDeadline, type DeadlineCardG
 import { loadAlertDeadlines, loadAlertRecipients, raiseOwnDeadlineNotices } from "@/lib/today/deadline-alerts-store";
 import {
   DEADLINE_ALERTS_UNCHECKED,
+  DEADLINE_CARD_CUT,
+  DEADLINE_CARD_OPEN_CALENDAR,
   DEADLINE_CARD_FAILED,
   DEADLINE_CARD_HEADING,
   DEADLINE_CARD_MONTH,
@@ -61,7 +63,7 @@ function Group({ id, title, rows, tone }: { id: string; title: string; rows: Ale
  * The card's markup, from what was read. `recipients` unavailable says the alerts couldn't be checked (never "no
  * alerts"); a viewer who is not a recipient gets nothing; `groups` null is "Couldn't load", never "No deadlines".
  */
-export function DeadlineAlertsView({ recipients, viewerId, groups }: { recipients: RecipientRead; viewerId: string; groups: DeadlineCardGroups | null }) {
+export function DeadlineAlertsView({ recipients, viewerId, groups, cutShort = false }: { recipients: RecipientRead; viewerId: string; groups: DeadlineCardGroups | null; /** A read reached its cap. */ cutShort?: boolean }) {
   const member = isRecipient(recipients, viewerId);
   if (member === false) return null;
   const total = groups ? groups.overdue.length + groups.week.length + groups.month.length : null;
@@ -81,31 +83,49 @@ export function DeadlineAlertsView({ recipients, viewerId, groups }: { recipient
         <div className="td-pad-end">
           <LoadFailedLine role="alert" refresh={false}>{DEADLINE_CARD_FAILED}</LoadFailedLine>
         </div>
-      ) : total === 0 ? (
+      ) : total === 0 && !cutShort ? (
         <p className="lx-note td-pad-end">{DEADLINE_CARD_NONE}</p>
       ) : (
         <>
           <Group id="overdue" title={DEADLINE_CARD_OVERDUE} rows={groups.overdue} tone="risk" />
           <Group id="week" title={DEADLINE_CARD_WEEK} rows={groups.week} tone="warn" />
           <Group id="month" title={DEADLINE_CARD_MONTH} rows={groups.month} tone="mute" />
+          {cutShort && (
+            <p className="lx-note td-pad-end" role="status" data-cut-short="">
+              {DEADLINE_CARD_CUT}{" "}
+              <Link prefetch={false} href="/dashboard/calendar/">
+                {DEADLINE_CARD_OPEN_CALENDAR}
+              </Link>
+            </p>
+          )}
         </>
       )}
     </section>
   );
 }
 
+export type DeadlineAlertsData = { recipients: RecipientRead; groups: DeadlineCardGroups | null; cutShort: boolean };
+
 /**
- * Today's "Deadlines" card (PGE Sprint 3 Part A): drawn only for the members chosen in Settings -> Team. Its own
- * reads (scoped client), and for a recipient it also raises their own bell notices for deadlines that entered the
- * 30- or 7-day window (once each, see deadline-alerts.ts). Never throws.
+ * Today's "Deadlines" card data (PGE Sprint 3 Part A): drawn only for the members chosen in Settings -> Team. Its own
+ * reads (scoped client); for a recipient it also raises their own bell notices for deadlines that entered the 30- or
+ * 7-day window (once each, see deadline-alerts.ts). Never throws. The Today pages START this beside their other reads
+ * and await it with them, so it never runs after them.
  */
-export async function DeadlineAlertsCard({ userId, now = new Date() }: { userId: string; now?: Date }) {
-  const recipients = await loadAlertRecipients();
-  if (isRecipient(recipients, userId) === false) return null;
-  if (recipients.status !== "ok") return <DeadlineAlertsView recipients={recipients} viewerId={userId} groups={null} />;
-  const tz = await getFirmTimeZone().catch(() => DEFAULT_TIME_ZONE);
-  const today = civilInZone(now, tz);
-  const deadlines = await loadAlertDeadlines(today, addDays(today, 30));
-  if (deadlines) await raiseOwnDeadlineNotices(userId, deadlines, today);
-  return <DeadlineAlertsView recipients={recipients} viewerId={userId} groups={deadlines ? deadlineCardGroups(deadlines, today) : null} />;
+export async function loadDeadlineAlerts(userId: string, now: Date = new Date()): Promise<DeadlineAlertsData> {
+  try {
+    const [recipients, tz] = await Promise.all([loadAlertRecipients(), getFirmTimeZone().catch(() => DEFAULT_TIME_ZONE)]);
+    if (recipients.status !== "ok" || isRecipient(recipients, userId) === false) return { recipients, groups: null, cutShort: false };
+    const today = civilInZone(now, tz);
+    const read = await loadAlertDeadlines(today, addDays(today, 30));
+    if (read) await raiseOwnDeadlineNotices(userId, read.deadlines, today);
+    return { recipients, groups: read ? deadlineCardGroups(read.deadlines, today) : null, cutShort: read ? read.cutShort.upcoming || read.cutShort.overdue : false };
+  } catch {
+    return { recipients: { status: "unavailable" }, groups: null, cutShort: false };
+  }
+}
+
+/** The card from what `loadDeadlineAlerts` read (nothing for a non-recipient). */
+export function DeadlineAlertsCard({ data, userId }: { data: DeadlineAlertsData; userId: string }) {
+  return <DeadlineAlertsView recipients={data.recipients} viewerId={userId} groups={data.groups} cutShort={data.cutShort} />;
 }

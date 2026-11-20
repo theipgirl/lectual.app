@@ -1329,7 +1329,10 @@ export const DEADLINE_CARD_NONE = "No open deadlines in the next 30 days.";
 export const DEADLINE_CARD_FAILED = "Couldn't load";
 export const DEADLINE_UNCONFIRMED = "Unconfirmed";
 export const DEADLINE_ALERTS_UNCHECKED = "Deadline alerts couldn't be checked. Refresh to try again.";
-export const deadlineCardMore = (n: number) => `and ${n} more on the calendar`;
+export const deadlineCardMore = (n: number) => `and ${n} more`;
+/** A Deadlines card read reached its cap: said, never silent. */
+export const DEADLINE_CARD_CUT = "Not every deadline could be listed here.";
+export const DEADLINE_CARD_OPEN_CALENDAR = "Open the calendar";
 /** The bell notice when a deadline enters the 30- or 7-day window. Ids and the deadline's title only. */
 export const DEADLINE_NOTICE_LABEL = "Deadline";
 export const deadlineNoticeSentence = (window: number, title: string | null) => `${title ?? "A deadline"} is due within ${window} days`;
@@ -1342,10 +1345,12 @@ export const DEADLINE_ALERTS_SAVE = "Save alert recipients";
 export const REVIEW_DEADLINES_HEADING = "Deadlines";
 export const REVIEW_DEADLINES_NONE = "No open deadlines in this view.";
 export const REVIEW_DEADLINE_CONFIRMED = "Confirmed";
-/** Closing a matter that still has an open USPTO deadline (an attorney, with a reason). */
+/** Closing a matter that still has an open deadline (an attorney, with a reason). */
 export const CLOSE_OVERRIDE_SUMMARY = "Close with an open deadline";
-export const CLOSE_OVERRIDE_HELP = "This matter has an open USPTO deadline. An attorney can still close it with a reason. The reason goes on the timeline.";
+export const CLOSE_OVERRIDE_HELP = "This matter has an open deadline. An attorney can still close it with a reason. The reason goes on the timeline.";
 export const CLOSE_OVERRIDE_REASON = "Reason (required, up to 300 characters)";
 export const CLOSE_OVERRIDE_CONFIRM = "I understand this matter will close with that deadline still open.";
 export const CLOSE_OVERRIDE_BUTTON = "Close the matter";
 export const CLOSE_OVERRIDE_DONE = "Closed. The reason is on the timeline.";
+/** The pre-0110 override closed the matter, could not write its reason, and could not put the status back either. */
+export const CLOSE_OVERRIDE_UNRECORDED = "The matter was closed, but the reason couldn't be recorded. Tell Lectual.";

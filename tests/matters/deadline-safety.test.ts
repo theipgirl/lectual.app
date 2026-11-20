@@ -76,7 +76,7 @@ describe("the close guard's rule", () => {
   it("the fixed refusal names the deadline (soonest first) and how many more", () => {
     const text = closeRefusal(guardedDeadlines("TM", [d({ id: "b", due_date: "2027-01-05", title: "Statement of use" }), d({ id: "a", due_date: "2026-12-01" })]));
     expect(text).toContain("Office Action response (due 2026-12-01) and 1 more");
-    expect(text).toMatch(/^This matter can't be closed while it has an open USPTO deadline/);
+    expect(text).toMatch(/^This matter can't be closed while it has an open deadline/);
   });
 
   it("recognises 0110's trigger refusal by its prefix and the missing function by its code", () => {
@@ -103,5 +103,30 @@ describe("AT5: the override is for the override roles, with a required reason", 
     expect(parseOverrideReason("x".repeat(301)).ok).toBe(false);
     expect(parseOverrideReason("x".repeat(300))).toEqual({ ok: true, reason: "x".repeat(300) });
     expect(parseOverrideReason("  Client abandoned \n the mark  ")).toEqual({ ok: true, reason: "Client abandoned the mark" });
+  });
+});
+
+describe("review fixes: wording and the type change", () => {
+  const d = (over: Record<string, unknown> = {}) => ({ id: "d1", kind: "other", title: null, due_date: "2026-12-01", status: "open", ...over });
+
+  it("the refusal says 'open deadline', never 'USPTO deadline', for an `other` kind", () => {
+    const text = closeRefusal(guardedDeadlines("TM", [d()]));
+    expect(text).toContain("open deadline: Other");
+    expect(text).not.toContain("USPTO");
+  });
+
+  it("5b: the stored type and the new one both count: TM in either applies the TM rule", () => {
+    expect(guardedDeadlines(["TM", "CR"], [d()])).toHaveLength(1);
+    expect(guardedDeadlines(["CR", "TM"], [d()])).toHaveLength(1);
+    expect(guardedDeadlines(["CR", "BL"], [d()])).toHaveLength(0);
+  });
+
+  it("5b: retyping TM -> CR is refused while a deadline counts only because it is a TM; USPTO kinds keep counting", async () => {
+    const { typeChangeUnguards, typeChangeRefusal } = await import("@/lib/matters/deadline-safety");
+    expect(typeChangeUnguards("TM", "CR", [d()]).map((x) => x.id)).toEqual(["d1"]);
+    expect(typeChangeUnguards("TM", "CR", [d({ kind: "office_action_response" })])).toEqual([]);
+    expect(typeChangeUnguards("TM", "TM", [d()])).toEqual([]);
+    expect(typeChangeUnguards("CR", "BL", [d()])).toEqual([]);
+    expect(typeChangeRefusal([d()])).toMatch(/can't stop being a trademark matter while it has an open deadline: Other/);
   });
 });

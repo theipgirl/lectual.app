@@ -263,7 +263,7 @@ describe("AT4: the close guard inside updateMatterStatus (scoped client)", () =>
       { data: { type: "TM", status: "open" }, error: null },
       { data: [{ id: "d1", kind: "office_action_response", title: null, due_date: "2026-12-01", status: "open" }], error: null },
     ];
-    await expect(updateMatterStatus("matter-1", "closed")).rejects.toThrow(/can't be closed while it has an open USPTO deadline: Office Action response \(due 2026-12-01\)/);
+    await expect(updateMatterStatus("matter-1", "closed")).rejects.toThrow(/can't be closed while it has an open deadline: Office Action response \(due 2026-12-01\)/);
     expect(state.queries.some((q) => q.calls.some(([name]) => name === "update"))).toBe(false);
   });
 
@@ -285,7 +285,7 @@ describe("AT4: the close guard inside updateMatterStatus (scoped client)", () =>
       { data: null, error: { code: "P0001", message: "matter_close_open_deadline: this matter has an open USPTO deadline" } },
     ];
     const err = await updateMatterStatus("matter-1", "closed").catch((e: Error) => e);
-    expect((err as Error).message).toBe("This matter can't be closed while it has an open USPTO deadline. Close the deadline out first, or an attorney can close the matter with a reason.");
+    expect((err as Error).message).toBe("This matter can't be closed while it has an open deadline. Close the deadline out first, or an attorney can close the matter with a reason.");
   });
 
   it("other statuses are not guarded (no deadline read)", async () => {

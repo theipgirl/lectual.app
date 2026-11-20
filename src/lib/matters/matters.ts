@@ -12,7 +12,7 @@ import { nextMatterNumber } from "./numbering";
 import { carryPayload, consultCarryForLead, type ConsultDb } from "@/lib/consult/store";
 import { ReadableError } from "@/lib/ui/readable-error";
 import { checkClose, runCloseOverride, type CloseReadDeps, type OverrideResult } from "./close-guard";
-import { CLOSE_GUARD_DATABASE, isCloseGuardRefusal, isMissingOverrideFunction } from "./deadline-safety";
+import { CLOSE_GUARD_DATABASE, TYPE_CHANGE_DATABASE, TYPE_CHANGE_UNREADABLE, isCloseGuardRefusal, isMissingOverrideFunction, typeChangeRefusal, typeChangeUnguards } from "./deadline-safety";
 
 
 /** The crm_matter row exactly as the table stores it. */
@@ -387,7 +387,7 @@ export async function updateMatterStatus(id: string, status: MatterStatus): Prom
     throw new ReadableError(`'${status}' isn't a valid matter status.`);
   }
 
-  // The close guard (PGE Sprint 3): a matter holding an open USPTO deadline is not closed here. A failed read of
+  // The close guard (PGE Sprint 3): a matter holding an open deadline that counts is not closed here. A failed read of
   // the matter or its deadlines refuses the close too. lectual 0110's trigger is the second half of the same rule.
   if (status === "closed") {
     const check = await checkClose(closeReadDeps(supabase, id));
@@ -462,7 +462,17 @@ export async function closeMatterWithOverride(id: string, reason: unknown): Prom
       return !error && (data ?? []).length === 1;
     },
     restoreStatus: async (previous) => {
-      await supabase.from("crm_matter").update({ status: previous, updated_at: new Date().toISOString() }).eq("id", id);
+      const { data, error } = await supabase
+        .from("crm_matter")
+        .update({ status: previous, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .eq("status", "closed")
+        .select("id");
+      return !error && (data ?? []).length === 1;
+    },
+    reportUnrecorded: () => {
+      // The matter id only: no reason text, no name.
+      console.error("[close-override] matter closed but its reason could not be recorded", id);
     },
     logOverride: async (payload) => {
       try {
@@ -543,13 +553,26 @@ export async function updateMatterHeader(
   if (!checked.ok) throw new ReadableError(checked.error);
   if (checked.fields.length === 0) return { matter: current, fields: [] };
 
+  // PGE Sprint 3: a TM matter can't be retyped while an open deadline counts only because it is a TM (that would let
+  // the TM -> CR -> close path skip the close guard). A failed read refuses the change.
+  const newType = (checked.changes as { type?: string }).type;
+  if (newType !== undefined && current.type === "TM" && newType !== "TM") {
+    const open = await closeReadDeps(supabase, id).readOpenDeadlines();
+    if (open === null) throw new ReadableError(TYPE_CHANGE_UNREADABLE);
+    const lost = typeChangeUnguards(current.type, newType, open);
+    if (lost.length > 0) throw new ReadableError(typeChangeRefusal(lost));
+  }
+
   const { data, error } = await supabase
     .from("crm_matter")
     .update({ ...checked.changes, updated_at: new Date().toISOString() })
     .eq("id", id)
     .select("*")
     .single();
-  if (error) throw error;
+  if (error) {
+    if (isCloseGuardRefusal(error)) throw new ReadableError(TYPE_CHANGE_DATABASE);
+    throw error;
+  }
 
   await logActivitySafe({
     type: "matter_updated",

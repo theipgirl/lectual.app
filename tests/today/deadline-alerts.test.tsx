@@ -135,7 +135,7 @@ describe("AT3: Today's Deadlines card", () => {
 });
 
 // ── the store: raising the recipient's own notices through the scoped client ──
-const store = vi.hoisted(() => ({ readError: null as unknown, raised: [] as unknown[], notified: [] as unknown[], filters: [] as unknown[][] }));
+const store = vi.hoisted(() => ({ readError: null as unknown, raised: [] as unknown[], notified: [] as unknown[], filters: [] as unknown[][], batches: 0 }));
 
 vi.mock("@/lib/db/scoped-client", () => ({
   getScopedClient: vi.fn(async () => ({
@@ -150,7 +150,13 @@ vi.mock("@/lib/db/scoped-client", () => ({
     },
   })),
 }));
-vi.mock("@/lib/notifications/core", () => ({ notify: vi.fn(async (input: unknown) => void store.notified.push(input)) }));
+vi.mock("@/lib/notifications/core", () => ({
+  notifyOwnMany: vi.fn(async (userId: string, items: Array<{ kind: string; matterId: string; payload: unknown }>) => {
+    store.batches += 1;
+    for (const i of items) store.notified.push({ userId, kind: i.kind, matterId: i.matterId, actorId: null, payload: i.payload });
+    return items.length;
+  }),
+}));
 vi.mock("@/lib/members/directory", () => ({ listMemberDirectory: vi.fn(async () => []) }));
 vi.mock("@/lib/brain/entries", () => ({ createBrainEntry: vi.fn(), updateBrainEntry: vi.fn() }));
 
@@ -160,9 +166,10 @@ describe("AT3a: raiseOwnDeadlineNotices (the recipient's own bell, scoped client
     store.raised = [];
     store.notified = [];
     store.filters = [];
+    store.batches = 0;
   });
 
-  it("raises each new window once through notify(), for the signed-in recipient only", async () => {
+  it("raises each new window once, for the signed-in recipient only, in ONE batched insert", async () => {
     const { raiseOwnDeadlineNotices } = await import("@/lib/today/deadline-alerts-store");
     const n = await raiseOwnDeadlineNotices(U1, [dl("a", "2026-11-25"), dl("b", "2026-12-10")], TODAY);
     expect(n).toBe(2);
@@ -171,6 +178,7 @@ describe("AT3a: raiseOwnDeadlineNotices (the recipient's own bell, scoped client
       { userId: U1, kind: "mentioned", matterId: "m-b", actorId: null, payload: { source: "deadline_window", deadline_id: "b", window: 30, title: "Deadline b" } },
     ]);
     expect(store.filters).toContainEqual(["eq", "payload->>source", "deadline_window"]);
+    expect(store.batches).toBe(1);
   });
 
   it("a second load the same day raises nothing (read back from the bell)", async () => {
@@ -185,5 +193,68 @@ describe("AT3a: raiseOwnDeadlineNotices (the recipient's own bell, scoped client
     store.readError = { code: "57014" };
     expect(await raiseOwnDeadlineNotices(U1, [dl("a", "2026-11-25")], TODAY)).toBe(0);
     expect(store.notified).toEqual([]);
+  });
+});
+
+// ── review item 4: old overdue rows never push the 7- and 30-day rows out ──
+describe("loadAlertDeadlines: two reads, and a cut-short state in words", () => {
+  type Row = { id: string; matter_id: string; kind: string; title: string | null; due_date: string; status: string; attorney_confirmed: boolean; source: string; crm_matter: null };
+  const mk = (id: string, due: string): Row => ({ id, matter_id: `m-${id}`, kind: "office_action_response", title: null, due_date: due, status: "open", attorney_confirmed: true, source: "calculated", crm_matter: null });
+
+  async function load(all: Row[]) {
+    vi.resetModules();
+    vi.doMock("@/lib/db/scoped-client", () => ({
+      getScopedClient: vi.fn(async () => ({
+        from: () => {
+          const f: { gte?: string; lte?: string; lt?: string; asc: boolean; from: number; to: number; limit?: number } = { asc: true, from: 0, to: 1e9 };
+          const q = {
+            select: () => q,
+            eq: () => q,
+            gte: (_c: string, v: string) => ((f.gte = v), q),
+            lte: (_c: string, v: string) => ((f.lte = v), q),
+            lt: (_c: string, v: string) => ((f.lt = v), q),
+            order: (c: string, o: { ascending: boolean }) => (c === "due_date" ? (f.asc = o.ascending) : null, q),
+            range: (a: number, b: number) => ((f.from = a), (f.to = b), q),
+            limit: (n: number) => ((f.limit = n), q),
+            then: (res: (v: unknown) => unknown) => {
+              let rows = all.filter((r) => (!f.gte || r.due_date >= f.gte) && (!f.lte || r.due_date <= f.lte) && (!f.lt || r.due_date < f.lt));
+              rows = [...rows].sort((a, b) => (f.asc ? 1 : -1) * a.due_date.localeCompare(b.due_date) || a.id.localeCompare(b.id));
+              rows = f.limit !== undefined ? rows.slice(0, f.limit) : rows.slice(f.from, f.to + 1);
+              return Promise.resolve({ data: rows, error: null }).then(res);
+            },
+          };
+          return q;
+        },
+      })),
+    }));
+    const { loadAlertDeadlines } = await import("@/lib/today/deadline-alerts-store");
+    return loadAlertDeadlines(TODAY, "2026-12-20");
+  }
+
+  it("with more than 500 old overdue rows, every 7- and 30-day row is still read, and the cut is reported", async () => {
+    const overdue = Array.from({ length: 600 }, (_, i) => mk(`o${String(i).padStart(3, "0")}`, `2026-0${1 + (i % 9)}-${String(1 + (i % 28)).padStart(2, "0")}`));
+    const upcoming = [mk("w1", "2026-11-22"), mk("w2", "2026-11-27"), mk("t1", "2026-12-15")];
+    const read = await load([...overdue, ...upcoming]);
+    expect(read).not.toBeNull();
+    const ids = read!.deadlines.map((d) => d.id);
+    for (const id of ["w1", "w2", "t1"]) expect(ids).toContain(id);
+    expect(read!.cutShort.overdue).toBe(true);
+    expect(read!.cutShort.upcoming).toBe(false);
+    const groups = deadlineCardGroups(read!.deadlines, TODAY);
+    expect(groups.week.map((d) => d.id)).toEqual(["w1", "w2"]);
+    expect(groups.month.map((d) => d.id)).toEqual(["t1"]);
+  });
+
+  it("the card says the list was cut short, in words, with a calendar link", () => {
+    const html = text(renderToStaticMarkup(<DeadlineAlertsView recipients={{ status: "ok", userIds: [U1] }} viewerId={U1} groups={{ overdue: [], week: [dl("w1", "2026-11-22")], month: [] }} cutShort />));
+    expect(html).toContain("Not every deadline could be listed here.");
+    expect(html).toContain('href="/dashboard/calendar/"');
+  });
+
+  it("'and N more' no longer claims a calendar it doesn't link to", () => {
+    const many = Array.from({ length: 10 }, (_, i) => dl(`x${i}`, "2026-11-22"));
+    const html = text(renderToStaticMarkup(<DeadlineAlertsView recipients={{ status: "ok", userIds: [U1] }} viewerId={U1} groups={{ overdue: [], week: many, month: [] }} />));
+    expect(html).toContain("and 2 more");
+    expect(html).not.toContain("on the calendar");
   });
 });

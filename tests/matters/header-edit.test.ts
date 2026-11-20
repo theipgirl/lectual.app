@@ -171,3 +171,30 @@ describe("updateMatterHeaderAction (role matrix)", () => {
     expect(Object.keys(update.payload as object).sort()).toEqual(["referral_source", "updated_at"]);
   });
 });
+
+describe("PGE Sprint 3 review 5b: the two-step TM -> CR -> close path is guarded at the first step", () => {
+  const otherOpen = { id: "dl-other", org_id: "org-1", matter_id: "matter-1", kind: "other", title: "Note to file", due_date: "2026-12-05", status: "open", source: "manual", attorney_confirmed: false };
+
+  it("retyping a TM matter to CR with an open `other` deadline is refused and writes nothing", async () => {
+    db = createFakeDb({ tables: { ...standardSeed(), crm_matter_deadline: [otherOpen] } });
+    h.db = db;
+    await expect(updateMatterHeader("matter-1", { type: "CR" })).rejects.toThrow(/can't stop being a trademark matter while it has an open deadline: Note to file/);
+    expect(db.writes).toEqual([]);
+    expect(db.rows("crm_matter").find((r) => r.id === "matter-1")!.type).toBe("TM");
+  });
+
+  it("a failed deadlines read refuses the retype too", async () => {
+    db.fail("crm_matter_deadline", "select");
+    await expect(updateMatterHeader("matter-1", { type: "CR" })).rejects.toThrow(/Couldn't check this matter's deadlines/);
+    expect(db.writes).toEqual([]);
+  });
+
+  it("then closing it as CR is still refused by the plain close guard (the deadline kind counts under any type, or the retype never happened)", async () => {
+    const { updateMatterStatus } = await import("@/lib/matters/matters");
+    db = createFakeDb({ tables: { ...standardSeed(), crm_matter_deadline: [otherOpen] } });
+    h.db = db;
+    await expect(updateMatterHeader("matter-1", { type: "CR" })).rejects.toThrow();
+    await expect(updateMatterStatus("matter-1", "closed")).rejects.toThrow(/open deadline/);
+    expect(db.rows("crm_matter").find((r) => r.id === "matter-1")!.status).toBe("open");
+  });
+});
