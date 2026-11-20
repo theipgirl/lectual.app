@@ -11,7 +11,13 @@ import type { CardEvent, CardEventKind, CardState } from "@/lib/queue/deck";
  * other failure). A deck that can't read these shows EVERY card it would otherwise deal, never fewer.
  */
 
-const COLUMNS = "queue_item_id, kind, actor_id, target_user_id, until, note, created_at";
+const COLUMNS = "queue_item_id, kind, actor_id, target_user_id, until, note, attempt, created_at";
+/** Before lectual 0112 there is no `attempt` column (42703 / PGRST204): read the 0103 columns, every attempt is null. */
+const COLUMNS_0103 = "queue_item_id, kind, actor_id, target_user_id, until, note, created_at";
+const isMissingColumn = (error: unknown) => {
+  const code = (error as { code?: unknown } | null)?.code;
+  return code === "42703" || code === "PGRST204";
+};
 const CHUNK = 100;
 
 const KINDS: readonly CardEventKind[] = ["handoff", "later", "returned", "draft_to", "drafting", "drafted", "draft_failed", "pass_failed"];
@@ -32,6 +38,7 @@ function toEvent(row: Record<string, unknown>): CardEvent | null {
     targetUserId: typeof row.target_user_id === "string" ? row.target_user_id : null,
     until: typeof row.until === "string" ? row.until : null,
     note: typeof row.note === "string" ? row.note : null,
+    attempt: typeof row.attempt === "number" ? row.attempt : null,
     createdAt: row.created_at,
   };
 }
@@ -48,14 +55,16 @@ export async function loadCardState(itemIds: readonly string[]): Promise<CardSta
       if (error) return isNotSetUpError(error) ? { status: "not-set-up" } : { status: "unavailable" };
       return { status: "ok", events };
     }
+    let columns = COLUMNS;
     for (let i = 0; i < ids.length; i += CHUNK) {
-      const { data, error } = await supabase
-        .from("queue_card_event")
-        .select(COLUMNS)
-        .in("queue_item_id", ids.slice(i, i + CHUNK))
-        .order("created_at", { ascending: true });
+      const read = () => supabase.from("queue_card_event").select(columns).in("queue_item_id", ids.slice(i, i + CHUNK)).order("created_at", { ascending: true });
+      let { data, error } = await read();
+      if (error && columns === COLUMNS && isMissingColumn(error)) {
+        columns = COLUMNS_0103;
+        ({ data, error } = await read());
+      }
       if (error) return isNotSetUpError(error) ? { status: "not-set-up" } : { status: "unavailable" };
-      for (const row of (data ?? []) as Record<string, unknown>[]) {
+      for (const row of (data ?? []) as unknown as Record<string, unknown>[]) {
         const e = toEvent(row);
         if (e) events.push(e);
       }
@@ -83,7 +92,10 @@ export function isKindNotSetUpError(kind: CardEventKind, error: unknown): boolea
   // Read only to recognise the refusal; never shown or logged.
   const refusal = error as { code?: unknown; message?: unknown } | null;
   const text = typeof refusal?.message === "string" ? refusal.message : "";
-  return refusal?.code === "23514" && (text.includes(`"${KIND_CHECK_NAME}"`) || text.includes(`"${SHAPE_CHECK_NAME}"`));
+  if (refusal?.code === "23514") return text.includes(`"${KIND_CHECK_NAME}"`) || text.includes(`"${SHAPE_CHECK_NAME}"`);
+  // The attempt column 0112 adds isn't there yet (sent on drafting / drafted / draft_failed only).
+  if (refusal?.code === "PGRST204" || refusal?.code === "42703") return /\battempt\b/.test(text);
+  return false;
 }
 
 /** 23505: a unique index refused the row (0112's one claim per attempt, one `drafted` per item). */
@@ -102,6 +114,8 @@ export async function recordCardEvent(input: {
   targetUserId?: string | null;
   until?: string | null;
   note?: string | null;
+  /** lectual 0112: only for drafting / drafted / draft_failed; never sent for any other kind. */
+  attempt?: number | null;
 }): Promise<RecordResult> {
   try {
     const supabase = await getScopedClient();
@@ -112,6 +126,7 @@ export async function recordCardEvent(input: {
       target_user_id: input.targetUserId ?? null,
       until: input.until ?? null,
       note: input.note ?? null,
+      ...(typeof input.attempt === "number" ? { attempt: input.attempt } : {}),
     });
     if (error) return { ok: false, reason: isNotSetUpError(error) || isKindNotSetUpError(input.kind, error) ? "not-set-up" : isUniqueViolation(error) ? "conflict" : "failed" };
     return { ok: true };

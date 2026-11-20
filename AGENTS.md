@@ -2412,7 +2412,7 @@ their own click). Contract: `docs/pge/2026-11-17-agentic-ip-os/sprint-4.md`. App
     0112 drops and re-adds both under their own names. Before 0112, 23514 naming either (quote-delimited, exactly as Postgres prints
     `violates check constraint "queue_card_event_kind"`) reads as "not switched on" for the new kinds only (`isKindNotSetUpError`), so a refused
     `draft_to` takes the documented fallback (the approver's own mailbox), never `pass-failed`.
-  - **Make the draft: claim, confirm, fail.** The click claims "attempt <n>" with a `drafting` row (0112: one per (org, item, note), and the policy
+  - **Make the draft: claim, confirm, fail.** The click claims attempt n with a `drafting` row (0112: one per (org, item, attempt), and the policy
     admits only the NEXT attempt), makes the Outlook draft, then writes `drafted` (confirmed) or, on a Graph failure, `draft_failed`, which re-opens
     the item for attempt n + 1. Two concurrent clicks: the second `drafting` for the same attempt answers 23505 ("already being drafted"). A claim with
     no outcome (a crash in between) is never drafted again from here and never reads as "Drafted": the page says "Check your Drafts. If it isn't
@@ -2425,6 +2425,15 @@ their own click). Contract: `docs/pge/2026-11-17-agentic-ip-os/sprint-4.md`. App
   - **The receipt** is read only from the LAST line of the resolution note, exactly `Receipt: sha256 <12 hex>` (the server appends it last), so a
     receipt pasted into the approver's own note never counts.
   - **A failed Ready-to-draft read** shows the drafter "Couldn't check what's ready to draft." on Approvals and the deck.
+  - **0112 aligned with 0103's text (Nov 20).** The attempt is a real `attempt smallint` column added by 0112 (null for every other kind,
+    required >= 1 for drafting / drafted / draft_failed, in the shape CHECK; the insert grant gains `attempt`; the unique indexes are on
+    `attempt`). `note` stays free text and is never parsed for it (a note reading "attempt 2" changes nothing; pinned). The app sends
+    `attempt` only for those three kinds (`recordCardEvent`), reads it into `CardEvent.attempt`, and before 0112 (42703 / PGRST204 on the
+    select) reads 0103's columns with every attempt null, so hand-offs keep working; an insert refused for the missing column (PGRST204 /
+    42703 naming `attempt`) is "not switched on" for the new kinds only. 0112's re-added `queue_card_event_shape` carries 0103's three
+    clauses verbatim. **0103's trigger `queue_card_event_rules()` is left alone** (its branches cover handoff / later / returned only;
+    the new kinds fall through and get `created_at := now()`). 0103's `queue_card_event_not_self` refuses a draft_to to oneself; the app
+    never writes one (plan `self` writes no draft_to; pinned). 0103's `queue_card_event_insert_staff` stays; 0112's restrictive policy sits on top.
   - **If lawmatics-mcp ever normalises `final_body`** (trims, re-wraps, changes line endings), the stored text stops hashing to the `draft_to` /
     receipt hash and EVERY Make-draft is refused ("changed after it was approved"): it fails closed, never drafts other text (pinned by a test).
 

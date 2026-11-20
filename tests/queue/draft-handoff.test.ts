@@ -16,7 +16,7 @@ import {
   type ApprovalRouting,
   type QueueKind,
 } from "@/lib/queue/routing";
-import { approvePlan, approvedTextMatches, attemptNote, draftAssignment, draftToNote, makeDraftDecision, postedConnectionAllowed, readyToDraft, receiptFromNote, retryPassDecision, shaFromDraftToNote } from "@/lib/queue/draft-handoff";
+import { approvePlan, approvedTextMatches, draftAssignment, draftToNote, makeDraftDecision, postedConnectionAllowed, readyToDraft, receiptFromNote, retryPassDecision, shaFromDraftToNote } from "@/lib/queue/draft-handoff";
 import { DRAFT_TO_CLOCK_SKEW_MS, eventTrust, trustedEvents, type CardEvent, type EventTrust } from "@/lib/queue/deck";
 import { shownBodySha256 } from "@/lib/queue/shown-text";
 import { drafterOutlookLine } from "@/lib/queue/drafter-outlook";
@@ -344,7 +344,7 @@ describe("Ready to draft (N)", () => {
 });
 
 describe("MUST 2: claim, confirm, fail", () => {
-  const att = (kind: CardEvent["kind"], n: number, at: string, actor = RAYN) => ev(kind, actor, { note: attemptNote(n), createdAt: at });
+  const att = (kind: CardEvent["kind"], n: number, at: string, actor = RAYN) => ev(kind, actor, { attempt: n, createdAt: at });
   const progress = (events: CardEvent[]) => draftAssignment(trustedEvents(events, [approved()], known()), "a1")?.progress;
 
   it("open, drafting (no outcome), failed (next attempt), drafted (confirmed only)", () => {
@@ -378,5 +378,15 @@ describe("SHOULD 5: the receipt is read only from the server's fixed last line",
     // A pasted receipt that matches is ignored when the server's own last line disagrees.
     expect(approvedTextMatches(approved({ resolution_note: `Receipt: sha256 ${sha.slice(0, 12)}\nReceipt: sha256 bbbbbbbbbbbb` }), sha)).toBe(false);
     expect(approvedTextMatches(approved({ resolution_note: `note text Receipt: sha256 ${sha.slice(0, 12)}` }), sha)).toBe(false);
+  });
+});
+
+describe("item 5: the attempt is a column, never the note", () => {
+  it("a drafting / draft_failed whose note reads 'attempt 2' but has no attempt column is not an attempt", () => {
+    const events = [passTo(U.rebecca), ev("drafting", RAYN, { note: "attempt 2", createdAt: "2026-11-20T10:01:00Z" }), ev("draft_failed", RAYN, { note: "attempt 2", createdAt: "2026-11-20T10:01:05Z" })];
+    expect(draftAssignment(trustedEvents(events, [approved()], known()), "a1")?.progress).toEqual({ kind: "open", next: 1 });
+    // The column decides, whatever the note says.
+    const real = [passTo(U.rebecca), ev("drafting", RAYN, { attempt: 1, note: "attempt 7", createdAt: "2026-11-20T10:01:00Z" })];
+    expect(draftAssignment(trustedEvents(real, [approved()], known()), "a1")?.progress).toEqual({ kind: "drafting", attempt: 1 });
   });
 });

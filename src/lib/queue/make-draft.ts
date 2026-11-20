@@ -3,7 +3,7 @@ import { resolveFirmSession } from "@/lib/firm/session";
 import { loadCardState, recordCardEvent } from "@/lib/queue/card-state";
 import { cardCaller, readCardItem } from "@/lib/queue/card-moves";
 import { eventTrust, trustedCardState } from "@/lib/queue/deck";
-import { attemptNote, makeDraftDecision, retryPassDecision, type DraftRefusal, type MyOutlookDraftAccess, type RetryPassRefusal } from "@/lib/queue/draft-handoff";
+import { makeDraftDecision, retryPassDecision, type DraftRefusal, type MyOutlookDraftAccess, type RetryPassRefusal } from "@/lib/queue/draft-handoff";
 import { passToDrafter } from "@/lib/queue/review-core";
 import { memberName } from "@/lib/queue/routing";
 import { loadApprovalRouting } from "@/lib/queue/routing-load";
@@ -43,7 +43,7 @@ import {
  * re-reads the item from the queue and the card events through the scoped client, folds them with `trustedEvents`, and
  * refuses unless the caller is the CURRENT draft_to target of an approved client email whose text still hashes to the
  * approve receipt. Then ONE draft in the caller's OWN Outlook (their scoped read; a posted connection id is only ever
- * compared with it). The attempt is CLAIMED first (`drafting`, "attempt <n>", one per attempt by 0112's unique index), then
+ * compared with it). The attempt is CLAIMED first (`drafting` with lectual 0112's `attempt` column, one per attempt by 0112's unique index), then
  * confirmed (`drafted`) only after Outlook made the draft, or recorded as failed (`draft_failed`), which offers the button
  * again. A drafted item does nothing; a claimed attempt with no outcome (a crash in between) is never drafted again from
  * here: the page tells the person to check Drafts and shows the approved text. Nothing here sends.
@@ -76,11 +76,11 @@ export async function makeDraftInMyOutlook(args: { id: string; postedConnectionI
   if (decision.already || !item) return { ok: true, message: MAKE_DRAFT_ALREADY, webLink: null };
 
   // Claim first: a `drafting` row for this attempt is written BEFORE any mailbox call. 0112's unique index on
-  // (org, item, note) for `drafting` lets exactly one of two concurrent clicks claim "attempt <n>"; the other gets 23505.
+  // (org, item, attempt) for `drafting` lets exactly one of two concurrent clicks claim attempt n; the other gets 23505.
   const access = await myOutlookDraftAccess(args.postedConnectionId);
   if (access !== "ready") return { ok: false, error: access === "not-yours" ? MAKE_DRAFT_NOT_YOURS : ACCESS_SENTENCE[access] };
-  const note = attemptNote(decision.attempt);
-  const claim = await recordCardEvent({ orgId: who.orgId, queueItemId: item.id, kind: "drafting", note });
+  const attempt = decision.attempt;
+  const claim = await recordCardEvent({ orgId: who.orgId, queueItemId: item.id, kind: "drafting", attempt });
   if (!claim.ok) return { ok: false, error: claim.reason === "conflict" ? MAKE_DRAFT_IN_PROGRESS : claim.reason === "not-set-up" ? NOT_SWITCHED_ON : MAKE_DRAFT_FAILED };
 
   // The approved text, checked above against the receipt; the same subject the approve path drafts with.
@@ -91,12 +91,12 @@ export async function makeDraftInMyOutlook(args: { id: string; postedConnectionI
   if (!made.ok) {
     // No draft: record the failure, which re-opens the item for the same drafter. If even that can't be written, the claim
     // stands with no outcome and the page says to check Drafts (and shows the text): never a silent second draft.
-    const failed = await recordCardEvent({ orgId: who.orgId, queueItemId: item.id, kind: "draft_failed", note });
+    const failed = await recordCardEvent({ orgId: who.orgId, queueItemId: item.id, kind: "draft_failed", attempt });
     if (!failed.ok) return { ok: false, error: MAKE_DRAFT_CLAIMED_FAILED };
     return { ok: false, error: made.reason === "reauth" ? MAKE_DRAFT_FAILED_RECONNECT : MAKE_DRAFT_FAILED_RETRY };
   }
   // Confirmed only now. If the confirmation can't be written the page shows "check your Drafts", never "Drafted".
-  const confirmed = await recordCardEvent({ orgId: who.orgId, queueItemId: item.id, kind: "drafted", note });
+  const confirmed = await recordCardEvent({ orgId: who.orgId, queueItemId: item.id, kind: "drafted", attempt });
   return { ok: true, message: confirmed.ok ? MAKE_DRAFT_DONE : MAKE_DRAFT_DONE_NOT_RECORDED, webLink: made.webLink };
 }
 

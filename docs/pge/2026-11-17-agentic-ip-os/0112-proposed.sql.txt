@@ -25,6 +25,22 @@
 --   * Parts 3 and 4 (who may write each kind; one claim per attempt, one failure per attempt, one drafted per item) are what
 --     stop two concurrent "Make the draft" clicks and forged rows in the database; without them the app's fold (`trustedEvents`)
 --     is the only guard.
+--   * 0103's trigger `queue_card_event_rules()` (BEFORE INSERT OR UPDATE, `queue_card_event_rules_trg`) has branches for handoff,
+--     later and returned only; any other kind falls through to the kind CHECK and gets `created_at := now()`. So the new kinds
+--     pass the trigger untouched, and THIS FILE LEAVES THE TRIGGER ALONE (option chosen: no trigger change). Nothing below needs
+--     a trigger rule: the shapes are the CHECK, who may write is the restrictive policy. (If a later change ever needs a branch
+--     for the new kinds, it must `create or replace` the function with 0103's body copied exactly; that body is not in this
+--     session, so do not write one from memory.) `actor_id` stays forced to auth.uid() and `created_at` stays the database's.
+--   * 0103's `queue_card_event_not_self` (`target_user_id is null or target_user_id <> actor_id`) refuses a draft_to to oneself.
+--     The app never writes one: the drafter approving her own item is plan `self`, which writes no draft_to at all, and a pass
+--     targets the drafter only when the drafter is someone else (pinned by tests). `drafting`, `drafted`, `draft_failed` and
+--     `pass_failed` have no target, so they pass it.
+--   * 0103's insert policy `queue_card_event_insert_staff` (owner, admin, senior_admin, attorney, intake, paralegal, law_clerk,
+--     clerk; `actor_id = auth.uid()` and `org_id = current_org_id()`) STAYS. The RESTRICTIVE policy below sits on top of it:
+--     a new-kind row must pass both.
+--   * The attempt is a real column (step 0 below), not the note: 0103's insert grant is the column list
+--     (org_id, queue_item_id, kind, target_user_id, until, note), and `note` is free text any staff member writes, so a unique
+--     index over it would be fragile. The app sends `attempt` only for drafting / drafted / draft_failed and never parses `note`.
 --
 -- Why (decision 3b): when the attorney approves a client email and the firm's "Drafts go to" is someone else, the card passes
 -- to that person (`draft_to`, target = the drafter, note = 'approved-text sha256 <64 hex>') and they make the draft in their OWN
@@ -34,32 +50,37 @@
 
 begin;
 
+-- 0. The drafter's attempt number, a real column (null for every other kind; required, >= 1, for the drafting kinds: see the
+--    shape CHECK), and the insert grant extended to it. The app reads it with a fallback to 0103's columns before this file.
+alter table public.queue_card_event add column if not exists attempt smallint;
+grant insert (attempt) on public.queue_card_event to authenticated;
+
 -- 1. The five new kinds. Drop and recreate 0103's kind CHECK under its real name, `queue_card_event_kind` (0103 line 98).
 --      draft_to      the approver passes an approved email to the firm's drafter (target = the drafter)
---      drafting      the drafter CLAIMS attempt <n> before making the Outlook draft (note 'attempt <n>')
---      drafted       the draft is CONFIRMED made, written only after Outlook said so (note 'attempt <n>')
---      draft_failed  attempt <n> made no draft; the item is open again for the same drafter (note 'attempt <n>')
+--      drafting      the drafter CLAIMS attempt <n> (the `attempt` column) before making the Outlook draft
+--      drafted       the draft is CONFIRMED made, written only after Outlook said so (same `attempt`)
+--      draft_failed  attempt <n> made no draft; the item is open again for the same drafter (same `attempt`)
 --      pass_failed   the approve path couldn't write the draft_to: the marker that lets the approver retry the pass
 alter table public.queue_card_event drop constraint if exists queue_card_event_kind;
 alter table public.queue_card_event
   add constraint queue_card_event_kind
   check (kind in ('handoff', 'later', 'returned', 'draft_to', 'drafting', 'drafted', 'draft_failed', 'pass_failed'));
 
--- 2. Shapes. 0103 lines ~100-104 add `queue_card_event_shape`, which admits ONLY the three old shapes, so the new kinds would
---    still be refused after step 1. Drop it and re-add it under the SAME name with the old three clauses copied VERBATIM from
---    0103 (the three below are this file's reading of them: handoff names a target and no until, later has an until and no
---    target, returned has neither; replace them with 0103's own text before applying) plus the new ones.
+-- 2. Shapes. 0103 adds `queue_card_event_shape`, which admits ONLY the three old shapes, so the new kinds would still be refused
+--    after step 1. Drop it and re-add it under the SAME name: 0103's three clauses verbatim (0103 lines 100-104), each now also
+--    requiring `attempt is null`, plus the new shapes.
 alter table public.queue_card_event drop constraint if exists queue_card_event_shape;
 alter table public.queue_card_event
   add constraint queue_card_event_shape
   check (
-    (kind = 'handoff'      and target_user_id is not null and until is null)       -- 0103: copy verbatim
-    or (kind = 'later'     and target_user_id is null     and until is not null)   -- 0103: copy verbatim
-    or (kind = 'returned'  and target_user_id is null     and until is null)       -- 0103: copy verbatim
-    or (kind = 'draft_to'  and target_user_id is not null and until is null)
+    ((kind = 'handoff'  and target_user_id is not null and until is null)
+    or (kind = 'later'    and target_user_id is null     and until is not null)
+    or (kind = 'returned' and target_user_id is null     and until is null))
+      and attempt is null
+    or (kind = 'draft_to'    and target_user_id is not null and until is null and attempt is null)
+    or (kind = 'pass_failed' and target_user_id is null     and until is null and attempt is null)
     or (kind in ('drafting', 'drafted', 'draft_failed') and target_user_id is null and until is null
-        and note is not null and note ~ '^attempt [1-9][0-9]{0,3}$')
-    or (kind = 'pass_failed' and target_user_id is null and until is null and note is null)
+        and attempt is not null and attempt >= 1)
   );
 
 -- 3. Who may insert them. 0103's insert policy (staff of the row's org) stays; this adds, for the new kinds only:
@@ -68,8 +89,8 @@ alter table public.queue_card_event
 --                    as a value in that firm's approval_routing (a routed approver). Same org only.
 --    * pass_failed:  the same writer rule as draft_to (no target).
 --    * drafting:     only the CURRENT draft_to target (the newest draft_to on the item, by created_at then id), for themselves
---                    (actor_id is auth.uid() by the trigger), and only for the NEXT attempt: note = 'attempt ' || (the number of
---                    their draft_failed rows on the item since that draft_to + 1), and never once a drafted exists.
+--                    (actor_id is auth.uid() by the trigger), and only for the NEXT attempt: attempt = (the number of their
+--                    draft_failed rows on the item since that draft_to) + 1, and never once a drafted exists.
 --    * drafted / draft_failed: only the current target, and only for their own newest `drafting` attempt that has no outcome yet.
 --    RESTRICTIVE, so it narrows 0103's permissive policy and widens nothing.
 --
@@ -82,7 +103,7 @@ create schema if not exists private;
 revoke all on schema private from public, anon;
 grant usage on schema private to authenticated;
 
-create or replace function private.queue_card_event_draft_ok(p_org uuid, p_item text, p_kind text, p_target uuid, p_note text)
+create or replace function private.queue_card_event_draft_ok(p_org uuid, p_item text, p_kind text, p_target uuid, p_attempt smallint)
 returns boolean
 language plpgsql
 stable
@@ -94,7 +115,7 @@ declare
   v_newest_target uuid;
   v_newest_at timestamptz;
   v_failed int;
-  v_open_claim text;
+  v_open_claim smallint;
 begin
   if p_org is distinct from public.current_org_id() then
     return false;
@@ -138,23 +159,23 @@ begin
       select count(*) into v_failed from public.queue_card_event e
       where e.org_id = p_org and e.queue_item_id = p_item and e.kind = 'draft_failed'
         and e.actor_id = auth.uid() and e.created_at >= v_newest_at;
-      return p_note = 'attempt ' || (v_failed + 1)::text;          -- only the next attempt can be claimed
+      return p_attempt = v_failed + 1;                               -- only the next attempt can be claimed
     end if;
     -- drafted / draft_failed: the caller's own newest claim, still without an outcome.
-    select c.note into v_open_claim from public.queue_card_event c
+    select c.attempt into v_open_claim from public.queue_card_event c
     where c.org_id = p_org and c.queue_item_id = p_item and c.kind = 'drafting' and c.actor_id = auth.uid()
       and c.created_at >= v_newest_at
       and not exists (select 1 from public.queue_card_event f where f.org_id = p_org and f.queue_item_id = p_item
-                      and f.kind = 'draft_failed' and f.note = c.note)
+                      and f.kind = 'draft_failed' and f.attempt = c.attempt)
     order by c.created_at desc, c.id desc
     limit 1;
-    return v_open_claim is not null and p_note = v_open_claim;
+    return v_open_claim is not null and p_attempt = v_open_claim;
   end if;
   return true;
 end
 $$;
-revoke all on function private.queue_card_event_draft_ok(uuid, text, text, uuid, text) from public, anon;
-grant execute on function private.queue_card_event_draft_ok(uuid, text, text, uuid, text) to authenticated;
+revoke all on function private.queue_card_event_draft_ok(uuid, text, text, uuid, smallint) from public, anon;
+grant execute on function private.queue_card_event_draft_ok(uuid, text, text, uuid, smallint) to authenticated;
 
 drop policy if exists queue_card_event_draft_kinds on public.queue_card_event;
 create policy queue_card_event_draft_kinds on public.queue_card_event
@@ -163,20 +184,20 @@ create policy queue_card_event_draft_kinds on public.queue_card_event
   to authenticated
   with check (
     kind not in ('draft_to', 'drafting', 'drafted', 'draft_failed', 'pass_failed')
-    or (org_id = public.current_org_id() and private.queue_card_event_draft_ok(org_id, queue_item_id, kind, target_user_id, note))
+    or (org_id = public.current_org_id() and private.queue_card_event_draft_ok(org_id, queue_item_id, kind, target_user_id, attempt))
   );
 
 -- 4. Two concurrent clicks make at most ONE Outlook draft:
---    * A click CLAIMS 'attempt <n>' with a `drafting` row BEFORE it calls Outlook. One `drafting` per (org, item, note): both
+--    * A click CLAIMS attempt n with a `drafting` row BEFORE it calls Outlook. One `drafting` per (org, item, attempt): both
 --      clicks compute the same n from the rows they read, so the second insert answers 23505 and the app refuses it ("already
 --      being drafted"). The policy only admits the NEXT attempt, so nobody can pre-claim attempt 2 while attempt 1 is open.
 --    * After a `draft_failed` for attempt n, the next claim is n + 1, a new key: a retry after a failure is allowed.
 --    * One `draft_failed` per attempt and one `drafted` per item (confirmation only after Outlook said so).
 create unique index if not exists queue_card_event_one_claim_per_attempt
-  on public.queue_card_event (org_id, queue_item_id, note)
+  on public.queue_card_event (org_id, queue_item_id, attempt)
   where kind = 'drafting';
 create unique index if not exists queue_card_event_one_failure_per_attempt
-  on public.queue_card_event (org_id, queue_item_id, note)
+  on public.queue_card_event (org_id, queue_item_id, attempt)
   where kind = 'draft_failed';
 create unique index if not exists queue_card_event_one_drafted
   on public.queue_card_event (org_id, queue_item_id)
@@ -209,13 +230,16 @@ commit;
 --      of firm B): refused. With no drafter configured, every draft_to is refused.
 --   3. A paralegal / law_clerk / intake / clerk of firm A who is NOT a value in approval_routing inserts a draft_to or a
 --      pass_failed: refused. The same person named as a routing value: allowed. An attorney of firm A: allowed.
---   4. Shapes: a `draft_to` with target null, a `drafting` / `drafted` / `draft_failed` with a target, an until, a null note or a
---      note that isn't 'attempt <n>', a `pass_failed` with a target or a note: refused (23514 naming "queue_card_event_shape").
+--   4. Shapes: a `draft_to` with target null, a `drafting` / `drafted` / `draft_failed` with a target, an until, a null attempt or
+--      attempt 0, a `pass_failed` / `draft_to` / handoff / later / returned row WITH an attempt: refused (23514 naming
+--      "queue_card_event_shape"). A `drafting` whose note reads 'attempt 2' but whose attempt is 1 is attempt 1 (the note is text).
+--   4b. A signed-in user may insert `attempt` (the grant now lists it) and still not `actor_id` or `created_at` (permission denied).
+--   4c. A `draft_to` whose target is the writer: refused by 0103's queue_card_event_not_self (the app never writes one).
 --   5. Anyone but the newest draft_to's target inserts `drafting`, `drafted` or `draft_failed`: refused. Two draft_to rows with
 --      the same created_at: the one with the larger id decides.
---   6. The target claims 'attempt 1' (allowed; actor_id is their auth.uid() and created_at the database's own). A second
---      'attempt 1' claim: 23505. A claim of 'attempt 2' while attempt 1 has no outcome: refused (policy).
---   7. `draft_failed` 'attempt 1' by the target: allowed; then 'attempt 2' may be claimed; a second `draft_failed` 'attempt 1':
+--   6. The target claims attempt 1 (allowed; actor_id is their auth.uid() and created_at the database's own). A second
+--      attempt-1 claim: 23505. A claim of attempt 2 while attempt 1 has no outcome: refused (policy).
+--   7. `draft_failed` attempt 1 by the target: allowed; then attempt 2 may be claimed; a second `draft_failed` attempt 1:
 --      23505 (and refused by the policy).
 --   8. `drafted` for an attempt that was never claimed, or that already failed: refused. `drafted` for the open claim: allowed. A
 --      second `drafted` on the item: 23505. Any `drafting` after a `drafted`: refused.

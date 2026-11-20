@@ -22,7 +22,7 @@ import { canApproveItem, classifyQueueItem, type ApprovalRouting, type QueueKind
 /**
  *  · draft_to  (Sprint 4, lectual 0112) an APPROVED client email is passed to the firm's drafter: the approver wrote it
  *              at approve time instead of drafting in their own mailbox. `note` carries the approved text's sha256.
- *  · drafting  the drafter CLAIMED attempt <n> ("attempt <n>"), before making the draft in their OWN Outlook.
+ *  · drafting  the drafter CLAIMED attempt <n> (the `attempt` column, lectual 0112), before making the draft in their OWN Outlook.
  *  · drafted   the draft is confirmed made (only after Outlook said so). Ends the draft_to.
  *  · draft_failed  attempt <n> didn't make a draft; the item is open again for the same drafter.
  *  · pass_failed   the approve path couldn't write the draft_to: the marker that lets the approver retry the pass.
@@ -36,6 +36,8 @@ export type CardEvent = {
   targetUserId: string | null;
   until: string | null;
   note: string | null;
+  /** lectual 0112's `attempt` column: set only on drafting / drafted / draft_failed. `note` is free text and never read for it. */
+  attempt?: number | null;
   createdAt: string;
 };
 export type CardState = { status: "ok"; events: CardEvent[] } | { status: "not-set-up" } | { status: "unavailable" };

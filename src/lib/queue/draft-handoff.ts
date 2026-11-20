@@ -88,7 +88,8 @@ export function approvedBy(item: Pick<QueueItem, "status" | "resolved_by">, emai
 /**
  * The drafter's attempts, after the current draft_to (MUST 2). The click CLAIMS an attempt with a `drafting` row (one per
  * attempt number, a unique index in 0112), makes the Outlook draft, then CONFIRMS it with `drafted` or records
- * `draft_failed`, which re-opens the item for the next attempt. Each of the three carries the note "attempt <n>".
+ * `draft_failed`, which re-opens the item for the next attempt. Each of the three carries the attempt number in lectual 0112's
+ * `attempt` column. `note` is free text a staff member can write and is NEVER parsed for the attempt.
  *  · open      no attempt yet (next = 1)
  *  · failed    the newest attempt has a draft_failed (next = that + 1): the button is offered again
  *  · drafting  the newest attempt has neither (a crash in between): never "Drafted", never a second click
@@ -98,11 +99,9 @@ export type DraftProgress = { kind: "open"; next: number } | { kind: "failed"; n
 
 export type DraftAssignment = { target: string; by: string; sha: string | null; at: string; progress: DraftProgress };
 
-const ATTEMPT = /^attempt ([1-9][0-9]{0,3})$/;
-export const attemptNote = (n: number): string => `attempt ${n}`;
-export function attemptOf(note: string | null | undefined): number | null {
-  const m = ATTEMPT.exec(note ?? "");
-  return m ? Number(m[1]) : null;
+/** A usable attempt number from the `attempt` column: a whole number from 1 to 9999, else null. */
+export function attemptOf(value: unknown): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 9999 ? value : null;
 }
 
 /** The newest draft_to on the item and what its target has done since. Trusted events only. */
@@ -121,7 +120,7 @@ export function draftAssignment(events: readonly CardEvent[], itemId: string): D
       continue;
     }
     if (!current || e.actorId !== current.target) continue;
-    const n = attemptOf(e.note);
+    const n = attemptOf(e.attempt);
     if (e.kind === "drafted") drafted = e.createdAt;
     else if (e.kind === "drafting" && n !== null) claimed.add(n);
     else if (e.kind === "draft_failed" && n !== null) failed.add(n);

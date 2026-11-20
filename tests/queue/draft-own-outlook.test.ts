@@ -14,19 +14,34 @@ const state = vi.hoisted(() => ({
   create: vi.fn(),
   filters: [] as [string, unknown][],
   insertError: null as unknown,
+  eventRows: null as null | Record<string, unknown>[],
+  noAttemptColumn: false,
+  selects: [] as string[],
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db/scoped-client", () => ({
   getScopedClient: vi.fn(async () => {
+    let cols = "";
     const q = {
-      select: () => q,
+      select: (c: string) => {
+        cols = c;
+        state.selects.push(c);
+        return q;
+      },
       eq: (col: string, v: unknown) => {
         state.filters.push([col, v]);
         return q;
       },
+      in: () => q,
       order: () => q,
-      then: (resolve: (v: unknown) => void) => resolve({ data: state.scopedError ? null : state.rows, error: state.scopedError }),
+      then: (resolve: (v: unknown) => void) => {
+        if (state.eventRows) {
+          if (state.noAttemptColumn && /\battempt\b/.test(cols)) return resolve({ data: null, error: { code: "42703", message: "column queue_card_event.attempt does not exist" } });
+          return resolve({ data: state.eventRows, error: null });
+        }
+        return resolve({ data: state.scopedError ? null : state.rows, error: state.scopedError });
+      },
     };
     const table = { ...q, insert: async () => ({ error: state.insertError }) };
     return { from: () => table, auth: { getUser: async () => ({ data: { user: { id: "user-rayn" } } }) } };
@@ -197,7 +212,36 @@ describe("MUST 1: 0103's TWO constraints, with the real Postgres message strings
     state.insertError = { code: "23514", message: 'violates check constraint "queue_card_event_draft_shape"' };
     expect(await recordCardEvent({ orgId: "o", queueItemId: "q1", kind: "draft_to", targetUserId: "t" })).toEqual({ ok: false, reason: "failed" });
     state.insertError = { code: "23505", message: "duplicate key" };
-    expect(await recordCardEvent({ orgId: "o", queueItemId: "q1", kind: "drafting", note: "attempt 1" })).toEqual({ ok: false, reason: "conflict" });
+    expect(await recordCardEvent({ orgId: "o", queueItemId: "q1", kind: "drafting", attempt: 1 })).toEqual({ ok: false, reason: "conflict" });
+    // Before 0112 the attempt column isn't there: read as not switched on for the new kinds only.
+    state.insertError = { code: "PGRST204", message: "Could not find the 'attempt' column of 'queue_card_event' in the schema cache" };
+    expect(await recordCardEvent({ orgId: "o", queueItemId: "q1", kind: "drafting", attempt: 1 })).toEqual({ ok: false, reason: "not-set-up" });
+    state.insertError = { code: "PGRST204", message: "Could not find the 'other' column" };
+    expect(await recordCardEvent({ orgId: "o", queueItemId: "q1", kind: "drafting", attempt: 1 })).toEqual({ ok: false, reason: "failed" });
     state.insertError = null;
+  });
+});
+
+describe("item 5: reading card events before and after 0112's attempt column", () => {
+  const row = { queue_item_id: "q1", kind: "handoff", actor_id: "a", target_user_id: "b", until: null, note: "please check", created_at: "2026-11-20T10:00:00Z" };
+
+  it("before 0112 (no attempt column, 42703) the read falls back to 0103's columns: hand-offs keep working, every attempt is null", async () => {
+    const { loadCardState } = await import("@/lib/queue/card-state");
+    state.eventRows = [row];
+    state.noAttemptColumn = true;
+    state.selects = [];
+    const out = await loadCardState(["q1"]);
+    expect(out).toEqual({ status: "ok", events: [{ queueItemId: "q1", kind: "handoff", actorId: "a", targetUserId: "b", until: null, note: "please check", attempt: null, createdAt: "2026-11-20T10:00:00Z" }] });
+    expect(state.selects.some((c) => /attempt/.test(c))).toBe(true);
+    expect(state.selects[state.selects.length - 1]).not.toMatch(/attempt/);
+  });
+
+  it("after 0112 the attempt column is read as a number; a note is never read for it", async () => {
+    const { loadCardState } = await import("@/lib/queue/card-state");
+    state.eventRows = [{ ...row, kind: "drafting", target_user_id: null, note: "attempt 9", attempt: 2 }];
+    state.noAttemptColumn = false;
+    const out = await loadCardState(["q1"]);
+    expect(out.status === "ok" && out.events[0].attempt).toBe(2);
+    state.eventRows = null;
   });
 });

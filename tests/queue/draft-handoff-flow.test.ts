@@ -164,6 +164,26 @@ describe("Acceptance 10: before lectual 0112 (the event is refused)", () => {
   });
 });
 
+describe("Item 3 (0103's queue_card_event_not_self): a draft_to is never written to oneself", () => {
+  it("the drafter approving her own client email (plan self) writes no draft_to at all, so the self-refusal can never fire", async () => {
+    state.role = "law_clerk";
+    state.userId = RAYN;
+    state.item = qitem({ id: "q1", agent: ROUTINE_MARKER.client_reminder.agent, headline: "Reminder", draft_body: BODY });
+    state.routed = routed({ client_reminder: RAYN }, RAYN);
+    await runQueueReview({ id: "q1", intent: "approve" });
+    expect(state.record).not.toHaveBeenCalled();
+    expect(state.record.mock.calls.some((c) => (c[0] as { kind: string; targetUserId?: string }).kind === "draft_to")).toBe(false);
+  });
+
+  it("every draft_to the approve path writes targets the drafter, who is never the approver (plan pass only)", async () => {
+    await runQueueReview({ id: "q1", intent: "approve" });
+    const call = state.record.mock.calls[0][0] as { kind: string; targetUserId: string };
+    expect(call.kind).toBe("draft_to");
+    expect(call.targetUserId).toBe(RAYN);
+    expect(call.targetUserId).not.toBe(U.rebecca);
+  });
+});
+
 describe("Item 6 and acceptance 4: unchanged paths", () => {
   it("S5 (changed on purpose): the drafter approving herself drafts in her own mailbox only: the queue is asked not to draft, no draft_to", async () => {
     state.role = "law_clerk";
@@ -266,11 +286,11 @@ describe("Acceptances 6 to 8 through makeDraftInMyOutlook", () => {
 
   it("MUST 2 (changed on purpose): Rayn claims the attempt (drafting), makes the draft, THEN confirms it (drafted)", async () => {
     const order: string[] = [];
-    state.record.mockImplementation(async (e: { kind: string; note?: string }) => (order.push(`${e.kind}:${e.note}`), { ok: true }));
+    state.record.mockImplementation(async (e: { kind: string; attempt?: number }) => (order.push(`${e.kind}:${e.attempt}`), { ok: true }));
     state.draftOwnOutlook.mockImplementation(async () => (order.push("graph"), { ok: true, id: "AAMk-2", webLink: null }));
     const out = await makeDraftInMyOutlook({ id: "q1" });
     expect(out).toEqual({ ok: true, message: "The draft is in your Outlook Drafts. Open it there and press Send. Nothing has reached the client yet.", webLink: null });
-    expect(order).toEqual(["drafting:attempt 1", "graph", "drafted:attempt 1"]);
+    expect(order).toEqual(["drafting:1", "graph", "drafted:1"]);
     expect(state.draftOwnOutlook.mock.calls[0][0]).toEqual({ draft: { to: "ana@example.com", subject: "Next steps", body: BODY }, postedConnectionId: undefined });
     expect(state.draftMine).not.toHaveBeenCalled();
   });
@@ -299,16 +319,26 @@ describe("Acceptances 6 to 8 through makeDraftInMyOutlook", () => {
 
   it("MUST 2: Graph fails after the claim: draft_failed is recorded (never drafted), the item re-opens, and the retry claims attempt 2", async () => {
     const written: string[] = [];
-    state.record.mockImplementation(async (e: { kind: string; note?: string }) => (written.push(`${e.kind}:${e.note}`), { ok: true }));
+    state.record.mockImplementation(async (e: { kind: string; attempt?: number; note?: string }) => (written.push(`${e.kind}:${e.attempt}${e.note ? `:${e.note}` : ""}`), { ok: true }));
     state.draftOwnOutlook.mockResolvedValueOnce({ ok: false, reason: "failed" });
     expect(await makeDraftInMyOutlook({ id: "q1" })).toEqual({ ok: false, error: "The draft couldn't be made. Nothing was sent. Try again." });
-    expect(written).toEqual(["drafting:attempt 1", "draft_failed:attempt 1"]);
+    expect(written).toEqual(["drafting:1", "draft_failed:1"]);
     // The retry, after reading those rows back:
-    const ev = (kind: string, note: string, at: string) => ({ ...passEvent(), kind, actorId: RAYN, targetUserId: null, note, createdAt: at });
-    state.cardState = { status: "ok", events: [passEvent(), ev("drafting", "attempt 1", "2026-11-20T10:01:00Z"), ev("draft_failed", "attempt 1", "2026-11-20T10:01:05Z")] };
+    const ev = (kind: string, attempt: number, at: string) => ({ ...passEvent(), kind, actorId: RAYN, targetUserId: null, note: null, attempt, createdAt: at });
+    state.cardState = { status: "ok", events: [passEvent(), ev("drafting", 1, "2026-11-20T10:01:00Z"), ev("draft_failed", 1, "2026-11-20T10:01:05Z")] };
     written.length = 0;
     expect((await makeDraftInMyOutlook({ id: "q1" })).ok).toBe(true);
-    expect(written).toEqual(["drafting:attempt 2", "drafted:attempt 2"]);
+    expect(written).toEqual(["drafting:2", "drafted:2"]);
+  });
+
+  it("item 5: a note reading 'attempt 2' has no effect: the attempt comes only from the attempt column", async () => {
+    const ev = (kind: string, note: string | null, attempt: number | null, at: string) => ({ ...passEvent(), kind, actorId: RAYN, targetUserId: null, note, attempt, createdAt: at });
+    // A drafting whose NOTE says "attempt 2" but carries no attempt is not a claim: the item is still open for attempt 1.
+    state.cardState = { status: "ok", events: [passEvent(), ev("drafting", "attempt 2", null, "2026-11-20T10:01:00Z")] };
+    const written: string[] = [];
+    state.record.mockImplementation(async (e: { kind: string; attempt?: number; note?: string }) => (written.push(`${e.kind}:${e.attempt}:${e.note ?? ""}`), { ok: true }));
+    expect((await makeDraftInMyOutlook({ id: "q1" })).ok).toBe(true);
+    expect(written).toEqual(["drafting:1:", "drafted:1:"]);
   });
 
   it("MUST 2: if even the failure can't be recorded, the person is told to ask Lectual (the page then shows 'check your Drafts')", async () => {
@@ -318,7 +348,7 @@ describe("Acceptances 6 to 8 through makeDraftInMyOutlook", () => {
   });
 
   it("MUST 2: a crash between the claim and the draft (drafting, no outcome) is never drafted again from here", async () => {
-    state.cardState = { status: "ok", events: [passEvent(), { ...passEvent(), kind: "drafting", actorId: RAYN, targetUserId: null, note: "attempt 1", createdAt: "2026-11-20T10:01:00Z" }] };
+    state.cardState = { status: "ok", events: [passEvent(), { ...passEvent(), kind: "drafting", actorId: RAYN, targetUserId: null, note: null, attempt: 1, createdAt: "2026-11-20T10:01:00Z" }] };
     expect(await makeDraftInMyOutlook({ id: "q1" })).toEqual({ ok: false, error: "Check your Drafts. If it isn't there, copy the approved text below." });
     expect(state.record).not.toHaveBeenCalled();
     expect(state.draftOwnOutlook).not.toHaveBeenCalled();
@@ -360,7 +390,7 @@ describe("Acceptances 6 to 8 through makeDraftInMyOutlook", () => {
   });
 
   it("a second click on a drafted item does nothing", async () => {
-    state.cardState = { status: "ok", events: [passEvent(), { ...passEvent(), kind: "drafted", actorId: RAYN, targetUserId: null, note: "attempt 1", createdAt: "2026-11-20T10:05:00Z" }] };
+    state.cardState = { status: "ok", events: [passEvent(), { ...passEvent(), kind: "drafted", actorId: RAYN, targetUserId: null, note: null, attempt: 1, createdAt: "2026-11-20T10:05:00Z" }] };
     expect(await makeDraftInMyOutlook({ id: "q1" })).toMatchObject({ ok: true });
     expect(state.draftOwnOutlook).not.toHaveBeenCalled();
     expect(state.record).not.toHaveBeenCalled();
