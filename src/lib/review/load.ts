@@ -129,7 +129,7 @@ export async function readFirmSenders(db: ScopedClient): Promise<FirmSenders> {
 export async function readOpenDeadlines(db: ScopedClient, matterIds: readonly string[]): Promise<ReviewDeadlineIn[]> {
   return inChunks(matterIds, (chunk) =>
     readAllPages<ReviewDeadlineIn>((from, to) =>
-      db.from("crm_matter_deadline").select("matter_id, due_date, title").eq("status", "open").in("matter_id", chunk).order("id").range(from, to),
+      db.from("crm_matter_deadline").select("id, matter_id, kind, due_date, title, attorney_confirmed").eq("status", "open").in("matter_id", chunk).order("id").range(from, to),
     ),
   );
 }

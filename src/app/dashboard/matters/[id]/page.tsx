@@ -19,12 +19,14 @@ import {
 } from "@/lib/matters";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { formatCivilDate, formatInternationalClasses, FILING_BASIS_LABEL } from "@/lib/matters/ip-fields";
+import { canOverrideClose, guardedDeadlines, guardedNames, noOpenDeadline } from "@/lib/matters/deadline-safety";
+import { CloseOverrideForm } from "@/components/matters/CloseOverrideForm";
 import { CALCULATED_DEADLINE_NOTICE, daysUntil, deadlineKindLabel, deadlineSourceLabel } from "@/lib/matters/deadline-rules";
 import { matterLabel } from "@/lib/matters/docket-summary";
 import { matterStatusLabel } from "@/lib/matters/status";
 import { BAND_COPY, bandOf, stageAge } from "@/lib/matters/worklist";
 import { LoadFailedLine, Notice, PageHeader, Pill } from "@/components/ui";
-import { A_TEAMMATE, BLANK, MATTERS_NAME, NEXT_STEPS, OWNER_COLUMN, TEAMMATE, UNASSIGNED } from "@/lib/ui/words";
+import { A_TEAMMATE, BLANK, DEADLINES_COULDNT_LOAD, MATTERS_NAME, NEXT_STEPS, NO_OPEN_DEADLINE, NO_OPEN_DEADLINE_HINT, OWNER_COLUMN, TEAMMATE, UNASSIGNED } from "@/lib/ui/words";
 import { Timeline } from "@/components/timeline/Timeline";
 import { meetingsFor } from "@/lib/meetings/read";
 import { LinkedMeetings } from "@/components/meetings/LinkedMeetings";
@@ -124,7 +126,8 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
     listMatterStages().catch(() => null),
     listTasks({ matterId: matter.id }),
     activityForMatter(matter.id),
-    listMatterDeadlines(matter.id),
+    // null = the docket couldn't be read: the card says so and nothing is flagged "No open deadline" (PGE Sprint 3).
+    listMatterDeadlines(matter.id).catch(() => null),
     // Three states (linked / none / unavailable); a failed read never takes the page down.
     loadMatterContacts(matter.id),
     // null = could not read the team list, which is not the same as "no teammates".
@@ -170,8 +173,13 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
   const canConfirm = (DEADLINE_CONFIRM_ROLES as readonly string[]).includes(session.role);
   const canDeleteDeadline = (DEADLINE_DELETE_ROLES as readonly string[]).includes(session.role);
   const openTasks = tasks.filter((t) => t.status === "open");
-  const openDeadlines = deadlines.filter((d) => d.status === "open");
-  const closedDeadlines = deadlines.filter((d) => d.status !== "open");
+  const openDeadlines = (deadlines ?? []).filter((d) => d.status === "open");
+  const closedDeadlines = (deadlines ?? []).filter((d) => d.status !== "open");
+  // Deadline safety (PGE Sprint 3): the flag needs a deadlines read that worked; the override form needs an override role,
+  // a matter that isn't closed, and an open deadline the close guard counts.
+  const flagNoDeadline = noOpenDeadline(matter, deadlines === null ? null : new Set(openDeadlines.map((d) => d.matter_id)));
+  const guarded = deadlines === null ? [] : guardedDeadlines(matter.type, openDeadlines);
+  const showCloseOverride = canOverrideClose(session.role) && matter.status !== "closed" && guarded.length > 0;
   const age = stageAge(matter);
   const band = BAND_COPY[bandOf(matter)];
   const memberList = (members ?? []).map((m) => ({ userId: m.userId, name: m.displayName ?? m.email ?? TEAMMATE }));
@@ -262,9 +270,17 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
           <section className="lx-card mx-card" data-tour="matter-deadlines">
             <div className="mx-between">
               <h2 className="lx-h2">Deadlines</h2>
-              <span className="lx-note">{openDeadlines.length} open</span>
+              {deadlines !== null && <span className="lx-note">{openDeadlines.length} open</span>}
             </div>
-            {openDeadlines.length === 0 ? (
+            {flagNoDeadline && (
+              <p className="mx-row" data-flag="no-open-deadline">
+                <Pill tone="risk">{NO_OPEN_DEADLINE}</Pill>
+                <span className="lx-note">{NO_OPEN_DEADLINE_HINT}</span>
+              </p>
+            )}
+            {deadlines === null ? (
+              <LoadFailedLine role="alert" refresh={false}>{DEADLINES_COULDNT_LOAD}</LoadFailedLine>
+            ) : openDeadlines.length === 0 ? (
               <p className="lx-note">No deadlines yet. Nothing is ever docketed automatically.</p>
             ) : (
               <ul className="lx-list">
@@ -338,6 +354,7 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
                 </ul>
               </details>
             )}
+            {showCloseOverride && <CloseOverrideForm matterId={matter.id} deadlineNames={guardedNames(guarded)} />}
             {canWrite && (
               <details className="lx-disclosure-inline lx-add-deadline">
                 <summary className="lx-btn lx-btn-sec lx-btn-sm">Add a deadline</summary>

@@ -2271,3 +2271,44 @@ Intake and Matters, Board and List: temperature, source, owner, next step and st
 - **Matters intake line** follows the chip in use (Closed, Unassigned, Needs your review, any `?seg=`), and "Show them" keeps the chip. A firm with phases but no
   signed-engagement stage (`isHiredStage`) gets one quiet warn line (`MATTER_NO_HIRED_STAGE`). Copilot's stalled/open counts leave intake-stage matters out too
   (`withoutIntake`; a failed stage read counts every matter).
+
+## Sprint 3 Part A: deadline safety (PGE, no schema here; the database half is lectual 0110, proposed, NOT applied)
+Spec `docs/pge/2026-11-17-agentic-ip-os/sprint-3.md` items 1-4. Part B (the USPTO watcher, 0111) is NOT built. Nothing here sends, writes a
+deadline or changes `attorney_confirmed`. Rules are pure in `src/lib/matters/deadline-safety.ts` and `src/lib/today/deadline-alerts.ts`.
+- **"No open deadline"** (`isFiledTrademark`, `noOpenDeadline`): an open (`status = open`, docket stage not closed) TM matter with a
+  `serial_number` or `filing_date` and no `crm_matter_deadline` row of status `open` (only satisfied / waived / superseded counts as none).
+  A tag on the matter page's Deadlines card, the Matters list (table sub-line and board card foot, `loadOpenDeadlineMatterIds`, scoped,
+  only the filed TM ids) and the Weekly review (`row.noOpenDeadline`, `rowTags`). It never changes a bucket, sort or count. A failed
+  deadlines read is "unknown": nothing is flagged, and the page says the deadlines couldn't load (the matter page no longer fails whole).
+- **Alerts** (Taylor C8): recipients are the firm note `crm_firm_brain_entry` (category `other`, key `deadline_alert_recipients`,
+  `data.user_ids`), set by the admin tier in Settings -> Team ("Deadline alerts", `saveDeadlineAlertRecipientsAction`: role and every id
+  re-checked against the member directory). Hidden from the Firm notes page. No names in code. A removed member's id is dropped on read.
+  Windows: 0..7 days = 7, 8..30 = 30 (overdue raises nothing). **De-dupe without schema:** the notice is raised for the SIGNED-IN recipient
+  on their own Today (`DeadlineAlertsCard` -> `raiseOwnDeadlineNotices`, existing `notify()`, kind `mentioned`, payload
+  `{ source: "deadline_window", deadline_id, window, title }` only), after reading their OWN `crm_notification` rows for those deadlines
+  (`payload->>source`, `payload->>deadline_id`; RLS shows only their own). Key = deadline id + window: one notice per deadline per window. A
+  failed de-dupe read raises nothing; at most 20 per load. Limits: a recipient who never opens Today gets the notice when they next do (a
+  window they skipped past is not raised late), and two Today loads at the same instant could both raise one (no unique index).
+  The bell reads it as "Deadline: <title> is due within N days" linking to the matter.
+- **Today "Deadlines" card** (technician Today, after Consults; owner Today, in the deadlines column): recipients only. Overdue, then due in
+  7 days, then 8..30 days; "Unconfirmed" when `attorney_confirmed` is false; the stale hand-entered dates "Needs review" holds are left out.
+  Three states: an unreadable recipient list says the alerts couldn't be checked (to everyone); a failed deadlines read is "Couldn't load".
+- **Morning brief**: `DEADLINE_DAYS` is 30 and the section is two blocks, "Deadlines in the next 7 days" and "Deadlines in 8 to 30 days"
+  (`windowOf`, same windows). A failed read says so in both.
+- **Weekly review Deadlines strip** (`deadlinesOut`, `DeadlinesStrip`, beside "Waiting on", Board and Sheet): every open deadline in the
+  FILTERED rows, soonest first, Confirmed / Unconfirmed, each a link to `?open=` (the centred record card). Drawn even with no review
+  person; a failed read is one line, never "No open deadlines". The review's deadline read now selects `id, kind, attorney_confirmed` too.
+- **Close guard** (`updateMatterStatus` to `closed`, through `checkClose` in `close-guard.ts`): an open deadline that counts refuses with a
+  fixed sentence naming it ("...: Office Action response (due 2026-12-03)..."), writing nothing. Counts (questions.md R1 default): EVERY open
+  deadline on a TM matter, else the eight trademark kinds (`USPTO_DEADLINE_KINDS`). A failed read refuses ("couldn't check"). 0110's trigger
+  refusal (`matter_close_open_deadline`) maps to a fixed sentence. `matters.ts` is the only file that writes `crm_matter.status` (a test greps).
+- **Override** (`closeMatterWithOverrideAction` -> `closeMatterWithOverride` -> `runCloseOverride`): **decision: a role rule, owner and
+  attorney (`CLOSE_OVERRIDE_ROLES`, the R2 default; never a name)**, re-read FIRST (a paralegal reads and writes nothing), a 1..300 character
+  reason and a confirm tick. With 0110: `rpc('crm_close_matter_with_override')` writes the override row and closes in one transaction, then the
+  app logs ONE `matter_updated` row `{ change: "close_override", reason, deadline_ids, from_status, recorded }` ("Closed with an open deadline
+  (attorney override)", "Reason: ..."). Before 0110 (42883 / PGRST202): the plain close, then the timeline row, which IS the record; if it
+  can't be written the status is put back. The form (`CloseOverrideForm`) shows only to those roles, on a non-closed matter with a counting deadline.
+- **0110 is a proposal file** (`docs/pge/2026-11-17-agentic-ip-os/0110-proposed.sql.txt`): the trigger knows an override by an override row for
+  that matter with `created_at = now()` and `actor_id = auth.uid()` in the same transaction (no session setting a client could send). Apply to
+  lectual-dev, run its isolation cases, then prod with the owner's OK. Change its kind list and roles together with deadline-safety.ts.
+- Not verified: a real browser, the real `crm_notification` insert/select policies for a self-notice, 0110 against any database.

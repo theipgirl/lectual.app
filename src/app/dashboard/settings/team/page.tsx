@@ -3,14 +3,17 @@ import { resolveFirmSession } from "@/lib/firm/session";
 import { ROLES, hasRole } from "@/lib/auth/roles";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { QUEUE_APPROVE_ROLES } from "@/lib/queue/roles";
-import { LoadFailedCard, Pill, SheetCard, SheetScroll, SheetTable } from "@/components/ui";
+import { LoadFailedCard, LoadFailedLine, Pill, SheetCard, SheetScroll, SheetTable } from "@/components/ui";
 import { RemoveMember, ROLE_LABEL, RoleSelect, TeamHeader } from "@/components/settings/TeamForms";
 import { RoleTable } from "@/components/settings/RoleTable";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 import { inviteFormOpen } from "@/lib/team/invite-open";
-import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
-import { TEAM_NAME } from "@/lib/ui/words";
+import { ADMIN_TIER_PHRASE, canSeeSetup } from "@/lib/setup/roles";
+import { DEADLINE_ALERTS_NONE_CHOSEN, DEADLINE_ALERTS_UNCHECKED, DEADLINE_ALERTS_SETTINGS_HEADING, DEADLINE_ALERTS_SETTINGS_HELP, TEAM_NAME } from "@/lib/ui/words";
+import { loadRecipientSetting } from "@/lib/today/deadline-alerts-store";
+import { DeadlineAlertsForm } from "@/components/settings/DeadlineAlertsForm";
+import "@/components/settings/deadline-alerts.css";
 
 export const metadata: Metadata = { title: pageTitle(TEAM_NAME) };
 
@@ -36,6 +39,9 @@ export default async function TeamPage() {
   } catch {
     loadError = true;
   }
+  // Deadline alerts (PGE Sprint 3): every member sees who gets them; only the admin tier changes the list.
+  const alerts = loadError ? ({ status: "unavailable" } as const) : await loadRecipientSetting();
+  const canSetAlerts = canSeeSetup(session.role);
 
   return (
     <>
@@ -81,6 +87,29 @@ export default async function TeamPage() {
         </SheetCard>
       )}
       {!isAdmin && <p className="lx-note">{ADMIN_TIER_PHRASE} can manage the team.</p>}
+
+      <section className="lx-card lx-dl-alerts" aria-labelledby="team-deadline-alerts">
+        <h2 id="team-deadline-alerts" className="lx-h2">
+          {DEADLINE_ALERTS_SETTINGS_HEADING}
+        </h2>
+        <p className="lx-note" style={{ margin: 0 }}>{DEADLINE_ALERTS_SETTINGS_HELP}</p>
+        {alerts.status !== "ok" ? (
+          <LoadFailedLine role="alert" refresh={false}>{DEADLINE_ALERTS_UNCHECKED}</LoadFailedLine>
+        ) : canSetAlerts ? (
+          <DeadlineAlertsForm
+            members={members.map((m) => ({ userId: m.userId, name: m.displayName ?? m.email ?? "Teammate", role: ROLE_LABEL[m.role] ?? m.role, chosen: alerts.userIds.includes(m.userId) }))}
+          />
+        ) : alerts.userIds.length === 0 ? (
+          <p className="lx-note" style={{ margin: 0 }}>{DEADLINE_ALERTS_NONE_CHOSEN}</p>
+        ) : (
+          <ul className="lx-dl-alerts-names">
+            {members.filter((m) => alerts.userIds.includes(m.userId)).map((m) => (
+              <li key={m.userId}>{m.displayName ?? m.email ?? "Teammate"}</li>
+            ))}
+          </ul>
+        )}
+        {alerts.status === "ok" && !canSetAlerts && <p className="lx-note" style={{ margin: 0 }}>{ADMIN_TIER_PHRASE} can change who gets them.</p>}
+      </section>
 
       <RoleTable />
     </>

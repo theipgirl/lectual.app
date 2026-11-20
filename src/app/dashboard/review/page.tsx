@@ -9,7 +9,7 @@ import { ListSearch, ListToolbar } from "@/components/list-page/ListToolbar";
 import { Chip, FilterChips } from "@/components/list-page/Chips";
 import "@/components/list-page/list-page.css";
 import { ReviewSection } from "@/components/review/ReviewSection";
-import { KpiStrip, ReviewBoard, ViewSwitch, WaitingOnStrip } from "@/components/review/ReviewViews";
+import { DeadlinesStrip, KpiStrip, ReviewBoard, ViewSwitch, WaitingOnStrip } from "@/components/review/ReviewViews";
 import { SheetView } from "@/components/review/SheetView";
 import { SheetSaveStatus } from "@/components/review/SheetSaveStatus";
 import { loadSheetStages } from "@/lib/review/sheet-edit-load";
@@ -26,7 +26,7 @@ import { CAN_MOVE_STAGE, CAN_WRITE_LEAD } from "@/lib/pipeline/leads";
 import { loadReview } from "@/lib/review/load";
 import { reviewBuckets, reviewSubline } from "@/lib/review/buckets";
 import { boardLanes, kpis, meetingPosition, offBoard } from "@/lib/review/lanes";
-import { reviewPerson, waitingOnPerson } from "@/lib/review/strips";
+import { deadlinesOut, reviewPerson, waitingOnPerson } from "@/lib/review/strips";
 import { applyReviewFilters, olderHiddenCount, sinceSuspended, DEFAULT_REVIEW_VIEW, parseReviewParams, reviewHref, type ReviewParams } from "@/lib/review/params";
 import { criticalAlert, detailsNote } from "@/lib/review/notes";
 import { noticeFor } from "@/lib/review/notice";
@@ -95,12 +95,15 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const isApprover = !!role && !!userId && QUEUE_APPROVE_ROLES.includes(role);
   const person = isApprover ? { userId: userId!, firstName: "you" } : reviewPerson(load.members);
   const olderHidden = olderHiddenCount(load.rows, params, userId);
-  // No review person, no strip: nothing (not an empty wrapper) is drawn.
-  const strips = person ? (
+  // No review person, no "Waiting on" strip. The Deadlines strip (PGE Sprint 3) is always drawn: the open deadlines in the
+  // rows on screen, or one line saying the deadlines couldn't load (never "no deadlines").
+  const deadlinesFailed = load.failed.includes("deadlines");
+  const strips = (
     <div className="rv-strips">
-      <WaitingOnStrip owner={owner} firstName={person.firstName} you={isApprover} personId={person.userId} rows={waitingOnPerson(shown, person.userId)} approvalsKnown={approvalsKnown} params={params} />
+      {person && <WaitingOnStrip owner={owner} firstName={person.firstName} you={isApprover} personId={person.userId} rows={waitingOnPerson(shown, person.userId)} approvalsKnown={approvalsKnown} params={params} />}
+      <DeadlinesStrip items={deadlinesFailed ? [] : deadlinesOut(shown, load.today)} failed={deadlinesFailed} params={params} />
     </div>
-  ) : null;
+  );
   const lanes = boardLanes(buckets, load.members);
   const rest = offBoard(buckets);
 

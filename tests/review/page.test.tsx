@@ -123,10 +123,11 @@ describe("Weekly review page", () => {
     expect(lane.split('<li class="lx-board-card').length - 1).toBe(4);
   });
 
-  it("no review person and not an approver: no empty strips wrapper is drawn", async () => {
+  it("no review person and not an approver: no 'Waiting on' strip; the Deadlines strip (PGE Sprint 3) is still drawn", async () => {
     mock(ok({ members: [{ userId: "u-rayn", name: "Rayn", role: "paralegal" }] }), "paralegal");
     const html = await render();
-    expect(html).not.toContain("rv-strips");
+    expect(html).not.toContain('data-strip="person"');
+    expect(html).toContain('data-strip="deadlines"');
   });
 
   it("each person's column says how much they hold, split into overdue and due this week", async () => {

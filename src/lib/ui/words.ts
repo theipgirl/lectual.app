@@ -1312,3 +1312,40 @@ export const REVIEW_CARD_USPTO_DEADLINE = "USPTO deadline";
 /** The Cards deck's "Add to timeline" note box. */
 export const REVIEW_LOG_LABEL = "What happened";
 export const REVIEW_LOG_PLACEHOLDER = "A short note for the timeline";
+
+// PGE Sprint 3 Part A: deadline safety.
+/** The tag on a filed trademark with no open docket entry (matter page, Matters list, Weekly review). Never moves a row. */
+export const NO_OPEN_DEADLINE = "No open deadline";
+export const NO_OPEN_DEADLINE_HINT = "This trademark is filed and nothing is open on its docket. Add the next USPTO deadline, or close the matter if the work is done.";
+/** A failed deadlines read: nothing is flagged, and this is said instead. */
+export const DEADLINES_COULDNT_LOAD = "Deadlines couldn't load. Refresh to try again.";
+export const DEADLINE_FLAGS_UNCHECKED = "Deadlines couldn't load, so filed matters weren't checked for a missing deadline. Refresh to try again.";
+/** The Today "Deadlines" card, drawn for the members chosen in Settings. */
+export const DEADLINE_CARD_HEADING = "Deadlines";
+export const DEADLINE_CARD_OVERDUE = "Overdue";
+export const DEADLINE_CARD_WEEK = "Due in the next 7 days";
+export const DEADLINE_CARD_MONTH = "Due in 8 to 30 days";
+export const DEADLINE_CARD_NONE = "No open deadlines in the next 30 days.";
+export const DEADLINE_CARD_FAILED = "Couldn't load";
+export const DEADLINE_UNCONFIRMED = "Unconfirmed";
+export const DEADLINE_ALERTS_UNCHECKED = "Deadline alerts couldn't be checked. Refresh to try again.";
+export const deadlineCardMore = (n: number) => `and ${n} more on the calendar`;
+/** The bell notice when a deadline enters the 30- or 7-day window. Ids and the deadline's title only. */
+export const DEADLINE_NOTICE_LABEL = "Deadline";
+export const deadlineNoticeSentence = (window: number, title: string | null) => `${title ?? "A deadline"} is due within ${window} days`;
+/** Settings -> Team: who gets the alerts. */
+export const DEADLINE_ALERTS_SETTINGS_HEADING = "Deadline alerts";
+export const DEADLINE_ALERTS_SETTINGS_HELP = "The people chosen here see the Deadlines card on Today and get a notice in the bell when a deadline is 30 days out and again at 7 days. Everyone still sees deadlines on the matter page.";
+export const DEADLINE_ALERTS_NONE_CHOSEN = "Nobody is chosen yet, so nobody gets deadline alerts.";
+export const DEADLINE_ALERTS_SAVE = "Save alert recipients";
+/** The Weekly review's deadlines strip. */
+export const REVIEW_DEADLINES_HEADING = "Deadlines";
+export const REVIEW_DEADLINES_NONE = "No open deadlines in this view.";
+export const REVIEW_DEADLINE_CONFIRMED = "Confirmed";
+/** Closing a matter that still has an open USPTO deadline (an attorney, with a reason). */
+export const CLOSE_OVERRIDE_SUMMARY = "Close with an open deadline";
+export const CLOSE_OVERRIDE_HELP = "This matter has an open USPTO deadline. An attorney can still close it with a reason. The reason goes on the timeline.";
+export const CLOSE_OVERRIDE_REASON = "Reason (required, up to 300 characters)";
+export const CLOSE_OVERRIDE_CONFIRM = "I understand this matter will close with that deadline still open.";
+export const CLOSE_OVERRIDE_BUTTON = "Close the matter";
+export const CLOSE_OVERRIDE_DONE = "Closed. The reason is on the timeline.";

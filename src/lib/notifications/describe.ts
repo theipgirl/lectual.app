@@ -1,5 +1,5 @@
 import { QUEUE_ID, UUID } from "@/lib/queue/link-rules";
-import { NOTICE_HANDED_LABEL, NOTICE_RETURNED_LABEL, noticeHandedSentence, noticeReturnedSentence } from "@/lib/ui/words";
+import { DEADLINE_NOTICE_LABEL, NOTICE_HANDED_LABEL, NOTICE_RETURNED_LABEL, deadlineNoticeSentence, noticeHandedSentence, noticeReturnedSentence } from "@/lib/ui/words";
 import { CONSULT_OUTCOME_LABEL, isConsultOutcome } from "@/lib/pipeline/consult-outcome-labels";
 
 /**
@@ -83,6 +83,8 @@ export function describeNotification(
       ? "proposal_accepted"
       : row.kind === "approval_needed" && (source === "card_handoff" || source === "card_returned")
         ? source
+        : row.kind === "mentioned" && source === "deadline_window"
+          ? "deadline_window"
         : row.kind === "consult_outcome" || (row.kind === "mentioned" && source === "consult_outcome")
         ? "consult_outcome"
         : row.kind === "approval_needed" || (row.kind === "mentioned" && source === "approval_needed")
@@ -147,6 +149,17 @@ export function describeNotification(
         label: event === "card_handoff" ? NOTICE_HANDED_LABEL : NOTICE_RETURNED_LABEL,
         sentence: event === "card_handoff" ? noticeHandedSentence(first) : noticeReturnedSentence(first),
         href: hrefFor(row, payload, true),
+      };
+    }
+    case "deadline_window": {
+      // PGE Sprint 3: a deadline entered the 30- or 7-day window. Ids, the window and the deadline's title only.
+      const window = payload.window === 7 || payload.window === 30 ? payload.window : null;
+      const title = text(payload.title);
+      return {
+        icon: "timer",
+        label: DEADLINE_NOTICE_LABEL,
+        sentence: window ? deadlineNoticeSentence(window, title ? truncate(title, HEADLINE_MAX) : null) : title ? truncate(title, HEADLINE_MAX) : "A deadline is coming up",
+        href: hrefFor(row, payload, false),
       };
     }
     case "approval_needed": {

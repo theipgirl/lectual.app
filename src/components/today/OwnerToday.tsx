@@ -26,6 +26,7 @@ import { OwnerNeedsReview } from "@/components/today/owner/OwnerNeedsReview";
 import { OwnerConsults } from "@/components/today/owner/OwnerConsults";
 import { WeekStrip } from "@/components/today/owner/WeekStrip";
 import { CopilotBox } from "@/components/today/owner/CopilotBox";
+import { DeadlineAlertsCard } from "@/components/today/DeadlineAlertsCard";
 import "@/components/today/owner/owner-today.css";
 import {
   OWNER_CARDS_HEADING,
@@ -94,6 +95,8 @@ export async function OwnerToday({
     listMemberDirectory(),
   ]);
 
+  // The Deadlines card for the alert recipients (PGE Sprint 3): its own reads, rendered here once so the page stays one tree.
+  const alertsCard = await DeadlineAlertsCard({ userId, now });
   // loadDeckSummary never throws; a rejection would be a bug, shown as unavailable.
   const deck: DeckSummary = deckS.status === "fulfilled" ? deckS.value : { status: "unavailable" };
   const consults: TodayConsultsResult | null = consultsS.status === "fulfilled" ? consultsS.value : null;
@@ -252,6 +255,7 @@ export async function OwnerToday({
         )}
 
         <div className="ot-col-deadlines">
+          {alertsCard}
           <section className="lx-card ot-card" aria-labelledby="ot-deadlines-h">
             <div className="ot-card-head">
               <h2 id="ot-deadlines-h" className="lx-h3">

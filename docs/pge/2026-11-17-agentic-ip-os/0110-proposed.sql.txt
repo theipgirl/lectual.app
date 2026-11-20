@@ -1,0 +1,236 @@
+-- =====================================================================================================================
+-- PROPOSAL ONLY. NOT A MIGRATION OF THIS REPO. NOT APPLIED ANYWHERE (not lectual-dev, not lectual-prod).
+--
+-- This file is a draft for the `lectual` repo (theipgirl/lectual), where migrations live (AGENTS.md: "No migrations in this
+-- repo"). To use it: copy it to `lectual/supabase/migrations/0110_matter_close_guard.sql` (first-merged-wins numbering:
+-- renumber if 0110 is taken), review it there, add the isolation cases below to tests/tenant-isolation.test.ts, apply to
+-- lectual-dev, run the tests, and apply to lectual-prod only with the owner's OK.
+--
+-- PGE Sprint 3 Part A, item 4 (decision 5): a matter cannot be set to `closed` while it holds an open USPTO deadline,
+-- unless it is closed through `crm_close_matter_with_override` by an override role with a written reason.
+--
+-- Checked against THIS app's code (Nov 20), NOT against lectual's migrations or a live database:
+--   * `public.crm_matter` has `id`, `org_id`, `type` (enum `crm_matter_type`, includes 'TM'), `status` (text, 0035's
+--     `crm_matter_status_vocab`: open / on_hold / closed) and `updated_at` (src/lib/db/types.ts; src/lib/matters/status.ts).
+--   * `public.crm_matter_deadline` has `matter_id`, `org_id`, `kind` (enum `crm_deadline_kind`) and `status` (enum
+--     `crm_deadline_status`: open / satisfied / waived / superseded) (src/lib/db/types.ts, src/lib/matters/deadline-rules.ts).
+--   * `public.current_org_id()` takes no arguments (generated types; called as `rpc("current_org_id")` across the app).
+--   * `public.crm_org_member` has `org_id`, `user_id`, `role` (enum `crm_role`, includes 'owner' and 'attorney').
+--   * The app's guard rule (src/lib/matters/deadline-safety.ts, `guardedDeadlines`) is: on a TM matter EVERY open deadline
+--     counts (questions.md R1, until Rebecca names the kinds); on any other matter only the eight trademark kinds
+--     (`USPTO_DEADLINE_KINDS`). The trigger below uses the SAME rule; change both together.
+--   * Override roles (src/lib/matters/deadline-safety.ts, `CLOSE_OVERRIDE_ROLES`): 'owner' and 'attorney' (questions.md R2
+--     default). Change both together.
+--   * The app calls `rpc('crm_close_matter_with_override', { p_matter_id, p_reason })` through the caller's SCOPED client
+--     (src/lib/matters/matters.ts `closeMatterWithOverride`). A missing function (42883 / PGRST202) runs the app's own
+--     pre-0110 path; 42501 reads as "only an attorney can"; any other error as "couldn't close". The app writes the
+--     `matter_updated` / `close_override` timeline row itself AFTER this function returns, so the function does not.
+--   * The plain status write (`updateMatterStatus`) maps any error whose message contains `matter_close_open_deadline` to a
+--     fixed sentence; the trigger's own text is never shown.
+--
+-- How the trigger knows the update came from the override function: the function inserts the override row first, in the
+-- same transaction, and `created_at` is forced to `now()` (the TRANSACTION's start time). The trigger looks for an override
+-- row for this matter with `created_at = now()` and `actor_id = auth.uid()`. Nobody else can insert into the table (no
+-- INSERT grant for `authenticated` or `anon`; only this SECURITY DEFINER function writes it), so the row cannot be forged
+-- and a later transaction cannot reuse it. No session setting is involved, so nothing a client sends through PostgREST
+-- can switch the guard off.
+-- =====================================================================================================================
+
+-- ── the override log ────────────────────────────────────────────────────────────────────────────────────────────────
+create table if not exists public.crm_matter_close_override (
+  id            uuid primary key default gen_random_uuid(),
+  org_id        uuid not null references public.crm_org (id) on delete cascade,
+  matter_id     uuid not null references public.crm_matter (id) on delete cascade,
+  deadline_ids  uuid[] not null default '{}',
+  reason        text not null check (char_length(btrim(reason)) between 1 and 300),
+  actor_id      uuid not null,
+  created_at    timestamptz not null default now()
+);
+
+create index if not exists crm_matter_close_override_matter_idx on public.crm_matter_close_override (matter_id, created_at);
+
+alter table public.crm_matter_close_override enable row level security;
+
+-- Members of the firm read their firm's overrides. No insert, update or delete policy: only the function below writes.
+drop policy if exists crm_matter_close_override_select_own on public.crm_matter_close_override;
+create policy crm_matter_close_override_select_own on public.crm_matter_close_override
+  for select to authenticated
+  using (org_id = public.current_org_id());
+
+revoke all on public.crm_matter_close_override from anon, authenticated;
+grant select on public.crm_matter_close_override to authenticated;
+
+-- actor_id and created_at are the database's own, whoever inserts (belt and braces: only the function inserts).
+create or replace function public.crm_matter_close_override_stamp()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  new.actor_id   := auth.uid();
+  new.created_at := now();
+  if new.actor_id is null then
+    raise exception 'matter_close_override_no_actor' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists crm_matter_close_override_stamp on public.crm_matter_close_override;
+create trigger crm_matter_close_override_stamp
+  before insert on public.crm_matter_close_override
+  for each row execute function public.crm_matter_close_override_stamp();
+
+-- Append-only, for everyone (the service role included).
+create or replace function public.crm_matter_close_override_no_change()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  raise exception 'matter_close_override_append_only' using errcode = '42501';
+end;
+$$;
+
+drop trigger if exists crm_matter_close_override_no_update on public.crm_matter_close_override;
+create trigger crm_matter_close_override_no_update
+  before update or delete on public.crm_matter_close_override
+  for each row execute function public.crm_matter_close_override_no_change();
+
+-- ── the guard ───────────────────────────────────────────────────────────────────────────────────────────────────────
+create or replace function public.crm_matter_close_guard()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.status is distinct from 'closed' or old.status is not distinct from 'closed' then
+    return new;
+  end if;
+
+  if not exists (
+    select 1
+    from public.crm_matter_deadline d
+    where d.matter_id = new.id
+      and d.status = 'open'::public.crm_deadline_status
+      and (
+        new.type = 'TM'::public.crm_matter_type
+        or d.kind::text in (
+          'office_action_response', 'statement_of_use', 'sou_extension_request', 'opposition_window',
+          'section_8_declaration', 'section_15_declaration', 'section_9_renewal', 'priority_filing'
+        )
+      )
+  ) then
+    return new;
+  end if;
+
+  -- Closed through crm_close_matter_with_override in THIS transaction, by this caller.
+  if exists (
+    select 1
+    from public.crm_matter_close_override o
+    where o.matter_id = new.id
+      and o.org_id = new.org_id
+      and o.created_at = now()
+      and o.actor_id = auth.uid()
+  ) then
+    return new;
+  end if;
+
+  raise exception 'matter_close_open_deadline: this matter has an open USPTO deadline' using errcode = 'P0001';
+end;
+$$;
+
+drop trigger if exists crm_matter_close_guard on public.crm_matter;
+create trigger crm_matter_close_guard
+  before update of status on public.crm_matter
+  for each row execute function public.crm_matter_close_guard();
+
+-- ── the override function ───────────────────────────────────────────────────────────────────────────────────────────
+create or replace function public.crm_close_matter_with_override(p_matter_id uuid, p_reason text)
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_org     uuid;
+  v_type    public.crm_matter_type;
+  v_status  text;
+  v_reason  text := btrim(coalesce(p_reason, ''));
+  v_ids     uuid[];
+begin
+  if auth.uid() is null or public.current_org_id() is null then
+    raise exception 'matter_close_override_not_allowed' using errcode = '42501';
+  end if;
+
+  select m.org_id, m.type, m.status
+    into v_org, v_type, v_status
+    from public.crm_matter m
+   where m.id = p_matter_id
+   for update;
+
+  -- Another firm's matter reads exactly like a missing one.
+  if v_org is null or v_org <> public.current_org_id() then
+    raise exception 'matter_close_override_not_found' using errcode = 'P0002';
+  end if;
+
+  if not exists (
+    select 1
+    from public.crm_org_member mem
+    where mem.org_id  = v_org
+      and mem.user_id = auth.uid()
+      and mem.role in ('owner'::public.crm_role, 'attorney'::public.crm_role)
+  ) then
+    raise exception 'matter_close_override_not_allowed' using errcode = '42501';
+  end if;
+
+  if char_length(v_reason) < 1 or char_length(v_reason) > 300 then
+    raise exception 'matter_close_override_reason' using errcode = '22023';
+  end if;
+
+  if v_status = 'closed' then
+    return;
+  end if;
+
+  select coalesce(array_agg(d.id order by d.due_date, d.id), '{}')
+    into v_ids
+    from public.crm_matter_deadline d
+   where d.matter_id = p_matter_id
+     and d.status = 'open'::public.crm_deadline_status
+     and (
+       v_type = 'TM'::public.crm_matter_type
+       or d.kind::text in (
+         'office_action_response', 'statement_of_use', 'sou_extension_request', 'opposition_window',
+         'section_8_declaration', 'section_15_declaration', 'section_9_renewal', 'priority_filing'
+       )
+     );
+
+  insert into public.crm_matter_close_override (org_id, matter_id, deadline_ids, reason, actor_id)
+  values (v_org, p_matter_id, v_ids, v_reason, auth.uid());
+
+  update public.crm_matter
+     set status = 'closed', updated_at = now()
+   where id = p_matter_id;
+end;
+$$;
+
+revoke all on function public.crm_close_matter_with_override(uuid, text) from public, anon;
+grant execute on function public.crm_close_matter_with_override(uuid, text) to authenticated;
+revoke all on function public.crm_matter_close_guard() from public, anon, authenticated;
+revoke all on function public.crm_matter_close_override_stamp() from public, anon, authenticated;
+
+-- ── isolation cases for lectual's tests/tenant-isolation.test.ts ────────────────────────────────────────────────────
+--   1. Firm A's member reads none of firm B's crm_matter_close_override rows.
+--   2. Firm A's attorney calling crm_close_matter_with_override on firm B's matter: P0002, nothing written in either firm.
+--   3. A paralegal (or intake, admin, senior_admin, clerk, law_clerk, viewer, social_media) of the matter's own firm: 42501,
+--      no override row, matter still open.
+--   4. A direct INSERT into crm_matter_close_override as `authenticated` (any role) is refused (no grant), and as the
+--      service role it gets actor_id = null -> 42501 from the stamp trigger.
+--   5. A scoped UPDATE crm_matter SET status = 'closed' on a TM matter with an open deadline: refused with
+--      'matter_close_open_deadline'; with only satisfied / waived deadlines: allowed.
+--   6. The override function by the firm's attorney with a 1..300 character reason: one override row (deadline_ids filled,
+--      actor_id = the caller), the matter closed; an empty or 301-character reason: 22023, nothing written.
+--   7. UPDATE / DELETE on crm_matter_close_override: refused for everyone.

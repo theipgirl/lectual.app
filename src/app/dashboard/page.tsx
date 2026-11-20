@@ -38,6 +38,7 @@ import { needsReviewItems } from "@/lib/today/needs-review";
 import { NeedsYouSection } from "@/components/today/NeedsYouSection";
 import { AddNameLink } from "@/components/account/AddNameLink";
 import { TodayConsults } from "@/components/calendar/TodayConsults";
+import { DeadlineAlertsCard } from "@/components/today/DeadlineAlertsCard";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 import { ASSISTANTS_NAME, BLANK, OUR_TURN } from "@/lib/ui/words";
@@ -123,6 +124,8 @@ export default async function TodayPage() {
       loadIntakeStageIds(),
     ]);
 
+  // The Deadlines card for the alert recipients (PGE Sprint 3): its own reads; rendered here so the page stays one tree.
+  const alertsCard = await DeadlineAlertsCard({ userId: session.user.id, now });
   // loadActiveQueue never throws; a rejection would be a bug, shown as unavailable.
   const queue: QueueLoad = await mineQueue(queueS.status === "fulfilled" ? queueS.value : { status: "unavailable", items: [] }, { userId: session.user.id, role: session.role });
   const leads: Lead[] | null = leadsS.status === "fulfilled" ? leadsS.value : null;
@@ -238,6 +241,8 @@ export default async function TodayPage() {
       <div className="lx-split">
         <div className="lx-col">
           <TodayConsults />
+
+          {alertsCard}
 
           <NeedsYouSection needs={needs} queue={queue.status} />
 

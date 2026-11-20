@@ -50,7 +50,7 @@ export const AGENT_DEFS: Record<AgentId, { name: string; reads: string; descript
     name: "Morning brief",
     reads: "Leads, matters, consults and Approvals",
     description:
-      "Writes the attorney a daily briefing into Approvals: today's consults, leads waiting on a reply, stage suggestions, stalled leads, deadlines in the next 14 days and the Approvals count. For up to five stalled leads a day it also drafts a follow-up email. It only drafts: an attorney reviews and sends everything.",
+      "Writes the attorney a daily briefing into Approvals: today's consults, leads waiting on a reply, stage suggestions, stalled leads, deadlines in the next 7 and 30 days and the Approvals count. For up to five stalled leads a day it also drafts a follow-up email. It only drafts: an attorney reviews and sends everything.",
     defaultAutonomy: "draft",
   },
   "consult-prep": {

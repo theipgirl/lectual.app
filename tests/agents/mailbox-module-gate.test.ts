@@ -198,7 +198,7 @@ describe.each(["cron", "run-now"] as const)("F21: the Mailboxes module gate at r
     expect(w.log.some((q) => q.table === "crm_calendar_event")).toBe(false);
     expect(body).toContain("Leads waiting on a reply (1)");
     expect(body).toContain("Stalled leads (1)");
-    expect(body).toContain("Matters with deadlines in the next 14 days (1)");
+    expect(body).toContain("Deadlines in the next 7 days (1)");
     expect(body).toContain("Pending stage suggestions (0)");
     expect(body).toContain("The queue (0)");
   });

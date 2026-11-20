@@ -11,6 +11,8 @@ import { type MatterStage, listMatterStages } from "./stages";
 import { nextMatterNumber } from "./numbering";
 import { carryPayload, consultCarryForLead, type ConsultDb } from "@/lib/consult/store";
 import { ReadableError } from "@/lib/ui/readable-error";
+import { checkClose, runCloseOverride, type CloseReadDeps, type OverrideResult } from "./close-guard";
+import { CLOSE_GUARD_DATABASE, isCloseGuardRefusal, isMissingOverrideFunction } from "./deadline-safety";
 
 
 /** The crm_matter row exactly as the table stores it. */
@@ -385,14 +387,92 @@ export async function updateMatterStatus(id: string, status: MatterStatus): Prom
     throw new ReadableError(`'${status}' isn't a valid matter status.`);
   }
 
+  // The close guard (PGE Sprint 3): a matter holding an open USPTO deadline is not closed here. A failed read of
+  // the matter or its deadlines refuses the close too. lectual 0110's trigger is the second half of the same rule.
+  if (status === "closed") {
+    const check = await checkClose(closeReadDeps(supabase, id));
+    if (!check.ok) throw new ReadableError(check.error);
+  }
+
   const { data, error } = await supabase
     .from("crm_matter")
     .update({ status, updated_at: new Date().toISOString() })
     .eq("id", id)
     .select("*")
     .single();
-  if (error) throw error;
+  if (error) {
+    if (isCloseGuardRefusal(error)) throw new ReadableError(CLOSE_GUARD_DATABASE);
+    throw error;
+  }
   return data;
+}
+
+type ScopedDb = Awaited<ReturnType<typeof getScopedClient>>;
+
+/** The guard's two reads, through the caller's scoped client (another firm's matter reads as missing). */
+function closeReadDeps(supabase: ScopedDb, id: string): CloseReadDeps {
+  return {
+    readMatter: async () => {
+      const { data, error } = await supabase.from("crm_matter").select("type, status").eq("id", id).maybeSingle();
+      if (error) return { status: "unavailable" };
+      if (!data) return { status: "missing" };
+      return { status: "ok", matter: { type: data.type, status: data.status } };
+    },
+    readOpenDeadlines: async () => {
+      const { data, error } = await supabase
+        .from("crm_matter_deadline")
+        .select("id, kind, title, due_date, status")
+        .eq("matter_id", id)
+        .eq("status", "open")
+        .limit(500);
+      if (error) return null;
+      return (data ?? []).map((d) => ({ id: d.id, kind: String(d.kind), title: d.title, due_date: d.due_date, status: String(d.status) }));
+    },
+  };
+}
+
+/**
+ * Closes a matter that still holds an open USPTO deadline, with a written reason (max 300 characters). Only the
+ * override roles (CLOSE_OVERRIDE_ROLES: owner and attorney until Rebecca answers questions.md R2), re-read here.
+ * With lectual 0110 the database function writes the override row and closes in one transaction; before it, the
+ * timeline entry is the record (see runCloseOverride). Never the service role.
+ */
+export async function closeMatterWithOverride(id: string, reason: unknown): Promise<OverrideResult> {
+  const supabase = await getScopedClient();
+  const untyped = supabase as unknown as { rpc: (name: string, args: Record<string, unknown>) => PromiseLike<{ error: { code?: string; message?: string } | null }> };
+  return runCloseOverride(reason, {
+    ...closeReadDeps(supabase, id),
+    role: async () => {
+      const { data, error } = await supabase.rpc("current_org_role");
+      return error || typeof data !== "string" ? null : data;
+    },
+    callOverride: async (text) => {
+      try {
+        const { error } = await untyped.rpc("crm_close_matter_with_override", { p_matter_id: id, p_reason: text });
+        if (!error) return "done";
+        if (isMissingOverrideFunction(error)) return "missing";
+        if (error.code === "42501") return "forbidden";
+        return "failed";
+      } catch {
+        return "failed";
+      }
+    },
+    closeDirect: async () => {
+      const { data, error } = await supabase.from("crm_matter").update({ status: "closed", updated_at: new Date().toISOString() }).eq("id", id).select("id");
+      return !error && (data ?? []).length === 1;
+    },
+    restoreStatus: async (previous) => {
+      await supabase.from("crm_matter").update({ status: previous, updated_at: new Date().toISOString() }).eq("id", id);
+    },
+    logOverride: async (payload) => {
+      try {
+        await logActivity({ type: "matter_updated", matterId: id, payload: { change: "close_override", ...payload } });
+        return true;
+      } catch {
+        return false;
+      }
+    },
+  });
 }
 
 /**
