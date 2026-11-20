@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Notice } from "@/components/ui/Notice";
 import { notFound } from "next/navigation";
 import { orgHasModule } from "@/lib/org/modules";
@@ -5,6 +6,8 @@ import { resolveFirmSession } from "@/lib/firm/session";
 import { loadActiveQueue } from "@/lib/queue/load";
 import { loadApprovalRouting } from "@/lib/queue/routing-load";
 import { loadCardState } from "@/lib/queue/card-state";
+import { loadReadyToDraft } from "@/lib/queue/ready-load";
+import { readyToDraftCount } from "@/lib/ui/words";
 import { loadAuditContext } from "@/lib/queue/audit-context";
 import { shownBodySha256 } from "@/lib/queue/shown-text";
 import { checkDraftStaleness, stalenessRequiresConfirm } from "@/lib/queue/stale";
@@ -195,6 +198,9 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
     loadActiveQueue("rejected"),
   ]);
   const routing = routed.status === "ok" ? routed.routing : {};
+  // Sprint 4: approved emails passed to this viewer for their own draft click (drawn only when some are ready).
+  const ready = routed.status === "ok" && routed.drafter && QUEUE_EDIT_ROLES.includes(viewer.role) && approved.status === "ok" ? await loadReadyToDraft({ viewerId: viewer.userId, trust: eventTrust(routed), approved: approved.items }) : null;
+  const readyCount = ready && ready.status === "ok" ? ready.items.length : 0;
   const base = { items: load.items, routing, viewer, cardState, trust: eventTrust(routed), now, dealtAt: dealNow ? null : dealtAt(now, tz, myTimes), audit };
   const first = buildDeck(base);
   const deck: Deck = buildDeck({ ...base, flags: await closerLookFlags(first.cards.map((c) => c.item)) });
@@ -251,6 +257,11 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
         <Notice tone="warn" role="status">
           {DECK_ROUTING_UNREAD}
         </Notice>
+      )}
+      {readyCount > 0 && (
+        <p className="lx-note" data-ready-to-draft>
+          <Link href="/dashboard/queue/?status=approved&who=ready">{readyToDraftCount(readyCount)}</Link>
+        </p>
       )}
       {children}
     </DeckFrame>

@@ -12,7 +12,8 @@ import { DismissFollowups } from "@/components/queue/DismissFollowups";
 import { agentLabel, statusPill, fmtWhen, parseQueueStatus, preview, typeLabel, type QueueStatus } from "@/components/queue/format";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
-import { APPROVALS_NAME, HANDED_TO_YOU_MARKER, noneYet } from "@/lib/ui/words";
+import { APPROVALS_NAME, HANDED_TO_YOU_MARKER, READY_TO_DRAFT, noneYet, readyToDraftCount } from "@/lib/ui/words";
+import { loadReadyToDraft } from "@/lib/queue/ready-load";
 import { loadCardState } from "@/lib/queue/card-state";
 import { handedToViewer, showHandedPill } from "@/lib/queue/handed";
 import { viewEventTrust } from "@/lib/queue/deck";
@@ -64,8 +65,25 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
       : new Map();
   const handedPill = showHandedPill(handed);
   const handedActive = handedPill && rawWho === "handed";
+  // Sprint 4: approved emails passed to this viewer for their own "Make the draft" click. Read only while the firm has a
+  // drafter set (a firm without one reads exactly what it always did). Additive: drawn only when the read worked and found some; a failed read or a database without the new event kinds draws nothing here (the item
+  // page says what it couldn't check).
+  const ready =
+    view.drafter && viewer && QUEUE_EDIT_ROLES.includes(viewer.role) && load.status === "ok"
+      ? await loadReadyToDraft({ viewerId: viewer.userId, trust: viewEventTrust(view), approved: status === "approved" ? allItems : undefined })
+      : null;
+  const readyItems = ready && ready.status === "ok" ? ready.items : [];
+  const readyActive = readyItems.length > 0 && status === "approved" && rawWho === "ready";
   const counts = countsByPerson(allItems, routing, members, viewer);
-  const shown = load.status === "ok" ? (handedActive ? allItems.filter((i) => handed.has(i.id)) : filterByWho(allItems, who, routing, members, viewer)) : [];
+  const readyIds = new Set(readyItems.map((i) => i.id));
+  const shown =
+    load.status === "ok"
+      ? readyActive
+        ? allItems.filter((i) => readyIds.has(i.id))
+        : handedActive
+          ? allItems.filter((i) => handed.has(i.id))
+          : filterByWho(allItems, who, routing, members, viewer)
+      : [];
   const waitingOnOthers = allItems.length - shown.length;
   const dismissable = status === "pending" && load.status === "ok" ? dismissableFollowups(allItems, { routing, viewer, now: view.now }).length : 0;
   // Only what is still waiting can be approved twice.
@@ -92,6 +110,11 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
         <div className="lx-queue-filters">
           <PersonSwitch status={status} who={who} counts={counts} mineEnabled={mineEnabled} handed={handedPill ? { count: handed.size, active: handedActive } : undefined} />
           {dismissable > 0 && <DismissFollowups count={dismissable} />}
+          {readyItems.length > 0 && (
+            <Link href="/dashboard/queue/?status=approved&who=ready" className="lx-btn" aria-current={readyActive ? "page" : undefined} data-ready-to-draft>
+              {readyToDraftCount(readyItems.length)}
+            </Link>
+          )}
         </div>
       )}
       {view.routingFailed && load.status === "ok" && (
@@ -129,6 +152,11 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
                     <Link href={`/dashboard/queue/${item.id}/`} className="lx-rowlink">
                       {item.headline}
                     </Link>
+                    {readyIds.has(item.id) && (
+                      <span className="lx-handed-pill" data-ready-marker>
+                        <Pill tone="ox">{READY_TO_DRAFT}</Pill>
+                      </span>
+                    )}
                     {handed.has(item.id) && (
                       <span className="lx-handed-pill" data-handed-marker>
                         <Pill tone="ox">{HANDED_TO_YOU_MARKER}</Pill>

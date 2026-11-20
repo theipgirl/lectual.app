@@ -1,0 +1,115 @@
+-- =====================================================================================================================
+-- PROPOSAL ONLY. NOT A MIGRATION OF THIS REPO. NOT APPLIED ANYWHERE (not lectual-dev, not lectual-prod).
+--
+-- This file is a draft for the `lectual` repo (theipgirl/lectual), where migrations live (AGENTS.md: "No migrations in this
+-- repo"). To use it: copy it to `lectual/supabase/migrations/0112_queue_card_event_draft_kinds.sql` (first-merged-wins
+-- numbering: renumber if 0112 is taken), review it there against 0103's own text, apply to lectual-dev, run the tests below,
+-- and apply to lectual-prod only with the owner's OK.
+--
+-- WHAT WAS CHECKED, AND WHAT COULD NOT BE (PGE Sprint 4, Nov 20):
+--   * Checked against THIS app's code only. The `lectual` repo (0103's text) and the databases were NOT reachable from the
+--     session that wrote this, so whether 0103 put a CHECK on `queue_card_event.kind` (or made it an enum) is NOT known.
+--   * What this app shows: the hand-added type (src/lib/db/types.ts) has `kind: string`; the app writes and reads exactly three
+--     kinds, 'handoff', 'later', 'returned' (src/lib/queue/deck.ts `CardEventKind`, card-state.ts `KINDS`); AGENTS.md records
+--     (verified on lectual-prod 2026-11-12) that `actor_id` is forced to auth.uid(), a BEFORE INSERT trigger sets created_at,
+--     signed-in users may insert only org_id, queue_item_id, kind, target_user_id, until, note, and there is no UPDATE or DELETE.
+--   * A closed kind list is the likely shape (the sprint contract says "Extend queue_card_event's kind CHECK"), so the app is
+--     built to need this file: before it, an insert of 'draft_to' / 'drafted' answers 23514 (CHECK) or 22P02 (enum), which
+--     src/lib/queue/card-state.ts (`isKindNotSetUpError`) reads, BY CODE and only for these two kinds, as "not switched on".
+--     The attorney's approve then falls back to today's behaviour for HER OWN mailbox only (never a third person's), and the
+--     page says passing to the drafter isn't switched on yet.
+--   * IF 0103 HAS NO CHECK AND NO ENUM ON `kind`: the two kinds already insert, this file is not needed for the kinds, and the
+--     app works without it. The policy part below (target required, drafted only for oneself) is then still recommended,
+--     because the app's fold (`trustedEvents`) is the only thing standing between a forged row and the Ready list.
+--
+-- Why (decision 3b): when the attorney approves a client email and the firm's "Drafts go to" is someone else, the card passes
+-- to that person (`draft_to`, target = the drafter, note = 'approved-text sha256 <64 hex>') and they make the draft in their OWN
+-- Outlook on their own click (`drafted`, no target). Nobody's mailbox is written without their own click.
+-- =====================================================================================================================
+
+begin;
+
+-- 1. The two kinds. Replace the constraint name with 0103's real one (`\d public.queue_card_event` on lectual-dev).
+--    If 0103 used an enum instead: `alter type public.<enum> add value if not exists 'draft_to'; ... 'drafted';` (outside a
+--    transaction on older Postgres) and skip this step.
+alter table public.queue_card_event drop constraint if exists queue_card_event_kind_check;
+alter table public.queue_card_event
+  add constraint queue_card_event_kind_check
+  check (kind in ('handoff', 'later', 'returned', 'draft_to', 'drafted'));
+
+-- 2. Shape rules for the new kinds (the old kinds are untouched).
+alter table public.queue_card_event drop constraint if exists queue_card_event_draft_shape_check;
+alter table public.queue_card_event
+  add constraint queue_card_event_draft_shape_check
+  check (
+    (kind <> 'draft_to' or target_user_id is not null)   -- a draft_to names its drafter
+    and (kind <> 'drafted' or target_user_id is null)    -- a drafted names nobody: it is the actor's own
+  );
+
+-- 3. Who may insert them. 0103's insert policy (staff of the row's org) stays; this adds, for the new kinds only:
+--    * draft_to: the target is a current member of the SAME org (no cross-firm target);
+--    * drafted:  only for oneself (actor_id is auth.uid() by the trigger, so the row can only be the caller's own), and only
+--                when the newest draft_to on that item names the caller.
+--    RESTRICTIVE, so it narrows 0103's permissive policy and widens nothing. Check 0103's role list and helper names
+--    (`current_org_id()`, `crm_org_member`) before copying; this file uses the names the app's generated types show.
+create or replace function public.queue_card_event_draft_ok(p_org uuid, p_item text, p_kind text, p_target uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case
+    when p_kind = 'draft_to' then exists (
+      select 1 from public.crm_org_member m
+      where m.org_id = p_org and m.user_id = p_target
+        and m.role::text in ('owner', 'admin', 'senior_admin', 'attorney', 'intake', 'paralegal', 'law_clerk', 'clerk')
+    )
+    when p_kind = 'drafted' then (
+      select e.target_user_id = auth.uid()
+      from public.queue_card_event e
+      where e.org_id = p_org and e.queue_item_id = p_item and e.kind = 'draft_to'
+      order by e.created_at desc
+      limit 1
+    ) is true
+    else true
+  end
+$$;
+revoke all on function public.queue_card_event_draft_ok(uuid, text, text, uuid) from public, anon;
+grant execute on function public.queue_card_event_draft_ok(uuid, text, text, uuid) to authenticated;
+
+drop policy if exists queue_card_event_draft_kinds on public.queue_card_event;
+create policy queue_card_event_draft_kinds on public.queue_card_event
+  as restrictive
+  for insert
+  to authenticated
+  with check (
+    kind not in ('draft_to', 'drafted')
+    or (org_id = public.current_org_id() and public.queue_card_event_draft_ok(org_id, queue_item_id, kind, target_user_id))
+  );
+
+commit;
+
+-- Notes for the reviewer:
+--   * `queue_item_id` is typed `string` in the app's types; it is the lawmatics-mcp queue's id (not a uuid FK). If 0103 made it
+--     uuid, change `p_item text` to uuid.
+--   * Postgres cannot check from here that the draft_to's ACTOR may approve the item (the queue lives in lawmatics-mcp, outside
+--     this database). The app's fold does: a draft_to counts only when `canApproveItem` says its actor may approve the item, and a
+--     drafted only from the current target (src/lib/queue/deck.ts `trustedEvents`). The policy above stops the cross-firm and
+--     someone-else's-drafted cases the database CAN see.
+--   * No new table and no new column: "Drafts go to" lives in client_proposal_setting.pricing.approval_routing.drafter
+--     (questions.md T8: firms without the Proposals feature can't save it).
+--
+-- Tenant-isolation cases to add to lectual `tests/tenant-isolation.test.ts` (the gate lives there):
+--   1. A member of firm B inserts a `draft_to` for firm A's org_id (or with firm A's active org claim but no membership): refused.
+--   2. A member of firm A inserts a `draft_to` whose target is a member of firm B only: refused.
+--   3. A `draft_to` with target_user_id null: refused (23514).
+--   4. A member of firm A inserts a `drafted` on an item whose newest draft_to names ANOTHER user: refused.
+--   5. The draft_to target inserts a `drafted` for that item: allowed; actor_id comes back as their own auth.uid() and created_at
+--      the database's own (an actor_id or created_at in the insert is permission denied, as for 0103).
+--   6. A `drafted` with a target_user_id: refused (23514).
+--   7. Firm B reads no firm A rows of either kind (0103's select policy, re-asserted for the new kinds).
+--   8. 'handoff', 'later', 'returned' inserts behave exactly as before (regression).
+--   9. A kind outside the five: refused (23514).
+--  10. `proconfig` of queue_card_event_draft_ok is exactly `search_path=""`; `public` and anon have no EXECUTE.
+-- =====================================================================================================================

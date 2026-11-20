@@ -14,7 +14,7 @@ import type { CardEvent, CardEventKind, CardState } from "@/lib/queue/deck";
 const COLUMNS = "queue_item_id, kind, actor_id, target_user_id, until, note, created_at";
 const CHUNK = 100;
 
-const KINDS: readonly CardEventKind[] = ["handoff", "later", "returned"];
+const KINDS: readonly CardEventKind[] = ["handoff", "later", "returned", "draft_to", "drafted"];
 
 export function isNotSetUpError(error: unknown): boolean {
   const code = (error as { code?: unknown } | null)?.code;
@@ -67,6 +67,17 @@ export async function loadCardState(itemIds: readonly string[]): Promise<CardSta
   }
 }
 
+/**
+ * The kinds lectual 0112 adds. Before 0112 the table refuses them: a CHECK on `kind` (23514) or, if `kind` is an enum,
+ * an invalid value (22P02). Judged by error CODE only, and only for these kinds, so an old kind's refusal stays "failed".
+ */
+export const KINDS_0112: readonly CardEventKind[] = ["draft_to", "drafted"];
+export function isKindNotSetUpError(kind: CardEventKind, error: unknown): boolean {
+  if (!KINDS_0112.includes(kind)) return false;
+  const code = (error as { code?: unknown } | null)?.code;
+  return code === "23514" || code === "22P02";
+}
+
 export type RecordResult = { ok: true } | { ok: false; reason: "not-set-up" | "failed" };
 
 /**
@@ -91,7 +102,7 @@ export async function recordCardEvent(input: {
       until: input.until ?? null,
       note: input.note ?? null,
     });
-    if (error) return { ok: false, reason: isNotSetUpError(error) ? "not-set-up" : "failed" };
+    if (error) return { ok: false, reason: isNotSetUpError(error) || isKindNotSetUpError(input.kind, error) ? "not-set-up" : "failed" };
     return { ok: true };
   } catch {
     return { ok: false, reason: "failed" };

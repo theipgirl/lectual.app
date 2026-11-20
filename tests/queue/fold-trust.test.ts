@@ -201,3 +201,30 @@ describe("every reader of the card events folds them with the trust rule", () =>
     }
   });
 });
+
+describe("Sprint 4: draft_to and drafted in the fold", () => {
+  const draftTo = (actorId: string, targetUserId: string, queueItemId = "pc"): CardEvent => ({ queueItemId, kind: "draft_to", actorId, targetUserId, until: null, note: null, createdAt: at() });
+  const drafted = (actorId: string, queueItemId = "pc"): CardEvent => ({ queueItemId, kind: "drafted", actorId, targetUserId: null, until: null, note: null, createdAt: at() });
+
+  it("a draft_to counts only from someone who may approve the item, to a current staff member", () => {
+    expect(trustedEvents([draftTo(U.rebecca, U.caitlyn)], items, known())).toHaveLength(1);
+    expect(trustedEvents([draftTo(MALLORY, MALLORY)], items, known())).toHaveLength(0); // a non-approver
+    expect(trustedEvents([draftTo(U.rebecca, U.viewer)], items, known())).toHaveLength(0); // a viewer can't hold a draft
+    expect(trustedEvents([draftTo(U.rebecca, U.ghost)], items, known())).toHaveLength(0); // not a member
+  });
+
+  it("a non-approver routed a routine kind may pass a non-attorney item (canApproveItem allows it), never an attorney-only one", () => {
+    expect(trustedEvents([draftTo(MALLORY, U.caitlyn, "fu")], items, known({ stalled_followup: MALLORY }))).toHaveLength(1);
+    expect(trustedEvents([draftTo(MALLORY, U.caitlyn, "pc")], items, known({ stalled_followup: MALLORY }))).toHaveLength(0);
+  });
+
+  it("a drafted counts only from the current draft_to target", () => {
+    expect(trustedEvents([draftTo(U.rebecca, U.caitlyn), drafted(MALLORY)], items, known())).toHaveLength(1);
+    expect(trustedEvents([draftTo(U.rebecca, U.caitlyn), drafted(U.caitlyn)], items, known())).toHaveLength(2);
+    expect(trustedEvents([drafted(U.caitlyn)], items, known())).toHaveLength(0);
+  });
+
+  it("neither is a hand-off: the holder is untouched", () => {
+    expect(holderOf([handoff(U.rebecca, U.caitlyn), draftTo(U.rebecca, MALLORY), drafted(MALLORY)])?.userId).toBe(U.caitlyn);
+  });
+});

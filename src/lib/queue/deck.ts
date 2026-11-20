@@ -19,7 +19,13 @@ import { canApproveItem, classifyQueueItem, type ApprovalRouting, type QueueKind
  * When the events can't be read (or the table isn't there yet) every card the viewer may approve is dealt: never fewer.
  */
 
-export type CardEventKind = "handoff" | "later" | "returned";
+/**
+ *  · draft_to  (Sprint 4, lectual 0112) an APPROVED client email is passed to the firm's drafter: the approver wrote it
+ *              at approve time instead of drafting in their own mailbox. `note` carries the approved text's sha256.
+ *  · drafted   the drafter made the draft in their OWN Outlook. Ends the draft_to.
+ * Neither changes who may approve anything, and neither is a hand-off (`currentHolder` ignores both).
+ */
+export type CardEventKind = "handoff" | "later" | "returned" | "draft_to" | "drafted";
 export type CardEvent = {
   queueItemId: string;
   kind: CardEventKind;
@@ -74,11 +80,15 @@ export function viewEventTrust(view: { routing: ApprovalRouting; members: readon
  * Events are folded in the order given (the database order); two rows with the same `created_at` keep that order.
  * `later` rows only ever change their own actor's deck and are kept. With trust `unknown` nothing is dropped. With trust
  * `known`, a hand-off or return for an item not in `items` can't be checked and is dropped. Idempotent.
+ * Sprint 4: a `draft_to` counts only from someone who may approve the item and only to a current staff member; a
+ * `drafted` only from the current draft_to target.
  */
 export function trustedEvents(events: readonly CardEvent[], items: readonly (RoutableItem & { id: string })[], trust: EventTrust): CardEvent[] {
   if (trust.status !== "known") return [...events];
   const byId = new Map(items.map((i) => [i.id, i]));
   const holders = new Map<string, Holder | null>();
+  // The current draft_to target per item (Sprint 4): a `drafted` counts only from them.
+  const drafters = new Map<string, string>();
   const mayApprove = (actorId: string, item: RoutableItem) => canApproveItem({ role: trust.roles.get(actorId) ?? null, userId: actorId, item, routing: trust.routing });
   const out: CardEvent[] = [];
   for (const e of events) {
@@ -100,6 +110,19 @@ export function trustedEvents(events: readonly CardEvent[], items: readonly (Rou
       const isStaff = !!actorRole && QUEUE_EDIT_ROLES.includes(actorRole);
       if (!isStaff && e.actorId !== holder.userId && e.actorId !== holder.by && !mayApprove(e.actorId, item)) continue;
       holders.set(e.queueItemId, null);
+      out.push(e);
+    } else if (e.kind === "draft_to") {
+      // Only someone who may approve the item passes it to a drafter (the approve path writes it as the approver), and
+      // only to a current staff member. A forged draft_to (any staff member can insert a row) is left out.
+      if (!e.targetUserId) continue;
+      const targetRole = trust.roles.get(e.targetUserId);
+      if (!targetRole || !QUEUE_EDIT_ROLES.includes(targetRole)) continue;
+      if (!mayApprove(e.actorId, item)) continue;
+      drafters.set(e.queueItemId, e.targetUserId);
+      out.push(e);
+    } else if (e.kind === "drafted") {
+      // Only the current draft_to target says it is drafted.
+      if (drafters.get(e.queueItemId) !== e.actorId) continue;
       out.push(e);
     }
   }

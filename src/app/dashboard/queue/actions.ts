@@ -14,6 +14,7 @@ import type { Role } from "@/lib/auth/roles";
 import { cardIdOf, cardNoteOf, sendCardBack } from "@/lib/queue/card-moves";
 import { sendBackNoteTooLong } from "@/lib/queue/handed";
 import { isDoneNote } from "@/lib/queue/done";
+import { makeDraftInMyOutlook } from "@/lib/queue/make-draft";
 import { DECK_FAILED, REJECT_NOTE_IS_DONE_MARKER, SEND_BACK_NOTE_TOO_LONG } from "@/lib/ui/words";
 
 export type ReviewState = { error?: string };
@@ -45,7 +46,9 @@ export async function reviewQueueAction(_prev: ReviewState, formData: FormData):
   revalidatePath("/dashboard/queue/");
   revalidatePath(`/dashboard/queue/${id}/`);
   const sendParam = outcome.send ? `&send=${encodeURIComponent(outcome.send)}` : "";
-  redirect(`/dashboard/queue/${id}/?resolved=${outcome.intent}${sendParam}`);
+  // Sprint 4: before lectual 0112 the email went to the approver's own mailbox instead of the drafter; the page says so.
+  const passParam = outcome.kind === "resolved" && outcome.handoff?.status === "not-switched-on" ? "&pass=off" : outcome.handoff?.status === "queue-drafted" ? "&pass=queue" : "";
+  redirect(`/dashboard/queue/${id}/?resolved=${outcome.intent}${sendParam}${passParam}`);
 }
 
 export type DismissState = { message?: string; error?: string };
@@ -119,4 +122,20 @@ export async function sendBackAction(_prev: SendBackState, formData: FormData): 
   revalidatePath("/dashboard/queue/deck/");
   revalidatePath(`/dashboard/queue/${id}/`);
   redirect(`/dashboard/queue/${id}/?returned=1`);
+}
+
+export type MakeDraftState = { error?: string; message?: string; webLink?: string | null };
+
+/**
+ * "Make the draft in my Outlook" (Sprint 4). The form posts the item id; a posted `connection_id`, if any, is only ever
+ * compared with the caller's own connection (`makeDraftInMyOutlook`), never used. Every check is in the core.
+ */
+export async function makeDraftAction(_prev: MakeDraftState, formData: FormData): Promise<MakeDraftState> {
+  const id = cardIdOf(formData.get("id"));
+  if (!id) return { error: DECK_FAILED };
+  const made = await makeDraftInMyOutlook({ id, postedConnectionId: formData.get("connection_id") ?? undefined });
+  if (!made.ok) return { error: made.error };
+  revalidatePath("/dashboard/queue/");
+  revalidatePath(`/dashboard/queue/${id}/`);
+  return { message: made.message, webLink: made.webLink };
 }

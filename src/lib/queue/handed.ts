@@ -80,7 +80,8 @@ const clip = (s: string) => {
   return t.length > HEADLINE_MAX ? `${t.slice(0, HEADLINE_MAX - 1).trimEnd()}…` : t;
 };
 
-export type CardNoticePayload = { source: "card_handoff" | "card_returned"; queue_id: string; headline: string };
+/** `draft_to` (Sprint 4): an approved email is waiting on the drafter's own "Make the draft" click. */
+export type CardNoticePayload = { source: "card_handoff" | "card_returned" | "draft_to"; queue_id: string; headline: string };
 
 export const cardNoticePayload = (source: CardNoticePayload["source"], item: Pick<QueueItem, "id" | "headline">): CardNoticePayload => ({
   source,

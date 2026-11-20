@@ -2329,3 +2329,45 @@ deadline or changes `attorney_confirmed`. Rules are pure in `src/lib/matters/dea
   that matter with `created_at = now()` and `actor_id = auth.uid()` in the same transaction (no session setting a client could send). Apply to
   lectual-dev, run its isolation cases, then prod with the owner's OK. Change its kind list and roles together with deadline-safety.ts.
 - Not verified: a real browser, the real `crm_notification` insert/select policies for a self-notice, 0110 against any database.
+
+## Sprint 4: routine approval kinds and drafts in the drafter's Outlook (PGE; the database half is lectual 0112, proposed, NOT applied)
+Decision 15 (a law clerk clears routine kinds) and 3b (approved client emails become drafts in the DRAFTER's own Outlook, on
+their own click). Contract: `docs/pge/2026-11-17-agentic-ip-os/sprint-4.md`. Approving still never sends; `outlook-send.ts` is untouched.
+- **Four routine kinds** in `src/lib/queue/routing.ts` (still the ONE place): `filing_receipt`, `uspto_notice`, `client_reminder`,
+  `client_request`, all `attorneyOnly: false`. Reached ONLY through the exact (agent, type) pairs in `ROUTINE_MARKER`
+  (`filing-receipt` / `uspto-watcher` / `client-reminder` / `client-request`, each `CLIENT_EMAIL`; `routineKindOf`, exact string
+  equality). A headline never makes an item routine; the same headline from another agent is `client_email_other` (attorney-only). A
+  proposal link still wins (post-consult). A drafting path that makes one imports its marker from `ROUTINE_MARKER`. **No drafting path sets
+  one today**: the USPTO watcher (Sprint 3 Part B) is not built yet, and the monthly filing update (`filing-followup`) stays attorney-only
+  (questions.md R4 default). `flagsLegalAdvice` still wins over every marker, and `runQueueReview` re-runs `approvalRefusal` on the item AS
+  RE-READ (with the approved text) right before resolving, so an edit that adds advice is refused before anything is resolved or drafted.
+- **Routing to the clerk** is the existing Settings -> Approvals form; `canApproveItem` is unchanged (routed to a person: that person or the admin
+  tier). With empty routing every role's rights equal `canApproveQueue` (pinned for all 10 roles x every kind).
+- **"Drafts go to"** is `approval_routing.drafter` in the same jsonb (`DRAFTER_KEY`): `parseDrafter` keeps it only for a current member in a staff
+  role (`eligibleDrafters`); `parseApprovalRouting` skips the key (never counted as dropped); `withApprovalRouting(pricing, routing, drafter?)` keeps
+  the stored one when the third argument is left out, so a routing-only save never drops it. Settings shows the drafter's Outlook state only when it
+  is the viewer's own (`drafterOutlookLine`), else "Only <name> can see this." `RoutingLoad.ok` and `QueueViewContext` carry `drafter`.
+- **Approve with a drafter set** (`approvePlan`, `src/lib/queue/draft-handoff.ts`, pure): a CLIENT_EMAIL approved by someone who is NOT the drafter,
+  with the routing READ, is `pass`; everything else (no drafter, the drafter approving, a failed routing read, another type) is today's path, byte for
+  byte (no `handoff` key, no extra resolve field: pinned). On `pass`: Lectual staff (`actingAsStaff`) are refused before anything; the resolve call
+  carries `mailbox_draft: false` (`skipMailboxDraft`, **NOT verified against lawmatics-mcp**; if the queue drafts anyway, `send` says so, nothing is
+  passed on and no second draft is made: `handoff.status = "queue-drafted"`); NO `draftInMyMailbox`; one `draft_to` card event (target the drafter,
+  note `approved-text sha256 <64 hex>`, never the text) and one bell notice (`source: "draft_to"`, ids and a clipped headline; "Rebecca approved an
+  email · Make the draft"). The insert refused with 23514 / 22P02 (before lectual 0112, `isKindNotSetUpError`, by code and only for the two new kinds)
+  falls back to the APPROVER'S OWN mailbox only and the page says passing isn't switched on (`?pass=off`); any other failure makes no draft anywhere
+  (`send=pass-failed`).
+- **The fold** (`trustedEvents`): a `draft_to` counts only from someone `canApproveItem` allows for the item and only to a current staff member; a
+  `drafted` only from the current draft_to target. Neither is a hand-off (`currentHolder` ignores both).
+- **"Make the draft in my Outlook"** (`makeDraftInMyOutlook`, `src/lib/queue/make-draft.ts`, the ONE core; the item page's `makeDraftAction`): session
+  re-resolved (staff previewing refused), item re-read (approved CLIENT_EMAIL), events and routing re-read and folded with trust (unknown trust or
+  unreadable events = "couldn't check"; before 0112 = `NOT_SWITCHED_ON`), caller must be the CURRENT target, the item's current text must hash to the
+  draft_to sha (and agree with a resolution-note receipt if there is one: an edit after approval refuses), a drafted item does nothing. The draft goes
+  through `draftInMyOwnOutlook` (`my-mailbox.ts`): the caller's scoped read of their own personal, active Microsoft connection with `Mail.ReadWrite`
+  (`hasDraftScope`); a posted `connection_id` is only COMPARED with it (another person's id is refused, never used). Then a `drafted` event.
+- **Ready to draft (N)** (`loadReadyToDraft`, `ready-load.ts`): on Approvals (a link to `?status=approved&who=ready` and a row marker) and the deck (a
+  link), drawn only when the read worked and found some. Every one of these reads (and the item page's card) runs only while the firm HAS a drafter
+  set, so a firm without one reads and renders exactly what it did before. Known limit: removing the drafter hides the list for anyone still holding
+  a draft_to until one is set again.
+- **NOT verified:** lectual 0103's real `kind` column (CHECK, enum or free text; the lectual repo wasn't reachable), so whether 0112 is needed for the
+  kinds is inferred; `docs/pge/2026-11-17-agentic-ip-os/0112-proposed.sql.txt` holds the proposal and its isolation cases (not on lectual-dev). Also
+  unverified: lawmatics-mcp honouring `mailbox_draft: false`, a real Graph draft, a real browser.

@@ -692,6 +692,46 @@ export const NOTICE_HANDED_LABEL = "Handed to you";
 export const NOTICE_RETURNED_LABEL = "Sent back";
 export const noticeHandedSentence = (first: string) => `${first} handed you an approval`;
 export const noticeReturnedSentence = (first: string) => `${first} sent an approval back`;
+/* Sprint 4: approved emails passed to the drafter, who makes the draft in their OWN Outlook. */
+export const NOTICE_DRAFT_TO_LABEL = "Ready to draft";
+export const noticeDraftToSentence = (first: string) => `${first} approved an email · Make the draft`;
+export const READY_TO_DRAFT = "Ready to draft";
+export const readyToDraftCount = (n: number) => `${READY_TO_DRAFT} (${n})`;
+export const MAKE_DRAFT_BUTTON = "Make the draft in my Outlook";
+export const MAKE_DRAFT_TITLE = "Make the draft";
+export const makeDraftIntro = (approverName: string) =>
+  `${approverName} approved this email. Make the draft in your own Outlook, check it there and press Send. Nothing has reached the client yet.`;
+export const MAKE_DRAFT_DONE = "The draft is in your Outlook Drafts. Open it there and press Send. Nothing has reached the client yet.";
+export const MAKE_DRAFT_ALREADY = "This one is already drafted in your Outlook. Nothing else was made.";
+export const MAKE_DRAFT_DONE_NOT_MARKED =
+  "The draft is in your Outlook Drafts, but Lectual couldn't mark it as drafted. Don't press the button again: open Drafts in Outlook.";
+export const MAKE_DRAFT_NOT_YOURS = "This email isn't waiting on your draft. Refresh to see what's left.";
+export const MAKE_DRAFT_NOT_APPROVED = "Only an approved client email can be drafted from here.";
+export const MAKE_DRAFT_CHANGED = "This email changed after it was approved, so no draft was made. Ask for it to be approved again.";
+export const MAKE_DRAFT_COULDNT_CHECK = "Couldn't check what's ready to draft. Refresh to try again.";
+export const MAKE_DRAFT_PREVIEW_ONLY = "Preview only: drafts aren't made while you're viewing as the firm.";
+export const MAKE_DRAFT_FAILED = "Couldn't make the draft in your Outlook. Nothing was sent. Refresh to try again.";
+export const MAKE_DRAFT_NO_OUTLOOK = "Connect your own Outlook to make drafts here.";
+export const MAKE_DRAFT_NOT_OUTLOOK = "Only a Gmail mailbox is connected. Connect your own Outlook to make drafts here.";
+export const MAKE_DRAFT_NEEDS_PERMISSION = "Reconnect your Outlook and allow it to save drafts.";
+export const MAKE_DRAFT_OUTLOOK_UNREAD = "Couldn't check your Outlook. Refresh to try again.";
+export const MAKE_DRAFT_RECONNECT = "Your Outlook needs reconnecting before a draft can be made. Nothing was made.";
+export const CONNECT_OUTLOOK_LINK = "Connect Outlook";
+export const DRAFTED_IN_OUTLOOK = "Drafted in your Outlook.";
+/** The approve outcome when the email was passed to the drafter. */
+export const passedToDrafter = (name: string) => `Approved and passed to ${name}, who makes the draft in their own Outlook. Nothing has reached the client yet.`;
+export const PASS_FAILED =
+  "Approved, but passing it to the drafter didn't go through, so no draft was made anywhere. Open the approval to copy it, or ask Lectual to check.";
+/** Before lectual 0112: passing to the drafter isn't on, so the approver's own mailbox was used (today's behaviour). */
+export const PASS_NOT_SWITCHED_ON = notReadyYet("Passing approved emails to the drafter");
+export const QUEUE_DRAFTED_ANYWAY = "Approved and drafted by the approval queue, so it wasn't passed to the drafter.";
+/* Settings -> Approvals: "Drafts go to". */
+export const DRAFTS_GO_TO = "Drafts go to";
+export const DRAFTS_GO_TO_HELP =
+  "When someone else approves a client email, it waits on this person, who makes the draft in their own Outlook and sends it. With nobody chosen, the approver gets the draft, as today.";
+export const DRAFTER_OUTLOOK_READY = "Your Outlook is connected and can save drafts.";
+export const DRAFTS_GO_TO_NOBODY = "The approver (default)";
+export const DRAFTER_DROPPED = "The saved drafter is no longer on your team, so approvers get the drafts until you choose someone.";
 /* Phase 2: each person sets their own two deal times (owner view). */
 export const DEAL_TIMES_TITLE = "Your deal times";
 export const DEAL_TIMES_OPEN = "Change deal times";

@@ -1,5 +1,5 @@
 import { QUEUE_ID, UUID } from "@/lib/queue/link-rules";
-import { DEADLINE_NOTICE_LABEL, NOTICE_HANDED_LABEL, NOTICE_RETURNED_LABEL, deadlineNoticeSentence, noticeHandedSentence, noticeReturnedSentence } from "@/lib/ui/words";
+import { DEADLINE_NOTICE_LABEL, NOTICE_DRAFT_TO_LABEL, NOTICE_HANDED_LABEL, NOTICE_RETURNED_LABEL, deadlineNoticeSentence, noticeDraftToSentence, noticeHandedSentence, noticeReturnedSentence } from "@/lib/ui/words";
 import { CONSULT_OUTCOME_LABEL, isConsultOutcome } from "@/lib/pipeline/consult-outcome-labels";
 
 /**
@@ -81,7 +81,7 @@ export function describeNotification(
   const event =
     (row.kind === "approval_needed" || row.kind === "mentioned") && source === "proposal_accepted"
       ? "proposal_accepted"
-      : row.kind === "approval_needed" && (source === "card_handoff" || source === "card_returned")
+      : row.kind === "approval_needed" && (source === "card_handoff" || source === "card_returned" || source === "draft_to")
         ? source
         : row.kind === "mentioned" && source === "deadline_window"
           ? "deadline_window"
@@ -150,6 +150,11 @@ export function describeNotification(
         sentence: event === "card_handoff" ? noticeHandedSentence(first) : noticeReturnedSentence(first),
         href: hrefFor(row, payload, true),
       };
+    }
+    case "draft_to": {
+      // Sprint 4: an approved email waits on the drafter's own "Make the draft" click. Ids and the headline only.
+      const first = actor.split(/\s+/)[0] || actor;
+      return { icon: "approval", label: NOTICE_DRAFT_TO_LABEL, sentence: noticeDraftToSentence(first), href: hrefFor(row, payload, true) };
     }
     case "deadline_window": {
       // PGE Sprint 3: a deadline entered the 30- or 7-day window. Ids, the window and the deadline's title only.
