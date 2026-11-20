@@ -57,7 +57,7 @@ const BUCKET_TONE: Record<BucketKey, PillTone> = { overdue: "risk", week: "warn"
 /**
  * ONE review card, in the shared Board kit's card look (the same as the Leads board): a bold name, one quiet line (kind, company,
  * mark, stage), the next step with its due chip, then the timeline line: the newest thing SENT OUT for the record. The title is the
- * link to the panel; Done and Open sit below it as plain text links, so nothing interactive is nested.
+ * link to the opened record card; Done and Open sit below it as plain text links, so nothing interactive is nested.
  */
 function ReviewCard({ row, bucket, today, members, canWrite, params, waitingOnClient }: Common & { row: ReviewRow; bucket: BucketKey; /** A "Waiting on client" card also says how long since we followed up. */ waitingOnClient?: boolean }) {
   const due = row.nextStep ? dueText(row.nextStep.dueDate, today) : null;

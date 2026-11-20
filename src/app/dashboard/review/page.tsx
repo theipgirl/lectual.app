@@ -15,7 +15,9 @@ import { SheetSaveStatus } from "@/components/review/SheetSaveStatus";
 import { loadSheetStages } from "@/lib/review/sheet-edit-load";
 import { READ_ONLY_PERMS, type SheetPerms } from "@/lib/review/sheet-edit";
 import { CardsDeck, PersonChips } from "@/components/review/CardsDeck";
-import { ReviewPanel } from "@/components/review/ReviewPanel";
+import { ReviewCardAside, ReviewCardNote } from "@/components/review/ReviewCardExtras";
+import { RecordCardHost } from "@/components/record-card/RecordCardHost";
+import { loadRecordCard } from "@/lib/record-card/load";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { NO_PREVIEW, previewFor, viewFor } from "@/lib/views";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
@@ -28,10 +30,9 @@ import { applyReviewFilters, olderHiddenCount, sinceSuspended, DEFAULT_REVIEW_VI
 import { criticalAlert, detailsNote } from "@/lib/review/notes";
 import { noticeFor } from "@/lib/review/notice";
 import { buildDeck, chosenPerson, deckPeople } from "@/lib/review/deck";
-import { loadDeckDocuments, loadLatestNote, loadReviewDetail } from "@/lib/review/detail-load";
+import { loadDeckDocuments, loadLatestNote } from "@/lib/review/detail-load";
 import { pageTitle } from "@/lib/ui/page-title";
 import { QUEUE_APPROVE_ROLES } from "@/lib/queue/roles";
-import { FILE_UPLOAD_ROLES } from "@/lib/files/roles";
 import { REVIEW_NAME, REVIEW_SHOW_ALL, REVIEW_SHOWING_ALL, REVIEW_SINCE_LABEL, REVIEW_SINCE_SUSPENDED, reviewIntro, reviewOlderHidden } from "@/lib/ui/words";
 
 export const metadata: Metadata = { title: pageTitle(REVIEW_NAME) };
@@ -117,13 +118,38 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
     cards = { people, personId, card, pos: cardPos, note: cardNote, docs: cardDocs };
   }
 
-  // The detail panel: the record is read AGAIN through the scoped client; the review row only supplies the computed facts.
-  const panelDetail = params.open ? await loadReviewDetail(params.open) : null;
-  // A merged lead opened by URL shows its keeper (the loader followed the pointer).
-  const shownOpen = params.open && panelDetail?.status === "ok" ? { kind: params.open.kind, id: panelDetail.openId ?? params.open.id } : params.open;
-  const panel = params.open && panelDetail && shownOpen
-    ? { detail: panelDetail, row: load.rows.find((r) => r.kind === shownOpen.kind && r.id === shownOpen.id) ?? null }
-    : null;
+  // `?open=` opens the record in the SAME centred card Intake and Matters open (no drawer). The card re-reads the record through the
+  // scoped client (`loadRecordCard`: a foreign or missing id is "couldn't be found", a failed read "couldn't be loaded"); the review
+  // row only supplies the facts it computed. A merged lead opened by URL shows its keeper (the loader followed the pointer).
+  const cardLoad = params.open ? await loadRecordCard(params.open) : null;
+  const cardShownId = cardLoad?.status === "ok" ? (cardLoad.kind === "lead" ? cardLoad.lead.id : cardLoad.matter.id) : null;
+  const cardRow = params.open && cardShownId ? (load.rows.find((r) => r.kind === params.open!.kind && r.id === cardShownId) ?? null) : null;
+  // Close (and Back) land on the same review view: every other review param is kept, only `open` goes.
+  const cardBase = reviewHref({ ...params, open: null });
+  const cardParams = new URLSearchParams(cardBase.includes("?") ? cardBase.slice(cardBase.indexOf("?") + 1) : "");
+  // Rendered here (an async server component called once) so the page itself stays one synchronous tree.
+  const card =
+    params.open && cardLoad
+      ? await RecordCardHost({
+          open: params.open,
+          path: "/dashboard/review/",
+          params: cardParams,
+          load: cardLoad,
+          review: {
+            aside: (
+              <ReviewCardAside
+                open={{ kind: params.open.kind, id: cardShownId ?? params.open.id }}
+                row={cardRow}
+                members={load.members}
+                today={load.today}
+                stagesFailed={cardLoad.status === "ok" && cardLoad.stages.status !== "ok"}
+                closeStages={canMove ? load.closeStages : []}
+              />
+            ),
+            note: <ReviewCardNote open={{ kind: params.open.kind, id: cardShownId ?? params.open.id }} />,
+          },
+        })
+      : null;
   const notice = noticeFor(sp.notice);
 
   const searchHidden = { ...(params.since === "all" ? { since: "all" } : {}), ...(params.view !== DEFAULT_REVIEW_VIEW ? { view: params.view } : {}), ...(params.view === "cards" && params.person ? { person: params.person } : {}), ...(params.who === "mine" ? { who: "mine" } : {}), ...(params.kind !== "both" ? { kind: params.kind === "matter" ? "matters" : "leads" } : {}) };
@@ -262,21 +288,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           )}
         </>
       )}
-      {panel && shownOpen && (
-        <ReviewPanel
-          open={shownOpen}
-          row={panel.row}
-          detail={panel.detail}
-          today={load.today}
-          timeZone={load.timeZone}
-          members={load.members}
-          canWrite={canWrite}
-          canUpload={!!role && FILE_UPLOAD_ROLES.includes(role)}
-          canMove={canMove}
-          closeStages={load.closeStages}
-          closeHref={reviewHref({ ...params, open: null })}
-        />
-      )}
+      {card}
     </div>
   );
 }

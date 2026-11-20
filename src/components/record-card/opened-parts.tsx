@@ -15,8 +15,9 @@ import {
   RECORD_CARD_TITLE,
   RECORD_CARD_STEPS_HEADING,
   RECORD_CARD_ADD_STEP,
+  RECORD_CARD_A_TEAMMATE,
 } from "@/lib/ui/words";
-import { SnoozeDone, StepForm } from "./controls";
+import { SnoozeDone, StepForm, type StepAssignees } from "./controls";
 import { SavedMarkView } from "./SavedMarkView";
 import { useRun, viaForm } from "./use-run";
 import "./record-card.css";
@@ -103,8 +104,22 @@ export function TagsEditor({ leadId, tags }: { leadId: string; tags: Extract<Tag
   );
 }
 
-/** The Next steps checklist: tick (Done), edit title and date, snooze, add. Draws only what the role may do. */
-export function StepsChecklist({ kind, id, steps }: { kind: "lead" | "matter"; id: string; steps: ChecklistView }) {
+/**
+ * The Next steps checklist: tick (Done), edit title and date, snooze, add. Draws only what the role may do. `assignees` (the
+ * Weekly review only) adds who each step is assigned to: the team, each step's current assignee by task id, and the starting
+ * choice for a new step. Without it the checklist is exactly as before.
+ */
+export function StepsChecklist({
+  kind,
+  id,
+  steps,
+  assignees,
+}: {
+  kind: "lead" | "matter";
+  id: string;
+  steps: ChecklistView;
+  assignees?: { members: StepAssignees["members"]; byTask: Readonly<Record<string, string | null>>; forNew: string | null } | null;
+}) {
   const [editing, setEditing] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   return (
@@ -121,7 +136,7 @@ export function StepsChecklist({ kind, id, steps }: { kind: "lead" | "matter"; i
             {steps.items.map((s) => (
               <li key={s.id}>
                 {editing === s.id && steps.edit ? (
-                  <StepForm kind={kind} id={id} step={s} dueIso={s.dueIso} onDone={() => setEditing(null)} autoFocus />
+                  <StepForm kind={kind} id={id} step={s} dueIso={s.dueIso} onDone={() => setEditing(null)} autoFocus assignees={assignees ? { members: assignees.members, current: assignees.byTask[s.id] ?? null } : null} />
                 ) : (
                   <div className="rc-step-row" data-overdue={s.overdue ? "" : undefined}>
                     {steps.edit ? (
@@ -132,6 +147,9 @@ export function StepsChecklist({ kind, id, steps }: { kind: "lead" | "matter"; i
                       <span className="rc-text">{s.title}</span>
                     )}
                     <span className="rc-text rc-step-due">{s.due}</span>
+                    {assignees && assignees.byTask[s.id] && (
+                      <span className="rc-text rc-step-who">{assignees.members.find((m) => m.userId === assignees.byTask[s.id])?.name ?? RECORD_CARD_A_TEAMMATE}</span>
+                    )}
                   </div>
                 )}
                 {(steps.snooze || steps.done) && <SnoozeDone taskId={s.id} snooze={steps.snooze} done={steps.done} />}
@@ -140,7 +158,7 @@ export function StepsChecklist({ kind, id, steps }: { kind: "lead" | "matter"; i
           </ul>
           {steps.add &&
             (adding ? (
-              <StepForm kind={kind} id={id} step={null} onDone={() => setAdding(false)} autoFocus />
+              <StepForm kind={kind} id={id} step={null} onDone={() => setAdding(false)} autoFocus assignees={assignees ? { members: assignees.members, current: assignees.forNew } : null} />
             ) : (
               <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={() => setAdding(true)}>
                 {RECORD_CARD_ADD_STEP}

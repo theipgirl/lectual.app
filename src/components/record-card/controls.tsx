@@ -34,6 +34,7 @@ import {
   RECORD_CARD_SET_BTN,
   RECORD_CARD_STEP_DONE,
   RECORD_CARD_STEP_DUE,
+  LEAD_PAGE_STEP_OWNER,
   RECORD_CARD_STEP_SAVE,
   RECORD_CARD_STEP_TITLE,
   RECORD_CARD_STAGE,
@@ -290,22 +291,39 @@ export function StagePick({ kind, id, name, stage, onPick }: { kind: CardKind; i
 
 type Step = { id: string; title: string; due: string; overdue: boolean };
 
+/**
+ * Who a step is assigned to, offered only where the page passes the team (the Weekly review's card). `current` is the step's
+ * assignee (edit) or the starting choice (add). Intake and Matters pass nothing and the form is unchanged.
+ */
+export type StepAssignees = { members: readonly CardMember[]; current: string | null };
+
 /** Inline form for one step (edit) or a new one (add). Uses the review's existing actions; the role gate is theirs. */
-export function StepForm({ kind, id, step, dueIso, onDone, autoFocus }: { kind: CardKind; id: string; step: Step | null; dueIso?: string | null; onDone: () => void; autoFocus?: boolean }) {
+export function StepForm({ kind, id, step, dueIso, onDone, autoFocus, assignees }: { kind: CardKind; id: string; step: Step | null; dueIso?: string | null; onDone: () => void; autoFocus?: boolean; assignees?: StepAssignees | null }) {
   const { pending, mark, run } = useRun(onDone);
   const [title, setTitle] = useState(step?.title ?? "");
   const [due, setDue] = useState(dueIso ?? "");
+  const [who, setWho] = useState(assignees?.current ?? "");
   return (
     <form
-      className="rc-stepform"
+      className={assignees ? "rc-stepform rc-stepform-who" : "rc-stepform"}
       onSubmit={(e) => {
         e.preventDefault();
-        if (step) run(viaForm(updateNextStepAction, { taskId: step.id, title, dueAt: due }));
-        else run(viaForm(setNextStepAction, { kind, id, title, dueAt: due, assigneeId: "" }));
+        if (step) run(viaForm(updateNextStepAction, { taskId: step.id, title, dueAt: due, ...(assignees ? { assigneeId: who } : {}) }));
+        else run(viaForm(setNextStepAction, { kind, id, title, dueAt: due, assigneeId: assignees ? who : "" }));
       }}
     >
       <input className="lx-input" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={TASK_TITLE_MAX} aria-label={RECORD_CARD_STEP_TITLE} placeholder="What happens next" required autoFocus={autoFocus} />
       <input className="lx-input" type="date" value={due} onChange={(e) => setDue(e.target.value)} aria-label={RECORD_CARD_STEP_DUE} />
+      {assignees && (
+        <select className="lx-input" value={who} onChange={(e) => setWho(e.target.value)} aria-label={LEAD_PAGE_STEP_OWNER}>
+          <option value="">{UNASSIGNED}</option>
+          {assignees.members.map((m) => (
+            <option key={m.userId} value={m.userId}>
+              {m.name}
+            </option>
+          ))}
+        </select>
+      )}
       <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
         {pending ? RECORD_CARD_SAVING : step ? RECORD_CARD_STEP_SAVE : RECORD_CARD_ADD_STEP}
       </button>

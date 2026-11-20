@@ -36,7 +36,7 @@ export function PersonChips({ people, personId, params }: { people: DeckPerson[]
 
 /**
  * One big card at a time. Every button is a plain form or link, so the deck works without JavaScript; the arrow keys are a
- * bonus. The buttons run the same actions as the detail panel and then land back on the same place in the deck.
+ * bonus. The buttons run the same actions as the opened record card and then land back on the same place in the deck.
  */
 export function CardsDeck({
   card,

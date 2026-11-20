@@ -7,6 +7,7 @@ import { buildEntries, LIST_CAP, type Directory, type DocEntry, type DocumentsRe
 import type { FileParentInput } from "@/lib/files/guard";
 import { FILE_MESSAGES, formatFileSize } from "@/lib/files/rules";
 import { DeleteFileButton } from "./DeleteFileButton";
+import { UploadAndRefresh } from "./UploadAndRefresh";
 import { UploadControl } from "./UploadControl";
 
 /**
@@ -62,6 +63,7 @@ export function DocumentsCard({
   canDelete,
   now,
   tz = DEFAULT_TIME_ZONE,
+  refreshAfterUpload = false,
 }: {
   parent: FileParentInput;
   read: DocumentsRead;
@@ -72,6 +74,8 @@ export function DocumentsCard({
   now?: number;
   /** The firm's time zone, for the dates. */
   tz?: string;
+  /** Drawn on a page that is not the record's own (the Weekly review's card): the page refreshes itself after an upload. */
+  refreshAfterUpload?: boolean;
 }) {
   const { files, letters } = read;
   const entries = buildEntries(read, directory);
@@ -96,7 +100,7 @@ export function DocumentsCard({
       {files.status === "not-set-up" && (
         <p className="lx-note">{FILE_MESSAGES.notSetUp}</p>
       )}
-      {canUpload && files.status !== "not-set-up" && <UploadControl parent={parent} />}
+      {canUpload && files.status !== "not-set-up" && (refreshAfterUpload ? <UploadAndRefresh parent={parent} /> : <UploadControl parent={parent} />)}
       {everyReadWorked && entries.length === 0 && (
         <EmptyState variant="line">{EMPTY_LINE}</EmptyState>
       )}

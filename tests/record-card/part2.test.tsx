@@ -127,8 +127,9 @@ describe("each control is wired to the right existing action", () => {
       expect(t).not.toMatch(/@\/lib\/db\/admin/);
     }
   });
-  it("the Weekly review was not touched by the card wiring", () => {
-    for (const f of ["src/app/dashboard/review/page.tsx", "src/components/review/ReviewPanel.tsx"]) expect(src(f)).not.toMatch(/record-card/);
+  it("the Weekly review opens the same card (with its review part); Intake and Matters pass no review part", () => {
+    expect(src("src/app/dashboard/review/page.tsx")).toMatch(/await RecordCardHost\(\{[\s\S]*?review: \{/);
+    for (const f of ["src/app/dashboard/intake/page.tsx", "src/app/dashboard/matters/page.tsx"]) expect(src(f)).not.toMatch(/review=\{/);
   });
 });
 

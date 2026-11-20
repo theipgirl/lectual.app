@@ -1512,37 +1512,44 @@ and a Follow-Up stage; a lead that has a matter shows once, as the matter). Ever
   "Proposal expires today" / "Proposal expired Oct 26" (the expired one in the `--ox` risk style), on board cards, the meeting card and stage-view rows. Tags NEVER change a bucket. KPI tile
   "Proposals expiring this week" (the tile itself was dropped for the Proposals out strip; `expiringThisWeek` is still in `proposal-expiry.ts`) = expires today..+6 or expired within the last 14 days and still sent. Optional source `proposals`: a failed read draws no tags, the tile is a dash with
   "Couldn't load", and the note reads "Some details couldn't load (proposals)", never "no proposal".
-- **Lost / Nurture** (leads only, now inside the detail panel; `LostNurture.tsx`, `closeLeadAction`): a small inline form (stage select, optional reason of at most 200 characters,
+- **Lost / Nurture** (leads only, now inside the opened record card's review part; `LostNurture.tsx`, `closeLeadAction`): a small inline form (stage select, optional reason of at most 200 characters,
   `InlineConfirm`). The choices are the firm's stages whose category is `lost` or `nurture` (`closeStagesOf`, read from the stage list the loader already has); a firm with neither sees no button
   and nothing else changes. Shown only for `CAN_MOVE_STAGE` (narrower than `CAN_WRITE_LEAD`: a paralegal can edit leads but `moveLeadStage` refuses them). The action re-resolves the role,
   re-reads the lead and the target stage through the scoped client, refuses any stage that is not `lost`/`nurture`, then moves with the person path `moveLeadStage(id, stageId)` (logs
   `stage_changed`; no agent path) and, when a reason was given, `addLeadNote` "Moved to <stage>: <reason>". The lead then leaves the review (it left an open stage). Its open task is left alone.
   The firm needs a Lost and/or Nurture stage for the button to show.
-- **Open a record (detail panel, no schema).** A card, a stage-view row and the meeting card are LINKS to `?open=<matter|lead>:<uuid>` on the current review URL (view, who, kind, q, i
-  and person are kept), so the panel is server-rendered, shareable and Back closes it (`openHref` in `shared.tsx`; `parseOpenParam`, `open.ts`: only `matter:`/`lead:` plus a uuid, anything
-  else is no panel). The panel is a right-side drawer from 900px and a full-screen sheet below (`ReviewPanel` over `PanelShell`: focus moves in, Tab wraps, Esc follows the close link,
-  focus returns). It re-reads the ONE record through the scoped client (`loadReviewDetail`, `detail-load.ts`): a missing or foreign id is "This record couldn't be found." with no
-  record data, a failed read is "couldn't be loaded", and the three optional reads (open steps, last 8 timeline rows, stage options) each say so on failure. The computed facts (waiting
-  on, last contact, USPTO deadline, proposal tag) come from the review row. **No form lives on a card**: the card is one `<a>` and "Done" / "Open" sit outside it (nothing interactive
-  nested). The old inline "Set next step" / "Log what happened" details forms are gone from the cards and table; they live in the panel.
-- **Panel actions reuse the existing ones, all re-resolving the role** (`actions.ts`): Save the EXISTING next step = `updateNextStepAction` -> `updateTask` (the matter page's task editor;
-  only posted fields change); Snooze (Tomorrow / Next Monday / In 2 weeks) = `snoozeNextStepAction`, due date only, the date worked out on the server from the firm's own calendar day
-  (`snoozeDate`, `snooze.ts`; Monday + "next Monday" = +7); Done = `completeNextStepAction`; "Add another next step" = `setNextStepAction`; Move stage = `moveStageAction` (a matter:
-  `updateMatterStage`, the docket move; a lead: `moveLeadStage`, `CAN_MOVE_STAGE`, open / lost / nurture stages only, a `won` stage refused again on the server because that move runs the
-  matter handoff); Assigned to = `assignRecordAction` (`assignMatterOwner` / `assignLead`, member checked, unreadable directory refuses); Log what happened = `logWhatHappenedAction`;
-  Lost / Nurture keeps its own `closeLeadAction`. Read-only roles see the same facts with no form. Activity shows a title per row and the note text (clipped to 200 characters, as React
-  text) for plain notes only (`detail.ts`).
+- **Open a record: the SAME centred record card as Intake and Matters (no drawer; the firm owner, Nov 20: "no side panel"; no schema).** A board card, a sheet row,
+  a strip entry and the deck's Open are LINKS to `?open=<matter|lead>:<uuid>` on the current review URL (the review's own grammar, `parseOpenParam`, which the record card
+  imports, so every old review link still opens: only `matter:`/`lead:` plus a uuid, case-insensitive; anything else is no card). The page calls `loadRecordCard(params.open)`
+  (scoped client: a foreign or missing id is "This record couldn't be found." with no record data, a failed read "couldn't be loaded"; a merged lead shows its keeper) and renders
+  `RecordCardHost` (path `/dashboard/review/`, params = `reviewHref({ ...params, open: null })`, so view, who, kind, q, since and the deck's person and i are kept on open and
+  close, `notice` is dropped, Back closes). Centred from 900px, full-screen below (the card's own CSS). **No form lives on a board card**: the card is one `<a>` and "Done" / "Open"
+  sit outside it. `ReviewPanel`, `PanelShell`, `loadReviewDetail` and the panel's own documents list are gone.
+- **The review's part of the card** is the optional `review` prop of `RecordCardHost` (`RecordCardReview`: `aside`, `note`); Intake and Matters pass none and draw exactly as
+  before. From the review the card adds: `ReviewCardAside` (`src/components/review/ReviewCardExtras.tsx`, first in the side column, "On the weekly review"): stage + days in
+  stage, Waiting on (`waitingCell`: Our turn / "Client · followed up Nov 4" / USPTO / Approval), last contact, the last-changed line (none when its read failed), the USPTO deadline
+  (leads; a matter's card draws its own "Next USPTO deadline" from the docket), the proposal tag (only while `REVIEW_SHOWS_PROPOSALS`), "Stages couldn't load..." when the card's stage
+  read failed, and Lost / Nurture for a lead (the page passes `closeStages` only for `CAN_MOVE_STAGE`; none without such stages). A record not on the review opens anyway and says
+  "This record isn't on the weekly review right now." `ReviewCardNote` ("Log what happened", `logWhatHappenedAction`, id `rv-sec-note`) replaces the card's text composer (voice
+  stays), only where the card draws a composer (`notes` edit). The step checklist names each step's assignee and its edit/add forms gain "Assigned to" (`StepAssignees`; not drawn
+  when the team list is unreadable, so a select of nobody can't clear one). A lead's Move to stage also offers lost stages (`buildOpenedCard(..., { lostShown: true })`, as the drawer
+  did; never won). The Documents & files card's upload refreshes the review (`refreshAfterUpload` -> `UploadAndRefresh`).
+- **Card actions are the existing ones, all re-resolving the role**: step edit (title, due, assignee) = `updateNextStepAction` (only posted fields change); Snooze (Tomorrow / Next Monday /
+  In 2 weeks) = `snoozeNextStepAction`, the date worked out on the server from the firm's calendar day (`snoozeDate`); Done = `completeNextStepAction`; add = `setNextStepAction`; Stage =
+  `moveStageAction` (matter: `updateMatterStage`; lead: `CAN_MOVE_STAGE`, open / lost / nurture only, `won` refused on the server); Owner = `assignRecordAction` (member checked); Log what
+  happened = `logWhatHappenedAction`; Lost / Nurture = `closeLeadAction`; upload = the files actions. Read-only roles see the facts and steps with no form (`cardEdits`). The card's full
+  Timeline replaces the drawer's "last 8 rows".
 - **Cards view (`?view=cards&person=<user id>&i=<n>`, "Cards" from `words.ts`): a deck for one person** (Rebecca's cue cards). The person chips are every member (owners first); the
   default is the member whose name starts with "Rebecca", else the signed-in user. `buildDeck` (`deck.ts`, pure): that person's board lane (next-step assignee, else record assignee) in
   column order (Overdue, This week, Needs a next step, Quiet), then, for an approver role (`QUEUE_APPROVE_ROLES`), every row waiting on approval, never repeating a row. The Whose chip is
   ignored here (the person picker is the person); the search and Matters/Leads chips apply. One big card with "N of M" and progress dots; Done, Snooze, Hand to (the step's assignee, or
-  the record's when there is no step), Add note, Open (the panel), Skip / Back. The buttons are plain forms posting to `card-actions.ts`, which run the SAME actions as the panel and then
+  the record's when there is no step), Add note, Open (the record card), Skip / Back. The buttons are plain forms posting to `card-actions.ts`, which run the SAME actions as the card and then
   redirect back to the same `i` (clamped), rebuilding the address from the posted view fields through `parseReviewParams`, never a posted URL; a refusal rides back as a closed
   `notice=denied|missing|failed` code with a fixed sentence (`notice.ts`). Left / Right arrows follow the Back / Skip links (`DeckKeys`); without JavaScript the links work. The latest
   note line is its own optional read (`loadLatestNote`): a failure says "couldn't load", never "no notes".
 - **Board cards:** client (one line), a small kind / mark / stage line, the next step with a due chip (overdue in `--ox`), an initials avatar for the lane person, at most two tags then
   "+N", the bucket's left border, equal height; columns `minmax(260px, 1fr)`; lane headers carry an avatar, the name and the count. Tokens only, light and dark.
-- Leads DO have an assignee (`crm_lead.assigned_to`), so a lead row shows it and the board uses it. Snooze, move-stage and Lost / Nurture are now in the detail panel (above). `createTask` and `completeTask` write no timeline row today, so neither does this page.
+- Leads DO have an assignee (`crm_lead.assigned_to`), so a lead row shows it and the board uses it. Snooze, move-stage and Lost / Nurture are in the opened record card (above). `createTask` and `completeTask` write no timeline row today, so neither does this page.
 
 ### Documents on the review (no schema)
 The managing attorney opens a record's application or opinion letter from the Weekly review and comments on it without a call. Read and link only: no upload, no delete, nothing sends.
@@ -2236,7 +2243,7 @@ Intake and Matters, Board and List: temperature, source, owner, next step and st
 - **Matters cards use the board's move list and the checked source path:** the card's stage control and its menu's "Move to stage" offer `matterMoveStages` (the drawn stages while grouped, never an intake-phase one; every stage on `?intake=1`), the same list the board's drag uses. A matter's Source goes through the review's `setSourceAction` (role, record and `isReferralSource` checked), not `updateMatterHeaderAction`.
 - **Intake's `moveStageAction` checks the role first** (`CAN_MOVE_STAGE`): a refused role gets `MOVE_STAGE_NO_PERMISSION` and neither the lead nor the stage is read.
 - **A lead is labelled by the person first** (`leadLabel`): business and mark are the sub-line; the company is the name only when there is no person's name.
-- **Matter cards** show owner, source and next step but no last activity (the docket pages read none per matter). The Weekly review keeps its drawer until its redesign; then `?open=` there should render `RecordCardHost` (see the contract).
+- **Matter cards** show owner, source and next step but no last activity (the docket pages read none per matter). The Weekly review now opens the same card (`RecordCardHost` with its `review` part; see the Weekly review section).
 
 ## Sprint 10 review fixes (Nov 17, no schema)
 - **Lead page order:** under the status row, the top card first, then `OtherApprovals` (the OTHER pending drafts and briefings) SECOND, then

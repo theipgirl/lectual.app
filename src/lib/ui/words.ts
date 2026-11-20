@@ -962,13 +962,9 @@ export const DOCUMENTS_NAME = "Documents";
 export const NEW_LETTER = "New letter";
 
 // Review documents
-/** The weekly review's detail panel and Cards deck: a record's documents, and the way to comment on one. */
+/** The weekly review's Cards deck: a record's documents. (An opened record uses the Documents & files card.) */
 export const REVIEW_DOCS_TITLE = "Documents";
 export const REVIEW_DOCS_EMPTY = "No documents yet.";
-export const REVIEW_DOCS_OPEN_ALL = "Open all documents";
-export const REVIEW_DOCS_COMMENT = "Comment on a document";
-export const REVIEW_DOCS_COMMENT_HINT = "Your comment is added to the timeline.";
-export const REVIEW_DOCS_OPEN = "Open";
 export const reviewDocsMore = (n: number, capped = false) => (capped ? `+${n} or more` : `+${n} more`);
 export const REVIEW_DOCS_LOAD_FAILED = "Documents couldn't be loaded.";
 export const reviewDocsCount = (n: number) => `${n} ${n === 1 ? "document" : "documents"}`;
@@ -1307,3 +1303,12 @@ export const LANE_NOTHING_FOR_US = "Nothing for us to do here.";
 export const LANE_NOBODY_WAITING = "Nobody is waiting on a client.";
 /** What the number beside a person's name counts. */
 export const LANE_COUNT_NOTE = "Cards in this column: our turn plus waiting on client";
+
+// Weekly review: a record opens in the centred record card (no drawer). The review's own facts and actions sit in the card.
+export const REVIEW_CARD_HEADING = "On the weekly review";
+export const REVIEW_CARD_NOT_ON_REVIEW = "This record isn't on the weekly review right now.";
+export const reviewCardStageDays = (n: number) => `${n}d in stage`;
+export const REVIEW_CARD_USPTO_DEADLINE = "USPTO deadline";
+export const REVIEW_CARD_LOG_HEADING = "Log what happened";
+export const REVIEW_CARD_LOG_LABEL = "What happened";
+export const REVIEW_CARD_LOG_PLACEHOLDER = "A short note for the timeline";

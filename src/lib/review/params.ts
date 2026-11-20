@@ -15,7 +15,7 @@ export const DEFAULT_REVIEW_VIEW: ReviewView = "board";
 export const REVIEW_SINCE = "2026-02-01";
 export type ReviewSince = "default" | "all";
 
-export type ReviewParams = { /** `all` shows rows older than REVIEW_SINCE too. */ since: ReviewSince; who: ReviewWho; kind: ReviewScope; q: string; view: ReviewView; i: number; /** The Cards view's person (a user id), or null for the default. */ person: string | null; /** The record whose detail panel is open. */ open: OpenRef | null };
+export type ReviewParams = { /** `all` shows rows older than REVIEW_SINCE too. */ since: ReviewSince; who: ReviewWho; kind: ReviewScope; q: string; view: ReviewView; i: number; /** The Cards view's person (a user id), or null for the default. */ person: string | null; /** The record open in the centred record card. */ open: OpenRef | null };
 
 export const SEARCH_MAX = 80;
 

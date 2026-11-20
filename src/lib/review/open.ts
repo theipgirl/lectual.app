@@ -1,8 +1,8 @@
 import type { ReviewKind } from "./buckets";
 
 /**
- * `?open=<matter|lead>:<uuid>` on the review URL opens the detail panel for one record. Pure.
- * Anything that is not exactly one of the two kinds, a colon and a uuid is no panel at all.
+ * `?open=<matter|lead>:<uuid>` on the review URL (and on Intake and Matters) opens one record in the centred record card. Pure.
+ * Anything that is not exactly one of the two kinds, a colon and a uuid is no card at all.
  */
 export type OpenRef = { kind: ReviewKind; id: string };
 

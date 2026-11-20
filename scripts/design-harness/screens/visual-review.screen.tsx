@@ -87,7 +87,7 @@ async function withExtra<T>(fn: () => Promise<T>): Promise<T> {
 /** The sample review load is always "ok"; narrowed here so its rows can be read. */
 const okReview = review as Extract<ReviewLoad, { status: "ok" }>;
 
-/** A review row whose id is a real (fixture) matter id, so ?open= parses and the real detail loader can read it. */
+/** A review row whose id is a real (fixture) matter id, so ?open= parses and the real record-card loader can read it. */
 const openRow = { ...okReview.rows[1], id: M.lumen, key: `matter:${M.lumen}`, client: "Sam Lee", mark: "LUMEN TEA" } as ReviewRow;
 
 const reuse = (list: Screen[], id: string): Pick<Page, "render" | "prepare"> => {
@@ -112,11 +112,10 @@ const pages: Page[] = [
   { key: "review-list", pathname: "/dashboard/review/", render: () => a(ReviewPage({ searchParams: sp({ view: "sheet" }) })), tech: true },
   { key: "review-cards", pathname: "/dashboard/review/", render: () => a(ReviewPage({ searchParams: sp({ view: "cards" }) })), tech: true },
   {
-    key: "review-panel",
+    key: "review-card",
     pathname: "/dashboard/review/",
     prepare: () => {
       state.review = { ...okReview, rows: [...okReview.rows, openRow] };
-      (state as { reviewDetailReal?: boolean }).reviewDetailReal = true;
     },
     render: () => a(ReviewPage({ searchParams: sp({ open: `matter:${M.lumen}` }) })),
   },
@@ -164,7 +163,6 @@ const ownerScreens: Screen[] = pages.flatMap((p) =>
     shell: "none" as const,
     prepare: () => {
       resetState();
-      (state as { reviewDetailReal?: boolean }).reviewDetailReal = false;
       state.pathname = p.pathname;
       p.prepare?.();
     },

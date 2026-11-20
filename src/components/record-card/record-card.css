@@ -39,7 +39,8 @@ button.rc-temp { cursor: pointer; }
 .rc-snooze { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 .rc-stepform { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; align-items: center; }
 .rc-stepform .lx-saved, .rc-stepform .rc-err { grid-column: 1 / -1; }
-@media (max-width: 640px) { .rc-stepform { grid-template-columns: minmax(0, 1fr); } }
+.rc-stepform-who { grid-template-columns: minmax(0, 1fr) auto minmax(0, 160px) auto; }
+@media (max-width: 640px) { .rc-stepform, .rc-stepform-who { grid-template-columns: minmax(0, 1fr); } }
 .rc-menu-scroll { max-height: 320px; overflow-y: auto; display: grid; }
 .rc-menu-h { padding: 6px 12px 2px; }
 a.lp-pop-item { text-decoration: none; color: inherit; display: flex; }
@@ -64,6 +65,7 @@ a.lp-pop-item { text-decoration: none; color: inherit; display: flex; }
 .rc-checklist li { display: grid; gap: 4px; min-width: 0; }
 .rc-step-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
 .rc-step-row[data-overdue] .rc-step-due { color: var(--ox); }
+.rc-step-who { color: var(--muted); }
 .rc-tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .rc-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: var(--r-pill); background: var(--well); font-size: var(--fs-1); }
 .rc-tag button { border: 0; background: none; padding: 0 2px; cursor: pointer; color: var(--muted); font: inherit; }
