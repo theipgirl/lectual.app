@@ -399,7 +399,7 @@ footer.cp-footer { background: var(--cp-ink); color: var(--cp-on-brand); padding
   .cp-pkg-mark { padding-left: 0; }
 }
 
-/* ── Spacing pass (Sevetri Wilson's proposal: two brand names, a package per mark, a custom discount). CSS only. ──
+/* ── Spacing pass (Callum Ferreira's proposal: two brand names, a package per mark, a custom discount). CSS only. ──
    `.cp-root p { margin: 0 }` (0,1,1) beats the single-class rules above, so these paragraphs lost their margins and
    sat flush against the card edge (the note) or against each other (the Add a class text). Restated with `.cp-root`. */
 .cp-root .cp-note { margin: 16px 22px 0; }

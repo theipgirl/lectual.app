@@ -10,8 +10,8 @@ import { ProposalDocument, type ProposalDocumentProps } from "@/components/clien
 import { rebuildSignedLetter } from "@/lib/loe/signed-letter";
 import { withLoeSnapshot, type ApprovedLetter } from "@/lib/proposals/loe-snapshot";
 import { editorLetterState } from "@/lib/loe/editor-state";
-import { faithe } from "../proposals/general-fixture";
-import { sevetri } from "../proposals/fixture";
+import { imogen } from "../proposals/general-fixture";
+import { callum } from "../proposals/fixture";
 import { CONTINUE_LABEL, DOWNLOAD_SIGNED_LABEL, PAY_LABEL } from "@/lib/loe/client-words";
 import { TEST_DETAILS } from "./full-letter-fixture";
 import { GENERAL_LETTER_BODY, signedGeneral } from "./signed-fixtures";
@@ -22,16 +22,16 @@ const GENERAL: ApprovedLetter = { id: "22222222-2222-4222-8222-222222222222", ki
 const TRADEMARK: ApprovedLetter = { ...GENERAL, id: "11111111-1111-4111-8111-111111111111", kind: "trademark" };
 
 function render(over: Partial<ProposalDocumentProps> = {}) {
-  const content = withLoeSnapshot(faithe(), GENERAL, true);
+  const content = withLoeSnapshot(imogen(), GENERAL, true);
   return renderToStaticMarkup(
     <ProposalDocument
       content={content}
       title="Proposal"
-      clientName="Faithe Williams"
+      clientName="Imogen Pellegrino"
       expiresOn="2026-12-01"
       firm={{ name: "RPB Law", slug: "rpb-law" }}
       mode="live"
-      letter={{ dateText: "November 12, 2026", clientEmail: "faithe@example.com" }}
+      letter={{ dateText: "November 12, 2026", clientEmail: "imogen@example.com" }}
       onAccept={async () => ({ ok: true, payUrl: "https://example.com/pay" })}
       onDownloadReview={async () => ({ ok: false, message: "x" })}
       {...over}
@@ -42,13 +42,13 @@ const count = (html: string, needle: string) => html.split(needle).length - 1;
 
 describe("the editor switch and the general kind", () => {
   it("the general template is attached to a flat-fee proposal and refused for a trademark one (kind mismatch removes `loe`)", () => {
-    expect(withLoeSnapshot(faithe(), GENERAL, true).loe).toMatchObject({ kind: "general", template_version: 1, body: GENERAL_LETTER_BODY });
-    expect(withLoeSnapshot(sevetri(), GENERAL, true).loe).toBeUndefined();
-    expect(withLoeSnapshot(faithe(), TRADEMARK, true).loe).toBeUndefined();
+    expect(withLoeSnapshot(imogen(), GENERAL, true).loe).toMatchObject({ kind: "general", template_version: 1, body: GENERAL_LETTER_BODY });
+    expect(withLoeSnapshot(callum(), GENERAL, true).loe).toBeUndefined();
+    expect(withLoeSnapshot(imogen(), TRADEMARK, true).loe).toBeUndefined();
   });
 
   it("the section's state for a flat-fee proposal reads the general letter's version", () => {
-    const attached = withLoeSnapshot(faithe(), GENERAL, true).loe;
+    const attached = withLoeSnapshot(imogen(), GENERAL, true).loe;
     const state = editorLetterState({ read: { status: "ok", letter: GENERAL }, attached });
     expect(state).toMatchObject({ state: "on", version: 1, newerAvailable: false });
   });
@@ -61,7 +61,7 @@ describe("the client steps for a signed-letter flat-fee proposal", () => {
     expect(count(one, '<li class="cp-step ')).toBe(4);
     expect(render({ initialLoe: { step: 2, details: TEST_DETAILS } })).toContain("Your details");
 
-    const three = render({ initialLoe: { step: 3, details: { ...TEST_DETAILS, client_name: "Faithe Williams" } } });
+    const three = render({ initialLoe: { step: 3, details: { ...TEST_DETAILS, client_name: "Imogen Pellegrino" } } });
     expect(three).toContain("Exhibit A: Fee Structure and Estimated Costs");
     expect(three).toContain("Management agreement: notice of non-renewal and termination");
     for (const work of ["Review both management agreements", "Review all correspondence and evidence", "Draft the notice of non-renewal and termination"]) expect(three).toContain(work);
@@ -88,7 +88,7 @@ describe("the client steps for a signed-letter flat-fee proposal", () => {
       onDownloadReview: undefined,
       onAccept: undefined,
     });
-    expect(html).toContain("Signed November 12, 2026 at 2:14 PM EST by Faithe Williams");
+    expect(html).toContain("Signed November 12, 2026 at 2:14 PM EST by Imogen Pellegrino");
     expect(html).toContain(DOWNLOAD_SIGNED_LABEL);
     expect(html).toContain(`>${PAY_LABEL}</a>`);
     expect(html).toContain("Management agreement: notice of non-renewal and termination");

@@ -197,7 +197,7 @@ describe("generateApprovedDocument", () => {
  */
 describe("generateApprovedDocument: the proposal-born LOE upload", () => {
   const PROPOSAL = "44444444-4444-4444-8444-444444444444";
-  const loeDraft = { ...draftRow, doc_type: "loe_trademark_current" as const, payload: { clientName: "Sevetri Wilson", proposalId: PROPOSAL } };
+  const loeDraft = { ...draftRow, doc_type: "loe_trademark_current" as const, payload: { clientName: "Callum Ferreira", proposalId: PROPOSAL } };
   const approvedLoe = { id: "queue-1", type: "ENGAGEMENT_LETTER", status: "approved", draft_body: "chart", final_body: "reviewed chart" };
 
   function uploadMocks(over: { draft?: unknown; item?: unknown; renderThrows?: boolean; uploadError?: unknown; uploadResult?: unknown; proposal?: unknown; matter?: unknown; token?: unknown; recordOk?: boolean } = {}) {

@@ -23,13 +23,14 @@
  * ./hired-sync.ts writes, conditional on the lead still being in its from-stage.
  */
 import { compareStageOrder } from "@/lib/pipeline/stage-order";
+import { isHiredStage, TM_HIRED_STAGE_LABEL } from "@/lib/matters/hired-stage";
 import { originAsMatterSource, type LeadOrigin } from "./lead-origin";
 import { keeperIn } from "@/lib/leads/live";
 
 /** Hired before this date came from the spreadsheet or were reconciled by hand. */
 export const HIRED_SYNC_CUTOFF = "2026-10-28";
 export const MAX_CREATES_PER_RUN = 50;
-export const TM_HIRED_STAGE_LABEL = "Signed LOE / Deposit Received";
+export { TM_HIRED_STAGE_LABEL };
 
 export type MatterType = "TM" | "CR" | "PATENT" | "LIT" | "BL";
 
@@ -260,7 +261,7 @@ export function planHiredSync(input: PlanInput): HiredSyncPlan {
     owner: normalizeOwner(m.owner_name),
     titles: [normalizeTitle(m.title), normalizeTitle(m.mark_text)].filter(Boolean),
   }));
-  const stage = input.stages.find((s) => s.label === TM_HIRED_STAGE_LABEL) ?? null;
+  const stage = input.stages.find((s) => isHiredStage(s)) ?? null;
   const stageId = stage?.id ?? null;
 
   const leadFor = (p: HiredProspect): string | null => {

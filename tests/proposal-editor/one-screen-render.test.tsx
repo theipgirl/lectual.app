@@ -7,8 +7,8 @@ import { PayBox } from "@/components/proposal-editor/EditorSide";
 import { UnsavedGuardProvider } from "@/components/proposal-editor/UnsavedGuard";
 import { quoteProposal, defaultSelection } from "@/lib/proposals/pricing";
 import { targetForPath } from "@/lib/proposal-editor/checklist";
-import { faithe } from "../proposals/general-fixture";
-import { sevetri } from "../proposals/fixture";
+import { imogen } from "../proposals/general-fixture";
+import { callum } from "../proposals/fixture";
 
 /**
  * Sprint 1: the edit page is five sections, one Save. Rendered with the REAL page and components and the data
@@ -23,7 +23,7 @@ const SETTINGS = { pricing: { packages: [CONCIERGE, ESSENTIAL] }, approver_user_
 function row(over: Partial<ProposalRow> = {}): ProposalRow {
   return {
     id: ID, org_id: "o", family_id: ID, version: 1, public_token: "t".repeat(43), lead_id: null, matter_id: null,
-    client_name: "Sevetri Wilson", client_email: "s@example.com", title: "Trademark Proposal", status: "draft", content: sevetri(),
+    client_name: "Callum Ferreira", client_email: "s@example.com", title: "Trademark Proposal", status: "draft", content: callum(),
     expires_on: "2026-11-10", pay_url: "https://pay.example/x", source: "manual", created_by: null, updated_by: null, approved_by: null,
     approved_at: null, sent_at: null, accepted_at: null, superseded_at: null, withdrawn_at: null, accepted_selection: null, accepted_snapshot: null,
     created_at: "2026-10-18T12:00:00Z", updated_at: "2026-10-18T12:00:00Z", ...over,
@@ -78,7 +78,7 @@ describe("F1: one Save, one Save and create link, no per-section Save", () => {
     expect(buttons(html, "Save and create link")).toBe(1);
     expect(html.match(/<button[^>]*>Save[^<]*<\/button>/g)).toHaveLength(2);
     expect(html).not.toContain("data-more-save");
-    expect(html).not.toMatch(/Save (client|wording|package|discounts|included|this brand|Prosperall|Tech4PublicGood)/);
+    expect(html).not.toMatch(/Save (client|wording|package|discounts|included|this brand|Larkmoor|Open4Everyone)/);
     expect(html).not.toMatch(/<summary[^>]*>More options/);
     expect(html).not.toContain("More options");
     expect(html.match(/<form /g)?.filter(Boolean).length).toBeGreaterThanOrEqual(1);
@@ -94,7 +94,7 @@ describe("F1: one Save, one Save and create link, no per-section Save", () => {
 
 describe("D1: the common choices are in view, not inside a <details>", () => {
   it("package choice (all three modes), per-mark choice, Selected to start and the brand discount", async () => {
-    const c = sevetri();
+    const c = callum();
     c.names[0].package_choice = { options: ["Essential", "Concierge"], default: "Essential" };
     c.names[1].marks[0].package_choice = { options: ["Concierge"], default: "Concierge" };
     c.packages = [
@@ -140,7 +140,7 @@ describe("D2: Ready to send? lists what blocks the link, from the first load", (
   });
 
   it("every item's target id exists in the same render", async () => {
-    const c = sevetri();
+    const c = callum();
     c.names[0].classes = [];
     c.greeting = "";
     const html = await render(row({ pay_url: null, client_email: null, expires_on: null, title: "T", content: c }));
@@ -163,7 +163,7 @@ describe("D2: Ready to send? lists what blocks the link, from the first load", (
 });
 
 describe("D3: What the client pays comes from the saved prices", () => {
-  const quote = quoteProposal(sevetri(), defaultSelection(sevetri()));
+  const quote = quoteProposal(callum(), defaultSelection(callum()));
   const box = (dirty: boolean) => renderToStaticMarkup(createElement(UnsavedGuardProvider, { initial: { dirty } }, createElement(PayBox, { quote, general: false, valueOverFee: null })));
   it("shows the note while there are unsaved changes, and not otherwise", () => {
     expect(box(true)).toContain("Prices update when you save");
@@ -215,7 +215,7 @@ describe("F5: gates", () => {
 
 describe("F6: a flat-fee draft uses the same shell", () => {
   it("one Save, one Save and create link, the checklist and side column, and no trademark-only sections", async () => {
-    const html = await render(row({ content: faithe(), client_name: "Faithe Williams" }));
+    const html = await render(row({ content: imogen(), client_name: "Imogen Pellegrino" }));
     expect(buttons(html, "Save")).toBe(1);
     expect(buttons(html, "Save and create link")).toBe(1);
     expect(html).toContain("Ready to send?");
@@ -264,7 +264,7 @@ describe("F7: live, accepted, replaced and withdrawn versions keep today's behav
 
 describe("V4: the Engagement letter slot (Sprint 6 fills it)", () => {
   it("is drawn as its own section, after Message and inside the one form, with no placeholder text", async () => {
-    for (const content of [sevetri(), faithe()]) {
+    for (const content of [callum(), imogen()]) {
       const html = await render(row({ content }));
       expect(html).toContain('id="pe-sec-letter"');
       expect(html).toContain("Engagement letter");

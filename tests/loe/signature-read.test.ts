@@ -28,13 +28,13 @@ function fakeDb(result: { data?: unknown; error?: unknown } | "throw") {
   return { db: db as never, calls };
 }
 
-const ROW = { id: "s1", signer_name: "Sevetri Wilson", signed_at: "2026-11-12T19:14:00+00:00", agreement_sha256: "a".repeat(64), entity_name: "Prosperall Inc.", signer_title: "Founder", template_version: 3 };
+const ROW = { id: "s1", signer_name: "Callum Ferreira", signed_at: "2026-11-12T19:14:00+00:00", agreement_sha256: "a".repeat(64), entity_name: "Larkmoor Inc.", signer_title: "Founder", template_version: 3 };
 
 describe("readSignature", () => {
   it("ok: the newest signature of the version, read with named columns", async () => {
     const { db, calls } = fakeDb({ data: [ROW] });
     const r = await readSignature(db, "p1");
-    expect(r).toEqual({ status: "ok", signature: { id: "s1", signerName: "Sevetri Wilson", signedAt: ROW.signed_at, fingerprint: "a".repeat(64), entityName: "Prosperall Inc.", signerTitle: "Founder", templateVersion: 3 } });
+    expect(r).toEqual({ status: "ok", signature: { id: "s1", signerName: "Callum Ferreira", signedAt: ROW.signed_at, fingerprint: "a".repeat(64), entityName: "Larkmoor Inc.", signerTitle: "Founder", templateVersion: 3 } });
     expect(calls[0].table).toBe("client_proposal_signature");
     expect(calls[0].filters).toEqual([["proposal_id", "p1"]]);
     for (const never of ["agreement_text", "address", "ip", "user_agent", "*"]) expect(calls[0].columns.split(/,\s*/)).not.toContain(never);

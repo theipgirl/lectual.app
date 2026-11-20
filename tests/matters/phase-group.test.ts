@@ -168,8 +168,61 @@ describe("defaultGroupChoice", () => {
   it("an explicit ?group= wins, even an empty group", async () => {
     const { defaultGroupChoice, parseGroupChoice } = await import("../../src/lib/matters/phase-group");
     const c = counts({ post: 4 });
-    expect(parseGroupChoice("intake") ?? defaultGroupChoice(c)).toBe("intake");
+    // Intake is not a choice any more (Nov 17): an old link to it opens the default.
+    expect(parseGroupChoice("intake")).toBeNull();
+    expect(parseGroupChoice("intake") ?? defaultGroupChoice(c)).toBe("all");
     expect(parseGroupChoice("pre") ?? defaultGroupChoice(c)).toBe("pre");
     expect(parseGroupChoice("nope") ?? defaultGroupChoice(c)).toBe("all");
+  });
+});
+
+describe("intake stages (Nov 17): pipeline-phase stages before Signed LOE / Deposit Received", () => {
+  const st = (id: string, label: string, order_index: number | null, phase?: string | null) => ({ id, label, order_index, ...(phase === undefined ? {} : { phase }) });
+  const rpb = [
+    st("a", "Potential New Client", 0, "pipeline"),
+    st("b", "Preliminary Search", 1, "pipeline"),
+    st("hired", "Signed LOE / Deposit Received", 6, "pipeline"),
+    st("pre", "Application Preparation", 7, "pre_filing"),
+    st("post", "Filed", 16, "post_filing"),
+    st("closed", "Abandoned", 22, "inactive"),
+    st("done", "Trademark Registered", 23, "maintenance"),
+    st("nul", "Lost/Nurture", 24, null),
+  ];
+
+  it("hides pipeline stages before the hired-sync stage; keeps that stage and every other phase, including null", async () => {
+    const { intakeStageIds, pastLoeView } = await import("../../src/lib/matters/phase-group");
+    expect([...intakeStageIds(rpb)].sort()).toEqual(["a", "b"]);
+    const view = pastLoeView([{ stage_id: "a", stage: { phase: "pipeline" } }, { stage_id: "hired", stage: { phase: "pipeline" } }, { stage_id: "nul", stage: { phase: null } }, { stage_id: null, stage: null }], rpb, intakeStageIds(rpb));
+    expect(view.intake).toHaveLength(1);
+    expect(view.matters).toHaveLength(3);
+    // The Signed LOE stage is shown as Pre-filing, so its matters land in a group; the null-phase stage is untouched.
+    expect(view.stages.find((s) => s.id === "hired")?.phase).toBe("pre_filing");
+    expect(view.stages.find((s) => s.id === "nul")?.phase).toBeNull();
+    expect(view.stages.map((s) => s.id)).not.toContain("a");
+  });
+
+  it("the stage is the one the hired sync files into: the shared label rule, not a second match", async () => {
+    const { TM_HIRED_STAGE_LABEL, isHiredStage } = await import("../../src/lib/matters/hired-stage");
+    const plan = await import("../../src/lib/lawmatics/hired-sync-plan");
+    expect(plan.TM_HIRED_STAGE_LABEL).toBe(TM_HIRED_STAGE_LABEL);
+    expect(isHiredStage({ label: TM_HIRED_STAGE_LABEL })).toBe(true);
+    expect(isHiredStage({ label: "signed loe / deposit received" })).toBe(false);
+  });
+
+  it("a firm with no such stage hides every pipeline-phase stage, as before; no phase column hides nothing", async () => {
+    const { intakeStageIds } = await import("../../src/lib/matters/phase-group");
+    expect([...intakeStageIds([st("a", "New", 0, "pipeline"), st("b", "Next", 1, "pipeline"), st("c", "Filed", 2, "post_filing")])].sort()).toEqual(["a", "b"]);
+    expect(intakeStageIds([st("a", "New", 0), st("b", "Filed", 1)]).size).toBe(0);
+  });
+
+  it("a pipeline stage ordered after Signed LOE stays visible; ties break the way the pipeline order does", async () => {
+    const { intakeStageIds } = await import("../../src/lib/matters/phase-group");
+    const s = [st("x", "Early", 1, "pipeline"), st("h", "Signed LOE / Deposit Received", 2, "pipeline"), st("y", "Late", 3, "pipeline")];
+    expect([...intakeStageIds(s)]).toEqual(["x"]);
+  });
+
+  it("the stage name never decides anything but the hired stage's own label", async () => {
+    const { intakeStageIds } = await import("../../src/lib/matters/phase-group");
+    expect([...intakeStageIds([st("a", "Filed", 0, "pipeline"), st("b", "Intake review", 1, "pre_filing")])]).toEqual(["a"]);
   });
 });

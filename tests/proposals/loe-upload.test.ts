@@ -18,7 +18,7 @@ type Over = {
 };
 
 const QUEUED = { step: "loe_draft", outcome: "queued", queue_item_id: "queue-1" };
-const STORED = { id: "draft-1", matter_id: "matter-1", status: "generated", storage_path: "org-1/matter-1/draft-1.docx", file_name: "Sevetri - LOE DRAFT.docx" };
+const STORED = { id: "draft-1", matter_id: "matter-1", status: "generated", storage_path: "org-1/matter-1/draft-1.docx", file_name: "Callum - LOE DRAFT.docx" };
 
 async function setup(over: Over = {}) {
   vi.resetModules();
@@ -57,7 +57,7 @@ describe("retryLoeFileUpload", () => {
     expect(t.downloadStoredDocument).toHaveBeenCalledWith(expect.anything(), "org-1/matter-1/draft-1.docx");
     const [token, file] = t.uploadMatterFile.mock.calls[0] as unknown as [string, { matterId: string; fileName: string; bytes: Uint8Array }];
     expect(token).toBe("TOKEN-ORG-1");
-    expect(file).toMatchObject({ matterId: "LM-MATTER-1", fileName: "Sevetri - LOE DRAFT.docx" });
+    expect(file).toMatchObject({ matterId: "LM-MATTER-1", fileName: "Callum - LOE DRAFT.docx" });
     expect(Array.from(file.bytes)).toEqual([0x50, 0x4b, 1, 2]);
     expect(t.recordProposalStep).toHaveBeenCalledWith(expect.objectContaining({ id: PROPOSAL_ID }), expect.objectContaining({ step: "loe_file_upload", outcome: "uploaded" }));
   });

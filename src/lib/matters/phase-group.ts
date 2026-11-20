@@ -14,8 +14,72 @@
  * So every matter lands in exactly one group and nothing disappears. Pipeline is NOT folded into Pre-filing.
  */
 
+import { compareStageOrder } from "@/lib/pipeline/stage-order";
+import { isHiredStage } from "./hired-stage";
+
 export const PHASE_GROUPS = ["intake", "pre", "post", "other"] as const;
 export type PhaseGroup = (typeof PHASE_GROUPS)[number];
+
+/**
+ * The groups the Matters page OFFERS (Nov 17): matters past Signed LOE / Deposit Received. Intake is still a group of
+ * the pure rule above (so the counts stay one rule) but the page draws no Intake chip, board column or card; those
+ * matters are named in one quiet line that links to the Pipeline. The phase is data (`crm_matter_stage.phase`).
+ */
+export const DRAWN_GROUPS = ["pre", "post", "other"] as const;
+export type DrawnGroup = (typeof DRAWN_GROUPS)[number];
+
+/** The phase that means "still in intake" (the first docket stages, before the engagement is signed and paid). */
+export const INTAKE_PHASE = "pipeline";
+
+/**
+ * The stages the Matters page treats as intake: stages in the `pipeline` phase that sit BEFORE the hired-sync stage
+ * ("Signed LOE / Deposit Received", `isHiredStage`, the one rule the hired sync files every new TM matter on). That stage
+ * is itself in the `pipeline` phase in every firm's data we know of, so it and anything after it stays visible: a matter is
+ * drawn from Signed LOE on. A firm with no such stage has nothing to measure from, so every pipeline-phase stage is intake
+ * (as before). A stage that carries no phase, or any other phase, is never intake. Never reads any other stage name.
+ */
+export function intakeStageIds<T extends { id: string; label: string; order_index: number | null; phase?: string | null }>(stages: readonly T[]): Set<string> {
+  const pipeline = stages.filter((s) => s.phase === INTAKE_PHASE);
+  const hired = stages.find((s) => isHiredStage(s));
+  if (!hired) return new Set(pipeline.map((s) => s.id));
+  const key = (s: T) => ({ id: s.id, name: s.label, order_index: s.order_index });
+  return new Set(pipeline.filter((s) => s.id !== hired.id && compareStageOrder(key(s), key(hired)) < 0).map((s) => s.id));
+}
+
+/** True when the matter sits on one of the intake stages (`intakeStageIds`), whatever its type. */
+export function inIntakeStage(matter: { stage_id?: string | null }, intakeIds: ReadonlySet<string>): boolean {
+  return !!matter.stage_id && intakeIds.has(matter.stage_id);
+}
+
+/**
+ * What the Matters page draws: the matters and stages from Signed LOE on, and the matters left out (in an intake stage).
+ * A stage that is still in the `pipeline` phase but not intake (Signed LOE / Deposit Received itself) is shown as
+ * Pre-filing, so its matters land in the Pre-filing group instead of in none: the signed engagement is where pre-filing
+ * work starts. Only the phase of the clones changes; ids and everything else are the originals'.
+ */
+export function pastLoeView<M extends { stage_id?: string | null; stage?: { phase?: string | null } | null }, S extends { id: string; phase?: string | null }>(
+  matters: readonly M[],
+  stages: readonly S[],
+  intakeIds: ReadonlySet<string>,
+): { matters: M[]; intake: M[]; stages: S[] } {
+  const asPre = <T extends { phase?: string | null }>(s: T): T => (s.phase === INTAKE_PHASE ? { ...s, phase: "pre_filing" } : s);
+  const past: M[] = [];
+  const intake: M[] = [];
+  for (const m of matters) {
+    if (inIntakeStage(m, intakeIds)) intake.push(m);
+    else past.push(m.stage ? { ...m, stage: asPre(m.stage) } : m);
+  }
+  return { matters: past, intake, stages: stages.filter((s) => !intakeIds.has(s.id)).map(asPre) };
+}
+
+/**
+ * The stages a matter on the Matters page may be moved to (the card's stage control and its menu's "Move to stage", and the
+ * board's drag): with the intake phases grouped away, only the drawn stages (`pastLoeView`'s), so a card never offers an
+ * intake-phase stage it would then disappear into; on the `?intake=1` list, and with no grouping, every stage.
+ */
+export function matterMoveStages<S>(all: readonly S[], drawable: readonly S[], showIntake: boolean): S[] {
+  return [...(showIntake ? all : drawable)];
+}
 
 /** The matter types that are filed at an office and so move through the phases. */
 export const FILING_TYPES: readonly string[] = ["TM", "CR", "PATENT"];
@@ -29,14 +93,17 @@ export const DEFAULT_PHASE_GROUP: PhaseGroup = "pre";
 type StageLike = { phase?: string | null } | null | undefined;
 export type PhaseMatter = { type: string; stage: StageLike };
 
-/** The "All" choice: every matter, whatever its phase. Reached by `?group=all`; the links from Today and Pipeline carry it. */
+/** The "All" choice: every matter past signed LOE (the page removes intake-stage matters first). Reached by `?group=all`; the links from Today and Pipeline carry it. */
 export const ALL_GROUPS = "all" as const;
 export type GroupChoice = PhaseGroup | typeof ALL_GROUPS;
 
-/** `?group=` -> a choice, or null for a missing / unknown value (the page then uses its default). */
+/**
+ * `?group=` -> a choice, or null for a missing / unknown value (the page then uses its default). `intake` is not a
+ * choice any more: an old link to it opens the page's default.
+ */
 export function parseGroupChoice(value: unknown): GroupChoice | null {
   if (value === ALL_GROUPS) return ALL_GROUPS;
-  return isPhaseGroup(value) ? value : null;
+  return isPhaseGroup(value) && value !== "intake" ? value : null;
 }
 
 /**

@@ -17,8 +17,8 @@ export function fullLetterBody(): string {
 
 export const TEST_DETAILS: SignerDetails = {
   ...emptyDetails(),
-  client_name: "Sevetri Wilson",
-  entity_name: "Prosperall Inc.",
+  client_name: "Callum Ferreira",
+  entity_name: "Larkmoor Inc.",
   title: "Founder",
   street: "100 Example Street",
   street2: "Suite 4",
@@ -35,7 +35,7 @@ export function fullLetterBlocks(over: { details?: SignerDetails; typedName?: st
     client_name: d.client_name,
     entity_name: d.entity_name || d.client_name,
     address_block: addressBlock(d),
-    client_email: "sevetri@example.com",
+    client_email: "callum@example.com",
     signer_name: over.typedName ?? d.client_name,
     signed_date: over.dateText ?? "November 12, 2026",
   });

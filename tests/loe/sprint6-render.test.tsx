@@ -17,7 +17,7 @@ import type { SignatureRead } from "@/lib/loe/signature-read";
 import { fullLetterBody } from "./full-letter-fixture";
 import { FINGERPRINT, signedTrademark } from "./signed-fixtures";
 import { withLoe } from "./loe-fixtures";
-import { sevetri } from "../proposals/fixture";
+import { callum } from "../proposals/fixture";
 
 /**
  * Static renders of the Engagement letter section (four states) and the staff card (done, failed, skipped, unreadable), with the repo
@@ -26,10 +26,10 @@ import { sevetri } from "../proposals/fixture";
  */
 
 const APPROVED = { id: "11111111-1111-4111-8111-111111111111", kind: "trademark" as const, version: 3, title: "Engagement letter", body: fullLetterBody() };
-const ATTACHED = withLoe(sevetri()).loe;
+const ATTACHED = withLoe(callum()).loe;
 const OK: SignatureRead = {
   status: "ok",
-  signature: { id: "s1", signerName: "Sevetri Wilson", signedAt: "2026-11-12T19:14:00.000Z", fingerprint: FINGERPRINT, entityName: "Prosperall Inc.", signerTitle: "Founder", templateVersion: 3 },
+  signature: { id: "s1", signerName: "Callum Ferreira", signedAt: "2026-11-12T19:14:00.000Z", fingerprint: FINGERPRINT, entityName: "Larkmoor Inc.", signerTitle: "Founder", templateVersion: 3 },
 };
 
 function section(read: Parameters<typeof editorLetterState>[0]["read"], attached: typeof ATTACHED): ReactElement {

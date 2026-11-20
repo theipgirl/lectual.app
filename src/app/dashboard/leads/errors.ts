@@ -3,9 +3,13 @@
 
 import { isLeadWriteError } from "@/lib/pipeline/errors";
 import { mergeGuardSentence } from "@/lib/leads/merge";
+import { MOVE_STAGE_NO_PERMISSION } from "@/lib/ui/words";
 
 const FORBIDDEN_COPY =
   "You don't have permission to do that — ask an attorney, admin, or intake lead.";
+
+/** The one sentence for a role that may not move a lead's stage (the action's own role check and a refused write agree). */
+export { MOVE_STAGE_NO_PERMISSION };
 
 /** Translate a moveLeadStage refusal/throw into a friendly UI message. */
 export function friendlyMoveStageError(err: unknown): string {
@@ -14,7 +18,7 @@ export function friendlyMoveStageError(err: unknown): string {
   if (merged) return merged;
   const message = err instanceof Error ? err.message : String(err);
   if (/forbid/i.test(message) || /permission/i.test(message) || /role/i.test(message)) {
-    return "You don't have permission to move this lead to that stage — ask an attorney, admin, or intake lead.";
+    return MOVE_STAGE_NO_PERMISSION;
   }
   return "Couldn't move this lead. Please try again.";
 }

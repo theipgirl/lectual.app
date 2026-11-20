@@ -6,11 +6,11 @@ import { validateContent } from "@/lib/proposals/validate";
 import { madeByLine } from "@/lib/proposals/made-by";
 import { MadeByLine } from "@/components/proposal-editor/MadeByLine";
 import { MADE_BY_VALUES, type ProposalContent } from "@/lib/proposals/types";
-import { sevetri } from "./fixture";
+import { callum } from "./fixture";
 
 /** Sprint 3 F6 and F8: who made a proposal, staff-only. */
 
-const withMade = (over: Record<string, unknown>) => ({ ...sevetri(), ...over }) as ProposalContent;
+const withMade = (over: Record<string, unknown>) => ({ ...callum(), ...over }) as ProposalContent;
 const errorsOf = (c: unknown) => validateContent(c).filter((i) => i.level === "error");
 
 describe("F6: made_by is accepted, checked, and never published", () => {
@@ -40,7 +40,7 @@ describe("F6: made_by is accepted, checked, and never published", () => {
   });
 
   it("an older proposal with neither key still validates", () => {
-    expect(errorsOf(sevetri())).toEqual([]);
+    expect(errorsOf(callum())).toEqual([]);
   });
 });
 

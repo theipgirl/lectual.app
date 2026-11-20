@@ -60,11 +60,11 @@ function render(step: 1 | 2 | 3) {
     createElement(ProposalDocument, {
       content: withLoe(twoBrandPerMark()),
       title: "Trademark Proposal",
-      clientName: "Sevetri Wilson",
+      clientName: "Callum Ferreira",
       expiresOn: null,
       firm: { name: "RPB Law", slug: "rpb-law" },
       mode: "live",
-      letter: { dateText: "November 12, 2026", clientEmail: "sevetri@example.com" },
+      letter: { dateText: "November 12, 2026", clientEmail: "callum@example.com" },
       initialLoe: { step, details: TEST_DETAILS },
     }),
   );

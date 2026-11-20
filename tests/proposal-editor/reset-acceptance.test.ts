@@ -142,7 +142,7 @@ describe("resetAcceptanceAction (runResetAcceptance)", () => {
   it("a store refusal is its fixed sentence; an unexpected throw never shows its text", async () => {
     const refused = deps({ reset: vi.fn(async () => Promise.reject(new ProposalError("unavailable", RESET_NEEDS_DB_UPDATE))) });
     expect(await runResetAcceptance(refused.d, { id: "p1", updatedAt: T })).toEqual({ error: RESET_NEEDS_DB_UPDATE });
-    const boom = deps({ reset: vi.fn(async () => Promise.reject(new Error("secret internals for sevetri@example.com"))) });
+    const boom = deps({ reset: vi.fn(async () => Promise.reject(new Error("secret internals for callum@example.com"))) });
     expect(await runResetAcceptance(boom.d, { id: "p1", updatedAt: T })).toEqual({ error: RESET_FAILED });
     expect(boom.d.revalidate).not.toHaveBeenCalled();
   });

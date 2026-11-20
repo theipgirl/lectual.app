@@ -3,7 +3,7 @@ import { PDF_MESSAGES } from "@/lib/loe/client-words";
 import { reviewLetterPdf, signedLetterPdf } from "@/lib/proposals/public-letter";
 import { acceptPublicProposal, readPublicProposal, type PublicProposalsDb } from "@/lib/proposals/public";
 import { defaultSelection } from "@/lib/proposals/pricing";
-import { sevetri } from "./fixture";
+import { callum } from "./fixture";
 import type { Row } from "./public-db-double";
 import { TEST_DETAILS } from "../loe/full-letter-fixture";
 
@@ -81,10 +81,10 @@ describe("a proposal that carries a letter, when the firm's profile cannot be re
 
 describe("a proposal with no letter is unchanged", () => {
   it("still reads and accepts when the profile read fails (the zone only moves a date label there)", async () => {
-    const w = world({ content: sevetri() });
+    const w = world({ content: callum() });
     const db = failing(w.db, "crm_org_profile");
     const read = await readPublicProposal(TOKEN, NOW, db);
     expect(read.status).toBe("ok");
-    expect((await acceptPublicProposal(TOKEN, defaultSelection(sevetri()), NOW, db)).ok).toBe(true);
+    expect((await acceptPublicProposal(TOKEN, defaultSelection(callum()), NOW, db)).ok).toBe(true);
   });
 });

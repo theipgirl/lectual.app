@@ -19,7 +19,7 @@ import type { ApprovedLetter } from "@/lib/proposals/loe-snapshot";
 import type { ProposalContent, ProposalRow } from "@/lib/proposals/types";
 import { hasErrors, validateContent } from "@/lib/proposals/validate";
 import { LETTER_NOT_ATTACHED_CHECK, LETTER_PENDING_FIX, LETTER_PENDING_SWITCH_NOTE } from "@/lib/ui/words";
-import { sevetri } from "../proposals/fixture";
+import { callum } from "../proposals/fixture";
 import { fullLetterBody } from "./full-letter-fixture";
 
 /**
@@ -38,7 +38,7 @@ const OTHER = { text: "A credit was applied. Check it.", source: "consult" as co
 
 /** The draft as the assistant's run stores it when the letter read failed. */
 function pendingDraft(): ProposalContent {
-  const made = attachFirmLetter({ ...sevetri(), checks: [OTHER] }, DOWN, "assistant");
+  const made = attachFirmLetter({ ...callum(), checks: [OTHER] }, DOWN, "assistant");
   expect(made.letter).toBe("unreadable");
   return made.content;
 }
@@ -47,7 +47,7 @@ const UPDATED = "2026-11-10T12:00:00.000Z";
 function row(content: ProposalContent, over: Partial<ProposalRow> = {}): ProposalRow {
   return {
     id: "p1", org_id: "o", family_id: "p1", version: 1, public_token: "t".repeat(43), lead_id: null, matter_id: null,
-    client_name: "Sevetri Wilson", client_email: "s@example.com", title: "Trademark Proposal", status: "draft", content,
+    client_name: "Callum Ferreira", client_email: "s@example.com", title: "Trademark Proposal", status: "draft", content,
     expires_on: "2099-11-10", pay_url: null, source: "agent", created_by: null, updated_by: null, approved_by: null,
     approved_at: null, sent_at: null, accepted_at: null, superseded_at: null, withdrawn_at: null, accepted_selection: null, accepted_snapshot: null,
     created_at: UPDATED, updated_at: UPDATED, ...over,
@@ -65,8 +65,8 @@ function formAsRendered(content: ProposalContent, sectionHtml: string, over: Rec
   const f = new FormData();
   const base: Record<string, string> = {
     proposalId: "p1", updatedAt: UPDATED,
-    fullName: "Sevetri Wilson", firstName: "Sevetri", company: "Prosperall", clientEmail: "s@example.com", title: "Trademark Proposal",
-    greeting: "Hi Sevetri, here is your proposal.", recommendation: "Both marks are best.", officeActionNote: "",
+    fullName: "Callum Ferreira", firstName: "Callum", company: "Larkmoor", clientEmail: "s@example.com", title: "Trademark Proposal",
+    greeting: "Hi Callum, here is your proposal.", recommendation: "Both marks are best.", officeActionNote: "",
     payUrl: "https://pay.example/x", expiresOn: "2099-11-10",
     package: "Concierge", base: "4950", includedClasses: "3", perClass: "825", secondMarkPct: "20", govPerClass: "350",
     adjFields: "1", incFields: "1",
@@ -116,7 +116,7 @@ describe("the pending check", () => {
   });
 
   it("is not pending once a letter is on the content, or when the check is not there", () => {
-    expect(hasPendingLetterCheck(sevetri())).toBe(false);
+    expect(hasPendingLetterCheck(callum())).toBe(false);
     expect(hasPendingLetterCheck({ ...pendingDraft(), loe: { kind: "trademark", template_id: APPROVED.id, template_version: 3, title: "t", body: "b" } })).toBe(false);
     expect(hasPendingLetterCheck(null)).toBe(false);
   });
@@ -139,7 +139,7 @@ describe("the switch starts ON for a pending draft", () => {
   });
 
   it("an ordinary draft with no letter (a person turned it off earlier) still starts OFF", () => {
-    const html = drawSection(sevetri(), ok(APPROVED));
+    const html = drawSection(callum(), ok(APPROVED));
     expect(html).toMatch(/<input type="checkbox" name="loeOn"/);
     expect(html).not.toMatch(/<input type="checkbox" name="loeOn"[^>]*\schecked=""/);
     expect(html).not.toContain("data-letter-pending");
@@ -227,7 +227,7 @@ describe("the letter read fails AGAIN at save", () => {
   });
 
   it("an ORDINARY draft is unchanged: a switch change against an unreadable letter is still refused", async () => {
-    const plain = sevetri();
+    const plain = callum();
     const { deps, update } = saveDeps(row(plain), DOWN);
     const r = await runSaveDraft(deps, formAsRendered(plain, drawSection(plain, ok(APPROVED)), { loeOn: "on" }));
     expect(r).toEqual({ error: LETTER_SWITCH_UNREADABLE });
@@ -244,7 +244,7 @@ describe("while it is unresolved it BLOCKS the link", () => {
     // A draft may still be saved: without forApproval nothing about it is an error.
     expect(validateContent(draft).filter((i) => i.path === LETTER_CHECK_PATH)).toEqual([]);
     // And a content with no such check is untouched.
-    expect(forApproval(sevetri()).filter((i) => i.path.startsWith("loe"))).toEqual([]);
+    expect(forApproval(callum()).filter((i) => i.path.startsWith("loe"))).toEqual([]);
   });
 
   it("the editor's checklist shows ONE item for it, a Fix linked to the Engagement letter section, and it counts as blocking", () => {
@@ -260,7 +260,7 @@ describe("while it is unresolved it BLOCKS the link", () => {
   it("the letter copy check answers 'unattached' for it, before and whatever the firm's letter reads as", () => {
     const draft = pendingDraft();
     for (const read of [ok(APPROVED), ok(null), DOWN, { status: "not-set-up" } as ApprovedRead]) expect(letterCopyCheck(draft, read)).toBe("unattached");
-    expect(letterCopyCheck(sevetri(), ok(APPROVED))).toBe("no_letter");
+    expect(letterCopyCheck(callum(), ok(APPROVED))).toBe("no_letter");
   });
 
   it("'Save and create link' refuses with the fixed sentence and neither approves nor sends", async () => {
@@ -295,7 +295,7 @@ describe("the firm has NO approved letter (a read that worked)", () => {
   });
 
   it("when it was the only check, the list goes with it", () => {
-    const only = attachFirmLetter(sevetri(), DOWN, "copilot").content;
+    const only = attachFirmLetter(callum(), DOWN, "copilot").content;
     const out = settlePendingLetter(only, new FormData(), ok(null));
     expect("checks" in out).toBe(false);
   });

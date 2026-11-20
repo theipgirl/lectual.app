@@ -674,7 +674,7 @@ Display and derivation only: no data is rewritten, nothing is sent, no new depen
 - **Role-neutral copy:** nothing rendered to every firm names a person. The intake chip and badge read "Needs attorney" and hide the
   chip's count at zero. `tests/intake/role-neutral-copy.test.tsx` greps visible text. RPB-specific modules (consult proposal email,
   welcome, prep-consult, document templates, the ported assessment card) keep Rebecca's name on purpose.
-- **Matter titles:** `matterDisplayTitle` (`src/lib/matters/display-title.ts`) treats `TM-enisha-smith` / `TM-97123456` (or a title equal to the
+- **Matter titles:** `matterDisplayTitle` (`src/lib/matters/display-title.ts`) treats `TM-jane-doe` / `TM-97123456` (or a title equal to the
   matter number) as a generated key and shows the mark, then the client (`owner_name`), keeping the stored title only when neither exists.
   `matterLabel` uses it, so lists, cards and the header agree.
 - **Module list:** `activeOrgModules` is wrapped in React `cache`, one `crm_org` read per request across the layouts and the page.
@@ -1224,8 +1224,8 @@ A person marked **Hired** in a firm's OWN Lawmatics gets a `crm_matter` here. A 
   (never a generic duplicate). Owner AND title match matters with `lawmatics_id` NULL: exactly one -> **link** (fills `lawmatics_id` only, guarded by `.is('lawmatics_id', null)`), several -> skip as
   ambiguous. Owner AND title match a matter linked to a DIFFERENT Lawmatics id -> skip ("already in Lectual under another Lawmatics record"), never create. Otherwise **create**. Same owner with a
   different title is a new matter.
-- **Matching is loose on purpose:** owners match when first and last tokens are equal or one normalized name contains the other ("Vivian Olodun Anderson" ~ "Vivian Anderson", "Eli Chazin (Eli Levi)" ~
-  "Eli Chazin"; parentheticals dropped); titles match when normalized-equal or one contains the other (decoration such as "(word mark)" and a "word mark -" prefix is stripped; containment needs 3+ characters).
+- **Matching is loose on purpose:** owners match when first and last tokens are equal or one normalized name contains the other ("Marguerite Ashby Lindqvist" ~ "Marguerite Lindqvist", "Tobias Reinholt (Toby Rhine)" ~
+  "Tobias Reinholt"; parentheticals dropped); titles match when normalized-equal or one contains the other (decoration such as "(word mark)" and a "word mark -" prefix is stripped; containment needs 3+ characters).
 - **Created fields:** type from the practice area (Trademark -> TM, Copyright -> CR, Patent -> PATENT, Litigation -> LIT, Contracts / General Counsel Services / Business Law / Other -> BL; none -> TM when
   the "Practice Area" custom field says Trademark or "Name of Trademark" exists, else BL). Title = `case_title`, else "Name of Trademark", else the practice area, else "Lawmatics matter #<case number>".
   `mark_text` only for TM. `matter_number` = `<TYPE>-<owner slug>-<title slug>`, plus `-<case number or id>` on a collision. Stage for TM = the firm's "Signed LOE / Deposit Received" (null if the firm
@@ -1252,7 +1252,7 @@ A person marked **Hired** in a firm's OWN Lawmatics gets a `crm_matter` here. A 
 - **NOT verified against a live Lawmatics:** the attribute names `status`, `converted_date`, `case_title`, `case_number` and the shape of `custom_fields` come from the public API reference. Check the first run's counts. Also unverified: how tags appear on a prospect (relationship ids, inline names, `tag_ids` are all tried) and `custom_field_values[<id>].formatted_value`.
 
 ## A package per brand name on the client proposal page (Spec 6, 2026-10-29, no schema)
-Taylor, for Danielle Milton: one section per brand name, each with "Select your package" (Essential, Enhanced or Concierge), then the classes as
+Taylor, for Renata Ostrowski: one section per brand name, each with "Select your package" (Essential, Enhanced or Concierge), then the classes as
 before (tickable, plus Spec 3's "Add a class"). Money logic: `quoteProposal` stays the ONE price engine. Nothing sends.
 - **Content (jsonb, additive; old proposals price byte for byte as before):** `content.packages: PackageOffer[]`, a SNAPSHOT of the firm's packages
   (`package`, `base_cents`, `per_class_cents`, `included_classes`, `gov_per_class_cents`, `second_mark_discount_pct`, optional `includes` rows).
@@ -1267,9 +1267,9 @@ before (tickable, plus Spec 3's "Add a class"). Money logic: `quoteProposal` sta
   legal fee, rounded once (`QuotedName.discount_cents`). The USPTO fee is never discounted. Global `adjustments` apply to the subtotal as before.
   `QuotedName.package` / `discount_cents` appear only for names that have them. A choice makes the offer not fixed. `quoteWithClientClasses` (page
   total, $0 lock, accept) carries the picks; added classes are priced under the chosen package.
-- **Danielle's figures (tests/proposals/package-choice.test.ts, fixture `danielle-fixture.ts`):** The Fold, 3 classes: Essential $3,600, Enhanced
-  $4,075, Concierge $4,950, USPTO $1,050. The Confidence Interval, 2 classes, 10% off: $2,497.50 / $2,925 / $4,455, USPTO $700. One added class each:
-  The Fold $4,425 / $4,900 / $5,775 (USPTO $1,400); The Confidence Interval $3,240 / $3,667.50 / $4,455 (USPTO $1,050).
+- **Renata's figures (tests/proposals/package-choice.test.ts, fixture `renata-fixture.ts`):** The Pleat, 3 classes: Essential $3,600, Enhanced
+  $4,075, Concierge $4,950, USPTO $1,050. The Margin Note, 2 classes, 10% off: $2,497.50 / $2,925 / $4,455, USPTO $700. One added class each:
+  The Pleat $4,425 / $4,900 / $5,775 (USPTO $1,400); The Margin Note $3,240 / $3,667.50 / $4,455 (USPTO $1,050).
 - **Client page:** in each brand name's card, above its marks, a labelled `<select>` "Select your package" (stored order, default selected) and the
   line "<Package>: $X legal fee for <name> (after N% off) · includes N classes, each additional class $X". The review panel and the receipt title each
   name "<Brand name> — <Package>" (`packageLineTitle`, `src/lib/proposals/name-package.ts`); a discount is its own line. When an offered package has
@@ -1319,7 +1319,7 @@ Lectual when a proposal has been viewed". Money logic: `quoteProposal` stays the
 - **Client page:** on a name that prices per mark, the first mark keeps its row with its own "Select your package" (`.cp-pkg-sel`) and a price line
   ("Enhanced: $3,250 legal fee for the word mark · includes …"); every later mark is an add-on row ("Add the design mark (logo)", `addMarkLabel`) whose
   select and price line appear only once it is ticked. Locks, the class lock and fixed offers are unchanged. The review panel, receipt, staff page,
-  accept notice and Lawmatics note name the package per mark ("The Fold — word mark, Enhanced; design mark, Essential", `packageLineTitle` /
+  accept notice and Lawmatics note name the package per mark ("The Pleat — word mark, Enhanced; design mark, Essential", `packageLineTitle` /
   `chosenPackagesText`, `MARK_PACKAGE_WORDS`). The LOE adapter drafts when the accepted marks share one package; two different ones are
   `mixed_mark_packages` ("Choose the LOE template", never a guess). `paid-flow.ts` writes that line with `code: "unknown_package"` (plus
   `detail: "mixed_mark_packages"` and its own sentence), so the payment panel's LOE-form link works with `paid-view.ts` untouched (the Sprint 29 hygiene test pins it).
@@ -1343,7 +1343,7 @@ Lectual when a proposal has been viewed". Money logic: `quoteProposal` stays the
   new store read; `tests/client-proposal/commitment.test.tsx`'s "leaves pricing.ts untouched" compares with HEAD, so it passes once this is committed.
 
 ## Custom discount on one package (2026-11-03, no schema)
-Taylor, for Sevetri Wilson: a package offer can carry a discount that applies ONLY when that package is chosen, shown to the client as its own
+Taylor, for Callum Ferreira: a package offer can carry a discount that applies ONLY when that package is chosen, shown to the client as its own
 line, never hidden in the price. Data only for now: there is no editor control to set it (it is written into the content jsonb). Nothing sends.
 - **Content:** `PackageOffer.custom_discount = { label (1..60, plain text: no `<`, `>` or control characters), per_class_under_cents (whole, > 0, at most
   the offer's `per_class_cents`) }`, allowed only on `content.packages` entries (`validateContent` refuses one on `content.pricing`). `publicContent` keeps
@@ -1354,7 +1354,7 @@ line, never hidden in the price. Data only for now: there is no editor control t
   `custom_discount_cents` (what came off its `price_cents`, after the second-mark %), `price_before_custom_discount_cents` and `custom_discount_label`; the
   name carries the sum and the label. Present only when > 0, so content without one quotes byte for byte as before (`tests/proposals/custom-discount.test.ts`
   compares with the engine at `cc959d9`).
-- **Sevetri's figures** (fixture `tests/proposals/sevetri-custom-fixture.ts`, 2 classes per name, per-mark Essential/Enhanced/Concierge, Concierge
+- **Callum's figures** (fixture `tests/proposals/callum-custom-fixture.ts`, 2 classes per name, per-mark Essential/Enhanced/Concierge, Concierge
   `$825` per class under 3): all Concierge $4,125 + $3,300 = $7,425 per name, $14,850 legal, USPTO $2,800; all Enhanced $11,700; all Essential $9,990;
   Concierge with a third (client-added) class on a name: no discount there, $4,950 + $3,960.
 - **Shown:** the client page's package line gives the package price before the discount, then "<label> −$X" on its own line (`.cp-custom-off`); the
@@ -1399,7 +1399,7 @@ The collapsed "Recent consults (N ready to draft)" toggle is gone. Under the pro
 ## Unsaved-changes guard in the proposal editor (2026-10-30, no schema)
 Each editor section (Client, each brand name, Package and pay link, wording, discounts, included items) is saved by its own button, and "Save and create link" does not save them, so a ticked package choice left unsaved used to be missing from the live link. A UX guard now says so. The server stays authoritative: no action reads browser state and no pricing or action changed.
 - **Pure rules** in `src/lib/proposal-editor/unsaved.ts` (`dirtyReducer`, `blockingSentence`, `finishButtonState`). `UnsavedGuard.tsx` holds the provider, pill and `MoreSaveButton`. The provider listens for `input` / `change` on the document and uses the event target's `.form`, which follows the `form=` attribute, so More options fields count. A form is tracked only when `ActionForm` is given an `id` and `unsavedLabel` (it renders `data-unsaved-label`); a successful save (`state.saved`) marks it clean, a refusal does not. New proposal has no provider, so nothing is ever unsaved there.
-- **Effects:** "Save and create link" and "Turn on the link" are disabled with "Save your changes to The Fold and Client first." (`aria-describedby`, brand names use their own name). Each unsaved section shows an "Unsaved changes" pill by its heading and its Save button turns primary. Each brand name's More options holds its own Save button tied to that form by `form=`. `beforeunload` warns while anything is unsaved (browser only).
+- **Effects:** "Save and create link" and "Turn on the link" are disabled with "Save your changes to The Pleat and Client first." (`aria-describedby`, brand names use their own name). Each unsaved section shows an "Unsaved changes" pill by its heading and its Save button turns primary. Each brand name's More options holds its own Save button tied to that form by `form=`. `beforeunload` warns while anything is unsaved (browser only).
 - **Limit:** adding or removing a row with a button (discounts, included items) fires no `input` event, so those forms are marked only once a field is edited. Not verified in a real browser.
 
 ## Owner-only billing card (Lawmatics invoices, no schema)
@@ -1418,7 +1418,7 @@ The matter page's aside shows a "Billing" card listing that matter's invoices, r
 
 ## General (flat-fee) proposals (Spec 9, no schema)
 RPB's contract work (management-contract termination letters, contractor agreements and SOWs, equipment rental agreements) is a "General LOE" matter: one
-flat fee, scope typed by staff, never a trademark package price and never a USPTO fee. First real case and the test fixture: Faithe Williams
+flat fee, scope typed by staff, never a trademark package price and never a USPTO fee. First real case and the test fixture: Imogen Pellegrino
 (`tests/proposals/general-fixture.ts`), value 2.5 hrs x $500/hr = $1,250, fee $500. No migration: everything lives in `client_proposal.content`; statuses,
 RPCs, triggers, approval, link, accept, reset, delete, paid and opens are the existing ones, unchanged.
 - **Content (jsonb, additive):** `content.kind?: "trademark" | "general"` (absent = trademark, every older row) and, for general, `content.general =
@@ -1432,7 +1432,7 @@ RPCs, triggers, approval, link, accept, reset, delete, paid and opens are the ex
   else `value_cents`); `generalValueOverFee` gives "Value $1,250 · Your fee $500" only when the value is MORE than the fee. `quoteHasItems` is `fee_cents > 0`.
   The selection is ignored. **Trademark pricing did not move by a cent:** `tests/proposals/general-proposals.test.ts` compares `quoteProposal`,
   `defaultSelection`, `normalizeSelection`, `isFixedOffer`, `quoteHasItems`, `lockedSelectionIds` and `priceForClassCount` with the engine at `46f47dd`
-  over 300+ selections of the Sevetri, Danielle and Fold fixtures (credits and the custom package included).
+  over 300+ selections of the Callum, Renata and Pleat fixtures (credits and the custom package included).
 - **New proposal:** a "Type" switch at the top (`PROPOSAL_TYPE_TRADEMARK` "Trademark filing", the default and unchanged | `PROPOSAL_TYPE_GENERAL` "Contract or
   other matter (flat fee)", `?type=general`). The picker, its search and Start blank keep the type (`pickerWithType`, `withProposalType`, `WhoIsThisFor`'s
   `hidden`); the switch keeps the chosen lead or matter (`proposalTypeHrefs`). The general form (`NewGeneralProposalForm`, fields in `GeneralFields`) posts
@@ -1564,6 +1564,17 @@ The managing attorney opens a record's application or opinion letter from the We
 - **Upload from the panel (no schema, no new action).** Staff who may upload (`canWrite` on the review, the same eight roles as `FILE_UPLOAD_ROLES`; a test holds the lists equal; viewer / social media see no control at all) get the Documents & files card's own `UploadControl` (`requestUploadAction` -> browser PUT -> `confirmUploadAction`, same extension rule, size limit, `FILE_MESSAGES` and `file_uploaded` row) inside the panel via `ReviewUpload`, which only adds `router.refresh()` (the confirm action revalidates the record's page, not the review) so the list and the "N documents" tags update. `UploadControl` gained optional `onUploaded` / `inputId` (default behaviour unchanged). Not drawn when files are not set up; a failed read keeps it, as the card does. **Merged leads (M5):** `loadParentOrg` resolves a lead id through `keeperForWrite` and returns the resolved parent, which request AND confirm use, so the path, row, `file_uploaded` row and revalidation are the keeper's and the two steps agree; an unreadable pointer refuses with `MERGE_POINTER_UNREADABLE` and writes nothing; matters are unchanged. The panel's loader (`loadReviewDetail`) follows a merged id to its keeper (`openId`; the page shows that record), and an unreadable pointer is "unavailable".
 - Words: the `// Review documents` block at the end of `src/lib/ui/words.ts`. Tests: `tests/review/documents.test.tsx`. Not verified in a real browser: a download opened from the panel (the 303 to a signed URL), the `#rv-sec-note` jump inside the drawer, and focus.
 
+## Monday meeting changes (Nov 17, no schema)
+Three changes so the attorney can run the Monday meeting in Lectual. Display and derivation only; nothing sends.
+- **Matters: only matters past Signed LOE / Deposit Received.** The Intake group and chip are gone (`DRAWN_GROUPS` = Pre-filing, Post-filing, Matters; `parseGroupChoice("intake")` is null, so an old link opens the default). **All means past signed LOE.** An intake stage is a `pipeline`-phase stage ordered BEFORE the stage the Lawmatics hired sync files every new TM matter on (`intakeStageIds`, `src/lib/matters/phase-group.ts`). That stage is "Signed LOE / Deposit Received" (`TM_HIRED_STAGE_LABEL` / `isHiredStage`, now in `src/lib/matters/hired-stage.ts` and used by `planHiredSync` too: ONE rule, no second name match), and it is itself in the `pipeline` phase in RPB's data (checked on lectual-prod, Nov 17: codes 1 to 6 are `pipeline` and hold 22 older imported matters; code 7 Signed LOE is `pipeline` and holds 2; 8 to 16 `pre_filing`; 17 to 22 `post_filing`; 23 and 26 `inactive`; 24 `maintenance`; 25 Lost/Nurture has a NULL phase). So Signed LOE and anything after it stays visible (`pastLoeView` shows a visible `pipeline` stage as Pre-filing, so its matters land in a group), and a null, `inactive` or `maintenance` phase is never intake (it shows under All and Closed). A firm with no such stage hides every `pipeline` stage; a firm with no phases, or a failed phase read, sees the page as it was. The phase comes from `crm_matter_stage.phase`; only the hired stage's own label is matched. **Real phase data should still be checked on lectual-dev and lectual-prod after any docket change.**
+  - A matter in an intake stage is not a card, row or column, and the Move menu offers no intake stage. It is named in one quiet line under the Open chip only: "22 matters are in intake stages · Show them" (with a search, "N matching matters ..."). Show them is `?intake=1`: the same page listing only the intake matters, with "Back to matters". If every matter is in an intake stage the empty state says "No matters past intake yet".
+  - **Today's "of M open matters" and Copilot's Open / Stalled cards** drop intake-stage matters too (`loadIntakeStageIds`, `withoutIntake`, `src/lib/matters/intake-ids.ts`); a failed stage read counts every matter, as before.
+- **Weekly review in the Leads-board look.** Lanes are the shared Board kit's `BoardColumn` per person (`.rv-board.lx-board`, a wrapping grid, so no sideways scroll at 1440, 1280 or 375; the person's name is an h2 and the two lists are h3s over two separate lists, and the count has a title saying it covers cards: our turn plus waiting on client) and cards are the kit's `BoardCard` (title link, sub-line `cardSubline`: kind, company, mark, stage; next step; due chip). Each column header says how much the person holds: count plus "N overdue · N due this week" (`laneLoad`, `laneLoadText`, `laneLabel`, pure, from `bucketOf`). Each card has the timeline line `sentText`: the newest OUTBOUND contact the review already reads (`summarizeContact.lastOutbound`, now with its type on `ReviewRow.lastOutboundType`), "Sent Nov 11 · email" (`· call`), plus "· 5 days" on Waiting-on-client cards; "Nothing sent yet" and "Sent: couldn't load" are different (a failed contact read is never "nothing"). No new query.
+- **Lead labels:** the person's name first (`ReviewRow.client`); the company is `ReviewRow.company` in the sub-line (card, deck, panel, sections, read-only Sheet) and in search, and stands in as the name only when the lead has no person's name. The editable Sheet still shows the name only. A matter's Sent line and last contact also read the mail filed on its LEAD (the loader reads the lead ids behind matters too), so a matter whose emails sit on its lead is not "Nothing sent yet".
+- **Proposals and Forms are not drawn in the first wave** (`REVIEW_SHOWS_PROPOSALS = false`, `src/lib/review/scope.ts`): no "Proposals out" strip, no expiry tag on a card, Sheet row, section or panel. The loader still reads proposal expiry because the "Since Feb 2026" filter protects a row with a live proposal (and a failed read still turns that filter off and is named in the details note). There was nothing Forms-related on the page.
+- **Timeline dates are real dates.** `Timeline` shows "Nov 11" (the year only when it isn't this year) from the shared `formatDay` in the firm's zone, never "6 days ago". The component showed no times, so none are added; the matter page now passes the firm's zone too. Entries from today also show the time ("Nov 17, 2:30 PM") so same-day entries keep their order.
+- **For Taylor:** the lead page's "Came in through a form" line (`CAME_IN_THROUGH_A_FORM`) is a Forms mention outside the review; left as it is.
+
 ## Sign-in links a scanner can't spend (2026-11-05, no schema)
 RPB's Check Point Harmony filter (like Microsoft Safe Links) opens every emailed link, which used up the one-time magic link (`otp_expired`).
 - **`/auth/confirm/`** (`src/app/auth/confirm/`): the Magic Link / Invite email templates point here (`?token_hash={{ .TokenHash }}&type=email|invite`).
@@ -1671,7 +1682,7 @@ The edit page for a draft is five sections in ONE form with ONE Save. Nothing se
 - **One action, one write.** `saveDraftAction` -> `runSaveDraft` (`src/lib/proposal-editor/save-draft.ts`, deps injected like `create-link.ts`): `gateStaffAction` first (before any
   read), a missing `updatedAt` is refused before any read, then the existing parsers (`parseDetails`, `parseName` per brand, `parsePricing`, `parseMessage`, `parseAdjustments`,
   `parseIncludes`, `applyGeneralForm`) run on the one post and ONE `updateProposal` call carries everything with the `updated_at` fence. A refusal starts with the section and
-  field ("Brand name The Fold: Discount on this brand name: ...") and writes nothing. The per-section save actions are gone; add / remove brand name and link-to-lead stay (they
+  field ("Brand name The Pleat: Discount on this brand name: ...") and writes nothing. The per-section save actions are gone; add / remove brand name and link-to-lead stay (they
   are small forms OUTSIDE the editor form, reached by the `form=` attribute, so forms never nest).
 - **Brand fields are posted as `b.<n>.<field>`** (`brandForm` strips the prefix and hands `parseName` what it always read; `b.<n>.pkgFields=1` is always posted). Sections that
   can be emptied post a marker (`adjFields`, `incFields`) so removing the last row clears it. A package choice reads the firm's CURRENT list into the proposal (`withPackageSnapshot`);
@@ -1720,8 +1731,8 @@ client page, signing and the staff side come in later sprints. Nothing here send
   `src/lib/proposals/types.ts`). `withLoeSnapshot(content, approved | null, wanted)` (`loe-snapshot.ts`, pure) attaches, refreshes or removes it, returns
   a new object and removes it for a template of the other kind; `loeIsCurrent` is the check Sprint 6 uses before creating a link. `validateContent`
   applies `loeIssues` on BOTH kinds (kind must equal the proposal's, title 1..200, body 1..60,000, no unknown merge field, malformed block = error);
-  content with no `loe` key validates and prices exactly as before (`tests/proposals/loe-engine-unchanged.test.ts` compares the Sevetri, Danielle and
-  Faithe fixtures with the engine at the sprint's base commit). `publicContent` publishes `loe.title`, `loe.body` and `loe.kind` only: `template_id`,
+  content with no `loe` key validates and prices exactly as before (`tests/proposals/loe-engine-unchanged.test.ts` compares the Callum, Renata and
+  Imogen fixtures with the engine at the sprint's base commit). `publicContent` publishes `loe.title`, `loe.body` and `loe.kind` only: `template_id`,
   `template_version` and any other key stay staff-side. The DB rule `content ? 'loe'` means even `loe: null` counts as a letter, so `validateContent` refuses
   any `loe` value that is not a well-formed object.
 - **Settings -> Client proposals -> Engagement letter** (`/dashboard/settings/proposals/engagement-letter/`, linked from the proposals settings page).
@@ -2192,3 +2203,60 @@ Exactly one matter or none; the owner's name alone never matches.
 - **Weekly review** reads `payload->>from` and `payload->>party` only (`readContactActivity`) and the firm's mailbox addresses through the
   scoped client (`readFirmSenders`; failure = none known): an `email_received` from a firm address is ours, a USPTO one is a "USPTO notice"
   (last contact, no direction). `contactKindOf` / `summarizeContact` in `src/lib/review/contact.ts` are the rule.
+
+## Lead page: where Lectual does the step (Sprint 9 Part 2, no schema)
+The top of `/dashboard/leads/<id>/` is drawn from the engine in `src/lib/lead-step/` (Part 1): `loadLeadStepFacts` -> `buildLeadStepView`. The page decides nothing.
+Nothing here sends: a Yes makes a DRAFT through the existing approve core. Order under the status row: top card (`TopCardFrame` > `TopCard`), "What Lectual did", the four facts, then today's page
+(Needs attention for what the top card does not cover, composer, Timeline, one-line sections, Documents & files with upload, the side column), all unchanged.
+- **One top card** (`src/components/leads/TopCard.tsx`): needs-yes (`NeedsYourYes`, client), has-it, yours, not-prepared, approvals-off, quiet, couldn't-load. A lead the engine couldn't read is the
+  couldn't-load card, never a calm one. A role that can't say yes sees the same card with no buttons (the engine's `actions`).
+- **Yes** is a 5-second client hold with Undo (`lead-step-hold.ts`, pure; the deck's `HoldToast`). Only the tick that ends the hold posts `leadStepYesAction`; Undo posts nothing. The sentence after Yes
+  is whatever the action returned, shown by `TopCardFrame` (which survives the revalidation that may swap the card). **Not this** needs a reason (1 to 200 characters). **Edit** is a small inline editor
+  that saves through `leadStepEditAction` (the queue's save path); the queue's `ReviewPanel` is NOT reused because its Approve would skip the hold and this page's checks. **Send back** is `leadStepSendBackAction`.
+- **Yours to do** uses the existing next-step actions (`completeNextStepAction`, `snoozeNextStepAction`, `updateNextStepAction`, `setNextStepAction`), drawn only for `CAN_WRITE_LEAD`; they refresh the page themselves
+  because those actions revalidate the review pages, not this one.
+- **What Lectual did** (`WhatLectualDid`): Undo only where the view offers it (the Stage Keeper's `undoAgentMoveAction`); a failed read is "Couldn't load", never "Nothing yet"; a cut list says so.
+- **Replaced on the page:** the "Waiting on attorney review" list (`WaitingOnRebecca`) and its pending-approvals read. The top card shows the oldest item inline; `OtherApprovals` lists the OTHER pending drafts and the
+  internal briefings (headline, age, link to `/dashboard/queue/<id>/`), from the engine's `queue` view. The status row's "Last contact" item is hidden only while the facts are drawn (the Last contact fact says it, with who wrote last; a future time is no contact).
+  A saved Edit does not end the card (`lead-step-card.ts`); an approval whose draft failed is a warning with a link, not a green success; a stale draft says this page's own sentence. **Kept because the top card doesn't cover them:** the booked-consult line, proposals from client email, and the stage-suggestion cards
+  (Accept / Dismiss). `needsAttention`'s `approvals` input is optional now.
+- Styles: `src/components/leads/lead-step.css` (`ls-` classes, tokens only). Harness: `scripts/design-harness/screens/lead-step.screen.tsx` (five states at 1440 / 1280 / 375).
+- NOT verified: a real browser against the running app, a real Yes against a real queue, keyboard use of the Snooze menu.
+
+## Editable cards and the opened card (Sprint 10 Part 2, no schema; docs/pge/2026-11-17-agentic-ip-os/sprint-10.md)
+Intake and Matters, Board and List: temperature, source, owner, next step and stage are changed where they sit, and a name opens the record as a centred card (`?open=<lead|matter>:<uuid>`; a full-screen sheet under 900px). No send anywhere; Call and Email are `tel:` / `mailto:`.
+- **One decision per role:** `cardEdits` (`src/lib/record-card/rules.ts`) says which controls are drawn; a role that can't make an edit sees the same card with NO control for it. Each control calls an EXISTING action (`setLaneAction`, `setSourceAction`, `updateMatterHeaderAction`, the review's `assignRecordAction` / `moveStageAction` / `setNextStepAction` / `updateNextStepAction` / `snoozeNextStepAction` / `completeNextStepAction`, `logConsultOutcomeAction`) or the two new ones (`renameLeadAction`, `cardTagAction`). A matter's stage is the review's `moveStageAction`, never `updateMatterStageAction` (it can't say Saved). "Saved" is `savedMark(result)` of the action's own answer (`use-run.ts`); a refusal shows the action's fixed sentence.
+- **Components:** `src/components/record-card/` (`controls.tsx`: TempMenu / TempPill, SourcePick, OwnerPick, StagePick, NextStepLine, CardMenu, `useNoShow`; `opened-parts.tsx`: RenameForm, TagsEditor, StepsChecklist; `RecordCardHost.tsx`: the server-rendered opened card over the kit's `Dialog`, re-reading ONE record through `loadRecordCard`). The Intake cells (`TemperatureCell`, `SourceCell`, `OwnerCell`, `RowMenu`) take the card data (`cards`, `IntakeCardData`) and keep the workspace's optimistic writes; with no `cards` they draw as they did (tests only).
+- **Mark no-show** posts NOTHING for 5 seconds (`startHold`, `hold.ts`); Undo in the hold posts nothing; afterwards one `call_logged` row (`outcome: no_show`), no stage move.
+- **Next steps on a page** are one batched read per kind (`loadOpenSteps`, `steps-read.ts`), three-state; a failed read says "Couldn't load next steps", never "No next step". The Intake member list is read as an array that can't tell empty from failed: an empty one is treated as unreadable (owner shown read only).
+- **Fresh server rows win** (`resyncRows`, `src/lib/intake/resync.ts`): the Intake workspace keeps rows for optimistic edits, and a `router.refresh()` (a save in the opened card) replaces them, except the one row with a write in flight. Its open links are built from the workspace's CURRENT address (`openHrefFromHref`), so search, paging, filters, view and grouping survive open, close and Back.
+- **Server checks on Intake's own actions:** `moveStageAction` refuses a `won` stage ("Open the lead to move it to a won stage.") and a lead already in that stage; `assignLeadAction` refuses a user id outside the firm and an unreadable team list.
+- **Mark no-show is one hold:** a second request while one is held is ignored (`beginOnce`), and the menu item is offered only while `noShowOffered` (`hold.ts`) says so: hidden during the hold, while the post is in flight and after it saved (a second click would write a second `call_logged` row); after a refusal it comes back. "No-show logged." is drawn only from the action's own `{ saved: true }`. **Typing the note pauses the countdown** (focus or a change pauses it; leaving the field starts a full 5 seconds again, `Hold.pause` / `resume`), so the row is never posted with half a note; chosen over a "Log now" button, which would not stop the timer firing mid-word. **A card that unmounts inside the hold** (the opened card closed, the list re-drawn) cancels it and writes NOTHING, and is never silent: it pushes a notice to `noShowNotices` (`src/components/record-card/no-show-notices.ts`), which `NoShowNotices`, mounted once in the dashboard layout outside every card, shows as "No-show not logged for <name>..." with Dismiss. Not logging was chosen over logging on unmount (the person may have closed the card to stop it). A full page unload loses the notice too, and nothing was written.
+- **Esc inside a card's menu closes the menu only.** The shared `Popover` claims Esc in the capture phase (`preventDefault` + `stopPropagation`, `popoverClaimsKey`), and the kit's `Dialog` / `SidePanel` ignore a key whose default was prevented (`dialogKeyAction`), so the opened card (and a held no-show in it) stays.
+- **Matters cards use the board's move list and the checked source path:** the card's stage control and its menu's "Move to stage" offer `matterMoveStages` (the drawn stages while grouped, never an intake-phase one; every stage on `?intake=1`), the same list the board's drag uses. A matter's Source goes through the review's `setSourceAction` (role, record and `isReferralSource` checked), not `updateMatterHeaderAction`.
+- **Intake's `moveStageAction` checks the role first** (`CAN_MOVE_STAGE`): a refused role gets `MOVE_STAGE_NO_PERMISSION` and neither the lead nor the stage is read.
+- **A lead is labelled by the person first** (`leadLabel`): business and mark are the sub-line; the company is the name only when there is no person's name.
+- **Matter cards** show owner, source and next step but no last activity (the docket pages read none per matter). The Weekly review keeps its drawer until its redesign; then `?open=` there should render `RecordCardHost` (see the contract).
+
+## Sprint 10 review fixes (Nov 17, no schema)
+- **Lead page order:** under the status row, the top card first, then `OtherApprovals` (the OTHER pending drafts and briefings) SECOND, then
+  "What Lectual did", then the four facts. Keep `OtherApprovals` right under the top card.
+- **Yes approves only the text on screen.** The lead page's Yes and the deck's Yes post the sha256 (hex) of the body the card drew, computed on
+  the server (`shownBodySha256`, `src/lib/queue/shown-text.ts`; `PendingDraft.bodySha256` / `NeedsYesView.bodySha256`, the deck's `shownSha256` prop).
+  `runQueueReview` with `requireShown` compares it with `final_body ?? draft_body` of the item as re-read, before anything is saved and again on the read
+  the approval is built from; a mismatch, a missing hash or an edit posted with it is refused with `DRAFT_CHANGED_REFRESH` ("The draft changed. Refresh to
+  see it.") and nothing is approved, saved or drafted. With `requireShown` the resolve also carries that exact text as `finalBody`, so an edit saved
+  between the re-check and the resolve never becomes what the downstream drafter sends. The full approval page does not set `requireShown` (it posts the text it shows as its edit), and
+  Mark read (internal briefings) does not either.
+- **Team accounts (Settings -> Setup) and lectual 0108.** An owner's view of colleagues' mailboxes comes only from `mailbox_connections_for_owner()`
+  (`loadColleagueMailboxes`, scoped client, owner only; proposal text in `docs/pge/2026-11-17-agentic-ip-os/0108-proposed.sql.txt`, NOT applied). A missing
+  function (42883 / PGRST202) is "not switched on" and shows "Only <name> can see this"; any other failure is couldn't check. An answer is trusted only when it
+  contains every connection the caller can see; an EMPTY answer is trusted (it reads "No Outlook mailbox connected yet.") only when the caller's own read is empty too.
+- **Weekly review's last-changed line** ("Changed by Caitlyn · Nov 16", `LastChanged` over `pickLastChanges`) draws nothing when its read failed, never "not changed".
+- **A matter's lead mail** (filed on the lead before it signed) feeds the matter's Sent line and last contact date, NOT its direction: whose turn it is
+  comes from the matter's own mail, so an overdue step is not moved to "Waiting on client" by the proposal email. A board card keeps its due chip when
+  its bucket is overdue or due this week, in either list.
+- **Send back notes** over `SEND_BACK_NOTE_MAX` are refused with `SEND_BACK_NOTE_TOO_LONG` on every path (`sendBackNoteTooLong`), never cut.
+- **Matters intake line** follows the chip in use (Closed, Unassigned, Needs your review, any `?seg=`), and "Show them" keeps the chip. A firm with phases but no
+  signed-engagement stage (`isHiredStage`) gets one quiet warn line (`MATTER_NO_HIRED_STAGE`). Copilot's stalled/open counts leave intake-stage matters out too
+  (`withoutIntake`; a failed stage read counts every matter).

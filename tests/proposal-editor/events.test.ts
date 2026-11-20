@@ -4,7 +4,7 @@ import { describeIssuePath, groupIssues } from "@/lib/proposal-editor/issues";
 import { contentChanges } from "@/lib/proposals/diff";
 import { validateContent } from "@/lib/proposals/validate";
 import type { ProposalEventRow } from "@/lib/proposals/types";
-import { sevetri } from "../proposals/fixture";
+import { callum } from "../proposals/fixture";
 
 const names = new Map([["u1", "Taylor"], ["u2", "Rebecca"]]);
 
@@ -40,8 +40,8 @@ describe("formatDollars", () => {
 
 describe("an edited event reads as a sentence", () => {
   it("says who changed which price from what to what", () => {
-    const before = sevetri();
-    const after = sevetri();
+    const before = callum();
+    const after = callum();
     after.pricing.base_cents = 450000;
     const changes = contentChanges(before, after);
     const line = describeProposalEvent(
@@ -54,10 +54,10 @@ describe("an edited event reads as a sentence", () => {
   });
 
   it("summarises several changes and lists them", () => {
-    const before = sevetri();
-    const after = sevetri();
+    const before = callum();
+    const after = callum();
     after.pricing.base_cents = 450000;
-    after.names[0].name = "Prosperall Inc";
+    after.names[0].name = "Larkmoor Inc";
     after.adjustments.push({ id: "a1", label: "Consultation credit", kind: "amount", value: 45000 });
     const line = describeProposalEvent(
       event({ payload: { changes: contentChanges(before, after), reset_to_draft: true, legal_total_before: 5, legal_total_after: 5 } }),
@@ -71,25 +71,25 @@ describe("an edited event reads as a sentence", () => {
   });
 
   it("describes adds, removes and renames of brands, marks, classes and rows", () => {
-    const before = sevetri();
-    const after = sevetri();
+    const before = callum();
+    const after = callum();
     after.names[0].marks.pop();
     after.names[1].classes.push({ id: "t-c3", label: "Coaching", preselected: false });
     after.names.push({ id: "z", name: "Zed", marks: [], classes: [] });
     after.includes.push({ label: "Extra review", included: "✓" });
     const sentences = contentChanges(before, after).map(describeChange);
-    expect(sentences).toContain("removed the Logo mark from Prosperall");
-    expect(sentences).toContain("added the class “Coaching” to Tech4PublicGood");
+    expect(sentences).toContain("removed the Logo mark from Larkmoor");
+    expect(sentences).toContain("added the class “Coaching” to Open4Everyone");
     expect(sentences).toContain("added the brand name “Zed”");
     expect(sentences).toContain("added “Extra review” to what’s included");
   });
 
   it("uses a possessive for brand-specific fields and says cleared for a removed value", () => {
-    const before = sevetri();
+    const before = callum();
     before.names[0].price_override = { base_cents: 400000 };
-    const after = sevetri();
+    const after = callum();
     const sentences = contentChanges(before, after).map(describeChange);
-    expect(sentences).toContain("cleared Prosperall’s base price (it was $4,000)");
+    expect(sentences).toContain("cleared Larkmoor’s base price (it was $4,000)");
   });
 
   it("degrades to something honest when the payload is unreadable", () => {
@@ -129,7 +129,7 @@ describe("the other events", () => {
 
 describe("issues land on the section that can fix them", () => {
   it("groups by section and names the place in words", () => {
-    const c = sevetri();
+    const c = callum();
     c.greeting = "See International Class 9";
     c.names[0].marks[1].desc = "Class 25 goods";
     c.pricing.base_cents = -1;
@@ -144,7 +144,7 @@ describe("issues land on the section that can fix them", () => {
     expect(g.includes.length).toBeGreaterThan(0);
     expect(g.details.map((i) => i.path).sort()).toEqual(["client_email", "pay_url"]);
     expect(g.pricing.some((i) => i.path === "expires_on")).toBe(true);
-    expect(describeIssuePath("names[0].marks[1].desc", c)).toBe("Prosperall, mark 2, description");
+    expect(describeIssuePath("names[0].marks[1].desc", c)).toBe("Larkmoor, mark 2, description");
     expect(describeIssuePath("pricing.base_cents", c)).toBe("package prices, base price");
     expect(describeIssuePath("expires_on", c)).toBe("expiry date");
     expect(describeIssuePath("names[9].classes[0].label", c)).toBe("Brand name 10, class 1, label");

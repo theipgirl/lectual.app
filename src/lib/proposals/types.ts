@@ -466,7 +466,7 @@ export type ProposalEditedPayload = {
 export type ProposalChange = {
   /** Stable path, e.g. "pricing.base_cents" or "names[p].marks[p-word].desc". */
   path: string;
-  /** Readable label, e.g. "Concierge base price" or "Prosperall: Word mark description". */
+  /** Readable label, e.g. "Concierge base price" or "Larkmoor: Word mark description". */
   label: string;
   /** How the renderer should format before/after. */
   format: "cents" | "pct" | "text" | "bool" | "count";
@@ -619,7 +619,7 @@ export { DEFAULT_PROPOSAL_PRICING } from "./package-list";
 export const DEFAULT_OFFICE_ACTION_NOTE =
   "If a substantive office action is issued, your package includes Rebecca's strategy review. The response itself is quoted separately, and we will get your approval before any work begins.";
 
-/** RPB's "What your package includes" table (from the Sevetri example). */
+/** RPB's "What your package includes" table (from the Callum example). */
 export const DEFAULT_PROPOSAL_INCLUDES: ProposalInclude[] = [
   { label: "Classes included", included: "Your choice (up to 3)", highlight: true },
   { label: "Preliminary Consultation Strategy Call", value: "$450", included: "✓" },

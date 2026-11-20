@@ -2,7 +2,7 @@ import { quoteWithClientClasses } from "@/lib/proposals/client-classes";
 import { normalizeSelection } from "@/lib/proposals/pricing";
 import { buildAcceptedSnapshot } from "@/lib/proposals/public";
 import type { AcceptedSnapshot, ProposalContent, ProposalRow } from "@/lib/proposals/types";
-import { faithe } from "../proposals/general-fixture";
+import { imogen } from "../proposals/general-fixture";
 import { agreementTextSha256 } from "@/lib/loe/fingerprint";
 import { rebuildSignedLetter, signedLetterText } from "@/lib/loe/signed-letter";
 import { TEST_DETAILS } from "./full-letter-fixture";
@@ -63,8 +63,8 @@ export function signedTrademark(): AcceptedSnapshot {
       quote: priced.quote,
       acceptedAt: SIGNED_AT,
       signed: {
-        agreement: { signature_id: "sig-1", signer_name: "Sevetri Wilson", signed_at: SIGNED_AT, sha256: WRONG_FINGERPRINT, template_version: 3 },
-        signing: { details: { ...TEST_DETAILS }, date_text: "November 12, 2026", client_email: "sevetri@example.com" },
+        agreement: { signature_id: "sig-1", signer_name: "Callum Ferreira", signed_at: SIGNED_AT, sha256: WRONG_FINGERPRINT, template_version: 3 },
+        signing: { details: { ...TEST_DETAILS }, date_text: "November 12, 2026", client_email: "callum@example.com" },
       },
     }),
   );
@@ -73,9 +73,9 @@ export function signedTrademark(): AcceptedSnapshot {
 /** The trademark fixture's real fingerprint: the sha256 of its signed text. */
 export const FINGERPRINT = signedTrademark().agreement!.sha256;
 
-/** Faithe Williams' flat-fee proposal, signed: matter, three work lines worth $1,250, flat fee $500. */
+/** Imogen Pellegrino' flat-fee proposal, signed: matter, three work lines worth $1,250, flat fee $500. */
 export function signedGeneral(): AcceptedSnapshot {
-  const base: ProposalContent = faithe();
+  const base: ProposalContent = imogen();
   const content: ProposalContent = {
     ...base,
     loe: { kind: "general", template_id: "22222222-2222-4222-8222-222222222222", template_version: 1, title: "Engagement letter", body: GENERAL_LETTER_BODY },
@@ -90,8 +90,8 @@ export function signedGeneral(): AcceptedSnapshot {
       quote: priced.quote,
       acceptedAt: SIGNED_AT,
       signed: {
-        agreement: { signature_id: "sig-2", signer_name: "Faithe Williams", signed_at: SIGNED_AT, sha256: WRONG_FINGERPRINT, template_version: 1 },
-        signing: { details: { ...TEST_DETAILS, client_name: "Faithe Williams", entity_name: "" }, date_text: "November 12, 2026", client_email: "faithe@example.com" },
+        agreement: { signature_id: "sig-2", signer_name: "Imogen Pellegrino", signed_at: SIGNED_AT, sha256: WRONG_FINGERPRINT, template_version: 1 },
+        signing: { details: { ...TEST_DETAILS, client_name: "Imogen Pellegrino", entity_name: "" }, date_text: "November 12, 2026", client_email: "imogen@example.com" },
       },
     }),
   );
@@ -106,8 +106,8 @@ export function acceptedProposalRow(snapshot: AcceptedSnapshot, over: Partial<Pr
     public_token: "t".repeat(43),
     lead_id: "lead-1",
     matter_id: "matter-1",
-    client_name: "Sevetri Wilson",
-    client_email: "sevetri@example.com",
+    client_name: "Callum Ferreira",
+    client_email: "callum@example.com",
     title: "Trademark Proposal",
     status: "accepted",
     content: snapshot.content,

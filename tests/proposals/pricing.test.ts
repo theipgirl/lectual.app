@@ -10,10 +10,10 @@ import {
   wouldEmptyQuote,
 } from "@/lib/proposals/pricing";
 import type { ProposalContent, Selection } from "@/lib/proposals/types";
-import { sevetri } from "./fixture";
+import { callum } from "./fixture";
 
 /**
- * The Sevetri example, in cents. The numbers come from the firm's own proposal
+ * The Callum example, in cents. The numbers come from the firm's own proposal
  * page: a Concierge package is a FLAT $4,950 up to 3 classes (Sprint 28: fewer
  * classes never lower it), $825 more for each class past the third, 20% off the
  * second mark of the SAME brand name, and the USPTO's $350 per class per mark is
@@ -25,19 +25,19 @@ const pick = (...ids: string[]): Selection => Object.fromEntries(ids.map((id) =>
 
 describe("quoteProposal: the firm's Concierge price by class count", () => {
   it("1 class is the flat $4,950.00 (fewer classes than included never lower it)", () => {
-    const q = quoteProposal(sevetri(), pick("p-word", "p-c1"));
+    const q = quoteProposal(callum(), pick("p-word", "p-c1"));
     expect(q.names[0].base_cents).toBe(495_000);
     expect(q.names[0].legal_cents).toBe(495_000);
     expect(q.legal_total_cents).toBe(495_000);
   });
 
   it("2 classes is the same flat $4,950.00", () => {
-    const q = quoteProposal(sevetri(), pick("p-word", "p-c1", "p-c2"));
+    const q = quoteProposal(callum(), pick("p-word", "p-c1", "p-c2"));
     expect(q.legal_total_cents).toBe(495_000);
   });
 
   it("the 4th class adds $825.00 legal and $350.00 USPTO", () => {
-    const content = sevetri();
+    const content = callum();
     content.names[0].classes.push({ id: "p-c3", label: "Marketing", preselected: false }, { id: "p-c4", label: "Training", preselected: false });
     const three = quoteProposal(content, pick("p-word", "p-c1", "p-c2", "p-c3"));
     const four = quoteProposal(content, pick("p-word", "p-c1", "p-c2", "p-c3", "p-c4"));
@@ -46,14 +46,14 @@ describe("quoteProposal: the firm's Concierge price by class count", () => {
   });
 
   it("3 classes is the $4,950.00 base", () => {
-    const content = sevetri();
+    const content = callum();
     content.names[0].classes.push({ id: "p-c3", label: "Marketing", preselected: false });
     const q = quoteProposal(content, pick("p-word", "p-c1", "p-c2", "p-c3"));
     expect(q.legal_total_cents).toBe(495_000);
   });
 
   it("the second mark of the same brand name is 20% off", () => {
-    const q = quoteProposal(sevetri(), pick("p-word", "p-logo", "p-c1", "p-c2"));
+    const q = quoteProposal(callum(), pick("p-word", "p-logo", "p-c1", "p-c2"));
     const [first, second] = q.names[0].marks;
     expect(first.price_cents).toBe(495_000);
     expect(first.second).toBe(false);
@@ -63,7 +63,7 @@ describe("quoteProposal: the firm's Concierge price by class count", () => {
   });
 
   it("'second' follows content order, not mark kind", () => {
-    const q = quoteProposal(sevetri(), pick("t-logo", "t-word", "t-c1", "t-c2"));
+    const q = quoteProposal(callum(), pick("t-logo", "t-word", "t-c1", "t-c2"));
     expect(q.names[1].marks.map((m) => [m.id, m.second])).toEqual([
       ["t-logo", false],
       ["t-word", true],
@@ -71,13 +71,13 @@ describe("quoteProposal: the firm's Concierge price by class count", () => {
   });
 
   it("the discount applies per brand name, not across them", () => {
-    const q = quoteProposal(sevetri(), pick("p-word", "t-word", "p-c1", "t-c1"));
+    const q = quoteProposal(callum(), pick("p-word", "t-word", "p-c1", "t-c1"));
     expect(q.names.map((n) => n.legal_cents)).toEqual([495_000, 495_000]);
     expect(q.legal_total_cents).toBe(990_000);
   });
 
   it("rounds the discounted price once, to the cent", () => {
-    const content = sevetri();
+    const content = callum();
     content.pricing.base_cents = 100_001; // 1 class: 100001 - 165000 would go negative, so use 3 classes
     content.pricing.per_class_cents = 0;
     const q = quoteProposal(content, pick("p-word", "p-logo", "p-c1"));
@@ -86,14 +86,14 @@ describe("quoteProposal: the firm's Concierge price by class count", () => {
   });
 });
 
-describe("quoteProposal: the Sevetri proposal as the firm preselects it", () => {
-  const content = sevetri();
+describe("quoteProposal: the Callum proposal as the firm preselects it", () => {
+  const content = callum();
   const q = quoteProposal(content, defaultSelection(content));
 
   it("both names, 2 classes each, 4 marks", () => {
     expect(q.names.map((n) => [n.name, n.included, n.classes.length, n.marks.length])).toEqual([
-      ["Prosperall", true, 2, 2],
-      ["Tech4PublicGood", true, 2, 2],
+      ["Larkmoor", true, 2, 2],
+      ["Open4Everyone", true, 2, 2],
     ]);
   });
 
@@ -117,7 +117,7 @@ describe("quoteProposal: the Sevetri proposal as the firm preselects it", () => 
 
 describe("quoteProposal: nothing is bought unless a mark AND a class are ticked", () => {
   it("nothing selected is 0 and 0", () => {
-    const q = quoteProposal(sevetri(), {});
+    const q = quoteProposal(callum(), {});
     expect(q.legal_total_cents).toBe(0);
     expect(q.gov_total_cents).toBe(0);
     expect(q.gov_class_count).toBe(0);
@@ -126,20 +126,20 @@ describe("quoteProposal: nothing is bought unless a mark AND a class are ticked"
   });
 
   it("classes without a mark is 0", () => {
-    const q = quoteProposal(sevetri(), pick("p-c1", "p-c2"));
+    const q = quoteProposal(callum(), pick("p-c1", "p-c2"));
     expect(q.legal_total_cents).toBe(0);
     expect(q.gov_total_cents).toBe(0);
     expect(q.names[0].classes).toEqual([]);
   });
 
   it("a mark without a class is 0", () => {
-    const q = quoteProposal(sevetri(), pick("p-word", "p-logo"));
+    const q = quoteProposal(callum(), pick("p-word", "p-logo"));
     expect(q.legal_total_cents).toBe(0);
     expect(q.names[0].marks).toEqual([]);
   });
 
   it("only the ticked name is included", () => {
-    const q = quoteProposal(sevetri(), pick("t-logo", "t-c1"));
+    const q = quoteProposal(callum(), pick("t-logo", "t-c1"));
     expect(q.names.map((n) => n.included)).toEqual([false, true]);
     expect(q.names[0].legal_cents).toBe(0);
     expect(q.legal_total_cents).toBe(495_000);
@@ -148,13 +148,13 @@ describe("quoteProposal: nothing is bought unless a mark AND a class are ticked"
 
   it("only a literal true ticks a box", () => {
     const sneaky = { "p-word": 1, "p-c1": "true", "p-c2": {} } as unknown as Selection;
-    expect(quoteProposal(sevetri(), sneaky).legal_total_cents).toBe(0);
+    expect(quoteProposal(callum(), sneaky).legal_total_cents).toBe(0);
   });
 });
 
 describe("quoteProposal: price_override", () => {
   it("a different base for one brand, other brands untouched", () => {
-    const content = sevetri();
+    const content = callum();
     content.names[0].price_override = { base_cents: 450_000 };
     const q = quoteProposal(content, pick("p-word", "p-c1", "p-c2", "t-word", "t-c1", "t-c2"));
     expect(q.names[0].legal_cents).toBe(450_000); // flat: 2 classes is under the 3 included
@@ -162,28 +162,28 @@ describe("quoteProposal: price_override", () => {
   });
 
   it("a different per-class amount for one brand", () => {
-    const content = sevetri();
+    const content = callum();
     content.names[0].price_override = { per_class_cents: 50_000 };
     const q = quoteProposal(content, pick("p-word", "p-c1"));
     expect(q.names[0].legal_cents).toBe(495_000); // under the included count the per-class amount does not apply
   });
 
   it("override fields are independent: setting one keeps the package's other", () => {
-    const content = sevetri();
+    const content = callum();
     content.names[0].price_override = { base_cents: 600_000 };
     const q = quoteProposal(content, pick("p-word", "p-c1"));
     expect(q.names[0].legal_cents).toBe(600_000);
   });
 
   it("an override of 0 is a real override, not 'unset'", () => {
-    const content = sevetri();
+    const content = callum();
     content.names[0].price_override = { base_cents: 0, per_class_cents: 0 };
     const q = quoteProposal(content, pick("p-word", "p-logo", "p-c1"));
     expect(q.names[0].legal_cents).toBe(0);
   });
 
   it("the second-mark discount applies to the overridden price", () => {
-    const content = sevetri();
+    const content = callum();
     content.names[0].price_override = { base_cents: 500_000, per_class_cents: 0 };
     const q = quoteProposal(content, pick("p-word", "p-logo", "p-c1"));
     expect(q.names[0].marks.map((m) => m.price_cents)).toEqual([500_000, 400_000]);
@@ -194,7 +194,7 @@ describe("quoteProposal: adjustments on the legal fee", () => {
   const all = (c: ProposalContent) => quoteProposal(c, defaultSelection(c));
 
   it("an amount comes straight off, in cents", () => {
-    const content = sevetri();
+    const content = callum();
     content.adjustments = [{ id: "a1", label: "Consultation credit", kind: "amount", value: 45_000 }];
     const q = all(content);
     expect(q.legal_subtotal_cents).toBe(1_782_000);
@@ -204,7 +204,7 @@ describe("quoteProposal: adjustments on the legal fee", () => {
   });
 
   it("a percent is taken off the subtotal and rounded once", () => {
-    const content = sevetri();
+    const content = callum();
     content.adjustments = [{ id: "a1", label: "Referral", kind: "percent", value: 10 }];
     const q = all(content);
     expect(q.adjustments[0].discount_cents).toBe(178_200);
@@ -212,7 +212,7 @@ describe("quoteProposal: adjustments on the legal fee", () => {
   });
 
   it("percent adjustments are each taken from the SUBTOTAL, not compounded", () => {
-    const content = sevetri();
+    const content = callum();
     content.adjustments = [
       { id: "a1", label: "A", kind: "percent", value: 10 },
       { id: "a2", label: "B", kind: "percent", value: 10 },
@@ -221,7 +221,7 @@ describe("quoteProposal: adjustments on the legal fee", () => {
   });
 
   it("an amount and a percent together", () => {
-    const content = sevetri();
+    const content = callum();
     content.adjustments = [
       { id: "a1", label: "Credit", kind: "amount", value: 45_000 },
       { id: "a2", label: "Referral", kind: "percent", value: 5 },
@@ -232,7 +232,7 @@ describe("quoteProposal: adjustments on the legal fee", () => {
   });
 
   it("rounds a percent to the nearest cent", () => {
-    const content = sevetri();
+    const content = callum();
     content.pricing.base_cents = 333_333;
     content.pricing.per_class_cents = 0;
     content.adjustments = [{ id: "a1", label: "x", kind: "percent", value: 10 }];
@@ -242,7 +242,7 @@ describe("quoteProposal: adjustments on the legal fee", () => {
   });
 
   it("the total never goes below zero and the discounts add up to what was taken", () => {
-    const content = sevetri();
+    const content = callum();
     content.adjustments = [
       { id: "a1", label: "Big credit", kind: "amount", value: 9_999_999 },
       { id: "a2", label: "Another", kind: "amount", value: 5_000 },
@@ -255,7 +255,7 @@ describe("quoteProposal: adjustments on the legal fee", () => {
   });
 
   it("100% off is exactly zero; the USPTO fee is untouched by adjustments", () => {
-    const content = sevetri();
+    const content = callum();
     content.adjustments = [{ id: "a1", label: "Pro bono", kind: "percent", value: 100 }];
     const q = all(content);
     expect(q.legal_total_cents).toBe(0);
@@ -263,7 +263,7 @@ describe("quoteProposal: adjustments on the legal fee", () => {
   });
 
   it("adjustments apply only when there is a legal fee", () => {
-    const content = sevetri();
+    const content = callum();
     content.adjustments = [{ id: "a1", label: "Credit", kind: "amount", value: 45_000 }];
     const q = quoteProposal(content, {});
     expect(q.discount_cents).toBe(0);
@@ -272,13 +272,13 @@ describe("quoteProposal: adjustments on the legal fee", () => {
   });
 
   it("a negative amount cannot raise the price", () => {
-    const content = sevetri();
+    const content = callum();
     content.adjustments = [{ id: "a1", label: "?", kind: "amount", value: -50_000 }];
     expect(all(content).legal_total_cents).toBe(1_782_000);
   });
 
   it("a percent outside 0..100 is clamped", () => {
-    const content = sevetri();
+    const content = callum();
     content.adjustments = [{ id: "a1", label: "?", kind: "percent", value: 250 }];
     expect(all(content).legal_total_cents).toBe(0);
     content.adjustments = [{ id: "a1", label: "?", kind: "percent", value: -20 }];
@@ -298,7 +298,7 @@ describe("quoteProposal: total, never throwing", () => {
   });
 
   it("a name priced below zero is priced at zero, not negative", () => {
-    const content = sevetri();
+    const content = callum();
     content.names[0].price_override = { base_cents: -100_000 };
     const q = quoteProposal(content, pick("p-word", "p-c1"));
     expect(q.names[0].legal_cents).toBe(0);
@@ -308,7 +308,7 @@ describe("quoteProposal: total, never throwing", () => {
 
 describe("defaultSelection and normalizeSelection", () => {
   it("defaultSelection ticks the preselected ids and lists the rest as false", () => {
-    const content = sevetri();
+    const content = callum();
     content.names[0].marks[1].preselected = false;
     content.names[1].classes[1].preselected = false;
     const sel = defaultSelection(content);
@@ -321,7 +321,7 @@ describe("defaultSelection and normalizeSelection", () => {
   });
 
   it("nothing preselected prices at zero", () => {
-    const content = sevetri();
+    const content = callum();
     for (const n of content.names) {
       for (const m of n.marks) m.preselected = false;
       for (const c of n.classes) c.preselected = false;
@@ -330,7 +330,7 @@ describe("defaultSelection and normalizeSelection", () => {
   });
 
   it("normalizeSelection keeps only offered ids, as real booleans", () => {
-    const sel = normalizeSelection(sevetri(), {
+    const sel = normalizeSelection(callum(), {
       "p-word": true,
       "p-logo": "yes",
       "t-c1": 1,
@@ -342,7 +342,7 @@ describe("defaultSelection and normalizeSelection", () => {
     expect(sel["t-c1"]).toBe(false);
     expect("not-an-id" in sel).toBe(false);
     expect(Object.values(sel).every((v) => typeof v === "boolean")).toBe(true);
-    expect(normalizeSelection(sevetri(), "garbage")["p-word"]).toBe(false);
+    expect(normalizeSelection(callum(), "garbage")["p-word"]).toBe(false);
   });
 });
 
@@ -358,7 +358,7 @@ describe("quoteProposal: the package decides what an added class costs", () => {
 
   /** One brand name, one mark, n classes ticked. */
   function priced(pkg: keyof typeof PACKAGES, classes: number, extra: Record<string, unknown> = {}) {
-    const c = sevetri();
+    const c = callum();
     c.pricing = { ...c.pricing, package: pkg, ...PACKAGES[pkg], ...extra };
     c.names = [{ ...c.names[0], marks: [c.names[0].marks[0]], classes: Array.from({ length: 6 }, (_, i) => ({ id: `c${i}`, label: `C${i}`, preselected: false })) }];
     return quoteProposal(c, pick("p-word", ...Array.from({ length: classes }, (_, i) => `c${i}`)));
@@ -384,7 +384,7 @@ describe("quoteProposal: the package decides what an added class costs", () => {
     expect(step("Concierge", 3, 4)).toEqual({ legal: 82_500, gov: 35_000 });
   });
   it("USPTO is $350 per class even inside the included count, and is not touched by credits, the second-mark percent or the custom switch", () => {
-    const c = sevetri();
+    const c = callum();
     c.adjustments = [{ id: "a", label: "Credit", kind: "percent", value: 50 }];
     const base = quoteProposal(c, pick("p-word", "p-logo", "p-c1", "p-c2"));
     expect(base.gov_total_cents).toBe(4 * 35_000);
@@ -405,7 +405,7 @@ describe("quoteProposal: the package decides what an added class costs", () => {
 
 describe("isFixedOffer: no checkboxes when there is nothing to choose", () => {
   const one = (): ProposalContent => {
-    const c = sevetri();
+    const c = callum();
     c.names = [c.names[0]];
     c.names[0].marks = [c.names[0].marks[0]];
     c.names[0].classes = [c.names[0].classes[0]];
@@ -423,14 +423,14 @@ describe("isFixedOffer: no checkboxes when there is nothing to choose", () => {
   });
 
   it("word + logo is a choice", () => {
-    const c = sevetri();
+    const c = callum();
     c.names = [c.names[0]];
     c.names[0].classes = [c.names[0].classes[0]];
     expect(isFixedOffer(c)).toBe(false);
   });
 
   it("two brand names is a choice", () => {
-    const c = sevetri();
+    const c = callum();
     for (const nm of c.names) {
       nm.marks = [nm.marks[0]];
       nm.classes = [nm.classes[0]];
@@ -454,7 +454,7 @@ describe("isFixedOffer: no checkboxes when there is nothing to choose", () => {
 describe("wouldEmptyQuote / lockedSelectionIds: a client can never untick to $0", () => {
   /** One brand name, one mark, one class. */
   function single(): ProposalContent {
-    const c = sevetri();
+    const c = callum();
     c.names = [c.names[0]];
     c.names[0].marks = [c.names[0].marks[0]];
     c.names[0].classes = [c.names[0].classes[0]];
@@ -471,35 +471,35 @@ describe("wouldEmptyQuote / lockedSelectionIds: a client can never untick to $0"
   });
 
   it("one brand, two classes: neither class is locked until one is left; the only mark is", () => {
-    const c = sevetri();
+    const c = callum();
     c.names = [c.names[0]];
     expect(locked(c, pick("p-word", "p-c1", "p-c2"))).toEqual(["p-word"]);
     expect(locked(c, pick("p-word", "p-c2"))).toEqual(["p-c2", "p-word"]);
   });
 
   it("one brand, two marks: neither mark is locked until one is left", () => {
-    const c = sevetri();
+    const c = callum();
     c.names = [c.names[0]];
     expect(locked(c, pick("p-word", "p-logo", "p-c1"))).toEqual(["p-c1"]);
     expect(locked(c, pick("p-logo", "p-c1"))).toEqual(["p-c1", "p-logo"]);
   });
 
   it("two brands: nothing is locked while both are buyable", () => {
-    const c = sevetri();
+    const c = callum();
     expect(locked(c, defaultSelection(c))).toEqual([]);
     expect(locked(c, pick("p-word", "p-c1", "t-logo", "t-c1"))).toEqual([]);
   });
 
   it("two brands, one not buyable: the other's last mark and class lock, the first stays free", () => {
-    const c = sevetri();
-    // Prosperall has a mark but no class, so it isn't buyable; Tech4PublicGood is the only one left.
+    const c = callum();
+    // Larkmoor has a mark but no class, so it isn't buyable; Open4Everyone is the only one left.
     const s = pick("p-word", "t-logo", "t-c1");
     expect(locked(c, s)).toEqual(["t-c1", "t-logo"]);
     expect(wouldEmptyQuote(c, s, "p-word")).toBe(false);
   });
 
   it("nothing selected (no preselected items): nothing is locked, so the client can tick their way in", () => {
-    const c = sevetri();
+    const c = callum();
     for (const nm of c.names) {
       for (const m of nm.marks) m.preselected = false;
       for (const k of nm.classes) k.preselected = false;

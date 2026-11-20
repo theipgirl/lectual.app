@@ -7,7 +7,7 @@ import {
   markWithoutClass,
   repairSelection,
 } from "@/lib/proposals/class-lock";
-import { sevetri } from "./fixture";
+import { callum } from "./fixture";
 
 const pick = (...ids: string[]) => Object.fromEntries(ids.map((id) => [id, true]));
 
@@ -35,7 +35,7 @@ describe("classLock", () => {
   });
 
   it("classLocks is keyed by brand name id", () => {
-    const locks = classLocks(sevetri(), pick("p-word", "p-c1", "t-logo", "t-c1", "t-c2"));
+    const locks = classLocks(callum(), pick("p-word", "p-c1", "t-logo", "t-c1", "t-c2"));
     expect(Object.keys(locks)).toEqual(["p"]);
     expect(locks.p.classId).toBe("p-c1");
   });
@@ -49,47 +49,47 @@ describe("classLock", () => {
 describe("repairSelection", () => {
   it("leaves a good selection alone", () => {
     const sel = pick("p-word", "p-c1");
-    expect(repairSelection(sevetri(), sel)).toEqual({ ok: true, selection: sel, repaired: [] });
+    expect(repairSelection(callum(), sel)).toEqual({ ok: true, selection: sel, repaired: [] });
   });
 
   it("ticks the first class of a ticked mark that has none", () => {
-    const r = repairSelection(sevetri(), pick("p-word", "t-logo", "t-c2"));
+    const r = repairSelection(callum(), pick("p-word", "t-logo", "t-c2"));
     expect(r).toMatchObject({ ok: true, repaired: ["p"] });
     if (r.ok) expect(r.selection["p-c1"]).toBe(true);
   });
 
   it("refuses a brand name with a ticked mark and no class to fall back on", () => {
-    const c = sevetri();
+    const c = callum();
     c.names[0].classes = [];
     expect(repairSelection(c, pick("p-word"))).toEqual({ ok: false, nameId: "p" });
   });
 
   it("an unticked mark needs no class", () => {
-    expect(markWithoutClass(sevetri().names[0], {})).toBe(false);
-    expect(markWithoutClass(sevetri().names[0], pick("p-logo"))).toBe(true);
+    expect(markWithoutClass(callum().names[0], {})).toBe(false);
+    expect(markWithoutClass(callum().names[0], pick("p-logo"))).toBe(true);
   });
 });
 
 describe("validateContent and repairPreselections: a ticked mark needs a ticked class", () => {
   it("refuses a brand name whose mark starts ticked and no class does", async () => {
     const { validateContent } = await import("@/lib/proposals/validate");
-    const c = sevetri();
+    const c = callum();
     c.names[0].classes.forEach((cl) => (cl.preselected = false));
     const issues = validateContent(c);
     expect(issues.some((i) => i.level === "error" && i.path === "names[0].classes" && /at least one class/i.test(i.message))).toBe(true);
-    expect(validateContent(sevetri()).filter((i) => i.level === "error")).toEqual([]);
+    expect(validateContent(callum()).filter((i) => i.level === "error")).toEqual([]);
   });
 
   it("a ticked mark with no class at all is refused with the 'Add a class' sentence", async () => {
     const { validateContent } = await import("@/lib/proposals/validate");
-    const c = sevetri();
+    const c = callum();
     c.names[0].classes = [];
     expect(validateContent(c).some((i) => i.path === "names[0].classes" && /Add a class/.test(i.message))).toBe(true);
   });
 
   it("repairs by ticking the first class, and cannot repair a brand with no class", async () => {
     const { repairPreselections } = await import("@/lib/proposals/class-lock");
-    const c = sevetri();
+    const c = callum();
     c.names[1].classes.forEach((cl) => (cl.preselected = false));
     const r = repairPreselections(c);
     expect(r).toMatchObject({ ok: true, repaired: ["t"] });
@@ -99,6 +99,6 @@ describe("validateContent and repairPreselections: a ticked mark needs a ticked 
     }
     c.names[1].classes = [];
     expect(repairPreselections(c)).toEqual({ ok: false, nameId: "t" });
-    expect(repairPreselections(sevetri())).toMatchObject({ ok: true, repaired: [] });
+    expect(repairPreselections(callum())).toMatchObject({ ok: true, repaired: [] });
   });
 });

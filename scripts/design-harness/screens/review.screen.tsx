@@ -33,7 +33,7 @@ export const screens: Screen[] = [
     pathname: "/dashboard/review/",
     prepare,
     render: review(),
-    transformHtml: (html) => html.replace(/<section class="lx-card rv-strip"[\s\S]*?<\/section>/g, "").replace(/<section class="lx-card rv-person"[\s\S]*?<\/section>/, ""),
+    transformHtml: (html) => html.replace(/<section class="lx-card rv-strip"[\s\S]*?<\/section>/g, "").replace(/<section class="lx-board-col rv-person"[\s\S]*?<\/section>/, ""),
   },
   {
     id: "review-board-phone",

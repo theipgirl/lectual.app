@@ -378,6 +378,34 @@ describe("answerMattersChatQuestion", () => {
     expect(result.citations.map((c) => c.id)).toEqual(["m-stale"]);
   });
 
+  it.each([
+    ["an intake-stage matter is not counted (as the Matters page draws them)", new Set(["s-intake"]), 1],
+    ["a failed stage read counts every matter, as before the rule", null, 2],
+  ] as const)("stalled matters: %s", async (_n, intakeIds, expected) => {
+    const old = new Date(Date.now() - 45 * 86_400_000).toISOString();
+    const stage = (id: string) => ({ id, code: "3", label: "Drafting", order_index: 3, is_open: true, waiting_on: "firm" });
+    const past = matter({ id: "m-past", stage_id: "s-past", stage_entered_at: old, stage: stage("s-past") } as Partial<Matter>);
+    const intake = matter({ id: "m-intake", stage_id: "s-intake", stage_entered_at: old, stage: stage("s-intake") } as Partial<Matter>);
+    mockMatters({ listMatters: vi.fn(async () => [past, intake]) });
+    mockPipeline();
+    vi.doMock("@/lib/matters/intake-ids", async (orig) => ({ ...(await orig<typeof import("@/lib/matters/intake-ids")>()), loadIntakeStageIds: vi.fn(async () => intakeIds) }));
+    const { answerMattersChatQuestion } = await import("@/lib/agents/matters-chat");
+    let seen = "";
+    let call = 0;
+    const fakeCall: Call = async ({ messages }) => {
+      call += 1;
+      if (call === 1) return toolCallResponse([{ toolName: "list_stalled_matters", input: {} }]);
+      const last = messages[messages.length - 1];
+      seen = Array.isArray(last.content) ? (last.content[0] as { content: string }).content : "";
+      return textResponse("ok");
+    };
+    await answerMattersChatQuestion("which matters are stalled?", fakeCall);
+    const parsed = JSON.parse(seen) as { openMatters: number; totalStalled: number };
+    expect(parsed.openMatters).toBe(expected);
+    expect(parsed.totalStalled).toBe(expected);
+    vi.doUnmock("@/lib/matters/intake-ids");
+  });
+
   it("strips PostgREST filter syntax from a lead search term", async () => {
     mockMatters();
     mockPipeline();

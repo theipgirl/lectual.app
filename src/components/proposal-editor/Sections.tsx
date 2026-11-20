@@ -772,7 +772,7 @@ export function BrandsSection({ children, editable, issues }: Editable & { child
         <div className="pe-add-name">
           <label className="lx-field" style={{ flex: 1, minWidth: 220 }}>
             <span className="lx-label">Add a brand name</span>
-            <input className="lx-input" form={ADD_NAME_FORM_ID} name="name" maxLength={200} placeholder="e.g. Prosperall" />
+            <input className="lx-input" form={ADD_NAME_FORM_ID} name="name" maxLength={200} placeholder="e.g. Larkmoor" />
           </label>
           <button type="submit" form={ADD_NAME_FORM_ID} className="lx-btn lx-btn-sec">
             Add brand name

@@ -26,8 +26,8 @@ function both(): { v1: AcceptedSnapshot; v2: AcceptedSnapshot } {
     quote: plain.quote,
     acceptedAt: plain.accepted_at,
     signed: {
-      agreement: { signature_id: "sig-1", signer_name: "Sevetri Wilson", signed_at: "2026-10-21T15:00:05.000Z", sha256: "d".repeat(64), template_version: 3 },
-      signing: { details: { ...TEST_DETAILS }, date_text: "October 21, 2026", client_email: "sevetri@example.com" },
+      agreement: { signature_id: "sig-1", signer_name: "Callum Ferreira", signed_at: "2026-10-21T15:00:05.000Z", sha256: "d".repeat(64), template_version: 3 },
+      signing: { details: { ...TEST_DETAILS }, date_text: "October 21, 2026", client_email: "callum@example.com" },
     },
   });
   return { v1, v2 };
@@ -44,7 +44,7 @@ describe("the snapshot type and builder", () => {
 });
 
 describe("every reader of the snapshot takes schema 1 and 2", () => {
-  const facts = { clientName: "Sevetri Wilson", entityName: "Prosperall", timeZone: "America/New_York" };
+  const facts = { clientName: "Callum Ferreira", entityName: "Larkmoor", timeZone: "America/New_York" };
 
   it("the accepted-proposal document", () => {
     const { v1, v2 } = both();
@@ -71,23 +71,23 @@ describe("every reader of the snapshot takes schema 1 and 2", () => {
 
   it("the note and headline: only that it was signed, by whom and when", () => {
     const { v1, v2 } = both();
-    const n1 = acceptanceNoteBody(v1, "Sevetri Wilson");
-    const n2 = acceptanceNoteBody(v2, "Sevetri Wilson");
+    const n1 = acceptanceNoteBody(v1, "Callum Ferreira");
+    const n2 = acceptanceNoteBody(v2, "Callum Ferreira");
     expect(n1.body).not.toContain("Engagement letter signed");
-    expect(n2.body).toContain("Engagement letter signed by Sevetri Wilson on 2026-10-21T15:00:05.000Z (UTC).");
+    expect(n2.body).toContain("Engagement letter signed by Callum Ferreira on 2026-10-21T15:00:05.000Z (UTC).");
     // Everything else in the note is identical; none of the letter, the details or the address is in it.
     expect(n2.body.replace(/\nEngagement letter signed[^\n]*$/, "")).toBe(n1.body);
-    for (const never of ["100 Example Street", "Miami", "Dear ", "sevetri@example.com", "d".repeat(64)]) expect(n2.body).not.toContain(never);
-    expect(acceptanceHeadline({ clientName: "Sevetri Wilson", packageName: "Concierge", legalTotalCents: 495_000 })).toBe("Sevetri Wilson accepted Concierge · legal $4,950");
-    expect(acceptanceHeadline({ clientName: "Sevetri Wilson", packageName: "Concierge", legalTotalCents: 495_000, signedBy: "Sevetri Wilson" })).toBe(
-      "Sevetri Wilson accepted Concierge · legal $4,950 · engagement letter signed by Sevetri Wilson",
+    for (const never of ["100 Example Street", "Miami", "Dear ", "callum@example.com", "d".repeat(64)]) expect(n2.body).not.toContain(never);
+    expect(acceptanceHeadline({ clientName: "Callum Ferreira", packageName: "Concierge", legalTotalCents: 495_000 })).toBe("Callum Ferreira accepted Concierge · legal $4,950");
+    expect(acceptanceHeadline({ clientName: "Callum Ferreira", packageName: "Concierge", legalTotalCents: 495_000, signedBy: "Callum Ferreira" })).toBe(
+      "Callum Ferreira accepted Concierge · legal $4,950 · engagement letter signed by Callum Ferreira",
     );
   });
 
   it("the firm notice for a signed acceptance names the signing and carries no letter or detail", async () => {
     for (const snapshot of Object.values(both())) {
       const { db, tables } = fakeFollowupDb({
-        client_proposal: [{ id: "p1", org_id: "org-1", family_id: "f1", status: "accepted", client_name: "Sevetri Wilson", client_email: "sevetri@example.com", lead_id: null, matter_id: null, accepted_snapshot: snapshot }],
+        client_proposal: [{ id: "p1", org_id: "org-1", family_id: "f1", status: "accepted", client_name: "Callum Ferreira", client_email: "callum@example.com", lead_id: null, matter_id: null, accepted_snapshot: snapshot }],
         client_proposal_setting: [{ org_id: "org-1", approver_user_ids: ["u1"] }],
         crm_org_member: [{ org_id: "org-1", user_id: "u1", role: "owner" }],
         crm_lead: [],
@@ -98,7 +98,7 @@ describe("every reader of the snapshot takes schema 1 and 2", () => {
       await runAcceptanceFollowups(db, { proposalId: "p1", orgId: "org-1" }, { getToken: async () => null });
       const payload = tables.crm_notification[0].payload as { headline: string };
       expect(Object.keys(payload).sort()).toEqual(["headline", "proposal_id", "source"]);
-      expect(payload.headline.includes("engagement letter signed by Sevetri Wilson")).toBe(snapshot.schema === 2);
+      expect(payload.headline.includes("engagement letter signed by Callum Ferreira")).toBe(snapshot.schema === 2);
       const wire = JSON.stringify(tables.crm_notification);
       for (const never of ["100 Example Street", "Dear ", "Miami"]) expect(wire).not.toContain(never);
     }
@@ -115,7 +115,7 @@ describe("every reader of the snapshot takes schema 1 and 2", () => {
 
   it("the signed letter rebuild: a schema 2 snapshot rebuilds, a schema 1 snapshot (or one missing its agreement) does not", () => {
     const { v1, v2 } = both();
-    expect(rebuildSignedLetter(v2, "America/New_York")?.signerName).toBe("Sevetri Wilson");
+    expect(rebuildSignedLetter(v2, "America/New_York")?.signerName).toBe("Callum Ferreira");
     expect(rebuildSignedLetter(v1, "America/New_York")).toBeNull();
     expect(rebuildSignedLetter({ ...v2, agreement: undefined }, "UTC")).toBeNull();
     expect(rebuildSignedLetter(null, "UTC")).toBeNull();

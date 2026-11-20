@@ -83,7 +83,7 @@ describe("checker's m3: the client's 'Read it again' is only ever a letter that 
     expect(signed?.fingerprint).toBe(sha256);
     expect(signed?.blocks.map((b) => b.text).join("\n\n")).toBe(text);
     expect(signed?.blocks.every((b) => b.lead === null)).toBe(true);
-    expect(signed?.signedLine).toBe("Signed October 20, 2026 at 11:00 AM EDT by Sevetri Wilson");
+    expect(signed?.signedLine).toBe("Signed October 20, 2026 at 11:00 AM EDT by Callum Ferreira");
     const sigRead = s.w.calls.slice(before).find((c) => c.table === "client_proposal_signature")!;
     expect(sigRead.filters).toEqual([["proposal_id", "prop-2"], ["org_id", "org-1"], ["id", "sig-0001"]]);
 
@@ -116,7 +116,7 @@ describe("checker's m3: the client's 'Read it again' is only ever a letter that 
     expect(again).toContain("data-signed-unavailable");
     expect(again).toContain(SIGNED_VIEW_UNAVAILABLE.replace(/'/g, "&#x27;"));
     // Not one paragraph of the letter is under that label.
-    expect(again).not.toContain("Dear Sevetri Wilson");
+    expect(again).not.toContain("Dear Callum Ferreira");
     expect(again).not.toContain('class="cp-letter"');
   });
 
@@ -164,23 +164,23 @@ describe("checker's m3 on the just-signed page: the page's own letter is shown a
     const base = {
       content: world().tables.client_proposal[0].content as never,
       title: "Trademark Proposal",
-      clientName: "Sevetri Wilson",
+      clientName: "Callum Ferreira",
       expiresOn: "2026-12-01",
       firm: { name: "RPB Law", slug: "rpb-law" },
       mode: "live" as const,
-      letter: { dateText: "November 12, 2026", clientEmail: "sevetri@example.com" },
+      letter: { dateText: "November 12, 2026", clientEmail: "callum@example.com" },
       onAccept: async () => ({ ok: true as const, payUrl: "" }),
-      initialLoe: { step: 3 as const, details: TEST_DETAILS, typedName: "Sevetri Wilson", agree: true },
+      initialLoe: { step: 3 as const, details: TEST_DETAILS, typedName: "Callum Ferreira", agree: true },
     };
-    const done = { payUrl: null, signedLine: "Signed November 13, 2026 at 10:30 AM EST by Sevetri Wilson", letterDate: "November 13, 2026" };
+    const done = { payUrl: null, signedLine: "Signed November 13, 2026 at 10:30 AM EST by Callum Ferreira", letterDate: "November 13, 2026" };
     const again = (html: string) => html.match(/<section class="cp-signed-letter"[\s\S]*?<\/section>/)?.[0] ?? "";
     const verified = again(renderToStaticMarkup(<ProposalDocument {...base} initialDone={{ ...done, letterVerified: true }} />));
-    expect(verified).toContain("Dear Sevetri Wilson:");
+    expect(verified).toContain("Dear Callum Ferreira:");
     expect(verified).not.toContain("data-signed-unavailable");
     for (const unverified of [{ ...done, letterVerified: false }, done]) {
       const html = again(renderToStaticMarkup(<ProposalDocument {...base} initialDone={unverified} />));
       expect(html).toContain("data-signed-unavailable");
-      expect(html).not.toContain("Dear Sevetri Wilson:");
+      expect(html).not.toContain("Dear Callum Ferreira:");
     }
   });
 
@@ -255,6 +255,6 @@ describe("checker's m4 on the client's download: the generic sentence, and the o
       "[proposals] signed letter does not match its recorded fingerprint proposal=prop-2 step=client_view",
       "[proposals] signed letter does not match its recorded fingerprint proposal=prop-2 step=client_download",
     ]);
-    for (const never of ["Sevetri", "Example Street", sha256, "altered", "Dear "]) expect(lines.join("\n")).not.toContain(never);
+    for (const never of ["Callum", "Example Street", sha256, "altered", "Dear "]) expect(lines.join("\n")).not.toContain(never);
   });
 });

@@ -1,17 +1,17 @@
 /** Sample proposals for the mono screens (invented names). Built on the tests' own content fixture. */
-import { sevetri } from "../../tests/proposals/fixture";
+import { callum } from "../../tests/proposals/fixture";
 import type { ProposalRow, ProposalEventRow } from "@/lib/proposals/types";
 import type { ProposalListItem, ProposalDetail } from "@/lib/proposals/store";
 import { ORG, OWNER_ID } from "./fixtures";
 import { L } from "./mono-data";
 
 const pid = (n: number) => `${String(n).repeat(8)}-${String(n).repeat(4)}-4${String(n).repeat(3)}-8${String(n).repeat(3)}-${String(n).padStart(12, "0")}`;
-export const P = { crumb: pid(1), halcyon: pid(2), lumen: pid(3), oat: pid(4), north: pid(5), moon: pid(6), faithe: pid(7), vivian: pid(8), reset: pid(9) };
+export const P = { crumb: pid(1), halcyon: pid(2), lumen: pid(3), oat: pid(4), north: pid(5), moon: pid(6), imogen: pid(7), marguerite: pid(8), reset: pid(9) };
 /** Accepted rows the harness reads as paid (the rest are "not paid"). */
-export const PAID_IDS = new Set([P.faithe, P.vivian]);
+export const PAID_IDS = new Set([P.imogen, P.marguerite]);
 
 function content() {
-  const c = sevetri();
+  const c = callum();
   c.client = { first_name: "Maya", full_name: "Maya Chen", company: "CRUMB & CO." };
   c.greeting = "Hi Maya, thank you again for meeting with us for your strategy call. Your proposal is outlined below for your review and acceptance.";
   c.names[0].name = "CRUMB & CO.";
@@ -54,8 +54,8 @@ export const proposalList: ProposalListItem[] = [
   listItem(P.north, "Jonah Reyes", "approved", { brands: ["NORTHFIELD GOODS"] }),
   listItem(P.moon, "Ines Walker", "withdrawn", { brands: ["PAPER MOON"] }),
   // Long text: a flat-fee proposal with a long matter title and a long client name (paid), a long brand pair (paid), and a reset one (accepted again, not paid).
-  listItem(P.faithe, "Faithe Williams-Montgomery-Ashworth", "accepted", { matter_title: "Termination of the management contract and transition of vendor agreements for the studio", accepted_at: "2026-11-03T16:00:00Z", legal_total_cents: 125_000, gov_total_cents: 0, class_count: 0, offered: [] } as Partial<ProposalListItem>),
-  listItem(P.vivian, "Vivian Olodun Anderson", "accepted", { brands: ["THE CONFIDENCE INTERVAL LABORATORIES", "SEVENTH STREET APOTHECARY"], accepted_at: "2026-10-30T16:00:00Z", signed_package: "Concierge", class_count: 5, legal_total_cents: 842_500, gov_total_cents: 175_000 }),
+  listItem(P.imogen, "Imogen Pellegrino-Montgomery-Ashworth", "accepted", { matter_title: "Termination of the management contract and transition of vendor agreements for the studio", accepted_at: "2026-11-03T16:00:00Z", legal_total_cents: 125_000, gov_total_cents: 0, class_count: 0, offered: [] } as Partial<ProposalListItem>),
+  listItem(P.marguerite, "Marguerite Ashby Lindqvist", "accepted", { brands: ["THE MARGIN NOTE LABORATORIES", "SEVENTH STREET APOTHECARY"], accepted_at: "2026-10-30T16:00:00Z", signed_package: "Concierge", class_count: 5, legal_total_cents: 842_500, gov_total_cents: 175_000 }),
   listItem(P.reset, "Marcus Holloway", "accepted", { brands: ["HOLLOWAY & SONS PROVISIONS"], accepted_at: "2026-11-09T16:00:00Z", signed_package: "Enhanced" }),
 ];
 

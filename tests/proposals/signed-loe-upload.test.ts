@@ -19,7 +19,7 @@ const ORG = "org-1";
 
 function tablesFor(snapshot: AcceptedSnapshot, extra: Record<string, Row[]> = {}): Record<string, Row[]> {
   return {
-    client_proposal: [{ id: PID, org_id: ORG, family_id: "f1", status: "accepted", client_name: "Sevetri Wilson", client_email: "sevetri@example.com", lead_id: null, matter_id: "m1", accepted_snapshot: snapshot }],
+    client_proposal: [{ id: PID, org_id: ORG, family_id: "f1", status: "accepted", client_name: "Callum Ferreira", client_email: "callum@example.com", lead_id: null, matter_id: "m1", accepted_snapshot: snapshot }],
     client_proposal_setting: [{ org_id: ORG, approver_user_ids: ["u1"] }],
     crm_org_member: [{ org_id: ORG, user_id: "u1", role: "owner" }],
     crm_matter: [{ id: "m1", org_id: ORG, lawmatics_id: "LM-77" }],
@@ -72,7 +72,7 @@ describe("P3: the signed letter is filed in Lawmatics", () => {
     expect(up.sent[0].form.get("path[]")).toBe("Engagement");
     const file = up.sent[0].form.get("file") as File;
     expect(file.type).toBe("application/pdf");
-    expect(file.name).toBe("Sevetri-Wilson-engagement-letter-signed-2026-11-12.pdf");
+    expect(file.name).toBe("Callum-Ferreira-engagement-letter-signed-2026-11-12.pdf");
     expect(filed(tables).map((e) => (e.payload as Row).outcome)).toEqual(["uploaded"]);
     expect(filed(tables)[0].actor).toBe("system");
 
@@ -80,7 +80,7 @@ describe("P3: the signed letter is filed in Lawmatics", () => {
     const text = await pdfTextOf(up.sent[0].form);
     const letter = rebuildSignedLetter(snapshot, "America/New_York")!;
     for (const b of letter.blocks) expect(text).toContain(squash(paragraphText(b)));
-    expect(text).toContain("Sevetri Wilson");
+    expect(text).toContain("Callum Ferreira");
     expect(text).toContain(FINGERPRINT);
     expect(text.startsWith("RPB Law")).toBe(true);
 
@@ -120,7 +120,7 @@ describe("P3: the signed letter is filed in Lawmatics", () => {
     expect(filed(none.tables)[0].payload).toMatchObject({ outcome: "blocked", reason: "No Lawmatics record was found for this client, so the signed letter wasn't filed." });
 
     // No matter or lead id: the client's address matches two of the firm's leads.
-    const t = tablesFor(snapshot, { crm_matter: [], crm_lead: [{ id: "l1", org_id: ORG, email: "sevetri@example.com", lawmatics_id: "A" }, { id: "l2", org_id: ORG, email: "SEVETRI@example.com", lawmatics_id: "B" }] });
+    const t = tablesFor(snapshot, { crm_matter: [], crm_lead: [{ id: "l1", org_id: ORG, email: "callum@example.com", lawmatics_id: "A" }, { id: "l2", org_id: ORG, email: "CALLUM@example.com", lawmatics_id: "B" }] });
     (t.client_proposal[0] as Row).matter_id = null;
     const many = fakeFollowupDb(t);
     await run(many.db, up.fetchImpl);
@@ -187,7 +187,7 @@ describe("P3: the signed letter is filed in Lawmatics", () => {
       token: async () => ({ status: "ok", token: "t" }),
       target: async () => ({ ok: true, lawmaticsId: "1" }),
       buildPdf: async () => {
-        throw new Error("font exploded with Sevetri's address");
+        throw new Error("font exploded with Callum's address");
       },
       upload: async () => ((uploaded = true), { ok: true }),
       fileName: "x.pdf",
@@ -202,7 +202,7 @@ describe("P3: the signed letter is filed in Lawmatics", () => {
     const { db, tables } = fakeFollowupDb(tablesFor(snapshot));
     await run(db, fakeUpload(500).fetchImpl);
     const wire = JSON.stringify(tables.client_proposal_event) + JSON.stringify(spy.mock.calls) + JSON.stringify(log.mock.calls);
-    for (const never of ["100 Example Street", "Miami", "Dear ", "%PDF", FINGERPRINT, "Sevetri's"]) expect(wire).not.toContain(never);
+    for (const never of ["100 Example Street", "Miami", "Dear ", "%PDF", FINGERPRINT, "Callum's"]) expect(wire).not.toContain(never);
     spy.mockRestore();
     log.mockRestore();
   });
@@ -318,7 +318,7 @@ describe("item 6: the filed letter never carries a fingerprint beside other text
     const lines = spy.mock.calls.map((c) => c.join(" "));
     spy.mockRestore();
     expect(lines.filter((l) => l.includes("signed letter"))).toEqual([`[proposals] signed letter does not match its recorded fingerprint proposal=${PID} step=signed_loe_upload`]);
-    for (const never of ["Sevetri", "Example Street", "Dear ", sha256, "altered"]) expect(lines.join("\n")).not.toContain(never);
+    for (const never of ["Callum", "Example Street", "Dear ", sha256, "altered"]) expect(lines.join("\n")).not.toContain(never);
   });
 
   it("when the snapshot rebuilds to the signed text, the signature table is never read", async () => {

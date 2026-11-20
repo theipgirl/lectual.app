@@ -4,7 +4,7 @@
 
 Plan the build that puts the engagement letter (LOE) on the client proposal the way Rebecca
 described it, give the edit-proposal page a UX pass, and make proposals creatable three ways
-(the assistant, Copilot, from scratch). Sevetri Wilson's LOE was the example. Later in the
+(the assistant, Copilot, from scratch). Callum Ferreira's LOE was the example. Later in the
 session: once the plan is written, start a workflow and the PGE pipeline to build it.
 
 ## What was found
@@ -13,7 +13,7 @@ session: once the plan is written, start a workflow and the PGE pipeline to buil
   One standard letter that points to the proposal for fees. Payment stays in Lawmatics. She sees
   what goes to a client. The signed letter must be in the Lawmatics file. She never named an
   e-sign tool or said where the client signs.
-- **Why Sevetri's letter said "Trademark Package: TBD".** The app does not write the letter. It
+- **Why Callum's letter said "Trademark Package: TBD".** The app does not write the letter. It
   makes a fee chart for a person to paste into a Lawmatics template, and it refuses that chart
   for more than one brand name or for marks on different packages.
 - **The edit page.** Seven Save buttons on a two-brand draft; package choice, discount, greeting
@@ -100,7 +100,7 @@ decisions that matter are in the AGENTS.md sections each sprint wrote.
 
 ## Evening: letter details, layout and editor fixes (lectual.app#29)
 
-- 0106 applied to lectual-prod on Taylor's instruction; RPB's trademark letter saved there as a DRAFT (Sevetri's letter with her details turned into fields).
+- 0106 applied to lectual-prod on Taylor's instruction; RPB's trademark letter saved there as a DRAFT (Callum's letter with her details turned into fields).
 - Signing now needs the full legal name and mailing address (street, city, state, ZIP, country). The address is written to the Lawmatics matter and contact
   after signing (unverified against live Lawmatics) and shown on the lead and matter pages for staff.
 - RPB logo on the letter (page and PDF); footer "RPB Law Firm, PLLC"; the letter keeps the Word layout (centred address line with rule, bold underlined

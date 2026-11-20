@@ -21,8 +21,8 @@ export function world(over: { content?: unknown; proposal?: Row; token?: string;
     version: 2,
     public_token: over.token ?? TOKEN,
     title: "Trademark Proposal",
-    client_name: "Sevetri Wilson",
-    client_email: "sevetri@example.com",
+    client_name: "Callum Ferreira",
+    client_email: "callum@example.com",
     status: "sent",
     content: over.content ?? withLoe(twoBrandPerMark()),
     expires_on: "2026-10-26",
@@ -71,7 +71,7 @@ export async function browserSigning(
   // The page builds what it signs over with `quoteForAcceptance` (ProposalDocument's `signBasis`), the function the server calls.
   const priced = quoteForAcceptance(content, selection, over.clientClasses);
   if (!priced.ok) throw new Error("no quote");
-  const typedName = over.typedName ?? "Sevetri Wilson";
+  const typedName = over.typedName ?? "Callum Ferreira";
   const state = {
     body: content.loe!.body,
     details: over.details ?? TEST_DETAILS,

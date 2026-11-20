@@ -92,10 +92,10 @@ describe("matching existing matters", () => {
     expect(r.link).toHaveLength(0);
   });
   it("owner loosely: first+last tokens equal, or containment", () => {
-    expect(ownersMatch(normalizeOwner("Vivian Olodun Anderson"), normalizeOwner("Vivian Anderson"))).toBe(true);
-    expect(ownersMatch(normalizeOwner("Eli Chazin (Eli Levi)"), normalizeOwner("Eli Chazin"))).toBe(true);
+    expect(ownersMatch(normalizeOwner("Marguerite Ashby Lindqvist"), normalizeOwner("Marguerite Lindqvist"))).toBe(true);
+    expect(ownersMatch(normalizeOwner("Tobias Reinholt (Toby Rhine)"), normalizeOwner("Tobias Reinholt"))).toBe(true);
     expect(ownersMatch(normalizeOwner("Ada Lovelace"), normalizeOwner("Ada Byron"))).toBe(false);
-    expect(plan([P({ name: "Vivian Olodun Anderson" })], [M({ owner_name: "Vivian Anderson" })]).link).toHaveLength(1);
+    expect(plan([P({ name: "Marguerite Ashby Lindqvist" })], [M({ owner_name: "Marguerite Lindqvist" })]).link).toHaveLength(1);
   });
   it("titles loosely: one contains the other", () => {
     expect(plan([P({ caseTitle: "ENGINE WORKS" })], [M({ title: "ENGINE" })]).link).toHaveLength(1);

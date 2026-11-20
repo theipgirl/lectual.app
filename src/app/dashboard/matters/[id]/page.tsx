@@ -445,7 +445,7 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
                 <VoiceNoteRecorder target={{ kind: "matter", id: matter.id }} action={addVoiceNoteAction} />
               </div>
             )}
-            <Timeline rows={activity} mediaUrls={voiceUrls} />
+            <Timeline rows={activity} mediaUrls={voiceUrls} timeZone={tz} />
           </section>
         </div>
 

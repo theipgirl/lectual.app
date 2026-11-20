@@ -25,9 +25,9 @@ const RPB_ORG_ID = "11111111-1111-1111-1111-111111111111";
 export const LEGACY_PROPOSALS_BY_ORG: Readonly<Record<string, readonly LegacyProposal[]>> = {
   [RPB_ORG_ID]: [
     {
-      client: "Sevetri Wilson",
-      company: "Prosperall",
-      url: "https://proposals.rpblawfirm.com/prosperall-ojvfsf5ivxlu/",
+      client: "Callum Ferreira",
+      company: "Larkmoor",
+      url: "https://proposals.rpblawfirm.com/larkmoor-ojvfsf5ivxlu/",
       date: "Oct 16, 2026",
       expires: "Oct 26, 2026",
       leadId: "1d0d9e21-a9f8-4ef9-84f4-717f95611d6c",

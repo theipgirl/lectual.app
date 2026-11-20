@@ -122,3 +122,18 @@ export const screens: Screen[] = [
     ),
   ),
 ];
+
+/** For the record-card screens: the sample data and the first matter's id, so the opened card can be drawn over the same docket. */
+/** Applies the sample tables and hands back the way to put them back (the opened card reads after the page function returns). */
+export function applyMatterData(): () => void {
+  const keys = [...new Set([...Object.keys(MINE), ...EXTRA])];
+  const saved = keys.map((k) => [k, Object.getOwnPropertyDescriptor(tables, k)] as const);
+  for (const k of keys) Object.defineProperty(tables, k, { configurable: true, enumerable: true, value: MINE[k] ?? (tables as Record<string, StageRow[]>)[k] ?? [], writable: true });
+  return () => {
+    for (const [k, d] of saved) {
+      if (d) Object.defineProperty(tables, k, d);
+      else delete (tables as Record<string, unknown>)[k];
+    }
+  };
+}
+export const firstMatterId = String((matterRows[0] as { id: string }).id);

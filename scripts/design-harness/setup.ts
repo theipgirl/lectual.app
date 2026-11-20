@@ -245,3 +245,8 @@ vi.mock("@/lib/intake/facts", async (orig) => {
   const o = await orig<typeof import("@/lib/intake/facts")>();
   return { ...o, loadTemperatureFacts: async (...a: Parameters<typeof o.loadTemperatureFacts>) => (state as { l2Facts?: Awaited<ReturnType<typeof o.loadTemperatureFacts>> }).l2Facts ?? o.loadTemperatureFacts(...a) };
 });
+// Lead page (Sprint 9 Part 2): the top card is decided from these facts; a screen sets `state.leadStep` (screens/lead-step.screen.tsx).
+vi.mock("@/lib/lead-step/load", async (orig) => {
+  const o = await orig<typeof import("@/lib/lead-step/load")>();
+  return { ...o, loadLeadStepFacts: async (...a: Parameters<typeof o.loadLeadStepFacts>) => (state as { leadStep?: Awaited<ReturnType<typeof o.loadLeadStepFacts>> }).leadStep ?? o.loadLeadStepFacts(...a) };
+});

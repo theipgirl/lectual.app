@@ -186,8 +186,10 @@ describe("lead page: Consult booked", () => {
     vi.resetModules();
     mockPage({ mailbox: true, read: { status: "database-update-needed" } });
     const b = await render();
-    expect(b).toContain("switched on for your firm yet");
+    // A calendar that isn't switched on does not open the card by itself (`needsAttention`). The card used to open here only
+    // because the unrelated pending-approvals read failed in this mock; approvals are the top card's now (Sprint 9 Part 2).
     expect(b).not.toContain("Consult booked");
+    expect(b).toContain("Timeline");
   });
 
   it("a firm without the mailbox module triggers no read and shows nothing", async () => {

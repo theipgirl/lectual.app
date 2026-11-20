@@ -23,7 +23,7 @@ describe("the consult agent's event in the activity log", () => {
       agentEvent({
         source: "consult-proposal",
         meeting_id: "m1",
-        meeting_title: "Strategy call with Sevetri",
+        meeting_title: "Strategy call with Callum",
         notes: "Rebecca recommended word and logo marks for both brands.",
         evidence: [
           { path: "names[p].marks", quote: "I'd file the word and the logo for both", verified: true },
@@ -33,7 +33,7 @@ describe("the consult agent's event in the activity log", () => {
       ctx,
     );
     expect(line.who).toBe("The consult agent");
-    expect(line.what).toBe("drafted this proposal from the meeting “Strategy call with Sevetri”");
+    expect(line.what).toBe("drafted this proposal from the meeting “Strategy call with Callum”");
     expect(line.details[0]).toContain("Rebecca recommended word and logo marks");
     expect(line.details).toContain("From the call: “I'd file the word and the logo for both”");
     expect(line.details.some((d) => d.startsWith("Not found word for word in the call") && d.includes("four thousand"))).toBe(true);

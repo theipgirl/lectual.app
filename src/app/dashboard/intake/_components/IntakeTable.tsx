@@ -44,6 +44,12 @@ import {
   LEADS_NEEDS_STAGE,
   LEADS_RESIZE_COLUMN, BLANK } from "@/lib/ui/words";
 import { duplicateTitle, type DuplicateOf } from "@/lib/intake/duplicates";
+import { leadLabel } from "@/lib/record-card/lead-label";
+import type { IntakeCardData } from "@/lib/record-card/intake-cards";
+import { NextStepLine, StagePick } from "@/components/record-card/controls";
+import { SavedNote } from "@/components/ui/SavedNote";
+import { RECORD_CARD_SAVED, recordCardOpenLabel } from "@/lib/ui/words";
+import "@/components/record-card/record-card.css";
 
 /** The sort key and the words of each column. The Assistant activity column has no sort: it is not a value a person ranks by. */
 const COLUMNS: Record<ColKey, { key: SortKey | null; label: string }> = {
@@ -81,6 +87,9 @@ export default function IntakeTable({
   now,
   pendingLeadId,
   errors,
+  cards,
+  openHrefFor,
+  savedId,
   time,
   pendingApprovals,
   notesUnavailable,
@@ -111,6 +120,10 @@ export default function IntakeTable({
   now: Date;
   pendingLeadId: string | null;
   errors: Record<string, string>;
+  /** Sprint 10: what each role may do on each row, the open link and the next-step line. Absent: the plain list, as before. */
+  cards?: Record<string, IntakeCardData>;
+  openHrefFor?: (leadId: string) => string;
+  savedId?: string | null;
   time: IntakeTime | null;
   pendingApprovals?: LeadPendingApprovals;
   notesUnavailable?: boolean;
@@ -213,8 +226,11 @@ export default function IntakeTable({
             <tbody>
               {rows.map((row) => {
                 const lead = row.lead;
-                const name = `${lead.first_name} ${lead.last_name}`.trim() || lead.email;
-                const business = lead.mark_text?.trim() || lead.business_name?.trim() || "";
+                const card = cards?.[lead.id];
+                const openHref = openHrefFor?.(lead.id) ?? card?.openHref;
+                const label = leadLabel(lead);
+                const name = label.name;
+                const business = label.sub ?? "";
                 const step = nextStepFor(row, now, { notesUnavailable, timeZone });
                 const touch = touchStampFor(row, { now, timeZone });
                 const error = errors[lead.id];
@@ -229,18 +245,19 @@ export default function IntakeTable({
                       data-lead-row={lead.id}
                       onClick={(event) => {
                         if ((event.target as HTMLElement).closest("button, a, input, select")) return;
-                        router.push(`/dashboard/leads/${lead.id}`);
+                        router.push(openHref ?? `/dashboard/leads/${lead.id}`, card ? { scroll: false } : undefined);
                       }}
                       style={{ opacity: pending ? 0.55 : 1 }}
                     >
                       <td className="ix-lead-td" data-col="lead" data-primary="true">
-                        <Link href={`/dashboard/leads/${lead.id}`} className="ix-name sheet-link" title={name}>
+                        <Link href={openHref ?? `/dashboard/leads/${lead.id}`} scroll={card ? false : undefined} data-card-open={card ? "" : undefined} aria-label={card ? recordCardOpenLabel(name) : undefined} className="ix-name sheet-link" title={name}>
                           {name}
                         </Link>
                         <span className="ix-subline">
                           <span className="ix-sub" title={business || undefined}>
                             {business || BLANK}
                           </span>
+                          <SavedNote show={savedId === lead.id}>{RECORD_CARD_SAVED}</SavedNote>
                           {movedOut?.has(lead.id) && (
                             <span className="lx-pill lx-pill-mute" data-moved title={LEADS_MOVED_MARK_TITLE}>
                               {LEADS_MOVED_MARK}
@@ -251,10 +268,30 @@ export default function IntakeTable({
 
                       <td data-col="stage" data-label="Stage">
                         <span className="ix-stage-line">
-                          <Pill tone={row.stage ? MEANING_TONE.neutral : MEANING_TONE.needsPerson} wrap title={row.stage?.name ?? "This lead's stage no longer exists"}>
-                            {stageLabelFor(row.stage)}
-                          </Pill>
-                          <NeedsRebeccaBadge pending={pendingDrafts} />
+                          {card && card.edits.stage ? (
+                            <StagePick
+                              kind="lead"
+                              id={lead.id}
+                              name={name}
+                              stage={{ id: lead.current_stage_id, name: stageLabelFor(row.stage), targets: stages.filter((s) => s.id !== lead.current_stage_id).map((s) => ({ id: s.id, name: stageLabelFor(s) })) }}
+                              onPick={(stageId) => onMoveStage(lead.id, stageId)}
+                            />
+                          ) : (
+                            <Pill tone={row.stage ? MEANING_TONE.neutral : MEANING_TONE.needsPerson} wrap title={row.stage?.name ?? "This lead's stage no longer exists"}>
+                              {stageLabelFor(row.stage)}
+                            </Pill>
+                          )}
+                          {card?.approvals ? (
+                            card.approvals.href ? (
+                              <Link href={card.approvals.href === card.openHref && openHref ? openHref : card.approvals.href} className="lx-pill lx-pill-warn lx-pill-wrap rc-attn">
+                                {card.approvals.text}
+                              </Link>
+                            ) : (
+                              <span className="lx-pill lx-pill-mute">{card.approvals.text}</span>
+                            )
+                          ) : (
+                            !card && <NeedsRebeccaBadge pending={pendingDrafts} />
+                          )}
                           {decision && (
                             <span className="lx-pill lx-pill-warn lx-pill-wrap" data-needs-decision title={needsStageTitle(decision)}>
                               {LEADS_NEEDS_STAGE}
@@ -277,16 +314,16 @@ export default function IntakeTable({
                       </td>
 
                       <td data-col="temp" data-label="Temperature">
-                        <TemperatureCell leadName={name} temperature={row.temperature} pending={pending} onSet={(lane) => onSetLane(lead.id, lane)} />
+                        <TemperatureCell leadName={name} temperature={row.temperature} pending={pending} canEdit={card ? card.edits.temperature : true} onSet={(lane) => onSetLane(lead.id, lane)} />
                       </td>
 
                       <td data-col="source" data-label="Source">
-                        <SourceCell leadName={name} source={lead.referral_source} detail={lead.referral_detail} pending={pending} onSet={(source) => onSetSource(lead.id, source)} />
+                        <SourceCell leadName={name} source={lead.referral_source} detail={lead.referral_detail} pending={pending} canEdit={card ? card.edits.source : true} onSet={(source) => onSetSource(lead.id, source)} />
                       </td>
 
                       {hasOwnerColumn && (
                         <td data-col="owner" data-label={OWNER_COLUMN}>
-                          <OwnerCell leadName={name} owner={row.owner} assignedTo={lead.assigned_to} members={members} pending={pending} onAssign={(userId) => onAssign(lead.id, userId)} />
+                          <OwnerCell leadName={name} owner={row.owner} assignedTo={lead.assigned_to} members={members} pending={pending} canEdit={card ? card.edits.owner : true} onAssign={(userId) => onAssign(lead.id, userId)} />
                         </td>
                       )}
 
@@ -304,6 +341,7 @@ export default function IntakeTable({
 
                       <td className="rse-next-td" data-col="next" data-label={NEXT_STEP}>
                         <div className="ix-next-wrap">
+                          {card && <NextStepLine kind="lead" id={lead.id} line={card.nextStep} dueIso={card.dueIso} text={card.bottom.nextStep} />}
                           {/* Amber only on a person's own note; the sentences the page writes (waiting on, consult held) read the same on every row. */}
                           <span className="ix-next" data-urgent={step.urgent && row.latestNote?.trim() ? "" : undefined} data-muted={step.muted ? "" : undefined} title={step.text}>
                             {step.text}
@@ -315,7 +353,7 @@ export default function IntakeTable({
                       </td>
 
                       <td data-col="menu" className="ix-menu-td">
-                        <RowMenu lead={lead} name={name} stages={stages} members={members} running={time?.running ?? null} onMoveStage={onMoveStage} onAssign={onAssign} />
+                        <RowMenu card={card} openHref={openHref} lead={lead} name={name} stages={stages} members={members} running={time?.running ?? null} onMoveStage={onMoveStage} onAssign={onAssign} />
                       </td>
                     </tr>
                     {error && (

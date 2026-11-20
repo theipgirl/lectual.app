@@ -69,7 +69,7 @@ export function formatChangeValue(format: ProposalChange["format"], value: Propo
   }
 }
 
-/** "Prosperall: base price" -> "Prosperall’s base price"; other labels unchanged. */
+/** "Larkmoor: base price" -> "Larkmoor’s base price"; other labels unchanged. */
 function possessive(label: string): string {
   const i = label.indexOf(": ");
   return i > 0 ? `${label.slice(0, i)}’s ${label.slice(i + 2)}` : label;

@@ -157,7 +157,9 @@ describe("F6/P2: board cards", () => {
     expect(menu).toContain("updateMatterStageAction");
     expect(menu).toContain("Popover");
     const pop = readFileSync(path.join(root, "src/components/list-page/Popover.tsx"), "utf8");
-    expect(pop).toContain('"Escape"');
+    // Esc is decided by popoverClaimsKey (the menu claims it so a dialog around it stays open).
+    expect(pop).toContain("popoverClaimsKey");
+    expect(readFileSync(path.join(root, "src/lib/ui/dialog-keys.ts"), "utf8")).toMatch(/popoverClaimsKey[\s\S]*"Escape"/);
     expect(pop).toContain("mousedown");
   });
 });

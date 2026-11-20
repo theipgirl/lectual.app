@@ -19,7 +19,7 @@ import { generalWithLoe, twoBrandPerMark, withLoe } from "../loe/loe-fixtures";
  * firm has an active Lawmatics connection (`firm.savesAddressToLawmatics`). Nowhere else, and nothing more.
  */
 
-const LETTER = { dateText: "November 12, 2026", clientEmail: "sevetri@example.com" };
+const LETTER = { dateText: "November 12, 2026", clientEmail: "callum@example.com" };
 const esc = (s: string) => s.replace(/'/g, "&#x27;");
 
 function render(over: Partial<ProposalDocumentProps> = {}) {
@@ -27,7 +27,7 @@ function render(over: Partial<ProposalDocumentProps> = {}) {
     <ProposalDocument
       content={withLoe(twoBrandPerMark())}
       title="Trademark Proposal"
-      clientName="Sevetri Wilson"
+      clientName="Callum Ferreira"
       expiresOn="2026-12-01"
       firm={{ name: "RPB Law", slug: "rpb-law", displayName: "RPB Law Firm", savesAddressToLawmatics: true }}
       mode="live"

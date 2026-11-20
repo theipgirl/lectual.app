@@ -19,11 +19,20 @@ export function BoardColumn({
   foot,
   empty,
   ariaLabel,
+  headingLevel,
+  countTitle,
+  bare,
   children,
   className,
   ...rest
 }: {
   title: string;
+  /** Draws the title as a real heading (a person's lane is an h2). Omitted = a plain span, as every other board. */
+  headingLevel?: 2 | 3;
+  /** A hover/assistive note saying what the count covers. */
+  countTitle?: string;
+  /** The page draws its own lists inside (children are not wrapped in the card `ul`). */
+  bare?: boolean;
   titleHref?: string;
   /** Extra attributes for the title link (a data hook a test or the page reads). */
   titleLinkProps?: Record<`data-${string}`, string>;
@@ -37,23 +46,30 @@ export function BoardColumn({
   ariaLabel?: string;
   children?: React.ReactNode;
 } & Omit<React.HTMLAttributes<HTMLElement>, "title">) {
+  const Heading = (headingLevel === 3 ? "h3" : "h2") as "h2";
   const colClass = ["lx-board-col", className].filter(Boolean).join(" ");
   const header = (
     <header>
-      <span className="lx-board-title">
-        {titleHref ? (
-          <Link href={titleHref} {...titleLinkProps}>
-            {title}
-          </Link>
-        ) : (
-          title
-        )}
+      {headingLevel ? (
+        <Heading className="lx-board-title lx-board-heading">{title}</Heading>
+      ) : (
+        <span className="lx-board-title">
+          {titleHref ? (
+            <Link href={titleHref} {...titleLinkProps}>
+              {title}
+            </Link>
+          ) : (
+            title
+          )}
+        </span>
+      )}
+      <span className="lx-board-count" title={countTitle}>
+        {count}
       </span>
-      <span className="lx-board-count">{count}</span>
     </header>
   );
   // An empty array (a page mapping zero cards) counts as no cards, so the empty sentence still shows.
-  const body = Children.toArray(children).length > 0 ? <ul className="lx-board-cards">{children}</ul> : empty ? <p className="lx-board-empty">{empty}</p> : null;
+  const body = bare ? children : Children.toArray(children).length > 0 ? <ul className="lx-board-cards">{children}</ul> : empty ? <p className="lx-board-empty">{empty}</p> : null;
   if (as === "details") {
     return (
       <details className={colClass} aria-label={ariaLabel ?? title} {...(rest as React.HTMLAttributes<HTMLDetailsElement>)}>
@@ -84,6 +100,7 @@ export function BoardCard({
   foot,
   tone,
   id,
+  linkScroll,
   children,
   className,
   ...rest
@@ -97,6 +114,8 @@ export function BoardCard({
   foot?: React.ReactNode;
   tone?: PillTone;
   id?: string;
+  /** false keeps the page where it is when the title link opens a panel (the Weekly review, the opened record card). Omitted = Link's default. */
+  linkScroll?: boolean;
   children?: React.ReactNode;
 } & Omit<React.LiHTMLAttributes<HTMLLIElement>, "title">) {
   // A card with a menu but no foot line puts the menu beside its chip (or its name) so no empty strip is left at the foot.
@@ -105,7 +124,7 @@ export function BoardCard({
     <li className={["lx-board-card", className].filter(Boolean).join(" ")} data-tone={tone} id={id} {...rest}>
       <div className="lx-board-card-top">
         <span className="lx-board-card-title">
-          <Link href={href} className="lx-rowlink">
+          <Link href={href} className="lx-rowlink" {...(linkScroll === undefined ? {} : { scroll: linkScroll })}>
             {title}
           </Link>
         </span>

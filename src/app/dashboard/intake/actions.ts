@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { assignLead, moveLeadStage } from "@/lib/pipeline";
+import { listMemberDirectory } from "@/lib/members/directory";
 import { orgHasModule } from "@/lib/org/modules";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { compareRoleRules, loadCompare, type CompareResult } from "@/lib/intake/compare-load";
@@ -21,6 +22,7 @@ import { isReferralSource, type ReferralSource } from "@/lib/intake";
 import {
   friendlyLeadWriteError,
   friendlyMoveStageError,
+  MOVE_STAGE_NO_PERMISSION,
 } from "@/app/dashboard/leads/errors";
 
 /**
@@ -65,6 +67,16 @@ export async function assignLeadAction(
 
   try {
     await requireIntakeWriteRole();
+    if (userId) {
+      // Another firm's user id is refused, and an unreadable team list refuses the change rather than allowing it unchecked.
+      let member: boolean;
+      try {
+        member = (await listMemberDirectory()).some((m) => m.userId === userId);
+      } catch {
+        return { ok: false, error: "Couldn't check the team list right now, so nothing was saved. Try again." };
+      }
+      if (!member) return { ok: false, error: "That person isn't a member of your firm." };
+    }
     await assignLead(leadId, userId || null);
   } catch (err) {
     return {
@@ -91,6 +103,20 @@ export async function moveStageAction(
   if (!leadId || !stageId) return { ok: false, error: "Missing lead or stage." };
 
   try {
+    // The same refusals as the review's move: never a `won` stage (that move runs the matter handoff), and a lead already
+    // there is a no-op. The target is read through the caller's scoped client, so another firm's stage reads as missing.
+    const supabase = await getScopedClient();
+    // The role first: a role that may not move a stage reads nothing (not the lead, not the stage) and gets the one sentence.
+    if (!CAN_MOVE_STAGE.includes(await resolveCurrentRole(supabase))) return { ok: false, error: MOVE_STAGE_NO_PERMISSION };
+    // live-guard: re-reads one lead (live list) before a move whose guard refusal is mapped to a fixed sentence
+    const { data: lead, error: leadErr } = await supabase.from("crm_lead").select("id, current_stage_id").eq("id", leadId).maybeSingle();
+    if (leadErr) throw leadErr;
+    if (!lead) return { ok: false, error: "That record couldn't be found. It may have been removed." };
+    const { data: stage, error: stageErr } = await supabase.from("crm_stage").select("id, category").eq("id", stageId).maybeSingle();
+    if (stageErr) throw stageErr;
+    if (!stage) return { ok: false, error: "That stage isn't on your pipeline." };
+    if (stage.category === "won") return { ok: false, error: "Open the lead to move it to a won stage." };
+    if (lead.current_stage_id === stage.id) return { ok: false, error: "This lead is already in that stage." };
     await moveLeadStage(leadId, stageId);
   } catch (err) {
     return { ok: false, error: friendlyMoveStageError(err) };

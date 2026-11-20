@@ -14,8 +14,8 @@ import type { ProposalContent } from "@/lib/proposals/types";
 import { validateContent } from "@/lib/proposals/validate";
 import { NOW, ORG, assertOrgFenced, fakeLlm, writes } from "../agents/helpers";
 import { fakeAdmin, filterValue, type Handler, type Recorded } from "../mailbox/fake-db";
-import { sevetri } from "./fixture";
-import { faithe } from "./general-fixture";
+import { callum } from "./fixture";
+import { imogen } from "./general-fixture";
 
 /**
  * Review item 1. Every way of starting a proposal attaches the firm's approved engagement letter by default. The two that
@@ -34,7 +34,7 @@ const ok = (letter: typeof LETTER | typeof GENERAL_LETTER | null): ApprovedRead 
 
 describe("attachFirmLetter", () => {
   it("attaches the firm's approved letter of the proposal's kind, exactly as the from-scratch door's builder does", () => {
-    const r = attachFirmLetter(sevetri(), ok(LETTER), "assistant");
+    const r = attachFirmLetter(callum(), ok(LETTER), "assistant");
     expect(r.letter).toBe("attached");
     expect(r.content.loe).toEqual({ kind: "trademark", template_id: LETTER.id, template_version: 3, title: LETTER.title, body: LETTER.body });
     expect(r.content.checks ?? []).toEqual([]);
@@ -44,14 +44,14 @@ describe("attachFirmLetter", () => {
   });
 
   it("a flat-fee draft takes the flat-fee letter", () => {
-    const r = attachFirmLetter(faithe(), ok(GENERAL_LETTER), "copilot");
+    const r = attachFirmLetter(imogen(), ok(GENERAL_LETTER), "copilot");
     expect(r.letter).toBe("attached");
     expect(r.content.loe?.kind).toBe("general");
   });
 
   it("no approved letter, no letter table yet, or a letter of the other kind: nothing attached and nothing to check", () => {
     for (const read of [ok(null), { status: "not-set-up" } as ApprovedRead, ok(GENERAL_LETTER)]) {
-      const r = attachFirmLetter(sevetri(), read, "assistant");
+      const r = attachFirmLetter(callum(), read, "assistant");
       expect(r.letter).toBe("none");
       expect("loe" in r.content).toBe(false);
       expect(r.content.checks).toBeUndefined();
@@ -59,7 +59,7 @@ describe("attachFirmLetter", () => {
   });
 
   it("a FAILED read never passes silently: no letter, and a check that says so, first in the list", () => {
-    const base: ProposalContent = { ...sevetri(), checks: [{ text: "A credit was applied. Check it.", source: "consult", path: "adjustments[0]" }] };
+    const base: ProposalContent = { ...callum(), checks: [{ text: "A credit was applied. Check it.", source: "consult", path: "adjustments[0]" }] };
     const r = attachFirmLetter(base, { status: "unavailable" }, "assistant");
     expect(r.letter).toBe("unreadable");
     expect("loe" in r.content).toBe(false);
@@ -76,7 +76,7 @@ describe("attachFirmLetter", () => {
   });
 
   it("the check is drawn in the editor's Ready to send? list as a Check linked to the Engagement letter section", () => {
-    const r = attachFirmLetter(sevetri(), { status: "unavailable" }, "copilot");
+    const r = attachFirmLetter(callum(), { status: "unavailable" }, "copilot");
     const list = buildChecklist([], r.content);
     expect(list).toEqual([{ level: "check", text: LETTER_NOT_ATTACHED_CHECK, where: "engagement letter", href: "#pe-sec-letter" }]);
     const slot = readFileSync(join(process.cwd(), "src/components/proposal-editor/EngagementLetterSlot.tsx"), "utf8");
@@ -84,7 +84,7 @@ describe("attachFirmLetter", () => {
   });
 
   it("a letter that a proposal cannot carry (an unknown merge field) is treated like a failed read: not attached, checked", () => {
-    const r = attachFirmLetter(sevetri(), ok({ ...LETTER, body: "Dear {{nope}}," }), "assistant");
+    const r = attachFirmLetter(callum(), ok({ ...LETTER, body: "Dear {{nope}}," }), "assistant");
     expect(r.letter).toBe("unreadable");
     expect("loe" in r.content).toBe(false);
     expect(r.content.checks?.[0].path).toBe(LETTER_CHECK_PATH);
@@ -92,7 +92,7 @@ describe("attachFirmLetter", () => {
 
   it("keeps the list within its cap of 12 and never repeats itself", () => {
     const twelve = Array.from({ length: 12 }, (_, i) => ({ text: `Check ${i}`, source: "consult" as const, path: "pay_url" }));
-    const r = attachFirmLetter({ ...sevetri(), checks: twelve }, { status: "unavailable" }, "assistant");
+    const r = attachFirmLetter({ ...callum(), checks: twelve }, { status: "unavailable" }, "assistant");
     expect(r.content.checks).toHaveLength(12);
     expect(r.content.checks?.[0].path).toBe(LETTER_CHECK_PATH);
     const again = attachFirmLetter(r.content, { status: "unavailable" }, "assistant");
@@ -101,7 +101,7 @@ describe("attachFirmLetter", () => {
   });
 
   it("never mutates what it was given", () => {
-    const before = sevetri();
+    const before = callum();
     const frozen = JSON.stringify(before);
     attachFirmLetter(before, ok(LETTER), "assistant");
     attachFirmLetter(before, { status: "unavailable" }, "assistant");
@@ -109,10 +109,10 @@ describe("attachFirmLetter", () => {
   });
 
   it("withoutLetterCheck removes only that check (the editor's Save calls it once a person has chosen)", () => {
-    const withBoth: ProposalContent = { ...sevetri(), checks: [{ text: LETTER_NOT_ATTACHED_CHECK, source: "assistant", path: "loe" }, { text: "Other", source: "consult", path: "pay_url" }] };
+    const withBoth: ProposalContent = { ...callum(), checks: [{ text: LETTER_NOT_ATTACHED_CHECK, source: "assistant", path: "loe" }, { text: "Other", source: "consult", path: "pay_url" }] };
     expect(withoutLetterCheck(withBoth).checks).toEqual([{ text: "Other", source: "consult", path: "pay_url" }]);
-    expect("checks" in withoutLetterCheck({ ...sevetri(), checks: [{ text: LETTER_NOT_ATTACHED_CHECK, source: "assistant", path: "loe" }] })).toBe(false);
-    const plain = sevetri();
+    expect("checks" in withoutLetterCheck({ ...callum(), checks: [{ text: LETTER_NOT_ATTACHED_CHECK, source: "assistant", path: "loe" }] })).toBe(false);
+    const plain = callum();
     expect(withoutLetterCheck(plain)).toBe(plain);
   });
 });
@@ -120,10 +120,10 @@ describe("attachFirmLetter", () => {
 /* ─────────────────────────── the consult assistant ─────────────────────────── */
 
 const TRANSCRIPT = [
-  "Rebecca: Thanks for joining, Sevetri. Based on what you've told me I'd file the word mark for Prosperall and the logo too.",
-  "Sevetri: Great, that sounds right to me.",
-  "Rebecca: For Prosperall the right category is cloud based software as a service, so I'd cover that class.",
-  "Sevetri: Please send me the proposal and I'll look at it tonight. ".repeat(3),
+  "Rebecca: Thanks for joining, Callum. Based on what you've told me I'd file the word mark for Larkmoor and the logo too.",
+  "Callum: Great, that sounds right to me.",
+  "Rebecca: For Larkmoor the right category is cloud based software as a service, so I'd cover that class.",
+  "Callum: Please send me the proposal and I'll look at it tonight. ".repeat(3),
 ].join("\n");
 
 const EXTRACT = {
@@ -131,12 +131,12 @@ const EXTRACT = {
   recommendation_found: true,
   brands: [
     {
-      name: "Prosperall",
+      name: "Larkmoor",
       what: "Your company name",
       note_from_attorney: null,
       marks: [
-        { kind: "word", preselected: true, why_quote: "I'd file the word mark for Prosperall and the logo too" },
-        { kind: "logo", preselected: true, why_quote: "I'd file the word mark for Prosperall and the logo too" },
+        { kind: "word", preselected: true, why_quote: "I'd file the word mark for Larkmoor and the logo too" },
+        { kind: "logo", preselected: true, why_quote: "I'd file the word mark for Larkmoor and the logo too" },
       ],
       classes: [{ label: "Cloud-Based Software as a Service (SaaS)", preselected: true, why_quote: "the right category is cloud based software as a service" }],
     },
@@ -146,7 +146,7 @@ const EXTRACT = {
   reduced_package: null,
   price_changes: [],
   credits: [],
-  recommendation_summary: "Rebecca recommended word and logo marks for Prosperall.",
+  recommendation_summary: "Rebecca recommended word and logo marks for Larkmoor.",
   reasoning_parts: { principle: true, risk_brand: null, risk_quote: null, fallback_brand: null, fallback_quote: null },
 };
 
@@ -185,7 +185,7 @@ function consultSetup(letter: LetterAnswer) {
     orgId: ORG,
     actorUserId: "user-1",
     source: { kind: "pasted", text: TRANSCRIPT },
-    lead: { id: "lead-1", firstName: "Sevetri", lastName: "Wilson", email: "sevetri@example.com", businessName: "Prosperall" },
+    lead: { id: "lead-1", firstName: "Callum", lastName: "Ferreira", email: "callum@example.com", businessName: "Larkmoor" },
     matterId: null,
     llm,
     createDraft,

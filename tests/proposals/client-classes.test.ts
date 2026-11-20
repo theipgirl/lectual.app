@@ -15,13 +15,13 @@ import {
 import { defaultSelection, isFixedOffer, lockedSelectionIds, normalizeSelection, quoteProposal } from "@/lib/proposals/pricing";
 import { validateContent } from "@/lib/proposals/validate";
 import type { ProposalContent } from "@/lib/proposals/types";
-import { sevetri } from "./fixture";
+import { callum } from "./fixture";
 
 const pick = (...ids: string[]) => Object.fromEntries(ids.map((id) => [id, true]));
 
 /** Essential-shaped: $1,950 base, 1 class included, $825 per extra class, $350 USPTO; one brand, one firm class. */
 function essential(): ProposalContent {
-  const c = sevetri();
+  const c = callum();
   c.pricing = { ...c.pricing, package: "Essential", base_cents: 195_000, included_classes: 1, per_class_cents: 82_500, gov_per_class_cents: 35_000 };
   c.names = [{ ...c.names[0], classes: [c.names[0].classes[0]] }];
   return c;
@@ -72,7 +72,7 @@ describe("clientAddMax: an explicit max wins, else 5, else 0 on a fixed offer", 
   };
 
   it("explicit: an integer 0..10 (clamped); not a whole number is the firm saying nothing", () => {
-    const c = sevetri();
+    const c = callum();
     expect(explicitClientAddMax({ client_add: { max: 3 } })).toBe(3);
     expect(explicitClientAddMax({ client_add: { max: 99 } })).toBe(10);
     expect(explicitClientAddMax({ client_add: { max: -1 } })).toBe(0);
@@ -83,7 +83,7 @@ describe("clientAddMax: an explicit max wins, else 5, else 0 on a fixed offer", 
   });
 
   it("absent: Sprint 28's 5 for an offer with a choice in it", () => {
-    const c = sevetri();
+    const c = callum();
     expect(clientAddMax(c, c.names[0])).toBe(DEFAULT_CLIENT_ADD);
     expect(DEFAULT_CLIENT_ADD).toBe(5);
     // two marks, one class: still a choice
@@ -126,7 +126,7 @@ describe("parseClientClassInput: the server is the authority", () => {
   });
 
   it("drops adds for unknown names, for names whose max is 0, and past max", () => {
-    const two = sevetri();
+    const two = callum();
     two.names[0].client_add = { max: 2 };
     two.names[1].client_add = { max: 0 };
     const got = parseClientClassInput(two, {
@@ -150,7 +150,7 @@ describe("parseClientClassInput: the server is the authority", () => {
   });
 
   it("reads the Sprint 28 shape { nameId: string[] } as ticked added classes, up to the default 5", () => {
-    const c = sevetri();
+    const c = callum();
     const got = parseClientClassInput(c, { p: ["Online store", " <b>Events</b> ", "c", "d", "e", "f"] });
     expect(got.added.p).toEqual(["Online store", "bEvents/b", "c", "d", "e"].map((text) => ({ text, on: true })));
     expect(got.entries).toEqual({});

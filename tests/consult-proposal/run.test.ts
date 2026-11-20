@@ -13,11 +13,11 @@ import { fakeAdmin, filterValue, type Handler, type Recorded } from "../mailbox/
  */
 
 const TRANSCRIPT = [
-  "Rebecca: Thanks for joining, Sevetri. Based on what you've told me I'd file the word mark for Prosperall and the logo too.",
-  "Sevetri: Great, that sounds right to me.",
-  "Rebecca: For Prosperall the right category is cloud based software as a service, so I'd cover that class.",
-  "Rebecca: Same for Tech4PublicGood, the word mark and the logo, for charitable services.",
-  "Sevetri: Please send me the proposal and I'll look at it tonight. ".repeat(3),
+  "Rebecca: Thanks for joining, Callum. Based on what you've told me I'd file the word mark for Larkmoor and the logo too.",
+  "Callum: Great, that sounds right to me.",
+  "Rebecca: For Larkmoor the right category is cloud based software as a service, so I'd cover that class.",
+  "Rebecca: Same for Open4Everyone, the word mark and the logo, for charitable services.",
+  "Callum: Please send me the proposal and I'll look at it tonight. ".repeat(3),
 ].join("\n");
 
 const EXTRACT = {
@@ -25,22 +25,22 @@ const EXTRACT = {
   recommendation_found: true,
   brands: [
     {
-      name: "Prosperall",
+      name: "Larkmoor",
       what: "Your company name",
       note_from_attorney: null,
       marks: [
-        { kind: "word", preselected: true, why_quote: "I'd file the word mark for Prosperall and the logo too" },
-        { kind: "logo", preselected: true, why_quote: "I'd file the word mark for Prosperall and the logo too" },
+        { kind: "word", preselected: true, why_quote: "I'd file the word mark for Larkmoor and the logo too" },
+        { kind: "logo", preselected: true, why_quote: "I'd file the word mark for Larkmoor and the logo too" },
       ],
       classes: [{ label: "Cloud-Based Software as a Service (SaaS)", preselected: true, why_quote: "the right category is cloud based software as a service" }],
     },
     {
-      name: "Tech4PublicGood",
+      name: "Open4Everyone",
       what: "Your nonprofit initiative",
       note_from_attorney: null,
       marks: [
-        { kind: "word", preselected: true, why_quote: "Same for Tech4PublicGood, the word mark and the logo" },
-        { kind: "logo", preselected: true, why_quote: "Same for Tech4PublicGood, the word mark and the logo" },
+        { kind: "word", preselected: true, why_quote: "Same for Open4Everyone, the word mark and the logo" },
+        { kind: "logo", preselected: true, why_quote: "Same for Open4Everyone, the word mark and the logo" },
       ],
       classes: [{ label: "Charitable Services", preselected: true, why_quote: "for charitable services" }],
     },
@@ -55,7 +55,7 @@ const EXTRACT = {
 };
 const NOTHING = { ...EXTRACT, recommendation_found: false, brands: [], recommendation_summary: "No filings were recommended." };
 
-const LEAD = { id: "lead-1", firstName: "Sevetri", lastName: "Wilson", email: "sevetri@example.com", businessName: "Prosperall" };
+const LEAD = { id: "lead-1", firstName: "Callum", lastName: "Ferreira", email: "callum@example.com", businessName: "Larkmoor" };
 const TOKEN = "T".repeat(43);
 
 type Opts = {
@@ -147,7 +147,7 @@ describe("runConsultProposal", () => {
       source: "agent",
       version: 1,
       lead_id: "lead-1",
-      client_name: "Sevetri Wilson",
+      client_name: "Callum Ferreira",
       created_by: "user-1",
       pay_url: null,
     });
@@ -169,11 +169,11 @@ describe("runConsultProposal", () => {
     // The email, in the queue.
     expect(t.createDraft).toHaveBeenCalledTimes(1);
     const queued = (t.createDraft.mock.calls[0] as unknown as [Record<string, unknown>])[0];
-    expect(queued).toMatchObject({ orgKey: "firm-queue-key", agent: "post-consult", type: "CLIENT_EMAIL", recipient: "sevetri@example.com", clientName: "Sevetri Wilson" });
-    expect(queued.headline).toBe("[TEST] Proposal + follow-up — Sevetri Wilson");
+    expect(queued).toMatchObject({ orgKey: "firm-queue-key", agent: "post-consult", type: "CLIENT_EMAIL", recipient: "callum@example.com", clientName: "Callum Ferreira" });
+    expect(queued.headline).toBe("[TEST] Proposal + follow-up — Callum Ferreira");
     expect(String(queued.subject)).toMatch(/^\[TEST\] Your Trademark Proposal from RPB Law/);
     expect(String(queued.draftBody)).toContain(`https://app.example.com/p/${TOKEN}/`);
-    expect(String(queued.draftBody)).toContain("Sevetri Wilson Trademark Proposal");
+    expect(String(queued.draftBody)).toContain("Callum Ferreira Trademark Proposal");
     expect(String(queued.draftBody)).toContain("The RPB Law Team");
     expect(String(queued.summary)).toContain(`https://app.example.com/dashboard/proposals/${r.proposalId}/`);
 
@@ -409,7 +409,7 @@ describe("runConsultProposal failure handling", () => {
     const t = setup();
     const base = handler();
     const db = fakeAdmin((q) => {
-      if (q.table === "client_proposal_setting") throw new Error("connect ECONNRESET for sevetri@example.com");
+      if (q.table === "client_proposal_setting") throw new Error("connect ECONNRESET for callum@example.com");
       return base(q);
     });
     const r = await runConsultProposal({ ...t.input, db: db.client as unknown as SupabaseClient });
@@ -417,7 +417,7 @@ describe("runConsultProposal failure handling", () => {
     if (!r.ok) expect(r.message).toMatch(/nothing was sent/i);
     const [line] = logged(spy);
     expect(line).toMatchObject({ event: "consult_proposal_failed", stage: "settings", name: "Error" });
-    expect(JSON.stringify(line)).not.toContain("sevetri@example.com");
+    expect(JSON.stringify(line)).not.toContain("callum@example.com");
     spy.mockRestore();
   });
 
@@ -500,10 +500,10 @@ describe("runConsultProposal: the package from the firm's list and the lead on b
   ];
   const SETTING = { approver_user_ids: ["rebecca"], pricing: { ...PACKAGES[0], packages: PACKAGES } };
   const ESSENTIAL_TALK = [
-    "Rebecca: Based on what you've told me I'd file the word mark for Prosperall and the logo too.",
-    "Rebecca: For Prosperall the right category is cloud based software as a service, so I'd cover that class.",
+    "Rebecca: Based on what you've told me I'd file the word mark for Larkmoor and the logo too.",
+    "Rebecca: For Larkmoor the right category is cloud based software as a service, so I'd cover that class.",
     "Rebecca: I think the Essential package is the right fit. And I'll give you a $150 credit, plus 10% off the second mark.",
-    "Sevetri: Please send me the proposal and I'll look at it tonight. ".repeat(3),
+    "Callum: Please send me the proposal and I'll look at it tonight. ".repeat(3),
   ].join("\n");
   const essentialExtract = {
     ...EXTRACT,

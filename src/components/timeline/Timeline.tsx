@@ -1,4 +1,5 @@
-import { relativeTime } from "@/lib/relative-time";
+import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
+import { civilDay, formatDay, formatDayTime } from "@/lib/ui/dates";
 import { describeActivity } from "@/components/leads/describe";
 import { UndoAgentMoveButton } from "@/components/leads/StageKeeperControls";
 import { isAgentMoveRow, undoStateFor } from "@/lib/stage-keeper/moves";
@@ -17,6 +18,14 @@ export type TimelineUndo = {
   currentStageId: string | null;
 };
 
+/** The real date of an entry ("Nov 11", with the year when it is not this year) in the firm's zone; never "6 days ago". */
+export function timelineDate(iso: string, timeZone?: string, now: Date = new Date()): string {
+  const tz = timeZone ?? DEFAULT_TIME_ZONE;
+  // Today's entries also carry the time, so several on the same day keep their order.
+  if (civilDay(iso, tz) === civilDay(now, tz)) return formatDayTime(iso, { tz, now }) ?? "";
+  return formatDay(iso, { tz, now }) ?? "";
+}
+
 /**
  * A record's activity timeline (lead or matter). Voice notes play from a
  * short-lived signed URL the page minted through the caller's own scoped
@@ -32,11 +41,14 @@ export function Timeline({
   mediaUrls = {},
   timeZone,
   undo,
+  now,
 }: {
   rows: readonly Row[];
   mediaUrls?: Record<string, string>;
   timeZone?: string;
   undo?: TimelineUndo;
+  /** "Today" for the dates (tests pass a fixed one); the current time otherwise. */
+  now?: Date;
 }) {
   if (rows.length === 0) return <EmptyState variant="line">{noneYet("timeline entries")}</EmptyState>;
   // Undo reads only the lead's OWN rows: a merged lead's rows (M5) are history, never acted on.
@@ -52,7 +64,7 @@ export function Timeline({
           <li key={r.id} data-tone={d.tone}>
             <div className="lx-timeline-head">
               <span>{d.title}</span>
-              <span className="lx-note">{relativeTime(r.created_at, undefined, timeZone)}</span>
+              <span className="lx-note">{timelineDate(r.created_at, timeZone, now)}</span>
             </div>
             {audio && <audio controls preload="none" src={audio} aria-label="Voice note" style={{ width: "100%", height: 34, marginTop: 6 }} />}
             {d.detail && <p>{d.detail}</p>}

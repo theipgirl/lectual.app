@@ -11,7 +11,7 @@ import type { SignatureRead } from "@/lib/loe/signature-read";
 import { FINGERPRINT, signedTrademark } from "./signed-fixtures";
 
 const ID = "44444444-4444-4444-8444-444444444444";
-const OK: SignatureRead = { status: "ok", signature: { id: "s1", signerName: "Sevetri Wilson", signedAt: "2026-11-12T19:14:00.000Z", fingerprint: FINGERPRINT, entityName: null, signerTitle: null, templateVersion: 3 } };
+const OK: SignatureRead = { status: "ok", signature: { id: "s1", signerName: "Callum Ferreira", signedAt: "2026-11-12T19:14:00.000Z", fingerprint: FINGERPRINT, entityName: null, signerTitle: null, templateVersion: 3 } };
 const ev = (payload: Record<string, unknown>, i = 0) => ({ proposal_id: ID, type: "edited", created_at: `2026-11-12T19:1${i}:00.000Z`, payload });
 
 function html(steps: Array<Record<string, unknown>>, canRetry = true) {

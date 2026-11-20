@@ -3,7 +3,7 @@
  * review panel and receipt, the staff proposal page, the accept notice and the Lawmatics note. Pure. Package names
  * are the firm's own text (never client-typed), so they may travel; the client's class words never do.
  *
- * Spec 7: a brand name whose MARKS carry their own packages names each one: "The Fold — word mark, Enhanced; design
+ * Spec 7: a brand name whose MARKS carry their own packages names each one: "The Pleat — word mark, Enhanced; design
  * mark, Essential".
  */
 
@@ -27,7 +27,7 @@ export function markPackagesText(marks: ReadonlyArray<LineMark> | null | undefin
 }
 
 /**
- * "The Fold — Enhanced" for a brand name priced under a chosen package; "The Fold — word mark, Enhanced; design mark,
+ * "The Pleat — Enhanced" for a brand name priced under a chosen package; "The Pleat — word mark, Enhanced; design mark,
  * Essential" for one whose marks carry their own; the plain name otherwise.
  */
 export function packageLineTitle(qn: LineName): string {
@@ -36,7 +36,7 @@ export function packageLineTitle(qn: LineName): string {
   return marks ? `${qn.name} — ${marks}` : qn.name;
 }
 
-/** "The Fold — Enhanced; The Confidence Interval — Concierge" for the INCLUDED names that carry a package, or "". */
+/** "The Pleat — Enhanced; The Margin Note — Concierge" for the INCLUDED names that carry a package, or "". */
 export function chosenPackagesText(names: ReadonlyArray<LineName & { included: boolean }> | null | undefined): string {
   return (names ?? [])
     .filter((n) => n.included && ((typeof n.package === "string" && n.package) || markPackagesText(n.marks)))

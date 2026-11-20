@@ -25,9 +25,18 @@ import { loadPendingApprovalsByLead } from "@/lib/queue/lead-pending";
 import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { getFirmTimeZone } from "@/lib/org/profile";
+import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
 import { loadAgentMoves, type AgentMovesRead } from "@/lib/stage-keeper/read";
 import { loadStageDecisions, type StageDecisionsRead } from "@/lib/intake/stage-decisions-read";
 import { canReconcile } from "@/lib/reconcile/roles";
+import { getScopedClient } from "@/lib/db/scoped-client";
+import { mergeAvailable } from "@/lib/leads/live";
+import { RecordCardHost } from "@/components/record-card/RecordCardHost";
+import { buildIntakeCards } from "@/lib/record-card/intake-cards";
+import { parseCardOpen } from "@/lib/record-card/open";
+import { loadOpenSteps } from "@/lib/record-card/steps-read";
+import type { CardRead, CardMember } from "@/lib/record-card/model";
+
 import { LeadsLoadFailed, NoLeadStages } from "./_components/LeadsNotices";
 import { INTAKE_NAME } from "@/lib/ui/words";
 import IntakeWorkspace from "./_components/IntakeWorkspace";
@@ -91,7 +100,7 @@ export default async function IntakePage({
 
   // The Stage Keeper's recent moves, for the chip and the "Agent moves" filter. Two states: a read
   // that failed is `unavailable`, which the workspace says out loud and never filters on.
-  const zonePromise = getFirmTimeZone().catch(() => "UTC");
+  const zonePromise = getFirmTimeZone().catch(() => DEFAULT_TIME_ZONE);
   const agentMovesPromise: Promise<AgentMovesRead> = zonePromise
     .then((tz) => loadAgentMoves(now, tz))
     .catch((): AgentMovesRead => ({ status: "unavailable" }));
@@ -222,9 +231,35 @@ export default async function IntakePage({
     now,
   });
 
+  // The card data (Sprint 10 Part 2): which controls each role gets, the open link, the next-step and bottom lines. An
+  // unreadable member list or step read is its own state, never an empty one; a failed merge probe means no Merge link.
+  const mergeOn = await getScopedClient().then((db) => mergeAvailable(db)).catch(() => false);
+  const stepsRead = await loadOpenSteps("lead", leads.map((l) => l.id));
+  // The directory read above can't tell "failed" from "empty", but a firm always has at least its own member: empty is unreadable.
+  const memberRead: CardRead<CardMember[]> = members.length > 0 ? { status: "ok", value: members.map((m) => ({ userId: m.userId, name: (m.displayName ?? m.email ?? "").trim() || "A teammate" })) } : { status: "unavailable" };
+  const cards = buildIntakeCards({
+    rows,
+    ctx: {
+      role: session?.kind === "ok" ? session.role : null,
+      members: memberRead,
+      stages: { status: "ok", value: stages },
+      mergeAvailable: mergeOn === true,
+      path: "/dashboard/intake/",
+      params: params as Record<string, string | string[] | undefined>,
+      now,
+      timeZone: firmZone,
+      lostShown: lostView,
+    },
+    steps: stepsRead,
+    approvals: pendingApprovals,
+    duplicates,
+  });
+  const openRef = parseCardOpen((params as Record<string, string | string[] | undefined>).open);
+
   return (
     <div className="intake-root" data-tour="intake-board">
     <IntakeWorkspace
+      cards={cards}
       rows={rows}
       stages={stages}
       intakeStages={columns}
@@ -248,6 +283,7 @@ export default async function IntakePage({
       agentMoves={agentMoves.status === "ok" ? { status: "ok", truncated: agentMoves.truncated } : { status: "unavailable" }}
       stageDecisions={decisions.status === "ok" ? { status: "ok", truncated: decisions.truncated } : { status: "unavailable" }}
     />
+    {openRef ? <RecordCardHost open={openRef} path="/dashboard/intake/" params={params as Record<string, string | string[] | undefined>} duplicateOf={duplicates[openRef.id]?.leadId ?? null} /> : null}
     </div>
   );
 }

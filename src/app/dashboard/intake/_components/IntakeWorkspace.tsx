@@ -33,6 +33,9 @@ import { moveTargetStages } from "@/lib/intake/board-columns";
 import { boardModel } from "@/lib/intake/board-columns";
 import { hiddenSelectedCount, movableIds, selectShown, selectionKey } from "@/lib/intake/selection";
 import type { IntakeTime } from "@/lib/time";
+import { openHrefFromHref } from "@/lib/record-card/open";
+import { resyncRows } from "@/lib/intake/resync";
+import type { IntakeCardData } from "@/lib/record-card/intake-cards";
 import { ListHeader } from "@/components/list-page/ListHeader";
 import { ListToolbar } from "@/components/list-page/ListToolbar";
 import { MoreMenu } from "@/components/list-page/MoreMenu";
@@ -80,6 +83,7 @@ const URL_SYNC_DELAY_MS = 300;
  */
 export default function IntakeWorkspace({
   rows: initialRows,
+  cards,
   stages,
   intakeStages,
   lostStages = [],
@@ -104,6 +108,8 @@ export default function IntakeWorkspace({
 }: {
   /** The rows of the server's set: the intake list, or the lost leads when `lostView`. */
   rows: IntakeRow[];
+  /** What each role gets on each lead's card and row (the open link, controls, next step). Absent: the plain list, as before. */
+  cards?: Record<string, IntakeCardData>;
   stages: Stage[];
   intakeStages: Stage[];
   lostStages?: Stage[];
@@ -135,10 +141,18 @@ export default function IntakeWorkspace({
   timeZone?: string;
 }) {
   const [rows, setRows] = useState(initialRows);
+  // Fresh rows from the server (a save in the opened card, router.refresh()) replace the drawn ones; the row with a write in flight keeps its optimistic version.
+  const [seenRows, setSeenRows] = useState(initialRows);
   const [filters, setFilters] = useState(initialFilters);
   const [viewState, setViewState] = useState(initialViewState);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  if (seenRows !== initialRows) {
+    setSeenRows(initialRows);
+    setRows((current) => resyncRows(current, initialRows, pendingId));
+  }
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [announce, setAnnounce] = useState("");
   const [pinned, setPinned] = useState<string[]>([]);
   const [colExtra, setColExtra] = useState<Record<string, number>>({});
@@ -164,6 +178,9 @@ export default function IntakeWorkspace({
     // The set the person CHOSE, not the one drawn: while the All-open fallback shows, the URL must not lock `set=open` in.
     viewState,
   );
+
+  // Open links are built from the CURRENT address, so a filter, search or page change survives opening, closing and Back.
+  const openHrefFor = (leadId: string) => openHrefFromHref("/dashboard/intake/", href, { kind: "lead", id: leadId });
 
   // The URL mirrors the state (history.replaceState, not a router push: the page re-reads a dozen things on a navigation).
   const firstRender = useRef(true);
@@ -275,7 +292,13 @@ export default function IntakeWorkspace({
         if (!result.ok) {
           setRows(prior);
           setErrors((current) => ({ ...current, [leadId]: result.error }));
-        } else onOk?.();
+        } else {
+          // The quiet "Saved" comes only from the action's own { ok: true }.
+          setSavedId(leadId);
+          if (savedTimer.current) clearTimeout(savedTimer.current);
+          savedTimer.current = setTimeout(() => setSavedId(null), 3000);
+          onOk?.();
+        }
       });
     },
     [rows],
@@ -550,6 +573,11 @@ export default function IntakeWorkspace({
             now={now}
             pendingLeadId={pendingId}
             errors={errors}
+            cards={cards}
+            openHrefFor={openHrefFor}
+            savedId={savedId}
+            onSetLane={setLane}
+            onSetSource={setSource}
             time={time}
             pendingApprovals={pendingApprovals}
             rowById={rowById}
@@ -581,6 +609,9 @@ export default function IntakeWorkspace({
           now={now}
           pendingLeadId={pendingId}
           errors={errors}
+          cards={cards}
+          openHrefFor={openHrefFor}
+          savedId={savedId}
           time={time}
           pendingApprovals={pendingApprovals}
           notesUnavailable={notesUnavailable}

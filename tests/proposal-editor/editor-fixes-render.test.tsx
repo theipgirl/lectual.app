@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { ProposalDetail } from "@/lib/proposals/store";
 import type { ProposalRow, ProposalStatus } from "@/lib/proposals/types";
 import { defaultSelection, quoteProposal } from "@/lib/proposals/pricing";
-import { sevetri } from "../proposals/fixture";
+import { callum } from "../proposals/fixture";
 
 /**
  * Editor fixes (2026-11-12). Rendered with the REAL page and components and the data layer mocked (no database,
@@ -24,7 +24,7 @@ const SETTINGS = { pricing: { packages: [] }, approver_user_ids: ["u9"] };
 function row(over: Partial<ProposalRow> = {}): ProposalRow {
   return {
     id: ID, org_id: "o", family_id: ID, version: 1, public_token: "t".repeat(43), lead_id: null, matter_id: null,
-    client_name: "Sevetri Wilson", client_email: "s@example.com", title: "Trademark Proposal", status: "draft", content: sevetri(),
+    client_name: "Callum Ferreira", client_email: "s@example.com", title: "Trademark Proposal", status: "draft", content: callum(),
     expires_on: "2026-12-10", pay_url: "https://pay.example/x", source: "manual", created_by: null, updated_by: null, approved_by: null,
     approved_at: null, sent_at: null, accepted_at: null, superseded_at: null, withdrawn_at: null, accepted_selection: null, accepted_snapshot: null,
     created_at: "2026-10-18T12:00:00Z", updated_at: "2026-10-18T12:00:00Z", ...over,
@@ -33,7 +33,7 @@ function row(over: Partial<ProposalRow> = {}): ProposalRow {
 
 function forStatus(status: ProposalStatus): ProposalRow {
   if (status === "accepted") {
-    const c = sevetri();
+    const c = callum();
     const sel = defaultSelection(c);
     return row({ status, sent_at: "2026-11-01T12:00:00Z", accepted_at: "2026-11-02T12:00:00Z", accepted_selection: sel as never, accepted_snapshot: { schema: 1, content: c, selection: sel, quote: quoteProposal(c, sel) } as never });
   }

@@ -9,7 +9,7 @@ process.env.__NEXT_TRAILING_SLASH = "true";
 const text = (html: string) => html.replaceAll("&#x27;", "'").replaceAll("&apos;", "'").replaceAll("<!-- -->", "");
 const item = (over: Partial<NeedsReviewItem> = {}): NeedsReviewItem => ({ key: "n1", href: "/dashboard/matters/m9/", name: "Response to office action", matter: "TM-9 · Old Mark", dueDate: "2025-01-15", daysPastDue: 299, ...over });
 const row = (over: Partial<UpcomingDeadline> = {}) =>
-  ({ id: "d1", matter_id: "m1", kind: "office_action_response", title: null, due_date: "2025-01-15", status: "open", attorney_confirmed: false, source: "manual", matter_number: "TM-1", matter_title: "The Fold", ...over }) as UpcomingDeadline;
+  ({ id: "d1", matter_id: "m1", kind: "office_action_response", title: null, due_date: "2025-01-15", status: "open", attorney_confirmed: false, source: "manual", matter_number: "TM-1", matter_title: "The Pleat", ...over }) as UpcomingDeadline;
 
 describe("technician Today: Needs review card", () => {
   it("renders the items with matter, days past due and a matter link", () => {
@@ -45,7 +45,7 @@ describe("needsReviewItems", () => {
     );
     expect(out.map((o) => o.key)).toEqual(["b", "a"]);
     expect(out[0].daysPastDue).toBe(664);
-    expect(out[0].matter).toBe("TM-1 · The Fold");
+    expect(out[0].matter).toBe("TM-1 · The Pleat");
     expect(out[0].href).toBe("/dashboard/matters/m1/");
     expect(out[0].name.length).toBeGreaterThan(0);
   });

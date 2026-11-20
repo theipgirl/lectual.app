@@ -89,11 +89,12 @@ beforeEach(() => {
   state.meta = {};
 });
 
+const SHA = "a".repeat(64);
 const NOT_SWITCHED_ON = "This isn't switched on for your firm yet. Lectual will turn it on.";
 
 describe("the role-views gate", () => {
   it.each([
-    ["approve", () => A.approveCardAction("q1")],
+    ["approve", () => A.approveCardAction("q1", SHA)],
     ["mark read", () => A.markReadCardAction("q1")],
     ["reject", () => A.rejectCardAction("q1", "no")],
     ["done", () => A.doneCardAction("q1")],
@@ -121,7 +122,7 @@ describe("every action re-checks the caller", () => {
     ["a viewer", sessionFor(U.viewer, "viewer")],
   ])("%s gets nothing done", async (_n, session) => {
     state.session = session;
-    for (const r of [await A.approveCardAction("q1"), await A.rejectCardAction("q1", "x"), await A.doneCardAction("q1"), await A.handOffCardAction("q1", U.caitlyn, ""), await A.laterCardAction("q1"), await A.sendDraftNowAction("q1", "AAMk1")]) {
+    for (const r of [await A.approveCardAction("q1", SHA), await A.rejectCardAction("q1", "x"), await A.doneCardAction("q1"), await A.handOffCardAction("q1", U.caitlyn, ""), await A.laterCardAction("q1"), await A.sendDraftNowAction("q1", "AAMk1")]) {
       expect(r.ok).toBe(false);
     }
     expect(state.core).not.toHaveBeenCalled();
@@ -130,25 +131,32 @@ describe("every action re-checks the caller", () => {
   });
 
   it("Yes runs the shared core with a receipt and returns where the draft is", async () => {
-    const r = await A.approveCardAction("q1");
-    expect(state.core).toHaveBeenCalledWith({ id: "q1", intent: "approve", withReceipt: true });
+    const r = await A.approveCardAction("q1", SHA);
+    expect(state.core).toHaveBeenCalledWith({ id: "q1", intent: "approve", withReceipt: true, requireShown: true, shownSha256: SHA });
     expect(r).toMatchObject({ ok: true, draft: { provider: "microsoft", webLink: "https://outlook/d", draftId: "AAMk1", canSend: true } });
   });
 
   it("a second Yes on a decided card (another tab, a replayed POST) is refused by the core and drafts nothing", async () => {
     state.core.mockResolvedValue({ kind: "error", error: "This card was already decided." });
-    expect(await A.approveCardAction("q1")).toEqual({ ok: false, error: "This card was already decided." });
+    expect(await A.approveCardAction("q1", SHA)).toEqual({ ok: false, error: "This card was already decided." });
     expect(await A.markReadCardAction("q1")).toMatchObject({ ok: false });
   });
 
   it("the core's refusal comes back as it is (routing, gates, stale)", async () => {
     state.core.mockResolvedValue({ kind: "error", error: "Only an attorney can approve this kind of message." });
-    expect(await A.approveCardAction("q1")).toEqual({ ok: false, error: "Only an attorney can approve this kind of message." });
+    expect(await A.approveCardAction("q1", SHA)).toEqual({ ok: false, error: "Only an attorney can approve this kind of message." });
+  });
+
+  it("Yes without the hash of the text shown (or a malformed one) is refused and the core is never called", async () => {
+    for (const bad of [undefined, null, "", "abc", "A".repeat(64), 42]) {
+      expect(await A.approveCardAction("q1", bad)).toEqual({ ok: false, error: "The draft changed. Refresh to see it." });
+    }
+    expect(state.core).not.toHaveBeenCalled();
   });
 
   it("an id that isn't a queue id is refused before anything", async () => {
-    expect((await A.approveCardAction("../../x")).ok).toBe(false);
-    expect((await A.approveCardAction(42)).ok).toBe(false);
+    expect((await A.approveCardAction("../../x", SHA)).ok).toBe(false);
+    expect((await A.approveCardAction(42, SHA)).ok).toBe(false);
     expect(state.core).not.toHaveBeenCalled();
   });
 
@@ -168,10 +176,10 @@ describe("every action re-checks the caller", () => {
 
   it("Send is not offered when the permission isn't there, with the reconnect line", async () => {
     state.sendAccess = "needs-permission";
-    const r = await A.approveCardAction("q1");
+    const r = await A.approveCardAction("q1", SHA);
     expect(r).toMatchObject({ ok: true, draft: { canSend: false, sendNote: expect.stringMatching(/reconnect your Outlook/) } });
     state.sendAccess = "switched-off";
-    expect(await A.approveCardAction("q1")).toMatchObject({ ok: true, draft: { canSend: false, sendNote: expect.stringMatching(/isn't switched on/) } });
+    expect(await A.approveCardAction("q1", SHA)).toMatchObject({ ok: true, draft: { canSend: false, sendNote: expect.stringMatching(/isn't switched on/) } });
   });
 });
 
@@ -226,6 +234,18 @@ describe("hand off", () => {
     expect(state.record).toHaveBeenCalledWith({ orgId: "org-1", queueItemId: "q1", kind: "handoff", targetUserId: U.caitlyn, note: "tidy" });
     // The actor is never passed: the database default is auth.uid().
     expect(Object.keys(state.record.mock.calls[0][0])).not.toContain("actorId");
+  });
+
+  it("a Hand off note over the limit is refused, never cut, and nothing is written", async () => {
+    expect(await A.handOffCardAction("q1", U.caitlyn, "x".repeat(501))).toEqual({ ok: false, error: "That note is too long. Keep it to 500 characters." });
+    expect(state.record).not.toHaveBeenCalled();
+    expect(state.notify).not.toHaveBeenCalled();
+  });
+
+  it("a Hand off note of exactly 500 characters is accepted whole", async () => {
+    const note = "y".repeat(500);
+    expect((await A.handOffCardAction("q1", U.caitlyn, note)).ok).toBe(true);
+    expect(state.record).toHaveBeenCalledWith(expect.objectContaining({ kind: "handoff", note }));
   });
 
   it.each([
@@ -309,6 +329,13 @@ describe("later and send back", () => {
     state.session = sessionFor(U.caitlyn, "paralegal", "caitlyn@example.com");
     expect((await A.returnCardAction("q1", "done")).ok).toBe(true);
     expect(state.record).toHaveBeenCalledWith(expect.objectContaining({ kind: "returned", queueItemId: "q1" }));
+  });
+
+  it("a Send back note over the limit is refused, never cut, and nothing is written", async () => {
+    state.cardState = { status: "ok", events: [{ queueItemId: "q1", kind: "handoff", actorId: U.rebecca, targetUserId: U.caitlyn, until: null, note: null, createdAt: "2026-11-10T13:00:00Z" }] };
+    state.session = sessionFor(U.caitlyn, "paralegal", "caitlyn@example.com");
+    expect(await A.returnCardAction("q1", "x".repeat(501))).toEqual({ ok: false, error: "That note is too long. Keep it to 500 characters." });
+    expect(state.record).not.toHaveBeenCalled();
   });
 });
 

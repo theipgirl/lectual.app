@@ -3,15 +3,15 @@ import { applyPackagesToAll, brandForm, brandIndexes, runSaveDraft, type SaveDra
 import { proposalActionError } from "@/app/dashboard/proposals/errors";
 import { PROPOSAL_SAVE_CONFLICT } from "@/lib/proposals/store";
 import type { ProposalRow } from "@/lib/proposals/types";
-import { faithe } from "../proposals/general-fixture";
-import { sevetri } from "../proposals/fixture";
+import { imogen } from "../proposals/general-fixture";
+import { callum } from "../proposals/fixture";
 
 const UPDATED = "2026-10-18T12:00:00Z";
 
 function row(over: Partial<ProposalRow> = {}): ProposalRow {
   return {
     id: "p1", org_id: "o", family_id: "p1", version: 1, public_token: "t".repeat(43), lead_id: null, matter_id: null,
-    client_name: "Sevetri Wilson", client_email: "s@example.com", title: "Trademark Proposal", status: "draft", content: sevetri(),
+    client_name: "Callum Ferreira", client_email: "s@example.com", title: "Trademark Proposal", status: "draft", content: callum(),
     expires_on: "2026-11-10", pay_url: null, source: "manual", created_by: null, updated_by: null, approved_by: null, approved_at: null,
     sent_at: null, accepted_at: null, superseded_at: null, withdrawn_at: null, accepted_selection: null, accepted_snapshot: null,
     created_at: UPDATED, updated_at: UPDATED, ...over,
@@ -32,19 +32,19 @@ function deps(over: Partial<SaveDraftDeps> = {}, r: ProposalRow = row()) {
   return d;
 }
 
-/** What the editor posts for the Sevetri fixture: both brands, every section. */
+/** What the editor posts for the Callum fixture: both brands, every section. */
 function form(over: Record<string, string> = {}, drop: string[] = []): FormData {
   const f = new FormData();
   const set = (k: string, v: string) => f.set(k, v);
   const base: Record<string, string> = {
     proposalId: "p1", updatedAt: UPDATED,
-    fullName: "Sevetri Wilson", firstName: "Sevetri", company: "Prosperall", clientEmail: "s@example.com", title: "Trademark Proposal",
-    greeting: "Hi Sevetri, here is your proposal.", recommendation: "Both marks are best.", officeActionNote: "",
+    fullName: "Callum Ferreira", firstName: "Callum", company: "Larkmoor", clientEmail: "s@example.com", title: "Trademark Proposal",
+    greeting: "Hi Callum, here is your proposal.", recommendation: "Both marks are best.", officeActionNote: "",
     payUrl: "https://pay.example/x", expiresOn: "2026-11-10",
     package: "Concierge", base: "4950", includedClasses: "3", perClass: "825", secondMarkPct: "20", govPerClass: "350",
     adjFields: "1", incFields: "1",
   };
-  const c = sevetri();
+  const c = callum();
   c.names.forEach((n, b) => {
     const p = `b.${b}.`;
     base[`${p}nameId`] = n.id; base[`${p}name`] = n.name; base[`${p}pkgFields`] = "1";
@@ -132,7 +132,7 @@ describe("runSaveDraft: one post, one write (F2)", () => {
 
 describe("runSaveDraft: a refusal names the section and the field, and writes nothing (F3)", () => {
   const cases: Array<[string, Record<string, string>, RegExp]> = [
-    ["a bad brand discount", { "b.1.discountPct": "70" }, /^Brand name Tech4PublicGood: Discount on this brand name: enter a whole percent/],
+    ["a bad brand discount", { "b.1.discountPct": "70" }, /^Brand name Open4Everyone: Discount on this brand name: enter a whole percent/],
     ["a missing client name", { fullName: "" }, /^Who: Client name: /],
     ["bad money in the package numbers", { base: "abc" }, /^Fees and payment: Base price: enter a dollar amount/],
     ["a bad expiry date", { expiresOn: "2026-02-31" }, /^Who: Expiry date/],
@@ -150,12 +150,12 @@ describe("runSaveDraft: a refusal names the section and the field, and writes no
 
 describe("runSaveDraft: a flat-fee draft saves through the same action (F6)", () => {
   it("calls the general parser and carries the matter, fee and credits in one write", async () => {
-    const r0 = row({ content: faithe() });
+    const r0 = row({ content: imogen() });
     const d = deps({}, r0);
     const f = new FormData();
     for (const [k, v] of Object.entries({
-      proposalId: "p1", updatedAt: UPDATED, fullName: "Faithe Williams", firstName: "Faithe", title: "Proposal", clientEmail: "f@example.com",
-      greeting: "Hello Faithe.", matterTitle: "Contractor agreement", summary: "", fee: "500", excludes: "", termsNote: "",
+      proposalId: "p1", updatedAt: UPDATED, fullName: "Imogen Pellegrino", firstName: "Imogen", title: "Proposal", clientEmail: "f@example.com",
+      greeting: "Hello Imogen.", matterTitle: "Contractor agreement", summary: "", fee: "500", excludes: "", termsNote: "",
       "item.0.id": "w1", "item.0.label": "Review", "item.0.hours": "2.5", "item.0.rate": "500", "item.0.value": "",
       payUrl: "https://pay.example/g", expiresOn: "2026-11-10", adjFields: "1",
     })) f.set(k, v);
@@ -182,16 +182,16 @@ describe("Use these package options for every brand (D6)", () => {
   });
 
   it("refuses, by brand name, when another brand has its own price", () => {
-    const c = sevetri();
+    const c = callum();
     c.names[0].package_choice = { options: ["Concierge"], default: "Concierge" };
     c.names[1].price_override = { base_cents: 100 };
     const r = applyPackagesToAll(c.names, 0);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toMatch(/^Brand name Tech4PublicGood: it has its own price/);
+    if (!r.ok) expect(r.error).toMatch(/^Brand name Open4Everyone: it has its own price/);
   });
 
   it("per-mark choices are copied mark by mark", () => {
-    const c = sevetri();
+    const c = callum();
     c.names[0].marks[0].package_choice = { options: ["Essential"], default: "Essential" };
     const r = applyPackagesToAll(c.names, 0);
     expect(r.ok && r.value[1].marks[0].package_choice).toEqual({ options: ["Essential"], default: "Essential" });
@@ -209,7 +209,7 @@ describe("brand field helpers", () => {
 
 describe("Sprint 5: the whole-draft Save keeps content.checks and made_by as they were", () => {
   it("carries the checks and who made the draft through an ordinary save", async () => {
-    const content = { ...sevetri(), made_by: "copilot" as const, checks: [{ text: "Add the client's pay link before creating the link.", source: "copilot" as const, path: "pay_url" }] };
+    const content = { ...callum(), made_by: "copilot" as const, checks: [{ text: "Add the client's pay link before creating the link.", source: "copilot" as const, path: "pay_url" }] };
     const r0 = row({ content, source: "agent" });
     const d = deps({}, r0);
     const r = await runSaveDraft(d, form({ greeting: "Changed greeting." }));

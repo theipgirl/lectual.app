@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { sevetri } from "../proposals/fixture";
+import { callum } from "../proposals/fixture";
 
 /**
  * reviewQueueAction's approve gate for a consult-agent email: only a named
@@ -97,10 +97,10 @@ function proposalRow(status: string): Row {
     id: PROPOSAL_ID,
     version: 1,
     status,
-    client_name: "Sevetri Wilson",
+    client_name: "Callum Ferreira",
     client_email: "c@example.com",
     title: "Trademark Proposal",
-    content: sevetri(),
+    content: callum(),
     expires_on: "2026-11-01",
     pay_url: "https://pay.example.com/x",
   };

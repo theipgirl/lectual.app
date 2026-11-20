@@ -15,6 +15,8 @@ import { getFirmTimeZone } from "@/lib/org/profile";
 import { gateLinkedProposal, makeProposalLive } from "@/lib/consult-proposal/link";
 import { approvalBlock, auditDraft } from "@/lib/queue/hygiene";
 import { loadAuditContext } from "@/lib/queue/audit-context";
+import { shownTextMatches } from "@/lib/queue/shown-text";
+import { DRAFT_CHANGED_REFRESH } from "@/lib/ui/words";
 
 /**
  * The approve / save / reject core, moved out of `reviewQueueAction` so the approval deck can call it and get a
@@ -45,6 +47,14 @@ export type ReviewInput = {
    * approval page leaves it off for now, so its notes read exactly as before.
    */
   withReceipt?: boolean;
+  /**
+   * The lead page's Yes and the deck's Yes: approve only the text the person SAW. With `requireShown`, an approve is
+   * refused (nothing saved, resolved or drafted) unless `shownSha256` is the sha256 hex of the re-read item's
+   * `final_body ?? draft_body`. A missing hash is refused too. The full approval page does not set it: it posts the
+   * text it shows as its edit, so what is approved is that text.
+   */
+  requireShown?: boolean;
+  shownSha256?: string | null;
 };
 
 export type ReviewOutcome =
@@ -154,6 +164,9 @@ export async function runQueueReview(input: ReviewInput): Promise<ReviewOutcome>
       // The stale-draft check runs again HERE, server-side: a hand-posted form must not skip it.
       const before = await getQueueItem(qKey, id);
       if (before.status !== "pending") return { kind: "error", error: ALREADY_DECIDED };
+      if (input.requireShown && (editedBody || !input.shownSha256 || !shownTextMatches(before, input.shownSha256))) {
+        return { kind: "error", error: DRAFT_CHANGED_REFRESH };
+      }
 
       // What would actually go out: the edit in this form, else what is saved. Checked before anything is saved or
       // resolved, so a refused body is never stored as the final text.
@@ -177,6 +190,10 @@ export async function runQueueReview(input: ReviewInput): Promise<ReviewOutcome>
 
       if (editedBody) await saveQueueEdit(qKey, id, editedBody);
       const item = await getQueueItem(qKey, id);
+      // Again on the read the approval is built from, so an edit that lands in between is not approved unseen.
+      if (input.requireShown && (!input.shownSha256 || !shownTextMatches(item, input.shownSha256))) {
+        return { kind: "error", error: DRAFT_CHANGED_REFRESH };
+      }
       const approvedText = editedBody ?? item.final_body ?? item.draft_body;
       const receipt = input.withReceipt ? approvalReceipt(approvedText) : null;
       const approvalNote = [note, staleNote, receipt].filter(Boolean).join("\n") || null;
@@ -193,7 +210,16 @@ export async function runQueueReview(input: ReviewInput): Promise<ReviewOutcome>
         }
       }
 
-      const resolved = await resolveQueueItem({ orgKey: qKey, id, action: "approve", resolvedBy, ...(approvalNote ? { note: approvalNote } : {}) });
+      // With requireShown, the text whose hash matched is sent as the final body, so an edit a colleague saves after the
+      // re-check is never what the drafter sends. Without it, behaviour is unchanged (the queue reads its own final_body).
+      const resolved = await resolveQueueItem({
+        orgKey: qKey,
+        id,
+        action: "approve",
+        resolvedBy,
+        ...(approvalNote ? { note: approvalNote } : {}),
+        ...(input.requireShown ? { finalBody: approvedText } : {}),
+      });
       sendStatus = resolved.send;
       webLink = resolved.sendResult?.webLink ?? null;
 

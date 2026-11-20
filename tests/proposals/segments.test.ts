@@ -9,7 +9,7 @@ import {
   type OfferedPackage,
 } from "@/lib/proposals/segments";
 import { PROPOSAL_DISPLAY_KEYS } from "@/lib/proposals/display-status";
-import { sevetri } from "./fixture";
+import { callum } from "./fixture";
 
 const pkg = (legal: number, gov = 70_000, name = "Concierge"): OfferedPackage => ({ name, legalAtSigningCents: legal, usptoAtFilingCents: gov });
 
@@ -55,7 +55,7 @@ describe("parseSegment", () => {
 
 describe("offeredPackages", () => {
   it("is one entry, with the legal and USPTO fees kept apart, when the package is named", () => {
-    const content = sevetri();
+    const content = callum();
     const [p, ...rest] = offeredPackages(content);
     expect(rest).toEqual([]);
     expect(p.name).toBe("Concierge");
@@ -63,7 +63,7 @@ describe("offeredPackages", () => {
     expect(p.usptoAtFilingCents).toBeGreaterThan(0);
   });
   it("is none when the package name is blank (that row is blocked: 'no package offered yet')", () => {
-    const content = sevetri();
+    const content = callum();
     content.pricing.package = "   ";
     expect(offeredPackages(content)).toEqual([]);
   });

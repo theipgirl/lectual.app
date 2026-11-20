@@ -95,6 +95,8 @@ export type ApprovalCardProps = {
   movesUnavailable: string | null;
   people: HandOffPerson[];
   review: { initialBody: string; canApprove: boolean; canEdit: boolean; audit?: AuditContext };
+  /** sha256 hex of the body drawn (server-computed). Yes posts it; a draft changed since is refused, and none is refused. */
+  shownSha256?: string | null;
   /** Where the card starts. Default is the plain card; the design harness and tests draw the other states with it. */
   initial?: { mode?: Mode; holding?: number; result?: DeckResult; note?: string };
 };
@@ -153,7 +155,7 @@ export function ApprovalCard(props: ApprovalCardProps) {
       if (timer.current) clearInterval(timer.current);
       timer.current = null;
       setHolding(null);
-      run(() => (kind === "done" ? doneCardAction(props.id) : approveCardAction(props.id)));
+      run(() => (kind === "done" ? doneCardAction(props.id) : approveCardAction(props.id, props.shownSha256 ?? null)));
     }, 1000);
   };
   const undo = () => {

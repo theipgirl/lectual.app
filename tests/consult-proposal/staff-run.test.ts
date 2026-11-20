@@ -34,8 +34,8 @@ import { draftProposalForStaff } from "@/lib/consult-proposal/staff-run";
 const args = {
   orgId: "org-1",
   userId: "user-1",
-  source: { kind: "pasted" as const, text: "SECRET TRANSCRIPT sevetri@example.com" },
-  lead: { id: "lead-1", firstName: "S", lastName: "W", email: "sevetri@example.com", businessName: null },
+  source: { kind: "pasted" as const, text: "SECRET TRANSCRIPT callum@example.com" },
+  lead: { id: "lead-1", firstName: "S", lastName: "W", email: "callum@example.com", businessName: null },
   matterId: null,
 };
 
@@ -67,7 +67,7 @@ describe("draftProposalForStaff", () => {
     const text = String(spy.mock.calls[0][0]);
     expect(JSON.parse(text)).toMatchObject({ event: "consult_proposal_failed", stage: "env", name: "EnvVarError" });
     expect(text).not.toContain("SECRET TRANSCRIPT");
-    expect(text).not.toContain("sevetri@example.com");
+    expect(text).not.toContain("callum@example.com");
   });
 
   it("any other throw before the run is logged and refused with the stage, keeping 'Nothing was sent'", async () => {

@@ -54,7 +54,7 @@ describe("agreementFingerprint", () => {
   const parts = {
     letter: [{ lead: "A.", text: "Dear Pat" }],
     details: { signer_name: "Pat Client", address: { line1: "1 Main" } },
-    exhibit: { names: [{ name: "The Fold", classes: ["Clothing"] }], legal_total_cents: 325000 },
+    exhibit: { names: [{ name: "The Pleat", classes: ["Clothing"] }], legal_total_cents: 325000 },
   };
 
   it("is sha256 hex", () => {
@@ -63,7 +63,7 @@ describe("agreementFingerprint", () => {
 
   it("ignores key order and the whitespace of any serialisation", () => {
     const reordered = {
-      exhibit: { legal_total_cents: 325000, names: [{ classes: ["Clothing"], name: "The Fold" }] },
+      exhibit: { legal_total_cents: 325000, names: [{ classes: ["Clothing"], name: "The Pleat" }] },
       details: { address: { line1: "1 Main" }, signer_name: "Pat Client" },
       letter: [{ text: "Dear Pat", lead: "A." }],
     };
