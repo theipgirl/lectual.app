@@ -61,7 +61,7 @@ vi.mock("@/lib/notifications/core", () => ({ notify: (...a: unknown[]) => state.
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 const { runQueueReview } = await import("@/lib/queue/review-core");
-const { makeDraftInMyOutlook, retryPassToDrafter } = await import("@/lib/queue/make-draft");
+const { clearOpenClaim, makeDraftInMyOutlook, retryPassToDrafter } = await import("@/lib/queue/make-draft");
 
 const members = [
   { userId: U.rebecca, role: "attorney", displayName: "Rebecca", email: "rebecca@example.com" },
@@ -139,7 +139,9 @@ describe("Acceptance 5: the attorney approves with a drafter set", () => {
   it("Lectual staff viewing as the firm are refused before anything is saved or resolved", async () => {
     state.actingAsStaff = true;
     const out = await runQueueReview({ id: "q1", intent: "approve", body: `${BODY}\n` });
-    expect(out.kind).toBe("error");
+    // Final review 5: the deck's own staff-preview sentence, never an approval with no draft and no message.
+    expect(out).toEqual({ kind: "error", error: "Preview only: hand-offs aren't saved while you're viewing as the firm." });
+    expect(state.draftMine).not.toHaveBeenCalled();
     expect(state.save).not.toHaveBeenCalled();
     expect(state.resolve).not.toHaveBeenCalled();
     expect(state.record).not.toHaveBeenCalled();
@@ -320,7 +322,7 @@ describe("Acceptances 6 to 8 through makeDraftInMyOutlook", () => {
   it("MUST 2: Graph fails after the claim: draft_failed is recorded (never drafted), the item re-opens, and the retry claims attempt 2", async () => {
     const written: string[] = [];
     state.record.mockImplementation(async (e: { kind: string; attempt?: number; note?: string }) => (written.push(`${e.kind}:${e.attempt}${e.note ? `:${e.note}` : ""}`), { ok: true }));
-    state.draftOwnOutlook.mockResolvedValueOnce({ ok: false, reason: "failed" });
+    state.draftOwnOutlook.mockResolvedValueOnce({ ok: false, reason: "refused" });
     expect(await makeDraftInMyOutlook({ id: "q1" })).toEqual({ ok: false, error: "The draft couldn't be made. Nothing was sent. Try again." });
     expect(written).toEqual(["drafting:1", "draft_failed:1"]);
     // The retry, after reading those rows back:
@@ -341,9 +343,27 @@ describe("Acceptances 6 to 8 through makeDraftInMyOutlook", () => {
     expect(written).toEqual(["drafting:1:", "drafted:1:"]);
   });
 
+  it("final review 1: an UNCERTAIN Graph failure (5xx, timeout, unreadable reply) writes no draft_failed: the claim stays open, 'Check your Drafts'", async () => {
+    const written: string[] = [];
+    state.record.mockImplementation(async (e: { kind: string; attempt?: number }) => (written.push(`${e.kind}:${e.attempt}`), { ok: true }));
+    state.draftOwnOutlook.mockResolvedValue({ ok: false, reason: "uncertain" });
+    expect(await makeDraftInMyOutlook({ id: "q1" })).toEqual({ ok: false, error: "Check your Drafts. If it isn't there, copy the approved text below." });
+    expect(written).toEqual(["drafting:1"]);
+  });
+
+  it("final review 1: a definite refusal (reauth or a 4xx) writes draft_failed and re-opens the item", async () => {
+    for (const reason of ["reauth", "refused"]) {
+      const written: string[] = [];
+      state.record.mockImplementation(async (e: { kind: string; attempt?: number }) => (written.push(`${e.kind}:${e.attempt}`), { ok: true }));
+      state.draftOwnOutlook.mockResolvedValue({ ok: false, reason });
+      expect((await makeDraftInMyOutlook({ id: "q1" })).ok).toBe(false);
+      expect(written, reason).toEqual(["drafting:1", "draft_failed:1"]);
+    }
+  });
+
   it("MUST 2: if even the failure can't be recorded, the person is told to ask Lectual (the page then shows 'check your Drafts')", async () => {
     state.record.mockImplementation(async (e: { kind: string }) => (e.kind === "draft_failed" ? { ok: false, reason: "failed" } : { ok: true }));
-    state.draftOwnOutlook.mockResolvedValue({ ok: false, reason: "failed" });
+    state.draftOwnOutlook.mockResolvedValue({ ok: false, reason: "refused" });
     expect(await makeDraftInMyOutlook({ id: "q1" })).toEqual({ ok: false, error: "The draft couldn't be made. Ask Lectual." });
   });
 
@@ -456,6 +476,49 @@ describe("S3: Pass to <drafter> after a pass that didn't go through", () => {
     state.item = approvedItem();
     state.actingAsStaff = true;
     expect((await retryPassToDrafter({ id: "q1" })).ok).toBe(false);
+    expect(state.record).not.toHaveBeenCalled();
+  });
+});
+
+describe("Final review 2: 'It isn't in my Drafts, try again' clears an open claim", () => {
+  const open = { ...passEvent(), kind: "drafting", actorId: RAYN, targetUserId: null, note: null, attempt: 1, createdAt: "2026-11-20T10:01:00Z" };
+  beforeEach(() => {
+    state.item = approvedItem();
+    state.role = "law_clerk";
+    state.userId = RAYN;
+    state.cardState = { status: "ok", events: [passEvent(), open] };
+  });
+
+  it("the target writes draft_failed for that attempt; drafts nothing; the next attempt can then be claimed", async () => {
+    expect(await clearOpenClaim({ id: "q1" })).toEqual({ ok: true, message: "Noted. You can make the draft again.", webLink: null });
+    expect(state.record).toHaveBeenCalledWith({ orgId: "org-1", queueItemId: "q1", kind: "draft_failed", attempt: 1 });
+    expect(state.draftOwnOutlook).not.toHaveBeenCalled();
+    // After it is read back, Make the draft claims attempt 2.
+    state.record.mockClear();
+    state.cardState = { status: "ok", events: [passEvent(), open, { ...open, kind: "draft_failed", createdAt: "2026-11-20T10:02:00Z" }] };
+    await makeDraftInMyOutlook({ id: "q1" });
+    expect(state.record).toHaveBeenNthCalledWith(1, { orgId: "org-1", queueItemId: "q1", kind: "drafting", attempt: 2 });
+  });
+
+  it("only the target, only on an open claim, re-checked on the server (role, fold); staff previewing refused", async () => {
+    for (const [role, userId] of [["attorney", U.rebecca], ["paralegal", U.caitlyn], ["viewer", U.viewer]] as const) {
+      state.role = role;
+      state.userId = userId;
+      expect((await clearOpenClaim({ id: "q1" })).ok, role).toBe(false);
+    }
+    state.role = "law_clerk";
+    state.userId = RAYN;
+    // No open claim (none yet, or already drafted): refused.
+    state.cardState = { status: "ok", events: [passEvent()] };
+    expect(await clearOpenClaim({ id: "q1" })).toEqual({ ok: false, error: "There's no draft waiting to be checked on this one. Refresh to see where it is." });
+    state.cardState = { status: "ok", events: [passEvent(), open, { ...open, kind: "drafted", createdAt: "2026-11-20T10:02:00Z" }] };
+    expect((await clearOpenClaim({ id: "q1" })).ok).toBe(false);
+    // A forged claim by someone else isn't an open claim of hers.
+    state.cardState = { status: "ok", events: [passEvent(), { ...open, actorId: U.caitlyn }] };
+    expect((await clearOpenClaim({ id: "q1" })).ok).toBe(false);
+    state.cardState = { status: "ok", events: [passEvent(), open] };
+    state.actingAsStaff = true;
+    expect((await clearOpenClaim({ id: "q1" })).ok).toBe(false);
     expect(state.record).not.toHaveBeenCalled();
   });
 });

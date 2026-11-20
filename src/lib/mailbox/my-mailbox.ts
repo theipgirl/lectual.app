@@ -6,6 +6,7 @@ import { createMailboxDraft, type DraftInput } from "./drafts";
 import { freshAccessToken, type ConnectionRow } from "./sync";
 import { hasDraftScope, hasSendScope, sendScopeRequested, type MailboxProvider } from "./providers";
 import { postedConnectionAllowed, type MyOutlookDraftAccess } from "@/lib/queue/draft-handoff";
+import { draftFailureKind } from "./draft-outcome";
 import { sendCheckedDraft, type SendCheck } from "./outlook-send";
 import type { SearchableMailbox } from "@/lib/reconcile/mailbox-search";
 
@@ -170,7 +171,11 @@ export async function myOutlookDraftAccess(postedConnectionId?: unknown): Promis
 
 export type OwnOutlookDraft =
   | { ok: true; id: string; webLink: string | null }
-  | { ok: false; reason: MyOutlookDraftAccess | "not-yours" | "reauth" | "failed" };
+  /**
+   * `reauth` and `refused`: Graph definitely made no draft. `uncertain`: it may have (a 5xx, a timeout, a reply that couldn't
+   * be read): the caller must not treat it as "no draft" (draft-outcome.ts).
+   */
+  | { ok: false; reason: MyOutlookDraftAccess | "not-yours" | "reauth" | "refused" | "uncertain" };
 
 /**
  * Make one DRAFT in the caller's OWN Outlook Drafts (never sends; `createMailboxDraft` posts to /me/messages, which
@@ -197,9 +202,9 @@ export async function draftInMyOwnOutlook(args: { draft: DraftInput; postedConne
     const made = await createMailboxDraft("microsoft", { accessToken, draft: args.draft });
     return { ok: true, id: made.id, webLink: made.webLink };
   } catch (err) {
-    // The code only: a provider error can carry addresses or message text.
-    const code = (err as { code?: unknown } | null)?.code;
-    return { ok: false, reason: code === "reauth" ? "reauth" : "failed" };
+    // The code and status only: a provider error can carry addresses or message text.
+    if (draftFailureKind(err) === "uncertain") return { ok: false, reason: "uncertain" };
+    return { ok: false, reason: (err as { code?: unknown } | null)?.code === "reauth" ? "reauth" : "refused" };
   }
 }
 

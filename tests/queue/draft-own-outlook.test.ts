@@ -35,7 +35,10 @@ vi.mock("@/lib/db/scoped-client", () => ({
       },
       in: () => q,
       order: () => q,
+      limit: () => q,
       then: (resolve: (v: unknown) => void) => {
+        // recordCardEvent's per-call probe for 0112's attempt column.
+        if (cols === "attempt") return resolve(state.noAttemptColumn ? { data: null, error: { code: "42703", message: "column queue_card_event.attempt does not exist" } } : { data: [], error: null });
         if (state.eventRows) {
           if (state.noAttemptColumn && /\battempt\b/.test(cols)) return resolve({ data: null, error: { code: "42703", message: "column queue_card_event.attempt does not exist" } });
           return resolve({ data: state.eventRows, error: null });
@@ -114,8 +117,11 @@ describe("Acceptance 7: the caller's own connection, from the scoped read", () =
   });
 
   it("a provider failure is a reason, never the provider's text", async () => {
+    // Changed on purpose (final review 1): a failure with no Graph status is "uncertain", never the provider's text.
     state.create.mockRejectedValue(Object.assign(new Error("Graph said: ana@example.com bad"), { code: "fetch-failed" }));
-    expect(await draftInMyOwnOutlook({ draft: DRAFT })).toEqual({ ok: false, reason: "failed" });
+    expect(await draftInMyOwnOutlook({ draft: DRAFT })).toEqual({ ok: false, reason: "uncertain" });
+    state.create.mockRejectedValue(Object.assign(new Error("Graph said: ana@example.com bad"), { code: "fetch-failed", httpStatus: 404 }));
+    expect(await draftInMyOwnOutlook({ draft: DRAFT })).toEqual({ ok: false, reason: "refused" });
   });
 });
 
@@ -205,10 +211,12 @@ describe("MUST 1: 0103's TWO constraints, with the real Postgres message strings
 
   it("(d) recordCardEvent turns either refusal into not-set-up (the approve path's own-mailbox fallback), and another CHECK into failed", async () => {
     const { recordCardEvent } = await import("@/lib/queue/card-state");
+    state.noAttemptColumn = true; // before 0112: the attempt column isn't there
     for (const message of [KIND, SHAPE]) {
       state.insertError = { code: "23514", message };
       expect(await recordCardEvent({ orgId: "o", queueItemId: "q1", kind: "draft_to", targetUserId: "t" })).toEqual({ ok: false, reason: "not-set-up" });
     }
+    state.noAttemptColumn = false;
     state.insertError = { code: "23514", message: 'violates check constraint "queue_card_event_draft_shape"' };
     expect(await recordCardEvent({ orgId: "o", queueItemId: "q1", kind: "draft_to", targetUserId: "t" })).toEqual({ ok: false, reason: "failed" });
     state.insertError = { code: "23505", message: "duplicate key" };
@@ -243,5 +251,45 @@ describe("item 5: reading card events before and after 0112's attempt column", (
     const out = await loadCardState(["q1"]);
     expect(out.status === "ok" && out.events[0].attempt).toBe(2);
     state.eventRows = null;
+  });
+});
+
+describe("Final review 3: after 0112 a kind / shape 23514 is a real error", () => {
+  const SHAPE = 'new row for relation "queue_card_event" violates check constraint "queue_card_event_shape"';
+  it("not set up only while the attempt column is missing; with the column there it is 'failed' (shows as an error)", async () => {
+    const { recordCardEvent } = await import("@/lib/queue/card-state");
+    state.insertError = { code: "23514", message: SHAPE };
+    state.noAttemptColumn = true;
+    expect(await recordCardEvent({ orgId: "o", queueItemId: "q1", kind: "drafting", attempt: 1 })).toEqual({ ok: false, reason: "not-set-up" });
+    state.noAttemptColumn = false;
+    expect(await recordCardEvent({ orgId: "o", queueItemId: "q1", kind: "drafting", attempt: 1 })).toEqual({ ok: false, reason: "failed" });
+    expect(await recordCardEvent({ orgId: "o", queueItemId: "q1", kind: "draft_to", targetUserId: "t" })).toEqual({ ok: false, reason: "failed" });
+    state.insertError = null;
+  });
+});
+
+describe("Final review 1: which Graph failures definitely made no draft", () => {
+  it("draftFailureKind: 401 / 403 and other 4xx are definite; 5xx, timeout, network, unreadable reply and unknown are uncertain", async () => {
+    const { draftFailureKind } = await import("@/lib/mailbox/draft-outcome");
+    expect(draftFailureKind({ code: "reauth", httpStatus: 401 })).toBe("definite");
+    expect(draftFailureKind({ code: "reauth", httpStatus: 403 })).toBe("definite");
+    for (const status of [400, 404, 413, 429]) expect(draftFailureKind({ code: "fetch-failed", httpStatus: status }), String(status)).toBe("definite");
+    for (const status of [500, 502, 503, 504]) expect(draftFailureKind({ code: "fetch-failed", httpStatus: status }), String(status)).toBe("uncertain");
+    expect(draftFailureKind(Object.assign(new Error("aborted"), { name: "AbortError" }))).toBe("uncertain"); // timeout
+    expect(draftFailureKind(new TypeError("fetch failed"))).toBe("uncertain"); // network drop
+    expect(draftFailureKind(new SyntaxError("Unexpected end of JSON input"))).toBe("uncertain"); // json() failing after a 201
+    expect(draftFailureKind(null)).toBe("uncertain");
+    expect(draftFailureKind("x")).toBe("uncertain");
+  });
+
+  it("draftInMyOwnOutlook maps them: refused / reauth (definite) vs uncertain", async () => {
+    state.create.mockRejectedValueOnce(Object.assign(new Error("x"), { code: "fetch-failed", httpStatus: 400 }));
+    expect(await draftInMyOwnOutlook({ draft: DRAFT })).toEqual({ ok: false, reason: "refused" });
+    state.create.mockRejectedValueOnce(Object.assign(new Error("x"), { code: "reauth", httpStatus: 401 }));
+    expect(await draftInMyOwnOutlook({ draft: DRAFT })).toEqual({ ok: false, reason: "reauth" });
+    state.create.mockRejectedValueOnce(Object.assign(new Error("x"), { code: "fetch-failed", httpStatus: 503 }));
+    expect(await draftInMyOwnOutlook({ draft: DRAFT })).toEqual({ ok: false, reason: "uncertain" });
+    state.create.mockRejectedValueOnce(new SyntaxError("bad json"));
+    expect(await draftInMyOwnOutlook({ draft: DRAFT })).toEqual({ ok: false, reason: "uncertain" });
   });
 });

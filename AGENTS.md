@@ -2346,7 +2346,10 @@ deadline or changes `attorney_confirmed`. Rules are pure in `src/lib/matters/dea
 Decision 15 (a law clerk clears routine kinds) and 3b (approved client emails become drafts in the DRAFTER's own Outlook, on
 their own click). Contract: `docs/pge/2026-11-17-agentic-ip-os/sprint-4.md`. Approving still never sends; `outlook-send.ts` is untouched.
 - **SHIP BLOCKER:** lawmatics-mcp honours `mailbox_draft` only from its commit e738c24 (branch claude/gracious-darwin-rceoyv, on top of main 3bcbe3f), not yet
-  merged or deployed. Until it is deployed, approving with a drafter set makes two drafts. Sprint 4 must not merge, and no firm may set a drafter, before then.
+  merged or deployed. Until it is deployed the queue ignores `mailbox_draft: false` and, for a firm whose queue has a drafting channel, still
+  drafts the approved email in the FIRM's Outlook. The app then sees `send = "drafted"` and passes nothing on (`queue-drafted`; on plan `self` it
+  makes no own-mailbox draft either), so it is not two drafts: the firm mailbox gets the draft and the drafter feature silently doesn't run.
+  Sprint 4 must not merge, and no firm may set a drafter, before then.
   With that change, `POST /api/queue/{id}/resolve` takes an optional boolean `mailbox_draft`: `false` resolves as before but skips the Graph draft (`send` stays
   `manual`); omitted or true is today's behaviour. (The app's safety net: if the resolve says the queue drafted anyway, `queue-drafted`, nothing is passed on, no
   `draft_to` is written and the approver is told where the draft went.)
@@ -2376,7 +2379,7 @@ their own click). Contract: `docs/pge/2026-11-17-agentic-ip-os/sprint-4.md`. App
   `handoff.status = "queue-drafted"`); NO `draftInMyMailbox`; `passToDrafter` (`review-core.ts`, the one pass write) records one `draft_to` (target the
   drafter, note `approved-text sha256 <64 hex>`, never the text) and one bell notice (`source: "draft_to"`, ids and a clipped headline; "Rebecca
   approved an email · Make the draft"). Before lectual 0112 (`isKindNotSetUpError`: code AND message, 23514 naming the real constraint `queue_card_event_kind`, quote-delimited, from
-  lectual 0103 line 98, for these two kinds only; 0103 is a CHECK, not an enum, so there is no 22P02 branch; anything else is a plain failure) it falls back to the APPROVER'S OWN mailbox only and the page
+  lectual 0103 line 98, for these five kinds only; 0103 is a CHECK, not an enum, so there is no 22P02 branch; anything else is a plain failure) it falls back to the APPROVER'S OWN mailbox only and the page
   says passing isn't switched on (`?pass=off`); any other failure makes no draft anywhere (`send=pass-failed`). The full page, the deck and the lead
   page's Yes all say `passedToDrafter(name)` / `PASS_FAILED` (`afterYesSentence`).
 - **"Pass to <drafter>" (S3):** the approved item page offers the APPROVER a retry (`RetryPassCard` -> `retryPassAction` -> `retryPassToDrafter`, same
@@ -2403,10 +2406,25 @@ their own click). Contract: `docs/pge/2026-11-17-agentic-ip-os/sprint-4.md`. App
 - **Before any firm is switched on (S6):** all of the "no draft in the approver's mailbox" behaviour rests on lawmatics-mcp honouring
   `mailbox_draft: false` on resolve, which is NOT verified. Verify it against lawmatics-mcp first; until then a `pass` or `self` approve may still be
   drafted by the queue in the firm's Outlook (the app then reports `queue-drafted` and passes nothing on).
-- **0103's kind CHECK is `queue_card_event_kind`** (lectual 0103 line 98, checked by the director), so 0112 IS needed for the two kinds, and its proposal drops
+- **0103's kind CHECK is `queue_card_event_kind`** (lectual 0103 line 98, checked by the director), so 0112 IS needed for the five kinds, and its proposal drops
   and recreates that constraint by that name. `docs/pge/2026-11-17-agentic-ip-os/0112-proposed.sql.txt` holds the proposal (its helper lives in the
   unexposed `private` schema and refuses any org but the caller's) and its isolation cases (not on lectual-dev). Also unverified: lawmatics-mcp and
   `mailbox_draft: false`, the queue's `resolved_at` clock against the database's `created_at` (the fold compares them), a real Graph draft, a real browser.
+- **Applying 0112's drop constraint may hang the Supabase MCP; apply it in execute_sql chunks (see 0093).**
+- **Final review follow-ups (Nov 20):**
+  - **Uncertain Graph failures keep the claim open.** `draftFailureKind` (`src/lib/mailbox/draft-outcome.ts`, pure, the one place): only a
+    definite refusal (401 / 403 `reauth`, or another 4xx Graph returned, carried as `httpStatus` by `createMailboxDraft`) writes `draft_failed`;
+    a 5xx, a timeout or abort, a network drop, json failing after a 201 or an unknown error is `uncertain`: nothing is written, the claim stays
+    open and the page says "Check your Drafts…" with the approved text. Failures before the Graph call (no token, no connection) are definite.
+  - **"It isn't in my Drafts, try again"** (`CLEAR_CLAIM_BUTTON`, on the check-drafts view only; `clearClaimAction` -> `clearOpenClaim`,
+    rules `clearClaimDecision`): the current target, on an open claim only, re-checked on the server (role, fold); writes `draft_failed` for that
+    attempt, so the next attempt can be claimed.
+  - **After 0112 a 23514 is a real error.** `recordCardEvent` reads a kind / shape 23514 as "not switched on" only when a per-call read finds the
+    `attempt` column missing (42703 / PGRST204); otherwise it is `failed` and shows as one.
+  - **Attempts are per drafter** in 0112 (`actor_id` in the drafting and draft_failed unique indexes; the helper counts the caller's own failures).
+  - **Lectual staff approving inside a firm with a drafter set** (plan `pass`) are refused up front with the deck's own sentence
+    (`staffPreviewRefusal` / `DECK_PREVIEW_ONLY`), before anything is saved, resolved or drafted: never an approval with no draft and no message.
+    Chosen for consistency with the deck's other staff-preview refusals. With no drafter set their approve is unchanged.
 - **Director review (Nov 20), on top of 2281557:**
   - **0103 has TWO constraints that refuse the new kinds**, `queue_card_event_kind` and `queue_card_event_shape` (only the three old shapes).
     0112 drops and re-adds both under their own names. Before 0112, 23514 naming either (quote-delimited, exactly as Postgres prints

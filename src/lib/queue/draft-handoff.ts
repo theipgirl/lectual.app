@@ -232,6 +232,31 @@ export function makeDraftDecision(args: {
   return { ok: true, already: false, assignment: a, attempt: a.progress.next };
 }
 
+/* ─────────────── clear an open claim ─────────────── */
+
+export type ClearClaimRefusal = "preview" | "not-yours" | "not-approved" | "not-switched-on" | "couldnt-check" | "no-open-claim";
+
+/** "It isn't in my Drafts, try again": only the current draft_to target, only on an open claim (drafting, no outcome). */
+export function clearClaimDecision(args: {
+  actingAsStaff: boolean;
+  callerId: string | null;
+  callerRole: Role | null;
+  item: Pick<QueueItem, "id" | "status" | "type"> | null;
+  state: CardState;
+  trustKnown: boolean;
+}): { ok: true; attempt: number } | { ok: false; reason: ClearClaimRefusal } {
+  if (args.actingAsStaff) return { ok: false, reason: "preview" };
+  if (!args.callerId || !args.callerRole || !QUEUE_EDIT_ROLES.includes(args.callerRole)) return { ok: false, reason: "not-yours" };
+  if (!args.item) return { ok: false, reason: "couldnt-check" };
+  if (args.item.status !== "approved" || args.item.type !== "CLIENT_EMAIL") return { ok: false, reason: "not-approved" };
+  if (args.state.status === "not-set-up") return { ok: false, reason: "not-switched-on" };
+  if (args.state.status !== "ok" || !args.trustKnown) return { ok: false, reason: "couldnt-check" };
+  const a = draftAssignment(args.state.events, args.item.id);
+  if (!a || a.target !== args.callerId) return { ok: false, reason: "not-yours" };
+  if (a.progress.kind !== "drafting") return { ok: false, reason: "no-open-claim" };
+  return { ok: true, attempt: a.progress.attempt };
+}
+
 /* ─────────────── the drafter's own Outlook ─────────────── */
 
 /** The clicking person's own Outlook, as their scoped read shows it. */

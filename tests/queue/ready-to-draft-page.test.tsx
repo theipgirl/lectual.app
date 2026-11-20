@@ -52,9 +52,9 @@ describe("SHOULD 4: Ready to draft that couldn't be read", () => {
 });
 
 describe("MUST 2: the page never says Drafted for an unconfirmed claim", () => {
-  it("check-drafts shows the sentence and the approved body as plain React text (escaped), no button, no 'Drafted'", async () => {
+  it("check-drafts shows the sentence and the approved body as plain React text (escaped), no Make-the-draft button, no 'Drafted'", async () => {
     vi.resetModules();
-    vi.doMock("@/app/dashboard/queue/actions", () => ({ makeDraftAction: vi.fn() }));
+    vi.doMock("@/app/dashboard/queue/actions", () => ({ makeDraftAction: vi.fn(), clearClaimAction: vi.fn() }));
     const { createElement } = await import("react");
     const { MakeDraftCard } = await import("@/components/queue/MakeDraftCard");
     const html = renderToStaticMarkup(
@@ -64,7 +64,11 @@ describe("MUST 2: the page never says Drafted for an unconfirmed claim", () => {
     expect(html).toContain("Hi &lt;b&gt;Ana&lt;/b&gt;,\nPublished.");
     expect(html).not.toContain("<b>Ana</b>");
     expect(html).not.toContain("Drafted in your Outlook");
-    expect(html).not.toContain("<button");
+    // Changed on purpose (final review 2): the only button is "It isn't in my Drafts, try again", never "Make the draft".
+    expect(html).not.toContain("Make the draft in my Outlook");
+    expect((html.match(/<button/g) ?? []).length).toBe(1);
+    expect(html).toContain("It isn&#x27;t in my Drafts, try again");
+    expect(html).toContain("data-clear-claim");
     const drafted = renderToStaticMarkup(createElement(MakeDraftCard, { id: "q1", intro: "x", view: { kind: "drafted" } }));
     expect(drafted).toContain("Drafted in your Outlook.");
   });

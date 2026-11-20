@@ -50,6 +50,9 @@
 
 begin;
 
+-- APPLYING: the `drop constraint` statements below may hang the Supabase MCP when sent as one migration; apply this file in
+-- execute_sql chunks instead (see 0093).
+--
 -- 0. The drafter's attempt number, a real column (null for every other kind; required, >= 1, for the drafting kinds: see the
 --    shape CHECK), and the insert grant extended to it. The app reads it with a fallback to 0103's columns before this file.
 alter table public.queue_card_event add column if not exists attempt smallint;
@@ -166,7 +169,7 @@ begin
     where c.org_id = p_org and c.queue_item_id = p_item and c.kind = 'drafting' and c.actor_id = auth.uid()
       and c.created_at >= v_newest_at
       and not exists (select 1 from public.queue_card_event f where f.org_id = p_org and f.queue_item_id = p_item
-                      and f.kind = 'draft_failed' and f.attempt = c.attempt)
+                      and f.kind = 'draft_failed' and f.actor_id = c.actor_id and f.attempt = c.attempt)
     order by c.created_at desc, c.id desc
     limit 1;
     return v_open_claim is not null and p_attempt = v_open_claim;
@@ -188,16 +191,18 @@ create policy queue_card_event_draft_kinds on public.queue_card_event
   );
 
 -- 4. Two concurrent clicks make at most ONE Outlook draft:
---    * A click CLAIMS attempt n with a `drafting` row BEFORE it calls Outlook. One `drafting` per (org, item, attempt): both
+--    * A click CLAIMS attempt n with a `drafting` row BEFORE it calls Outlook. One `drafting` per (org, item, actor, attempt):
+--      attempts are numbered PER DRAFTER (the helper counts the caller's own draft_failed rows), so a new drafter's attempt 1
+--      never collides with a departed drafter's attempt 1. Both
 --      clicks compute the same n from the rows they read, so the second insert answers 23505 and the app refuses it ("already
 --      being drafted"). The policy only admits the NEXT attempt, so nobody can pre-claim attempt 2 while attempt 1 is open.
 --    * After a `draft_failed` for attempt n, the next claim is n + 1, a new key: a retry after a failure is allowed.
 --    * One `draft_failed` per attempt and one `drafted` per item (confirmation only after Outlook said so).
 create unique index if not exists queue_card_event_one_claim_per_attempt
-  on public.queue_card_event (org_id, queue_item_id, attempt)
+  on public.queue_card_event (org_id, queue_item_id, actor_id, attempt)
   where kind = 'drafting';
 create unique index if not exists queue_card_event_one_failure_per_attempt
-  on public.queue_card_event (org_id, queue_item_id, attempt)
+  on public.queue_card_event (org_id, queue_item_id, actor_id, attempt)
   where kind = 'draft_failed';
 create unique index if not exists queue_card_event_one_drafted
   on public.queue_card_event (org_id, queue_item_id)
@@ -238,7 +243,9 @@ commit;
 --   5. Anyone but the newest draft_to's target inserts `drafting`, `drafted` or `draft_failed`: refused. Two draft_to rows with
 --      the same created_at: the one with the larger id decides.
 --   6. The target claims attempt 1 (allowed; actor_id is their auth.uid() and created_at the database's own). A second
---      attempt-1 claim: 23505. A claim of attempt 2 while attempt 1 has no outcome: refused (policy).
+--      attempt-1 claim by the same drafter: 23505. A claim of attempt 2 while attempt 1 has no outcome: refused (policy).
+--      After the drafter changes (a new draft_to to someone else), the NEW drafter's attempt 1 is allowed even though the old
+--      drafter has an attempt-1 row on the same item (the indexes include actor_id; the count is per actor).
 --   7. `draft_failed` attempt 1 by the target: allowed; then attempt 2 may be claimed; a second `draft_failed` attempt 1:
 --      23505 (and refused by the policy).
 --   8. `drafted` for an attempt that was never claimed, or that already failed: refused. `drafted` for the open claim: allowed. A

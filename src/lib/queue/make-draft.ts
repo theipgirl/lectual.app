@@ -3,7 +3,7 @@ import { resolveFirmSession } from "@/lib/firm/session";
 import { loadCardState, recordCardEvent } from "@/lib/queue/card-state";
 import { cardCaller, readCardItem } from "@/lib/queue/card-moves";
 import { eventTrust, trustedCardState } from "@/lib/queue/deck";
-import { makeDraftDecision, retryPassDecision, type DraftRefusal, type MyOutlookDraftAccess, type RetryPassRefusal } from "@/lib/queue/draft-handoff";
+import { clearClaimDecision, makeDraftDecision, retryPassDecision, type ClearClaimRefusal, type DraftRefusal, type MyOutlookDraftAccess, type RetryPassRefusal } from "@/lib/queue/draft-handoff";
 import { passToDrafter } from "@/lib/queue/review-core";
 import { memberName } from "@/lib/queue/routing";
 import { loadApprovalRouting } from "@/lib/queue/routing-load";
@@ -14,6 +14,8 @@ import {
   MAKE_DRAFT_COULDNT_CHECK,
   MAKE_DRAFT_DONE,
   MAKE_DRAFT_CHECK_DRAFTS,
+  CLEAR_CLAIM_DONE,
+  CLEAR_CLAIM_NOTHING_OPEN,
   MAKE_DRAFT_CLAIMED_FAILED,
   MAKE_DRAFT_DONE_NOT_RECORDED,
   MAKE_DRAFT_FAILED_RECONNECT,
@@ -89,8 +91,11 @@ export async function makeDraftInMyOutlook(args: { id: string; postedConnectionI
     postedConnectionId: args.postedConnectionId,
   });
   if (!made.ok) {
-    // No draft: record the failure, which re-opens the item for the same drafter. If even that can't be written, the claim
-    // stands with no outcome and the page says to check Drafts (and shows the text): never a silent second draft.
+    // Uncertain (a 5xx, a timeout, a reply that couldn't be read): Graph may have made it. The claim stays open, so the page
+    // says "Check your Drafts" with the approved text; the person clears it with "It isn't in my Drafts" if it isn't there.
+    if (made.reason === "uncertain") return { ok: false, error: MAKE_DRAFT_CHECK_DRAFTS };
+    // Definitely no draft: record the failure, which re-opens the item for the same drafter. If even that can't be written,
+    // the claim stands with no outcome and the page says to check Drafts (and shows the text): never a silent second draft.
     const failed = await recordCardEvent({ orgId: who.orgId, queueItemId: item.id, kind: "draft_failed", attempt });
     if (!failed.ok) return { ok: false, error: MAKE_DRAFT_CLAIMED_FAILED };
     return { ok: false, error: made.reason === "reauth" ? MAKE_DRAFT_FAILED_RECONNECT : MAKE_DRAFT_FAILED_RETRY };
@@ -105,6 +110,39 @@ const ACCESS_SENTENCE: Record<Exclude<MyOutlookDraftAccess, "ready">, string> = 
   "not-outlook": MAKE_DRAFT_NOT_OUTLOOK,
   "needs-permission": MAKE_DRAFT_NEEDS_PERMISSION,
   unavailable: MAKE_DRAFT_OUTLOOK_UNREAD,
+};
+
+/* ─────────────── "It isn't in my Drafts, try again" (clear an open claim) ─────────────── */
+
+/**
+ * The current draft_to target says an open claim (drafting with no outcome) made no draft. Writes `draft_failed` for THAT
+ * attempt (0112 allows it for the drafter's own open claim), which re-opens the item for the next attempt. Session, role,
+ * item, events and routing are re-read and folded with trust; only the target, only on an open claim. Drafts nothing.
+ */
+export async function clearOpenClaim(args: { id: string }): Promise<MakeDraftResult> {
+  const session = await resolveFirmSession().catch(() => null);
+  const actingAsStaff = !!session && session.kind === "ok" && session.actingAsStaff;
+  if (actingAsStaff) return { ok: false, error: MAKE_DRAFT_PREVIEW_ONLY };
+  const who = await cardCaller();
+  if (!who) return { ok: false, error: MAKE_DRAFT_NOT_YOURS };
+  const item = await readCardItem(args.id);
+  const [loaded, routed] = await Promise.all([loadCardState([args.id]), loadApprovalRouting()]);
+  const trust = eventTrust(routed);
+  const state = item ? trustedCardState(loaded, [item], trust) : loaded;
+  const decision = clearClaimDecision({ actingAsStaff, callerId: who.userId, callerRole: who.role, item, state, trustKnown: trust.status === "known" });
+  if (!decision.ok || !item) return { ok: false, error: decision.ok ? MAKE_DRAFT_COULDNT_CHECK : CLEAR_REFUSAL[decision.reason] };
+  const failed = await recordCardEvent({ orgId: who.orgId, queueItemId: item.id, kind: "draft_failed", attempt: decision.attempt });
+  if (!failed.ok) return { ok: false, error: failed.reason === "not-set-up" ? NOT_SWITCHED_ON : MAKE_DRAFT_FAILED };
+  return { ok: true, message: CLEAR_CLAIM_DONE, webLink: null };
+}
+
+const CLEAR_REFUSAL: Record<ClearClaimRefusal, string> = {
+  preview: MAKE_DRAFT_PREVIEW_ONLY,
+  "not-yours": MAKE_DRAFT_NOT_YOURS,
+  "not-approved": MAKE_DRAFT_NOT_APPROVED,
+  "not-switched-on": NOT_SWITCHED_ON,
+  "couldnt-check": MAKE_DRAFT_COULDNT_CHECK,
+  "no-open-claim": CLEAR_CLAIM_NOTHING_OPEN,
 };
 
 /* ─────────────── "Pass to <drafter>": retry a failed pass (S3) ─────────────── */

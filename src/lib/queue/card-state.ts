@@ -101,6 +101,16 @@ export function isKindNotSetUpError(kind: CardEventKind, error: unknown): boolea
 /** 23505: a unique index refused the row (0112's one claim per attempt, one `drafted` per item). */
 const isUniqueViolation = (error: unknown) => (error as { code?: unknown } | null)?.code === "23505";
 
+/** True only when the read says the `attempt` column isn't there (42703 / PGRST204); any other outcome is false. */
+async function attemptColumnMissing(supabase: Awaited<ReturnType<typeof getScopedClient>>): Promise<boolean> {
+  try {
+    const { error } = await supabase.from("queue_card_event").select("attempt").limit(1);
+    return !!error && isMissingColumn(error);
+  } catch {
+    return false;
+  }
+}
+
 export type RecordResult = { ok: true } | { ok: false; reason: "not-set-up" | "failed" | "conflict" };
 
 /**
@@ -128,8 +138,15 @@ export async function recordCardEvent(input: {
       note: input.note ?? null,
       ...(typeof input.attempt === "number" ? { attempt: input.attempt } : {}),
     });
-    if (error) return { ok: false, reason: isNotSetUpError(error) || isKindNotSetUpError(input.kind, error) ? "not-set-up" : isUniqueViolation(error) ? "conflict" : "failed" };
-    return { ok: true };
+    if (!error) return { ok: true };
+    if (isNotSetUpError(error)) return { ok: false, reason: "not-set-up" };
+    if (isKindNotSetUpError(input.kind, error)) {
+      // A 23514 naming the kind or shape CHECK means "before 0112" only while 0112's `attempt` column is missing. Once it is
+      // there, the same refusal is a real error (a bad shape) and shows as one. Decided per call by asking for the column.
+      if ((error as { code?: unknown }).code !== "23514") return { ok: false, reason: "not-set-up" };
+      return { ok: false, reason: (await attemptColumnMissing(supabase)) ? "not-set-up" : "failed" };
+    }
+    return { ok: false, reason: isUniqueViolation(error) ? "conflict" : "failed" };
   } catch {
     return { ok: false, reason: "failed" };
   }

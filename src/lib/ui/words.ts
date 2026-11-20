@@ -714,6 +714,10 @@ export const MAKE_DRAFT_IN_PROGRESS = "This one is already being drafted. Check 
 export const MAKE_DRAFT_CHECK_DRAFTS = "Check your Drafts. If it isn't there, copy the approved text below.";
 export const MAKE_DRAFT_DONE_NOT_RECORDED = "The draft is in your Outlook Drafts, but Lectual couldn't record it. Don't make it again: check your Drafts.";
 export const APPROVED_TEXT_LABEL = "Approved text";
+/** On an open claim (drafting, no outcome), for the drafter: records that attempt as failed so it can be made again. */
+export const CLEAR_CLAIM_BUTTON = "It isn't in my Drafts, try again";
+export const CLEAR_CLAIM_DONE = "Noted. You can make the draft again.";
+export const CLEAR_CLAIM_NOTHING_OPEN = "There's no draft waiting to be checked on this one. Refresh to see where it is.";
 /** SHOULD 4: the drafter's Ready to draft read failed. */
 export const READY_TO_DRAFT_UNCHECKED = "Couldn't check what's ready to draft.";
 export const RETRY_PASS_NO_MARKER = "There's no record that passing this one failed, so it can't be passed again from here.";
