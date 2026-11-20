@@ -1,3 +1,4 @@
+import { resolveFirmSession } from "@/lib/firm/session";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { stopLeadSequencesAsStaff } from "@/lib/campaigns/stop-staff";
 import type { Database } from "@/lib/db/types";
@@ -442,6 +443,11 @@ export async function closeMatterWithOverride(id: string, reason: unknown): Prom
   const untyped = supabase as unknown as { rpc: (name: string, args: Record<string, unknown>) => PromiseLike<{ error: { code?: string; message?: string } | null }> };
   return runCloseOverride(reason, {
     ...closeReadDeps(supabase, id),
+    actingAsStaff: async () => {
+      const session = await resolveFirmSession().catch(() => null);
+      // Unreadable: refuse (it is treated as staff); only a resolved firm member goes on.
+      return !session || session.kind !== "ok" || session.actingAsStaff === true;
+    },
     role: async () => {
       const { data, error } = await supabase.rpc("current_org_role");
       return error || typeof data !== "string" ? null : data;
@@ -458,15 +464,18 @@ export async function closeMatterWithOverride(id: string, reason: unknown): Prom
       }
     },
     closeDirect: async () => {
-      const { data, error } = await supabase.from("crm_matter").update({ status: "closed", updated_at: new Date().toISOString() }).eq("id", id).select("id");
-      return !error && (data ?? []).length === 1;
+      const { data, error } = await supabase.from("crm_matter").update({ status: "closed", updated_at: new Date().toISOString() }).eq("id", id).select("id, updated_at");
+      const rows = data ?? [];
+      return !error && rows.length === 1 && typeof rows[0].updated_at === "string" ? rows[0].updated_at : null;
     },
-    restoreStatus: async (previous) => {
+    restoreStatus: async (previous, closedAt) => {
+      // Fenced on the stamp closeDirect wrote: a newer change by someone else (another status, an edit) is never overwritten.
       const { data, error } = await supabase
         .from("crm_matter")
         .update({ status: previous, updated_at: new Date().toISOString() })
         .eq("id", id)
         .eq("status", "closed")
+        .eq("updated_at", closedAt)
         .select("id");
       return !error && (data ?? []).length === 1;
     },

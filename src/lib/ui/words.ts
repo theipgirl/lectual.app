@@ -703,9 +703,20 @@ export const makeDraftIntro = (approverName: string) =>
   `${approverName} approved this email. Make the draft in your own Outlook, check it there and press Send. Nothing has reached the client yet.`;
 export const MAKE_DRAFT_DONE = "The draft is in your Outlook Drafts. Open it there and press Send. Nothing has reached the client yet.";
 export const MAKE_DRAFT_ALREADY = "This one is already drafted in your Outlook. Nothing else was made.";
-/** The claim (the drafted mark) was written first, then the draft failed: no silent retry, a person checks it. */
+/** The attempt was claimed, the draft failed, and even the failure couldn't be recorded: a person checks it. */
 export const MAKE_DRAFT_CLAIMED_FAILED = "The draft couldn't be made. Ask Lectual.";
-export const MAKE_DRAFT_CLAIMED_RECONNECT = "The draft couldn't be made because your Outlook needs reconnecting. Reconnect it, then ask Lectual.";
+/** The draft failed and the failure was recorded: the button is offered again. */
+export const MAKE_DRAFT_FAILED_RETRY = "The draft couldn't be made. Nothing was sent. Try again.";
+export const MAKE_DRAFT_FAILED_RECONNECT = "The draft couldn't be made because your Outlook needs reconnecting. Reconnect it, then try again.";
+/** Another click claimed this attempt first (a second tab, a double click). */
+export const MAKE_DRAFT_IN_PROGRESS = "This one is already being drafted. Check your Outlook Drafts before trying again.";
+/** A claimed attempt with no outcome (a crash in between): never "Drafted". The approved text is shown below it. */
+export const MAKE_DRAFT_CHECK_DRAFTS = "Check your Drafts. If it isn't there, copy the approved text below.";
+export const MAKE_DRAFT_DONE_NOT_RECORDED = "The draft is in your Outlook Drafts, but Lectual couldn't record it. Don't make it again: check your Drafts.";
+export const APPROVED_TEXT_LABEL = "Approved text";
+/** SHOULD 4: the drafter's Ready to draft read failed. */
+export const READY_TO_DRAFT_UNCHECKED = "Couldn't check what's ready to draft.";
+export const RETRY_PASS_NO_MARKER = "There's no record that passing this one failed, so it can't be passed again from here.";
 /* S3: the approver retries a pass that didn't go through. */
 export const passToDrafterButton = (name: string) => `Pass to ${name}`;
 export const RETRY_PASS_INTRO =

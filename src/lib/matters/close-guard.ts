@@ -60,6 +60,8 @@ export async function checkClose(deps: CloseReadDeps): Promise<CloseCheck> {
   return read;
 }
 
+/** Lectual staff acting inside a firm: lectual 0110's function would refuse them (no membership row), so the app says so first. */
+export const OVERRIDE_STAFF_PREVIEW = "Preview only: closing past a deadline isn't saved while you're viewing as the firm.";
 export const OVERRIDE_ROLE_REFUSAL = "Only an attorney can close a matter that still has an open deadline.";
 export const OVERRIDE_NOT_RECORDED = "Couldn't record the reason, so the matter wasn't closed. Try again.";
 export const OVERRIDE_FAILED = "Couldn't close this matter. Nothing was changed. Try again.";
@@ -67,17 +69,26 @@ export const OVERRIDE_FAILED = "Couldn't close this matter. Nothing was changed.
 export type OverrideCall = "done" | "missing" | "forbidden" | "failed";
 
 export type OverrideDeps = CloseReadDeps & {
+  /**
+   * True when the caller is Lectual staff acting inside the firm. lectual 0110's function needs a crm_org_member row, so it
+   * would refuse them anyway; the app refuses them up front with its own fixed sentence. An unreadable answer counts as true.
+   */
+  actingAsStaff: () => Promise<boolean>;
   /** The caller's role, re-read on every call (null = unreadable, which never overrides). */
   role: () => Promise<string | null>;
   /** lectual 0110's `crm_close_matter_with_override` (writes the override row and closes, in one transaction). */
   callOverride: (reason: string) => Promise<OverrideCall>;
-  /** Before 0110: the plain status write (there is no trigger yet). True when the row was closed. */
-  closeDirect: () => Promise<boolean>;
+  /**
+   * Before 0110: the plain status write (there is no trigger yet). The `updated_at` it wrote (as the database returned it)
+   * when the row was closed, else null.
+   */
+  closeDirect: () => Promise<string | null>;
   /**
    * Puts the status back when the timeline entry could not be written on the pre-0110 path. Fenced on the row still
-   * being `closed`; true only when exactly that one row was put back (an error or 0 rows is false).
+   * being `closed` AND still carrying the `updated_at` closeDirect wrote, so a newer change by someone else is never
+   * overwritten; true only when exactly that one row was put back (an error or 0 rows is false).
    */
-  restoreStatus: (previous: string) => Promise<boolean>;
+  restoreStatus: (previous: string, closedAt: string) => Promise<boolean>;
   /** Called when the restore failed too: the matter is closed with no recorded reason. Logs the matter id only. */
   reportUnrecorded: () => void;
   /** The timeline entry (`matter_updated`, change `close_override`). True when it was written. */
@@ -94,6 +105,13 @@ export type OverrideResult = { ok: true; overridden: boolean } | { ok: false; er
  * status back and says the matter wasn't closed: a matter is never closed past the guard without a recorded reason.
  */
 export async function runCloseOverride(rawReason: unknown, deps: OverrideDeps): Promise<OverrideResult> {
+  let staff: boolean;
+  try {
+    staff = await deps.actingAsStaff();
+  } catch {
+    staff = true;
+  }
+  if (staff) return { ok: false, error: OVERRIDE_STAFF_PREVIEW };
   let role: string | null;
   try {
     role = await deps.role();
@@ -109,7 +127,7 @@ export async function runCloseOverride(rawReason: unknown, deps: OverrideDeps): 
   if (read.previousStatus === "closed") return { ok: true, overridden: false };
 
   if (read.guarded.length === 0) {
-    return (await deps.closeDirect()) ? { ok: true, overridden: false } : { ok: false, error: OVERRIDE_FAILED };
+    return (await deps.closeDirect()) !== null ? { ok: true, overridden: false } : { ok: false, error: OVERRIDE_FAILED };
   }
 
   const ids = read.guarded.map((d) => d.id);
@@ -122,12 +140,13 @@ export async function runCloseOverride(rawReason: unknown, deps: OverrideDeps): 
   }
 
   // "missing": lectual 0110 is not applied, so there is no trigger and no override table. The timeline entry is the record.
-  if (!(await deps.closeDirect())) return { ok: false, error: OVERRIDE_FAILED };
+  const closedAt = await deps.closeDirect();
+  if (closedAt === null) return { ok: false, error: OVERRIDE_FAILED };
   const logged = await deps.logOverride({ reason: parsed.reason, deadline_ids: ids, from_status: read.previousStatus, recorded: "timeline" }).catch(() => false);
   if (!logged) {
     let restored = false;
     try {
-      restored = await deps.restoreStatus(read.previousStatus);
+      restored = await deps.restoreStatus(read.previousStatus, closedAt);
     } catch {
       restored = false;
     }

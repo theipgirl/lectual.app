@@ -317,9 +317,12 @@ export async function runQueueReview(input: ReviewInput): Promise<ReviewOutcome>
             handoff = { status: "not-switched-on", drafter };
             await draftInOwnMailbox();
           } else {
-            // Nothing passed and no draft made anywhere: a person drafts it from the approved item.
+            // Nothing passed and no draft made anywhere: a person drafts it from the approved item. The outcome is recorded
+            // as a `pass_failed` marker (no text) so the approver's "Pass to <drafter>" is offered for THIS item only;
+            // if the marker can't be written either, no retry is offered (never a second draft on a guess).
             handoff = { status: "failed", drafter };
             sendStatus = "pass-failed";
+            await recordCardEvent({ orgId: passOrgId, queueItemId: id, kind: "pass_failed" });
           }
         }
       } else if (item.type === "CLIENT_EMAIL" && sendStatus !== "drafted" && sendStatus !== "sent") {

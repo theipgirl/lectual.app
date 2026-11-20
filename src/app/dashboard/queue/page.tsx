@@ -12,7 +12,7 @@ import { DismissFollowups } from "@/components/queue/DismissFollowups";
 import { agentLabel, statusPill, fmtWhen, parseQueueStatus, preview, typeLabel, type QueueStatus } from "@/components/queue/format";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
-import { APPROVALS_NAME, HANDED_TO_YOU_MARKER, READY_TO_DRAFT, noneYet, readyToDraftCount } from "@/lib/ui/words";
+import { APPROVALS_NAME, HANDED_TO_YOU_MARKER, READY_TO_DRAFT, READY_TO_DRAFT_UNCHECKED, noneYet, readyToDraftCount } from "@/lib/ui/words";
 import { loadReadyToDraft } from "@/lib/queue/ready-load";
 import { loadCardState } from "@/lib/queue/card-state";
 import { handedToViewer, showHandedPill } from "@/lib/queue/handed";
@@ -73,6 +73,8 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
       ? await loadReadyToDraft({ viewerId: viewer.userId, trust: viewEventTrust(view), approved: status === "approved" ? allItems : undefined })
       : null;
   const readyItems = ready && ready.status === "ok" ? ready.items : [];
+  // SHOULD 4: for the drafter, a failed read is said, never drawn as nothing.
+  const readyUnchecked = !!viewer && view.drafter === viewer.userId && ready?.status === "unavailable";
   const readyActive = readyItems.length > 0 && status === "approved" && rawWho === "ready";
   const counts = countsByPerson(allItems, routing, members, viewer);
   const readyIds = new Set(readyItems.map((i) => i.id));
@@ -110,6 +112,11 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
         <div className="lx-queue-filters">
           <PersonSwitch status={status} who={who} counts={counts} mineEnabled={mineEnabled} handed={handedPill ? { count: handed.size, active: handedActive } : undefined} />
           {dismissable > 0 && <DismissFollowups count={dismissable} />}
+          {readyUnchecked && (
+            <span className="lx-note" role="status" data-ready-unchecked>
+              {READY_TO_DRAFT_UNCHECKED}
+            </span>
+          )}
           {readyItems.length > 0 && (
             <Link href="/dashboard/queue/?status=approved&who=ready" className="lx-btn" aria-current={readyActive ? "page" : undefined} data-ready-to-draft>
               {readyToDraftCount(readyItems.length)}

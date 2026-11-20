@@ -32,6 +32,7 @@ import {
   A_TEAMMATE,
   APPROVALS_NAME,
   MAKE_DRAFT_CHANGED,
+  MAKE_DRAFT_CHECK_DRAFTS,
   MAKE_DRAFT_COULDNT_CHECK,
   MAKE_DRAFT_NEEDS_PERMISSION,
   MAKE_DRAFT_NO_OUTLOOK,
@@ -43,7 +44,7 @@ import {
   SEND_BACK_DONE,
   makeDraftIntro,
 } from "@/lib/ui/words";
-import { approvedBy, approvedTextMatches, draftAssignment, receiptMatchesCurrent } from "@/lib/queue/draft-handoff";
+import { approvedBy, approvedTextMatches, draftAssignment, passFailedRecorded, receiptMatchesCurrent } from "@/lib/queue/draft-handoff";
 import { RetryPassCard } from "@/components/queue/RetryPassCard";
 import { myOutlookDraftAccess } from "@/lib/mailbox/my-mailbox";
 import { MakeDraftCard, type MakeDraftView } from "@/components/queue/MakeDraftCard";
@@ -149,15 +150,17 @@ export default async function QueueItemPage({
     if (events.status === "ok" && trust.status === "known") {
       const a = draftAssignment(events.events, item.id);
       const me = (view.members ?? []).find((m) => m.userId === view.viewer?.userId);
-      // S3: the approver may pass it again when no trusted draft_to exists (a pass that didn't go through) and the
-      // receipt still names the text. The action checks all of it again.
-      if (!a && view.drafter !== view.viewer.userId && approvedBy(item, me?.email) && receiptMatchesCurrent(item) && drafterMember) {
+      // S3: the approver may pass it again ONLY when the outcome recorded at approval was a failed pass (a trusted
+      // `pass_failed` marker), no trusted draft_to exists, and the receipt still names the text. The action checks it all again.
+      if (!a && passFailedRecorded(events.events, item.id) && view.drafter !== view.viewer.userId && approvedBy(item, me?.email) && receiptMatchesCurrent(item) && drafterMember) {
         retryPass = { drafterName: memberName(drafterMember) };
       }
       if (a && a.target === view.viewer.userId) {
         const by = (view.members ?? []).find((m) => m.userId === a.by);
         const intro = makeDraftIntro(by ? memberName(by) : A_TEAMMATE);
-        if (a.drafted) makeDraft = { intro, view: { kind: "drafted" } };
+        // "Drafted" only when confirmed. A claimed attempt with no outcome says to check Drafts and shows the approved text.
+        if (a.progress.kind === "drafted") makeDraft = { intro, view: { kind: "drafted" } };
+        else if (a.progress.kind === "drafting") makeDraft = { intro, view: { kind: "check-drafts", sentence: MAKE_DRAFT_CHECK_DRAFTS, text: item.final_body ?? item.draft_body } };
         else if (!approvedTextMatches(item, a.sha)) makeDraft = { intro, view: { kind: "blocked", sentence: MAKE_DRAFT_CHANGED, connect: null } };
         else {
           const access = await myOutlookDraftAccess();

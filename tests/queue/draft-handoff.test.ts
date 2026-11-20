@@ -16,7 +16,7 @@ import {
   type ApprovalRouting,
   type QueueKind,
 } from "@/lib/queue/routing";
-import { approvePlan, approvedTextMatches, draftAssignment, draftToNote, makeDraftDecision, postedConnectionAllowed, readyToDraft, retryPassDecision, shaFromDraftToNote } from "@/lib/queue/draft-handoff";
+import { approvePlan, approvedTextMatches, attemptNote, draftAssignment, draftToNote, makeDraftDecision, postedConnectionAllowed, readyToDraft, receiptFromNote, retryPassDecision, shaFromDraftToNote } from "@/lib/queue/draft-handoff";
 import { DRAFT_TO_CLOCK_SKEW_MS, eventTrust, trustedEvents, type CardEvent, type EventTrust } from "@/lib/queue/deck";
 import { shownBodySha256 } from "@/lib/queue/shown-text";
 import { drafterOutlookLine } from "@/lib/queue/drafter-outlook";
@@ -201,7 +201,7 @@ const decide = (args: Partial<Parameters<typeof makeDraftDecision>[0]> & { event
     callerId: args.callerId === undefined ? RAYN : args.callerId,
     callerRole: args.callerRole === undefined ? "law_clerk" : args.callerRole,
     item,
-    state: args.state ?? { status: "ok", events: item ? trustedEvents(events, [item], known()) : events },
+    state: args.state ?? { status: "ok", events: item ? trustedEvents(events, [item as ReturnType<typeof approved>], known()) : events },
     trustKnown: args.trustKnown ?? true,
   });
 };
@@ -304,11 +304,18 @@ describe("Acceptance 8: the drafted body is the approved text (receipt hash)", (
 
 describe("S3: retry a failed pass", () => {
   const base = { actingAsStaff: false, callerId: U.rebecca, callerRole: "attorney" as Role, callerEmail: "rebecca@example.com", drafter: RAYN, trustKnown: true };
-  const retry = (over: Partial<Parameters<typeof retryPassDecision>[0]> = {}) => retryPassDecision({ ...base, item: approved(), state: { status: "ok", events: [] }, ...over });
+  // SHOULD 3 (changed on purpose): a retry needs the trusted pass_failed marker written at approval.
+  const marker = ev("pass_failed", U.rebecca);
+  const retry = (over: Partial<Parameters<typeof retryPassDecision>[0]> = {}) =>
+    retryPassDecision({ ...base, item: approved(), state: { status: "ok", events: trustedEvents([marker], [approved()], known()) }, ...over });
   it("only the approver, only while no trusted draft_to exists, only with the receipt naming the current text", () => {
     expect(retry()).toEqual({ ok: true, drafter: RAYN });
     expect(retry({ callerId: U.taylor, callerRole: "owner", callerEmail: "taylor@example.com" })).toEqual({ ok: false, reason: "not-yours" });
-    expect(retry({ state: { status: "ok", events: trustedEvents([passTo(U.rebecca)], [approved()], known()) } })).toEqual({ ok: false, reason: "already-passed" });
+    expect(retry({ state: { status: "ok", events: trustedEvents([marker, passTo(U.rebecca)], [approved()], known()) } })).toEqual({ ok: false, reason: "already-passed" });
+    // No marker (queue drafted, own-mailbox fallback, approved before a drafter existed): no retry.
+    expect(retry({ state: { status: "ok", events: [] } })).toEqual({ ok: false, reason: "no-marker" });
+    // A marker from someone other than the approver is dropped by the fold, so no retry either.
+    expect(retry({ state: { status: "ok", events: trustedEvents([ev("pass_failed", U.taylor)], [approved()], known()) } })).toEqual({ ok: false, reason: "no-marker" });
     expect(retry({ item: approved({ final_body: `${BODY}\nlater` }) })).toEqual({ ok: false, reason: "changed" });
     expect(retry({ item: approved({ resolution_note: null }) })).toEqual({ ok: false, reason: "changed" });
     expect(retry({ drafter: U.rebecca })).toEqual({ ok: false, reason: "no-drafter" });
@@ -333,5 +340,43 @@ describe("Ready to draft (N)", () => {
     expect(readyToDraft(items, { status: "unavailable" }, RAYN)).toEqual([]);
     expect(readyToDraft(items, { status: "not-set-up" }, RAYN)).toEqual([]);
     expect(draftAssignment(events, "a3")?.target).toBe(OTHER_CLERK);
+  });
+});
+
+describe("MUST 2: claim, confirm, fail", () => {
+  const att = (kind: CardEvent["kind"], n: number, at: string, actor = RAYN) => ev(kind, actor, { note: attemptNote(n), createdAt: at });
+  const progress = (events: CardEvent[]) => draftAssignment(trustedEvents(events, [approved()], known()), "a1")?.progress;
+
+  it("open, drafting (no outcome), failed (next attempt), drafted (confirmed only)", () => {
+    expect(progress([passTo(U.rebecca)])).toEqual({ kind: "open", next: 1 });
+    expect(progress([passTo(U.rebecca), att("drafting", 1, "2026-11-20T10:01:00Z")])).toEqual({ kind: "drafting", attempt: 1 });
+    expect(progress([passTo(U.rebecca), att("drafting", 1, "2026-11-20T10:01:00Z"), att("draft_failed", 1, "2026-11-20T10:01:05Z")])).toEqual({ kind: "failed", next: 2 });
+    expect(progress([passTo(U.rebecca), att("drafting", 1, "2026-11-20T10:01:00Z"), att("draft_failed", 1, "2026-11-20T10:01:05Z"), att("drafting", 2, "2026-11-20T10:02:00Z")])).toEqual({ kind: "drafting", attempt: 2 });
+    expect(progress([passTo(U.rebecca), att("drafting", 1, "2026-11-20T10:01:00Z"), att("drafted", 1, "2026-11-20T10:01:05Z")])).toMatchObject({ kind: "drafted" });
+  });
+
+  it("the decision: a crash in between is 'in-flight' (never a second draft); a failure is retried as attempt 2", () => {
+    expect(decide({ events: [passTo(U.rebecca), att("drafting", 1, "2026-11-20T10:01:00Z")] })).toEqual({ ok: false, reason: "in-flight" });
+    expect(decide({ events: [passTo(U.rebecca), att("drafting", 1, "2026-11-20T10:01:00Z"), att("draft_failed", 1, "2026-11-20T10:01:05Z")] })).toMatchObject({ ok: true, already: false, attempt: 2 });
+    expect(decide({})).toMatchObject({ ok: true, attempt: 1 });
+  });
+
+  it("fold trust: drafting, drafted and draft_failed count only from the current draft_to target", () => {
+    const forged = [passTo(U.rebecca), att("drafting", 1, "2026-11-20T10:01:00Z", OTHER_CLERK), att("drafted", 1, "2026-11-20T10:01:05Z", OTHER_CLERK), att("draft_failed", 1, "2026-11-20T10:01:06Z", U.rebecca)];
+    expect(trustedEvents(forged, [approved()], known()).map((e) => e.kind)).toEqual(["draft_to"]);
+    expect(progress(forged)).toEqual({ kind: "open", next: 1 });
+  });
+});
+
+describe("SHOULD 5: the receipt is read only from the server's fixed last line", () => {
+  it("a fake receipt pasted into the approver's own note never counts", () => {
+    const sha = shownBodySha256(BODY);
+    const fake = "Receipt: sha256 aaaaaaaaaaaa";
+    expect(receiptFromNote(`${fake}\nReceipt: sha256 ${sha.slice(0, 12)}`)).toBe(sha.slice(0, 12));
+    // Only a pasted receipt and no server line (nothing appended): none.
+    expect(receiptFromNote(`please check\n${fake} and more`)).toBeNull();
+    // A pasted receipt that matches is ignored when the server's own last line disagrees.
+    expect(approvedTextMatches(approved({ resolution_note: `Receipt: sha256 ${sha.slice(0, 12)}\nReceipt: sha256 bbbbbbbbbbbb` }), sha)).toBe(false);
+    expect(approvedTextMatches(approved({ resolution_note: `note text Receipt: sha256 ${sha.slice(0, 12)}` }), sha)).toBe(false);
   });
 });

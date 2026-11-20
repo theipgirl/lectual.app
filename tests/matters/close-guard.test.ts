@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { checkClose, runCloseOverride, OVERRIDE_NOT_RECORDED, OVERRIDE_ROLE_REFUSAL, type OverrideDeps } from "@/lib/matters/close-guard";
+import { checkClose, runCloseOverride, OVERRIDE_NOT_RECORDED, OVERRIDE_ROLE_REFUSAL, OVERRIDE_STAFF_PREVIEW, type OverrideDeps } from "@/lib/matters/close-guard";
 import { CLOSE_OVERRIDE_UNRECORDED } from "@/lib/ui/words";
 import { CLOSE_GUARD_UNREADABLE } from "@/lib/matters/deadline-safety";
 
@@ -16,17 +16,19 @@ function deps(over: Partial<OverrideDeps> & { type?: string; status?: string; op
       log.push("readDeadlines");
       return over.open === undefined ? [oa] : over.open;
     }),
+    actingAsStaff: vi.fn(async () => false),
     role: vi.fn(async () => "attorney"),
     callOverride: vi.fn(async () => {
       log.push("override");
       return "done" as const;
     }),
+    // Changed on purpose (Sprint 3 review, SHOULD 6): closeDirect returns the updated_at it wrote, and the restore is fenced on it.
     closeDirect: vi.fn(async () => {
       log.push("close");
-      return true;
+      return "2026-11-20T10:00:00.000Z";
     }),
-    restoreStatus: vi.fn(async (prev: string) => {
-      log.push(`restore:${prev}`);
+    restoreStatus: vi.fn(async (prev: string, closedAt: string) => {
+      log.push(`restore:${prev}@${closedAt}`);
       return true;
     }),
     reportUnrecorded: vi.fn(() => {
@@ -109,7 +111,7 @@ describe("AT5: the override needs an override role and a reason, and records one
   it("before 0110, a timeline entry that fails puts the status back: never closed past the guard without a recorded reason", async () => {
     const { d, log } = deps({ callOverride: vi.fn(async () => "missing" as const), logOverride: vi.fn(async () => false) });
     expect(await runCloseOverride("Reason", d)).toEqual({ ok: false, error: OVERRIDE_NOT_RECORDED });
-    expect(log).toEqual(["readMatter", "readDeadlines", "close", "restore:open"]);
+    expect(log).toEqual(["readMatter", "readDeadlines", "close", "restore:open@2026-11-20T10:00:00.000Z"]);
   });
 
   it("before 0110, a failed timeline entry AND a failed restore: the distinct 'closed, reason not recorded' sentence, reported once", async () => {
@@ -138,5 +140,16 @@ describe("AT5: the override needs an override role and a reason, and records one
   it("a failed deadlines read refuses the override too", async () => {
     const { d } = deps({ open: null });
     expect(await runCloseOverride("Reason", d)).toEqual({ ok: false, error: CLOSE_GUARD_UNREADABLE });
+  });
+});
+
+describe("Sprint 3 review note (a): Lectual staff acting in a firm", () => {
+  it("are refused up front with a fixed sentence (0110's function needs a membership row), before any read; unreadable counts as staff", async () => {
+    for (const actingAsStaff of [vi.fn(async () => true), vi.fn(async () => Promise.reject(new Error("x")))]) {
+      const { d, log } = deps({ actingAsStaff });
+      expect(await runCloseOverride("Reason", d)).toEqual({ ok: false, error: OVERRIDE_STAFF_PREVIEW });
+      expect(log).toEqual([]);
+      expect(d.role).not.toHaveBeenCalled();
+    }
   });
 });

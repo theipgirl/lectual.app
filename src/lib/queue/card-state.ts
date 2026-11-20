@@ -14,7 +14,7 @@ import type { CardEvent, CardEventKind, CardState } from "@/lib/queue/deck";
 const COLUMNS = "queue_item_id, kind, actor_id, target_user_id, until, note, created_at";
 const CHUNK = 100;
 
-const KINDS: readonly CardEventKind[] = ["handoff", "later", "returned", "draft_to", "drafted"];
+const KINDS: readonly CardEventKind[] = ["handoff", "later", "returned", "draft_to", "drafting", "drafted", "draft_failed", "pass_failed"];
 
 export function isNotSetUpError(error: unknown): boolean {
   const code = (error as { code?: unknown } | null)?.code;
@@ -68,24 +68,25 @@ export async function loadCardState(itemIds: readonly string[]): Promise<CardSta
 }
 
 /**
- * The kinds lectual 0112 adds. Before 0112 the table refuses them with the kind CHECK: code 23514, naming the constraint
- * `queue_card_event_kind` (lectual 0103 line 98: `constraint queue_card_event_kind check (kind in ('handoff','later','returned'))`;
- * NOT `queue_card_event_kind_check`). Both the CODE and the message must say so, the name must appear quote-delimited (so a
- * different constraint that merely starts with it, such as `queue_card_event_kind_check` or a shape check, never matches), and
- * only for these two kinds. Another CHECK, a 22P02 from a bad uuid, or an old kind's refusal stays "failed", never "not
- * switched on". 0103 uses a CHECK, not an enum, so the old enum 22P02 branch is gone.
+ * The kinds lectual 0112 adds. Before 0112 the table refuses them with 23514 naming one of 0103's two constraints:
+ * `queue_card_event_kind` (line 98, the kind list) or `queue_card_event_shape` (lines ~100-104, which admits only the three
+ * old shapes). Postgres prints the name in double quotes ("... violates check constraint "queue_card_event_kind""), and the
+ * name is matched quote-delimited, so a constraint that merely starts with it (`queue_card_event_kind_check`) never matches.
+ * Code AND message, and only for these kinds: another CHECK, a 22P02, or an old kind's refusal stays "failed", never "not
+ * switched on".
  */
-export const KINDS_0112: readonly CardEventKind[] = ["draft_to", "drafted"];
+export const KINDS_0112: readonly CardEventKind[] = ["draft_to", "drafting", "drafted", "draft_failed", "pass_failed"];
 export const KIND_CHECK_NAME = "queue_card_event_kind";
+export const SHAPE_CHECK_NAME = "queue_card_event_shape";
 export function isKindNotSetUpError(kind: CardEventKind, error: unknown): boolean {
   if (!KINDS_0112.includes(kind)) return false;
   // Read only to recognise the refusal; never shown or logged.
   const refusal = error as { code?: unknown; message?: unknown } | null;
   const text = typeof refusal?.message === "string" ? refusal.message : "";
-  return refusal?.code === "23514" && text.includes(`"${KIND_CHECK_NAME}"`);
+  return refusal?.code === "23514" && (text.includes(`"${KIND_CHECK_NAME}"`) || text.includes(`"${SHAPE_CHECK_NAME}"`));
 }
 
-/** 23505: a unique index refused the row (0112's one-`drafted`-per-item claim). */
+/** 23505: a unique index refused the row (0112's one claim per attempt, one `drafted` per item). */
 const isUniqueViolation = (error: unknown) => (error as { code?: unknown } | null)?.code === "23505";
 
 export type RecordResult = { ok: true } | { ok: false; reason: "not-set-up" | "failed" | "conflict" };

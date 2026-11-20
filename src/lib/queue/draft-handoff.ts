@@ -46,9 +46,15 @@ export function shaFromDraftToNote(note: string | null | undefined): string | nu
   return SHOWN_SHA256.test(sha) ? sha : null;
 }
 
-/** The 12-hex receipt the approve path appends to the resolution note ("Receipt: sha256 <12 hex>"), if any. */
+/**
+ * The 12-hex receipt the approve path writes on the resolution note, if any. The server writes it in ONE fixed form and
+ * position: the LAST line of the note, exactly "Receipt: sha256 <12 hex>" (`runQueueReview` joins the person's note, the
+ * stale line and the receipt, in that order). Only that last line is read, so a receipt the approver pasted into their own
+ * note (which comes earlier) can never be the one checked.
+ */
 export function receiptFromNote(note: string | null | undefined): string | null {
-  const m = /Receipt: sha256 ([0-9a-f]{12})\b/.exec(note ?? "");
+  const lines = (note ?? "").split("\n");
+  const m = /^Receipt: sha256 ([0-9a-f]{12})$/.exec(lines[lines.length - 1] ?? "");
   return m ? m[1] : null;
 }
 
@@ -79,26 +85,76 @@ export function approvedBy(item: Pick<QueueItem, "status" | "resolved_by">, emai
 
 /* ─────────────── who holds the draft ─────────────── */
 
-export type DraftAssignment = { target: string; by: string; sha: string | null; at: string; drafted: { at: string } | null };
+/**
+ * The drafter's attempts, after the current draft_to (MUST 2). The click CLAIMS an attempt with a `drafting` row (one per
+ * attempt number, a unique index in 0112), makes the Outlook draft, then CONFIRMS it with `drafted` or records
+ * `draft_failed`, which re-opens the item for the next attempt. Each of the three carries the note "attempt <n>".
+ *  · open      no attempt yet (next = 1)
+ *  · failed    the newest attempt has a draft_failed (next = that + 1): the button is offered again
+ *  · drafting  the newest attempt has neither (a crash in between): never "Drafted", never a second click
+ *  · drafted   confirmed
+ */
+export type DraftProgress = { kind: "open"; next: number } | { kind: "failed"; next: number } | { kind: "drafting"; attempt: number } | { kind: "drafted"; at: string };
 
-/** The newest draft_to on the item (and whether its target has marked it drafted since). Trusted events only. */
-export function draftAssignment(events: readonly CardEvent[], itemId: string): DraftAssignment | null {
-  let current = null as DraftAssignment | null;
-  for (const e of events) {
-    if (e.queueItemId !== itemId) continue;
-    if (e.kind === "draft_to" && e.targetUserId) current = { target: e.targetUserId, by: e.actorId, sha: shaFromDraftToNote(e.note), at: e.createdAt, drafted: null };
-    else if (e.kind === "drafted" && current !== null && e.actorId === current.target) current = { target: current.target, by: current.by, sha: current.sha, at: current.at, drafted: { at: e.createdAt } };
-  }
-  return current;
+export type DraftAssignment = { target: string; by: string; sha: string | null; at: string; progress: DraftProgress };
+
+const ATTEMPT = /^attempt ([1-9][0-9]{0,3})$/;
+export const attemptNote = (n: number): string => `attempt ${n}`;
+export function attemptOf(note: string | null | undefined): number | null {
+  const m = ATTEMPT.exec(note ?? "");
+  return m ? Number(m[1]) : null;
 }
 
-/** The approved client emails waiting on `viewerId`'s draft click. Empty unless the events were READ. */
+/** The newest draft_to on the item and what its target has done since. Trusted events only. */
+export function draftAssignment(events: readonly CardEvent[], itemId: string): DraftAssignment | null {
+  let current = null as { target: string; by: string; sha: string | null; at: string } | null;
+  let claimed = new Set<number>();
+  let failed = new Set<number>();
+  let drafted: string | null = null;
+  for (const e of events) {
+    if (e.queueItemId !== itemId) continue;
+    if (e.kind === "draft_to" && e.targetUserId) {
+      current = { target: e.targetUserId, by: e.actorId, sha: shaFromDraftToNote(e.note), at: e.createdAt };
+      claimed = new Set();
+      failed = new Set();
+      drafted = null;
+      continue;
+    }
+    if (!current || e.actorId !== current.target) continue;
+    const n = attemptOf(e.note);
+    if (e.kind === "drafted") drafted = e.createdAt;
+    else if (e.kind === "drafting" && n !== null) claimed.add(n);
+    else if (e.kind === "draft_failed" && n !== null) failed.add(n);
+  }
+  if (!current) return null;
+  let progress: DraftProgress;
+  if (drafted) progress = { kind: "drafted", at: drafted };
+  else if (claimed.size === 0) progress = { kind: "open", next: 1 };
+  else {
+    const latest = Math.max(...claimed);
+    progress = failed.has(latest) ? { kind: "failed", next: latest + 1 } : { kind: "drafting", attempt: latest };
+  }
+  return { ...current, progress };
+}
+
+/** Was the pass at approval recorded as failed (SHOULD 3)? A trusted `pass_failed` with no trusted draft_to after it. */
+export function passFailedRecorded(events: readonly CardEvent[], itemId: string): boolean {
+  let failed = false;
+  for (const e of events) {
+    if (e.queueItemId !== itemId) continue;
+    if (e.kind === "pass_failed") failed = true;
+    else if (e.kind === "draft_to") failed = false;
+  }
+  return failed;
+}
+
+/** The approved client emails waiting on `viewerId`'s draft (not confirmed drafted). Empty unless the events were READ. */
 export function readyToDraft<T extends Pick<QueueItem, "id" | "status" | "type">>(items: readonly T[], state: CardState, viewerId: string | null | undefined): T[] {
   if (!viewerId || state.status !== "ok") return [];
   return items.filter((i) => {
     if (i.status !== "approved" || i.type !== "CLIENT_EMAIL") return false;
     const a = draftAssignment(state.events, i.id);
-    return !!a && a.target === viewerId && !a.drafted;
+    return !!a && a.target === viewerId && a.progress.kind !== "drafted";
   });
 }
 
@@ -106,7 +162,7 @@ export function readyToDraft<T extends Pick<QueueItem, "id" | "status" | "type">
 
 /* ─────────────── retry a failed pass (S3) ─────────────── */
 
-export type RetryPassRefusal = "preview" | "not-yours" | "not-approved" | "no-drafter" | "not-switched-on" | "couldnt-check" | "already-passed" | "changed";
+export type RetryPassRefusal = "preview" | "not-yours" | "not-approved" | "no-drafter" | "not-switched-on" | "couldnt-check" | "already-passed" | "no-marker" | "changed";
 
 /**
  * "Pass to <drafter>" again, after a pass that didn't go through. Only the person who approved the item (their address is
@@ -132,6 +188,9 @@ export function retryPassDecision(args: {
   if (args.state.status === "not-set-up") return { ok: false, reason: "not-switched-on" };
   if (args.state.status !== "ok" || !args.trustKnown) return { ok: false, reason: "couldnt-check" };
   if (draftAssignment(args.state.events, args.item.id)) return { ok: false, reason: "already-passed" };
+  // SHOULD 3: only when the outcome recorded at approval was a failed pass. No marker, no retry (the queue may have drafted
+  // it, or the approver's own mailbox did before 0112, or it was approved before a drafter existed).
+  if (!passFailedRecorded(args.state.events, args.item.id)) return { ok: false, reason: "no-marker" };
   if (!receiptMatchesCurrent(args.item)) return { ok: false, reason: "changed" };
   return { ok: true, drafter: args.drafter };
 }
@@ -142,9 +201,10 @@ export type DraftRefusal =
   | "not-approved" // the item is not an approved client email
   | "not-switched-on" // before lectual 0112
   | "couldnt-check" // the card events or the routing couldn't be read
-  | "changed"; // the text was edited after approval (or the receipt is missing)
+  | "changed" // the text was edited after approval (or the receipt is missing)
+  | "in-flight"; // an attempt was claimed and has no outcome (a crash in between): check Drafts, never a second draft
 
-export type DraftDecision = { ok: true; already: false; assignment: DraftAssignment } | { ok: true; already: true } | { ok: false; reason: DraftRefusal };
+export type DraftDecision = { ok: true; already: false; assignment: DraftAssignment; attempt: number } | { ok: true; already: true } | { ok: false; reason: DraftRefusal };
 
 /**
  * The pure decision over what the action re-read. `state` must be the TRUSTED fold; `trustKnown` false (the routing or
@@ -166,10 +226,11 @@ export function makeDraftDecision(args: {
   if (args.state.status !== "ok" || !args.trustKnown) return { ok: false, reason: "couldnt-check" };
   const a = draftAssignment(args.state.events, args.item.id);
   if (!a || a.target !== args.callerId) return { ok: false, reason: "not-yours" };
-  // A second click on a drafted item does nothing.
-  if (a.drafted) return { ok: true, already: true };
+  // A second click on a drafted item does nothing; one whose attempt is still open is never drafted twice.
+  if (a.progress.kind === "drafted") return { ok: true, already: true };
+  if (a.progress.kind === "drafting") return { ok: false, reason: "in-flight" };
   if (!approvedTextMatches(args.item, a.sha)) return { ok: false, reason: "changed" };
-  return { ok: true, already: false, assignment: a };
+  return { ok: true, already: false, assignment: a, attempt: a.progress.next };
 }
 
 /* ─────────────── the drafter's own Outlook ─────────────── */

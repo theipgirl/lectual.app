@@ -4,11 +4,13 @@ import "./handed.css";
 import { useActionState } from "react";
 import { makeDraftAction, type MakeDraftState } from "@/app/dashboard/queue/actions";
 import { Notice } from "@/components/ui/Notice";
-import { CONNECT_OUTLOOK_LINK, DRAFTED_IN_OUTLOOK, MAKE_DRAFT_BUTTON, MAKE_DRAFT_TITLE, SAVING } from "@/lib/ui/words";
+import { APPROVED_TEXT_LABEL, CONNECT_OUTLOOK_LINK, DRAFTED_IN_OUTLOOK, MAKE_DRAFT_BUTTON, MAKE_DRAFT_TITLE, SAVING } from "@/lib/ui/words";
 
 export type MakeDraftView =
   | { kind: "ready" }
   | { kind: "drafted" }
+  /** A claimed attempt with no outcome: check Drafts; the approved text as plain text to copy. No button. */
+  | { kind: "check-drafts"; sentence: string; text: string }
   /** The button is drawn disabled with the sentence; `connect` adds the "Connect Outlook" link. */
   | { kind: "blocked"; sentence: string; connect: string | null };
 
@@ -26,6 +28,16 @@ export function MakeDraftCard({ id, intro, view }: { id: string; intro: string; 
         <Notice tone="ok" role="status">
           {DRAFTED_IN_OUTLOOK}
         </Notice>
+      ) : view.kind === "check-drafts" ? (
+        <div data-make-draft-check>
+          <Notice tone="warn" role="status">
+            {view.sentence}
+          </Notice>
+          <p className="lx-label">{APPROVED_TEXT_LABEL}</p>
+          <pre className="lx-handed-text" style={{ whiteSpace: "pre-wrap" }}>
+            {view.text}
+          </pre>
+        </div>
       ) : (
         <form action={action} className="lx-sendback">
           <input type="hidden" name="id" value={id} />

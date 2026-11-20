@@ -13,6 +13,7 @@ const state = vi.hoisted(() => ({
   adminReads: [] as { id: unknown; org: unknown }[],
   create: vi.fn(),
   filters: [] as [string, unknown][],
+  insertError: null as unknown,
 }));
 
 vi.mock("server-only", () => ({}));
@@ -27,7 +28,8 @@ vi.mock("@/lib/db/scoped-client", () => ({
       order: () => q,
       then: (resolve: (v: unknown) => void) => resolve({ data: state.scopedError ? null : state.rows, error: state.scopedError }),
     };
-    return { from: () => q, auth: { getUser: async () => ({ data: { user: { id: "user-rayn" } } }) } };
+    const table = { ...q, insert: async () => ({ error: state.insertError }) };
+    return { from: () => table, auth: { getUser: async () => ({ data: { user: { id: "user-rayn" } } }) } };
   }),
 }));
 vi.mock("@/lib/db/admin", () => ({
@@ -167,5 +169,35 @@ describe("Acceptance 10: before lectual 0112 is detected by error code, only for
     // Other codes, and the OLD kinds, are failures.
     expect(isKindNotSetUpError("draft_to", { code: "42501", message: check })).toBe(false);
     expect(isKindNotSetUpError("handoff", { code: "23514", message: check })).toBe(false);
+  });
+});
+
+describe("MUST 1: 0103's TWO constraints, with the real Postgres message strings", () => {
+  const KIND = 'new row for relation "queue_card_event" violates check constraint "queue_card_event_kind"';
+  const SHAPE = 'new row for relation "queue_card_event" violates check constraint "queue_card_event_shape"';
+
+  it("(a)/(c) the kind CHECK and the shape CHECK, quote-delimited as Postgres prints them, both read as before-0112 for the new kinds only", async () => {
+    const { isKindNotSetUpError } = await import("@/lib/queue/card-state");
+    for (const kind of ["draft_to", "drafting", "drafted", "draft_failed", "pass_failed"] as const) {
+      expect(isKindNotSetUpError(kind, { code: "23514", message: KIND }), kind).toBe(true);
+      expect(isKindNotSetUpError(kind, { code: "23514", message: SHAPE }), kind).toBe(true);
+    }
+    for (const kind of ["handoff", "later", "returned"] as const) {
+      expect(isKindNotSetUpError(kind, { code: "23514", message: SHAPE }), kind).toBe(false);
+    }
+    expect(isKindNotSetUpError("draft_to", { code: "23514", message: 'violates check constraint "queue_card_event_shape_v2"' })).toBe(false);
+  });
+
+  it("(d) recordCardEvent turns either refusal into not-set-up (the approve path's own-mailbox fallback), and another CHECK into failed", async () => {
+    const { recordCardEvent } = await import("@/lib/queue/card-state");
+    for (const message of [KIND, SHAPE]) {
+      state.insertError = { code: "23514", message };
+      expect(await recordCardEvent({ orgId: "o", queueItemId: "q1", kind: "draft_to", targetUserId: "t" })).toEqual({ ok: false, reason: "not-set-up" });
+    }
+    state.insertError = { code: "23514", message: 'violates check constraint "queue_card_event_draft_shape"' };
+    expect(await recordCardEvent({ orgId: "o", queueItemId: "q1", kind: "draft_to", targetUserId: "t" })).toEqual({ ok: false, reason: "failed" });
+    state.insertError = { code: "23505", message: "duplicate key" };
+    expect(await recordCardEvent({ orgId: "o", queueItemId: "q1", kind: "drafting", note: "attempt 1" })).toEqual({ ok: false, reason: "conflict" });
+    state.insertError = null;
   });
 });

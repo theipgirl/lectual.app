@@ -2327,8 +2327,15 @@ deadline or changes `attorney_confirmed`. Rules are pure in `src/lib/matters/dea
   reason and a confirm tick. With 0110: `rpc('crm_close_matter_with_override')` writes the override row and closes in one transaction, then the
   app logs ONE `matter_updated` row `{ change: "close_override", reason, deadline_ids, from_status, recorded }` ("Closed with an open deadline
   (attorney override)", "Reason: ..."). Before 0110 (42883 / PGRST202): the plain close, then the timeline row, which IS the record; if it
-  can't be written the status is put back (fenced on `status = closed`, error and row count checked); if THAT fails too the action says
+  can't be written the status is put back (fenced on `status = closed` AND on the `updated_at` the close wrote, as the database returned it,
+  so a newer change by someone else is never overwritten; error and row count checked); if THAT fails too the action says
   "The matter was closed, but the reason couldn't be recorded. Tell Lectual." and logs the matter id only. The form (`CloseOverrideForm`) shows only to those roles, on a non-closed matter with a counting deadline.
+  Lectual staff acting inside a firm are refused up front (`OVERRIDE_STAFF_PREVIEW`, before any read): 0110's function needs a
+  `crm_org_member` row, so it would refuse them even though the app's role read allows them; an unreadable session counts as staff.
+- **0110 binds service-role writers too.** Its trigger runs for every `crm_matter` status write, the importers and agents that write as the
+  service role included (the hired-matter sync, the matters importer, any job that closes a matter): such a writer cannot close a matter that
+  holds a counting open deadline either, and has no `auth.uid()` to write an override row with. Check every service-role path that sets
+  `status = 'closed'` before applying 0110.
 - **0110 is a proposal file** (`docs/pge/2026-11-17-agentic-ip-os/0110-proposed.sql.txt`): the trigger knows an override by an override row for
   that matter with `created_at = now()` and `actor_id = auth.uid()` in the same transaction (no session setting a client could send). Apply to
   lectual-dev, run its isolation cases, then prod with the owner's OK. Change its kind list and roles together with deadline-safety.ts.
@@ -2373,21 +2380,19 @@ their own click). Contract: `docs/pge/2026-11-17-agentic-ip-os/sprint-4.md`. App
   says passing isn't switched on (`?pass=off`); any other failure makes no draft anywhere (`send=pass-failed`). The full page, the deck and the lead
   page's Yes all say `passedToDrafter(name)` / `PASS_FAILED` (`afterYesSentence`).
 - **"Pass to <drafter>" (S3):** the approved item page offers the APPROVER a retry (`RetryPassCard` -> `retryPassAction` -> `retryPassToDrafter`, same
-  `passToDrafter` write): only the approver (`resolved_by`), only while no trusted draft_to exists, only when the receipt still names the current text.
-  Known limit: the page can't tell a failed pass from a pre-0112 fallback that drafted in the approver's own mailbox (the queue item doesn't record
-  which), so the card shows for both and says to use it only if no draft was made; before 0112 the click says passing isn't switched on.
+  `passToDrafter` write): only the approver (`resolved_by`), only with a trusted `pass_failed` marker written at approval, only while no trusted
+  draft_to exists, only when the receipt still names the current text (see the director review below).
 - **The fold** (`trustedEvents`): a `draft_to` counts only from the member who APPROVED the item (their address = `resolved_by`, from the member
   directory via `EventTrust.emails`), written no more than 2 minutes before `resolved_at` (`DRAFT_TO_CLOCK_SKEW_MS`: the queue stamps `resolved_at`, the database stamps `created_at`) or after it, to a current staff member. A newer draft_to from another attorney or the owner,
-  or one written before approval, is dropped. A `drafted` counts only from the current draft_to target. Neither is a hand-off.
+  or one written before approval, is dropped. `drafting`, `drafted` and `draft_failed` count only from the current draft_to target; `pass_failed`
+  only from the approver. None of them is a hand-off.
 - **"Make the draft in my Outlook"** (`makeDraftInMyOutlook`, `src/lib/queue/make-draft.ts`, the ONE core; the item page's `makeDraftAction`): session
   re-resolved (staff previewing refused), item re-read (approved CLIENT_EMAIL), events and routing re-read and folded with trust (unknown trust or
   unreadable events = "couldn't check"; before 0112 = `NOT_SWITCHED_ON`), caller must be the CURRENT target, the item's current text must hash to the
   draft_to sha AND the receipt must be there and agree (an edit after approval, even with a re-issued draft_to, refuses), a drafted item does nothing.
   Then the caller's own Outlook is checked (`myOutlookDraftAccess(posted)`: their scoped read, `user_id` = the session user, personal, active,
-  Microsoft, `Mail.ReadWrite`; a posted `connection_id` that isn't theirs is refused before anything is written). **Claim first (S8):** the `drafted`
-  row is written BEFORE the Graph call; 0112's one-`drafted`-per-item unique index refuses a second click (23505, read as "already drafted"), a failed
-  claim is a refusal, and a Graph failure after the claim writes nothing more and says "The draft couldn't be made. Ask Lectual." (no silent retry).
-  Without 0112's index two truly concurrent clicks are not stopped by the database.
+  Microsoft, `Mail.ReadWrite`; a posted `connection_id` that isn't theirs is refused before anything is written). Then claim, draft, confirm or
+  fail (see the director review below). Without 0112's indexes two truly concurrent clicks are not stopped by the database.
 - **Ready to draft (N)** (`loadReadyToDraft`, `ready-load.ts`): on Approvals (a link to `?status=approved&who=ready` and a row marker) and the deck (a
   link), drawn only when the read worked and found some. Every one of these reads (and the item page's cards) runs only while the firm HAS a drafter
   set, so a firm without one reads and renders exactly what it did before. Known limit: removing the drafter hides the list for anyone still holding
@@ -2402,3 +2407,24 @@ their own click). Contract: `docs/pge/2026-11-17-agentic-ip-os/sprint-4.md`. App
   and recreates that constraint by that name. `docs/pge/2026-11-17-agentic-ip-os/0112-proposed.sql.txt` holds the proposal (its helper lives in the
   unexposed `private` schema and refuses any org but the caller's) and its isolation cases (not on lectual-dev). Also unverified: lawmatics-mcp and
   `mailbox_draft: false`, the queue's `resolved_at` clock against the database's `created_at` (the fold compares them), a real Graph draft, a real browser.
+- **Director review (Nov 20), on top of 2281557:**
+  - **0103 has TWO constraints that refuse the new kinds**, `queue_card_event_kind` and `queue_card_event_shape` (only the three old shapes).
+    0112 drops and re-adds both under their own names. Before 0112, 23514 naming either (quote-delimited, exactly as Postgres prints
+    `violates check constraint "queue_card_event_kind"`) reads as "not switched on" for the new kinds only (`isKindNotSetUpError`), so a refused
+    `draft_to` takes the documented fallback (the approver's own mailbox), never `pass-failed`.
+  - **Make the draft: claim, confirm, fail.** The click claims "attempt <n>" with a `drafting` row (0112: one per (org, item, note), and the policy
+    admits only the NEXT attempt), makes the Outlook draft, then writes `drafted` (confirmed) or, on a Graph failure, `draft_failed`, which re-opens
+    the item for attempt n + 1. Two concurrent clicks: the second `drafting` for the same attempt answers 23505 ("already being drafted"). A claim with
+    no outcome (a crash in between) is never drafted again from here and never reads as "Drafted": the page says "Check your Drafts. If it isn't
+    there, copy the approved text below." and shows the approved body as plain text. "Drafted" only once `drafted` is confirmed. `drafting`,
+    `drafted` and `draft_failed` count only from the current draft_to target (`trustedEvents`); progress is `draftAssignment(...).progress`.
+  - **"Pass to <drafter>" only after a recorded failed pass.** When the approve path's `draft_to` write fails (not before 0112), it writes a
+    `pass_failed` marker (no text; trusted only from the approver, after `resolved_at`). The retry is offered, and allowed, only with that marker
+    and no trusted draft_to. The queue drafting anyway, the own-mailbox fallback and items approved before a drafter existed leave no marker:
+    no button. If the marker itself can't be written, no retry is offered (the approval page still says to copy the text).
+  - **The receipt** is read only from the LAST line of the resolution note, exactly `Receipt: sha256 <12 hex>` (the server appends it last), so a
+    receipt pasted into the approver's own note never counts.
+  - **A failed Ready-to-draft read** shows the drafter "Couldn't check what's ready to draft." on Approvals and the deck.
+  - **If lawmatics-mcp ever normalises `final_body`** (trims, re-wraps, changes line endings), the stored text stops hashing to the `draft_to` /
+    receipt hash and EVERY Make-draft is refused ("changed after it was approved"): it fails closed, never drafts other text (pinned by a test).
+

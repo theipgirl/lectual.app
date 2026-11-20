@@ -22,10 +22,13 @@ import { canApproveItem, classifyQueueItem, type ApprovalRouting, type QueueKind
 /**
  *  · draft_to  (Sprint 4, lectual 0112) an APPROVED client email is passed to the firm's drafter: the approver wrote it
  *              at approve time instead of drafting in their own mailbox. `note` carries the approved text's sha256.
- *  · drafted   the drafter made the draft in their OWN Outlook. Ends the draft_to.
+ *  · drafting  the drafter CLAIMED attempt <n> ("attempt <n>"), before making the draft in their OWN Outlook.
+ *  · drafted   the draft is confirmed made (only after Outlook said so). Ends the draft_to.
+ *  · draft_failed  attempt <n> didn't make a draft; the item is open again for the same drafter.
+ *  · pass_failed   the approve path couldn't write the draft_to: the marker that lets the approver retry the pass.
  * Neither changes who may approve anything, and neither is a hand-off (`currentHolder` ignores both).
  */
-export type CardEventKind = "handoff" | "later" | "returned" | "draft_to" | "drafted";
+export type CardEventKind = "handoff" | "later" | "returned" | "draft_to" | "drafting" | "drafted" | "draft_failed" | "pass_failed";
 export type CardEvent = {
   queueItemId: string;
   kind: CardEventKind;
@@ -91,7 +94,8 @@ export function viewEventTrust(view: { routing: ApprovalRouting; members: readon
  * `later` rows only ever change their own actor's deck and are kept. With trust `unknown` nothing is dropped. With trust
  * `known`, a hand-off or return for an item not in `items` can't be checked and is dropped. Idempotent.
  * Sprint 4: a `draft_to` counts only from the member who approved the item (address = `resolved_by`), written at or after
- * `resolved_at`, and only to a current staff member; a `drafted` only from the current draft_to target.
+ * `resolved_at`, and only to a current staff member; `drafting`, `drafted` and `draft_failed` only from the current draft_to
+ * target; a `pass_failed` only from the member who approved the item, at or after `resolved_at` (the draft_to rule, no target).
  */
 /** Allowed difference between the queue service's clock (`resolved_at`) and the database's (`created_at`). */
 export const DRAFT_TO_CLOCK_SKEW_MS = 2 * 60 * 1000;
@@ -126,13 +130,15 @@ export function trustedEvents(events: readonly CardEvent[], items: readonly Fold
       if (!isStaff && e.actorId !== holder.userId && e.actorId !== holder.by && !mayApprove(e.actorId, item)) continue;
       holders.set(e.queueItemId, null);
       out.push(e);
-    } else if (e.kind === "draft_to") {
+    } else if (e.kind === "draft_to" || e.kind === "pass_failed") {
       // Only the person who APPROVED the item passes it to a drafter (the approve path writes it as the approver, after
       // resolving): the writer's address must be the item's `resolved_by`, the row no older than `resolved_at`, and the
       // target a current staff member. Anything else (another attorney, a row written before approval, a forged row) is left out.
-      if (!e.targetUserId) continue;
-      const targetRole = trust.roles.get(e.targetUserId);
-      if (!targetRole || !QUEUE_EDIT_ROLES.includes(targetRole)) continue;
+      if (e.kind === "draft_to") {
+        if (!e.targetUserId) continue;
+        const targetRole = trust.roles.get(e.targetUserId);
+        if (!targetRole || !QUEUE_EDIT_ROLES.includes(targetRole)) continue;
+      } else if (e.targetUserId) continue;
       const actorEmail = trust.emails?.get(e.actorId);
       const by = (item.resolved_by ?? "").trim().toLowerCase();
       if (item.status !== "approved" || !by || !actorEmail || actorEmail.trim().toLowerCase() !== by) continue;
@@ -141,10 +147,10 @@ export function trustedEvents(events: readonly CardEvent[], items: readonly Fold
       // `resolved_at` is stamped by the queue service's clock and `created_at` by the database's: allow a small skew so a
       // pass written right after approving isn't dropped. A row written well before approval is still left out.
       if (!Number.isFinite(resolvedAt) || !Number.isFinite(writtenAt) || writtenAt < resolvedAt - DRAFT_TO_CLOCK_SKEW_MS) continue;
-      drafters.set(e.queueItemId, e.targetUserId);
+      if (e.kind === "draft_to" && e.targetUserId) drafters.set(e.queueItemId, e.targetUserId);
       out.push(e);
-    } else if (e.kind === "drafted") {
-      // Only the current draft_to target says it is drafted.
+    } else if (e.kind === "drafting" || e.kind === "drafted" || e.kind === "draft_failed") {
+      // Only the current draft_to target claims, confirms or fails an attempt.
       if (drafters.get(e.queueItemId) !== e.actorId) continue;
       out.push(e);
     }

@@ -27,6 +27,11 @@ const s = vi.hoisted(() => ({
   overrideThrows: false,
   queue: [] as Result[],
   qs: [] as unknown[],
+  actingAsStaff: false,
+}));
+
+vi.mock("@/lib/firm/session", () => ({
+  resolveFirmSession: vi.fn(async () => ({ kind: "ok", role: s.role, actingAsStaff: s.actingAsStaff, user: { id: "u-1" }, org: { id: "o-1" } })),
 }));
 
 vi.mock("@/lib/db/scoped-client", () => ({
@@ -50,6 +55,7 @@ vi.mock("@/lib/db/scoped-client", () => ({
 
 const { closeMatterWithOverride } = await import("@/lib/matters/matters");
 
+const CLOSED_AT = "2026-11-20T10:00:00.123+00:00";
 const matterOpen: Result = { data: { type: "TM", status: "open" }, error: null };
 const oneOpen: Result = { data: [{ id: "d1", kind: "other", title: "Note to file", due_date: "2026-12-01", status: "open" }], error: null };
 const qs = () => s.qs as Q[];
@@ -61,6 +67,7 @@ beforeEach(() => {
   s.overrideThrows = false;
   s.queue = [];
   s.qs = [];
+  s.actingAsStaff = false;
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
@@ -96,10 +103,12 @@ describe("closeMatterWithOverride wiring: the rpc's error codes", () => {
   it("missing function, the timeline row fails, the restore is fenced on status = closed and succeeds: not recorded, put back", async () => {
     s.override = { data: null, error: { code: "PGRST202", message: "missing" } };
     // read matter, read deadlines, close (1 row), logActivity's org read FAILS, restore (1 row)
-    s.queue = [matterOpen, oneOpen, { data: [{ id: "m1" }], error: null }, { data: null, error: { code: "XX000" } }, { data: [{ id: "m1" }], error: null }];
+    s.queue = [matterOpen, oneOpen, { data: [{ id: "m1", updated_at: CLOSED_AT }], error: null }, { data: null, error: { code: "XX000" } }, { data: [{ id: "m1" }], error: null }];
     expect(await closeMatterWithOverride("m1", "Reason")).toEqual({ ok: false, error: "Couldn't record the reason, so the matter wasn't closed. Try again." });
     const restore = updates()[1];
     expect(restore.calls).toContainEqual(["eq", ["status", "closed"]]);
+    // SHOULD 6: fenced on the updated_at closeDirect wrote, so a newer change by someone else is never overwritten.
+    expect(restore.calls).toContainEqual(["eq", ["updated_at", CLOSED_AT]]);
     expect((restore.calls.find(([n]) => n === "update")![1][0] as { status: string }).status).toBe("open");
     expect(console.error).not.toHaveBeenCalled();
   });
@@ -109,12 +118,29 @@ describe("closeMatterWithOverride wiring: the rpc's error codes", () => {
       s.qs = [];
       (console.error as unknown as { mockClear(): void }).mockClear();
       s.override = { data: null, error: { code: "PGRST202", message: "missing" } };
-      s.queue = [matterOpen, oneOpen, { data: [{ id: "m1" }], error: null }, { data: null, error: { code: "XX000" } }, restore];
+      s.queue = [matterOpen, oneOpen, { data: [{ id: "m1", updated_at: CLOSED_AT }], error: null }, { data: null, error: { code: "XX000" } }, restore];
       expect(await closeMatterWithOverride("m1", "Secret reason text")).toEqual({ ok: false, error: "The matter was closed, but the reason couldn't be recorded. Tell Lectual." });
       expect(console.error).toHaveBeenCalledTimes(1);
       const logged = JSON.stringify((console.error as unknown as { mock: { calls: unknown[][] } }).mock.calls);
       expect(logged).toContain("m1");
       expect(logged).not.toContain("Secret");
     }
+  });
+});
+
+describe("Sprint 3 review: staff previewing, and a restore that loses to a newer change", () => {
+  it("note (a): Lectual staff acting in a firm are refused up front with a fixed sentence: no read, no rpc, no write", async () => {
+    s.actingAsStaff = true;
+    expect(await closeMatterWithOverride("m1", "Reason")).toEqual({ ok: false, error: "Preview only: closing past a deadline isn't saved while you're viewing as the firm." });
+    expect(qs()).toHaveLength(0);
+  });
+
+  it("SHOULD 6: someone else changed the matter after the close (updated_at moved): the fenced restore finds 0 rows and overwrites nothing", async () => {
+    s.override = { data: null, error: { code: "PGRST202", message: "missing" } };
+    // The restore's fence (status closed AND updated_at = CLOSED_AT) matches nothing: the newer change wins.
+    s.queue = [matterOpen, oneOpen, { data: [{ id: "m1", updated_at: CLOSED_AT }], error: null }, { data: null, error: { code: "XX000" } }, { data: [], error: null }];
+    expect(await closeMatterWithOverride("m1", "Reason")).toEqual({ ok: false, error: "The matter was closed, but the reason couldn't be recorded. Tell Lectual." });
+    const restore = updates()[1];
+    expect(restore.calls).toContainEqual(["eq", ["updated_at", CLOSED_AT]]);
   });
 });
