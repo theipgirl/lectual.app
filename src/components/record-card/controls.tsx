@@ -20,7 +20,7 @@ import { TASK_TITLE_MAX } from "@/lib/matters/task-edit";
 import { beginOnce, noShowOffered, type Hold } from "@/lib/record-card/hold";
 import { noShowNotices } from "@/components/record-card/no-show-notices";
 import type { CardMember, CardView, StepLine } from "@/lib/record-card/model";
-import { stepEditFields, type TemperatureControl, type MenuItem, type CardKind } from "@/lib/record-card/rules";
+import { stepAssigneeOptions, stepEditFields, type TemperatureControl, type MenuItem, type CardKind } from "@/lib/record-card/rules";
 import type { ReferralSource } from "@/lib/intake";
 import {
   RECORD_CARD_ADD_STEP,
@@ -302,24 +302,38 @@ export function StepForm({ kind, id, step, dueIso, onDone, autoFocus, assignees 
   const { pending, mark, run } = useRun(onDone);
   const [title, setTitle] = useState(step?.title ?? "");
   const [due, setDue] = useState(dueIso ?? "");
-  const [who, setWho] = useState(assignees?.current ?? "");
+  // Edit: the picker opens on the step's real assignee (a former member gets their own option). Add: only the team is offered,
+  // and a starting choice that isn't on it starts as Unassigned.
+  const options = assignees ? stepAssigneeOptions(assignees.members, step ? assignees.current : null) : [];
+  const [who, setWho] = useState(() => {
+    const start = assignees?.current ?? "";
+    return options.some((o) => o.value === start) ? start : "";
+  });
+  const [picked, setPicked] = useState(false);
   return (
     <form
       className={assignees ? "rc-stepform rc-stepform-who" : "rc-stepform"}
       onSubmit={(e) => {
         e.preventDefault();
-        if (step) run(viaForm(updateNextStepAction, stepEditFields({ taskId: step.id, title, dueAt: due, assignees: assignees ?? null, chosen: who })));
+        if (step) run(viaForm(updateNextStepAction, stepEditFields({ taskId: step.id, title, dueAt: due, assignees: assignees ?? null, chosen: who, picked })));
         else run(viaForm(setNextStepAction, { kind, id, title, dueAt: due, assigneeId: assignees ? who : "" }));
       }}
     >
       <input className="lx-input" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={TASK_TITLE_MAX} aria-label={RECORD_CARD_STEP_TITLE} placeholder="What happens next" required autoFocus={autoFocus} />
       <input className="lx-input" type="date" value={due} onChange={(e) => setDue(e.target.value)} aria-label={RECORD_CARD_STEP_DUE} />
       {assignees && (
-        <select className="lx-input" value={who} onChange={(e) => setWho(e.target.value)} aria-label={LEAD_PAGE_STEP_OWNER}>
-          <option value="">{UNASSIGNED}</option>
-          {assignees.members.map((m) => (
-            <option key={m.userId} value={m.userId}>
-              {m.name}
+        <select
+          className="lx-input"
+          value={who}
+          onChange={(e) => {
+            setWho(e.target.value);
+            setPicked(true);
+          }}
+          aria-label={LEAD_PAGE_STEP_OWNER}
+        >
+          {options.map((o) => (
+            <option key={o.value || "none"} value={o.value}>
+              {o.label}
             </option>
           ))}
         </select>

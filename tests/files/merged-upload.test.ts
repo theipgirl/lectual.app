@@ -36,7 +36,7 @@ describe("an upload from a page opened before a merge goes to the keeper", () =>
     const [insert] = writesTo(world.db, "crm_file");
     expect(insert.payload).toMatchObject({ lead_id: LEAD, storage_path: keeperPath });
     expect(JSON.stringify(world.db.rows("crm_file"))).not.toContain(MERGED);
-    expect(revalidated).toEqual([`/dashboard/leads/${LEAD}/`]);
+    expect(revalidated).toEqual([`/dashboard/leads/${LEAD}/`, "/dashboard/review/"]);
     expect(world.db.rows("crm_activity").every((a) => a.lead_id !== MERGED)).toBe(true);
   });
 

@@ -1534,12 +1534,18 @@ and a Follow-Up stage; a lead that has a matter shows once, as the matter). Ever
   **The note box is the card's own composer** (`NoteComposer` / `MatterNoteComposer` with Call / Email / Meeting, the email subject and @mentions, plus voice): a call or email logged
   there is the outbound `call_logged` / `email_sent` row that the review's "Waiting on client" and "Last followed up" read, so the review keeps it (no separate "Log what happened"
   box on the card; `logWhatHappenedAction` stays for the owner's Sheet and the Cards deck). The step checklist names each step's assignee and its edit/add forms gain "Assigned
-  to" (`StepAssignees`; not drawn when the team list is unreadable). A step edit posts `assigneeId` ONLY when the person changed it in that form (`stepEditFields`,
-  `src/lib/record-card/rules.ts`), so a reassignment someone saved after the card was drawn is never reverted. A lead's Move to stage also offers lost stages
-  (`buildOpenedCard(..., { lostShown: true })`, as the drawer did; never won). The Documents & files card's upload refreshes the review (`refreshAfterUpload` -> `UploadAndRefresh`).
+  to" (`StepAssignees`; not drawn when the team list is unreadable). A step edit posts `assigneeId` ONLY when the person explicitly PICKED a value in that form's picker (the
+  select's change event, `picked`; `stepEditFields`, `src/lib/record-card/rules.ts`), whatever the value: an untouched picker never reverts a reassignment saved after the card was
+  drawn, and re-picking the opening assignee after someone moved it is posted (it was chosen). The lead page's / card's top "Change" form builds its fields through the same
+  `stepEditFields` (hidden inputs; `members` null = team unreadable = no picker, no assignee posted). A step whose assignee isn't in the team list gets its own option
+  (`stepAssigneeOptions`, "Someone no longer on the team"), so the picker opens on them and Unassigned really clears. A lead's Move to stage also offers lost stages
+  (`buildOpenedCard(..., { lostShown: true })`, as the drawer did; never won). A lead's USPTO deadline reads "Couldn't load" when the review's deadline read failed (`deadlinesFailed`),
+  never "—". The Documents & files card refreshes the review after an upload AND a delete (`refreshAfterUpload` -> `UploadAndRefresh` / `DeleteAndRefresh`).
 - **The review page stays current after a card edit:** every action the card calls revalidates `/dashboard/review/` beside its own paths (the review's own actions already did;
   added to `addNoteAction`, `addMatterNoteAction`, both `addVoiceNoteAction`s, `setLaneAction`, `setSourceAction`, the record-card actions' `refresh` (rename, tags),
-  `logConsultOutcomeAction` (no-show) and `revalidateMatter` (matter title and header)). The card's `useRun` also calls `router.refresh()` after a save.
+  `logConsultOutcomeAction` (no-show), `revalidateMatter` (matter title and header), the Stage Keeper's lead actions' `refresh` (`undoAgentMoveAction`,
+  `acceptStageSuggestionAction`, `dismissStageSuggestionAction`) and the files actions (`confirmUploadAction`, `deleteFileAction`)). The card's `useRun` also calls
+  `router.refresh()` after a save, and so do `UploadAndRefresh` / `DeleteAndRefresh`.
 - **Card actions are the existing ones, all re-resolving the role**: step edit (title, due, and assignee when changed) = `updateNextStepAction` (only posted fields change); Snooze
   (Tomorrow / Next Monday / In 2 weeks) = `snoozeNextStepAction`, the date worked out on the server from the firm's calendar day (`snoozeDate`); Done = `completeNextStepAction`; add =
   `setNextStepAction`; Stage = `moveStageAction` (matter: `updateMatterStage`; lead: `CAN_MOVE_STAGE`, open / lost / nurture only, `won` refused on the server); Owner =

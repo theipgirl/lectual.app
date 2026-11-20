@@ -10,6 +10,7 @@ import {
   BLANK,
   LAST_CHANGED_LABEL,
   LAST_CONTACT,
+  LEAD_STEP_COULDNT_LOAD,
   LEAD_STEP_FACT_PROPOSAL,
   LEAD_STEP_FACT_WAITING,
   RECORD_CARD_STAGE,
@@ -45,6 +46,7 @@ export function ReviewCardAside({
   today,
   stagesFailed,
   closeStages,
+  deadlinesFailed = false,
 }: {
   open: OpenRef;
   row: ReviewRow | null;
@@ -54,6 +56,8 @@ export function ReviewCardAside({
   stagesFailed: boolean;
   /** Lost / Nurture choices, or an empty list when the role can't move a lead or the firm has no such stage. */
   closeStages: CloseStage[];
+  /** The review's deadline read failed: a lead's USPTO deadline says "Couldn't load", never "—" (a failed read is never "none"). */
+  deadlinesFailed?: boolean;
 }) {
   if (!row) {
     return (
@@ -87,6 +91,10 @@ export function ReviewCardAside({
               <span className={deadlineIsSoon(row.deadline.dueDate, today) ? "rv-deadline-soon" : undefined}>
                 {shortDate(row.deadline.dueDate, today)}
                 {row.deadline.title ? <span className="lx-note rv-sub">{row.deadline.title}</span> : null}
+              </span>
+            ) : deadlinesFailed ? (
+              <span className="lx-note" role="status">
+                {LEAD_STEP_COULDNT_LOAD}
               </span>
             ) : (
               BLANK

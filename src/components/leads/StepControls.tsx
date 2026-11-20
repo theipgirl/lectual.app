@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, type ReactNode } from "react";
+import { useActionState, useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   completeNextStepAction,
@@ -12,6 +12,7 @@ import {
 import { SavedNote } from "@/components/ui/SavedNote";
 import { SNOOZE_CHOICES, SNOOZE_LABEL } from "@/lib/review/snooze";
 import { TASK_TITLE_MAX } from "@/lib/matters/task-edit";
+import { stepAssigneeOptions, stepEditFields } from "@/lib/record-card/rules";
 import {
   LEAD_PAGE_CHANGE,
   LEAD_PAGE_MARK_DONE,
@@ -23,7 +24,6 @@ import {
   LEAD_PAGE_STEP_WHAT,
   LEAD_STEP_SET_NEXT_STEP,
   SAVING,
-  UNASSIGNED,
 } from "@/lib/ui/words";
 import "./lead-step.css";
 
@@ -59,17 +59,57 @@ function StepForm({ action, submit, className = "ls-form", buttonClass = "lx-btn
 
 const MemberOptions = ({ members }: { members: StepMember[] }) => (
   <>
-    <option value="">{UNASSIGNED}</option>
-    {members.map((m) => (
-      <option key={m.userId} value={m.userId}>
-        {m.name}
+    {stepAssigneeOptions(members, null).map((o) => (
+      <option key={o.value || "none"} value={o.value}>
+        {o.label}
       </option>
     ))}
   </>
 );
 
+/**
+ * The fields of "Change", posted as hidden inputs built by `stepEditFields` (the record card's own rule): the visible inputs
+ * carry no `name`. The assignee is posted only after the person picked one, so an untouched picker never unassigns or undoes a
+ * reassignment saved meanwhile. `members` null = the team list couldn't be read: no picker, and no assignee is ever posted.
+ */
+function ChangeStepFields({ taskId, title: startTitle, dueDate, assigneeId, members }: { taskId: string; title: string; dueDate: string | null; assigneeId: string | null; members: StepMember[] | null }) {
+  const [title, setTitle] = useState(startTitle);
+  const [due, setDue] = useState(dueDate ?? "");
+  const options = members ? stepAssigneeOptions(members, assigneeId) : [];
+  const [who, setWho] = useState(assigneeId ?? "");
+  const [picked, setPicked] = useState(false);
+  const fields = stepEditFields({ taskId, title, dueAt: due, assignees: members ? { current: assigneeId } : null, chosen: who, picked });
+  return (
+    <>
+      {Object.entries(fields).map(([name, value]) => (
+        <input key={name} type="hidden" name={name} value={value} />
+      ))}
+      <input className="lx-input" maxLength={TASK_TITLE_MAX} value={title} onChange={(e) => setTitle(e.target.value)} aria-label={LEAD_PAGE_STEP_LABEL} required />
+      <input className="lx-input" type="date" value={due} onChange={(e) => setDue(e.target.value)} aria-label={LEAD_PAGE_STEP_DUE} />
+      {members && (
+        <select
+          className="lx-input"
+          value={who}
+          onChange={(e) => {
+            setWho(e.target.value);
+            setPicked(true);
+          }}
+          aria-label={LEAD_PAGE_STEP_OWNER}
+        >
+          {options.map((o) => (
+            <option key={o.value || "none"} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      )}
+    </>
+  );
+}
+
 /** "Yours to do": Mark done, Snooze and Change, through the existing next-step actions (the review panel's). */
-export function YoursActions({ taskId, title, dueDate, assigneeId, members }: { taskId: string; title: string; dueDate: string | null; assigneeId: string | null; members: StepMember[] }) {
+/** `members` null = the team list couldn't be read: the forms draw no picker and post no assignee. */
+export function YoursActions({ taskId, title, dueDate, assigneeId, members }: { taskId: string; title: string; dueDate: string | null; assigneeId: string | null; members: StepMember[] | null }) {
   return (
     <div className="ls-act ls-act--steps">
       <StepForm action={completeNextStepAction} submit={LEAD_PAGE_MARK_DONE} className="ls-inline" buttonClass="lx-btn lx-btn-pri ls-yes">
@@ -89,12 +129,7 @@ export function YoursActions({ taskId, title, dueDate, assigneeId, members }: { 
       <details className="ls-change">
         <summary className="lx-btn lx-btn-ghost">{LEAD_PAGE_CHANGE}</summary>
         <StepForm action={updateNextStepAction} submit={LEAD_PAGE_SAVE_STEP}>
-          <input type="hidden" name="taskId" value={taskId} />
-          <input className="lx-input" name="title" maxLength={TASK_TITLE_MAX} defaultValue={title} aria-label={LEAD_PAGE_STEP_LABEL} required />
-          <input className="lx-input" type="date" name="dueAt" defaultValue={dueDate ?? ""} aria-label={LEAD_PAGE_STEP_DUE} />
-          <select className="lx-input" name="assigneeId" defaultValue={assigneeId ?? ""} aria-label={LEAD_PAGE_STEP_OWNER}>
-            <MemberOptions members={members} />
-          </select>
+          <ChangeStepFields taskId={taskId} title={title} dueDate={dueDate} assigneeId={assigneeId} members={members} />
         </StepForm>
       </details>
     </div>
@@ -102,7 +137,7 @@ export function YoursActions({ taskId, title, dueDate, assigneeId, members }: { 
 }
 
 /** "Set a next step" for the cards that have nothing lined up: the existing `setNextStepAction` on this lead. */
-export function SetNextStep({ leadId, members }: { leadId: string; members: StepMember[] }) {
+export function SetNextStep({ leadId, members }: { leadId: string; members: StepMember[] | null }) {
   return (
     <details className="ls-change">
       <summary className="lx-btn lx-btn-sec">{LEAD_STEP_SET_NEXT_STEP}</summary>
@@ -111,9 +146,11 @@ export function SetNextStep({ leadId, members }: { leadId: string; members: Step
         <input type="hidden" name="id" value={leadId} />
         <input className="lx-input" name="title" maxLength={TASK_TITLE_MAX} placeholder={LEAD_PAGE_STEP_WHAT} aria-label={LEAD_PAGE_STEP_WHAT} required />
         <input className="lx-input" type="date" name="dueAt" aria-label={LEAD_PAGE_STEP_DUE} />
-        <select className="lx-input" name="assigneeId" defaultValue="" aria-label={LEAD_PAGE_STEP_OWNER}>
-          <MemberOptions members={members} />
-        </select>
+        {members && (
+          <select className="lx-input" name="assigneeId" defaultValue="" aria-label={LEAD_PAGE_STEP_OWNER}>
+            <MemberOptions members={members} />
+          </select>
+        )}
       </StepForm>
     </details>
   );

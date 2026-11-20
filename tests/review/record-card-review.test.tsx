@@ -82,7 +82,7 @@ describe("the step form's assignee (review only)", () => {
   });
   it("posts the assignee through the review's existing actions only (no new write path)", () => {
     const src = readFileSync("src/components/record-card/controls.tsx", "utf8");
-    expect(src).toContain("viaForm(updateNextStepAction, stepEditFields({ taskId: step.id, title, dueAt: due, assignees: assignees ?? null, chosen: who }))");
+    expect(src).toContain("viaForm(updateNextStepAction, stepEditFields({ taskId: step.id, title, dueAt: due, assignees: assignees ?? null, chosen: who, picked }))");
     expect(src).toMatch(/viaForm\(setNextStepAction, \{ kind, id, title, dueAt: due, assigneeId: assignees \? who : "" \}\)/);
   });
 });

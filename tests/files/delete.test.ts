@@ -20,7 +20,7 @@ describe("deleteFileAction: who may delete", () => {
     expect(await deleteFileAction(FILE_ID)).toEqual({ ok: true });
     expect(world.db.rows("crm_file")).toEqual([]);
     expect(world.storage.objects.has(leadPath)).toBe(false);
-    expect(revalidated).toEqual([`/dashboard/leads/${LEAD}/`]);
+    expect(revalidated).toEqual([`/dashboard/leads/${LEAD}/`, "/dashboard/review/"]);
   });
 
   it.each(NON_DELETE_ROLES)("refuses %s with a sentence and touches neither storage nor the table", async (role) => {
@@ -146,7 +146,7 @@ describe("deleteFileAction: other firms and bad ids", () => {
     const world = makeWorld({ tables: seedTables({ crm_file: [row] }), objects: { [matterPath]: 5 }, role: "admin" });
     const { deleteFileAction, revalidated } = await loadActions(world);
     expect(await deleteFileAction(FILE_ID)).toEqual({ ok: true });
-    expect(revalidated).toEqual([`/dashboard/matters/${MATTER}/`]);
+    expect(revalidated).toEqual([`/dashboard/matters/${MATTER}/`, "/dashboard/review/"]);
   });
 
   it("says storage is not set up when the table is missing, and never throws", async () => {

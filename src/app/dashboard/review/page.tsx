@@ -149,6 +149,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
                 // Said only to a role that could change the stage (the card's own `stage` edit, judged as if the stages had been read).
                 stagesFailed={cardLoad.status === "ok" && cardLoad.stages.status !== "ok" && cardEdits({ role: cardLoad.role, kind: cardLoad.kind }).stage}
                 closeStages={canMove ? load.closeStages : []}
+                deadlinesFailed={load.failed.includes("deadlines")}
               />
             ),
           },
