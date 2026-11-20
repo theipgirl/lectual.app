@@ -236,7 +236,8 @@ export async function RecordCardHost({
   }
 
   // Lead
-  const members = directory;
+  // Null when the team couldn't be read: the top card's step forms then draw no picker (an empty list would unassign).
+  const members = load.members.status === "ok" ? directory : null;
   const yoursDue = view.top.kind === "yours" && view.steps.status === "ok" ? (view.steps.items.find((i) => i.id === (view.top as { taskId: string }).taskId)?.dueIso ?? null) : null;
   const stageId = load.kind === "lead" ? load.lead.current_stage_id : null;
   return (

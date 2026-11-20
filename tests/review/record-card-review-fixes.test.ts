@@ -2,7 +2,10 @@ import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { buildReviewRows, type ReviewInput } from "@/lib/review/build";
 import { noteEntry } from "@/lib/pipeline/lead-input";
-import { stepEditFields } from "@/lib/record-card/rules";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { stepAssigneeOptions, stepEditFields } from "@/lib/record-card/rules";
+import { BLANK, LEAD_PAGE_STEP_OWNER, LEAD_STEP_COULDNT_LOAD, STEP_ASSIGNEE_NOT_ON_TEAM, UNASSIGNED } from "@/lib/ui/words";
 
 /**
  * Review of da2828d: the card keeps its own note composers from the review (call / email / meeting), and every card action
@@ -110,19 +113,134 @@ describe("every other card action refreshes the review page too", () => {
 });
 
 describe("a step edit never reverts someone else's reassignment", () => {
-  it("posts the assignee only when the person changed it in this form", () => {
-    const base = { taskId: "t1", title: "Call back", dueAt: "2026-11-20" };
-    // Opened with Rayn, left alone: no assigneeId, so a reassignment saved meanwhile stands.
-    expect(stepEditFields({ ...base, assignees: { current: "u-rayn" }, chosen: "u-rayn" })).toEqual(base);
-    expect(stepEditFields({ ...base, assignees: { current: null }, chosen: "" })).toEqual(base);
-    // Changed: sent. Cleared on purpose: sent as "".
-    expect(stepEditFields({ ...base, assignees: { current: "u-rayn" }, chosen: "u-reb" })).toEqual({ ...base, assigneeId: "u-reb" });
-    expect(stepEditFields({ ...base, assignees: { current: "u-rayn" }, chosen: "" })).toEqual({ ...base, assigneeId: "" });
-    // No picker (Intake, Matters): never.
-    expect(stepEditFields({ ...base, assignees: null, chosen: "u-reb" })).toEqual(base);
+  const base = { taskId: "t1", title: "Call back", dueAt: "2026-11-20" };
+  it("posts the assignee only when the person explicitly picked one in this form", () => {
+    // Opened with Rayn, picker untouched: no assigneeId, so a reassignment saved meanwhile stands.
+    expect(stepEditFields({ ...base, assignees: { current: "u-rayn" }, chosen: "u-rayn", picked: false })).toEqual(base);
+    expect(stepEditFields({ ...base, assignees: { current: null }, chosen: "", picked: false })).toEqual(base);
+    // Picked: sent. Cleared on purpose: sent as "".
+    expect(stepEditFields({ ...base, assignees: { current: "u-rayn" }, chosen: "u-reb", picked: true })).toEqual({ ...base, assigneeId: "u-reb" });
+    expect(stepEditFields({ ...base, assignees: { current: "u-rayn" }, chosen: "", picked: true })).toEqual({ ...base, assigneeId: "" });
+    // No picker (Intake, Matters, or an unreadable team list): never, even with a value.
+    expect(stepEditFields({ ...base, assignees: null, chosen: "u-reb", picked: true })).toEqual(base);
   });
-  it("the step form posts through it", () => {
-    expect(src("src/components/record-card/controls.tsx")).toContain("viaForm(updateNextStepAction, stepEditFields({");
+  it("re-picking the value the form opened with is posted (someone moved X to Y meanwhile; the person chose X again)", () => {
+    expect(stepEditFields({ ...base, assignees: { current: "u-x" }, chosen: "u-x", picked: true })).toEqual({ ...base, assigneeId: "u-x" });
+  });
+  it("the step forms post through it, with the pick tracked from the select's change event", () => {
+    const controls = src("src/components/record-card/controls.tsx");
+    expect(controls).toContain("viaForm(updateNextStepAction, stepEditFields({");
+    expect(controls).toMatch(/chosen: who, picked \}\)/);
+    expect(controls).toMatch(/setPicked\(true\)/);
+    const lead = src("src/components/leads/StepControls.tsx");
+    expect(lead).toContain("stepEditFields({");
+    expect(lead).not.toMatch(/name="assigneeId" defaultValue=\{assigneeId/);
+  });
+});
+
+describe("the picker when the current assignee isn't on the team list", () => {
+  const team = [{ userId: "u-reb", name: "Reb Lane" }];
+  it("adds an option for them, so the select opens on them and Unassigned really clears", () => {
+    expect(stepAssigneeOptions(team, "u-gone")).toEqual([
+      { value: "", label: UNASSIGNED },
+      { value: "u-gone", label: STEP_ASSIGNEE_NOT_ON_TEAM },
+      { value: "u-reb", label: "Reb Lane" },
+    ]);
+    // On the team, or nobody: no extra option.
+    expect(stepAssigneeOptions(team, "u-reb").map((o) => o.value)).toEqual(["", "u-reb"]);
+    expect(stepAssigneeOptions(team, null).map((o) => o.value)).toEqual(["", "u-reb"]);
+    // Picking Unassigned from there is a real pick, posted as "".
+    expect(stepEditFields({ taskId: "t1", title: "x", dueAt: "", assignees: { current: "u-gone" }, chosen: "", picked: true }).assigneeId).toBe("");
+  });
+});
+
+describe("the lead page's top-card Change form (also on Intake's and the review's card)", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.doMock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
+    vi.doMock("@/app/dashboard/review/actions", () => ({ completeNextStepAction: vi.fn(), setNextStepAction: vi.fn(), snoozeNextStepAction: vi.fn(), updateNextStepAction: vi.fn() }));
+  });
+  const render = async (props: Partial<{ assigneeId: string | null; members: { userId: string; name: string }[] | null }>) => {
+    const { YoursActions } = await import("@/components/leads/StepControls");
+    return renderToStaticMarkup(createElement(YoursActions, { taskId: "t1", title: "Call back", dueDate: "2026-11-20", assigneeId: "u-rayn", members: [{ userId: "u-rayn", name: "Rayn Cole" }], ...props }));
+  };
+  const named = (html: string) => [...html.matchAll(/name="([^"]+)"/g)].map((m) => m[1]);
+
+  it("posts taskId, title and due date only (no assignee until one is picked)", async () => {
+    const html = await render({});
+    const change = html.slice(html.indexOf('class="ls-change"'));
+    expect(named(change).sort()).toEqual(["dueAt", "taskId", "title"]);
+    expect(html).not.toContain('name="assigneeId"');
+    expect(html).toContain(`aria-label="${LEAD_PAGE_STEP_OWNER}"`);
+  });
+  it("draws no picker and posts no assignee when the team list couldn't be read", async () => {
+    const html = await render({ members: null });
+    expect(html).not.toContain(`aria-label="${LEAD_PAGE_STEP_OWNER}"`);
+    expect(html).not.toContain('name="assigneeId"');
+  });
+  it("opens on an assignee who isn't on the team", async () => {
+    const html = await render({ assigneeId: "u-gone" });
+    expect(html).toMatch(new RegExp(`<option value="u-gone" selected="">${STEP_ASSIGNEE_NOT_ON_TEAM}</option>`));
+  });
+  it("Set a next step draws no picker when the team list couldn't be read", async () => {
+    const { SetNextStep } = await import("@/components/leads/StepControls");
+    expect(renderToStaticMarkup(createElement(SetNextStep, { leadId: "l1", members: null }))).not.toContain('name="assigneeId"');
+    expect(renderToStaticMarkup(createElement(SetNextStep, { leadId: "l1", members: [] }))).toContain('name="assigneeId"');
+  });
+  it("the lead page and the record card pass null, never an empty team, when the read failed", () => {
+    expect(src("src/app/dashboard/leads/[id]/page.tsx")).toContain("listMemberDirectory().catch(() => null)");
+    expect(src("src/components/record-card/RecordCardHost.tsx")).toContain('const members = load.members.status === "ok" ? directory : null;');
+  });
+});
+
+describe("deleting a file from the review's card", () => {
+  it("refreshes the page after a successful delete, like an upload", () => {
+    expect(src("src/components/files/DocumentsCard.tsx")).toContain("refresh ? <DeleteAndRefresh");
+    expect(src("src/components/files/DeleteAndRefresh.tsx")).toContain("onDeleted={() => router.refresh()}");
+    const btn = body("src/components/files/DeleteFileButton.tsx", "export function DeleteFileButton(");
+    expect(btn.indexOf("if (!result.ok) return setError")).toBeLessThan(btn.indexOf("onDeleted?.()"));
+  });
+  it("draws DeleteAndRefresh only where the card refreshes itself", async () => {
+    vi.resetModules();
+    vi.doMock("@/app/dashboard/files/actions", () => ({ requestUploadAction: vi.fn(), confirmUploadAction: vi.fn(), deleteFileAction: vi.fn() }));
+    vi.doMock("@/components/files/DeleteAndRefresh", () => ({ DeleteAndRefresh: () => createElement("i", { "data-refreshing-delete": "" }) }));
+    vi.doMock("@/components/files/UploadAndRefresh", () => ({ UploadAndRefresh: () => null }));
+    const { DocumentsCard } = await import("@/components/files/DocumentsCard");
+    const read = { files: { status: "ok", files: [{ id: "f1", file_name: "a.pdf", mime: "application/pdf", size_bytes: 10, uploaded_by: null, created_at: "2026-11-10T00:00:00Z" }], capped: false }, letters: null };
+    const props = { parent: { kind: "lead" as const, id: "11111111-1111-4111-8111-111111111111" }, read: read as never, directory: [], canUpload: false, canDelete: true };
+    expect(renderToStaticMarkup(createElement(DocumentsCard, { ...props, refreshAfterUpload: true }))).toContain("data-refreshing-delete");
+    expect(renderToStaticMarkup(createElement(DocumentsCard, props))).not.toContain("data-refreshing-delete");
+  });
+});
+
+describe("a lead's USPTO deadline on the review's card", () => {
+  const row = { kind: "lead", id: "l1", stageLabel: "Consult", stageDays: null, stageNote: null, deadline: null, waiting: "us", lastContact: null, lastChange: undefined, proposalExpiry: null } as never;
+  const props = { open: { kind: "lead" as const, id: "l1" }, row, members: [], today: "2026-11-17", stagesFailed: false, closeStages: [] };
+  it("says Couldn't load when the deadline read failed, never a dash", async () => {
+    const { ReviewCardAside } = await import("@/components/review/ReviewCardExtras");
+    const uspto = (html: string) => html.replaceAll("&#x27;", "'").split("USPTO deadline</dt>")[1].split("</dd>")[0];
+    expect(uspto(renderToStaticMarkup(createElement(ReviewCardAside, { ...props, deadlinesFailed: true })))).toContain(LEAD_STEP_COULDNT_LOAD);
+    const ok = uspto(renderToStaticMarkup(createElement(ReviewCardAside, props)));
+    expect(ok).not.toContain(LEAD_STEP_COULDNT_LOAD);
+    expect(ok).toContain(BLANK);
+  });
+  it("the page passes the review's deadline source", () => {
+    expect(src("src/app/dashboard/review/page.tsx")).toContain('deadlinesFailed={load.failed.includes("deadlines")}');
+  });
+});
+
+describe("Stage Keeper and files actions refresh the review", () => {
+  it.each([
+    ["src/app/dashboard/leads/[id]/stage-keeper-actions.ts", "function refresh(leadId"],
+    ["src/app/dashboard/files/actions.ts", "export async function deleteFileAction("],
+    ["src/app/dashboard/files/actions.ts", "export async function confirmUploadAction("],
+  ])("%s %s", (file, name) => {
+    expect(body(file, name)).toContain('revalidatePath("/dashboard/review/")');
+  });
+  it("undo, accept and dismiss all go through that refresh", () => {
+    for (const name of ["export async function undoAgentMoveAction(", "export async function acceptStageSuggestionAction(", "export async function dismissStageSuggestionAction("]) {
+      expect(body("src/app/dashboard/leads/[id]/stage-keeper-actions.ts", name)).toMatch(/refresh\(target\.leadId\)/);
+    }
   });
 });
 

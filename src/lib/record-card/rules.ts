@@ -16,6 +16,8 @@ import {
   RECORD_CARD_MENU_OPEN,
   RECORD_CARD_MENU_STEP,
   RECORD_CARD_SUGGESTED_MARK,
+  STEP_ASSIGNEE_NOT_ON_TEAM,
+  UNASSIGNED,
   recordCardNeedsAttorney,
   recordCardSuggests,
 } from "@/lib/ui/words";
@@ -289,11 +291,29 @@ export const NO_SHOW_HOLD_MS = 5_000;
 
 /**
  * The fields a step edit posts to `updateNextStepAction` (which changes only the fields it is given). The assignee goes ONLY when
- * the person changed it in this form: posting the value the form opened with would quietly undo a reassignment someone else
- * saved after the card was drawn. `assignees` is null where the form has no picker (Intake and Matters).
+ * the person explicitly PICKED a value in this form's picker (`picked`, set by the select's change event), whatever the value is.
+ * Never comparing with the value the form opened with: posting an untouched picker would quietly undo a reassignment someone else
+ * saved after the card was drawn, and comparing would drop a deliberate pick of the opening value (X, then someone moved it to Y,
+ * then this person picks X again: X is posted, because they chose it). `assignees` is null where the form has no picker (Intake
+ * and Matters, or a team list that couldn't be read): then never.
  */
-export function stepEditFields(input: { taskId: string; title: string; dueAt: string; assignees: { current: string | null } | null; chosen: string }): Record<string, string> {
+export function stepEditFields(input: { taskId: string; title: string; dueAt: string; assignees: { current: string | null } | null; chosen: string; picked: boolean }): Record<string, string> {
   const fields: Record<string, string> = { taskId: input.taskId, title: input.title, dueAt: input.dueAt };
-  if (input.assignees && input.chosen !== (input.assignees.current ?? "")) fields.assigneeId = input.chosen;
+  if (input.assignees && input.picked) fields.assigneeId = input.chosen;
   return fields;
+}
+
+export type StepAssigneeOption = { value: string; label: string };
+
+/**
+ * The options of a step's "who" picker: Unassigned, then the step's CURRENT assignee when they aren't in the team list (a
+ * former member, or someone the directory didn't return), then the team. Without that option the select would open on
+ * "Unassigned" while the step still has someone, and picking Unassigned would change nothing on the screen (no change event)
+ * and post nothing. With it, the select opens on the real assignee and Unassigned really clears it.
+ */
+export function stepAssigneeOptions(members: readonly { userId: string; name: string }[], current: string | null): StepAssigneeOption[] {
+  const options: StepAssigneeOption[] = [{ value: "", label: UNASSIGNED }];
+  if (current && !members.some((m) => m.userId === current)) options.push({ value: current, label: STEP_ASSIGNEE_NOT_ON_TEAM });
+  for (const m of members) options.push({ value: m.userId, label: m.name });
+  return options;
 }

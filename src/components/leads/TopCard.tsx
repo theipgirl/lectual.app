@@ -22,7 +22,8 @@ export function TopCard({
   leadId: string;
   view: TopCardView;
   canWriteSteps: boolean;
-  members: StepMember[];
+  /** The team, or null when it couldn't be read (the step forms then draw no picker and post no assignee). */
+  members: StepMember[] | null;
   /** The open step's due date as YYYY-MM-DD (for the Change form), or null. */
   yoursDueDate?: string | null;
 }) {

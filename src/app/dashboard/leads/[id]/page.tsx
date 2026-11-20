@@ -131,9 +131,10 @@ export default async function LeadPage({
     listTags().catch(() => []),
     meetingsFor({ leadId: id }),
   ]);
-  const [stages, members, { data: activity }] = await Promise.all([
+  const [stages, membersRead, { data: activity }] = await Promise.all([
     listStages(),
-    listMemberDirectory().catch(() => []),
+    // Null on a failed read (never an empty team): the step forms then draw no picker and post no assignee.
+    listMemberDirectory().catch(() => null),
     (mergedIds.length
       ? supabase.from("crm_activity").select("id, lead_id, type, actor_type, created_at, payload").in("lead_id", mergedSet.ids)
       : supabase.from("crm_activity").select("id, lead_id, type, actor_type, created_at, payload").eq("lead_id", id)
@@ -141,6 +142,7 @@ export default async function LeadPage({
       .order("created_at", { ascending: false })
       .limit(100),
   ]);
+  const members = membersRead ?? [];
   const proposalRead = hasProposals
     ? await listProposals(mergedIds.length ? { leadIds: mergedSet.ids } : { leadId: id })
         .then((proposals) => ({ status: "ok" as const, proposals }))
@@ -245,7 +247,7 @@ export default async function LeadPage({
   }
   const yoursId = step?.top.kind === "yours" ? step.top.taskId : null;
   const yoursTask = yoursId && stepLoad.status === "ok" && stepLoad.facts.tasks.status === "ok" ? stepLoad.facts.tasks.value.find((t) => t.id === yoursId) : undefined;
-  const stepMembers = members.map((m) => ({ userId: m.userId, name: m.displayName ?? m.email ?? "Teammate" }));
+  const stepMembers = membersRead ? membersRead.map((m) => ({ userId: m.userId, name: m.displayName ?? m.email ?? "Teammate" })) : null;
 
   return (
     <>

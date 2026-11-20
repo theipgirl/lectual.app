@@ -1149,6 +1149,8 @@ export const RECORD_CARD_NO_STEP = "No next step";
 export const RECORD_CARD_ADD_STEP = "Add a next step";
 export const RECORD_CARD_UNASSIGNED = "Unassigned";
 export const RECORD_CARD_A_TEAMMATE = "A teammate";
+/** A step's "who" picker: the step's current assignee is not in the team list (`stepAssigneeOptions`). */
+export const STEP_ASSIGNEE_NOT_ON_TEAM = "Someone no longer on the team";
 export const RECORD_CARD_NO_ACTIVITY = "No activity yet";
 export const RECORD_CARD_ACTIVITY_FAILED = "Couldn't load last activity";
 export const recordCardLastActivity = (when: string) => `Last activity ${when}`;

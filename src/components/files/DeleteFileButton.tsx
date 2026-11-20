@@ -12,7 +12,7 @@ import { deleteFileAction } from "@/app/dashboard/files/actions";
  * nothing is removed until "Yes, delete". `defaultOpen` shows the question
  * straight away (used by the render tests).
  */
-export function DeleteFileButton({ fileId, name, defaultOpen = false }: { fileId: string; name: string; defaultOpen?: boolean }) {
+export function DeleteFileButton({ fileId, name, defaultOpen = false, onDeleted }: { fileId: string; name: string; defaultOpen?: boolean; onDeleted?: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -22,7 +22,8 @@ export function DeleteFileButton({ fileId, name, defaultOpen = false }: { fileId
       try {
         const result = await deleteFileAction(fileId);
         if (!result.ok) return setError(result.error);
-        // deleteFileAction revalidates this page, which refreshes the list
+        // deleteFileAction revalidates the record's page (and the review); a page that isn't the record's own refreshes itself.
+        onDeleted?.();
       } catch {
         setError("Couldn't delete that file just now. Try again shortly.");
       }
