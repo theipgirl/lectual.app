@@ -6,25 +6,24 @@
 -- numbering: renumber if 0112 is taken), review it there against 0103's own text, apply to lectual-dev, run the tests below,
 -- and apply to lectual-prod only with the owner's OK.
 --
--- WHAT WAS CHECKED, AND WHAT COULD NOT BE (PGE Sprint 4, Nov 20):
---   * Checked against THIS app's code only. The `lectual` repo (0103's text) and the databases were NOT reachable from the
---     session that wrote this, so whether 0103 put a CHECK on `queue_card_event.kind` (or made it an enum) is NOT known.
---   * What this app shows: the hand-added type (src/lib/db/types.ts) has `kind: string`; the app writes and reads exactly three
---     kinds, 'handoff', 'later', 'returned' (src/lib/queue/deck.ts `CardEventKind`, card-state.ts `KINDS`); AGENTS.md records
---     (verified on lectual-prod 2026-11-12) that `actor_id` is forced to auth.uid(), a BEFORE INSERT trigger sets created_at,
---     signed-in users may insert only org_id, queue_item_id, kind, target_user_id, until, note, and there is no UPDATE or DELETE.
---   * A closed kind list is the likely shape (the sprint contract says "Extend queue_card_event's kind CHECK"), so the app is
---     built to need this file: before it, an insert of 'draft_to' / 'drafted' answers 23514 (CHECK) or 22P02 (enum), which
---     src/lib/queue/card-state.ts (`isKindNotSetUpError`) reads, BY CODE and only for these two kinds, as "not switched on".
---     The attorney's approve then falls back to today's behaviour for HER OWN mailbox only (never a third person's), and the
---     page says passing to the drafter isn't switched on yet.
---   * IF 0103 HAS NO CHECK AND NO ENUM ON `kind`: the two kinds already insert, this file is not needed for the kinds, and the
---     app works without it. Parts 2 to 4 (target = the firm's configured drafter, writer an approver role or routed, drafted
---     only for oneself, one drafted per item as the double-click claim) are then still needed: without part 4 two concurrent
---     "Make the draft" clicks are not stopped by the database, and without parts 2 and 3 the app's fold (`trustedEvents`) is
---     the only thing standing between a forged row and the Ready list.
---   * The app recognises "before 0112" only by code AND message: 23514 naming `queue_card_event_kind_check`, or 22P02 "invalid
---     input value for enum" naming the new kind (card-state.ts `isKindNotSetUpError`).
+-- WHAT WAS CHECKED (PGE Sprint 4, Nov 20):
+--   * Checked against lectual 0103 line 98 via the director: `constraint queue_card_event_kind check (kind in ('handoff','later',
+--     'returned'))`. So `kind` has a CHECK (not an enum) and its real name is `queue_card_event_kind` (NOT `..._kind_check`).
+--     The databases themselves were not reachable from the session that wrote this; run `\d public.queue_card_event` on
+--     lectual-dev before applying.
+--   * What this app shows: the hand-added type (src/lib/db/types.ts) has `kind: string`; the app writes and reads the kinds
+--     'handoff', 'later', 'returned' (src/lib/queue/deck.ts `CardEventKind`, card-state.ts `KINDS`) and, with this file, 'draft_to'
+--     and 'drafted'. AGENTS.md records (verified on lectual-prod 2026-11-12) that `actor_id` is forced to auth.uid(), a BEFORE
+--     INSERT trigger sets created_at, signed-in users may insert only org_id, queue_item_id, kind, target_user_id, until, note,
+--     and there is no UPDATE or DELETE.
+--   * Before this file an insert of 'draft_to' / 'drafted' answers 23514 naming `queue_card_event_kind`, which
+--     src/lib/queue/card-state.ts (`isKindNotSetUpError`) reads, BY CODE and quote-delimited name, and only for these two kinds,
+--     as "not switched on". The attorney's approve then falls back to today's behaviour for HER OWN mailbox only (never a third
+--     person's), and the page says passing to the drafter isn't switched on yet.
+--   * Parts 2 to 4 (target = the firm's configured drafter, writer an approver role or routed, drafted only for oneself, one
+--     drafted per item as the double-click claim) are also needed: without part 4 two concurrent "Make the draft" clicks are not
+--     stopped by the database, and without parts 2 and 3 the app's fold (`trustedEvents`) is the only thing standing between a
+--     forged row and the Ready list.
 --
 -- Why (decision 3b): when the attorney approves a client email and the firm's "Drafts go to" is someone else, the card passes
 -- to that person (`draft_to`, target = the drafter, note = 'approved-text sha256 <64 hex>') and they make the draft in their OWN
@@ -33,12 +32,10 @@
 
 begin;
 
--- 1. The two kinds. Replace the constraint name with 0103's real one (`\d public.queue_card_event` on lectual-dev).
---    If 0103 used an enum instead: `alter type public.<enum> add value if not exists 'draft_to'; ... 'drafted';` (outside a
---    transaction on older Postgres) and skip this step.
-alter table public.queue_card_event drop constraint if exists queue_card_event_kind_check;
+-- 1. The two kinds. Drop and recreate 0103's CHECK by its real name, `queue_card_event_kind` (0103 line 98).
+alter table public.queue_card_event drop constraint if exists queue_card_event_kind;
 alter table public.queue_card_event
-  add constraint queue_card_event_kind_check
+  add constraint queue_card_event_kind
   check (kind in ('handoff', 'later', 'returned', 'draft_to', 'drafted'));
 
 -- 2. Shape rules for the new kinds (the old kinds are untouched).
@@ -134,9 +131,9 @@ commit;
 --   * `queue_item_id` is typed `string` in the app's types; it is the lawmatics-mcp queue's id (not a uuid FK). If 0103 made it
 --     uuid, change `p_item text` to uuid. `id` is assumed to be 0103's primary key (the drafted subquery breaks created_at ties
 --     on it); use 0103's real key column if it is named differently.
---   * The kind CHECK must keep the name `queue_card_event_kind_check`: the app recognises "before 0112" by that name in the
---     23514 message (src/lib/queue/card-state.ts `KIND_CHECK_NAME`). If 0103 named it differently, keep 0103's name here AND
---     in the app, or 0112's absence reads as a plain failure (safe, but the fallback to the approver's own mailbox is lost).
+--   * The kind CHECK must keep the name `queue_card_event_kind` (0103 line 98): the app recognises "before 0112" by that
+--     quote-delimited name in the 23514 message (src/lib/queue/card-state.ts `KIND_CHECK_NAME`). If lectual-dev shows another
+--     name, keep it here AND in the app, or 0112's absence reads as a plain failure (safe, but the fallback to the approver's own mailbox is lost).
 --   * Postgres cannot check from here that the draft_to's writer APPROVED the item (the queue lives in lawmatics-mcp, outside
 --     this database). The app's fold does: a draft_to counts only when its writer's address is the item's `resolved_by` and it was
 --     written at or after `resolved_at`; a drafted only from the current target (src/lib/queue/deck.ts `trustedEvents`). The
@@ -159,7 +156,7 @@ commit;
 --   7. A `drafted` with a target_user_id: refused (23514).
 --   8. Firm B reads no firm A rows of either kind (0103's select policy, re-asserted for the new kinds).
 --   9. 'handoff', 'later', 'returned' inserts behave exactly as before (regression).
---  10. A kind outside the five: refused (23514), and the message names `queue_card_event_kind_check`.
+--  10. A kind outside the five: refused (23514), and the message names `queue_card_event_kind`.
 --  11. Direct call as an RPC: `POST /rest/v1/rpc/queue_card_event_draft_ok` as a member of firm B (any arguments, firm A's org id
 --      included) is NOT FOUND (the `private` schema is not exposed); `select private.queue_card_event_draft_ok('<firm A org>', ...)`
 --      from SQL as firm B's member returns false; as anon it is permission denied (no USAGE on `private`, no EXECUTE).

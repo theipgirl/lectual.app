@@ -275,7 +275,7 @@ export async function runQueueReview(input: ReviewInput): Promise<ReviewOutcome>
         ...(approvalNote ? { note: approvalNote } : {}),
         finalBody: approvedText,
         // A drafter is set: the queue must not draft it in any mailbox. On `pass` nobody's mailbox gets it now; on `self`
-        // the only draft is the drafter's own personal one, below. NOT verified that lawmatics-mcp honours this.
+        // the only draft is the drafter's own personal one, below. lawmatics-mcp honours it only from e738c24 (not yet deployed).
         ...(plan === "pass" || plan === "self" ? { skipMailboxDraft: true } : {}),
       });
       sendStatus = resolved.send;

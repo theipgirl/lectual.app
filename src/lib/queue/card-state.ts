@@ -68,22 +68,21 @@ export async function loadCardState(itemIds: readonly string[]): Promise<CardSta
 }
 
 /**
- * The kinds lectual 0112 adds. Before 0112 the table refuses them: the kind CHECK (23514, naming the constraint
- * `queue_card_event_kind_check`, Postgres's default name for a CHECK on the `kind` column) or, if `kind` is an enum, an
- * invalid enum value (22P02, "invalid input value for enum ...: "draft_to""). Both the CODE and the message must say so,
- * and only for these two kinds: another CHECK (0112's own shape check), a 22P02 from a bad uuid, or an old kind's refusal
- * stays "failed", never "not switched on".
+ * The kinds lectual 0112 adds. Before 0112 the table refuses them with the kind CHECK: code 23514, naming the constraint
+ * `queue_card_event_kind` (lectual 0103 line 98: `constraint queue_card_event_kind check (kind in ('handoff','later','returned'))`;
+ * NOT `queue_card_event_kind_check`). Both the CODE and the message must say so, the name must appear quote-delimited (so a
+ * different constraint that merely starts with it, such as `queue_card_event_kind_check` or a shape check, never matches), and
+ * only for these two kinds. Another CHECK, a 22P02 from a bad uuid, or an old kind's refusal stays "failed", never "not
+ * switched on". 0103 uses a CHECK, not an enum, so the old enum 22P02 branch is gone.
  */
 export const KINDS_0112: readonly CardEventKind[] = ["draft_to", "drafted"];
-export const KIND_CHECK_NAME = "queue_card_event_kind_check";
+export const KIND_CHECK_NAME = "queue_card_event_kind";
 export function isKindNotSetUpError(kind: CardEventKind, error: unknown): boolean {
   if (!KINDS_0112.includes(kind)) return false;
   // Read only to recognise the refusal; never shown or logged.
   const refusal = error as { code?: unknown; message?: unknown } | null;
   const text = typeof refusal?.message === "string" ? refusal.message : "";
-  if (refusal?.code === "23514") return text.includes(KIND_CHECK_NAME);
-  if (refusal?.code === "22P02") return /invalid input value for enum/i.test(text) && text.includes(`"${kind}"`);
-  return false;
+  return refusal?.code === "23514" && text.includes(`"${KIND_CHECK_NAME}"`);
 }
 
 /** 23505: a unique index refused the row (0112's one-`drafted`-per-item claim). */

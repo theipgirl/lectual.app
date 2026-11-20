@@ -3,6 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
   alertWindow,
   civilDaysUntil,
+  ALERT_RECIPIENT_ROLES,
+  canReceiveDeadlineAlerts,
   currentRecipients,
   deadlineCardGroups,
   isRecipient,
@@ -44,7 +46,24 @@ describe("AT3a: recipients are the members picked in Settings", () => {
   });
 
   it("a removed member gets none: only current members count", () => {
-    expect(currentRecipients([U1, U2], [U1, U3])).toEqual([U1]);
+    expect(currentRecipients([U1, U2], [{ userId: U1, role: "attorney" }, { userId: U3, role: "owner" }])).toEqual([U1]);
+  });
+
+  it("a stored recipient whose role became viewer or social media (or unreadable) is dropped on read, like a removed member", () => {
+    const members = [
+      { userId: U1, role: "viewer" },
+      { userId: U2, role: "social_media" },
+      { userId: U3, role: "paralegal" },
+    ];
+    expect(currentRecipients([U1, U2, U3], members)).toEqual([U3]);
+    expect(currentRecipients([U1], [{ userId: U1, role: null }])).toEqual([]);
+    expect(currentRecipients([U1], [{ userId: U1, role: "something_new" }])).toEqual([]);
+  });
+
+  it("only the eight staff roles lectual 0056 lets insert a notification can be recipients", () => {
+    expect([...ALERT_RECIPIENT_ROLES].sort()).toEqual(["admin", "attorney", "clerk", "intake", "law_clerk", "owner", "paralegal", "senior_admin"]);
+    expect(canReceiveDeadlineAlerts("viewer")).toBe(false);
+    expect(canReceiveDeadlineAlerts("social_media")).toBe(false);
   });
 
   it("recipient / non-recipient / unreadable list are three answers", () => {

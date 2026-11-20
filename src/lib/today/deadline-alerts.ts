@@ -50,10 +50,21 @@ export function parseRecipientData(data: unknown): string[] {
   return [...new Set(ids.filter((x): x is string => typeof x === "string" && UUID.test(x)).map((x) => x.toLowerCase()))];
 }
 
-/** Only current members count: a removed member's id stays stored but gets nothing. */
-export function currentRecipients(stored: readonly string[], memberIds: readonly string[]): string[] {
-  const members = new Set(memberIds.map((m) => m.toLowerCase()));
-  return stored.filter((id) => members.has(id.toLowerCase()));
+/**
+ * The roles that can be alert recipients: the eight staff roles lectual 0056's `crm_notification_insert_staff` lets insert a
+ * notification in the active org (the notice is raised by the recipient's own Today). A viewer or social media member could
+ * never be told, so they cannot be chosen.
+ */
+export const ALERT_RECIPIENT_ROLES: readonly string[] = ["owner", "admin", "senior_admin", "intake", "paralegal", "law_clerk", "attorney", "clerk"];
+
+export const canReceiveDeadlineAlerts = (role: string | null | undefined): boolean => !!role && ALERT_RECIPIENT_ROLES.includes(role);
+
+export type AlertMemberRef = { userId: string; role: string | null | undefined };
+
+/** Only current members in an eligible role count: a removed member's, or a demoted viewer's, id stays stored but gets nothing. */
+export function currentRecipients(stored: readonly string[], members: readonly AlertMemberRef[]): string[] {
+  const eligible = new Set(members.filter((m) => canReceiveDeadlineAlerts(m.role)).map((m) => m.userId.toLowerCase()));
+  return stored.filter((id) => eligible.has(id.toLowerCase()));
 }
 
 export type RecipientRead = { status: "ok"; userIds: string[] } | { status: "unavailable" };

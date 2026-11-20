@@ -1389,6 +1389,7 @@ export const deadlineNoticeSentence = (window: number, title: string | null) => 
 export const DEADLINE_ALERTS_SETTINGS_HEADING = "Deadline alerts";
 export const DEADLINE_ALERTS_SETTINGS_HELP = "The people chosen here see the Deadlines card on Today and get a notice in the bell when a deadline is 30 days out and again at 7 days. Everyone still sees deadlines on the matter page.";
 export const DEADLINE_ALERTS_NONE_CHOSEN = "Nobody is chosen yet, so nobody gets deadline alerts.";
+export const DEADLINE_ALERTS_INELIGIBLE = "Viewers and social media members can\u2019t get deadline alerts. Pick someone else.";
 export const DEADLINE_ALERTS_SAVE = "Save alert recipients";
 /** The Weekly review's deadlines strip. */
 export const REVIEW_DEADLINES_HEADING = "Deadlines";

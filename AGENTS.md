@@ -2292,6 +2292,10 @@ deadline or changes `attorney_confirmed`. Rules are pure in `src/lib/matters/dea
 - **Alerts** (Taylor C8): recipients are the firm note `crm_firm_brain_entry` (category `other`, key `deadline_alert_recipients`,
   `data.user_ids`), set by the admin tier in Settings -> Team ("Deadline alerts", `saveDeadlineAlertRecipientsAction`: role and every id
   re-checked against the member directory). Hidden from the Firm notes page. No names in code. A removed member's id is dropped on read.
+  **Only the eight staff roles can be recipients** (`ALERT_RECIPIENT_ROLES`: owner, admin, senior_admin, intake, paralegal, law_clerk, attorney, clerk,
+  the roles lectual 0056's `crm_notification_insert_staff` lets insert a notification in the active org). A viewer or social media member is refused
+  with `DEADLINE_ALERTS_INELIGIBLE`, the Team picker lists only eligible members, and a stored recipient whose role became ineligible is dropped on read
+  (`currentRecipients`), like a removed member.
   Windows: 0..7 days = 7, 8..30 = 30 (overdue raises nothing). **De-dupe without schema:** the notice is raised for the SIGNED-IN recipient
   on their own Today (`DeadlineAlertsCard` -> `raiseOwnDeadlineNotices`, existing `notify()`, kind `mentioned`, payload
   `{ source: "deadline_window", deadline_id, window, title }` only), after reading their OWN `crm_notification` rows for those deadlines
@@ -2328,11 +2332,17 @@ deadline or changes `attorney_confirmed`. Rules are pure in `src/lib/matters/dea
 - **0110 is a proposal file** (`docs/pge/2026-11-17-agentic-ip-os/0110-proposed.sql.txt`): the trigger knows an override by an override row for
   that matter with `created_at = now()` and `actor_id = auth.uid()` in the same transaction (no session setting a client could send). Apply to
   lectual-dev, run its isolation cases, then prod with the owner's OK. Change its kind list and roles together with deadline-safety.ts.
-- Not verified: a real browser, the real `crm_notification` insert/select policies for a self-notice, 0110 against any database.
+- The self-notice insert is allowed by lectual 0056 for those eight staff roles (a viewer or social media user cannot insert one, which is why they cannot
+  be recipients). Not verified: a real browser, the real `crm_notification` select policy, 0110 against any database.
 
 ## Sprint 4: routine approval kinds and drafts in the drafter's Outlook (PGE; the database half is lectual 0112, proposed, NOT applied)
 Decision 15 (a law clerk clears routine kinds) and 3b (approved client emails become drafts in the DRAFTER's own Outlook, on
 their own click). Contract: `docs/pge/2026-11-17-agentic-ip-os/sprint-4.md`. Approving still never sends; `outlook-send.ts` is untouched.
+- **SHIP BLOCKER:** lawmatics-mcp honours `mailbox_draft` only from its commit e738c24 (branch claude/gracious-darwin-rceoyv, on top of main 3bcbe3f), not yet
+  merged or deployed. Until it is deployed, approving with a drafter set makes two drafts. Sprint 4 must not merge, and no firm may set a drafter, before then.
+  With that change, `POST /api/queue/{id}/resolve` takes an optional boolean `mailbox_draft`: `false` resolves as before but skips the Graph draft (`send` stays
+  `manual`); omitted or true is today's behaviour. (The app's safety net: if the resolve says the queue drafted anyway, `queue-drafted`, nothing is passed on, no
+  `draft_to` is written and the approver is told where the draft went.)
 - **Four routine kinds** in `src/lib/queue/routing.ts` (still the ONE place): `filing_receipt`, `uspto_notice`, `client_reminder`,
   `client_request`, all `attorneyOnly: false`. Reached ONLY through the exact (agent, type) pairs in `ROUTINE_MARKER`
   (`filing-receipt` / `uspto-watcher` / `client-reminder` / `client-request`, each `CLIENT_EMAIL`; `routineKindOf`, exact string
@@ -2358,8 +2368,8 @@ their own click). Contract: `docs/pge/2026-11-17-agentic-ip-os/sprint-4.md`. App
   note; the resolve call carries `mailbox_draft: false` (if the queue drafts anyway, `send` says so, nothing is passed on and no second draft is made:
   `handoff.status = "queue-drafted"`); NO `draftInMyMailbox`; `passToDrafter` (`review-core.ts`, the one pass write) records one `draft_to` (target the
   drafter, note `approved-text sha256 <64 hex>`, never the text) and one bell notice (`source: "draft_to"`, ids and a clipped headline; "Rebecca
-  approved an email · Make the draft"). Before lectual 0112 (`isKindNotSetUpError`: code AND message, 23514 naming `queue_card_event_kind_check` or
-  22P02 "invalid input value for enum" naming the kind; anything else is a plain failure) it falls back to the APPROVER'S OWN mailbox only and the page
+  approved an email · Make the draft"). Before lectual 0112 (`isKindNotSetUpError`: code AND message, 23514 naming the real constraint `queue_card_event_kind`, quote-delimited, from
+  lectual 0103 line 98, for these two kinds only; 0103 is a CHECK, not an enum, so there is no 22P02 branch; anything else is a plain failure) it falls back to the APPROVER'S OWN mailbox only and the page
   says passing isn't switched on (`?pass=off`); any other failure makes no draft anywhere (`send=pass-failed`). The full page, the deck and the lead
   page's Yes all say `passedToDrafter(name)` / `PASS_FAILED` (`afterYesSentence`).
 - **"Pass to <drafter>" (S3):** the approved item page offers the APPROVER a retry (`RetryPassCard` -> `retryPassAction` -> `retryPassToDrafter`, same
@@ -2388,7 +2398,7 @@ their own click). Contract: `docs/pge/2026-11-17-agentic-ip-os/sprint-4.md`. App
 - **Before any firm is switched on (S6):** all of the "no draft in the approver's mailbox" behaviour rests on lawmatics-mcp honouring
   `mailbox_draft: false` on resolve, which is NOT verified. Verify it against lawmatics-mcp first; until then a `pass` or `self` approve may still be
   drafted by the queue in the firm's Outlook (the app then reports `queue-drafted` and passes nothing on).
-- **NOT verified:** lectual 0103's real `kind` column (CHECK, enum or free text, and the CHECK's name; the lectual repo wasn't reachable), so whether
-  0112 is needed for the kinds is inferred; `docs/pge/2026-11-17-agentic-ip-os/0112-proposed.sql.txt` holds the proposal (its helper lives in the
+- **0103's kind CHECK is `queue_card_event_kind`** (lectual 0103 line 98, checked by the director), so 0112 IS needed for the two kinds, and its proposal drops
+  and recreates that constraint by that name. `docs/pge/2026-11-17-agentic-ip-os/0112-proposed.sql.txt` holds the proposal (its helper lives in the
   unexposed `private` schema and refuses any org but the caller's) and its isolation cases (not on lectual-dev). Also unverified: lawmatics-mcp and
   `mailbox_draft: false`, the queue's `resolved_at` clock against the database's `created_at` (the fold compares them), a real Graph draft, a real browser.

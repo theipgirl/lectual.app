@@ -11,6 +11,7 @@ import { pageTitle } from "@/lib/ui/page-title";
 import { inviteFormOpen } from "@/lib/team/invite-open";
 import { ADMIN_TIER_PHRASE, canSeeSetup } from "@/lib/setup/roles";
 import { DEADLINE_ALERTS_NONE_CHOSEN, DEADLINE_ALERTS_UNCHECKED, DEADLINE_ALERTS_SETTINGS_HEADING, DEADLINE_ALERTS_SETTINGS_HELP, TEAM_NAME } from "@/lib/ui/words";
+import { canReceiveDeadlineAlerts } from "@/lib/today/deadline-alerts";
 import { loadRecipientSetting } from "@/lib/today/deadline-alerts-store";
 import { DeadlineAlertsForm } from "@/components/settings/DeadlineAlertsForm";
 import "@/components/settings/deadline-alerts.css";
@@ -97,7 +98,7 @@ export default async function TeamPage() {
           <LoadFailedLine role="alert" refresh={false}>{DEADLINE_ALERTS_UNCHECKED}</LoadFailedLine>
         ) : canSetAlerts ? (
           <DeadlineAlertsForm
-            members={members.map((m) => ({ userId: m.userId, name: m.displayName ?? m.email ?? "Teammate", role: ROLE_LABEL[m.role] ?? m.role, chosen: alerts.userIds.includes(m.userId) }))}
+            members={members.filter((m) => canReceiveDeadlineAlerts(m.role)).map((m) => ({ userId: m.userId, name: m.displayName ?? m.email ?? "Teammate", role: ROLE_LABEL[m.role] ?? m.role, chosen: alerts.userIds.includes(m.userId) }))}
           />
         ) : alerts.userIds.length === 0 ? (
           <p className="lx-note" style={{ margin: 0 }}>{DEADLINE_ALERTS_NONE_CHOSEN}</p>

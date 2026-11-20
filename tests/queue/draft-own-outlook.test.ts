@@ -148,22 +148,24 @@ describe("Acceptance 9 and the sprint's hygiene greps", () => {
 });
 
 describe("Acceptance 10: before lectual 0112 is detected by error code, only for the new kinds", () => {
-  it("N2: the code AND the message must name the kind CHECK (23514) or the enum value (22P02); anything else stays a failure", async () => {
+  it("N2: the code AND the quote-delimited real constraint name (queue_card_event_kind) must be there; anything else stays a failure", async () => {
     const { isKindNotSetUpError } = await import("@/lib/queue/card-state");
-    const check = 'new row for relation "queue_card_event" violates check constraint "queue_card_event_kind_check"';
+    const check = 'new row for relation "queue_card_event" violates check constraint "queue_card_event_kind"';
     expect(isKindNotSetUpError("draft_to", { code: "23514", message: check })).toBe(true);
-    expect(isKindNotSetUpError("drafted", { code: "22P02", message: 'invalid input value for enum queue_card_event_kind: "drafted"' })).toBe(true);
-    // Code alone is not enough.
+    expect(isKindNotSetUpError("drafted", { code: "23514", message: check })).toBe(true);
+    // Missing code or message is a failure.
     expect(isKindNotSetUpError("draft_to", { code: "23514" })).toBe(false);
-    expect(isKindNotSetUpError("drafted", { code: "22P02" })).toBe(false);
-    // Another CHECK (0112's own shape check) is a failure, not "not switched on".
+    expect(isKindNotSetUpError("draft_to", { message: check })).toBe(false);
+    // Unrelated constraints never match, including ones that merely start with the name.
     expect(isKindNotSetUpError("draft_to", { code: "23514", message: 'violates check constraint "queue_card_event_draft_shape_check"' })).toBe(false);
-    // A 22P02 from a bad uuid is a failure.
+    expect(isKindNotSetUpError("draft_to", { code: "23514", message: 'violates check constraint "queue_card_event_kind_check"' })).toBe(false);
+    expect(isKindNotSetUpError("draft_to", { code: "23514", message: 'violates check constraint "queue_card_event_kind_x"' })).toBe(false);
+    expect(isKindNotSetUpError("draft_to", { code: "23514", message: "queue_card_event_kind without quotes" })).toBe(false);
+    // The enum branch is gone (0103 uses a CHECK): a 22P02 is never "not switched on".
+    expect(isKindNotSetUpError("drafted", { code: "22P02", message: 'invalid input value for enum queue_card_event_kind: "drafted"' })).toBe(false);
     expect(isKindNotSetUpError("draft_to", { code: "22P02", message: 'invalid input syntax for type uuid: "x"' })).toBe(false);
-    // The enum message naming the OTHER new kind doesn't count for this one.
-    expect(isKindNotSetUpError("draft_to", { code: "22P02", message: 'invalid input value for enum k: "drafted"' })).toBe(false);
+    // Other codes, and the OLD kinds, are failures.
     expect(isKindNotSetUpError("draft_to", { code: "42501", message: check })).toBe(false);
     expect(isKindNotSetUpError("handoff", { code: "23514", message: check })).toBe(false);
-    expect(isKindNotSetUpError("draft_to", { message: check })).toBe(false);
   });
 });

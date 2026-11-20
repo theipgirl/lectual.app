@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const U1 = "11111111-1111-4111-8111-111111111111";
 const U2 = "22222222-2222-4222-8222-222222222222";
+const V1 = "33333333-3333-4333-8333-333333333333";
+const SM = "44444444-4444-4444-8444-444444444444";
 const GONE = "99999999-9999-4999-8999-999999999999";
 
 const s = vi.hoisted(() => ({
   role: "owner" as string | null,
-  members: [] as { userId: string }[],
+  members: [] as { userId: string; role: string }[],
   membersFail: false,
   setting: { status: "ok", entryId: "e1", stored: [], userIds: [] } as unknown,
   saved: [] as unknown[],
@@ -35,7 +37,7 @@ const form = (...ids: string[]) => {
 
 beforeEach(() => {
   s.role = "owner";
-  s.members = [{ userId: U1 }, { userId: U2 }];
+  s.members = [{ userId: U1, role: "attorney" }, { userId: U2, role: "paralegal" }, { userId: V1, role: "viewer" }, { userId: SM, role: "social_media" }];
   s.membersFail = false;
   s.setting = { status: "ok", entryId: "e1", stored: [], userIds: [] };
   s.saved = [];
@@ -60,6 +62,20 @@ describe("AT3a: the alert recipients are the members the admin tier picks in Set
     const res = await saveDeadlineAlertRecipientsAction({}, form(U1, GONE));
     expect(res.error).toMatch(/isn't on the team/);
     expect(s.saved).toEqual([]);
+  });
+
+  it("a viewer or social media member is refused with the fixed sentence, and nothing is saved", async () => {
+    const { DEADLINE_ALERTS_INELIGIBLE } = await import("@/lib/ui/words");
+    for (const id of [V1, SM]) {
+      expect((await saveDeadlineAlertRecipientsAction({}, form(U1, id))).error).toBe(DEADLINE_ALERTS_INELIGIBLE);
+    }
+    expect(s.saved).toEqual([]);
+  });
+
+  it("the Team page's picker lists only eligible members", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync("src/app/dashboard/settings/team/page.tsx", "utf8");
+    expect(src).toMatch(/members=\{members\.filter\(\(m\) => canReceiveDeadlineAlerts\(m\.role\)\)\.map\(/);
   });
 
   it("an unreadable team or an unreadable current list saves nothing", async () => {

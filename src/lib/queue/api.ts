@@ -314,8 +314,10 @@ export async function resolveQueueItem(args: {
   finalBody?: string;
   /**
    * Sprint 4: approve WITHOUT any mailbox draft on the queue side (the approved email goes to the firm's drafter, who
-   * drafts it in their own Outlook). Sent as `mailbox_draft: false`. NOT verified against lawmatics-mcp: if the queue
-   * drafts it anyway, it says so in `send` ("drafted" / "sent") and the caller passes nothing on (no second draft).
+   * drafts it in their own Outlook). Sent as `mailbox_draft: false`. lawmatics-mcp honours it only from its commit
+   * e738c24 (branch claude/gracious-darwin-rceoyv), not yet merged or deployed: `false` resolves as before but skips the Graph draft
+   * (`send` stays "manual"). Until then, or if the queue drafts anyway, it says so in `send` ("drafted" / "sent") and the caller
+   * passes nothing on (no second draft).
    */
   skipMailboxDraft?: boolean;
 }): Promise<{

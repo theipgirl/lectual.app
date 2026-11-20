@@ -38,7 +38,7 @@ export async function loadRecipientSetting(): Promise<RecipientSetting> {
     if (entryRes.error) return { status: "unavailable" };
     const entry = (entryRes.data ?? [])[0] ?? null;
     const stored = entry ? parseRecipientData(entry.data) : [];
-    return { status: "ok", entryId: entry?.id ?? null, stored, userIds: currentRecipients(stored, members.map((m) => m.userId)) };
+    return { status: "ok", entryId: entry?.id ?? null, stored, userIds: currentRecipients(stored, members) };
   } catch {
     return { status: "unavailable" };
   }

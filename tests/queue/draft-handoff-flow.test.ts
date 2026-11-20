@@ -113,6 +113,17 @@ describe("Acceptance 5: the attorney approves with a drafter set", () => {
     expect(out).toMatchObject({ kind: "resolved", send: "drafted", handoff: { status: "queue-drafted" } });
     expect(state.record).not.toHaveBeenCalled();
     expect(state.draftMine).not.toHaveBeenCalled();
+    expect(state.draftOwnOutlook).not.toHaveBeenCalled();
+    expect(state.notify).not.toHaveBeenCalled();
+  });
+
+  it("when the queue drafted it anyway, the approver is told plainly where the draft went (page and deck)", async () => {
+    const { readFileSync } = await import("node:fs");
+    const words = readFileSync("src/lib/ui/words.ts", "utf8");
+    expect(words).toContain('QUEUE_DRAFTED_ANYWAY = "Approved and drafted by the approval queue, so it wasn\'t passed to the drafter."');
+    expect(readFileSync("src/app/dashboard/queue/actions.ts", "utf8")).toMatch(/status === "queue-drafted" \? "&pass=queue"/);
+    expect(readFileSync("src/app/dashboard/queue/[id]/page.tsx", "utf8")).toMatch(/pass === "off" \? PASS_NOT_SWITCHED_ON : QUEUE_DRAFTED_ANYWAY/);
+    expect(readFileSync("src/app/dashboard/queue/deck/actions.ts", "utf8")).toMatch(/status === "queue-drafted" && !message\) message = QUEUE_DRAFTED_ANYWAY/);
   });
 
   it("a failed pass makes no draft anywhere", async () => {
