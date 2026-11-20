@@ -15,9 +15,10 @@ import { SheetSaveStatus } from "@/components/review/SheetSaveStatus";
 import { loadSheetStages } from "@/lib/review/sheet-edit-load";
 import { READ_ONLY_PERMS, type SheetPerms } from "@/lib/review/sheet-edit";
 import { CardsDeck, PersonChips } from "@/components/review/CardsDeck";
-import { ReviewCardAside, ReviewCardNote } from "@/components/review/ReviewCardExtras";
+import { ReviewCardAside } from "@/components/review/ReviewCardExtras";
 import { RecordCardHost } from "@/components/record-card/RecordCardHost";
 import { loadRecordCard } from "@/lib/record-card/load";
+import { cardEdits } from "@/lib/record-card/rules";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { NO_PREVIEW, previewFor, viewFor } from "@/lib/views";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
@@ -142,11 +143,11 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
                 row={cardRow}
                 members={load.members}
                 today={load.today}
-                stagesFailed={cardLoad.status === "ok" && cardLoad.stages.status !== "ok"}
+                // Said only to a role that could change the stage (the card's own `stage` edit, judged as if the stages had been read).
+                stagesFailed={cardLoad.status === "ok" && cardLoad.stages.status !== "ok" && cardEdits({ role: cardLoad.role, kind: cardLoad.kind }).stage}
                 closeStages={canMove ? load.closeStages : []}
               />
             ),
-            note: <ReviewCardNote open={{ kind: params.open.kind, id: cardShownId ?? params.open.id }} />,
           },
         })
       : null;

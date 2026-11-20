@@ -52,6 +52,8 @@ async function mayWriteLead(): Promise<boolean> {
 function refresh(leadId: string) {
   revalidatePath("/dashboard/intake/");
   revalidatePath(`/dashboard/leads/${leadId}/`);
+  // The Weekly review opens the same card.
+  revalidatePath("/dashboard/review/");
 }
 
 /**

@@ -185,6 +185,8 @@ export async function setLaneAction(leadId: string, lane: Lane | null): Promise<
 
   revalidatePath("/dashboard/intake/");
   revalidatePath(`/dashboard/leads/${leadId}`);
+  // The Weekly review opens the same card; its rows read these fields too.
+  revalidatePath("/dashboard/review/");
   return { ok: true };
 }
 
@@ -211,6 +213,8 @@ export async function setSourceAction(
 
   revalidatePath("/dashboard/intake/");
   revalidatePath(`/dashboard/leads/${leadId}`);
+  // The Weekly review opens the same card; its rows read these fields too.
+  revalidatePath("/dashboard/review/");
   return { ok: true };
 }
 

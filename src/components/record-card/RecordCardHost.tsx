@@ -102,13 +102,11 @@ function Docs({ view, role, directory, refresh }: { view: Ok; role: string; dire
  * pass nothing and their card is exactly as before.
  */
 export type RecordCardReview = {
-  /** The review row's facts (waiting on, last contact, last changed, USPTO deadline, proposal) and, for a lead, Lost / Nurture: first in the side column. */
-  aside: ReactNode;
   /**
-   * The review's "Log what happened" form, in place of the text composer: the same plain note, through the review's own action,
-   * which refreshes the review. Drawn only where the card already draws a composer (the role's `notes` edit).
+   * The review row's facts (waiting on, last contact, last changed, USPTO deadline, proposal) and, for a lead, Lost / Nurture: first in
+   * the side column. The note composers stay the card's own (call / email / meeting, subject, @mentions); their actions refresh the review.
    */
-  note: ReactNode;
+  aside: ReactNode;
 };
 
 type StepAssigneesProp = { members: { userId: string; name: string }[]; byTask: Record<string, string | null>; forNew: string | null };
@@ -202,7 +200,7 @@ export async function RecordCardHost({
             {c.edits.notes && (
               <section className="rc-sec" aria-label={RECORD_CARD_NOTE_HEADING}>
                 <div className="lx-composer">
-                  {review ? review.note : <MatterNoteComposer matterId={c.id} />}
+                  <MatterNoteComposer matterId={c.id} />
                   <VoiceNoteRecorder target={{ kind: "matter", id: c.id }} action={addMatterVoiceNote} />
                 </div>
               </section>
@@ -262,7 +260,7 @@ export async function RecordCardHost({
           <StepsChecklist kind="lead" id={c.id} steps={view.steps} {...(assignees ? { assignees } : {})} />
           {c.edits.notes && (
             <section className="rc-sec" aria-label={RECORD_CARD_NOTE_HEADING}>
-              <ComposerTabs text={review ? review.note : <NoteComposer leadId={c.id} />} voice={<VoiceNoteRecorder target={{ kind: "lead", id: c.id }} action={addLeadVoiceNote} />} />
+              <ComposerTabs text={<NoteComposer leadId={c.id} />} voice={<VoiceNoteRecorder target={{ kind: "lead", id: c.id }} action={addLeadVoiceNote} />} />
             </section>
           )}
           <section className="rc-sec">

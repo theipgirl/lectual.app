@@ -92,6 +92,8 @@ function revalidateMatter(matterId?: string) {
   if (matterId) revalidatePath(`/dashboard/matters/${matterId}/`);
   revalidatePath("/dashboard/matters/");
   revalidatePath("/dashboard/");
+  // The Weekly review opens the matter in the same card (title, header fields).
+  revalidatePath("/dashboard/review/");
 }
 
 /** Only fields the form posted come back, so one group can't blank another. */
@@ -493,6 +495,8 @@ export async function addVoiceNoteAction(
   }
 
   revalidatePath(`/dashboard/matters/${matterId}/`);
+  // The Weekly review opens the matter in the same card; a call or email logged here is its last contact and direction.
+  revalidatePath("/dashboard/review/");
   return {};
 }
 
@@ -715,6 +719,8 @@ export async function addMatterNoteAction(_prev: ActionState, formData: FormData
     return { error: friendlyMatterError(err, "Couldn't add this to the timeline.") };
   }
   revalidatePath(`/dashboard/matters/${matterId}/`);
+  // The Weekly review opens the matter in the same card; a call or email logged here is its last contact and direction.
+  revalidatePath("/dashboard/review/");
   return { saved: true };
 }
 

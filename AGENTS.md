@@ -1494,7 +1494,7 @@ and a Follow-Up stage; a lead that has a matter shows once, as the matter). Ever
   never "Nothing is waiting".
 - **Sheet** (`?view=sheet`, `sheet.ts` + `SheetView.tsx`): the Excel tracker as one table, two sections, **Trademarks** (every lead plus TM / CR / PATENT matters; no type reads as TM) then **Contracts** (other matter
   types). Columns in order: Client | Mark | Status (stage label) | Next step (title + due, overdue in `--ox`) | Whose court (lane person, else Unassigned) | Waiting on (Us / "Client · followed up Nov 4" /
-  USPTO / Approval) | Source | Last contact. Rows by stage pipeline order (`stageOrder`, none last), then client. The Client cell links to `?open=` (edits happen in the panel). Sticky header, zebra rows,
+  USPTO / Approval) | Source | Last contact. Rows by stage pipeline order (`stageOrder`, none last), then client. The Client cell links to `?open=` (edits happen in the opened record card). Sticky header, zebra rows,
   `.lx-stack` + `data-label` under 640px, sideways scroll 641-900px. Source is `referral_source` of the matter or lead, read from the rows `listMatters` / `listLeads` already return (`select("*")`), "—" when none.
 - **Cards** keep their membership (the person's flagged lane rows, then approval rows for an approver) but are now dealt in board column order (the agenda ordering went with the agenda; `buildDeck(buckets, members, personId)`).
   Not verified in a browser.
@@ -1525,25 +1525,31 @@ and a Follow-Up stage; a lead that has a matter shows once, as the matter). Ever
   `RecordCardHost` (path `/dashboard/review/`, params = `reviewHref({ ...params, open: null })`, so view, who, kind, q, since and the deck's person and i are kept on open and
   close, `notice` is dropped, Back closes). Centred from 900px, full-screen below (the card's own CSS). **No form lives on a board card**: the card is one `<a>` and "Done" / "Open"
   sit outside it. `ReviewPanel`, `PanelShell`, `loadReviewDetail` and the panel's own documents list are gone.
-- **The review's part of the card** is the optional `review` prop of `RecordCardHost` (`RecordCardReview`: `aside`, `note`); Intake and Matters pass none and draw exactly as
+- **The review's part of the card** is the optional `review` prop of `RecordCardHost` (`RecordCardReview`: `aside`); Intake and Matters pass none and draw exactly as
   before. From the review the card adds: `ReviewCardAside` (`src/components/review/ReviewCardExtras.tsx`, first in the side column, "On the weekly review"): stage + days in
   stage, Waiting on (`waitingCell`: Our turn / "Client · followed up Nov 4" / USPTO / Approval), last contact, the last-changed line (none when its read failed), the USPTO deadline
-  (leads; a matter's card draws its own "Next USPTO deadline" from the docket), the proposal tag (only while `REVIEW_SHOWS_PROPOSALS`), "Stages couldn't load..." when the card's stage
-  read failed, and Lost / Nurture for a lead (the page passes `closeStages` only for `CAN_MOVE_STAGE`; none without such stages). A record not on the review opens anyway and says
-  "This record isn't on the weekly review right now." `ReviewCardNote` ("Log what happened", `logWhatHappenedAction`, id `rv-sec-note`) replaces the card's text composer (voice
-  stays), only where the card draws a composer (`notes` edit). The step checklist names each step's assignee and its edit/add forms gain "Assigned to" (`StepAssignees`; not drawn
-  when the team list is unreadable, so a select of nobody can't clear one). A lead's Move to stage also offers lost stages (`buildOpenedCard(..., { lostShown: true })`, as the drawer
-  did; never won). The Documents & files card's upload refreshes the review (`refreshAfterUpload` -> `UploadAndRefresh`).
-- **Card actions are the existing ones, all re-resolving the role**: step edit (title, due, assignee) = `updateNextStepAction` (only posted fields change); Snooze (Tomorrow / Next Monday /
-  In 2 weeks) = `snoozeNextStepAction`, the date worked out on the server from the firm's calendar day (`snoozeDate`); Done = `completeNextStepAction`; add = `setNextStepAction`; Stage =
-  `moveStageAction` (matter: `updateMatterStage`; lead: `CAN_MOVE_STAGE`, open / lost / nurture only, `won` refused on the server); Owner = `assignRecordAction` (member checked); Log what
-  happened = `logWhatHappenedAction`; Lost / Nurture = `closeLeadAction`; upload = the files actions. Read-only roles see the facts and steps with no form (`cardEdits`). The card's full
-  Timeline replaces the drawer's "last 8 rows".
+  (leads; a matter's card draws its own "Next USPTO deadline" from the docket), the proposal tag (only while `REVIEW_SHOWS_PROPOSALS`), "Stages couldn't load, so the stage can't be
+  changed here." when the card's stage read failed AND the role has the card's `stage` edit (never to a viewer or a paralegal on a lead), and Lost / Nurture for a lead (the page
+  passes `closeStages` only for `CAN_MOVE_STAGE`; none without such stages). A record not on the review opens anyway and says "This record isn't on the weekly review right now."
+  **The note box is the card's own composer** (`NoteComposer` / `MatterNoteComposer` with Call / Email / Meeting, the email subject and @mentions, plus voice): a call or email logged
+  there is the outbound `call_logged` / `email_sent` row that the review's "Waiting on client" and "Last followed up" read, so the review keeps it (no separate "Log what happened"
+  box on the card; `logWhatHappenedAction` stays for the owner's Sheet and the Cards deck). The step checklist names each step's assignee and its edit/add forms gain "Assigned
+  to" (`StepAssignees`; not drawn when the team list is unreadable). A step edit posts `assigneeId` ONLY when the person changed it in that form (`stepEditFields`,
+  `src/lib/record-card/rules.ts`), so a reassignment someone saved after the card was drawn is never reverted. A lead's Move to stage also offers lost stages
+  (`buildOpenedCard(..., { lostShown: true })`, as the drawer did; never won). The Documents & files card's upload refreshes the review (`refreshAfterUpload` -> `UploadAndRefresh`).
+- **The review page stays current after a card edit:** every action the card calls revalidates `/dashboard/review/` beside its own paths (the review's own actions already did;
+  added to `addNoteAction`, `addMatterNoteAction`, both `addVoiceNoteAction`s, `setLaneAction`, `setSourceAction`, the record-card actions' `refresh` (rename, tags),
+  `logConsultOutcomeAction` (no-show) and `revalidateMatter` (matter title and header)). The card's `useRun` also calls `router.refresh()` after a save.
+- **Card actions are the existing ones, all re-resolving the role**: step edit (title, due, and assignee when changed) = `updateNextStepAction` (only posted fields change); Snooze
+  (Tomorrow / Next Monday / In 2 weeks) = `snoozeNextStepAction`, the date worked out on the server from the firm's calendar day (`snoozeDate`); Done = `completeNextStepAction`; add =
+  `setNextStepAction`; Stage = `moveStageAction` (matter: `updateMatterStage`; lead: `CAN_MOVE_STAGE`, open / lost / nurture only, `won` refused on the server); Owner =
+  `assignRecordAction` (member checked); notes = the composer's `addNoteAction` / `addMatterNoteAction`; Lost / Nurture = `closeLeadAction`; upload = the files actions. Read-only roles
+  see the facts and steps with no form (`cardEdits`). The card's full Timeline replaces the drawer's "last 8 rows".
 - **Cards view (`?view=cards&person=<user id>&i=<n>`, "Cards" from `words.ts`): a deck for one person** (Rebecca's cue cards). The person chips are every member (owners first); the
   default is the member whose name starts with "Rebecca", else the signed-in user. `buildDeck` (`deck.ts`, pure): that person's board lane (next-step assignee, else record assignee) in
   column order (Overdue, This week, Needs a next step, Quiet), then, for an approver role (`QUEUE_APPROVE_ROLES`), every row waiting on approval, never repeating a row. The Whose chip is
   ignored here (the person picker is the person); the search and Matters/Leads chips apply. One big card with "N of M" and progress dots; Done, Snooze, Hand to (the step's assignee, or
-  the record's when there is no step), Add note, Open (the record card), Skip / Back. The buttons are plain forms posting to `card-actions.ts`, which run the SAME actions as the card and then
+  the record's when there is no step), Add note (its button is disabled while posting, `DeckNoteSubmit`, and the form is reset after a save and keyed to the card, so a second click can't file it twice), Open (the record card), Skip / Back. The buttons are plain forms posting to `card-actions.ts`, which run the SAME actions as the card and then
   redirect back to the same `i` (clamped), rebuilding the address from the posted view fields through `parseReviewParams`, never a posted URL; a refusal rides back as a closed
   `notice=denied|missing|failed` code with a fixed sentence (`notice.ts`). Left / Right arrows follow the Back / Skip links (`DeckKeys`); without JavaScript the links work. The latest
   note line is its own optional read (`loadLatestNote`): a failure says "couldn't load", never "no notes".
@@ -1553,23 +1559,21 @@ and a Follow-Up stage; a lead that has a matter shows once, as the matter). Ever
 
 ### Documents on the review (no schema)
 The managing attorney opens a record's application or opinion letter from the Weekly review and comments on it without a call. Read and link only: no upload, no delete, nothing sends.
-- **Panel section "Documents"** (`ReviewDocuments.tsx`, in `?open=matter:<uuid>` and `?open=lead:<uuid>`, just above "Log what happened"). It is fed by `loadDocumentsRead` from `src/lib/files/read.ts`, the
-  Documents & files card's own loader, called from `loadReviewDetail` AFTER the record was read through RLS (a foreign or missing id is `missing` and no document read is made). A matter lists its OWN files
-  and, only for a firm with `document-center` (an unreadable module list fails closed), its generated letters as a separate read; a lead lists its own files and those of leads merged into it (`mergedSetFor`, as the lead page does; an unreadable merged set lists the keeper's own and says "History from merged leads couldn't be loaded."). An unreadable module list makes a matter's letters "unavailable" (their sentence), never empty.
-  Newest first, at most 8 then "+N more" ("+N or more" when a reader hit its 100 cap; `PANEL_DOC_MAX`), each with name, kind ("File · PDF" / "Letter · Opinion letter"), date and who (member directory, else "A teammate"). A plain anchor opens the EXISTING
-  download route (`/dashboard/files/<id>/download/`) or letter route (`/dashboard/documents/<id>/download/`). File names are React text.
-- **States, never collapsed** (`documentsView`, `src/lib/review/documents.ts`, pure): files and letters each ok / failed (`FILES_ERROR_LINE`, `LETTERS_ERROR_LINE`, the card's own sentences) and files also not-set-up
-  (`FILE_MESSAGES.notSetUp`). "No documents yet." only when every read that was made succeeded and found nothing.
-- **"Open all documents"** is a plain `<a>` to the page's card, `/dashboard/<matters|leads>/<id>/#documents` (`id="documents"` was added to `DocumentsCard`'s section; no layout change). **"Comment on a document"**
-  (write roles only) is an anchor to the panel's existing "Log what happened" section (`id="rv-sec-note"`); the note lands on the timeline as before. No new action or table.
+- **An opened record's documents** are the card's own Documents & files card (`DocumentsCard`, fed by `readRecordDocuments` in `detail-load.ts` through `loadRecordCard`, AFTER the record was
+  read through RLS: a foreign or missing id is "couldn't be found" and no document read is made). A matter lists its OWN files and, only for a firm with `document-center` (an unreadable module
+  list makes the letters "unavailable", never empty), its generated letters; a lead lists its own files and those of leads merged into it (`mergedSetFor`; an unreadable merged set lists the
+  keeper's own and says so). The existing download routes open them. A comment on a document is a note in the card's own composer. The drawer's own Documents section, "Open all documents"
+  link and `PANEL_DOC_MAX` are gone with the drawer.
+- **States, never collapsed** (`documentsView`, `src/lib/review/documents.ts`, pure, used by the Cards deck): files and letters each ok / failed (`FILES_ERROR_LINE`, `LETTERS_ERROR_LINE`) and files also
+  not-set-up (`FILE_MESSAGES.notSetUp`). "No documents yet." only when every read that was made succeeded and found nothing.
 - **Counts** are an OPTIONAL source named "documents" (`OPTIONAL_SOURCES`). `readDocumentCounts` (`load.ts`) does one batched read per table and chunk of `CHUNK` ids (`countFilesByParent`, `countLettersByMatter`, in
   `files/read.ts` beside the loader so `crm_file` is read in one module) for every matter and lead the review asks about, not only the rows a filter shows. Letters are counted only with `document-center`. A lead's count includes the files of leads merged into it (one batched `merged_into_id` read per chunk through `leadRead`; a failure or a possibly cut-short read rejects, so no tag; before 0107 nothing is merged). A failed read, or an
   unreadable module list (the letters would be undercounted), leaves `documentCount` unset on every row and adds "documents" to "Some details couldn't load (...)". A missing `crm_file` table counts as zero files (there is
   no table to hold any). The tag (`documentsTag`) shows only a known count above 0, never "0 documents": board cards and the Cards deck (`DocTag`), the Sheet and the owner's editable Sheet (client cell).
-- **Cards deck**: the big card lists up to 3 newest documents and "+N more" (`DECK_DOC_MAX`, `DeckDocuments`). It reads the CURRENT card's record only, through the same loader as the panel (`loadDeckDocuments`: one small read of
+- **Cards deck**: the big card lists up to 3 newest documents and "+N more" (`DECK_DOC_MAX`, `DeckDocuments`). It reads the CURRENT card's record only, through the same loader as the opened card (`loadDeckDocuments`: one small read of
   up to 100 files and 100 letters for that one record, of which three are drawn), not every row. A thrown read says "Documents couldn't be loaded.", never "No documents yet.".
-- **Upload from the panel (no schema, no new action).** Staff who may upload (`canWrite` on the review, the same eight roles as `FILE_UPLOAD_ROLES`; a test holds the lists equal; viewer / social media see no control at all) get the Documents & files card's own `UploadControl` (`requestUploadAction` -> browser PUT -> `confirmUploadAction`, same extension rule, size limit, `FILE_MESSAGES` and `file_uploaded` row) inside the panel via `ReviewUpload`, which only adds `router.refresh()` (the confirm action revalidates the record's page, not the review) so the list and the "N documents" tags update. `UploadControl` gained optional `onUploaded` / `inputId` (default behaviour unchanged). Not drawn when files are not set up; a failed read keeps it, as the card does. **Merged leads (M5):** `loadParentOrg` resolves a lead id through `keeperForWrite` and returns the resolved parent, which request AND confirm use, so the path, row, `file_uploaded` row and revalidation are the keeper's and the two steps agree; an unreadable pointer refuses with `MERGE_POINTER_UNREADABLE` and writes nothing; matters are unchanged. The panel's loader (`loadReviewDetail`) follows a merged id to its keeper (`openId`; the page shows that record), and an unreadable pointer is "unavailable".
-- Words: the `// Review documents` block at the end of `src/lib/ui/words.ts`. Tests: `tests/review/documents.test.tsx`. Not verified in a real browser: a download opened from the panel (the 303 to a signed URL), the `#rv-sec-note` jump inside the drawer, and focus.
+- **Upload from the opened card (no schema, no new action).** The card's own Documents & files upload (`edits.upload` = `FILE_UPLOAD_ROLES`; viewer / social media see no control) with `refreshAfterUpload`, which draws `UploadAndRefresh` (`src/components/files/`): the same `UploadControl` (`requestUploadAction` -> browser PUT -> `confirmUploadAction`) plus `router.refresh()`, since the confirm action revalidates the record's page, not the review. Not drawn when files are not set up. **Merged leads (M5):** `loadParentOrg` resolves a lead id through `keeperForWrite`, so request and confirm use the keeper; `loadRecordCard` follows a merged id to its keeper and an unreadable pointer is "couldn't be loaded".
+- Words: the `// Review documents` block at the end of `src/lib/ui/words.ts`. Tests: `tests/review/documents.test.tsx`. Not verified in a real browser: a download opened from the card (the 303 to a signed URL) and focus.
 
 ## Monday meeting changes (Nov 17, no schema)
 Three changes so the attorney can run the Monday meeting in Lectual. Display and derivation only; nothing sends.

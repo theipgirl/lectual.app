@@ -1309,6 +1309,6 @@ export const REVIEW_CARD_HEADING = "On the weekly review";
 export const REVIEW_CARD_NOT_ON_REVIEW = "This record isn't on the weekly review right now.";
 export const reviewCardStageDays = (n: number) => `${n}d in stage`;
 export const REVIEW_CARD_USPTO_DEADLINE = "USPTO deadline";
-export const REVIEW_CARD_LOG_HEADING = "Log what happened";
-export const REVIEW_CARD_LOG_LABEL = "What happened";
-export const REVIEW_CARD_LOG_PLACEHOLDER = "A short note for the timeline";
+/** The Cards deck's "Add to timeline" note box. */
+export const REVIEW_LOG_LABEL = "What happened";
+export const REVIEW_LOG_PLACEHOLDER = "A short note for the timeline";

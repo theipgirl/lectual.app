@@ -286,3 +286,14 @@ export function fullPageHref(kind: CardKind, id: string): string {
 
 /** Mark no-show's Undo window: nothing is posted until it ends (the approval deck's rule); after it there is no undo. */
 export const NO_SHOW_HOLD_MS = 5_000;
+
+/**
+ * The fields a step edit posts to `updateNextStepAction` (which changes only the fields it is given). The assignee goes ONLY when
+ * the person changed it in this form: posting the value the form opened with would quietly undo a reassignment someone else
+ * saved after the card was drawn. `assignees` is null where the form has no picker (Intake and Matters).
+ */
+export function stepEditFields(input: { taskId: string; title: string; dueAt: string; assignees: { current: string | null } | null; chosen: string }): Record<string, string> {
+  const fields: Record<string, string> = { taskId: input.taskId, title: input.title, dueAt: input.dueAt };
+  if (input.assignees && input.chosen !== (input.assignees.current ?? "")) fields.assigneeId = input.chosen;
+  return fields;
+}

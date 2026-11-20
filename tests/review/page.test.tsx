@@ -314,18 +314,19 @@ describe("Weekly review page", () => {
       expect(cardLoader).toHaveBeenCalledWith({ kind: "lead", id: ID });
     });
 
-    it("an editor gets the review's actions in the card: steps (snooze, done, add), stage incl. lost, owner, Log what happened, Lost / Nurture, upload", async () => {
+    it("an editor gets the review's actions in the card: steps (snooze, done, add), stage incl. lost, owner, the note composer, Lost / Nurture, upload", async () => {
       cardResult = leadLoad("attorney");
       mock(ok({ rows: [lead], closeStages: stages }));
       const card = cardOf(await render({ open: `lead:${ID}` }));
-      for (const w of ["Follow up", "Send form", "Tomorrow", "Next Monday", "In 2 weeks", "Done", "Add a next step", "Log what happened", "Add to timeline", "Lost / Nurture", 'type="file"']) expect(card).toContain(w);
+      for (const w of ["Follow up", "Send form", "Tomorrow", "Next Monday", "In 2 weeks", "Done", "Add a next step", "Lost / Nurture", 'type="file"']) expect(card).toContain(w);
       // Each step names who it is assigned to (the drawer's "· Rayn").
       expect(card).toMatch(/rc-step-who[^>]*>Rebecca</);
       expect(card).toMatch(/rc-step-who[^>]*>Rayn</);
-      // The review's own note action, not the lead page's composer.
-      expect(card).toContain('name="body"');
-      expect(card).toContain('id="rv-sec-note"');
-      expect(card).not.toContain('id="lx-note-body"');
+      // The card's own composer (Call / Email / Meeting, subject, @mentions), as on Intake: its action refreshes the review.
+      expect(card).toContain('id="lx-note-body"');
+      expect(card).toMatch(/name="kind" value="call_logged"/);
+      expect(card).toMatch(/name="kind" value="email_sent"/);
+      expect(card).not.toContain("Log what happened");
       // Stage and owner are the card's own controls (moveStageAction / assignRecordAction).
       expect(card).toMatch(/Stage for Lena Lead: Proposal/);
       expect(card).toContain("Reassign");
@@ -351,7 +352,7 @@ describe("Weekly review page", () => {
       expect(card).toMatch(/Waiting on<\/dt><dd>USPTO</);
       expect(card).not.toContain(">USPTO deadline<");
       expect(card).not.toContain("Lost / Nurture");
-      expect(card).toContain("Log what happened");
+      expect(card).toContain('id="lx-matter-note-body"');
       expect(card).toMatch(/rc-step-who[^>]*>Rayn</);
     });
 
@@ -365,7 +366,7 @@ describe("Weekly review page", () => {
       const card = cardOf(await render({ open: `lead:${ID}` }));
       expect(card).not.toContain("Lost / Nurture");
       // A paralegal still writes steps and notes.
-      expect(card).toContain("Log what happened");
+      expect(card).toContain('id="lx-note-body"');
     });
 
     it("a viewer sees the facts and the steps with no form, no note box and no upload", async () => {
@@ -375,7 +376,7 @@ describe("Weekly review page", () => {
       expect(card).toContain("On the weekly review");
       expect(card).toContain("Client · followed up Oct 28");
       expect(card).toContain("Follow up");
-      for (const f of ["<form", "<textarea", "<select", 'type="file"', "Lost / Nurture", "Log what happened", ">Tomorrow<"]) expect(card).not.toContain(f);
+      for (const f of ["<form", "<textarea", "<select", 'type="file"', "Lost / Nurture", 'id="lx-note-body"', ">Tomorrow<"]) expect(card).not.toContain(f);
     });
 
     it("a foreign or missing id reads 'couldn't be found' with a close link and no record data", async () => {
@@ -408,6 +409,29 @@ describe("Weekly review page", () => {
       expect(card).not.toContain("No next steps");
     });
 
+    it("the stage-read line is said only to a role that could change the stage", async () => {
+      const failing = (role: string) => leadLoad(role, ID, { stages: { status: "unavailable" } });
+      cardResult = failing("viewer");
+      mock(ok({ rows: [lead] }), "viewer");
+      expect(cardOf(await render({ open: `lead:${ID}` }))).not.toContain("the stage can&#x27;t be changed here");
+      vi.resetModules();
+      cardResult = failing("paralegal");
+      mock(ok({ rows: [lead] }), "paralegal");
+      expect(cardOf(await render({ open: `lead:${ID}` }))).not.toContain("the stage can&#x27;t be changed here");
+      vi.resetModules();
+      cardResult = failing("attorney");
+      mock(ok({ rows: [lead] }));
+      expect(cardOf(await render({ open: `lead:${ID}` }))).toContain("the stage can&#x27;t be changed here");
+    });
+
+    it("the note box has one heading, not two", async () => {
+      cardResult = leadLoad("attorney");
+      mock(ok({ rows: [lead] }));
+      const card = cardOf(await render({ open: `lead:${ID}` }));
+      expect(card).not.toContain("Log what happened");
+      expect(card).not.toContain('id="rv-sec-note"');
+    });
+
     it("a record that isn't on the review still opens, and says so instead of guessing facts", async () => {
       cardResult = leadLoad("attorney");
       mock(ok({ rows: [] }));
@@ -423,7 +447,7 @@ describe("Weekly review page", () => {
       const card = cardOf(await render({ open: `lead:${ID}` }));
       expect(card).toContain("On the weekly review");
       expect(card).not.toContain("isn&#x27;t on the weekly review");
-      expect(card).toContain(`name="id" value="${KEEPER}"`);
+      expect(card).toContain(`name="leadId" value="${KEEPER}"`);
     });
 
     it("close and every card link keep the other review params (view, who, kind, q, person, since); notice is dropped", async () => {

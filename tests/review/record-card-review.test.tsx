@@ -33,7 +33,7 @@ async function host(review: boolean, load = leadLoad()) {
     path: review ? "/dashboard/review/" : "/dashboard/intake/",
     params: {},
     load,
-    ...(review ? { review: { aside: <section data-review-card="">facts</section>, note: <form id="rv-sec-note">note</form> } } : {}),
+    ...(review ? { review: { aside: <section data-review-card="">facts</section> } } : {}),
   });
   return renderToStaticMarkup(el);
 }
@@ -47,19 +47,18 @@ describe("the record card with and without the review's part", () => {
     expect(html).toContain('id="lx-note-body"');
     expect(html).not.toContain('id="rv-file-input"');
   });
-  it("the review's card: its facts first in the side column, the step's assignee, its own note form, an upload that refreshes the review", async () => {
+  it("the review's card: its facts first in the side column, the step's assignee, the card's own composer, an upload that refreshes the review", async () => {
     const html = await host(true);
     expect(html).toContain("data-review-card");
     expect(html.indexOf("data-review-card")).toBeLessThan(html.indexOf("Contact"));
     expect(html).toMatch(/rc-step-who[^>]*>Rayn</);
-    expect(html).toContain('id="rv-sec-note"');
-    expect(html).not.toContain('id="lx-note-body"');
+    expect(html).toContain('id="lx-note-body"');
     expect(html).toContain('id="rv-file-input"');
   });
   it("a role without the note edit gets no note form even from the review", async () => {
     const html = await host(true, leadLoad({ role: "viewer" }));
     expect(html).toContain("data-review-card");
-    expect(html).not.toContain('id="rv-sec-note"');
+    expect(html).not.toContain('id="lx-note-body"');
     expect(html).not.toContain('type="file"');
   });
   it("an unreadable team list draws no assignee picker (a select of nobody would clear an assignee)", async () => {
@@ -83,7 +82,7 @@ describe("the step form's assignee (review only)", () => {
   });
   it("posts the assignee through the review's existing actions only (no new write path)", () => {
     const src = readFileSync("src/components/record-card/controls.tsx", "utf8");
-    expect(src).toMatch(/viaForm\(updateNextStepAction, \{ taskId: step\.id, title, dueAt: due, \.\.\.\(assignees \? \{ assigneeId: who \} : \{\}\) \}\)/);
+    expect(src).toContain("viaForm(updateNextStepAction, stepEditFields({ taskId: step.id, title, dueAt: due, assignees: assignees ?? null, chosen: who }))");
     expect(src).toMatch(/viaForm\(setNextStepAction, \{ kind, id, title, dueAt: due, assigneeId: assignees \? who : "" \}\)/);
   });
 });
@@ -96,9 +95,9 @@ describe("the drawer is gone", () => {
     expect(page).not.toMatch(/SidePanel|ReviewPanel|PanelShell/);
     expect(page).toContain("loadRecordCard(params.open)");
   });
-  it("the review's card part uses the existing review actions and no service role", () => {
+  it("the review's card part uses the existing review actions and no service role, and no second note box", () => {
     const src = readFileSync("src/components/review/ReviewCardExtras.tsx", "utf8");
-    expect(src).toContain("logWhatHappenedAction");
+    expect(src).not.toContain("logWhatHappenedAction");
     expect(src).toContain("LostNurture");
     expect(src).not.toMatch(/@\/lib\/db\/admin|getAdminClient/);
   });

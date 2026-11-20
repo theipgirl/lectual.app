@@ -5,10 +5,8 @@ import { lastChangedText } from "@/lib/review/last-changed";
 import type { OpenRef } from "@/lib/review/open";
 import { REVIEW_SHOWS_PROPOSALS } from "@/lib/review/scope";
 import { waitingCell } from "@/lib/review/sheet";
-import { logWhatHappenedAction } from "@/app/dashboard/review/actions";
 import { Pill } from "@/components/ui/Pill";
 import {
-  ADD_TO_TIMELINE,
   BLANK,
   LAST_CHANGED_LABEL,
   LAST_CONTACT,
@@ -17,14 +15,10 @@ import {
   RECORD_CARD_STAGE,
   RECORD_CARD_STAGE_READ_ONLY,
   REVIEW_CARD_HEADING,
-  REVIEW_CARD_LOG_HEADING,
-  REVIEW_CARD_LOG_LABEL,
-  REVIEW_CARD_LOG_PLACEHOLDER,
   REVIEW_CARD_NOT_ON_REVIEW,
   REVIEW_CARD_USPTO_DEADLINE,
   reviewCardStageDays,
 } from "@/lib/ui/words";
-import { ActForm } from "./ActForm";
 import { LostNurture } from "./LostNurture";
 import "./review.css";
 
@@ -56,7 +50,7 @@ export function ReviewCardAside({
   row: ReviewRow | null;
   members: Member[];
   today: string;
-  /** The card's stage read failed: the stage can't be changed, and that is said rather than left blank. */
+  /** The card's stage read failed AND this role has the stage edit: then "the stage can't be changed here" is said. Never for a role that couldn't change it anyway. */
   stagesFailed: boolean;
   /** Lost / Nurture choices, or an empty list when the role can't move a lead or the firm has no such stage. */
   closeStages: CloseStage[];
@@ -107,22 +101,5 @@ export function ReviewCardAside({
       </dl>
       {open.kind === "lead" && closeStages.length > 0 && <LostNurture id={open.id} stages={closeStages} />}
     </section>
-  );
-}
-
-/**
- * "Log what happened": the review's plain timeline note (`logWhatHappenedAction`, which re-resolves the role, checks the
- * record and refreshes the review). The card draws it only where it would draw a note composer.
- */
-export function ReviewCardNote({ open }: { open: OpenRef }) {
-  return (
-    <div className="rv-cardx-note" id="rv-sec-note">
-      <h3 className="lx-label">{REVIEW_CARD_LOG_HEADING}</h3>
-      <ActForm action={logWhatHappenedAction} submit={ADD_TO_TIMELINE}>
-        <input type="hidden" name="kind" value={open.kind} />
-        <input type="hidden" name="id" value={open.id} />
-        <textarea className="lx-input" name="body" rows={3} placeholder={REVIEW_CARD_LOG_PLACEHOLDER} aria-label={REVIEW_CARD_LOG_LABEL} required />
-      </ActForm>
-    </div>
   );
 }

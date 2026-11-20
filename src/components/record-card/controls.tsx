@@ -20,7 +20,7 @@ import { TASK_TITLE_MAX } from "@/lib/matters/task-edit";
 import { beginOnce, noShowOffered, type Hold } from "@/lib/record-card/hold";
 import { noShowNotices } from "@/components/record-card/no-show-notices";
 import type { CardMember, CardView, StepLine } from "@/lib/record-card/model";
-import type { TemperatureControl, MenuItem, CardKind } from "@/lib/record-card/rules";
+import { stepEditFields, type TemperatureControl, type MenuItem, type CardKind } from "@/lib/record-card/rules";
 import type { ReferralSource } from "@/lib/intake";
 import {
   RECORD_CARD_ADD_STEP,
@@ -308,7 +308,7 @@ export function StepForm({ kind, id, step, dueIso, onDone, autoFocus, assignees 
       className={assignees ? "rc-stepform rc-stepform-who" : "rc-stepform"}
       onSubmit={(e) => {
         e.preventDefault();
-        if (step) run(viaForm(updateNextStepAction, { taskId: step.id, title, dueAt: due, ...(assignees ? { assigneeId: who } : {}) }));
+        if (step) run(viaForm(updateNextStepAction, stepEditFields({ taskId: step.id, title, dueAt: due, assignees: assignees ?? null, chosen: who })));
         else run(viaForm(setNextStepAction, { kind, id, title, dueAt: due, assigneeId: assignees ? who : "" }));
       }}
     >
