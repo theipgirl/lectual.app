@@ -38,6 +38,7 @@ import { needsReviewItems } from "@/lib/today/needs-review";
 import { NeedsYouSection } from "@/components/today/NeedsYouSection";
 import { AddNameLink } from "@/components/account/AddNameLink";
 import { TodayConsults } from "@/components/calendar/TodayConsults";
+import { DeadlineAlertsCard, loadDeadlineAlerts } from "@/components/today/DeadlineAlertsCard";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 import { ASSISTANTS_NAME, BLANK, OUR_TURN } from "@/lib/ui/words";
@@ -89,6 +90,8 @@ export default async function TodayPage() {
     return <OwnerToday userId={session.user.id} role={session.role} email={session.user.email} metadata={session.user.user_metadata} />;
   }
   const now = new Date();
+  // The Deadlines card (PGE Sprint 3) reads on its own, started now so it runs beside every other read on this page.
+  const alertsP = loadDeadlineAlerts(session.user.id, now);
   const [hasAgents, tz] = await Promise.all([orgHasModule("agents"), getFirmTimeZone()]);
   const monthFloor = monthQueryFloor(now, tz);
 
@@ -123,6 +126,7 @@ export default async function TodayPage() {
       loadIntakeStageIds(),
     ]);
 
+  const alertsData = await alertsP;
   // loadActiveQueue never throws; a rejection would be a bug, shown as unavailable.
   const queue: QueueLoad = await mineQueue(queueS.status === "fulfilled" ? queueS.value : { status: "unavailable", items: [] }, { userId: session.user.id, role: session.role });
   const leads: Lead[] | null = leadsS.status === "fulfilled" ? leadsS.value : null;
@@ -238,6 +242,8 @@ export default async function TodayPage() {
       <div className="lx-split">
         <div className="lx-col">
           <TodayConsults />
+
+          <DeadlineAlertsCard data={alertsData} userId={session.user.id} />
 
           <NeedsYouSection needs={needs} queue={queue.status} />
 

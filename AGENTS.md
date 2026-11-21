@@ -1494,7 +1494,7 @@ and a Follow-Up stage; a lead that has a matter shows once, as the matter). Ever
   never "Nothing is waiting".
 - **Sheet** (`?view=sheet`, `sheet.ts` + `SheetView.tsx`): the Excel tracker as one table, two sections, **Trademarks** (every lead plus TM / CR / PATENT matters; no type reads as TM) then **Contracts** (other matter
   types). Columns in order: Client | Mark | Status (stage label) | Next step (title + due, overdue in `--ox`) | Whose court (lane person, else Unassigned) | Waiting on (Us / "Client · followed up Nov 4" /
-  USPTO / Approval) | Source | Last contact. Rows by stage pipeline order (`stageOrder`, none last), then client. The Client cell links to `?open=` (edits happen in the panel). Sticky header, zebra rows,
+  USPTO / Approval) | Source | Last contact. Rows by stage pipeline order (`stageOrder`, none last), then client. The Client cell links to `?open=` (edits happen in the opened record card). Sticky header, zebra rows,
   `.lx-stack` + `data-label` under 640px, sideways scroll 641-900px. Source is `referral_source` of the matter or lead, read from the rows `listMatters` / `listLeads` already return (`select("*")`), "—" when none.
 - **Cards** keep their membership (the person's flagged lane rows, then approval rows for an approver) but are now dealt in board column order (the agenda ordering went with the agenda; `buildDeck(buckets, members, personId)`).
   Not verified in a browser.
@@ -1512,57 +1512,74 @@ and a Follow-Up stage; a lead that has a matter shows once, as the matter). Ever
   "Proposal expires today" / "Proposal expired Oct 26" (the expired one in the `--ox` risk style), on board cards, the meeting card and stage-view rows. Tags NEVER change a bucket. KPI tile
   "Proposals expiring this week" (the tile itself was dropped for the Proposals out strip; `expiringThisWeek` is still in `proposal-expiry.ts`) = expires today..+6 or expired within the last 14 days and still sent. Optional source `proposals`: a failed read draws no tags, the tile is a dash with
   "Couldn't load", and the note reads "Some details couldn't load (proposals)", never "no proposal".
-- **Lost / Nurture** (leads only, now inside the detail panel; `LostNurture.tsx`, `closeLeadAction`): a small inline form (stage select, optional reason of at most 200 characters,
+- **Lost / Nurture** (leads only, now inside the opened record card's review part; `LostNurture.tsx`, `closeLeadAction`): a small inline form (stage select, optional reason of at most 200 characters,
   `InlineConfirm`). The choices are the firm's stages whose category is `lost` or `nurture` (`closeStagesOf`, read from the stage list the loader already has); a firm with neither sees no button
   and nothing else changes. Shown only for `CAN_MOVE_STAGE` (narrower than `CAN_WRITE_LEAD`: a paralegal can edit leads but `moveLeadStage` refuses them). The action re-resolves the role,
   re-reads the lead and the target stage through the scoped client, refuses any stage that is not `lost`/`nurture`, then moves with the person path `moveLeadStage(id, stageId)` (logs
   `stage_changed`; no agent path) and, when a reason was given, `addLeadNote` "Moved to <stage>: <reason>". The lead then leaves the review (it left an open stage). Its open task is left alone.
   The firm needs a Lost and/or Nurture stage for the button to show.
-- **Open a record (detail panel, no schema).** A card, a stage-view row and the meeting card are LINKS to `?open=<matter|lead>:<uuid>` on the current review URL (view, who, kind, q, i
-  and person are kept), so the panel is server-rendered, shareable and Back closes it (`openHref` in `shared.tsx`; `parseOpenParam`, `open.ts`: only `matter:`/`lead:` plus a uuid, anything
-  else is no panel). The panel is a right-side drawer from 900px and a full-screen sheet below (`ReviewPanel` over `PanelShell`: focus moves in, Tab wraps, Esc follows the close link,
-  focus returns). It re-reads the ONE record through the scoped client (`loadReviewDetail`, `detail-load.ts`): a missing or foreign id is "This record couldn't be found." with no
-  record data, a failed read is "couldn't be loaded", and the three optional reads (open steps, last 8 timeline rows, stage options) each say so on failure. The computed facts (waiting
-  on, last contact, USPTO deadline, proposal tag) come from the review row. **No form lives on a card**: the card is one `<a>` and "Done" / "Open" sit outside it (nothing interactive
-  nested). The old inline "Set next step" / "Log what happened" details forms are gone from the cards and table; they live in the panel.
-- **Panel actions reuse the existing ones, all re-resolving the role** (`actions.ts`): Save the EXISTING next step = `updateNextStepAction` -> `updateTask` (the matter page's task editor;
-  only posted fields change); Snooze (Tomorrow / Next Monday / In 2 weeks) = `snoozeNextStepAction`, due date only, the date worked out on the server from the firm's own calendar day
-  (`snoozeDate`, `snooze.ts`; Monday + "next Monday" = +7); Done = `completeNextStepAction`; "Add another next step" = `setNextStepAction`; Move stage = `moveStageAction` (a matter:
-  `updateMatterStage`, the docket move; a lead: `moveLeadStage`, `CAN_MOVE_STAGE`, open / lost / nurture stages only, a `won` stage refused again on the server because that move runs the
-  matter handoff); Assigned to = `assignRecordAction` (`assignMatterOwner` / `assignLead`, member checked, unreadable directory refuses); Log what happened = `logWhatHappenedAction`;
-  Lost / Nurture keeps its own `closeLeadAction`. Read-only roles see the same facts with no form. Activity shows a title per row and the note text (clipped to 200 characters, as React
-  text) for plain notes only (`detail.ts`).
+- **Open a record: the SAME centred record card as Intake and Matters (no drawer; the firm owner, Nov 20: "no side panel"; no schema).** A board card, a sheet row,
+  a strip entry and the deck's Open are LINKS to `?open=<matter|lead>:<uuid>` on the current review URL (the review's own grammar, `parseOpenParam`, which the record card
+  imports, so every old review link still opens: only `matter:`/`lead:` plus a uuid, case-insensitive; anything else is no card). The page calls `loadRecordCard(params.open)`
+  (scoped client: a foreign or missing id is "This record couldn't be found." with no record data, a failed read "couldn't be loaded"; a merged lead shows its keeper) and renders
+  `RecordCardHost` (path `/dashboard/review/`, params = `reviewHref({ ...params, open: null })`, so view, who, kind, q, since and the deck's person and i are kept on open and
+  close, `notice` is dropped, Back closes). Centred from 900px, full-screen below (the card's own CSS). **No form lives on a board card**: the card is one `<a>` and "Done" / "Open"
+  sit outside it. `ReviewPanel`, `PanelShell`, `loadReviewDetail` and the panel's own documents list are gone.
+- **The review's part of the card** is the optional `review` prop of `RecordCardHost` (`RecordCardReview`: `aside`); Intake and Matters pass none and draw exactly as
+  before. From the review the card adds: `ReviewCardAside` (`src/components/review/ReviewCardExtras.tsx`, first in the side column, "On the weekly review"): stage + days in
+  stage, Waiting on (`waitingCell`: Our turn / "Client · followed up Nov 4" / USPTO / Approval), last contact, the last-changed line (none when its read failed), the USPTO deadline
+  (leads; a matter's card draws its own "Next USPTO deadline" from the docket), the proposal tag (only while `REVIEW_SHOWS_PROPOSALS`), "Stages couldn't load, so the stage can't be
+  changed here." when the card's stage read failed AND the role has the card's `stage` edit (never to a viewer or a paralegal on a lead), and Lost / Nurture for a lead (the page
+  passes `closeStages` only for `CAN_MOVE_STAGE`; none without such stages). A record not on the review opens anyway and says "This record isn't on the weekly review right now."
+  **The note box is the card's own composer** (`NoteComposer` / `MatterNoteComposer` with Call / Email / Meeting, the email subject and @mentions, plus voice): a call or email logged
+  there is the outbound `call_logged` / `email_sent` row that the review's "Waiting on client" and "Last followed up" read, so the review keeps it (no separate "Log what happened"
+  box on the card; `logWhatHappenedAction` stays for the owner's Sheet and the Cards deck). The step checklist names each step's assignee and its edit/add forms gain "Assigned
+  to" (`StepAssignees`; not drawn when the team list is unreadable). A step edit posts `assigneeId` ONLY when the person explicitly PICKED a value in that form's picker (the
+  select's change event, `picked`; `stepEditFields`, `src/lib/record-card/rules.ts`), whatever the value: an untouched picker never reverts a reassignment saved after the card was
+  drawn, and re-picking the opening assignee after someone moved it is posted (it was chosen). The lead page's / card's top "Change" form builds its fields through the same
+  `stepEditFields` (hidden inputs; `members` null = team unreadable = no picker, no assignee posted). A step whose assignee isn't in the team list gets its own option
+  (`stepAssigneeOptions`, "Someone no longer on the team"), so the picker opens on them and Unassigned really clears. A lead's Move to stage also offers lost stages
+  (`buildOpenedCard(..., { lostShown: true })`, as the drawer did; never won). A lead's USPTO deadline reads "Couldn't load" when the review's deadline read failed (`deadlinesFailed`),
+  never "—". The Documents & files card refreshes the review after an upload AND a delete (`refreshAfterUpload` -> `UploadAndRefresh` / `DeleteAndRefresh`).
+- **The review page stays current after a card edit:** every action the card calls revalidates `/dashboard/review/` beside its own paths (the review's own actions already did;
+  added to `addNoteAction`, `addMatterNoteAction`, both `addVoiceNoteAction`s, `setLaneAction`, `setSourceAction`, the record-card actions' `refresh` (rename, tags),
+  `logConsultOutcomeAction` (no-show), `revalidateMatter` (matter title and header), the Stage Keeper's lead actions' `refresh` (`undoAgentMoveAction`,
+  `acceptStageSuggestionAction`, `dismissStageSuggestionAction`) and the files actions (`confirmUploadAction`, `deleteFileAction`)). The card's `useRun` also calls
+  `router.refresh()` after a save, and so do `UploadAndRefresh` / `DeleteAndRefresh`.
+- **Card actions are the existing ones, all re-resolving the role**: step edit (title, due, and assignee when changed) = `updateNextStepAction` (only posted fields change); Snooze
+  (Tomorrow / Next Monday / In 2 weeks) = `snoozeNextStepAction`, the date worked out on the server from the firm's calendar day (`snoozeDate`); Done = `completeNextStepAction`; add =
+  `setNextStepAction`; Stage = `moveStageAction` (matter: `updateMatterStage`; lead: `CAN_MOVE_STAGE`, open / lost / nurture only, `won` refused on the server); Owner =
+  `assignRecordAction` (member checked); notes = the composer's `addNoteAction` / `addMatterNoteAction`; Lost / Nurture = `closeLeadAction`; upload = the files actions. Read-only roles
+  see the facts and steps with no form (`cardEdits`). The card's full Timeline replaces the drawer's "last 8 rows".
 - **Cards view (`?view=cards&person=<user id>&i=<n>`, "Cards" from `words.ts`): a deck for one person** (Rebecca's cue cards). The person chips are every member (owners first); the
   default is the member whose name starts with "Rebecca", else the signed-in user. `buildDeck` (`deck.ts`, pure): that person's board lane (next-step assignee, else record assignee) in
   column order (Overdue, This week, Needs a next step, Quiet), then, for an approver role (`QUEUE_APPROVE_ROLES`), every row waiting on approval, never repeating a row. The Whose chip is
   ignored here (the person picker is the person); the search and Matters/Leads chips apply. One big card with "N of M" and progress dots; Done, Snooze, Hand to (the step's assignee, or
-  the record's when there is no step), Add note, Open (the panel), Skip / Back. The buttons are plain forms posting to `card-actions.ts`, which run the SAME actions as the panel and then
+  the record's when there is no step), Add note (its button is disabled while posting, `DeckNoteSubmit`, and the form is reset after a save and keyed to the card, so a second click can't file it twice), Open (the record card), Skip / Back. The buttons are plain forms posting to `card-actions.ts`, which run the SAME actions as the card and then
   redirect back to the same `i` (clamped), rebuilding the address from the posted view fields through `parseReviewParams`, never a posted URL; a refusal rides back as a closed
   `notice=denied|missing|failed` code with a fixed sentence (`notice.ts`). Left / Right arrows follow the Back / Skip links (`DeckKeys`); without JavaScript the links work. The latest
   note line is its own optional read (`loadLatestNote`): a failure says "couldn't load", never "no notes".
 - **Board cards:** client (one line), a small kind / mark / stage line, the next step with a due chip (overdue in `--ox`), an initials avatar for the lane person, at most two tags then
   "+N", the bucket's left border, equal height; columns `minmax(260px, 1fr)`; lane headers carry an avatar, the name and the count. Tokens only, light and dark.
-- Leads DO have an assignee (`crm_lead.assigned_to`), so a lead row shows it and the board uses it. Snooze, move-stage and Lost / Nurture are now in the detail panel (above). `createTask` and `completeTask` write no timeline row today, so neither does this page.
+- Leads DO have an assignee (`crm_lead.assigned_to`), so a lead row shows it and the board uses it. Snooze, move-stage and Lost / Nurture are in the opened record card (above). `createTask` and `completeTask` write no timeline row today, so neither does this page.
 
 ### Documents on the review (no schema)
 The managing attorney opens a record's application or opinion letter from the Weekly review and comments on it without a call. Read and link only: no upload, no delete, nothing sends.
-- **Panel section "Documents"** (`ReviewDocuments.tsx`, in `?open=matter:<uuid>` and `?open=lead:<uuid>`, just above "Log what happened"). It is fed by `loadDocumentsRead` from `src/lib/files/read.ts`, the
-  Documents & files card's own loader, called from `loadReviewDetail` AFTER the record was read through RLS (a foreign or missing id is `missing` and no document read is made). A matter lists its OWN files
-  and, only for a firm with `document-center` (an unreadable module list fails closed), its generated letters as a separate read; a lead lists its own files and those of leads merged into it (`mergedSetFor`, as the lead page does; an unreadable merged set lists the keeper's own and says "History from merged leads couldn't be loaded."). An unreadable module list makes a matter's letters "unavailable" (their sentence), never empty.
-  Newest first, at most 8 then "+N more" ("+N or more" when a reader hit its 100 cap; `PANEL_DOC_MAX`), each with name, kind ("File · PDF" / "Letter · Opinion letter"), date and who (member directory, else "A teammate"). A plain anchor opens the EXISTING
-  download route (`/dashboard/files/<id>/download/`) or letter route (`/dashboard/documents/<id>/download/`). File names are React text.
-- **States, never collapsed** (`documentsView`, `src/lib/review/documents.ts`, pure): files and letters each ok / failed (`FILES_ERROR_LINE`, `LETTERS_ERROR_LINE`, the card's own sentences) and files also not-set-up
-  (`FILE_MESSAGES.notSetUp`). "No documents yet." only when every read that was made succeeded and found nothing.
-- **"Open all documents"** is a plain `<a>` to the page's card, `/dashboard/<matters|leads>/<id>/#documents` (`id="documents"` was added to `DocumentsCard`'s section; no layout change). **"Comment on a document"**
-  (write roles only) is an anchor to the panel's existing "Log what happened" section (`id="rv-sec-note"`); the note lands on the timeline as before. No new action or table.
+- **An opened record's documents** are the card's own Documents & files card (`DocumentsCard`, fed by `readRecordDocuments` in `detail-load.ts` through `loadRecordCard`, AFTER the record was
+  read through RLS: a foreign or missing id is "couldn't be found" and no document read is made). A matter lists its OWN files and, only for a firm with `document-center` (an unreadable module
+  list makes the letters "unavailable", never empty), its generated letters; a lead lists its own files and those of leads merged into it (`mergedSetFor`; an unreadable merged set lists the
+  keeper's own and says so). The existing download routes open them. A comment on a document is a note in the card's own composer. The drawer's own Documents section, "Open all documents"
+  link and `PANEL_DOC_MAX` are gone with the drawer.
+- **States, never collapsed** (`documentsView`, `src/lib/review/documents.ts`, pure, used by the Cards deck): files and letters each ok / failed (`FILES_ERROR_LINE`, `LETTERS_ERROR_LINE`) and files also
+  not-set-up (`FILE_MESSAGES.notSetUp`). "No documents yet." only when every read that was made succeeded and found nothing.
 - **Counts** are an OPTIONAL source named "documents" (`OPTIONAL_SOURCES`). `readDocumentCounts` (`load.ts`) does one batched read per table and chunk of `CHUNK` ids (`countFilesByParent`, `countLettersByMatter`, in
   `files/read.ts` beside the loader so `crm_file` is read in one module) for every matter and lead the review asks about, not only the rows a filter shows. Letters are counted only with `document-center`. A lead's count includes the files of leads merged into it (one batched `merged_into_id` read per chunk through `leadRead`; a failure or a possibly cut-short read rejects, so no tag; before 0107 nothing is merged). A failed read, or an
   unreadable module list (the letters would be undercounted), leaves `documentCount` unset on every row and adds "documents" to "Some details couldn't load (...)". A missing `crm_file` table counts as zero files (there is
   no table to hold any). The tag (`documentsTag`) shows only a known count above 0, never "0 documents": board cards and the Cards deck (`DocTag`), the Sheet and the owner's editable Sheet (client cell).
-- **Cards deck**: the big card lists up to 3 newest documents and "+N more" (`DECK_DOC_MAX`, `DeckDocuments`). It reads the CURRENT card's record only, through the same loader as the panel (`loadDeckDocuments`: one small read of
+- **Cards deck**: the big card lists up to 3 newest documents and "+N more" (`DECK_DOC_MAX`, `DeckDocuments`). It reads the CURRENT card's record only, through the same loader as the opened card (`loadDeckDocuments`: one small read of
   up to 100 files and 100 letters for that one record, of which three are drawn), not every row. A thrown read says "Documents couldn't be loaded.", never "No documents yet.".
-- **Upload from the panel (no schema, no new action).** Staff who may upload (`canWrite` on the review, the same eight roles as `FILE_UPLOAD_ROLES`; a test holds the lists equal; viewer / social media see no control at all) get the Documents & files card's own `UploadControl` (`requestUploadAction` -> browser PUT -> `confirmUploadAction`, same extension rule, size limit, `FILE_MESSAGES` and `file_uploaded` row) inside the panel via `ReviewUpload`, which only adds `router.refresh()` (the confirm action revalidates the record's page, not the review) so the list and the "N documents" tags update. `UploadControl` gained optional `onUploaded` / `inputId` (default behaviour unchanged). Not drawn when files are not set up; a failed read keeps it, as the card does. **Merged leads (M5):** `loadParentOrg` resolves a lead id through `keeperForWrite` and returns the resolved parent, which request AND confirm use, so the path, row, `file_uploaded` row and revalidation are the keeper's and the two steps agree; an unreadable pointer refuses with `MERGE_POINTER_UNREADABLE` and writes nothing; matters are unchanged. The panel's loader (`loadReviewDetail`) follows a merged id to its keeper (`openId`; the page shows that record), and an unreadable pointer is "unavailable".
-- Words: the `// Review documents` block at the end of `src/lib/ui/words.ts`. Tests: `tests/review/documents.test.tsx`. Not verified in a real browser: a download opened from the panel (the 303 to a signed URL), the `#rv-sec-note` jump inside the drawer, and focus.
+- **Upload from the opened card (no schema, no new action).** The card's own Documents & files upload (`edits.upload` = `FILE_UPLOAD_ROLES`; viewer / social media see no control) with `refreshAfterUpload`, which draws `UploadAndRefresh` (`src/components/files/`): the same `UploadControl` (`requestUploadAction` -> browser PUT -> `confirmUploadAction`) plus `router.refresh()`, since the confirm action revalidates the record's page, not the review. Not drawn when files are not set up. **Merged leads (M5):** `loadParentOrg` resolves a lead id through `keeperForWrite`, so request and confirm use the keeper; `loadRecordCard` follows a merged id to its keeper and an unreadable pointer is "couldn't be loaded".
+- Words: the `// Review documents` block at the end of `src/lib/ui/words.ts`. Tests: `tests/review/documents.test.tsx`. Not verified in a real browser: a download opened from the card (the 303 to a signed URL) and focus.
 
 ## Monday meeting changes (Nov 17, no schema)
 Three changes so the attorney can run the Monday meeting in Lectual. Display and derivation only; nothing sends.
@@ -2236,7 +2253,7 @@ Intake and Matters, Board and List: temperature, source, owner, next step and st
 - **Matters cards use the board's move list and the checked source path:** the card's stage control and its menu's "Move to stage" offer `matterMoveStages` (the drawn stages while grouped, never an intake-phase one; every stage on `?intake=1`), the same list the board's drag uses. A matter's Source goes through the review's `setSourceAction` (role, record and `isReferralSource` checked), not `updateMatterHeaderAction`.
 - **Intake's `moveStageAction` checks the role first** (`CAN_MOVE_STAGE`): a refused role gets `MOVE_STAGE_NO_PERMISSION` and neither the lead nor the stage is read.
 - **A lead is labelled by the person first** (`leadLabel`): business and mark are the sub-line; the company is the name only when there is no person's name.
-- **Matter cards** show owner, source and next step but no last activity (the docket pages read none per matter). The Weekly review keeps its drawer until its redesign; then `?open=` there should render `RecordCardHost` (see the contract).
+- **Matter cards** show owner, source and next step but no last activity (the docket pages read none per matter). The Weekly review now opens the same card (`RecordCardHost` with its `review` part; see the Weekly review section).
 
 ## Sprint 10 review fixes (Nov 17, no schema)
 - **Lead page order:** under the status row, the top card first, then `OtherApprovals` (the OTHER pending drafts and briefings) SECOND, then
@@ -2260,3 +2277,181 @@ Intake and Matters, Board and List: temperature, source, owner, next step and st
 - **Matters intake line** follows the chip in use (Closed, Unassigned, Needs your review, any `?seg=`), and "Show them" keeps the chip. A firm with phases but no
   signed-engagement stage (`isHiredStage`) gets one quiet warn line (`MATTER_NO_HIRED_STAGE`). Copilot's stalled/open counts leave intake-stage matters out too
   (`withoutIntake`; a failed stage read counts every matter).
+
+## Sprint 3 Part A: deadline safety (PGE, no schema here; the database half is lectual 0110, proposed, NOT applied)
+Spec `docs/pge/2026-11-17-agentic-ip-os/sprint-3.md` items 1-4. Part B (the USPTO watcher, 0111) is NOT built. Nothing here sends, writes a
+deadline or changes `attorney_confirmed`. Rules are pure in `src/lib/matters/deadline-safety.ts` and `src/lib/today/deadline-alerts.ts`.
+- **"No open deadline"** (`isFiledTrademark`, `noOpenDeadline`): an open (`status = open`, docket stage not closed) TM matter with a
+  `serial_number` or `filing_date` and no `crm_matter_deadline` row of status `open` (only satisfied / waived / superseded counts as none).
+  A tag on the matter page's Deadlines card, the Matters list (table sub-line and board card foot, `loadOpenDeadlineMatterIds`, scoped,
+  only the filed TM ids) and the Weekly review (`row.noOpenDeadline`, `rowTags`). It never changes a bucket, sort or count. A failed
+  deadlines read is "unknown": nothing is flagged, and the page says the deadlines couldn't load (the matter page no longer fails whole).
+  The Weekly review's "Since Feb 2026" filter never hides a flagged row (`isOlderThanSince`).
+  **Registered marks are not flagged** (`isOpenMatter` reads a registered docket stage as closed). Kept on purpose: whether a registered
+  mark with no Section 8 or renewal deadline should be flagged is Rebecca's decision.
+- **Alerts** (Taylor C8): recipients are the firm note `crm_firm_brain_entry` (category `other`, key `deadline_alert_recipients`,
+  `data.user_ids`), set by the admin tier in Settings -> Team ("Deadline alerts", `saveDeadlineAlertRecipientsAction`: role and every id
+  re-checked against the member directory). Hidden from the Firm notes page. No names in code. A removed member's id is dropped on read.
+  **Only the eight staff roles can be recipients** (`ALERT_RECIPIENT_ROLES`: owner, admin, senior_admin, intake, paralegal, law_clerk, attorney, clerk,
+  the roles lectual 0056's `crm_notification_insert_staff` lets insert a notification in the active org). A viewer or social media member is refused
+  with `DEADLINE_ALERTS_INELIGIBLE`, the Team picker lists only eligible members, and a stored recipient whose role became ineligible is dropped on read
+  (`currentRecipients`), like a removed member.
+  Windows: 0..7 days = 7, 8..30 = 30 (overdue raises nothing). **De-dupe without schema:** the notice is raised for the SIGNED-IN recipient
+  on their own Today (`DeadlineAlertsCard` -> `raiseOwnDeadlineNotices`, existing `notify()`, kind `mentioned`, payload
+  `{ source: "deadline_window", deadline_id, window, title }` only), after reading their OWN `crm_notification` rows for those deadlines
+  (`payload->>source`, `payload->>deadline_id`; RLS shows only their own). Key = deadline id + window: one notice per deadline per window. A
+  failed de-dupe read raises nothing; at most 20 per load, written in ONE insert (`notifyOwnMany` beside `notify()`: one membership check,
+  one org read, self-only). **Limits, plainly:** notices are raised ONLY when the recipient opens Today (nobody's bell fills overnight, and
+  a window they skipped past is not raised late), and two Today loads at the same moment can raise a duplicate (no unique index).
+  Moving this to the cron is a later decision.
+  The bell reads it as "Deadline: <title> is due within N days" linking to the matter.
+- **Today "Deadlines" card** (technician Today, after Consults; owner Today, in the deadlines column): recipients only. Overdue, then due in
+  7 days, then 8..30 days; "Unconfirmed" when `attorney_confirmed` is false; the stale hand-entered dates "Needs review" holds are left out.
+  Three states: an unreadable recipient list says the alerts couldn't be checked (to everyone); a failed deadlines read is "Couldn't load".
+  The reads (`loadDeadlineAlerts`) start beside the page's other reads on both Todays. Two reads, so old overdue rows can't push the 7- and
+  30-day rows out: today..+30 paged (5 x 1,000), and overdue newest first (200); a read that hits its cap says "Not every deadline could be
+  listed here." with a calendar link, never silently.
+- **Morning brief**: `DEADLINE_DAYS` is 30 and the section is two blocks, "Deadlines in the next 7 days" and "Deadlines in 8 to 30 days"
+  (`windowOf`, same windows). A failed read says so in both.
+- **Weekly review Deadlines strip** (`deadlinesOut`, `DeadlinesStrip`, beside "Waiting on", Board and Sheet): every open deadline in the
+  FILTERED rows, soonest first, Confirmed / Unconfirmed, each a link to `?open=` (the centred record card). Drawn even with no review
+  person; a failed read is one line, never "No open deadlines". The review's deadline read now selects `id, kind, attorney_confirmed` too.
+- **Close guard** (`updateMatterStatus` to `closed`, through `checkClose` in `close-guard.ts`): an open deadline that counts refuses with a
+  fixed sentence naming it ("can't be closed while it has an open deadline: Office Action response (due 2026-12-03)..."), writing nothing. Counts (questions.md R1 default): EVERY open
+  deadline on a TM matter, else the eight trademark kinds (`USPTO_DEADLINE_KINDS`). A failed read refuses ("couldn't check"). 0110's trigger
+  refusal (`matter_close_open_deadline`) maps to a fixed sentence. `matters.ts` is the only file that writes `crm_matter.status` (a test greps).
+  `guardedDeadlines` takes the stored type and the new one (TM if either is). The two-step TM -> CR -> close path is shut at the first step:
+  `updateMatterHeader` refuses to retype a TM matter while an open deadline counts only because it is a TM (`typeChangeUnguards`).
+- **Override** (`closeMatterWithOverrideAction` -> `closeMatterWithOverride` -> `runCloseOverride`): **decision: a role rule, owner and
+  attorney (`CLOSE_OVERRIDE_ROLES`, the R2 default; never a name)**, re-read FIRST (a paralegal reads and writes nothing), a 1..300 character
+  reason and a confirm tick. With 0110: `rpc('crm_close_matter_with_override')` writes the override row and closes in one transaction, then the
+  app logs ONE `matter_updated` row `{ change: "close_override", reason, deadline_ids, from_status, recorded }` ("Closed with an open deadline
+  (attorney override)", "Reason: ..."). Before 0110 (42883 / PGRST202): the plain close, then the timeline row, which IS the record; if it
+  can't be written the status is put back (fenced on `status = closed` AND on the `updated_at` the close wrote, as the database returned it,
+  so a newer change by someone else is never overwritten; error and row count checked); if THAT fails too the action says
+  "The matter was closed, but the reason couldn't be recorded. Tell Lectual." and logs the matter id only. The form (`CloseOverrideForm`) shows only to those roles, on a non-closed matter with a counting deadline.
+  Lectual staff acting inside a firm are refused up front (`OVERRIDE_STAFF_PREVIEW`, before any read): 0110's function needs a
+  `crm_org_member` row, so it would refuse them even though the app's role read allows them; an unreadable session counts as staff.
+- **0110 binds service-role writers too.** Its trigger runs for every `crm_matter` status write, the importers and agents that write as the
+  service role included (the hired-matter sync, the matters importer, any job that closes a matter): such a writer cannot close a matter that
+  holds a counting open deadline either, and has no `auth.uid()` to write an override row with. Check every service-role path that sets
+  `status = 'closed'` before applying 0110.
+- **0110 is a proposal file** (`docs/pge/2026-11-17-agentic-ip-os/0110-proposed.sql.txt`): the trigger knows an override by an override row for
+  that matter with `created_at = now()` and `actor_id = auth.uid()` in the same transaction (no session setting a client could send). Apply to
+  lectual-dev, run its isolation cases, then prod with the owner's OK. Change its kind list and roles together with deadline-safety.ts.
+- The self-notice insert is allowed by lectual 0056 for those eight staff roles (a viewer or social media user cannot insert one, which is why they cannot
+  be recipients). Not verified: a real browser, the real `crm_notification` select policy, 0110 against any database.
+
+## Sprint 4: routine approval kinds and drafts in the drafter's Outlook (PGE; the database half is lectual 0112, proposed, NOT applied)
+Decision 15 (a law clerk clears routine kinds) and 3b (approved client emails become drafts in the DRAFTER's own Outlook, on
+their own click). Contract: `docs/pge/2026-11-17-agentic-ip-os/sprint-4.md`. Approving still never sends; `outlook-send.ts` is untouched.
+- **SHIP BLOCKER:** lawmatics-mcp honours `mailbox_draft` only from its commit e738c24 (branch claude/gracious-darwin-rceoyv, on top of main 3bcbe3f), not yet
+  merged or deployed. Until it is deployed the queue ignores `mailbox_draft: false` and, for a firm whose queue has a drafting channel, still
+  drafts the approved email in the FIRM's Outlook. The app then sees `send = "drafted"` and passes nothing on (`queue-drafted`; on plan `self` it
+  makes no own-mailbox draft either), so it is not two drafts: the firm mailbox gets the draft and the drafter feature silently doesn't run.
+  Sprint 4 must not merge, and no firm may set a drafter, before then.
+  With that change, `POST /api/queue/{id}/resolve` takes an optional boolean `mailbox_draft`: `false` resolves as before but skips the Graph draft (`send` stays
+  `manual`); omitted or true is today's behaviour. (The app's safety net: if the resolve says the queue drafted anyway, `queue-drafted`, nothing is passed on, no
+  `draft_to` is written and the approver is told where the draft went.)
+- **Four routine kinds** in `src/lib/queue/routing.ts` (still the ONE place): `filing_receipt`, `uspto_notice`, `client_reminder`,
+  `client_request`, all `attorneyOnly: false`. Reached ONLY through the exact (agent, type) pairs in `ROUTINE_MARKER`
+  (`filing-receipt` / `uspto-watcher` / `client-reminder` / `client-request`, each `CLIENT_EMAIL`; `routineKindOf`, exact string
+  equality). A headline never makes an item routine; the same headline from another agent is `client_email_other` (attorney-only). A
+  proposal link still wins (post-consult). A drafting path that makes one imports its marker from `ROUTINE_MARKER`. **No drafting path sets
+  one today**: the USPTO watcher (Sprint 3 Part B) is not built yet, and the monthly filing update (`filing-followup`) stays attorney-only
+  (questions.md R4 default). `flagsLegalAdvice` still wins over every marker, and `runQueueReview` re-runs `approvalRefusal` on the item AS
+  RE-READ (with the approved text) right before resolving, so an edit that adds advice is refused before anything is resolved or drafted.
+- **The markers are not a security boundary on their own.** Any queue writer can set the `agent` string, including a Cowork skill's
+  `queue_draft` call to lawmatics-mcp; for a marked item only the legal-advice phrase list then stands between a law clerk and the approval.
+  So the markers stay limited to Lectual's OWN drafting paths, and each path is reviewed (its template has no advice) before it sets one.
+- **Routing to the clerk** is the existing Settings -> Approvals form; `canApproveItem` is unchanged (routed to a person: that person or the admin
+  tier). With empty routing every role's rights equal `canApproveQueue` (pinned for all 10 roles x every kind).
+- **"Drafts go to"** is `approval_routing.drafter` in the same jsonb (`DRAFTER_KEY`): `parseDrafter` keeps it only for a current member in a staff
+  role (`eligibleDrafters`); `parseApprovalRouting` skips the key (never counted as dropped); `withApprovalRouting(pricing, routing, drafter?)` keeps
+  the stored one when the third argument is left out, so a routing-only save never drops it. Settings shows the drafter's Outlook state only when it
+  is the viewer's own (`drafterOutlookLine`), else "Only <name> can see this." `RoutingLoad.ok` and `QueueViewContext` carry `drafter`.
+- **The approve plan** (`approvePlan`, `src/lib/queue/draft-handoff.ts`, pure), for a CLIENT_EMAIL with the routing READ and a drafter set: the drafter
+  approving is `self` (the queue is asked not to draft, so the only mailbox draft is her own personal one, `draftInMyMailbox`); anyone else is `pass`.
+  No drafter, another type, or a failed routing read is `today`, unchanged except that EVERY approve now sends the text it re-read and re-classified as
+  `final_body` (S7: a colleague's save landing between the re-read and the resolve is never what gets approved).
+- **`pass`:** Lectual staff (`actingAsStaff`) refused before anything; the approve receipt ("Receipt: sha256 <12 hex>") is ALWAYS on the resolution
+  note; the resolve call carries `mailbox_draft: false` (if the queue drafts anyway, `send` says so, nothing is passed on and no second draft is made:
+  `handoff.status = "queue-drafted"`); NO `draftInMyMailbox`; `passToDrafter` (`review-core.ts`, the one pass write) records one `draft_to` (target the
+  drafter, note `approved-text sha256 <64 hex>`, never the text) and one bell notice (`source: "draft_to"`, ids and a clipped headline; "Rebecca
+  approved an email · Make the draft"). Before lectual 0112 (`isKindNotSetUpError`: code AND message, 23514 naming the real constraint `queue_card_event_kind`, quote-delimited, from
+  lectual 0103 line 98, for these five kinds only; 0103 is a CHECK, not an enum, so there is no 22P02 branch; anything else is a plain failure) it falls back to the APPROVER'S OWN mailbox only and the page
+  says passing isn't switched on (`?pass=off`); any other failure makes no draft anywhere (`send=pass-failed`). The full page, the deck and the lead
+  page's Yes all say `passedToDrafter(name)` / `PASS_FAILED` (`afterYesSentence`).
+- **"Pass to <drafter>" (S3):** the approved item page offers the APPROVER a retry (`RetryPassCard` -> `retryPassAction` -> `retryPassToDrafter`, same
+  `passToDrafter` write): only the approver (`resolved_by`), only with a trusted `pass_failed` marker written at approval, only while no trusted
+  draft_to exists, only when the receipt still names the current text (see the director review below).
+- **The fold** (`trustedEvents`): a `draft_to` counts only from the member who APPROVED the item (their address = `resolved_by`, from the member
+  directory via `EventTrust.emails`), written no more than 2 minutes before `resolved_at` (`DRAFT_TO_CLOCK_SKEW_MS`: the queue stamps `resolved_at`, the database stamps `created_at`) or after it, to a current staff member. A newer draft_to from another attorney or the owner,
+  or one written before approval, is dropped. `drafting`, `drafted` and `draft_failed` count only from the current draft_to target; `pass_failed`
+  only from the approver. None of them is a hand-off.
+- **"Make the draft in my Outlook"** (`makeDraftInMyOutlook`, `src/lib/queue/make-draft.ts`, the ONE core; the item page's `makeDraftAction`): session
+  re-resolved (staff previewing refused), item re-read (approved CLIENT_EMAIL), events and routing re-read and folded with trust (unknown trust or
+  unreadable events = "couldn't check"; before 0112 = `NOT_SWITCHED_ON`), caller must be the CURRENT target, the item's current text must hash to the
+  draft_to sha AND the receipt must be there and agree (an edit after approval, even with a re-issued draft_to, refuses), a drafted item does nothing.
+  Then the caller's own Outlook is checked (`myOutlookDraftAccess(posted)`: their scoped read, `user_id` = the session user, personal, active,
+  Microsoft, `Mail.ReadWrite`; a posted `connection_id` that isn't theirs is refused before anything is written). Then claim, draft, confirm or
+  fail (see the director review below). Without 0112's indexes two truly concurrent clicks are not stopped by the database.
+- **Ready to draft (N)** (`loadReadyToDraft`, `ready-load.ts`): on Approvals (a link to `?status=approved&who=ready` and a row marker) and the deck (a
+  link), drawn only when the read worked and found some. Every one of these reads (and the item page's cards) runs only while the firm HAS a drafter
+  set, so a firm without one reads and renders exactly what it did before. Known limit: removing the drafter hides the list for anyone still holding
+  a draft_to until one is set again.
+- **Decision for the director (S5): a routing read that fails** keeps today's path (the queue's channel, else the approver's own mailbox) and makes no
+  hand-off, so firms without a drafter are unchanged. The contract's alternative is "no draft, left for a person": safer for a firm WITH a drafter
+  (nothing lands in the attorney's mailbox on a bad read) but it changes every firm's approve whenever the settings read fails.
+- **Before any firm is switched on (S6):** all of the "no draft in the approver's mailbox" behaviour rests on lawmatics-mcp honouring
+  `mailbox_draft: false` on resolve, which is NOT verified. Verify it against lawmatics-mcp first; until then a `pass` or `self` approve may still be
+  drafted by the queue in the firm's Outlook (the app then reports `queue-drafted` and passes nothing on).
+- **0103's kind CHECK is `queue_card_event_kind`** (lectual 0103 line 98, checked by the director), so 0112 IS needed for the five kinds, and its proposal drops
+  and recreates that constraint by that name. `docs/pge/2026-11-17-agentic-ip-os/0112-proposed.sql.txt` holds the proposal (its helper lives in the
+  unexposed `private` schema and refuses any org but the caller's) and its isolation cases (not on lectual-dev). Also unverified: lawmatics-mcp and
+  `mailbox_draft: false`, the queue's `resolved_at` clock against the database's `created_at` (the fold compares them), a real Graph draft, a real browser.
+- **Applying 0112's drop constraint may hang the Supabase MCP; apply it in execute_sql chunks (see 0093).**
+- **Final review follow-ups (Nov 20):**
+  - **Uncertain Graph failures keep the claim open.** `draftFailureKind` (`src/lib/mailbox/draft-outcome.ts`, pure, the one place): only a
+    definite refusal (401 / 403 `reauth`, or another 4xx Graph returned, carried as `httpStatus` by `createMailboxDraft`) writes `draft_failed`;
+    a 5xx, a timeout or abort, a network drop, json failing after a 201 or an unknown error is `uncertain`: nothing is written, the claim stays
+    open and the page says "Check your Drafts…" with the approved text. Failures before the Graph call (no token, no connection) are definite.
+  - **"It isn't in my Drafts, try again"** (`CLEAR_CLAIM_BUTTON`, on the check-drafts view only; `clearClaimAction` -> `clearOpenClaim`,
+    rules `clearClaimDecision`): the current target, on an open claim only, re-checked on the server (role, fold); writes `draft_failed` for that
+    attempt, so the next attempt can be claimed.
+  - **After 0112 a 23514 is a real error.** `recordCardEvent` reads a kind / shape 23514 as "not switched on" only when a per-call read finds the
+    `attempt` column missing (42703 / PGRST204); otherwise it is `failed` and shows as one.
+  - **Attempts are per drafter** in 0112 (`actor_id` in the drafting and draft_failed unique indexes; the helper counts the caller's own failures).
+  - **Lectual staff approving inside a firm with a drafter set** (plan `pass`) are refused up front with the deck's own sentence
+    (`staffPreviewRefusal` / `DECK_PREVIEW_ONLY`), before anything is saved, resolved or drafted: never an approval with no draft and no message.
+    Chosen for consistency with the deck's other staff-preview refusals. With no drafter set their approve is unchanged.
+- **Director review (Nov 20), on top of 2281557:**
+  - **0103 has TWO constraints that refuse the new kinds**, `queue_card_event_kind` and `queue_card_event_shape` (only the three old shapes).
+    0112 drops and re-adds both under their own names. Before 0112, 23514 naming either (quote-delimited, exactly as Postgres prints
+    `violates check constraint "queue_card_event_kind"`) reads as "not switched on" for the new kinds only (`isKindNotSetUpError`), so a refused
+    `draft_to` takes the documented fallback (the approver's own mailbox), never `pass-failed`.
+  - **Make the draft: claim, confirm, fail.** The click claims attempt n with a `drafting` row (0112: one per (org, item, attempt), and the policy
+    admits only the NEXT attempt), makes the Outlook draft, then writes `drafted` (confirmed) or, on a Graph failure, `draft_failed`, which re-opens
+    the item for attempt n + 1. Two concurrent clicks: the second `drafting` for the same attempt answers 23505 ("already being drafted"). A claim with
+    no outcome (a crash in between) is never drafted again from here and never reads as "Drafted": the page says "Check your Drafts. If it isn't
+    there, copy the approved text below." and shows the approved body as plain text. "Drafted" only once `drafted` is confirmed. `drafting`,
+    `drafted` and `draft_failed` count only from the current draft_to target (`trustedEvents`); progress is `draftAssignment(...).progress`.
+  - **"Pass to <drafter>" only after a recorded failed pass.** When the approve path's `draft_to` write fails (not before 0112), it writes a
+    `pass_failed` marker (no text; trusted only from the approver, after `resolved_at`). The retry is offered, and allowed, only with that marker
+    and no trusted draft_to. The queue drafting anyway, the own-mailbox fallback and items approved before a drafter existed leave no marker:
+    no button. If the marker itself can't be written, no retry is offered (the approval page still says to copy the text).
+  - **The receipt** is read only from the LAST line of the resolution note, exactly `Receipt: sha256 <12 hex>` (the server appends it last), so a
+    receipt pasted into the approver's own note never counts.
+  - **A failed Ready-to-draft read** shows the drafter "Couldn't check what's ready to draft." on Approvals and the deck.
+  - **0112 aligned with 0103's text (Nov 20).** The attempt is a real `attempt smallint` column added by 0112 (null for every other kind,
+    required >= 1 for drafting / drafted / draft_failed, in the shape CHECK; the insert grant gains `attempt`; the unique indexes are on
+    `attempt`). `note` stays free text and is never parsed for it (a note reading "attempt 2" changes nothing; pinned). The app sends
+    `attempt` only for those three kinds (`recordCardEvent`), reads it into `CardEvent.attempt`, and before 0112 (42703 / PGRST204 on the
+    select) reads 0103's columns with every attempt null, so hand-offs keep working; an insert refused for the missing column (PGRST204 /
+    42703 naming `attempt`) is "not switched on" for the new kinds only. 0112's re-added `queue_card_event_shape` carries 0103's three
+    clauses verbatim. **0103's trigger `queue_card_event_rules()` is left alone** (its branches cover handoff / later / returned only;
+    the new kinds fall through and get `created_at := now()`). 0103's `queue_card_event_not_self` refuses a draft_to to oneself; the app
+    never writes one (plan `self` writes no draft_to; pinned). 0103's `queue_card_event_insert_staff` stays; 0112's restrictive policy sits on top.
+  - **If lawmatics-mcp ever normalises `final_body`** (trims, re-wraps, changes line endings), the stored text stops hashing to the `draft_to` /
+    receipt hash and EVERY Make-draft is refused ("changed after it was approved"): it fails closed, never drafts other text (pinned by a test).
+

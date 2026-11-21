@@ -27,6 +27,7 @@ import EntryRow from "./_components/EntryRow";
 import ProposeClaimForm from "./_components/ProposeClaimForm";
 import ClaimRow from "./_components/ClaimRow";
 import type { Metadata } from "next";
+import { DEADLINE_ALERT_KEY } from "@/lib/today/deadline-alerts";
 import { pageTitle } from "@/lib/ui/page-title";
 import { listStages } from "@/lib/pipeline/stages";
 import { isSignalId } from "@/lib/stage-keeper/signals";
@@ -129,6 +130,8 @@ export default async function BrainPage({
   let loadFailed = false;
   try {
     [entries, claims] = await Promise.all([listBrainEntries(), listClaims()]);
+    // A setting stored as a firm note (Settings -> Team's deadline alert list) is changed there, not here.
+    entries = entries.filter((e) => !(e.category === "other" && e.key === DEADLINE_ALERT_KEY));
   } catch (err) {
     // The message can carry database text, so it is logged and never drawn.
     console.error("[brain] load failed", err instanceof Error ? err.name : typeof err);

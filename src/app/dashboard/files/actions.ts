@@ -143,6 +143,7 @@ export async function confirmUploadAction(parent: FileParentInput, fileId: strin
       // The unique path (or id) means this exact file is already on the record.
       if (insertError.code === "23505") {
         revalidatePath(parentPath(target));
+        revalidatePath("/dashboard/review/");
         return { ok: true as const, fileId, alreadySaved: true as const };
       }
       logFileFailure("save file row", insertError);
@@ -161,6 +162,7 @@ export async function confirmUploadAction(parent: FileParentInput, fileId: strin
       payload: { file_id: fileId, file_name: type.name, size_bytes: sizeBytes },
     });
     revalidatePath(parentPath(target));
+    revalidatePath("/dashboard/review/");
     return { ok: true as const, fileId };
   }) as Promise<ConfirmUploadResult>;
 }
@@ -209,6 +211,8 @@ export async function deleteFileAction(fileId: string): Promise<DeleteFileResult
 
     const parent = row.lead_id ? { kind: "lead" as const, id: row.lead_id } : row.matter_id ? { kind: "matter" as const, id: row.matter_id } : null;
     if (parent) revalidatePath(parentPath(parent));
+    // The Weekly review's opened card lists the file and counts it on the row ("N documents").
+    revalidatePath("/dashboard/review/");
     return { ok: true as const };
   }) as Promise<DeleteFileResult>;
 }

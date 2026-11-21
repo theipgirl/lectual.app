@@ -44,25 +44,14 @@ describe("the documents reads (reusing loadDocumentsRead)", () => {
     expect(world.db.froms).not.toContain("crm_document_draft");
   });
 
-  it("another firm's id reads as nothing: the record is missing and no document read is made", async () => {
+  it("another firm's rows are never listed (RLS); the opened card refuses a foreign id before any document read (tests/record-card/load.test.ts)", async () => {
     const world = makeWorld({ tables: seedTables({ crm_file: [fileRow({ id: "x", org_id: OTHER_ORG, lead_id: OTHER_LEAD }), fileRow({ id: "y", org_id: OTHER_ORG, lead_id: null, matter_id: OTHER_MATTER })] }) });
     mockDb(world);
-    const { loadReviewDetail } = await import("../../src/lib/review/detail-load");
-    expect(await loadReviewDetail({ kind: "matter", id: OTHER_MATTER })).toEqual({ status: "missing" });
-    expect(await loadReviewDetail({ kind: "lead", id: OTHER_LEAD })).toEqual({ status: "missing" });
-    expect(world.db.froms).not.toContain("crm_file");
-    // Even a direct read of the loader cannot see another firm's rows (RLS).
     const { listFiles } = await import("../../src/lib/files/read");
     expect(await listFiles({ kind: "lead", id: OTHER_LEAD })).toEqual({ status: "ok", files: [], capped: false });
-  });
-
-  it("the detail carries the documents of the record it read", async () => {
-    const world = makeWorld({ tables: seedTables({ crm_file: [fileRow({ id: "f1" })] }) });
-    mockDb(world);
-    const { loadReviewDetail } = await import("../../src/lib/review/detail-load");
-    const d = await loadReviewDetail({ kind: "lead", id: LEAD });
-    expect(d.status).toBe("ok");
-    expect(d.status === "ok" && d.documents.files.status).toBe("ok");
+    const { readRecordDocuments } = await import("../../src/lib/review/detail-load");
+    const r = await readRecordDocuments({ kind: "matter", id: OTHER_MATTER });
+    expect(r.files.status === "ok" && r.files.files).toEqual([]);
   });
 
   it("the deck read is the same reader for one record", async () => {
@@ -89,16 +78,14 @@ describe("capped, merged leads, unreadable modules", () => {
       }),
     });
 
-  it("'+N or more' when a reader hit its cap, in the panel and the deck", async () => {
+  it("'+N or more' when a reader hit its cap, in the deck", async () => {
     const files = Array.from({ length: 10 }, (_, i) => ({ id: `f${i}`, file_name: `n${i}.pdf`, mime: "x", size_bytes: 1, uploaded_by: null, created_at: `2026-10-${10 + i}T10:00:00Z` }));
-    const { ReviewDocuments, DeckDocuments } = await import("../../src/components/review/ReviewDocuments");
+    const { DeckDocuments } = await import("../../src/components/review/ReviewDocuments");
     const read = { files: { ...ok, capped: true, files }, letters: null };
-    const panel = renderToStaticMarkup(<ReviewDocuments open={{ kind: "lead", id: LEAD }} documents={read as never} members={members} today={TODAY} timeZone="America/New_York" canWrite={false} />);
-    expect(panel).toContain("+2 or more");
     expect(renderToStaticMarkup(<DeckDocuments read={read as never} members={members} today={TODAY} timeZone="America/New_York" />)).toContain("+7 or more");
   });
 
-  it("a lead's panel lists the merged leads' files, as the lead page does", async () => {
+  it("a lead's documents read lists the merged leads' files, as the lead page does", async () => {
     const world = mergedWorld();
     mockDb(world);
     const { readRecordDocuments } = await import("../../src/lib/review/detail-load");
@@ -114,8 +101,8 @@ describe("capped, merged leads, unreadable modules", () => {
     const { readRecordDocuments } = await import("../../src/lib/review/detail-load");
     const r = await readRecordDocuments({ kind: "lead", id: LEAD });
     expect(r.mergedPartial).toBe(true);
-    const { ReviewDocuments } = await import("../../src/components/review/ReviewDocuments");
-    const html = renderToStaticMarkup(<ReviewDocuments open={{ kind: "lead", id: LEAD }} documents={{ files: { ...ok, capped: false, files: [] }, letters: null, mergedPartial: true } as never} members={members} today={TODAY} timeZone="America/New_York" canWrite={false} />);
+    const { DeckDocuments } = await import("../../src/components/review/ReviewDocuments");
+    const html = renderToStaticMarkup(<DeckDocuments read={{ files: { ...ok, capped: false, files: [] }, letters: null, mergedPartial: true } as never} members={members} today={TODAY} timeZone="America/New_York" />);
     expect(html).toContain("History from merged leads couldn&#x27;t be loaded.");
     expect(html).not.toContain("No documents yet.");
   });
@@ -246,12 +233,12 @@ describe("the count tag", () => {
   });
 });
 
-describe("the panel's Documents section", () => {
+describe("the review's documents list (the Cards deck; an opened record uses the Documents & files card)", () => {
   const ok = { status: "ok" as const, capped: false };
   const file = (id: string, at: string, name = "App.pdf") => ({ id, file_name: name, mime: "application/pdf", size_bytes: 1000, uploaded_by: "u-reb", created_at: at });
-  async function render(documents: unknown, canWrite = true, kind: "matter" | "lead" = "matter") {
-    const { ReviewDocuments } = await import("../../src/components/review/ReviewDocuments");
-    return renderToStaticMarkup(<ReviewDocuments open={{ kind, id: MATTER }} documents={documents as never} members={members} today={TODAY} timeZone="America/New_York" canWrite={canWrite} />);
+  async function render(documents: unknown) {
+    const { DeckDocuments } = await import("../../src/components/review/ReviewDocuments");
+    return renderToStaticMarkup(<DeckDocuments read={documents as never} members={members} today={TODAY} timeZone="America/New_York" />);
   }
 
   it("lists newest first with name, kind, date and who, through the existing download routes", async () => {
@@ -290,25 +277,6 @@ describe("the panel's Documents section", () => {
     const html = await render({ files: { status: "not-set-up" }, letters: null });
     expect(html).toContain("File storage isn&#x27;t set up for this firm yet.");
     expect(html).not.toContain("No documents yet.");
-  });
-
-  it("has the 'Open all documents' link to the page's card, and the comment entry point only where a note can be written", async () => {
-    const docs = { files: { ...ok, files: [] }, letters: null };
-    const matter = await render(docs, true, "matter");
-    expect(matter).toContain(`href="/dashboard/matters/${MATTER}/#documents"`);
-    expect(matter).toContain("Open all documents");
-    expect(matter).toContain('href="#rv-sec-note"');
-    expect(matter).toContain("Comment on a document");
-    const lead = await render(docs, false, "lead");
-    expect(lead).toContain(`href="/dashboard/leads/${MATTER}/#documents"`);
-    expect(lead).not.toContain("Comment on a document");
-  });
-
-  it("more than eight: the rest is counted, not listed", async () => {
-    const files = Array.from({ length: 10 }, (_, i) => file(`f${i}`, `2026-10-${String(10 + i).padStart(2, "0")}T10:00:00Z`, `n${i}.pdf`));
-    const html = await render({ files: { ...ok, files }, letters: null });
-    expect(html).toContain("+2 more");
-    expect(html.match(/rv-doc-link/g)).toHaveLength(8);
   });
 });
 

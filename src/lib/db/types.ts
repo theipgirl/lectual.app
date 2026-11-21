@@ -3911,6 +3911,8 @@ export type Database = {
       queue_card_event: {
         Row: {
           actor_id: string
+          /** lectual 0112 (proposed): the drafter's attempt number for drafting / drafted / draft_failed; null for every other kind. */
+          attempt?: number | null
           created_at: string
           kind: string
           note: string | null
@@ -3920,6 +3922,8 @@ export type Database = {
           until: string | null
         }
         Insert: {
+          /** lectual 0112 (proposed) adds `attempt` to the insert grant; before it, sending it is refused. */
+          attempt?: number | null
           kind: string
           note?: string | null
           org_id: string
@@ -3929,6 +3933,7 @@ export type Database = {
         }
         Update: {
           actor_id?: string
+          attempt?: number | null
           created_at?: string
           kind?: string
           note?: string | null

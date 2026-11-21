@@ -15,3 +15,7 @@
 .td-pad { margin: 0; padding: 0 18px; }
 .td-pad-end { margin: 0; padding: 0 18px 14px; }
 .td-list { padding: 0 18px 8px; }
+/* PGE Sprint 3: the Deadlines card. */
+.td-dl-group + .td-dl-group { border-top: 1px solid var(--line); padding-top: 6px; }
+.td-dl-group > .lx-label { margin: 6px 0 2px; }
+.td-dl-pills { display: inline-flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }

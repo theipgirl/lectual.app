@@ -34,7 +34,8 @@ export type Section<T> =
 export const SECTION_PAGE = 1000;
 const SECTION_PAGES = 10;
 const SUGGESTION_ROW_CAP = 2000;
-export const DEADLINE_DAYS = 14;
+/** The brief reads 30 days out and shows the same two windows as Today's Deadlines card (7, then 8..30). */
+export const DEADLINE_DAYS = 30;
 
 const LEAD_COLUMNS =
   "id, first_name, last_name, business_name, email, practice_area, mark_text, current_stage_id, stage_entered_at, last_activity_at, last_inbound_at, last_outbound_at, created_at";
@@ -151,7 +152,7 @@ export async function readPendingSuggestions(admin: SupabaseClient, orgId: strin
   }
 }
 
-// ── 5. deadlines in the next 14 days ─────────────────────────────────────────
+// ── 5. deadlines in the next 30 days (shown as two windows: 7, then 8..30) ───
 
 export type DeadlineItem = { id: string; matterLabel: string; kind: string; dueDay: string; confirmed: boolean };
 

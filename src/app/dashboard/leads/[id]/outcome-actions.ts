@@ -28,5 +28,7 @@ export async function logConsultOutcomeAction(
   }
 
   revalidatePath(`/dashboard/leads/${leadId}/`);
+  // A no-show is a `call_logged` row: the Weekly review's last contact and direction read it.
+  revalidatePath("/dashboard/review/");
   return { saved: true };
 }

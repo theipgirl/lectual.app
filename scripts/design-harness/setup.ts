@@ -127,8 +127,6 @@ vi.mock("@/lib/review/detail-load", async (orig) => {
   const real = await orig<typeof import("@/lib/review/detail-load")>();
   return {
     ...real,
-    // `state.reviewDetailReal`: run the real loader over the fake scoped client (visual-review screens open a panel); otherwise none, as before.
-    loadReviewDetail: async (...a: Parameters<typeof real.loadReviewDetail>) => ((state as { reviewDetailReal?: boolean }).reviewDetailReal ? real.loadReviewDetail(...a) : null),
     loadLatestNote: async () => null,
   };
 });

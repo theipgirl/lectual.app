@@ -9,13 +9,16 @@ import { ListSearch, ListToolbar } from "@/components/list-page/ListToolbar";
 import { Chip, FilterChips } from "@/components/list-page/Chips";
 import "@/components/list-page/list-page.css";
 import { ReviewSection } from "@/components/review/ReviewSection";
-import { KpiStrip, ReviewBoard, ViewSwitch, WaitingOnStrip } from "@/components/review/ReviewViews";
+import { DeadlinesStrip, KpiStrip, ReviewBoard, ViewSwitch, WaitingOnStrip } from "@/components/review/ReviewViews";
 import { SheetView } from "@/components/review/SheetView";
 import { SheetSaveStatus } from "@/components/review/SheetSaveStatus";
 import { loadSheetStages } from "@/lib/review/sheet-edit-load";
 import { READ_ONLY_PERMS, type SheetPerms } from "@/lib/review/sheet-edit";
 import { CardsDeck, PersonChips } from "@/components/review/CardsDeck";
-import { ReviewPanel } from "@/components/review/ReviewPanel";
+import { ReviewCardAside } from "@/components/review/ReviewCardExtras";
+import { RecordCardHost } from "@/components/record-card/RecordCardHost";
+import { loadRecordCard } from "@/lib/record-card/load";
+import { cardEdits } from "@/lib/record-card/rules";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { NO_PREVIEW, previewFor, viewFor } from "@/lib/views";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
@@ -23,15 +26,14 @@ import { CAN_MOVE_STAGE, CAN_WRITE_LEAD } from "@/lib/pipeline/leads";
 import { loadReview } from "@/lib/review/load";
 import { reviewBuckets, reviewSubline } from "@/lib/review/buckets";
 import { boardLanes, kpis, meetingPosition, offBoard } from "@/lib/review/lanes";
-import { reviewPerson, waitingOnPerson } from "@/lib/review/strips";
+import { deadlinesOut, reviewPerson, waitingOnPerson } from "@/lib/review/strips";
 import { applyReviewFilters, olderHiddenCount, sinceSuspended, DEFAULT_REVIEW_VIEW, parseReviewParams, reviewHref, type ReviewParams } from "@/lib/review/params";
 import { criticalAlert, detailsNote } from "@/lib/review/notes";
 import { noticeFor } from "@/lib/review/notice";
 import { buildDeck, chosenPerson, deckPeople } from "@/lib/review/deck";
-import { loadDeckDocuments, loadLatestNote, loadReviewDetail } from "@/lib/review/detail-load";
+import { loadDeckDocuments, loadLatestNote } from "@/lib/review/detail-load";
 import { pageTitle } from "@/lib/ui/page-title";
 import { QUEUE_APPROVE_ROLES } from "@/lib/queue/roles";
-import { FILE_UPLOAD_ROLES } from "@/lib/files/roles";
 import { REVIEW_NAME, REVIEW_SHOW_ALL, REVIEW_SHOWING_ALL, REVIEW_SINCE_LABEL, REVIEW_SINCE_SUSPENDED, reviewIntro, reviewOlderHidden } from "@/lib/ui/words";
 
 export const metadata: Metadata = { title: pageTitle(REVIEW_NAME) };
@@ -93,12 +95,15 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const isApprover = !!role && !!userId && QUEUE_APPROVE_ROLES.includes(role);
   const person = isApprover ? { userId: userId!, firstName: "you" } : reviewPerson(load.members);
   const olderHidden = olderHiddenCount(load.rows, params, userId);
-  // No review person, no strip: nothing (not an empty wrapper) is drawn.
-  const strips = person ? (
+  // No review person, no "Waiting on" strip. The Deadlines strip (PGE Sprint 3) is always drawn: the open deadlines in the
+  // rows on screen, or one line saying the deadlines couldn't load (never "no deadlines").
+  const deadlinesFailed = load.failed.includes("deadlines");
+  const strips = (
     <div className="rv-strips">
-      <WaitingOnStrip owner={owner} firstName={person.firstName} you={isApprover} personId={person.userId} rows={waitingOnPerson(shown, person.userId)} approvalsKnown={approvalsKnown} params={params} />
+      {person && <WaitingOnStrip owner={owner} firstName={person.firstName} you={isApprover} personId={person.userId} rows={waitingOnPerson(shown, person.userId)} approvalsKnown={approvalsKnown} params={params} />}
+      <DeadlinesStrip items={deadlinesFailed ? [] : deadlinesOut(shown, load.today)} failed={deadlinesFailed} params={params} />
     </div>
-  ) : null;
+  );
   const lanes = boardLanes(buckets, load.members);
   const rest = offBoard(buckets);
 
@@ -117,13 +122,39 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
     cards = { people, personId, card, pos: cardPos, note: cardNote, docs: cardDocs };
   }
 
-  // The detail panel: the record is read AGAIN through the scoped client; the review row only supplies the computed facts.
-  const panelDetail = params.open ? await loadReviewDetail(params.open) : null;
-  // A merged lead opened by URL shows its keeper (the loader followed the pointer).
-  const shownOpen = params.open && panelDetail?.status === "ok" ? { kind: params.open.kind, id: panelDetail.openId ?? params.open.id } : params.open;
-  const panel = params.open && panelDetail && shownOpen
-    ? { detail: panelDetail, row: load.rows.find((r) => r.kind === shownOpen.kind && r.id === shownOpen.id) ?? null }
-    : null;
+  // `?open=` opens the record in the SAME centred card Intake and Matters open (no drawer). The card re-reads the record through the
+  // scoped client (`loadRecordCard`: a foreign or missing id is "couldn't be found", a failed read "couldn't be loaded"); the review
+  // row only supplies the facts it computed. A merged lead opened by URL shows its keeper (the loader followed the pointer).
+  const cardLoad = params.open ? await loadRecordCard(params.open) : null;
+  const cardShownId = cardLoad?.status === "ok" ? (cardLoad.kind === "lead" ? cardLoad.lead.id : cardLoad.matter.id) : null;
+  const cardRow = params.open && cardShownId ? (load.rows.find((r) => r.kind === params.open!.kind && r.id === cardShownId) ?? null) : null;
+  // Close (and Back) land on the same review view: every other review param is kept, only `open` goes.
+  const cardBase = reviewHref({ ...params, open: null });
+  const cardParams = new URLSearchParams(cardBase.includes("?") ? cardBase.slice(cardBase.indexOf("?") + 1) : "");
+  // Rendered here (an async server component called once) so the page itself stays one synchronous tree.
+  const card =
+    params.open && cardLoad
+      ? await RecordCardHost({
+          open: params.open,
+          path: "/dashboard/review/",
+          params: cardParams,
+          load: cardLoad,
+          review: {
+            aside: (
+              <ReviewCardAside
+                open={{ kind: params.open.kind, id: cardShownId ?? params.open.id }}
+                row={cardRow}
+                members={load.members}
+                today={load.today}
+                // Said only to a role that could change the stage (the card's own `stage` edit, judged as if the stages had been read).
+                stagesFailed={cardLoad.status === "ok" && cardLoad.stages.status !== "ok" && cardEdits({ role: cardLoad.role, kind: cardLoad.kind }).stage}
+                closeStages={canMove ? load.closeStages : []}
+                deadlinesFailed={load.failed.includes("deadlines")}
+              />
+            ),
+          },
+        })
+      : null;
   const notice = noticeFor(sp.notice);
 
   const searchHidden = { ...(params.since === "all" ? { since: "all" } : {}), ...(params.view !== DEFAULT_REVIEW_VIEW ? { view: params.view } : {}), ...(params.view === "cards" && params.person ? { person: params.person } : {}), ...(params.who === "mine" ? { who: "mine" } : {}), ...(params.kind !== "both" ? { kind: params.kind === "matter" ? "matters" : "leads" } : {}) };
@@ -262,21 +293,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           )}
         </>
       )}
-      {panel && shownOpen && (
-        <ReviewPanel
-          open={shownOpen}
-          row={panel.row}
-          detail={panel.detail}
-          today={load.today}
-          timeZone={load.timeZone}
-          members={load.members}
-          canWrite={canWrite}
-          canUpload={!!role && FILE_UPLOAD_ROLES.includes(role)}
-          canMove={canMove}
-          closeStages={load.closeStages}
-          closeHref={reviewHref({ ...params, open: null })}
-        />
-      )}
+      {card}
     </div>
   );
 }

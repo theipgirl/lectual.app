@@ -40,8 +40,10 @@ import {
   phaseGroupCounts,
 } from "@/lib/matters/phase-group";
 import { isHiredStage } from "@/lib/matters/hired-stage";
-import { searchPlaceholder, BLANK, MATTERS_NAME, OWNER_COLUMN, TEAMMATE, UNASSIGNED, MATTER_GROUPS_NAV, MATTER_GROUP_ALL, MATTER_INTAKE_STAGES, MATTER_INTAKE_SHOW, MATTER_SHOWING_INTAKE, MATTER_BACK_TO_PAST_INTAKE, MATTER_ALL_INTAKE_BODY, MATTER_ALL_INTAKE_TITLE, MATTER_GROUP_EMPTY, MATTER_GROUP_LABEL, MATTER_PHASES_UNAVAILABLE, MATTER_NO_HIRED_STAGE, MATTER_STATUS_NAV } from "@/lib/ui/words";
+import { searchPlaceholder, BLANK, MATTERS_NAME, OWNER_COLUMN, TEAMMATE, UNASSIGNED, MATTER_GROUPS_NAV, MATTER_GROUP_ALL, MATTER_INTAKE_STAGES, MATTER_INTAKE_SHOW, MATTER_SHOWING_INTAKE, MATTER_BACK_TO_PAST_INTAKE, MATTER_ALL_INTAKE_BODY, MATTER_ALL_INTAKE_TITLE, MATTER_GROUP_EMPTY, MATTER_GROUP_LABEL, MATTER_PHASES_UNAVAILABLE, MATTER_NO_HIRED_STAGE, MATTER_STATUS_NAV, DEADLINE_FLAGS_UNCHECKED, NO_OPEN_DEADLINE, NO_OPEN_DEADLINE_HINT } from "@/lib/ui/words";
 import { resolveFirmSession } from "@/lib/firm/session";
+import { isFiledTrademark, noOpenDeadline } from "@/lib/matters/deadline-safety";
+import { loadOpenDeadlineMatterIds } from "@/lib/matters/open-deadlines-read";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import { matterIdsNeedingReview } from "./list-utils";
 import { MATTERS_LIST_VALUE, mattersViewFromParam } from "@/lib/matters/list-href";
@@ -87,14 +89,19 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
     loadError = true;
   }
 
-  const [queue, members, leads, canCreateLitigation, stageRead, role] = await Promise.all([
+  // Deadline safety (PGE Sprint 3): which filed trademarks hold an open deadline. Only those matters are asked about;
+  // a failed read flags nothing and says so.
+  const filedIds = all.filter((m) => isFiledTrademark(m)).map((m) => m.id);
+  const [queue, members, leads, canCreateLitigation, stageRead, role, openDeadlineRead] = await Promise.all([
     loadActiveQueue(),
     listMemberDirectory().catch(() => []),
     listLeads().catch(() => []),
     orgHasModule("litigation"),
     loadMatterStages().catch((error): MatterStageRead => ({ status: "unavailable", error })),
     resolveFirmSession().then((x) => (x.kind === "ok" ? x.role : null)),
+    loadOpenDeadlineMatterIds(filedIds),
   ]);
+  const openDeadlineIds = openDeadlineRead.status === "ok" ? openDeadlineRead.ids : null;
 
   // "Needs your review" means something only when the queue was reached.
   // Unconfigured or unavailable is never shown as "nothing to review".
@@ -234,6 +241,11 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
           {MATTER_PHASES_UNAVAILABLE}
         </Notice>
       )}
+      {openDeadlineIds === null && filedIds.length > 0 && (
+        <Notice tone="warn" role="status">
+          {DEADLINE_FLAGS_UNCHECKED}
+        </Notice>
+      )}
       {queue.status === "unavailable" && (
         <Notice tone="warn" role="status">
           The approval queue can&apos;t be reached right now, so matters can&apos;t be checked for drafts waiting on review.
@@ -258,6 +270,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
           canMove={!!role && MATTER_WRITE_ROLES.includes(role)}
           reviewIds={reviewIds}
           reviewItems={reviewItems}
+          noDeadlineIds={new Set(shown.filter((m) => noOpenDeadline(m, openDeadlineIds)).map((m) => m.id))}
           ownerName={(id) => (id ? memberName.get(id) ?? TEAMMATE : null)}
           cards={cards}
         />
@@ -323,6 +336,12 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
                             {m.matter_number}
                             {m.owner_name ? ` · ${m.owner_name}` : ""}
                             {note ? ` · ${note}` : ""}
+                            {noOpenDeadline(m, openDeadlineIds) && (
+                              <>
+                                {" "}
+                                <Pill tone="risk" title={NO_OPEN_DEADLINE_HINT}>{NO_OPEN_DEADLINE}</Pill>
+                              </>
+                            )}
                             {reviewIds.has(m.id) && (
                               <>
                                 {" "}

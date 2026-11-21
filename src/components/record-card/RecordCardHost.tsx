@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { Dialog } from "@/components/ui/Dialog";
 import { LoadFailedLine } from "@/components/ui/LoadFailed";
 import { Pill } from "@/components/ui/Pill";
@@ -82,7 +83,7 @@ function TimelineBlock({ view, tz, urls, leadUndo }: { view: Ok; tz: string; url
   return <Timeline rows={rows} mediaUrls={urls} timeZone={tz} undo={leadUndo} />;
 }
 
-function Docs({ view, role, directory }: { view: Ok; role: string; directory: { userId: string; name: string }[] }) {
+function Docs({ view, role, directory, refresh }: { view: Ok; role: string; directory: { userId: string; name: string }[]; refresh?: boolean }) {
   if (view.documents.status !== "ok") return <LoadFailedLine refresh={false}>{LEAD_STEP_COULDNT_LOAD}</LoadFailedLine>;
   return (
     <DocumentsCard
@@ -91,8 +92,40 @@ function Docs({ view, role, directory }: { view: Ok; role: string; directory: { 
       directory={directory}
       canUpload={view.card.edits.upload}
       canDelete={(FILE_DELETE_ROLES as readonly string[]).includes(role)}
+      {...(refresh ? { refreshAfterUpload: true } : {})}
     />
   );
+}
+
+/**
+ * What the Weekly review adds when it opens a record in this card (it has no drawer of its own any more). Intake and Matters
+ * pass nothing and their card is exactly as before.
+ */
+export type RecordCardReview = {
+  /**
+   * The review row's facts (waiting on, last contact, last changed, USPTO deadline, proposal) and, for a lead, Lost / Nurture: first in
+   * the side column. The note composers stay the card's own (call / email / meeting, subject, @mentions); their actions refresh the review.
+   */
+  aside: ReactNode;
+};
+
+type StepAssigneesProp = { members: { userId: string; name: string }[]; byTask: Record<string, string | null>; forNew: string | null };
+
+/** Who each open step is assigned to, from the rows the loader already read. Null when the team list can't be read: a select of nobody would clear an assignee. */
+function stepAssignees(load: Extract<RecordCardLoad, { status: "ok" }>, directory: { userId: string; name: string }[]): StepAssigneesProp | null {
+  if (load.members.status !== "ok") return null;
+  const tasks =
+    load.kind === "matter"
+      ? load.tasks.status === "ok"
+        ? load.tasks.value
+        : []
+      : load.leadStep.status === "ok" && load.leadStep.facts.tasks.status === "ok"
+        ? load.leadStep.facts.tasks.value
+        : [];
+  const byTask: Record<string, string | null> = {};
+  for (const t of tasks) byTask[t.id] = t.assigneeId ?? null;
+  const owner = load.kind === "matter" ? load.matter.assigned_to : load.lead.assigned_to;
+  return { members: directory, byTask, forNew: tasks[0]?.assigneeId ?? owner ?? null };
 }
 
 /**
@@ -108,6 +141,7 @@ export async function RecordCardHost({
   duplicateOf,
   load: given,
   moveStages,
+  review,
 }: {
   open: CardRef | null;
   path: string;
@@ -116,11 +150,14 @@ export async function RecordCardHost({
   load?: RecordCardLoad;
   /** Matters page only: the stages its board and card menus offer (`matterMoveStages`). Leads and a failed stage read keep the loader's list. */
   moveStages?: readonly { id: string; label: string }[];
+  /** The Weekly review's facts and actions (see `RecordCardReview`). Left out on Intake and Matters. */
+  review?: RecordCardReview;
 }) {
   if (!open) return null;
   const loaded = given ?? (await loadRecordCard(open, { duplicateOf }));
   const load = withMatterMoveStages(loaded, moveStages);
-  const view = buildOpenedCard(load, { path, params });
+  // From the review a lead may also be moved to a lost stage, as its old drawer allowed (never won: moveTargets and the action refuse it).
+  const view = buildOpenedCard(load, review ? { path, params, lostShown: true } : { path, params });
   if (view.status !== "ok" || load.status !== "ok") {
     return (
       <Dialog closeHref={view.status === "ok" ? closeHref(path, params) : view.closeHref} title={RECORD_CARD_OPENED_LABEL} titleId="record-card-title" size="sm">
@@ -142,6 +179,7 @@ export async function RecordCardHost({
   const urls: Record<string, string> =
     view.timeline.status === "ok" ? await voiceNotePlaybackUrls(view.timeline.value.rows as unknown as Parameters<typeof voiceNotePlaybackUrls>[0]).catch(() => ({})) : {};
   const stepsHere = openHref(path, params, { kind: view.kind, id: c.id }) + "#card-steps";
+  const assignees = review ? stepAssignees(load, directory) : null;
 
   if (view.kind === "matter") {
     const matter = load.kind === "matter" ? load.matter : null;
@@ -158,7 +196,7 @@ export async function RecordCardHost({
         </div>
         <div className="rc-cols">
           <div className="rc-main">
-            <StepsChecklist kind="matter" id={c.id} steps={view.steps} />
+            <StepsChecklist kind="matter" id={c.id} steps={view.steps} {...(assignees ? { assignees } : {})} />
             {c.edits.notes && (
               <section className="rc-sec" aria-label={RECORD_CARD_NOTE_HEADING}>
                 <div className="lx-composer">
@@ -173,6 +211,7 @@ export async function RecordCardHost({
             </section>
           </div>
           <div className="rc-side">
+            {review?.aside}
             <section className="rc-sec" aria-label={RECORD_CARD_DEADLINE_HEAD}>
               <h3 className="lx-label">{RECORD_CARD_DEADLINE_HEAD}</h3>
               {view.deadline.status === "unavailable" ? (
@@ -186,7 +225,7 @@ export async function RecordCardHost({
               )}
               <p className="lx-note">{RECORD_CARD_DEADLINE_NOTE}</p>
             </section>
-            <Docs view={view} role={role} directory={directory} />
+            <Docs view={view} role={role} directory={directory} refresh={!!review} />
             <Link href={c.fullHref} className="lx-btn lx-btn-sec lx-btn-sm">
               {RECORD_CARD_MENU_OPEN} →
             </Link>
@@ -197,7 +236,8 @@ export async function RecordCardHost({
   }
 
   // Lead
-  const members = directory;
+  // Null when the team couldn't be read: the top card's step forms then draw no picker (an empty list would unassign).
+  const members = load.members.status === "ok" ? directory : null;
   const yoursDue = view.top.kind === "yours" && view.steps.status === "ok" ? (view.steps.items.find((i) => i.id === (view.top as { taskId: string }).taskId)?.dueIso ?? null) : null;
   const stageId = load.kind === "lead" ? load.lead.current_stage_id : null;
   return (
@@ -218,7 +258,7 @@ export async function RecordCardHost({
           <TopCardFrame>
             <TopCard leadId={c.id} view={view.top} canWriteSteps={c.edits.stepAdd} members={members} yoursDueDate={yoursDue} />
           </TopCardFrame>
-          <StepsChecklist kind="lead" id={c.id} steps={view.steps} />
+          <StepsChecklist kind="lead" id={c.id} steps={view.steps} {...(assignees ? { assignees } : {})} />
           {c.edits.notes && (
             <section className="rc-sec" aria-label={RECORD_CARD_NOTE_HEADING}>
               <ComposerTabs text={<NoteComposer leadId={c.id} />} voice={<VoiceNoteRecorder target={{ kind: "lead", id: c.id }} action={addLeadVoiceNote} />} />
@@ -230,6 +270,7 @@ export async function RecordCardHost({
           </section>
         </div>
         <div className="rc-side">
+          {review?.aside}
           <section className="rc-sec" aria-label={RECORD_CARD_CONTACT}>
             <h3 className="lx-label">{RECORD_CARD_CONTACT}</h3>
             {view.contact.call || view.contact.email ? (
@@ -273,7 +314,7 @@ export async function RecordCardHost({
               )}
             </section>
           )}
-          <Docs view={view} role={role} directory={directory} />
+          <Docs view={view} role={role} directory={directory} refresh={!!review} />
           <WhatLectualDid leadId={c.id} did={view.did} />
           <Link href={c.fullHref} className="lx-btn lx-btn-sec lx-btn-sm">
             {RECORD_CARD_MENU_OPEN} →

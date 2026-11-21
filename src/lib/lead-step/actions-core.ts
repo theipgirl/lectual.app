@@ -4,7 +4,7 @@ import { DOCUMENT_QUEUE_TYPES } from "@/lib/documents/types";
 import { SEND_BACK_NOTE_MAX, sendBackNoteTooLong } from "@/lib/queue/handed";
 import { isDoneNote } from "@/lib/queue/done";
 import { QUEUE_EDIT_ROLES } from "@/lib/queue/roles";
-import { approvalRefusal } from "@/lib/queue/routing";
+import { approvalRefusal, memberName } from "@/lib/queue/routing";
 import type { ReviewInput, ReviewOutcome } from "@/lib/queue/review-core";
 import {
   LEAD_STEP_ALREADY_DECIDED,
@@ -33,6 +33,8 @@ import {
   DRAFT_CHANGED_REFRESH,
   SEND_BACK_NOTE_TOO_LONG,
   leadStepDraftInMailbox,
+  PASS_FAILED,
+  passedToDrafter,
 } from "@/lib/ui/words";
 import type { HandoffFact, RoutingFacts } from "./facts";
 import type { LeadCloserLook } from "./closer-look";
@@ -142,13 +144,19 @@ export function cleanBody(raw: unknown): string | null {
  */
 export function afterYesWarns(outcome: Extract<ReviewOutcome, { kind: "resolved" }>, itemType: string): boolean {
   const send = outcome.send;
+  // Sprint 4: passed to the firm's drafter is a success (no mailbox draft is expected); a failed pass is a warning.
+  if (send === "passed") return false;
+  if (send === "pass-failed") return true;
   if (send === "failed" || send === "mailbox-failed") return true;
   if (send === "mailbox-microsoft" || send === "mailbox-google" || send === "drafted" || send === "manual" || send === "sent") return false;
   return !DOCUMENT_QUEUE_TYPES.has(itemType);
 }
 
-export function afterYesSentence(outcome: Extract<ReviewOutcome, { kind: "resolved" }>, itemType: string, owner: string | null = null): string {
+export function afterYesSentence(outcome: Extract<ReviewOutcome, { kind: "resolved" }>, itemType: string, owner: string | null = null, drafterName: string | null = null): string {
   const send = outcome.send;
+  // Sprint 4: the same sentences the deck and the full approval page say.
+  if (send === "passed") return passedToDrafter(drafterName?.trim() || "the drafter");
+  if (send === "pass-failed") return PASS_FAILED;
   if (send === "mailbox-microsoft" || send === "mailbox-google") {
     const provider = outcome.provider ?? (send === "mailbox-microsoft" ? "microsoft" : "google");
     return leadStepDraftInMailbox(owner, provider === "microsoft" ? "Outlook" : "Gmail");
@@ -214,7 +222,9 @@ export async function runLeadStepYes(deps: LeadStepActionDeps, rawLeadId: unknow
   if (outcome.kind === "error") return { ok: false, error: STALE_CONFIRM.test(outcome.error) ? LEAD_PAGE_STALE_DRAFT : outcome.error };
   if (outcome.kind !== "resolved" || outcome.intent !== "approve") return { ok: false, error: LEAD_STEP_FAILED };
   deps.revalidate(leadId);
-  return { ok: true, message: afterYesSentence(outcome, c.item.type), webLink: outcome.webLink, warn: afterYesWarns(outcome, c.item.type) };
+  const drafterId = outcome.handoff?.drafter ?? null;
+  const drafter = drafterId && c.routing.status === "ok" ? c.routing.members.find((m) => m.userId === drafterId) : undefined;
+  return { ok: true, message: afterYesSentence(outcome, c.item.type, null, drafter ? memberName(drafter) : null), webLink: outcome.webLink, warn: afterYesWarns(outcome, c.item.type) };
 }
 
 export async function runLeadStepNotThis(deps: LeadStepActionDeps, rawLeadId: unknown, rawItemId: unknown, rawReason: unknown): Promise<NotThisResult> {

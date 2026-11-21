@@ -102,6 +102,50 @@ export async function notify(input: NotifyInput): Promise<void> {
   }
 }
 
+export type OwnNoticeInput = {
+  kind: NotificationKind;
+  leadId?: string | null;
+  matterId?: string | null;
+  /** Render hints only. NEVER a mail body. */
+  payload?: Record<string, unknown>;
+};
+
+/**
+ * Raises several notices for the SIGNED-IN person themselves (PGE Sprint 3's deadline alerts), in ONE insert: one
+ * membership check, one org read, one statement, instead of `notify()` once per notice. Self-only: `userId` must be the
+ * session's own user id, or nothing is written. Never throws; returns how many rows were written (0 on any failure).
+ */
+export async function notifyOwnMany(userId: string, items: readonly OwnNoticeInput[]): Promise<number> {
+  if (items.length === 0) return 0;
+  try {
+    const supabase = await getScopedClient();
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth?.user?.id || auth.user.id !== userId) return 0;
+    const [directory, orgId] = await Promise.all([listMemberDirectory(), currentOrgId(supabase)]);
+    if (!orgId || !directory.some((member) => member.userId === userId)) return 0;
+    const { error } = await supabase.from("crm_notification").insert(
+      items.map((item) => ({
+        org_id: orgId,
+        user_id: userId,
+        kind: item.kind,
+        lead_id: item.leadId ?? null,
+        matter_id: item.matterId ?? null,
+        activity_id: null,
+        actor_id: null,
+        payload: (item.payload ?? {}) as Json,
+      })),
+    );
+    if (error) {
+      console.warn(`[notifications] could not raise ${items.length} own notices: ${error.message}`);
+      return 0;
+    }
+    return items.length;
+  } catch (err) {
+    console.warn(`[notifications] could not raise own notices: ${err instanceof Error ? err.message : String(err)}`);
+    return 0;
+  }
+}
+
 /**
  * The caller's own notifications, newest first.
  *

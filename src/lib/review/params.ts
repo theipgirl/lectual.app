@@ -15,7 +15,7 @@ export const DEFAULT_REVIEW_VIEW: ReviewView = "board";
 export const REVIEW_SINCE = "2026-02-01";
 export type ReviewSince = "default" | "all";
 
-export type ReviewParams = { /** `all` shows rows older than REVIEW_SINCE too. */ since: ReviewSince; who: ReviewWho; kind: ReviewScope; q: string; view: ReviewView; i: number; /** The Cards view's person (a user id), or null for the default. */ person: string | null; /** The record whose detail panel is open. */ open: OpenRef | null };
+export type ReviewParams = { /** `all` shows rows older than REVIEW_SINCE too. */ since: ReviewSince; who: ReviewWho; kind: ReviewScope; q: string; view: ReviewView; i: number; /** The Cards view's person (a user id), or null for the default. */ person: string | null; /** The record open in the centred record card. */ open: OpenRef | null };
 
 export const SEARCH_MAX = 80;
 
@@ -64,12 +64,14 @@ export function matchesSearch(row: ReviewRow, q: string): boolean {
  * True when the "since" filter would hide this row. The date used is the row's LAST CONTACT (`lastContact.date`, the
  * newest email / call / note), the only "last touched" field a review row carries. A row with no contact at all is
  * treated as older (it has never been touched). NEVER hidden: an open next step, an open USPTO deadline or a
- * USPTO wait, a pending approval, a live (not expired) proposal, or contact history that could not be read.
+ * USPTO wait, a filed trademark with no open deadline (PGE Sprint 3), a pending approval, a live (not expired) proposal, or contact history that could not be read.
  */
 export function isOlderThanSince(row: ReviewRow): boolean {
   if (!row.contactKnown) return false;
   if (row.nextStep) return false;
   if (row.deadline || row.waiting === "uspto") return false;
+  // PGE Sprint 3: a filed trademark with no open deadline is exactly what must not be hidden.
+  if (row.noOpenDeadline) return false;
   if (row.waiting === "approval") return false;
   if (row.proposalExpiry && !row.proposalExpiry.expired) return false;
   const last = row.lastContact?.date ?? null;

@@ -233,7 +233,7 @@ async function assigneeIsMember(userId: string): Promise<"yes" | "no" | "unknown
 }
 
 /**
- * Move stage from the panel. A matter goes to a stage on the firm's docket (`updateMatterStage`, the matter page's own
+ * Move stage from the opened record card. A matter goes to a stage on the firm's docket (`updateMatterStage`, the matter page's own
  * move). A lead goes through `moveLeadStage` (the board's move), only to an open, lost or nurture stage: never `won`,
  * because that move runs the matter handoff. Role, record and target stage are all re-read here.
  */
@@ -270,7 +270,7 @@ export async function moveStageAction(_prev: ReviewActionState, formData: FormDa
   return { saved: true };
 }
 
-/** Assigned to, from the panel: the matter's owner or the lead's assignee. Empty unassigns. */
+/** Assigned to, from the opened record card: the matter's owner or the lead's assignee. Empty unassigns. */
 export async function assignRecordAction(_prev: ReviewActionState, formData: FormData): Promise<ReviewActionState> {
   const kind = parseKind(formData.get("kind"));
   const id = String(formData.get("id") ?? "").trim();

@@ -32,7 +32,7 @@ import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import { isMatterStatus } from "@/lib/matters/status";
 import { MATTER_TYPE_MODULE, isMatterType, requiresExplicitMatterNumber } from "@/lib/matters/matter-types";
 import { updateMatterStage } from "@/lib/matters/stages";
-import { updateMatterHeader } from "@/lib/matters/matters";
+import { closeMatterWithOverride, updateMatterHeader } from "@/lib/matters/matters";
 import { addMatterNote } from "@/lib/matters/notes";
 import { DEADLINE_DELETE_ROLES, deleteDeadline, reopenDeadline, updateDeadline } from "@/lib/matters/deadlines";
 import { deleteTask, updateTask } from "@/lib/matters/tasks";
@@ -92,6 +92,8 @@ function revalidateMatter(matterId?: string) {
   if (matterId) revalidatePath(`/dashboard/matters/${matterId}/`);
   revalidatePath("/dashboard/matters/");
   revalidatePath("/dashboard/");
+  // The Weekly review opens the matter in the same card (title, header fields).
+  revalidatePath("/dashboard/review/");
 }
 
 /** Only fields the form posted come back, so one group can't blank another. */
@@ -175,6 +177,25 @@ export async function updateMatterStatusAction(_prev: ActionState, formData: For
   }
   revalidateMatter(matterId);
   return {};
+}
+
+/**
+ * Close a matter that still has an open USPTO deadline, with a reason (max 300 characters). Its own POST entry
+ * point: the role (owner / attorney, CLOSE_OVERRIDE_ROLES) is re-read inside `closeMatterWithOverride` before any
+ * read, so a paralegal posting this form changes nothing. Fixed sentences only.
+ */
+export async function closeMatterWithOverrideAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const matterId = String(formData.get("matterId") ?? "");
+  if (!matterId) return { error: "That matter couldn't be found. It may have been removed." };
+  if (formData.get("confirm") !== "yes") return { error: "Confirm that you want to close this matter." };
+  try {
+    const result = await closeMatterWithOverride(matterId, formData.get("reason"));
+    if (!result.ok) return { error: result.error };
+  } catch (err) {
+    return { error: friendlyMatterError(err, "Couldn't close this matter. Nothing was changed. Try again.") };
+  }
+  revalidateMatter(matterId);
+  return { saved: true };
 }
 
 /** Where the matter sits in the firm's own process. Not the same thing as status. */
@@ -493,6 +514,8 @@ export async function addVoiceNoteAction(
   }
 
   revalidatePath(`/dashboard/matters/${matterId}/`);
+  // The Weekly review opens the matter in the same card; a call or email logged here is its last contact and direction.
+  revalidatePath("/dashboard/review/");
   return {};
 }
 
@@ -715,6 +738,8 @@ export async function addMatterNoteAction(_prev: ActionState, formData: FormData
     return { error: friendlyMatterError(err, "Couldn't add this to the timeline.") };
   }
   revalidatePath(`/dashboard/matters/${matterId}/`);
+  // The Weekly review opens the matter in the same card; a call or email logged here is its last contact and direction.
+  revalidatePath("/dashboard/review/");
   return { saved: true };
 }
 

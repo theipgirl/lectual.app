@@ -222,10 +222,24 @@ describe("runQueueReview: results", () => {
       expect(state.save).not.toHaveBeenCalled();
     });
 
-    it("without requireShown (the full approval page) nothing changes", async () => {
+    it("Sprint 4 S7 (changed on purpose): the full approval page also sends the re-read text as the final body", async () => {
       state.item = qitem({ draft_body: BODY, final_body: "a saved edit" });
       expect(await runQueueReview({ id: "q1", intent: "approve" })).toMatchObject({ kind: "resolved" });
-      expect(state.resolve.mock.calls[0][0]).not.toHaveProperty("finalBody");
+      expect(state.resolve.mock.calls[0][0]).toMatchObject({ finalBody: "a saved edit" });
+    });
+
+    it("Sprint 4 S7: a colleague's save landing between the re-read and the resolve is not what gets approved", async () => {
+      const api = await import("@/lib/queue/api");
+      const reread = qitem({ draft_body: BODY, final_body: "the text re-read and re-classified" });
+      // The colleague's save lands after the last read the approve core makes: the queue would now hold it.
+      vi.mocked(api.getQueueItem).mockImplementation(async () => reread as never);
+      state.resolve.mockImplementation(async (args: { finalBody?: string }) => {
+        expect(args.finalBody).toBe("the text re-read and re-classified");
+        return { status: "approved", send: "none" };
+      });
+      expect(await runQueueReview({ id: "q1", intent: "approve" })).toMatchObject({ kind: "resolved" });
+      expect(state.resolve.mock.calls[0][0].finalBody).not.toBe("a colleague's later save");
+      vi.mocked(api.getQueueItem).mockImplementation(async () => state.item as never);
     });
   });
 

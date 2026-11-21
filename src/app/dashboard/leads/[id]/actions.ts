@@ -203,6 +203,8 @@ export async function addNoteAction(
   }
 
   revalidatePath(`/dashboard/leads/${leadId}/`);
+  // The Weekly review opens the lead in the same card; a call or email logged here is its last contact and direction.
+  revalidatePath("/dashboard/review/");
   return {};
 }
 
@@ -385,5 +387,7 @@ export async function addVoiceNoteAction(
   }
 
   revalidatePath(`/dashboard/leads/${leadId}/`);
+  // The Weekly review opens the lead in the same card; a call or email logged here is its last contact and direction.
+  revalidatePath("/dashboard/review/");
   return {};
 }

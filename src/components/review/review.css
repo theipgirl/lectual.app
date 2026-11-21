@@ -103,20 +103,18 @@
 .rv-facts dd { margin: 4px 0 0; }
 .rv-pager { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; }
 
-/* Detail panel: the shared side panel (a right-side drawer from 900px, a full-screen sheet below) */
-.rv-panel-kind { margin: 0; }
-.rv-panel-facts { margin: 0; }
-.rv-panel-full { font-weight: 500; }
-.rv-panel-sec { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
-.rv-panel-sec .lx-label { margin: 0; }
-.rv-panel-foot { display: flex; gap: 8px; flex-wrap: wrap; }
-.rv-snooze { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+/* The review's own part of the opened record card (the drawer is gone): its facts, Lost / Nurture and "Log what happened". */
+.rv-cardx { padding: 12px; border-radius: var(--r-md); background: var(--well); }
+.rv-cardx-facts { display: grid; gap: 8px; margin: 0; }
+.rv-cardx-facts > div { display: grid; gap: 2px; min-width: 0; }
+.rv-cardx-facts dt { margin: 0; }
+.rv-cardx-facts dd { margin: 0; font-size: var(--fs-2); overflow-wrap: anywhere; }
+.rv-cardx-note { display: grid; gap: 8px; min-width: 0; }
+.rv-cardx-note > h3 { margin: 0; }
 .rv-more > summary { list-style: none; }
 .rv-more > summary::-webkit-details-marker { display: none; }
-.rv-steps, .rv-activity { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.rv-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .rv-steps li { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-.rv-activity li { padding-bottom: 8px; border-bottom: 1px solid var(--line); }
-.rv-activity-note { margin: 4px 0 0; font-size: var(--fs-2); color: var(--body); overflow-wrap: anywhere; }
 
 /* Cards: one person's deck */
 .rv-people { display: flex; flex-wrap: wrap; gap: 8px; }

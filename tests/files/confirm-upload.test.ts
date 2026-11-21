@@ -36,7 +36,7 @@ describe("confirmUploadAction: the row and the timeline entry", () => {
     expect(payload).not.toHaveProperty("uploaded_by");
     expect(payload).not.toHaveProperty("contact_id");
     expect(world.db.rows("crm_file")[0].uploaded_by).toBe("user-1"); // the database's own default
-    expect(revalidated).toEqual([`/dashboard/leads/${LEAD}/`]);
+    expect(revalidated).toEqual([`/dashboard/leads/${LEAD}/`, "/dashboard/review/"]);
   });
 
   it("inserts one row for a matter with matter_id set and lead_id null", async () => {
@@ -45,7 +45,7 @@ describe("confirmUploadAction: the row and the timeline entry", () => {
     expect((await confirmUploadAction({ kind: "matter", id: MATTER }, FILE_ID, "x.pdf")).ok).toBe(true);
     const payload = writesTo(world.db, "crm_file")[0].payload as Record<string, unknown>;
     expect(payload).toMatchObject({ lead_id: null, matter_id: MATTER, storage_path: matterPath });
-    expect(revalidated).toEqual([`/dashboard/matters/${MATTER}/`]);
+    expect(revalidated).toEqual([`/dashboard/matters/${MATTER}/`, "/dashboard/review/"]);
   });
 
   it.each(STAFF_ROLES)("%s may confirm", async (role) => {
@@ -122,7 +122,7 @@ describe("confirmUploadAction: failures", () => {
     expect(world.db.rows("crm_file")).toHaveLength(1);
     expect(world.db.activity()).toHaveLength(1);
     expect(world.storage.callsTo("remove")).toEqual([]); // the saved file's object is never cleaned up
-    expect(revalidated).toHaveLength(2); // the page refreshes either way
+    expect(revalidated).toHaveLength(4); // the page (and the review) refreshes either way
   });
 
   it("says storage is not set up for a missing table, without throwing", async () => {

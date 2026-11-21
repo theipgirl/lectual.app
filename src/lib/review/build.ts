@@ -9,6 +9,8 @@ import type { ReviewRow, ReviewNextStep } from "./buckets";
 import { summarizeContact, type ContactActivity } from "./contact";
 import type { FirmSenders } from "@/lib/mailbox/firm-sender";
 import { stageIsWithUspto, waitingOn } from "./waiting";
+import { noOpenDeadline } from "@/lib/matters/deadline-safety";
+import { deadlineKindLabel, type DeadlineKind } from "@/lib/matters/deadline-rules";
 
 /**
  * Turns what the page read into review rows. Pure: structural inputs, no database, no server
@@ -23,6 +25,9 @@ export type ReviewMatterIn = {
   owner_name: string | null;
   status: string;
   type?: string | null;
+  /** "Filed" (PGE Sprint 3) is a TM matter with a serial number or a filing date. */
+  serial_number?: string | null;
+  filing_date?: string | null;
   referral_source?: string | null;
   stage_id?: string | null;
   lead_id: string | null;
@@ -65,7 +70,15 @@ export type ReviewTaskIn = {
 
 export type ReviewActivityIn = ContactActivity & { lead_id: string | null; matter_id: string | null };
 
-export type ReviewDeadlineIn = { matter_id: string; due_date: string; title: string | null };
+export type ReviewDeadlineIn = {
+  matter_id: string;
+  due_date: string;
+  title: string | null;
+  /** Read for the Deadlines strip (PGE Sprint 3). Older callers may leave them out. */
+  id?: string;
+  kind?: string | null;
+  attorney_confirmed?: boolean | null;
+};
 
 /** The state of one source the page read. `unavailable` is never drawn as empty. */
 export type SourceState = "ok" | "unavailable";
@@ -145,6 +158,27 @@ function groupBy<T>(items: readonly T[], key: (t: T) => string | null): Map<stri
   return out;
 }
 
+function kindLabel(kind: string | null | undefined): string | null {
+  if (!kind) return null;
+  try {
+    return deadlineKindLabel(kind as DeadlineKind);
+  } catch {
+    return null;
+  }
+}
+
+/** Every open deadline of a matter, soonest first, for the Deadlines strip. */
+function openDeadlinesOf(list: readonly ReviewDeadlineIn[] | undefined): NonNullable<ReviewRow["openDeadlines"]> {
+  return [...(list ?? [])]
+    .sort((a, b) => a.due_date.localeCompare(b.due_date) || (a.id ?? "").localeCompare(b.id ?? ""))
+    .map((d, i) => ({
+      id: d.id ?? `${d.matter_id}-${i}`,
+      title: d.title?.trim() || kindLabel(d.kind) || "Deadline",
+      dueDate: d.due_date.slice(0, 10),
+      confirmed: d.attorney_confirmed === true,
+    }));
+}
+
 function nearestDeadline(list: readonly ReviewDeadlineIn[] | undefined): ReviewRow["deadline"] {
   if (!list || list.length === 0) return null;
   const first = [...list].sort((a, b) => a.due_date.localeCompare(b.due_date))[0];
@@ -158,6 +192,7 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
   const activityByMatter = groupBy(input.activity, (a) => a.matter_id);
   const activityByLead = groupBy(input.activity, (a) => a.lead_id);
   const deadlinesByMatter = groupBy(input.deadlines, (d) => d.matter_id);
+  const openSet = new Set(deadlinesByMatter.keys());
   const contactKnown = input.sources.activity === "ok";
 
   const contactOf = (list: readonly ContactActivity[] | undefined) => {
@@ -217,6 +252,9 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
       }),
       nextStep: matterTasks.get(m.id) ?? null,
       deadline: input.sources.deadlines === "ok" ? nearestDeadline(deadlinesByMatter.get(m.id)) : null,
+      // A tag only (never a bucket). Unknown when the deadlines could not be read: nothing is flagged then.
+      noOpenDeadline: noOpenDeadline(m, input.sources.deadlines === "ok" ? openSet : null),
+      ...(input.sources.deadlines === "ok" ? { openDeadlines: openDeadlinesOf(deadlinesByMatter.get(m.id)) } : {}),
     });
   }
 

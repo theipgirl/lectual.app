@@ -15,6 +15,8 @@ import { DocTag, LastChanged, openHref, Tags, type Common } from "./shared";
 import "@/components/list-page/list-page.css";
 import "./review.css";
 import { ViewToggle } from "@/components/ViewToggle";
+import type { DeadlineOut } from "@/lib/review/strips";
+import { DEADLINES_COULDNT_LOAD, DEADLINE_UNCONFIRMED, REVIEW_DEADLINES_HEADING, REVIEW_DEADLINES_NONE, REVIEW_DEADLINE_CONFIRMED, deadlineCardMore } from "@/lib/ui/words";
 
 const VIEW_LABEL: Record<ReviewView, string> = { board: REVIEW_BOARD_VIEW, sheet: REVIEW_SHEET_VIEW, cards: REVIEW_CARDS_VIEW };
 
@@ -57,7 +59,7 @@ const BUCKET_TONE: Record<BucketKey, PillTone> = { overdue: "risk", week: "warn"
 /**
  * ONE review card, in the shared Board kit's card look (the same as the Leads board): a bold name, one quiet line (kind, company,
  * mark, stage), the next step with its due chip, then the timeline line: the newest thing SENT OUT for the record. The title is the
- * link to the panel; Done and Open sit below it as plain text links, so nothing interactive is nested.
+ * link to the opened record card; Done and Open sit below it as plain text links, so nothing interactive is nested.
  */
 function ReviewCard({ row, bucket, today, members, canWrite, params, waitingOnClient }: Common & { row: ReviewRow; bucket: BucketKey; /** A "Waiting on client" card also says how long since we followed up. */ waitingOnClient?: boolean }) {
   const due = row.nextStep ? dueText(row.nextStep.dueDate, today) : null;
@@ -190,6 +192,45 @@ export function WaitingOnStrip({ firstName, rows, approvalsKnown, params, person
             );
           })}
         </ul>
+      )}
+    </section>
+  );
+}
+
+/** At most this many deadlines are listed in the strip; the rest are counted. */
+export const DEADLINES_STRIP_SHOWN = 24;
+
+/**
+ * Every open deadline in the rows on screen, soonest first, each linking to the record card (`?open=`), with
+ * "Unconfirmed" until an attorney confirms it (PGE Sprint 3). `failed` = the deadlines read failed: said, never
+ * "No open deadlines".
+ */
+export function DeadlinesStrip({ items, failed, params }: { items: DeadlineOut[]; failed: boolean; params: ReviewParams }) {
+  return (
+    <section className="lx-card rv-strip" data-strip="deadlines" aria-labelledby="rv-strip-deadlines">
+      <div className="rv-strip-head">
+        <h2 id="rv-strip-deadlines" className="lx-h3">{REVIEW_DEADLINES_HEADING}</h2>
+        {!failed && <span className="rv-strip-count">{items.length}</span>}
+      </div>
+      {failed ? (
+        <LoadFailedLine refresh={false}>{DEADLINES_COULDNT_LOAD}</LoadFailedLine>
+      ) : items.length === 0 ? (
+        <EmptyState variant="line">{REVIEW_DEADLINES_NONE}</EmptyState>
+      ) : (
+        <>
+          <ul className="rv-strip-list">
+            {items.slice(0, DEADLINES_STRIP_SHOWN).map((d) => (
+              <li key={`${d.row.key}-${d.id}`} data-deadline={d.id} data-confirmed={d.confirmed ? "yes" : "no"}>
+                <Link href={openHref(params, d.row)} className="rv-strip-link" scroll={false}>
+                  <Pill tone={d.overdue ? "risk" : d.confirmed ? "mute" : "warn"}>
+                    {d.text} · {d.title} · {d.row.client} · {d.confirmed ? REVIEW_DEADLINE_CONFIRMED : DEADLINE_UNCONFIRMED}
+                  </Pill>
+                </Link>
+              </li>
+            ))}
+          </ul>
+          {items.length > DEADLINES_STRIP_SHOWN && <p className="lx-note rv-strip-note">{deadlineCardMore(items.length - DEADLINES_STRIP_SHOWN)}</p>}
+        </>
       )}
     </section>
   );

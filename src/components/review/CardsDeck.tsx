@@ -10,12 +10,13 @@ import { SNOOZE_LABEL } from "@/lib/review/snooze";
 import { WAITING_LABEL } from "@/lib/review/waiting";
 import { deckDoneAction, deckHandToAction, deckNoteAction, deckSnoozeAction } from "@/app/dashboard/review/card-actions";
 import { DeckKeys } from "./DeckKeys";
+import { DeckNoteSubmit } from "./DeckNoteSubmit";
 import { Avatar, DocTag, openHref, Tags, type Common } from "./shared";
 import { DeckDocuments } from "./ReviewDocuments";
 import { Chip, FilterChips } from "@/components/list-page/Chips";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Pill } from "@/components/ui/Pill";
-import { ADD_TO_TIMELINE, UNASSIGNED } from "@/lib/ui/words";
+import { ADD_TO_TIMELINE, REVIEW_LOG_LABEL, REVIEW_LOG_PLACEHOLDER, UNASSIGNED } from "@/lib/ui/words";
 import "./review.css";
 
 const MAX_DOTS = 40;
@@ -36,7 +37,7 @@ export function PersonChips({ people, personId, params }: { people: DeckPerson[]
 
 /**
  * One big card at a time. Every button is a plain form or link, so the deck works without JavaScript; the arrow keys are a
- * bonus. The buttons run the same actions as the detail panel and then land back on the same place in the deck.
+ * bonus. The buttons run the same actions as the opened record card and then land back on the same place in the deck.
  */
 export function CardsDeck({
   card,
@@ -164,13 +165,12 @@ export function CardsDeck({
             </form>
             <details className="rv-more rv-note-box">
               <summary className="lx-btn lx-btn-sec">{ADD_TO_TIMELINE}</summary>
-              <form action={deckNoteAction} className="rv-form">
+              {/* Keyed to the card, so the next card starts with an empty box; React resets it after a successful post too. */}
+              <form key={`${row.kind}:${row.id}`} action={deckNoteAction} className="rv-form">
                 {view}
                 {record}
-                <textarea className="lx-input" name="body" rows={3} placeholder="A short note for the timeline" aria-label="What happened" required />
-                <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm">
-                  {ADD_TO_TIMELINE}
-                </button>
+                <textarea className="lx-input" name="body" rows={3} placeholder={REVIEW_LOG_PLACEHOLDER} aria-label={REVIEW_LOG_LABEL} required />
+                <DeckNoteSubmit />
               </form>
             </details>
           </div>

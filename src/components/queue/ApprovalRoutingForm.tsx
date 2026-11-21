@@ -7,7 +7,7 @@ import { roleLabel } from "@/lib/auth/roles";
 import { Notice } from "@/components/ui/Notice";
 import { Pill } from "@/components/ui/Pill";
 import { SavedNote } from "@/components/ui/SavedNote";
-import { SAVING } from "@/lib/ui/words";
+import { DRAFTS_GO_TO, DRAFTS_GO_TO_HELP, DRAFTS_GO_TO_NOBODY, SAVING } from "@/lib/ui/words";
 import "./handed.css";
 
 export type RoutingRow = {
@@ -19,8 +19,11 @@ export type RoutingRow = {
   options: { userId: string; name: string; role: string }[];
 };
 
-/** One row per kind: the label, one line of help, and a person to send it to. */
-export function ApprovalRoutingForm({ rows }: { rows: RoutingRow[] }) {
+/** "Drafts go to" (Sprint 4): one staff member, and what can be said about their Outlook. */
+export type DrafterRow = { current: string; options: { userId: string; name: string; role: string }[]; outlook: string | null };
+
+/** One row per kind: the label, one line of help, and a person to send it to. Then "Drafts go to". */
+export function ApprovalRoutingForm({ rows, drafter }: { rows: RoutingRow[]; drafter?: DrafterRow }) {
   const [state, action, pending] = useActionState<ActionState, FormData>(saveApprovalRoutingAction, {});
   return (
     <form action={action} className="lx-card lx-pad lx-routing">
@@ -47,6 +50,29 @@ export function ApprovalRoutingForm({ rows }: { rows: RoutingRow[] }) {
           </select>
         </div>
       ))}
+      {drafter && (
+        <div className="lx-routing-row" data-drafter>
+          <label htmlFor="route-drafter" className="lx-routing-label">
+            {DRAFTS_GO_TO}
+          </label>
+          <p id="route-drafter-help" className="lx-note lx-routing-help">
+            {DRAFTS_GO_TO_HELP}
+          </p>
+          <select id="route-drafter" name="drafter" defaultValue={drafter.current} aria-describedby="route-drafter-help" className="lx-input lx-routing-select">
+            <option value="">{DRAFTS_GO_TO_NOBODY}</option>
+            {drafter.options.map((o) => (
+              <option key={o.userId} value={o.userId}>
+                {o.name} · {roleLabel(o.role)}
+              </option>
+            ))}
+          </select>
+          {drafter.outlook && (
+            <p className="lx-note" data-drafter-outlook>
+              {drafter.outlook}
+            </p>
+          )}
+        </div>
+      )}
       <div className="lx-queue-filters">
         <button type="submit" className="lx-btn lx-btn-pri" disabled={pending}>
           {pending ? SAVING : "Save"}

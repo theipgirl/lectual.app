@@ -37,7 +37,12 @@ import {
   deckSentAt,
   DRAFT_CHANGED_REFRESH,
   SEND_BACK_NOTE_TOO_LONG,
+  PASS_FAILED,
+  PASS_NOT_SWITCHED_ON,
+  QUEUE_DRAFTED_ANYWAY,
+  passedToDrafter,
 } from "@/lib/ui/words";
+import { memberName } from "@/lib/queue/routing";
 
 /**
  * The approval deck's moves. Every one, on every call:
@@ -77,6 +82,11 @@ async function approveResult(outcome: ReviewOutcome, message?: string): Promise<
   if (outcome.kind === "error") return { ok: false, error: outcome.error };
   if (outcome.kind !== "resolved") return { ok: false, error: DECK_FAILED };
   revalidate();
+  // Sprint 4: passed to the drafter (no mailbox draft anywhere), or the pass failed.
+  if (outcome.handoff?.status === "passed") return { ok: true, message: passedToDrafter(await drafterName(outcome.handoff.drafter)), draft: null };
+  if (outcome.handoff?.status === "failed") return { ok: true, message: PASS_FAILED, draft: null };
+  if (outcome.handoff?.status === "not-switched-on" && !message) message = PASS_NOT_SWITCHED_ON;
+  if (outcome.handoff?.status === "queue-drafted" && !message) message = QUEUE_DRAFTED_ANYWAY;
   const drafted = outcome.send === "drafted" || outcome.send === "mailbox-microsoft" || outcome.send === "mailbox-google";
   if (!drafted) return { ok: true, message: message ?? approvedText(outcome.send), draft: null };
   const provider = outcome.provider ?? (outcome.send === "drafted" ? "microsoft" : null);
@@ -88,6 +98,12 @@ async function approveResult(outcome: ReviewOutcome, message?: string): Promise<
     message: message ?? "",
     draft: { provider, webLink: outcome.webLink, draftId: outcome.draftId, canSend: ownOutlook && access === "ready", sendNote: ownOutlook ? sendNoteFor(access) : DECK_SEND_OFF },
   };
+}
+
+async function drafterName(userId: string): Promise<string> {
+  const members = await listMemberDirectory().catch(() => null);
+  const m = members?.find((x) => x.userId === userId);
+  return m ? memberName(m) : "the drafter";
 }
 
 function approvedText(send: string | null): string {
@@ -245,3 +261,4 @@ export async function sendDraftNowAction(rawId: unknown, rawDraftId: unknown): P
   revalidate();
   return { ok: true, message: deckSentAt(time) };
 }
+

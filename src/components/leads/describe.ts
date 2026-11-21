@@ -45,6 +45,7 @@ const MATTER_CHANGE: Record<string, string> = {
   task_edited: "Task edited",
   task_assigned: "Task assigned",
   task_deleted: "Task deleted",
+  close_override: "Closed with an open deadline (attorney override)",
 };
 
 // Column names the matter edits record, in the words a person would say.
@@ -54,6 +55,8 @@ function matterChangeDetail(p: Record<string, unknown>): string | null {
   if (Array.isArray(p.fields)) {
     return (p.fields as string[]).map((f) => FIELD_WORDS[f] ?? f.replaceAll("_", " ")).join(", ");
   }
+  // PGE Sprint 3: the reason the attorney gave for closing past the deadline guard, as they wrote it (staff-only timeline).
+  if (str(p.change) === "close_override") return str(p.reason) ? `Reason: ${str(p.reason)}` : null;
   // A reassigned task: the new assignee is an id (the row never copies a name), so say only the task and whether it was cleared.
   if (str(p.change) === "task_assigned") return [str(p.title), p.assignee_id ? null : "unassigned"].filter(Boolean).join(" · ") || null;
   const due = str(p.due_date) ?? str(p.to);

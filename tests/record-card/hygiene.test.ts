@@ -104,7 +104,7 @@ describe("the record card library", () => {
     expect(code("open.ts")).not.toMatch(/new RegExp|\/\^\(matter/);
   });
 
-  it("is wired only into the Intake and Matters pages and their components (Part 2), never the Weekly review", () => {
+  it("is wired into Intake, Matters and (since the drawer went) the Weekly review page only: no review component reads it", () => {
     const walk = (dir: string, out: string[] = []): string[] => {
       for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
         const p = path.join(dir, e.name);
@@ -116,7 +116,9 @@ describe("the record card library", () => {
     const users = [...walk(path.join(ROOT, "src/app")), ...walk(path.join(ROOT, "src/components"))]
       .filter((f) => /@\/lib\/record-card\//.test(fs.readFileSync(f, "utf8")))
       .map((f) => path.relative(ROOT, f));
-    for (const f of users) expect(f, f).not.toMatch(/^src\/(app\/dashboard|components)\/review\//);
+    // The review PAGE opens the card (loadRecordCard); its components draw only the review's own part and never reach into the library.
+    for (const f of users) expect(f, f).not.toMatch(/^src\/components\/review\/|^src\/app\/dashboard\/review\/(?!page\.tsx$)/);
+    expect(users).toContain("src/app/dashboard/review/page.tsx");
     expect(users.length).toBeGreaterThan(0);
   });
 

@@ -4,7 +4,9 @@ import { getAdminClient } from "@/lib/db/admin";
 import { providerCredentials, rootKeyOrNull } from "./config";
 import { createMailboxDraft, type DraftInput } from "./drafts";
 import { freshAccessToken, type ConnectionRow } from "./sync";
-import { hasSendScope, sendScopeRequested, type MailboxProvider } from "./providers";
+import { hasDraftScope, hasSendScope, sendScopeRequested, type MailboxProvider } from "./providers";
+import { postedConnectionAllowed, type MyOutlookDraftAccess } from "@/lib/queue/draft-handoff";
+import { draftFailureKind } from "./draft-outcome";
 import { sendCheckedDraft, type SendCheck } from "./outlook-send";
 import type { SearchableMailbox } from "@/lib/reconcile/mailbox-search";
 
@@ -117,6 +119,93 @@ export async function sendFromMyOutlook(args: { draftId: string; recipient: stri
   }
   if (!accessToken) return { ok: false, reason: "no-mailbox" };
   return sendCheckedDraft({ accessToken, draftId: args.draftId, recipient: args.recipient, subject: args.subject, approvedAt: args.approvedAt });
+}
+
+/* ─────────────── Sprint 4: the drafter's own Outlook ─────────────── */
+
+/**
+ * The caller's own personal, active Microsoft connection, by THEIR scoped read (lectual 0075 shows a personal row only
+ * to its owner, so this can only ever be the signed-in person's own). Never a connection id from the browser.
+ */
+async function myOwnOutlookRow(): Promise<{ ok: true; row: { id: string; org_id: string; scopes: unknown } | null; anyOther: boolean } | { ok: false }> {
+  try {
+    const supabase = await getScopedClient();
+    // The session's own user: RLS already shows a personal row only to its owner, and the filter says so as well.
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user?.id) return { ok: false };
+    const { data, error } = await supabase
+      .from("mailbox_connection")
+      .select("id, org_id, provider, scopes")
+      .eq("scope", "personal")
+      .eq("status", "active")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: true });
+    if (error) return { ok: false };
+    const rows = (data ?? []) as { id: string; org_id: string; provider: string; scopes: unknown }[];
+    const outlook = rows.find((r) => r.provider === "microsoft") ?? null;
+    return { ok: true, row: outlook ? { id: outlook.id, org_id: outlook.org_id, scopes: outlook.scopes } : null, anyOther: rows.length > 0 };
+  } catch {
+    return { ok: false };
+  }
+}
+
+function draftAccessOf(mine: Awaited<ReturnType<typeof myOwnOutlookRow>>): MyOutlookDraftAccess {
+  if (!mine.ok) return "unavailable";
+  if (!mine.row) return mine.anyOther ? "not-outlook" : "no-mailbox";
+  const scopes = Array.isArray(mine.row.scopes) ? (mine.row.scopes as string[]) : null;
+  return hasDraftScope("microsoft", scopes) ? "ready" : "needs-permission";
+}
+
+/**
+ * Can "Make the draft in my Outlook" run for the signed-in person? A failed read is `unavailable`, never "no mailbox".
+ * A connection id the browser posted that is not the caller's own is `not-yours` (checked before anything is written).
+ */
+export async function myOutlookDraftAccess(postedConnectionId?: unknown): Promise<MyOutlookDraftAccess | "not-yours"> {
+  if (!rootKeyOrNull()) return "unavailable";
+  const mine = await myOwnOutlookRow();
+  if (!postedConnectionAllowed(postedConnectionId, mine.ok && mine.row ? mine.row.id : null)) return "not-yours";
+  return draftAccessOf(mine);
+}
+
+export type OwnOutlookDraft =
+  | { ok: true; id: string; webLink: string | null }
+  /**
+   * `reauth` and `refused`: Graph definitely made no draft. `uncertain`: it may have (a 5xx, a timeout, a reply that couldn't
+   * be read): the caller must not treat it as "no draft" (draft-outcome.ts).
+   */
+  | { ok: false; reason: MyOutlookDraftAccess | "not-yours" | "reauth" | "refused" | "uncertain" };
+
+/**
+ * Make one DRAFT in the caller's OWN Outlook Drafts (never sends; `createMailboxDraft` posts to /me/messages, which
+ * leaves the message in Drafts). The connection is the caller's scoped read, re-read on every call; `postedConnectionId`,
+ * if the browser sent one, must be that same id (another person's id is refused, never used). Its stored scopes must
+ * allow a draft. The sealed token is read by id AND the org the scoped read returned, exactly as `draftInMyMailbox` does.
+ */
+export async function draftInMyOwnOutlook(args: { draft: DraftInput; postedConnectionId?: unknown }): Promise<OwnOutlookDraft> {
+  const root = rootKeyOrNull();
+  if (!root) return { ok: false, reason: "unavailable" };
+  const mine = await myOwnOutlookRow();
+  const access = draftAccessOf(mine);
+  const ownId = mine.ok && mine.row ? mine.row.id : null;
+  if (!postedConnectionAllowed(args.postedConnectionId, ownId)) return { ok: false, reason: "not-yours" };
+  if (access !== "ready" || !mine.ok || !mine.row) return { ok: false, reason: access };
+  let accessToken: string | null;
+  try {
+    accessToken = await openMailboxToken(root, mine.row.id, mine.row.org_id);
+  } catch {
+    return { ok: false, reason: "reauth" };
+  }
+  if (!accessToken) return { ok: false, reason: "no-mailbox" };
+  try {
+    const made = await createMailboxDraft("microsoft", { accessToken, draft: args.draft });
+    return { ok: true, id: made.id, webLink: made.webLink };
+  } catch (err) {
+    // The code and status only: a provider error can carry addresses or message text.
+    if (draftFailureKind(err) === "uncertain") return { ok: false, reason: "uncertain" };
+    return { ok: false, reason: (err as { code?: unknown } | null)?.code === "reauth" ? "reauth" : "refused" };
+  }
 }
 
 /**

@@ -20,7 +20,7 @@ import { TASK_TITLE_MAX } from "@/lib/matters/task-edit";
 import { beginOnce, noShowOffered, type Hold } from "@/lib/record-card/hold";
 import { noShowNotices } from "@/components/record-card/no-show-notices";
 import type { CardMember, CardView, StepLine } from "@/lib/record-card/model";
-import type { TemperatureControl, MenuItem, CardKind } from "@/lib/record-card/rules";
+import { stepAssigneeOptions, stepEditFields, type TemperatureControl, type MenuItem, type CardKind } from "@/lib/record-card/rules";
 import type { ReferralSource } from "@/lib/intake";
 import {
   RECORD_CARD_ADD_STEP,
@@ -34,6 +34,7 @@ import {
   RECORD_CARD_SET_BTN,
   RECORD_CARD_STEP_DONE,
   RECORD_CARD_STEP_DUE,
+  LEAD_PAGE_STEP_OWNER,
   RECORD_CARD_STEP_SAVE,
   RECORD_CARD_STEP_TITLE,
   RECORD_CARD_STAGE,
@@ -290,22 +291,53 @@ export function StagePick({ kind, id, name, stage, onPick }: { kind: CardKind; i
 
 type Step = { id: string; title: string; due: string; overdue: boolean };
 
+/**
+ * Who a step is assigned to, offered only where the page passes the team (the Weekly review's card). `current` is the step's
+ * assignee (edit) or the starting choice (add). Intake and Matters pass nothing and the form is unchanged.
+ */
+export type StepAssignees = { members: readonly CardMember[]; current: string | null };
+
 /** Inline form for one step (edit) or a new one (add). Uses the review's existing actions; the role gate is theirs. */
-export function StepForm({ kind, id, step, dueIso, onDone, autoFocus }: { kind: CardKind; id: string; step: Step | null; dueIso?: string | null; onDone: () => void; autoFocus?: boolean }) {
+export function StepForm({ kind, id, step, dueIso, onDone, autoFocus, assignees }: { kind: CardKind; id: string; step: Step | null; dueIso?: string | null; onDone: () => void; autoFocus?: boolean; assignees?: StepAssignees | null }) {
   const { pending, mark, run } = useRun(onDone);
   const [title, setTitle] = useState(step?.title ?? "");
   const [due, setDue] = useState(dueIso ?? "");
+  // Edit: the picker opens on the step's real assignee (a former member gets their own option). Add: only the team is offered,
+  // and a starting choice that isn't on it starts as Unassigned.
+  const options = assignees ? stepAssigneeOptions(assignees.members, step ? assignees.current : null) : [];
+  const [who, setWho] = useState(() => {
+    const start = assignees?.current ?? "";
+    return options.some((o) => o.value === start) ? start : "";
+  });
+  const [picked, setPicked] = useState(false);
   return (
     <form
-      className="rc-stepform"
+      className={assignees ? "rc-stepform rc-stepform-who" : "rc-stepform"}
       onSubmit={(e) => {
         e.preventDefault();
-        if (step) run(viaForm(updateNextStepAction, { taskId: step.id, title, dueAt: due }));
-        else run(viaForm(setNextStepAction, { kind, id, title, dueAt: due, assigneeId: "" }));
+        if (step) run(viaForm(updateNextStepAction, stepEditFields({ taskId: step.id, title, dueAt: due, assignees: assignees ?? null, chosen: who, picked })));
+        else run(viaForm(setNextStepAction, { kind, id, title, dueAt: due, assigneeId: assignees ? who : "" }));
       }}
     >
       <input className="lx-input" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={TASK_TITLE_MAX} aria-label={RECORD_CARD_STEP_TITLE} placeholder="What happens next" required autoFocus={autoFocus} />
       <input className="lx-input" type="date" value={due} onChange={(e) => setDue(e.target.value)} aria-label={RECORD_CARD_STEP_DUE} />
+      {assignees && (
+        <select
+          className="lx-input"
+          value={who}
+          onChange={(e) => {
+            setWho(e.target.value);
+            setPicked(true);
+          }}
+          aria-label={LEAD_PAGE_STEP_OWNER}
+        >
+          {options.map((o) => (
+            <option key={o.value || "none"} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      )}
       <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
         {pending ? RECORD_CARD_SAVING : step ? RECORD_CARD_STEP_SAVE : RECORD_CARD_ADD_STEP}
       </button>

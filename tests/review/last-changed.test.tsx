@@ -170,14 +170,13 @@ describe("the line on a card, a sheet row and the panel (acceptance 4)", () => {
     expect(html).toContain("Changed by Caitlyn · Nov 16");
   });
 
-  it("the panel shows it as a fact, and none when the read failed", async () => {
-    const { ReviewPanel } = await import("@/components/review/ReviewPanel");
-    const detail = { status: "ok", openId: "x", currentStageId: null, assignedTo: null, cameFrom: null, steps: { ok: true, items: [] }, activity: { ok: true, items: [] }, stages: { ok: true, options: [] }, documents: { files: { status: "unavailable" }, letters: null } };
-    const props = { open: { kind: "matter", id: "x" }, detail, today: "2026-11-17", timeZone: TZ, members: [{ userId: "u-cait", name: "Caitlyn Ross", role: "owner" }], canWrite: false, canMove: false, closeStages: [], closeHref: "/dashboard/review/" };
-    const ok = renderToStaticMarkup(<ReviewPanel {...(props as never)} row={withChange} />);
+  it("the opened record card's review facts show it, and none when the read failed", async () => {
+    const { ReviewCardAside } = await import("@/components/review/ReviewCardExtras");
+    const props = { open: { kind: "matter" as const, id: "x" }, today: "2026-11-17", members: [{ userId: "u-cait", name: "Caitlyn Ross" }], stagesFailed: false, closeStages: [] };
+    const ok = renderToStaticMarkup(<ReviewCardAside {...props} row={withChange} />);
     expect(ok).toContain("Last changed");
     expect(ok).toContain("Changed by Caitlyn · Nov 16");
-    const bad = renderToStaticMarkup(<ReviewPanel {...(props as never)} row={failed} />);
+    const bad = renderToStaticMarkup(<ReviewCardAside {...props} row={failed} />);
     expect(bad).not.toContain("Last changed");
   });
 });

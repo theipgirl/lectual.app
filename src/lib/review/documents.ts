@@ -3,13 +3,12 @@ import { extensionOf } from "@/lib/files/rules";
 import { reviewDocsCount } from "@/lib/ui/words";
 
 /**
- * Pure rules for the documents shown on the weekly review (the detail panel and the Cards deck). The reads
+ * Pure rules for the documents shown on the weekly review (the Cards deck). The reads
  * are `loadDocumentsRead` (src/lib/files/read.ts), reused as they are; this turns their result into what
  * is drawn. States are never collapsed: a read that failed or is not set up is its own flag, and `empty`
  * is true ONLY when every read that was made succeeded and found nothing.
  */
 
-export const PANEL_DOC_MAX = 8;
 export const DECK_DOC_MAX = 3;
 
 /** The reads plus whether the merged leads' history (lectual 0107) could not be listed. */
@@ -62,9 +61,4 @@ export function entryHref(entry: DocEntry): string {
 export function documentsTag(count: number | null | undefined): string | null {
   if (typeof count !== "number" || !Number.isInteger(count) || count <= 0) return null;
   return reviewDocsCount(count);
-}
-
-/** The review's id for the full page's Documents & files card. */
-export function documentsCardHref(kind: "matter" | "lead", id: string): string {
-  return `/dashboard/${kind === "matter" ? "matters" : "leads"}/${id}/#documents`;
 }

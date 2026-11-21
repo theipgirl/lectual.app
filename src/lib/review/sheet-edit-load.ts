@@ -6,7 +6,7 @@ import { sheetLeadStages, type StageChoice } from "./sheet-edit";
 
 /**
  * The stage lists the owner's Sheet offers in its Status picker, read once per page through the scoped client (the same
- * two reads the detail panel makes per record). Each is its own state: a list that couldn't be read is null, and the Status
+ * two reads the opened record card makes per record). Each is its own state: a list that couldn't be read is null, and the Status
  * cells of that kind then get no editor (they never offer an empty or guessed list).
  */
 export async function loadSheetStages(): Promise<{ matter: StageChoice[] | null; lead: StageChoice[] | null }> {

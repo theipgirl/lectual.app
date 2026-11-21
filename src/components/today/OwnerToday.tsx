@@ -26,6 +26,7 @@ import { OwnerNeedsReview } from "@/components/today/owner/OwnerNeedsReview";
 import { OwnerConsults } from "@/components/today/owner/OwnerConsults";
 import { WeekStrip } from "@/components/today/owner/WeekStrip";
 import { CopilotBox } from "@/components/today/owner/CopilotBox";
+import { DeadlineAlertsCard, loadDeadlineAlerts } from "@/components/today/DeadlineAlertsCard";
 import "@/components/today/owner/owner-today.css";
 import {
   OWNER_CARDS_HEADING,
@@ -83,6 +84,8 @@ export async function OwnerToday({
   metadata?: Record<string, unknown> | null;
   now?: Date;
 }) {
+  // The Deadlines card (PGE Sprint 3) reads on its own, started now so it runs beside every other read on this page.
+  const alertsP = loadDeadlineAlerts(userId, now);
   const [hasProposals, tz] = await Promise.all([orgHasModule("proposals").catch(() => false), getFirmTimeZone()]);
   const dealTimes = parseDealTimes(metadata);
   const [deckS, consultsS, deadlinesS, reviewS, proposalsS, membersS] = await Promise.allSettled([
@@ -94,6 +97,7 @@ export async function OwnerToday({
     listMemberDirectory(),
   ]);
 
+  const alertsData = await alertsP;
   // loadDeckSummary never throws; a rejection would be a bug, shown as unavailable.
   const deck: DeckSummary = deckS.status === "fulfilled" ? deckS.value : { status: "unavailable" };
   const consults: TodayConsultsResult | null = consultsS.status === "fulfilled" ? consultsS.value : null;
@@ -252,6 +256,7 @@ export async function OwnerToday({
         )}
 
         <div className="ot-col-deadlines">
+          <DeadlineAlertsCard data={alertsData} userId={userId} />
           <section className="lx-card ot-card" aria-labelledby="ot-deadlines-h">
             <div className="ot-card-head">
               <h2 id="ot-deadlines-h" className="lx-h3">

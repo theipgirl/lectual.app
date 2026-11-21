@@ -692,6 +692,68 @@ export const NOTICE_HANDED_LABEL = "Handed to you";
 export const NOTICE_RETURNED_LABEL = "Sent back";
 export const noticeHandedSentence = (first: string) => `${first} handed you an approval`;
 export const noticeReturnedSentence = (first: string) => `${first} sent an approval back`;
+/* Sprint 4: approved emails passed to the drafter, who makes the draft in their OWN Outlook. */
+export const NOTICE_DRAFT_TO_LABEL = "Ready to draft";
+export const noticeDraftToSentence = (first: string) => `${first} approved an email · Make the draft`;
+export const READY_TO_DRAFT = "Ready to draft";
+export const readyToDraftCount = (n: number) => `${READY_TO_DRAFT} (${n})`;
+export const MAKE_DRAFT_BUTTON = "Make the draft in my Outlook";
+export const MAKE_DRAFT_TITLE = "Make the draft";
+export const makeDraftIntro = (approverName: string) =>
+  `${approverName} approved this email. Make the draft in your own Outlook, check it there and press Send. Nothing has reached the client yet.`;
+export const MAKE_DRAFT_DONE = "The draft is in your Outlook Drafts. Open it there and press Send. Nothing has reached the client yet.";
+export const MAKE_DRAFT_ALREADY = "This one is already drafted in your Outlook. Nothing else was made.";
+/** The attempt was claimed, the draft failed, and even the failure couldn't be recorded: a person checks it. */
+export const MAKE_DRAFT_CLAIMED_FAILED = "The draft couldn't be made. Ask Lectual.";
+/** The draft failed and the failure was recorded: the button is offered again. */
+export const MAKE_DRAFT_FAILED_RETRY = "The draft couldn't be made. Nothing was sent. Try again.";
+export const MAKE_DRAFT_FAILED_RECONNECT = "The draft couldn't be made because your Outlook needs reconnecting. Reconnect it, then try again.";
+/** Another click claimed this attempt first (a second tab, a double click). */
+export const MAKE_DRAFT_IN_PROGRESS = "This one is already being drafted. Check your Outlook Drafts before trying again.";
+/** A claimed attempt with no outcome (a crash in between): never "Drafted". The approved text is shown below it. */
+export const MAKE_DRAFT_CHECK_DRAFTS = "Check your Drafts. If it isn't there, copy the approved text below.";
+export const MAKE_DRAFT_DONE_NOT_RECORDED = "The draft is in your Outlook Drafts, but Lectual couldn't record it. Don't make it again: check your Drafts.";
+export const APPROVED_TEXT_LABEL = "Approved text";
+/** On an open claim (drafting, no outcome), for the drafter: records that attempt as failed so it can be made again. */
+export const CLEAR_CLAIM_BUTTON = "It isn't in my Drafts, try again";
+export const CLEAR_CLAIM_DONE = "Noted. You can make the draft again.";
+export const CLEAR_CLAIM_NOTHING_OPEN = "There's no draft waiting to be checked on this one. Refresh to see where it is.";
+/** SHOULD 4: the drafter's Ready to draft read failed. */
+export const READY_TO_DRAFT_UNCHECKED = "Couldn't check what's ready to draft.";
+export const RETRY_PASS_NO_MARKER = "There's no record that passing this one failed, so it can't be passed again from here.";
+/* S3: the approver retries a pass that didn't go through. */
+export const passToDrafterButton = (name: string) => `Pass to ${name}`;
+export const RETRY_PASS_INTRO =
+  "This approved email hasn't been passed to the drafter. If passing it didn't go through, pass it again. Use this only if no draft of it was made anywhere.";
+export const RETRY_PASS_NOT_YOURS = "Only the person who approved this email can pass it on.";
+export const RETRY_PASS_NO_DRAFTER = "There's no one else to pass this to. Check Drafts go to in Approval settings.";
+export const RETRY_PASS_ALREADY = "This email has already been passed on. Nothing else was done.";
+export const MAKE_DRAFT_NOT_YOURS = "This email isn't waiting on your draft. Refresh to see what's left.";
+export const MAKE_DRAFT_NOT_APPROVED = "Only an approved client email can be drafted from here.";
+export const MAKE_DRAFT_CHANGED = "This email changed after it was approved, so no draft was made. Ask for it to be approved again.";
+export const MAKE_DRAFT_COULDNT_CHECK = "Couldn't check what's ready to draft. Refresh to try again.";
+export const MAKE_DRAFT_PREVIEW_ONLY = "Preview only: drafts aren't made while you're viewing as the firm.";
+export const MAKE_DRAFT_FAILED = "Couldn't make the draft in your Outlook. Nothing was sent. Refresh to try again.";
+export const MAKE_DRAFT_NO_OUTLOOK = "Connect your own Outlook to make drafts here.";
+export const MAKE_DRAFT_NOT_OUTLOOK = "Only a Gmail mailbox is connected. Connect your own Outlook to make drafts here.";
+export const MAKE_DRAFT_NEEDS_PERMISSION = "Reconnect your Outlook and allow it to save drafts.";
+export const MAKE_DRAFT_OUTLOOK_UNREAD = "Couldn't check your Outlook. Refresh to try again.";
+export const CONNECT_OUTLOOK_LINK = "Connect Outlook";
+export const DRAFTED_IN_OUTLOOK = "Drafted in your Outlook.";
+/** The approve outcome when the email was passed to the drafter. */
+export const passedToDrafter = (name: string) => `Approved and passed to ${name}, who makes the draft in their own Outlook. Nothing has reached the client yet.`;
+export const PASS_FAILED =
+  "Approved, but passing it to the drafter didn't go through, so no draft was made anywhere. Open the approval to copy it, or ask Lectual to check.";
+/** Before lectual 0112: passing to the drafter isn't on, so the approver's own mailbox was used (today's behaviour). */
+export const PASS_NOT_SWITCHED_ON = notReadyYet("Passing approved emails to the drafter");
+export const QUEUE_DRAFTED_ANYWAY = "Approved and drafted by the approval queue, so it wasn't passed to the drafter.";
+/* Settings -> Approvals: "Drafts go to". */
+export const DRAFTS_GO_TO = "Drafts go to";
+export const DRAFTS_GO_TO_HELP =
+  "When someone else approves a client email, it waits on this person, who makes the draft in their own Outlook and sends it. With nobody chosen, the approver gets the draft, as today.";
+export const DRAFTER_OUTLOOK_READY = "Your Outlook is connected and can save drafts.";
+export const DRAFTS_GO_TO_NOBODY = "The approver (default)";
+export const DRAFTER_DROPPED = "The saved drafter is no longer on your team, so approvers get the drafts until you choose someone.";
 /* Phase 2: each person sets their own two deal times (owner view). */
 export const DEAL_TIMES_TITLE = "Your deal times";
 export const DEAL_TIMES_OPEN = "Change deal times";
@@ -962,13 +1024,9 @@ export const DOCUMENTS_NAME = "Documents";
 export const NEW_LETTER = "New letter";
 
 // Review documents
-/** The weekly review's detail panel and Cards deck: a record's documents, and the way to comment on one. */
+/** The weekly review's Cards deck: a record's documents. (An opened record uses the Documents & files card.) */
 export const REVIEW_DOCS_TITLE = "Documents";
 export const REVIEW_DOCS_EMPTY = "No documents yet.";
-export const REVIEW_DOCS_OPEN_ALL = "Open all documents";
-export const REVIEW_DOCS_COMMENT = "Comment on a document";
-export const REVIEW_DOCS_COMMENT_HINT = "Your comment is added to the timeline.";
-export const REVIEW_DOCS_OPEN = "Open";
 export const reviewDocsMore = (n: number, capped = false) => (capped ? `+${n} or more` : `+${n} more`);
 export const REVIEW_DOCS_LOAD_FAILED = "Documents couldn't be loaded.";
 export const reviewDocsCount = (n: number) => `${n} ${n === 1 ? "document" : "documents"}`;
@@ -1153,6 +1211,8 @@ export const RECORD_CARD_NO_STEP = "No next step";
 export const RECORD_CARD_ADD_STEP = "Add a next step";
 export const RECORD_CARD_UNASSIGNED = "Unassigned";
 export const RECORD_CARD_A_TEAMMATE = "A teammate";
+/** A step's "who" picker: the step's current assignee is not in the team list (`stepAssigneeOptions`). */
+export const STEP_ASSIGNEE_NOT_ON_TEAM = "Someone no longer on the team";
 export const RECORD_CARD_NO_ACTIVITY = "No activity yet";
 export const RECORD_CARD_ACTIVITY_FAILED = "Couldn't load last activity";
 export const recordCardLastActivity = (when: string) => `Last activity ${when}`;
@@ -1307,3 +1367,55 @@ export const LANE_NOTHING_FOR_US = "Nothing for us to do here.";
 export const LANE_NOBODY_WAITING = "Nobody is waiting on a client.";
 /** What the number beside a person's name counts. */
 export const LANE_COUNT_NOTE = "Cards in this column: our turn plus waiting on client";
+
+// Weekly review: a record opens in the centred record card (no drawer). The review's own facts and actions sit in the card.
+export const REVIEW_CARD_HEADING = "On the weekly review";
+export const REVIEW_CARD_NOT_ON_REVIEW = "This record isn't on the weekly review right now.";
+export const reviewCardStageDays = (n: number) => `${n}d in stage`;
+export const REVIEW_CARD_USPTO_DEADLINE = "USPTO deadline";
+/** The Cards deck's "Add to timeline" note box. */
+export const REVIEW_LOG_LABEL = "What happened";
+export const REVIEW_LOG_PLACEHOLDER = "A short note for the timeline";
+
+// PGE Sprint 3 Part A: deadline safety.
+/** The tag on a filed trademark with no open docket entry (matter page, Matters list, Weekly review). Never moves a row. */
+export const NO_OPEN_DEADLINE = "No open deadline";
+export const NO_OPEN_DEADLINE_HINT = "This trademark is filed and nothing is open on its docket. Add the next USPTO deadline, or close the matter if the work is done.";
+/** A failed deadlines read: nothing is flagged, and this is said instead. */
+export const DEADLINES_COULDNT_LOAD = "Deadlines couldn't load. Refresh to try again.";
+export const DEADLINE_FLAGS_UNCHECKED = "Deadlines couldn't load, so filed matters weren't checked for a missing deadline. Refresh to try again.";
+/** The Today "Deadlines" card, drawn for the members chosen in Settings. */
+export const DEADLINE_CARD_HEADING = "Deadlines";
+export const DEADLINE_CARD_OVERDUE = "Overdue";
+export const DEADLINE_CARD_WEEK = "Due in the next 7 days";
+export const DEADLINE_CARD_MONTH = "Due in 8 to 30 days";
+export const DEADLINE_CARD_NONE = "No open deadlines in the next 30 days.";
+export const DEADLINE_CARD_FAILED = "Couldn't load";
+export const DEADLINE_UNCONFIRMED = "Unconfirmed";
+export const DEADLINE_ALERTS_UNCHECKED = "Deadline alerts couldn't be checked. Refresh to try again.";
+export const deadlineCardMore = (n: number) => `and ${n} more`;
+/** A Deadlines card read reached its cap: said, never silent. */
+export const DEADLINE_CARD_CUT = "Not every deadline could be listed here.";
+export const DEADLINE_CARD_OPEN_CALENDAR = "Open the calendar";
+/** The bell notice when a deadline enters the 30- or 7-day window. Ids and the deadline's title only. */
+export const DEADLINE_NOTICE_LABEL = "Deadline";
+export const deadlineNoticeSentence = (window: number, title: string | null) => `${title ?? "A deadline"} is due within ${window} days`;
+/** Settings -> Team: who gets the alerts. */
+export const DEADLINE_ALERTS_SETTINGS_HEADING = "Deadline alerts";
+export const DEADLINE_ALERTS_SETTINGS_HELP = "The people chosen here see the Deadlines card on Today and get a notice in the bell when a deadline is 30 days out and again at 7 days. Everyone still sees deadlines on the matter page.";
+export const DEADLINE_ALERTS_NONE_CHOSEN = "Nobody is chosen yet, so nobody gets deadline alerts.";
+export const DEADLINE_ALERTS_INELIGIBLE = "Viewers and social media members can\u2019t get deadline alerts. Pick someone else.";
+export const DEADLINE_ALERTS_SAVE = "Save alert recipients";
+/** The Weekly review's deadlines strip. */
+export const REVIEW_DEADLINES_HEADING = "Deadlines";
+export const REVIEW_DEADLINES_NONE = "No open deadlines in this view.";
+export const REVIEW_DEADLINE_CONFIRMED = "Confirmed";
+/** Closing a matter that still has an open deadline (an attorney, with a reason). */
+export const CLOSE_OVERRIDE_SUMMARY = "Close with an open deadline";
+export const CLOSE_OVERRIDE_HELP = "This matter has an open deadline. An attorney can still close it with a reason. The reason goes on the timeline.";
+export const CLOSE_OVERRIDE_REASON = "Reason (required, up to 300 characters)";
+export const CLOSE_OVERRIDE_CONFIRM = "I understand this matter will close with that deadline still open.";
+export const CLOSE_OVERRIDE_BUTTON = "Close the matter";
+export const CLOSE_OVERRIDE_DONE = "Closed. The reason is on the timeline.";
+/** The pre-0110 override closed the matter, could not write its reason, and could not put the status back either. */
+export const CLOSE_OVERRIDE_UNRECORDED = "The matter was closed, but the reason couldn't be recorded. Tell Lectual.";

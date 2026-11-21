@@ -18,7 +18,7 @@ import {
 /**
  * Morning brief: a BRIEFING draft for the attorney, in the approval queue, with six sections
  * (today's consults, leads waiting on a reply, pending stage suggestions, stalled leads, deadlines in
- * the next 14 days, the queue count), plus a follow-up CLIENT_EMAIL draft for each stalled lead
+ * the next 30 days (two windows, 7 and 8 to 30), the queue count), plus a follow-up CLIENT_EMAIL draft for each stalled lead
  * (at most five a run).
  *
  * It only drafts. Everything goes to the queue; nothing is sent, no lead is moved, no stage changes.

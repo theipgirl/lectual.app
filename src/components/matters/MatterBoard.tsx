@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { BoardCard, BoardColumn, Pill } from "@/components/ui";
-import { columnEmpty } from "@/lib/ui/words";
+import { NO_OPEN_DEADLINE, NO_OPEN_DEADLINE_HINT, columnEmpty } from "@/lib/ui/words";
 import type { Matter } from "@/lib/matters";
 import type { MatterStage } from "@/lib/matters/stages";
 import { buildBoard } from "@/lib/matters/board";
@@ -32,6 +32,8 @@ export function MatterBoard(props: {
   /** matter id -> the queue item to review; the Review pill links to it. */
   reviewItems?: ReadonlyMap<string, string>;
   ownerName: (id: string | null) => string | null;
+  /** PGE Sprint 3: filed trademarks with no open deadline (a tag only). Absent or empty = none flagged. */
+  noDeadlineIds?: ReadonlySet<string>;
   /** Sprint 10: what each role may do on each card, the open link and the lines. Absent: the plain board, as before. */
   cards?: Record<string, MatterCardData>;
 }) {
@@ -43,6 +45,7 @@ export function MatterBoard(props: {
     const owner = props.ownerName(m.assigned_to);
     const reviewId = props.reviewItems?.get(m.id);
     const needsReview = props.reviewIds.has(m.id);
+    const noDeadline = props.noDeadlineIds?.has(m.id) ?? false;
     const rc = props.cards?.[m.id];
     return (
       <BoardCard
@@ -61,14 +64,23 @@ export function MatterBoard(props: {
           ) : undefined
         }
         foot={
-          needsReview ? (
-            reviewId ? (
-              <Link href={reviewHref(reviewId)} className="lx-pill lx-pill-warn">
-                Review
-              </Link>
-            ) : (
-              <Pill tone="warn">Review</Pill>
-            )
+          needsReview || noDeadline ? (
+            <>
+              {needsReview &&
+                (reviewId ? (
+                  <Link href={reviewHref(reviewId)} className="lx-pill lx-pill-warn">
+                    Review
+                  </Link>
+                ) : (
+                  <Pill tone="warn">Review</Pill>
+                ))}
+              {needsReview && noDeadline && " "}
+              {noDeadline && (
+                <Pill tone="risk" title={NO_OPEN_DEADLINE_HINT}>
+                  {NO_OPEN_DEADLINE}
+                </Pill>
+              )}
+            </>
           ) : undefined
         }
         step={rc ? <MatterCardFoot card={rc} /> : undefined}

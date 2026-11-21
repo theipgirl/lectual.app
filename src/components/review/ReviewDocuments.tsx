@@ -1,13 +1,11 @@
 import { FILE_MESSAGES } from "@/lib/files/rules";
 import type { DocEntry } from "@/lib/files/read";
 import { civilDateIn } from "@/lib/review/build";
-import { DECK_DOC_MAX, type RecordDocuments, PANEL_DOC_MAX, documentsCardHref, documentsView, entryHref, entryKindLabel } from "@/lib/review/documents";
+import { DECK_DOC_MAX, type RecordDocuments, documentsView, entryHref, entryKindLabel } from "@/lib/review/documents";
 import { shortDate } from "@/lib/review/format";
-import type { OpenRef } from "@/lib/review/open";
-import { REVIEW_DOCS_COMMENT, REVIEW_DOCS_COMMENT_HINT, REVIEW_DOCS_EMPTY, REVIEW_DOCS_LOAD_FAILED, REVIEW_DOCS_OPEN_ALL, REVIEW_DOCS_TITLE, reviewDocsMore } from "@/lib/ui/words";
+import { REVIEW_DOCS_EMPTY, REVIEW_DOCS_LOAD_FAILED, REVIEW_DOCS_TITLE, reviewDocsMore } from "@/lib/ui/words";
 import { MERGE_HISTORY_PARTIAL } from "@/lib/ui/words";
 import { FILES_ERROR_LINE, LETTERS_ERROR_LINE } from "@/components/files/DocumentsCard";
-import { ReviewUpload } from "./ReviewUpload";
 import "./review.css";
 
 type Member = { userId: string; name: string };
@@ -57,60 +55,6 @@ function Entry({ entry, today, timeZone }: { entry: DocEntry; today: string; tim
         <span className="lx-note rv-sub">{[entryKindLabel(entry), when, entry.who].filter(Boolean).join(" · ")}</span>
       </span>
     </li>
-  );
-}
-
-/** The detail panel's Documents section. The comment entry point is the panel's own "Log what happened" form (an anchor to its id). */
-export function ReviewDocuments({
-  open,
-  documents,
-  members,
-  today,
-  timeZone,
-  canWrite,
-  canUpload = false,
-}: {
-  open: OpenRef;
-  documents: RecordDocuments;
-  members: Member[];
-  today: string;
-  timeZone: string;
-  canWrite: boolean;
-  /** Same list as the Documents & files card (FILE_UPLOAD_ROLES). Nothing is drawn for anyone else. */
-  canUpload?: boolean;
-}) {
-  const view = documentsView(documents, members, PANEL_DOC_MAX);
-  return (
-    <section className="rv-panel-sec" id="rv-sec-docs" aria-labelledby="rv-sec-docs-h">
-      <h3 id="rv-sec-docs-h" className="lx-label">
-        {REVIEW_DOCS_TITLE}
-      </h3>
-      <States view={view} />
-      {view.shown.length > 0 && (
-        <ul className="rv-steps rv-docs">
-          {view.shown.map((e) => (
-            <Entry key={`${e.kind}:${e.id}`} entry={e} today={today} timeZone={timeZone} />
-          ))}
-        </ul>
-      )}
-      {view.more > 0 && (
-        <p className="lx-note" style={{ margin: 0 }}>
-          {reviewDocsMore(view.more, view.capped)}
-        </p>
-      )}
-      {canUpload && !view.filesNotSetUp && <ReviewUpload parent={{ kind: open.kind, id: open.id }} />}
-      <p style={{ margin: 0, display: "flex", gap: 12, flexWrap: "wrap" }}>
-        {/* A plain anchor: the href reaches the page exactly as built (the trailing slash and the #documents anchor). */}
-        <a href={documentsCardHref(open.kind, open.id)} className="rv-panel-full lx-link">
-          {REVIEW_DOCS_OPEN_ALL}
-        </a>
-        {canWrite && (
-          <a href="#rv-sec-note" className="rv-panel-full lx-link" title={REVIEW_DOCS_COMMENT_HINT}>
-            {REVIEW_DOCS_COMMENT}
-          </a>
-        )}
-      </p>
-    </section>
   );
 }
 

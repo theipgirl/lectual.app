@@ -201,3 +201,36 @@ describe("every reader of the card events folds them with the trust rule", () =>
     }
   });
 });
+
+describe("Sprint 4: draft_to and drafted in the fold", () => {
+  // Approved by Rebecca at 13:00; every event below is written after that (at() starts at 13:00 and only counts up).
+  const apc = qitem({ id: "apc", status: "approved", resolved_by: "rebecca@example.com", resolved_at: "2026-11-10T12:59:00Z" });
+  const afu = followup({ id: "afu", status: "approved", resolved_by: "mallory@example.com", resolved_at: "2026-11-10T12:59:00Z" });
+  const approvedItems = [apc, afu];
+  const draftTo = (actorId: string, targetUserId: string, queueItemId = "apc"): CardEvent => ({ queueItemId, kind: "draft_to", actorId, targetUserId, until: null, note: null, createdAt: at() });
+  const drafted = (actorId: string, queueItemId = "apc"): CardEvent => ({ queueItemId, kind: "drafted", actorId, targetUserId: null, until: null, note: null, createdAt: at() });
+  const fold = (events: CardEvent[], routing: ApprovalRouting = {}) => trustedEvents(events, approvedItems, known(routing));
+
+  it("a draft_to counts only from the member who approved the item, to a current staff member", () => {
+    expect(fold([draftTo(U.rebecca, U.caitlyn)])).toHaveLength(1);
+    expect(fold([draftTo(MALLORY, MALLORY)])).toHaveLength(0); // not the approver
+    expect(fold([draftTo(U.taylor, U.caitlyn)])).toHaveLength(0); // the owner, but not the approver of this item
+    expect(fold([draftTo(U.rebecca, U.viewer)])).toHaveLength(0); // a viewer can't hold a draft
+    expect(fold([draftTo(U.rebecca, U.ghost)])).toHaveLength(0); // not a member
+  });
+
+  it("a routed non-approver who approved a routine item may pass it; on a pending item nobody can", () => {
+    expect(fold([draftTo(MALLORY, U.caitlyn, "afu")], { stalled_followup: MALLORY })).toHaveLength(1);
+    expect(trustedEvents([draftTo(U.rebecca, U.caitlyn, "pc")], items, known())).toHaveLength(0); // pc is still pending
+  });
+
+  it("a drafted counts only from the current draft_to target", () => {
+    expect(fold([draftTo(U.rebecca, U.caitlyn), drafted(MALLORY)])).toHaveLength(1);
+    expect(fold([draftTo(U.rebecca, U.caitlyn), drafted(U.caitlyn)])).toHaveLength(2);
+    expect(fold([drafted(U.caitlyn)])).toHaveLength(0);
+  });
+
+  it("neither is a hand-off: the holder is untouched", () => {
+    expect(holderOf([handoff(U.rebecca, U.caitlyn), draftTo(U.rebecca, MALLORY, "pc"), drafted(MALLORY, "pc")])?.userId).toBe(U.caitlyn);
+  });
+});

@@ -174,9 +174,11 @@ describe("morning-brief (F3): the six sections from fixtures", () => {
     ],
     crm_matter: [{ id: MATTER, org_id: ORG, matter_number: "TM-0042", title: "Sankofa", mark_text: "SANKOFA" }],
     crm_matter_deadline: [
-      // today is Sep 25, so day 14 is Oct 9 and day 15 is Oct 10
-      { id: "d14", org_id: ORG, matter_id: MATTER, kind: "office_action_response", title: null, due_date: "2026-10-09", attorney_confirmed: true, status: "open" },
-      { id: "d15", org_id: ORG, matter_id: MATTER, kind: "statement_of_use", title: "Day fifteen", due_date: "2026-10-10", attorney_confirmed: true, status: "open" },
+      // today is Sep 25: day 7 is Oct 2, day 8 Oct 3, day 30 Oct 25, day 31 Oct 26 (PGE Sprint 3: the two windows, 7 and 8..30)
+      { id: "d7", org_id: ORG, matter_id: MATTER, kind: "office_action_response", title: null, due_date: "2026-10-02", attorney_confirmed: true, status: "open" },
+      { id: "d8", org_id: ORG, matter_id: MATTER, kind: "statement_of_use", title: "Day eight", due_date: "2026-10-03", attorney_confirmed: true, status: "open" },
+      { id: "d30", org_id: ORG, matter_id: MATTER, kind: "statement_of_use", title: "Day thirty", due_date: "2026-10-25", attorney_confirmed: false, status: "open" },
+      { id: "d31", org_id: ORG, matter_id: MATTER, kind: "section_9_renewal", title: "Day thirty-one", due_date: "2026-10-26", attorney_confirmed: true, status: "open" },
       { id: "dest", org_id: ORG, matter_id: MATTER, kind: "section_8_declaration", title: "Estimated filing", due_date: "2026-09-30", attorney_confirmed: false, status: "open" },
       { id: "dpast", org_id: ORG, matter_id: MATTER, kind: "other", title: "Yesterday", due_date: "2026-09-24", attorney_confirmed: true, status: "open" },
       { id: "ddone", org_id: ORG, matter_id: MATTER, kind: "other", title: "Done already", due_date: "2026-09-28", attorney_confirmed: true, status: "satisfied" },
@@ -200,7 +202,7 @@ describe("morning-brief (F3): the six sections from fixtures", () => {
 
     expect(brief.headline).toBe("Morning brief for Fri Sep 25, 2026");
     const body = brief.draftBody;
-    const order = ["Today's consults", "Leads waiting on a reply", "Pending stage suggestions", "Stalled leads", "Matters with deadlines in the next 14 days", "The queue"].map((t) => body.indexOf(t));
+    const order = ["Today's consults", "Leads waiting on a reply", "Pending stage suggestions", "Stalled leads", "Deadlines in the next 7 days", "Deadlines in 8 to 30 days", "The queue"].map((t) => body.indexOf(t));
     expect(order.every((i) => i >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
 
@@ -224,22 +226,31 @@ describe("morning-brief (F3): the six sections from fixtures", () => {
     expect(stalled).toContain("Dana stalled");
     expect(stalled).not.toContain("Dana hired");
 
-    // deadlines: day 14 in, day 15 out, unconfirmed ones labelled as estimates
-    const dl = section(body, "Matters with deadlines in the next 14 days");
-    expect(dl).toContain("Matters with deadlines in the next 14 days (2)");
-    expect(dl).toContain("Oct 9");
-    expect(dl).toContain("(confirmed by the attorney)");
-    expect(dl).not.toContain("Oct 10");
-    expect(dl).not.toContain("Yesterday");
-    expect(dl).not.toContain("Done already");
-    expect(dl).toContain("Estimated filing");
-    expect(dl).toContain("(estimate, confirm against TSDR)");
-    expect(dl).toContain("TM-0042 SANKOFA");
+    // deadlines (PGE Sprint 3): the same two windows as Today's card. Day 7 is in the 7-day window, day 8 and day 30 in
+    // the 30-day one, day 31 out; unconfirmed ones labelled as estimates; past and closed-out ones never listed.
+    const week = section(body, "Deadlines in the next 7 days");
+    expect(week).toContain("Deadlines in the next 7 days (2)");
+    expect(week).toContain("Oct 2");
+    expect(week).toContain("(confirmed by the attorney)");
+    expect(week).toContain("Estimated filing");
+    expect(week).toContain("(estimate, confirm against TSDR)");
+    expect(week).toContain("TM-0042 SANKOFA");
+    expect(week).not.toContain("Day eight");
+    const month = section(body, "Deadlines in 8 to 30 days");
+    expect(month).toContain("Deadlines in 8 to 30 days (2)");
+    expect(month).toContain("Day eight");
+    expect(month).toContain("Day thirty");
+    expect(month).not.toContain("Estimated filing");
+    for (const sec of [week, month]) {
+      expect(sec).not.toContain("Day thirty-one");
+      expect(sec).not.toContain("Yesterday");
+      expect(sec).not.toContain("Done already");
+    }
 
     // the queue count
     expect(section(body, "The queue")).toContain("3 items are waiting for review");
 
-    expect(result.itemsIn).toBe(1 + 1 + 1 + 1 + 2); // consult, waiting, suggestion, stalled, two deadlines
+    expect(result.itemsIn).toBe(1 + 1 + 1 + 1 + 4); // consult, waiting, suggestion, stalled, four deadlines in 30 days
     assertOrgFenced(log);
   });
 
@@ -326,7 +337,8 @@ describe("morning-brief (F4): a failed read is reported, never an empty section"
     ["the lead list", failing(stagesRead), "Leads waiting on a reply (could not be read)"],
     ["the calendar", failing(calendar), "Today's consults (could not be read)"],
     ["the suggestions", failing(suggestions), "Pending stage suggestions (could not be read)"],
-    ["the docket", failing(deadlines), "Matters with deadlines in the next 14 days (could not be read)"],
+    ["the docket", failing(deadlines), "Deadlines in the next 7 days (could not be read)"],
+    ["the docket (30 days)", failing(deadlines), "Deadlines in 8 to 30 days (could not be read)"],
     ["the queue", () => undefined, "The queue (could not be read)", "fail"],
   ];
   it.each(cases)("%s failing: the brief is still written and says so", async (_name, failures, heading, pending) => {

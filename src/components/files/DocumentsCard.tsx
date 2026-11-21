@@ -6,7 +6,9 @@ import "./files.css";
 import { buildEntries, LIST_CAP, type Directory, type DocEntry, type DocumentsRead } from "@/lib/files/read";
 import type { FileParentInput } from "@/lib/files/guard";
 import { FILE_MESSAGES, formatFileSize } from "@/lib/files/rules";
+import { DeleteAndRefresh } from "./DeleteAndRefresh";
 import { DeleteFileButton } from "./DeleteFileButton";
+import { UploadAndRefresh } from "./UploadAndRefresh";
 import { UploadControl } from "./UploadControl";
 
 /**
@@ -30,7 +32,7 @@ export const FILES_ERROR_LINE =
 export const LETTERS_ERROR_LINE =
   "Generated letters couldn't be loaded. Refresh to try again.";
 
-function Entry({ entry, now, tz, canDelete }: { entry: DocEntry; now?: number; tz: string; canDelete: boolean }) {
+function Entry({ entry, now, tz, canDelete, refresh }: { entry: DocEntry; now?: number; tz: string; canDelete: boolean; refresh: boolean }) {
   const href = entry.kind === "file" ? `/dashboard/files/${entry.id}/download/` : `/dashboard/documents/${entry.id}/download/`;
   const meta = [entry.kind === "file" ? formatFileSize(entry.sizeBytes) : entry.typeLabel, entry.who, formatRelative(entry.at, { tz, now: now === undefined ? undefined : new Date(now) }) ?? BLANK]
     .filter(Boolean)
@@ -48,7 +50,7 @@ function Entry({ entry, now, tz, canDelete }: { entry: DocEntry; now?: number; t
         <a href={href} className="lx-btn lx-btn-sec lx-btn-sm">
           Download
         </a>
-        {entry.kind === "file" && canDelete && <DeleteFileButton fileId={entry.id} name={entry.name} />}
+        {entry.kind === "file" && canDelete && (refresh ? <DeleteAndRefresh fileId={entry.id} name={entry.name} /> : <DeleteFileButton fileId={entry.id} name={entry.name} />)}
       </span>
     </li>
   );
@@ -62,6 +64,7 @@ export function DocumentsCard({
   canDelete,
   now,
   tz = DEFAULT_TIME_ZONE,
+  refreshAfterUpload = false,
 }: {
   parent: FileParentInput;
   read: DocumentsRead;
@@ -72,6 +75,8 @@ export function DocumentsCard({
   now?: number;
   /** The firm's time zone, for the dates. */
   tz?: string;
+  /** Drawn on a page that is not the record's own (the Weekly review's card): the page refreshes itself after an upload AND after a delete. */
+  refreshAfterUpload?: boolean;
 }) {
   const { files, letters } = read;
   const entries = buildEntries(read, directory);
@@ -96,14 +101,14 @@ export function DocumentsCard({
       {files.status === "not-set-up" && (
         <p className="lx-note">{FILE_MESSAGES.notSetUp}</p>
       )}
-      {canUpload && files.status !== "not-set-up" && <UploadControl parent={parent} />}
+      {canUpload && files.status !== "not-set-up" && (refreshAfterUpload ? <UploadAndRefresh parent={parent} /> : <UploadControl parent={parent} />)}
       {everyReadWorked && entries.length === 0 && (
         <EmptyState variant="line">{EMPTY_LINE}</EmptyState>
       )}
       {entries.length > 0 && (
         <ul className="lx-list">
           {entries.map((entry) => (
-            <Entry key={`${entry.kind}:${entry.id}`} entry={entry} now={now} tz={tz} canDelete={canDelete} />
+            <Entry key={`${entry.kind}:${entry.id}`} entry={entry} now={now} tz={tz} canDelete={canDelete} refresh={refreshAfterUpload} />
           ))}
         </ul>
       )}

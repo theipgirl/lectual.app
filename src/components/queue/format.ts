@@ -1,5 +1,5 @@
 import type { QueueItem } from "@/lib/queue/api";
-import { BLANK, DECK_CHIP_DONE, DONE_OUTCOME_TEXT, FROM_THEIR_EMAILS } from "@/lib/ui/words";
+import { BLANK, DECK_CHIP_DONE, DONE_OUTCOME_TEXT, FROM_THEIR_EMAILS, PASS_FAILED, passedToDrafter } from "@/lib/ui/words";
 import { formatDayTime } from "@/lib/ui/dates";
 import type { PillTone } from "@/lib/ui/tones";
 import { isDoneItem } from "@/lib/queue/done";
@@ -66,7 +66,13 @@ export const STATUS_PILL: Record<QueueStatus, { label: string; tone: PillTone }>
  * What actually happened after approval. "Approved" alone made an unsent
  * message look handled, so every outcome says where the message is now.
  */
-export function outcomeText(resolved: string | undefined, send: string | undefined, done?: boolean): { tone: "ok" | "warn" | "risk"; text: string } | null {
+export function outcomeText(
+  resolved: string | undefined,
+  send: string | undefined,
+  done?: boolean,
+  /** Sprint 4: the drafter's name, for "passed to <name>". */
+  drafterName?: string | null,
+): { tone: "ok" | "warn" | "risk"; text: string } | null {
   if (resolved === "reject" && done) return { tone: "ok", text: DONE_OUTCOME_TEXT };
   if (resolved === "reject") return { tone: "risk", text: "Rejected. The note goes back to the drafting assistant — nothing was sent." };
   if (resolved !== "approve") return null;
@@ -81,6 +87,10 @@ export function outcomeText(resolved: string | undefined, send: string | undefin
       };
     case "sent":
       return { tone: "ok", text: "Approved and sent from the firm's mailbox." };
+    case "passed":
+      return { tone: "ok", text: passedToDrafter(drafterName?.trim() || "the drafter") };
+    case "pass-failed":
+      return { tone: "risk", text: PASS_FAILED };
     case "manual":
       return { tone: "warn", text: "Approved. This type isn't emailed — file or deliver it the usual way." };
     case "failed":

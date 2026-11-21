@@ -415,12 +415,20 @@ export function withMatterMoveStages(load: RecordCardLoad, moveStages?: readonly
 }
 
 /** The opened card for `?open=`. A foreign or missing id carries no field of the record, only the sentence. */
-export function buildOpenedCard(load: RecordCardLoad, page: { path: string; params: CurrentParams }): OpenedCardView {
+export function buildOpenedCard(
+  load: RecordCardLoad,
+  page: {
+    path: string;
+    params: CurrentParams;
+    /** The Weekly review opens the card with its old drawer's stage list: open, lost and nurture (never won). Default false. */
+    lostShown?: boolean;
+  },
+): OpenedCardView {
   const close = closeHref(page.path, page.params);
   if (load.status === "not-found") return { status: "not-found", text: RECORD_CARD_NOT_FOUND, closeHref: close };
   if (load.status === "unavailable") return { status: "unavailable", text: RECORD_CARD_UNAVAILABLE, closeHref: close };
   const now = new Date(load.now);
-  const ctx: CardContext = { role: load.role, members: load.members, stages: load.stages, mergeAvailable: load.kind === "lead" ? load.mergeAvailable : false, path: page.path, params: page.params, now, timeZone: load.timeZone };
+  const ctx: CardContext = { role: load.role, members: load.members, stages: load.stages, mergeAvailable: load.kind === "lead" ? load.mergeAvailable : false, path: page.path, params: page.params, now, timeZone: load.timeZone, lostShown: page.lostShown === true };
   const titleId = `record-card-title-${load.kind}`;
 
   if (load.kind === "matter") {

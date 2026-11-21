@@ -28,7 +28,27 @@ import { HandedToYouCard } from "@/components/queue/HandedToYouCard";
 import { loadAuditContext } from "@/lib/queue/audit-context";
 import type { Metadata } from "next";
 import { recordPageTitle } from "@/lib/ui/page-title";
-import { A_TEAMMATE, APPROVALS_NAME, SEND_BACK_DONE } from "@/lib/ui/words";
+import {
+  A_TEAMMATE,
+  APPROVALS_NAME,
+  MAKE_DRAFT_CHANGED,
+  MAKE_DRAFT_CHECK_DRAFTS,
+  MAKE_DRAFT_COULDNT_CHECK,
+  MAKE_DRAFT_NEEDS_PERMISSION,
+  MAKE_DRAFT_NO_OUTLOOK,
+  MAKE_DRAFT_NOT_OUTLOOK,
+  MAKE_DRAFT_OUTLOOK_UNREAD,
+  PASS_NOT_SWITCHED_ON,
+  QUEUE_DRAFTED_ANYWAY,
+  READY_TO_DRAFT,
+  SEND_BACK_DONE,
+  makeDraftIntro,
+} from "@/lib/ui/words";
+import { approvedBy, approvedTextMatches, draftAssignment, passFailedRecorded, receiptMatchesCurrent } from "@/lib/queue/draft-handoff";
+import { RetryPassCard } from "@/components/queue/RetryPassCard";
+import { myOutlookDraftAccess } from "@/lib/mailbox/my-mailbox";
+import { MakeDraftCard, type MakeDraftView } from "@/components/queue/MakeDraftCard";
+import { INTEGRATIONS_PATH } from "@/lib/setup/routes";
 
 /** Tab title: the item's headline, so several open approvals can be told apart; "Approval" when it can't be read. */
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -58,10 +78,10 @@ export default async function QueueItemPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ resolved?: string; send?: string; returned?: string }>;
+  searchParams: Promise<{ resolved?: string; send?: string; returned?: string; pass?: string }>;
 }) {
   const { id } = await params;
-  const { resolved: justResolved, send, returned } = await searchParams;
+  const { resolved: justResolved, send, returned, pass } = await searchParams;
 
   // Outside the try on purpose: notFound() throws a control-flow error that a
   // catch would turn into "couldn't reach the queue" (a lesson from lectual).
@@ -97,7 +117,8 @@ export default async function QueueItemPage({
   const routeArgs = { role: editRole, userId: view.viewer?.userId, item, routing: view.routing, members: view.members ?? [] };
   const mayApprove = canApproveItem(routeArgs);
   const refusal = approvalRefusal(routeArgs);
-  const outcome = outcomeText(justResolved, send, isDoneItem(item));
+  const drafterMember = view.drafter ? (view.members ?? []).find((m) => m.userId === view.drafter) : undefined;
+  const outcome = outcomeText(justResolved, send, isDoneItem(item), drafterMember ? memberName(drafterMember) : null);
   const resolved = item.status !== "pending";
 
   // Handed to the viewer right now? Additive: read only while pending, shown only when the events were READ and the
@@ -115,6 +136,46 @@ export default async function QueueItemPage({
         note: holder.note,
         cantApprove: handedCantApprove({ canApprove: mayApprove, item, routing: view.routing, members: view.members ?? [] }),
       };
+    }
+  }
+
+  // Sprint 4: an approved client email passed to THIS viewer for their own "Make the draft" click. Only the current
+  // draft_to target (trusted events only) sees the card; a failed read is "couldn't check" for the configured drafter.
+  // Read only while the firm has a drafter set, so a firm without one renders exactly as before.
+  let makeDraft: { intro: string; view: MakeDraftView } | null = null;
+  let retryPass: { drafterName: string } | null = null;
+  if (view.drafter && resolved && item.status === "approved" && item.type === "CLIENT_EMAIL" && view.viewer && editRole) {
+    const trust = viewEventTrust(view);
+    const events = trustedCardState(await loadCardState([item.id]), [item], trust);
+    if (events.status === "ok" && trust.status === "known") {
+      const a = draftAssignment(events.events, item.id);
+      const me = (view.members ?? []).find((m) => m.userId === view.viewer?.userId);
+      // S3: the approver may pass it again ONLY when the outcome recorded at approval was a failed pass (a trusted
+      // `pass_failed` marker), no trusted draft_to exists, and the receipt still names the text. The action checks it all again.
+      if (!a && passFailedRecorded(events.events, item.id) && view.drafter !== view.viewer.userId && approvedBy(item, me?.email) && receiptMatchesCurrent(item) && drafterMember) {
+        retryPass = { drafterName: memberName(drafterMember) };
+      }
+      if (a && a.target === view.viewer.userId) {
+        const by = (view.members ?? []).find((m) => m.userId === a.by);
+        const intro = makeDraftIntro(by ? memberName(by) : A_TEAMMATE);
+        // "Drafted" only when confirmed. A claimed attempt with no outcome says to check Drafts and shows the approved text.
+        if (a.progress.kind === "drafted") makeDraft = { intro, view: { kind: "drafted" } };
+        else if (a.progress.kind === "drafting") makeDraft = { intro, view: { kind: "check-drafts", sentence: MAKE_DRAFT_CHECK_DRAFTS, text: item.final_body ?? item.draft_body } };
+        else if (!approvedTextMatches(item, a.sha)) makeDraft = { intro, view: { kind: "blocked", sentence: MAKE_DRAFT_CHANGED, connect: null } };
+        else {
+          const access = await myOutlookDraftAccess();
+          const blocked: Record<Exclude<typeof access, "ready">, MakeDraftView> = {
+            "no-mailbox": { kind: "blocked", sentence: MAKE_DRAFT_NO_OUTLOOK, connect: INTEGRATIONS_PATH },
+            "not-outlook": { kind: "blocked", sentence: MAKE_DRAFT_NOT_OUTLOOK, connect: INTEGRATIONS_PATH },
+            "needs-permission": { kind: "blocked", sentence: MAKE_DRAFT_NEEDS_PERMISSION, connect: INTEGRATIONS_PATH },
+            unavailable: { kind: "blocked", sentence: MAKE_DRAFT_OUTLOOK_UNREAD, connect: null },
+            "not-yours": { kind: "blocked", sentence: MAKE_DRAFT_OUTLOOK_UNREAD, connect: null },
+          };
+          makeDraft = { intro, view: access === "ready" ? { kind: "ready" } : blocked[access] };
+        }
+      }
+    } else if (events.status !== "not-set-up" && view.drafter && view.drafter === view.viewer.userId) {
+      makeDraft = { intro: READY_TO_DRAFT, view: { kind: "blocked", sentence: MAKE_DRAFT_COULDNT_CHECK, connect: null } };
     }
   }
 
@@ -138,6 +199,13 @@ export default async function QueueItemPage({
               {outcome.text}
             </Notice>
           )}
+          {justResolved === "approve" && (pass === "off" || pass === "queue") && (
+            <Notice role="status" tone="warn">
+              {pass === "off" ? PASS_NOT_SWITCHED_ON : QUEUE_DRAFTED_ANYWAY}
+            </Notice>
+          )}
+          {makeDraft && <MakeDraftCard id={item.id} intro={makeDraft.intro} view={makeDraft.view} />}
+          {retryPass && <RetryPassCard id={item.id} drafterName={retryPass.drafterName} />}
           {returned === "1" && (
             <Notice role="status" tone="ok">
               {SEND_BACK_DONE}

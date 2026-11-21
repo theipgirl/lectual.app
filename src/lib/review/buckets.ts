@@ -64,6 +64,10 @@ export type ReviewRow = {
   nextStep: ReviewNextStep | null;
   /** The nearest open USPTO deadline (matters only). */
   deadline: { dueDate: string; title: string | null } | null;
+  /** A filed trademark with no open deadline (PGE Sprint 3). A tag only, never a bucket. False when the deadlines could not be read. */
+  noOpenDeadline?: boolean;
+  /** Every open deadline of the matter, soonest first (the Deadlines strip). Absent on a lead and when the read failed. */
+  openDeadlines?: { id: string; title: string; dueDate: string; confirmed: boolean }[];
   /** A live proposal's expiry, drawn as a tag only. Never moves a row between sections. Absent = none, or the read failed. */
   proposalExpiry?: ProposalExpiryTag | null;
   /** Stored files plus (matters, Document Center firms) generated letters. Absent = not counted or the count failed: never drawn as 0. */

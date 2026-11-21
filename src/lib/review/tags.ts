@@ -1,6 +1,7 @@
 import type { ReviewRow } from "./buckets";
 import { WAITING_LABEL } from "./waiting";
 import { deadlineIsSoon, shortDate } from "./format";
+import { NO_OPEN_DEADLINE } from "@/lib/ui/words";
 
 export type ReviewTag = { text: string; tone: "warn" | "risk" | null };
 
@@ -8,6 +9,7 @@ export type ReviewTag = { text: string; tone: "warn" | "risk" | null };
 export function rowTags(row: ReviewRow, today: string): ReviewTag[] {
   const tags: ReviewTag[] = [];
   if (row.waiting) tags.push({ text: row.waiting === "us" ? WAITING_LABEL.us : `Waiting on ${WAITING_LABEL[row.waiting]}`, tone: row.waiting === "approval" ? "warn" : null });
+  if (row.noOpenDeadline) tags.push({ text: NO_OPEN_DEADLINE, tone: "risk" });
   if (row.deadline) tags.push({ text: `USPTO deadline ${shortDate(row.deadline.dueDate, today)}`, tone: deadlineIsSoon(row.deadline.dueDate, today) ? "risk" : null });
   if (row.proposalExpiry) tags.push({ text: row.proposalExpiry.text, tone: row.proposalExpiry.expired ? "risk" : null });
   return tags;

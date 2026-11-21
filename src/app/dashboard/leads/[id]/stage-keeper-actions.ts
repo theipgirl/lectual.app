@@ -47,6 +47,8 @@ function ids(formData: FormData): { leadId: string; activityId: string } | null 
 function refresh(leadId: string) {
   revalidatePath(`/dashboard/leads/${leadId}/`);
   revalidatePath("/dashboard/intake/");
+  // The Weekly review opens the same card (its suggestion cards and timeline Undo), and its rows show the stage.
+  revalidatePath("/dashboard/review/");
 }
 
 /** The date a person's accept stamps as when the lead entered the stage: the mail's own date. A future or unusable date is ignored downstream. */
