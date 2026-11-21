@@ -2455,3 +2455,10 @@ their own click). Contract: `docs/pge/2026-11-17-agentic-ip-os/sprint-4.md`. App
   - **If lawmatics-mcp ever normalises `final_body`** (trims, re-wraps, changes line endings), the stored text stops hashing to the `draft_to` /
     receipt hash and EVERY Make-draft is refused ("changed after it was approved"): it fails closed, never drafts other text (pinned by a test).
 
+
+## Rail: Forms and Proposals for the admin tier only (no schema)
+The Forms, Proposals and older Quotes rows carry `minRole: ADMIN_TIER_MIN_ROLE` (`senior_admin`, ranked, so owner / admin / senior_admin) in
+`NAV` (`src/lib/nav.ts`), the existing role filter inside `navItemAllowed` / `visibleNav`. So the rail, the phone bar's More sheet, the tour and the
+Getting started hub (whose flows need those rows) drop them for every other role, and an unknown role never sees them. Navigation only: the pages and
+actions keep their own role and feature gates (a staff member with the link still reaches what those gates allow). The Intake report stays (Leads is
+still visible). Tests: `tests/nav/admin-tier-rows.test.ts`.

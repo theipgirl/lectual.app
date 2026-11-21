@@ -38,7 +38,9 @@ describe("the Client proposals rail entry", () => {
     expect(item.module).toBe("proposals");
     expect(navItemAllowed(item, [], "owner")).toBe(false);
     expect(navItemAllowed(item, ["mailbox"], "owner")).toBe(false);
-    expect(navItemAllowed(item, ["proposals"], "viewer")).toBe(true);
+    // Changed on purpose: the row is drawn for the admin tier only (navigation; the pages keep their own gates).
+    expect(navItemAllowed(item, ["proposals"], "senior_admin")).toBe(true);
+    expect(navItemAllowed(item, ["proposals"], "viewer")).toBe(false);
     // One name per thing (design rollout, item 25): the rail row reads PROPOSALS_NAME; it is found by its key, since the older quotes
     // entry (shown only without the module) carries the same name.
     const entry = (mods: string[]) => railGroups(visibleNav(mods, "owner"), "/dashboard/").flat().find((e) => e.key === "proposals");
