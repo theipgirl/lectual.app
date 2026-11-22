@@ -28,7 +28,8 @@ import { canSeeBilling } from "@/lib/billing/can-see";
 import { ColumnChooser, type ChooserSection } from "@/components/review/ColumnChooser";
 import { NOTES_PRESENT, columnsFor } from "@/lib/review/sheet-columns";
 import { loadCardCustomColumns } from "@/lib/custom-columns/card-load";
-import { firmColumnsBlock, type FirmColumnsBlock } from "@/lib/custom-columns/rules";
+import { canWriteCustomValue, firmColumnsBlock, type FirmColumnsBlock } from "@/lib/custom-columns/rules";
+import { canSeeSetup } from "@/lib/setup/roles";
 import { reviewBuckets, reviewSubline } from "@/lib/review/buckets";
 import { boardLanes, kpis, meetingPosition, offBoard } from "@/lib/review/lanes";
 import { deadlinesOut, reviewPerson, waitingOnPerson } from "@/lib/review/strips";
@@ -67,6 +68,10 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const userId = session.kind === "ok" ? session.user.id : null;
   const canWrite = !!role && MATTER_WRITE_ROLES.includes(role);
   const canMove = canWrite && CAN_MOVE_STAGE.includes(role);
+  // The admin tier (the setup roles) alone hears that custom columns aren't switched on yet, and gets "Add a column" (CO4, R11).
+  const adminTier = canSeeSetup(role);
+  // Typing in the firm's own columns: 0115's value policy list, from the role re-resolved above.
+  const writeCustom = canWriteCustomValue(role);
 
   if (load.status === "unavailable") {
     return (
@@ -104,7 +109,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
     const writeLead = !!role && CAN_WRITE_LEAD.includes(role);
     const moveLead = writeLead && !!role && CAN_MOVE_STAGE.includes(role);
     const stages = canWrite || moveLead ? await loadSheetStages() : { matter: null, lead: null };
-    sheetPerms = canWrite || writeLead ? { writeMatter: canWrite, writeLead, moveLead, matterStages: canWrite ? stages.matter : null, leadStages: moveLead ? stages.lead : null } : READ_ONLY_PERMS;
+    sheetPerms = canWrite || writeLead ? { writeMatter: canWrite, writeLead, moveLead, matterStages: canWrite ? stages.matter : null, leadStages: moveLead ? stages.lead : null, writeCustom } : READ_ONLY_PERMS;
   }
   // "Columns" (draw-only, kept in this browser): offered on the List only, over exactly the columns this viewer may have.
   const chooser =
@@ -166,7 +171,8 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
       custom && cardRow
         ? custom
         : await loadCardCustomColumns(cardLoad.kind === "lead" ? { kind: "lead", id: cardLoad.lead.id } : { kind: "matter", id: cardLoad.matter.id, leadId: cardLoad.matter.lead_id ?? null });
-    firmColumns = firmColumnsBlock(state, custom && cardRow ? cardRow : record, customMembers, load.today);
+    // A staff role types in the card (the card's own re-resolved role); viewer and social media see the values only.
+    firmColumns = firmColumnsBlock(state, custom && cardRow ? cardRow : record, customMembers, load.today, canWriteCustomValue(cardLoad.role));
   }
   // Close (and Back) land on the same review view: every other review param is kept, only `open` goes.
   const cardBase = reviewHref({ ...params, open: null });
@@ -322,7 +328,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
       ) : params.view === "sheet" ? (
         <>
           {strips}
-          <SheetView rows={shown} canSeeMoney={canSeeMoney} custom={custom} customMembers={customMembers} {...common} {...(sheetPerms ? { sheetEdit: { perms: sheetPerms } } : {})} />
+          <SheetView rows={shown} canSeeMoney={canSeeMoney} custom={custom} customMembers={customMembers} adminTier={adminTier} {...common} {...(sheetPerms ? { sheetEdit: { perms: sheetPerms } } : {})} />
         </>
       ) : (
         <>

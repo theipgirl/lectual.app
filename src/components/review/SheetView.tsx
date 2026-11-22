@@ -4,9 +4,9 @@ import { dueText, lastContactText, shortDate } from "@/lib/review/format";
 import { documentsTag } from "@/lib/review/documents";
 import { laneOf } from "@/lib/review/lanes";
 import { sheetSections, waitingCell } from "@/lib/review/sheet";
-import { FACT_COLUMN_IDS, NOTES_PRESENT, columnsFor, type ColumnId, type SheetColumn, type SheetSectionId } from "@/lib/review/sheet-columns";
+import { FACT_COLUMN_IDS, NOTES_PRESENT, columnsFor, type ColumnId, type CustomStateLike, type SheetColumn, type SheetSectionId } from "@/lib/review/sheet-columns";
 import { factCells, type FactCell } from "@/lib/review/sheet-cells";
-import { customCells, type CustomColumnsState, type CustomMember } from "@/lib/custom-columns/rules";
+import { customCells, noteStateOf, type CustomColumnsState, type CustomMember } from "@/lib/custom-columns/rules";
 import type { PrefsDocument } from "@/lib/review/column-prefs-storage";
 import { LastChanged, openHref, type Common } from "./shared";
 import { SheetEdit } from "./SheetEdit";
@@ -20,7 +20,7 @@ import { BLANK, TEAMMATE, UNASSIGNED, SHEET_EMPTY_SECTION } from "@/lib/ui/words
 import "@/components/list-page/list-page.css";
 import "./review.css";
 
-function SheetSection({ id, title, rows, today, members, params, columns, initialPrefs, custom, customNotOn }: Common & { id: SheetSectionId; title: string; rows: ReviewRow[]; columns: SheetColumn[]; initialPrefs?: PrefsDocument; /** The firm's columns' cells by row key, then `cf:<field id>`. */ custom: Record<string, Record<string, FactCell>>; customNotOn: boolean }) {
+function SheetSection({ id, title, rows, today, members, params, columns, initialPrefs, custom, noteState, adminTier }: Common & { id: SheetSectionId; title: string; rows: ReviewRow[]; columns: SheetColumn[]; initialPrefs?: PrefsDocument; /** The firm's columns' cells by row key, then `cf:<field id>`. */ custom: Record<string, Record<string, FactCell>>; /** What the section note needs of the custom state (null: not read). */ noteState: CustomStateLike; adminTier: boolean }) {
   const names = new Map(members.map((m) => [m.userId, m.name]));
   const dash = <span className="lx-note">{BLANK}</span>;
   const tableRows: SheetViewTableRow[] = rows.map((r) => {
@@ -69,7 +69,7 @@ function SheetSection({ id, title, rows, today, members, params, columns, initia
       <h2 id={`rv-sheet-${id}`} className="lx-h3 rv-sheet-title">
         {title} <span className="lx-note">{rows.length}</span>
       </h2>
-      <SectionNote section={id} customNotOn={customNotOn} />
+      <SectionNote section={id} customState={noteState} adminTier={adminTier} />
       {rows.length === 0 ? (
         <div className="rv-strip-note"><EmptyState variant="line">{SHEET_EMPTY_SECTION}</EmptyState></div>
       ) : (
@@ -80,24 +80,25 @@ function SheetSection({ id, title, rows, today, members, params, columns, initia
 }
 
 /** The Excel tracker as one table: Trademarks, then Contracts, in pipeline order. Edits happen in the record card the Client link opens. */
-export function SheetView({ rows, owner, sheetEdit, canSeeMoney = false, initialPrefs, custom = null, customMembers, ...common }: Common & {
+export function SheetView({ rows, owner, sheetEdit, canSeeMoney = false, initialPrefs, custom = null, customMembers, adminTier = false, ...common }: Common & {
   rows: ReviewRow[];
   /** The owner view's editable sheet (owner view only). */ sheetEdit?: { perms: SheetPerms };
   /** From the page's re-resolved role (`canSeeBilling`), never from the browser. */ canSeeMoney?: boolean;
   /** Drawing-only starting column choices (a test or preview). */ initialPrefs?: PrefsDocument;
   /** The firm's custom columns as the page read them (null: not read). Only `ok` adds columns. */ custom?: CustomColumnsState | null;
   /** The member directory for person cells; null when it couldn't be read (a person cell then says so). Defaults to `members`. */ customMembers?: CustomMember[] | null;
+  /** The admin tier (`canSeeSetup` of the page's re-resolved role): the section note's "not switched on" line and "Add a column" link are theirs only. */ adminTier?: boolean;
 }) {
-  if (owner && sheetEdit) return <SheetEdit rows={rows} perms={sheetEdit.perms} owner canSeeMoney={canSeeMoney} initialPrefs={initialPrefs} custom={custom} customMembers={customMembers} {...common} />;
+  if (owner && sheetEdit) return <SheetEdit rows={rows} perms={sheetEdit.perms} owner canSeeMoney={canSeeMoney} initialPrefs={initialPrefs} custom={custom} customMembers={customMembers} adminTier={adminTier} {...common} />;
   const { trademarks, contracts } = sheetSections(rows);
   const fields = custom?.status === "ok" ? custom.fields : [];
   const cells = custom?.status === "ok" ? customCells(rows, fields, custom, customMembers === undefined ? common.members : customMembers, common.today) : {};
-  const customNotOn = custom?.status === "not-set-up";
+  const noteState = noteStateOf(custom);
   const columns = { trademarks: columnsFor("trademarks", { canSeeMoney, hasNotes: NOTES_PRESENT, customFields: fields }), contracts: columnsFor("contracts", { canSeeMoney, hasNotes: NOTES_PRESENT, customFields: fields }) };
   return (
     <div className="rv-sheets">
-      <SheetSection id="trademarks" title="Trademarks" rows={trademarks} columns={columns.trademarks} initialPrefs={initialPrefs} custom={cells} customNotOn={customNotOn} {...common} />
-      <SheetSection id="contracts" title="Contracts" rows={contracts} columns={columns.contracts} initialPrefs={initialPrefs} custom={cells} customNotOn={customNotOn} {...common} />
+      <SheetSection id="trademarks" title="Trademarks" rows={trademarks} columns={columns.trademarks} initialPrefs={initialPrefs} custom={cells} noteState={noteState} adminTier={adminTier} {...common} />
+      <SheetSection id="contracts" title="Contracts" rows={contracts} columns={columns.contracts} initialPrefs={initialPrefs} custom={cells} noteState={noteState} adminTier={adminTier} {...common} />
     </div>
   );
 }

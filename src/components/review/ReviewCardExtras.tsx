@@ -10,7 +10,6 @@ import type { FirmColumnsBlock } from "@/lib/custom-columns/rules";
 import { Pill } from "@/components/ui/Pill";
 import {
   BLANK,
-  CUSTOM_COLUMNS_NOT_ON,
   DECK_COULDNT_LOAD,
   FIRM_COLUMNS_HEADING,
   LAST_CHANGED_LABEL,
@@ -26,6 +25,7 @@ import {
   reviewCardStageDays,
 } from "@/lib/ui/words";
 import { LostNurture } from "./LostNurture";
+import { FirmColumnsEdit } from "./FirmColumnsEdit";
 import "./review.css";
 
 type Member = { userId: string; name: string };
@@ -51,20 +51,22 @@ function FirmCell({ cell }: { cell: FactCell }) {
 }
 
 /**
- * "Firm columns": the firm's own columns for the record shown, read only. Three states, never two: the values (a dash where nothing is
- * recorded), "not switched on" (a quiet line), and "Couldn't load". A firm with no column for this record's section draws nothing.
+ * "Firm columns": the firm's own columns for the record shown. The values (a dash where nothing is recorded) or "Couldn't load". Before
+ * the columns are switched on for the firm, NOTHING is drawn, for every role (CO4: that is the admin tier's to know, on the List and in
+ * Settings). A firm with no column for this record's section draws nothing. Items that carry `edit` (a staff role, decided by the page)
+ * are typed in place through `FirmColumnsEdit`; this component itself writes nothing.
  */
-export function FirmColumns({ block }: { block: FirmColumnsBlock | null | undefined }) {
-  if (!block || (block.status === "ok" && block.items.length === 0)) return null;
+export function FirmColumns({ block, members = null, today = "", recordKey = "" }: { block: FirmColumnsBlock | null | undefined; members?: Member[] | null; today?: string; recordKey?: string }) {
+  if (!block || block.status === "not-set-up" || (block.status === "ok" && block.items.length === 0)) return null;
   return (
     <div className="rv-cardx-firm" data-firm-columns={block.status}>
       <h4 className="lx-label">{FIRM_COLUMNS_HEADING}</h4>
-      {block.status === "not-set-up" ? (
-        <p className="lx-note">{CUSTOM_COLUMNS_NOT_ON}</p>
-      ) : block.status === "unavailable" ? (
+      {block.status === "unavailable" ? (
         <p className="lx-note" role="status">
           {DECK_COULDNT_LOAD}
         </p>
+      ) : block.items.some((item) => item.edit) ? (
+        <FirmColumnsEdit items={block.items} members={members} today={today} recordKey={recordKey} />
       ) : (
         <dl className="rv-cardx-facts">
           {block.items.map((item, i) => (
@@ -113,7 +115,7 @@ export function ReviewCardAside({
         <p className="lx-note" role="status">
           {REVIEW_CARD_NOT_ON_REVIEW}
         </p>
-        <FirmColumns block={firmColumns} />
+        <FirmColumns block={firmColumns} members={members} today={today} recordKey={`${open.kind}:${open.id}`} />
       </section>
     );
   }
@@ -155,7 +157,7 @@ export function ReviewCardAside({
           </Fact>
         )}
       </dl>
-      <FirmColumns block={firmColumns} />
+      <FirmColumns block={firmColumns} members={members} today={today} recordKey={`${open.kind}:${open.id}`} />
       {open.kind === "lead" && closeStages.length > 0 && <LostNurture id={open.id} stages={closeStages} />}
     </section>
   );

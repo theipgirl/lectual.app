@@ -91,3 +91,25 @@
   .rv-owner .rse-legend-body { font-size: var(--fs-2); }
   .rv-owner .rse-head-right { justify-content: flex-start; }
 }
+
+/* A firm's own column (Sprint 3): the money input's "$", the text / money / date popover, and the card's editors, which reuse the
+   Sheet's popover and option styles inside `.rv-fc-edit` (the card is not under `.rv-owner` for every role). Tokens only. */
+.rse-money { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.rse-money-sign { flex: 0 0 auto; font-size: var(--fs-3); color: var(--muted); }
+.rv-owner .rse-cv-pop { gap: 6px; min-width: 220px; }
+.rv-fc-edit .rse-ed-hint { font-size: var(--fs-1); line-height: 1.4; color: var(--muted); }
+.rv-fc-edit .rse-pop { position: absolute; z-index: 8; top: calc(100% - 2px); left: 0; min-width: 230px; width: max-content; max-width: 340px; padding: 8px; border-radius: var(--r-lg); background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow-lift); display: flex; flex-direction: column; gap: 2px; text-align: left; white-space: normal; }
+.rv-fc-edit .rse-pop-list { display: flex; flex-direction: column; gap: 2px; max-height: 300px; overflow: auto; }
+.rv-fc-edit .rse-pop-foot { margin: 0; padding: 4px 10px; font-size: var(--fs-1); line-height: 1.4; color: var(--muted); }
+.rv-fc-edit .rse-opt { display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 10px; border-radius: var(--r-md); border: 0; background: transparent; font: var(--fs-3) var(--sans); color: var(--ink); text-align: left; white-space: nowrap; cursor: pointer; }
+.rv-fc-edit .rse-opt:hover, .rv-fc-edit .rse-opt:focus-visible { background: color-mix(in srgb, var(--well) 60%, transparent); }
+.rv-fc-edit .rse-opt:focus-visible { outline: 2px solid var(--ox); outline-offset: -2px; }
+.rv-fc-edit .rse-opt.sel { background: var(--well); font-weight: 600; }
+.rv-fc-edit .rse-av { flex: 0 0 auto; width: 28px; height: 28px; border-radius: var(--r-pill); display: inline-flex; align-items: center; justify-content: center; background: var(--ox); color: var(--cream); font-size: var(--fs-1); }
+.rv-fc-edit .rse-av.soft { background: var(--tint-ox); color: var(--ox); }
+.rv-fc-edit .rse-pop .lx-input, .rv-fc-edit .rse-pop .rse-in { margin-bottom: 4px; }
+.rv-fc-edit .rv-fc-cell { position: relative; display: grid; gap: 4px; min-width: 0; }
+.rv-fc-edit .rv-fc-pick { justify-content: space-between; width: 100%; }
+.rv-fc-edit .rv-fc-status { margin: 0; min-height: 1em; }
+.rv-fc-edit .rse-in { width: 100%; box-shadow: none; height: var(--ctl-h); border: 1px solid var(--line); border-radius: var(--r-md); padding: 0 10px; font: var(--fs-3) var(--sans); color: var(--ink); background: var(--card); }
+.rv-fc-edit .rse-in:focus-visible { outline: 2px solid var(--ox); outline-offset: 0; }
