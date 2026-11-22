@@ -24,6 +24,9 @@ import { NO_PREVIEW, previewFor, viewFor } from "@/lib/views";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import { CAN_MOVE_STAGE, CAN_WRITE_LEAD } from "@/lib/pipeline/leads";
 import { loadReview } from "@/lib/review/load";
+import { canSeeBilling } from "@/lib/billing/can-see";
+import { ColumnChooser, type ChooserSection } from "@/components/review/ColumnChooser";
+import { NOTES_PRESENT, columnsFor } from "@/lib/review/sheet-columns";
 import { reviewBuckets, reviewSubline } from "@/lib/review/buckets";
 import { boardLanes, kpis, meetingPosition, offBoard } from "@/lib/review/lanes";
 import { deadlinesOut, reviewPerson, waitingOnPerson } from "@/lib/review/strips";
@@ -50,8 +53,13 @@ type SearchParams = { since?: string | string[]; who?: string | string[]; kind?:
 export default async function ReviewPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;
   const params = parseReviewParams(sp);
-  const [load, session] = await Promise.all([loadReview(), resolveFirmSession()]);
+  // The session comes FIRST: whether this viewer may see fees is decided here from the re-resolved role, before anything is read, so
+  // the money reads are never made for anyone else. Fees are the List's columns, so no other view pays for them.
+  const session = await resolveFirmSession();
   const role = session.kind === "ok" ? session.role : null;
+  const canSeeMoney = canSeeBilling(role);
+  const withFees = canSeeMoney && params.view === "sheet";
+  const load = await loadReview(new Date(), { withFees });
   const userId = session.kind === "ok" ? session.user.id : null;
   const canWrite = !!role && MATTER_WRITE_ROLES.includes(role);
   const canMove = canWrite && CAN_MOVE_STAGE.includes(role);
@@ -90,6 +98,16 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
     const stages = canWrite || moveLead ? await loadSheetStages() : { matter: null, lead: null };
     sheetPerms = canWrite || writeLead ? { writeMatter: canWrite, writeLead, moveLead, matterStages: canWrite ? stages.matter : null, leadStages: moveLead ? stages.lead : null } : READ_ONLY_PERMS;
   }
+  // "Columns" (draw-only, kept in this browser): offered on the List only, over exactly the columns this viewer may have.
+  const chooser =
+    params.view === "sheet" ? (
+      <ColumnChooser
+        sections={[
+          { id: "trademarks", title: "Trademarks", columns: columnsFor("trademarks", { canSeeMoney, hasNotes: NOTES_PRESENT }) },
+          { id: "contracts", title: "Contracts", columns: columnsFor("contracts", { canSeeMoney, hasNotes: NOTES_PRESENT }) },
+        ] satisfies ChooserSection[]}
+      />
+    ) : null;
   const approvalsKnown = !load.failed.includes("approvals");
   // An approver sees the strip about THEM ("Waiting on you"); anyone else sees it about the review person, as before.
   const isApprover = !!role && !!userId && QUEUE_APPROVE_ROLES.includes(role);
@@ -172,6 +190,12 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           sheetPerms && sheetPerms !== READ_ONLY_PERMS ? (
             <div className="rse-head-right">
               <SheetSaveStatus />
+              {chooser}
+              <ViewSwitch params={params} />
+            </div>
+          ) : chooser ? (
+            <div className="rse-head-right">
+              {chooser}
               <ViewSwitch params={params} />
             </div>
           ) : (
@@ -222,6 +246,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           clearHref: link({ q: "", i: 1 }),
         }}
         toggle={<ViewSwitch params={params} />}
+        more={chooser}
       />
 
       <KpiStrip kpis={kpis(buckets)} />
@@ -274,7 +299,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
       ) : params.view === "sheet" ? (
         <>
           {strips}
-          <SheetView rows={shown} {...common} {...(sheetPerms ? { sheetEdit: { perms: sheetPerms } } : {})} />
+          <SheetView rows={shown} canSeeMoney={canSeeMoney} {...common} {...(sheetPerms ? { sheetEdit: { perms: sheetPerms } } : {})} />
         </>
       ) : (
         <>

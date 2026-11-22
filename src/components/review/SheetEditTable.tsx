@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { Fragment, useEffect, useId, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import {
   closeLeadAction,
   logWhatHappenedAction,
@@ -46,6 +46,7 @@ import {
   sheetReducer,
   shownRow,
   stageChoices,
+  editColumnOf,
   type CellValue,
   type EditableColumn,
   type SheetActionName,
@@ -88,13 +89,18 @@ import {
   sheetNoteHint,
   sheetResizeColumn,
 } from "@/lib/ui/words";
+import type { PrefsDocument } from "@/lib/review/column-prefs-storage";
+import type { SheetColumn, SheetSectionId } from "@/lib/review/sheet-columns";
+import { SectionNote } from "./SectionNote";
+import { SheetFactTd } from "./SheetFactTd";
+import { useColumnPrefs } from "./use-column-prefs";
 import { usePopPlacement } from "./pop-placement";
 import { sheetStatusStore } from "./sheet-status-store";
 import { SheetCard, SheetScroll, SheetTable } from "@/components/ui/SheetTable";
 import "./review-sheet-edit.css";
 
 export type SheetPerson = { userId: string; name: string; /** What the cell shows. */ short: string; roleLabel: string };
-export type SheetSection = { id: string; title: string; rows: SheetEditRow[] };
+export type SheetSection = { id: SheetSectionId; title: string; rows: SheetEditRow[] };
 type OpenCell = { rowKey: string; col: EditableColumn | "note" };
 
 /** Drawing-only starting state (a preview harness opens editors with it). The default is everything closed. */
@@ -107,17 +113,6 @@ export type SheetEditInitial = {
   activeColumn?: SheetEditColumn;
   activeRow?: string;
 };
-
-const HEADS: { col: SheetEditColumn; label: string }[] = [
-  { col: "client", label: "Client" },
-  { col: "mark", label: "Mark" },
-  { col: "status", label: "Status" },
-  { col: "next", label: "Next step" },
-  { col: "court", label: OWNER_COLUMN },
-  { col: "waiting", label: "Waiting on" },
-  { col: "source", label: "Source" },
-  { col: "contact", label: LAST_CONTACT },
-];
 
 const ACTIONS: Record<SheetActionName, (prev: ReviewActionState, form: FormData) => Promise<ReviewActionState>> = {
   moveStage: (p, f) => moveStageAction(p, f),
@@ -206,7 +201,12 @@ function nextText(row: SheetEditRow, today: string): { text: string; overdue: bo
   return { text: due ? `${row.nextStep.title} · ${shortDate(due, today)}` : row.nextStep.title, overdue: !!due && due < today };
 }
 
-export function SheetEditTable({ sections, people, perms, sources, today, initial }: { sections: SheetSection[]; people: SheetPerson[]; perms: SheetPerms; sources: string[]; today: string; initial?: SheetEditInitial }) {
+export function SheetEditTable({ sections, people, perms, sources, today, initial, columns, initialPrefs }: { sections: SheetSection[]; people: SheetPerson[]; perms: SheetPerms; sources: string[]; today: string; initial?: SheetEditInitial; /** What `columnsFor` allowed this viewer, per section (the server decides; the chooser only thins and reorders). */ columns: Record<SheetSectionId, SheetColumn[]>; /** Drawing-only starting column choices (a test or preview). */ initialPrefs?: PrefsDocument }) {
+  // One hook per section, always both: the chooser's choices apply to this table and to the read-only List alike.
+  const drawnBy: Record<SheetSectionId, SheetColumn[]> = {
+    trademarks: useColumnPrefs("trademarks", columns.trademarks, initialPrefs).columns,
+    contracts: useColumnPrefs("contracts", columns.contracts, initialPrefs).columns,
+  };
   const [state, dispatch] = useReducer(sheetReducer, EMPTY_SHEET_STATE);
   const [open, setOpen] = useState<OpenCell[]>(initial?.open ?? []);
   const sizes = useSyncExternalStore(sizeStore.subscribe, sizeStore.get, sizeStore.server);
@@ -343,7 +343,6 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
   };
 
   const courtName = (id: string | null) => (id ? names.get(id) ?? TEAMMATE : UNASSIGNED_LANE);
-  const colCount = HEADS.length + (editing ? 1 : 0);
 
   return (
     <div className="rse-wrap" id={rootId} data-editing={editing ? "true" : "false"}>
@@ -352,25 +351,32 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
           <kbd className="rse-key">Enter</kbd> {SHEET_KEYS_EDIT} <kbd className="rse-key">Tab</kbd> {SHEET_KEYS_NEXT} <kbd className="rse-key">Esc</kbd> {SHEET_KEYS_CANCEL}
         </p>
       )}
-      <SheetCard>
+      {sections.map((sec) => {
+        const drawn = drawnBy[sec.id];
+        const colCount = drawn.length + (editing ? 1 : 0);
+        const labelOf = (col: SheetEditColumn) => columns[sec.id].find((c) => editColumnOf(c.id) === col)?.header ?? "";
+        return (
+      <SheetCard key={sec.id} className="rse-sec-card">
+       <SectionNote section={sec.id} />
        <SheetScroll>
-        <SheetTable className="rse-tbl" fixed minWidth={sheetMinWidth(sizes, editing)}>
+        <SheetTable className="rse-tbl" fixed minWidth={sheetMinWidth(sizes, editing, drawn.map((c) => editColumnOf(c.id)))}>
           <colgroup>
-            {HEADS.map((h) => {
-              const cw = colWidth(sizes, h.col);
-              return <col key={h.col} style={cw ? { width: cw } : undefined} />;
+            {drawn.map((c) => {
+              const cw = colWidth(sizes, editColumnOf(c.id));
+              return <col key={c.id} style={cw ? { width: cw } : undefined} />;
             })}
             {editing && <col style={{ width: NOTE_COL_WIDTH }} />}
           </colgroup>
           <thead>
             <tr>
-              {HEADS.map((h) => {
-                const typed = editing && (h.col === "status" || h.col === "next" || h.col === "court" || h.col === "source");
-                const locked = h.col === "waiting" || h.col === "contact";
+              {drawn.map((c) => {
+                const h = { col: editColumnOf(c.id), label: c.header };
+                const typed = editing && c.editable;
+                const locked = !c.editable && !c.pinned && c.id !== "mark";
                 const w = colWidth(sizes, h.col);
                 const active = initial?.activeColumn === h.col || dragCol === h.col;
                 return (
-                  <th key={h.col} className={locked ? "rse-lock-th" : undefined} scope="col">
+                  <th key={h.col} className={locked ? "rse-lock-th" : undefined} scope="col" title={c.title}>
                     {h.label}
                     {typed && (
                       <>
@@ -401,8 +407,7 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
             </tr>
           </thead>
           <tbody>
-            {sections.map((sec) => (
-              <SectionRows key={sec.id} sec={sec} colCount={colCount}>
+              <SectionRows sec={sec} colCount={colCount}>
                 {sec.rows.map((raw) => {
                   const row = shownRow(raw, state);
                   const h = sizes.rows[row.key];
@@ -429,8 +434,9 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                     },
                   });
                   const stages = stageChoices(row.kind, perms) ?? [];
-                  return (
-                    <tr key={row.key} style={h ? { height: h } : undefined} data-row={row.key}>
+                  const fact = (col: SheetEditColumn) => <SheetFactTd cell={row.facts?.[col as keyof NonNullable<SheetEditRow["facts"]>]} label={labelOf(col)} className="rse-locked" quiet="rse-dash" />;
+                  const cells: Partial<Record<SheetEditColumn, React.ReactNode>> = {
+                      client: (
                       <td className="pri" title={row.client}>
                         <Link href={row.openHref} className="sheet-link" scroll={false}>
                           {row.client}
@@ -438,8 +444,12 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                         {row.documentsText && <span className="lx-note rv-sub">{row.documentsText}</span>}
                         {row.changedText && <span className="lx-note rv-changed" data-last-changed="">{row.changedText}</span>}
                       </td>
-                      <td data-label="Mark">{row.mark ?? <span className="rse-dash">{BLANK}</span>}</td>
-                      <td data-label="Status">
+                      ),
+                      mark: (
+                      <td data-label={labelOf("mark")}>{row.mark ?? <span className="rse-dash">{BLANK}</span>}</td>
+                      ),
+                      status: (
+                      <td data-label={labelOf("status")}>
                         {can("status") ? (
                           <>
                             <button type="button" className={`rse-cell rse-edit${isOpen(row.key, "status") ? " rse-on" : ""}${saving("status") ? " is-saving" : ""}`} aria-label={`Status: ${row.stageLabel ?? "none"}`} {...cellProps("status")}>
@@ -468,7 +478,9 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                           <span>{row.stageLabel ?? BLANK}</span>
                         )}
                       </td>
-                      <td data-label="Next step" className="rse-next-td">
+                      ),
+                      next: (
+                      <td data-label={labelOf("next")} className="rse-next-td">
                         {can("next") ? (
                           isOpen(row.key, "next") ? (
                             <NextEditor
@@ -510,7 +522,9 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                           />
                         )}
                       </td>
-                      <td data-label={OWNER_COLUMN}>
+                      ),
+                      court: (
+                      <td data-label={labelOf("court")}>
                         {can("court") ? (
                           <>
                             <button type="button" className={`rse-cell rse-edit${isOpen(row.key, "court") ? " rse-on" : ""}${saving("court") ? " is-saving" : ""}`} {...cellProps("court")}>
@@ -536,10 +550,14 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                           <span>{courtName(court)}</span>
                         )}
                       </td>
-                      <td data-label="Waiting on" className="rse-locked">
+                      ),
+                      waiting: (
+                      <td data-label={labelOf("waiting")} className="rse-locked">
                         {row.waitingText}
                       </td>
-                      <td data-label="Source">
+                      ),
+                      source: (
+                      <td data-label={labelOf("source")}>
                         {can("source") ? (
                           <>
                             <button type="button" className={`rse-cell rse-edit${isOpen(row.key, "source") ? " rse-on" : ""}${saving("source") ? " is-saving" : ""}`} {...cellProps("source")}>
@@ -565,9 +583,26 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                           <span>{row.source ?? BLANK}</span>
                         )}
                       </td>
-                      <td data-label={LAST_CONTACT} className="rse-locked" title={row.contactTitle ?? undefined}>
+                      ),
+                      contact: (
+                      <td data-label={labelOf("contact")} className="rse-locked" title={row.contactTitle ?? undefined}>
                         {row.contactText}
                       </td>
+                      ),
+                      practiceArea: fact("practiceArea"),
+                      serial: fact("serial"),
+                      start: fact("start"),
+                      legalFee: fact("legalFee"),
+                      legalFeeDue: fact("legalFeeDue"),
+                      govFee: fact("govFee"),
+                      govFeeDue: fact("govFeeDue"),
+                      oaDue: fact("oaDue"),
+                  };
+                  return (
+                    <tr key={row.key} style={h ? { height: h } : undefined} data-row={row.key}>
+                      {drawn.map((c) => (
+                        <Fragment key={c.id}>{cells[editColumnOf(c.id)] ?? null}</Fragment>
+                      ))}
                       {editing && (
                         <td className="rse-note-td">
                           {canNote(row.kind, perms) && (
@@ -602,11 +637,12 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                   );
                 })}
               </SectionRows>
-            ))}
           </tbody>
         </SheetTable>
        </SheetScroll>
       </SheetCard>
+        );
+      })}
     </div>
   );
 }

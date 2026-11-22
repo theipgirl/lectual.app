@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { COLUMN_IDS } from "@/lib/review/sheet-columns";
 import {
   growHeight,
   normalizeNextStepTitle,
@@ -13,6 +14,7 @@ import {
   NEXT_MIN_WIDTH,
   colWidth,
   sheetMinWidth,
+  editColumnOf,
   courtOf,
   nextEditableCell,
   notePost,
@@ -195,7 +197,8 @@ describe("Tab and sizes", () => {
 
 describe("default column widths", () => {
   it("are the director's defaults, with Next step flexible", () => {
-    expect(DEFAULT_COL_WIDTHS).toEqual({ client: 140, mark: 130, status: 130, next: null, court: 110, waiting: 140, source: 100, contact: 84 });
+    // The original eight are unchanged; Sprint 1 adds the new columns' widths (a test below checks every id is covered).
+    expect(DEFAULT_COL_WIDTHS).toMatchObject({ client: 140, mark: 130, status: 130, next: null, court: 110, waiting: 140, source: 100, contact: 84 });
     expect(NEXT_MIN_WIDTH).toBe(200);
   });
   it("a stored width overrides the default; nothing stored reads the default", () => {
@@ -207,8 +210,18 @@ describe("default column widths", () => {
     expect(colWidth(stored, "mark")).toBe(130);
   });
   it("the table's minimum is the sum, Next step counted at 200 and the note column only while editing", () => {
-    expect(sheetMinWidth(parseSizes(null), false)).toBe(140 + 130 + 130 + 200 + 110 + 140 + 100 + 84);
-    expect(sheetMinWidth(parseSizes(null), true)).toBe(1034 + 76);
+    const eight = ["client", "mark", "status", "next", "court", "waiting", "source", "contact"] as const;
+    expect(sheetMinWidth(parseSizes(null), false, eight)).toBe(140 + 130 + 130 + 200 + 110 + 140 + 100 + 84);
+    expect(sheetMinWidth(parseSizes(null), true, eight)).toBe(1034 + 76);
+  });
+  it("widths cover every column id, and the minimum sums only the columns drawn", () => {
+    for (const id of COLUMN_IDS) expect(DEFAULT_COL_WIDTHS, id).toHaveProperty(editColumnOf(id));
+    const some = ["client", "serial", "oaDue"] as const;
+    expect(sheetMinWidth(parseSizes(null), false, some)).toBe(140 + 100 + 130);
+    expect(sheetMinWidth(parseSizes(JSON.stringify({ cols: { serial: 200 } })), false, some)).toBe(140 + 200 + 130);
+  });
+  it("stored widths for unknown ids are dropped; the new ids are kept and clamped", () => {
+    expect(parseSizes(JSON.stringify({ cols: { oaDue: 9999, serial: 20, legalFee: 150, owner: 300, notAColumn: 100 } })).cols).toEqual({ oaDue: 640, serial: 72, legalFee: 150 });
   });
 });
 

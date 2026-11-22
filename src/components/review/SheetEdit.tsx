@@ -1,16 +1,19 @@
 import type { ReviewRow } from "@/lib/review/buckets";
 import { lastContactText, shortDate } from "@/lib/review/format";
 import { sheetSections, waitingCell } from "@/lib/review/sheet";
+import { factCells } from "@/lib/review/sheet-cells";
+import { NOTES_PRESENT, columnsFor } from "@/lib/review/sheet-columns";
+import type { PrefsDocument } from "@/lib/review/column-prefs-storage";
 import { documentsTag } from "@/lib/review/documents";
 import { lastChangedText } from "@/lib/review/last-changed";
 import { contactWords } from "@/lib/review/contact";
 import { EDITABLE_COLUMNS, cellEditable, type SheetEditRow, type SheetPerms } from "@/lib/review/sheet-edit";
 import { roleLabel } from "@/lib/auth/roles";
 import { REFERRAL_SOURCES } from "@/lib/intake/referral-source";
-import { SHEET_LEGEND_LABEL, SHEET_STAGES_UNREADABLE, SHEET_WORKED_OUT, SHEET_WORKED_OUT_BODY, SHEET_YOU_TYPE, SHEET_YOU_TYPE_BODY } from "@/lib/ui/words";
+import { SHEET_LEGEND_LABEL, SHEET_STAGES_UNREADABLE, SHEET_WORKED_OUT, SHEET_WORKED_OUT_BODY, SHEET_WORKED_OUT_FEES, SHEET_YOU_TYPE, SHEET_YOU_TYPE_BODY } from "@/lib/ui/words";
 import { Icon } from "@/components/ui/Icon";
 import { Notice } from "@/components/ui/Notice";
-import { SheetEditTable, type SheetEditInitial, type SheetPerson } from "./SheetEditTable";
+import { SheetEditTable, type SheetEditInitial, type SheetPerson, type SheetSection } from "./SheetEditTable";
 import { openHref, type Common } from "./shared";
 import "./review-sheet-edit.css";
 
@@ -32,6 +35,7 @@ function toSheetRow(r: ReviewRow, href: string, today: string, names: ReadonlyMa
     contactText: r.contactKnown && r.lastContact ? shortDate(r.lastContact.date, today) : lastContactText(r, today),
     documentsText: documentsTag(r.documentCount),
     changedText: lastChangedText(r.lastChange, names, today),
+    facts: factCells(r, today),
     contactTitle: r.contactKnown && r.lastContact ? lastContactText(r, today) : r.lastContact ? contactWords(r.lastContact.type) : null,
   };
 }
@@ -41,14 +45,15 @@ function toSheetRow(r: ReviewRow, href: string, today: string, names: ReadonlyMa
  * are worked out and locked. Every edit goes through an existing review action, which re-resolves the role. A role that can't
  * write gets the same table with no editors. On a phone the rows stack and every edit happens in the record panel.
  */
-export function SheetEdit({ rows, today, members, params, perms, initial }: Common & { rows: ReviewRow[]; perms: SheetPerms; initial?: SheetEditInitial }) {
+export function SheetEdit({ rows, today, members, params, perms, initial, canSeeMoney = false, initialPrefs }: Common & { rows: ReviewRow[]; perms: SheetPerms; initial?: SheetEditInitial; /** From the page's re-resolved role (`canSeeBilling`). Drops the fee columns when false. */ canSeeMoney?: boolean; /** Drawing-only starting column choices (a test or preview). */ initialPrefs?: PrefsDocument }) {
   const names = new Map(members.map((m) => [m.userId, m.name]));
   const { trademarks, contracts } = sheetSections(rows);
-  const sections = [
+  const sections: SheetSection[] = [
     { id: "trademarks", title: "Trademarks", rows: trademarks.map((r) => toSheetRow(r, openHref(params, r), today, names)) },
     { id: "contracts", title: "Contracts", rows: contracts.map((r) => toSheetRow(r, openHref(params, r), today, names)) },
   ];
   const first = (n: string) => n.trim().split(/\s+/)[0] ?? n;
+  const columns = { trademarks: columnsFor("trademarks", { canSeeMoney, hasNotes: NOTES_PRESENT }), contracts: columnsFor("contracts", { canSeeMoney, hasNotes: NOTES_PRESENT }) };
   const people: SheetPerson[] = members.map((m) => ({
     userId: m.userId,
     name: m.name,
@@ -65,7 +70,7 @@ export function SheetEdit({ rows, today, members, params, perms, initial }: Comm
           {SHEET_STAGES_UNREADABLE}
         </Notice>
       )}
-      <SheetEditTable sections={sections} people={people} perms={perms} sources={[...REFERRAL_SOURCES]} today={today} initial={initial} />
+      <SheetEditTable sections={sections} people={people} perms={perms} sources={[...REFERRAL_SOURCES]} today={today} initial={initial} columns={columns} initialPrefs={initialPrefs} />
       {anyEditor && (
         <section className="lx-card rse-legend" aria-label={SHEET_LEGEND_LABEL}>
           <div>
@@ -76,7 +81,7 @@ export function SheetEdit({ rows, today, members, params, perms, initial }: Comm
           </div>
           <div>
             <p className="rse-legend-title">{SHEET_WORKED_OUT}</p>
-            <p className="rse-legend-body">{SHEET_WORKED_OUT_BODY}</p>
+            <p className="rse-legend-body">{SHEET_WORKED_OUT_BODY}{canSeeMoney ? ` ${SHEET_WORKED_OUT_FEES}` : ""}</p>
           </div>
         </section>
       )}

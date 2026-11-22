@@ -516,7 +516,9 @@ export const DECK_FOR = "for";
 export const SHEET_YOU_TYPE = "You type these";
 export const SHEET_YOU_TYPE_BODY = `Status (moves the stage), Next step (text and due date), ${OWNER_COLUMN} (a person), Source. Each change saves on its own and is logged on the record.`;
 export const SHEET_WORKED_OUT = "Lectual works these out";
-export const SHEET_WORKED_OUT_BODY = "Waiting on and Last contact come from next steps, mail and calls. They can't be edited here; log what happened with + Note instead.";
+export const SHEET_WORKED_OUT_BODY = "Waiting on and Last contact come from next steps, mail and calls. Serial No., Start Date, Practice Area and Office Action Due Date come from the record itself. None of these can be edited here; log what happened with + Note instead.";
+/** Added to the legend for the viewer who may see fees (the owner) and nobody else. */
+export const SHEET_WORKED_OUT_FEES = "The fee columns come from the accepted proposal, else from the spreadsheet import.";
 export const SHEET_LEGEND_LABEL = "Which columns you can edit";
 export const SHEET_KEYS_EDIT = "or click to edit";
 export const SHEET_KEYS_NEXT = "next cell";
@@ -1419,3 +1421,51 @@ export const CLOSE_OVERRIDE_BUTTON = "Close the matter";
 export const CLOSE_OVERRIDE_DONE = "Closed. The reason is on the timeline.";
 /** The pre-0110 override closed the matter, could not write its reason, and could not put the status back either. */
 export const CLOSE_OVERRIDE_UNRECORDED = "The matter was closed, but the reason couldn't be recorded. Tell Lectual.";
+
+/* ── The List's spreadsheet columns (Sprint 1): one registry, `src/lib/review/sheet-columns.ts` ── */
+export const COL_TRADEMARK_OWNER = "Trademark Owner";
+export const COL_TRADEMARK_NAME = "Trademark Name";
+export const COL_SERIAL = "Serial No.";
+export const COL_STATUS = "Status";
+export const COL_SOURCE = "Source";
+export const COL_NOTES = "Notes";
+export const COL_START = "Start Date";
+export const COL_LEGAL_FEE = "Legal Fee";
+export const COL_LEGAL_FEE_DUE = "Legal Fee Due Date";
+export const COL_GOV_FEE = "Government Filing fee";
+export const COL_GOV_FEE_DUE = "Government Filing Fee Due Date";
+export const COL_OA_DUE = "Office Action Due Date";
+export const COL_WAITING = "Waiting on";
+export const COL_CLIENT_NAME = "Client Name";
+export const COL_PRACTICE_AREA = "Practice Area";
+export const COL_CONTRACT_TYPE = "Contract Type";
+/** Header titles (hover text): where Lectual's word and the spreadsheet's word differ, or the value needs a sentence. */
+export const COL_OWNER_TITLE = "Assigned To in your spreadsheet: the next step's person, else the record's";
+export const COL_NEXT_TITLE = "Task in your spreadsheet";
+export const COL_START_TITLE = "The day it was opened in Lectual. Records brought in from the spreadsheet or Lawmatics show the day they were brought in.";
+export const COL_CONTRACT_TYPE_TITLE = "The matter's title in Lectual.";
+/** "Not tracked" names, one per spreadsheet column Lectual has no home for. */
+export const NT_PRIORITY = "Priority";
+export const NT_OPINION_LETTER_DUE = "Opinion Letter Due Date";
+export const NT_COMPLETION_DATE = "Completion Date";
+export const NT_OFFICE_ACTION_FEE = "Office Action Fee";
+export const notTrackedNote = (names: readonly string[]) => `Not tracked in Lectual yet: ${names.join(", ")}.`;
+/** Said only where a Notes column is drawn; without one it would point at nothing. */
+export const NOT_TRACKED_NOTES_SENTENCE = "Description and Notes are one column in Lectual: Notes.";
+export const COL_COULDNT_LOAD = "Couldn't load";
+export const COL_UNCONFIRMED_SUFFIX = " · unconfirmed";
+export const proposalsCount = (n: number) => `${n} proposals`;
+export const FEE_FROM_PROPOSAL = "From the accepted proposal";
+export const FEE_FROM_SPREADSHEET = "From the spreadsheet import";
+/** The column chooser (draw-only, kept in this browser). */
+export const COLUMNS_BUTTON = "Columns";
+export const COLUMNS_MENU_LABEL = "Choose columns";
+export const COLUMNS_RESET = "Reset to the spreadsheet's order";
+export const COLUMNS_MOVE_UP = "Move up";
+export const COLUMNS_MOVE_DOWN = "Move down";
+export const COLUMNS_ALWAYS_SHOWN = "Always shown";
+export const COLUMNS_KEPT_HERE = "Kept in this browser only. It changes what you see, not what you may see.";
+export const columnsShow = (header: string) => `Show ${header}`;
+export const columnsMoveUp = (header: string) => `${COLUMNS_MOVE_UP}: ${header}`;
+export const columnsMoveDown = (header: string) => `${COLUMNS_MOVE_DOWN}: ${header}`;
+export const columnsSectionLabel = (section: string) => `${section} columns`;

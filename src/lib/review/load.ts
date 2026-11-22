@@ -17,6 +17,8 @@ import { CONTACT_TYPES } from "./contact";
 import { firmSendersFrom, NO_FIRM_SENDERS, type FirmSenders } from "@/lib/mailbox/firm-sender";
 import { proposalExpiryTag, type ProposalExpiryIn } from "./proposal-expiry";
 import { CHANGE_SELECT, CHANGE_TYPES, changeWindowStart, lastChangeFor, pickLastChanges, withoutPeople, type ChangeRowIn } from "./last-changed";
+import { DEFAULT_FEE_READS, type FeeReads } from "./fees-load";
+import { feesFor } from "./fees-cells";
 import { closeStagesOf, type CloseStage } from "./close-stage";
 import { OPTIONAL_SOURCES, type CriticalSource, type OptionalSource } from "./notes";
 
@@ -255,7 +257,9 @@ function proposalsFor(row: ReviewRow, all: readonly ProposalExpiryRead[], matter
  * tasks are CRITICAL: if any fails there are no sections (a failed task read must not put everyone
  * under "Needs a next step"). The rest only enrich a row and are named when they fail.
  */
-export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
+export async function loadReview(now: Date = new Date(), options: { withFees?: boolean; reads?: Partial<FeeReads> } = {}): Promise<ReviewLoad> {
+  const withFees = options.withFees === true;
+  const feeReads: FeeReads = { ...DEFAULT_FEE_READS, ...options.reads };
   const db = await getScopedClient();
   const [mattersS, leadsS, stagesS, membersS, tzS, queueS] = await Promise.allSettled([
     listMatters(),
@@ -298,6 +302,12 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
     : ([null, null, null, null, null, null, null, null] as const);
   if (dependsOnRecords && tasksS && tasksS.status === "rejected") failedCritical.push("tasks");
   if (failedCritical.length > 0) return { status: "unavailable", failed: failedCritical };
+
+  // Owner-only money: asked for only when the page's re-resolved role may see it. One source, `fees`: either read failing (or being cut
+  // short) leaves the fee fields absent on every row. The same scoped client reads both; nothing here builds another.
+  const feesS = withFees
+    ? await Promise.allSettled([feeReads.acceptedProposalFees(db, matterIds, proposalLeadIds), feeReads.trackerFees(db, matterIds)])
+    : null;
 
   const failed: OptionalSource[] = [];
   const activityOk = activityS?.status === "fulfilled";
@@ -365,6 +375,9 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
   // A matter also takes the changes filed on its lead. With the member directory unreadable a person's change draws no line (never "a teammate").
   const leadOfMatter = new Map(matters.map((m) => [m.id, m.lead_id]));
   const namesKnown = membersS.status === "fulfilled";
+  const feeData = feesS && feesS[0].status === "fulfilled" && feesS[1].status === "fulfilled" ? { proposals: feesS[0].value, tracker: feesS[1].value } : null;
+  if (feesS && !feeData) failed.push("fees");
+
   const changed = lastChanges
     ? counted.map((r) => {
         const c = lastChangeFor(lastChanges, r.kind, r.id, r.kind === "matter" ? leadOfMatter.get(r.id) : null);
@@ -372,9 +385,11 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
       })
     : counted;
 
+  const withMoney = feeData ? changed.map((r) => ({ ...r, fees: feesFor(r, r.kind === "matter" ? leadOfMatter.get(r.id) ?? null : null, feeData.proposals, feeData.tracker) })) : changed;
+
   return {
     status: "ok",
-    rows: changed,
+    rows: withMoney,
     closeStages: closeStagesOf(leadStages),
     today,
     timeZone,

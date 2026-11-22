@@ -1,5 +1,7 @@
 import type { ReviewKind, ReviewNextStep, ReviewRow } from "./buckets";
 import { courtTarget, laneOf, withCourt } from "./lanes";
+import type { ColumnId } from "./sheet-columns";
+import type { FactCells } from "./sheet-cells";
 
 /**
  * The owner view's editable Sheet. Pure: which cells a person may edit, which EXISTING review action each edit posts to
@@ -8,9 +10,18 @@ import { courtTarget, laneOf, withCourt } from "./lanes";
  * what is DRAWN and what is POSTED.
  */
 
-/** Columns, in table order. Four are typed by a person; Waiting on and Last contact are worked out and never edited here. */
-export const SHEET_EDIT_COLUMNS = ["client", "mark", "status", "next", "court", "waiting", "source", "contact"] as const;
+/**
+ * Every column the Sheet can draw (the registry's, `sheet-columns.ts`; the section decides which and in what order). Four are typed
+ * by a person; every other one is worked out and never edited here. The Owner column keeps its editor id `court` (this file's
+ * tests and the `data-rse-cell="<row>|court"` hooks are pinned to it); the registry calls it `owner` (`editColumnOf`).
+ */
+export const SHEET_EDIT_COLUMNS = ["client", "mark", "practiceArea", "serial", "status", "next", "court", "source", "notes", "start", "legalFee", "legalFeeDue", "govFee", "govFeeDue", "oaDue", "waiting", "contact"] as const;
 export type SheetEditColumn = (typeof SHEET_EDIT_COLUMNS)[number];
+
+/** The registry's id as this file's column id. */
+export function editColumnOf(id: ColumnId): SheetEditColumn {
+  return id === "owner" ? "court" : id;
+}
 export const EDITABLE_COLUMNS = ["status", "next", "court", "source"] as const;
 export type EditableColumn = (typeof EDITABLE_COLUMNS)[number];
 export const LOCKED_COLUMNS = ["waiting", "contact"] as const satisfies readonly SheetEditColumn[];
@@ -90,6 +101,8 @@ export type SheetEditRow = {
   documentsText?: string | null;
   /** "Changed by Caitlyn · Nov 16"; null when the last-change read failed (no line is drawn). */
   changedText?: string | null;
+  /** The read-only cells of the spreadsheet's other columns (serial, dates, practice area, owner-only fees), worked out by the server. */
+  facts?: FactCells;
 };
 
 /** The typed value of one cell, as the editor saves it and the table draws it. */
@@ -294,14 +307,23 @@ export const NO_SIZES: SheetSizes = { cols: {}, rows: {} };
 export const DEFAULT_COL_WIDTHS: Record<SheetEditColumn, number | null> = {
   client: 140,
   mark: 130,
+  practiceArea: 120,
+  serial: 100,
   status: 130,
   next: null,
   court: 110,
-  waiting: 140,
   source: 100,
+  notes: 220,
+  start: 96,
+  legalFee: 100,
+  legalFeeDue: 110,
+  govFee: 110,
+  govFeeDue: 120,
+  oaDue: 130,
+  waiting: 140,
   contact: 84,
 };
-/** With the Note column the defaults and this minimum sum to 1,110px, which fits the content area at 1440 with the rail open (1,114px). */
+/** The "+ Note" column (the editing aid) adds `NOTE_COL_WIDTH` to whatever a section draws; each section table scrolls sideways inside its card when wider. */
 export const NEXT_MIN_WIDTH = 200;
 /** The "+ Note" column, drawn only while editing. */
 export const NOTE_COL_WIDTH = 76;
@@ -312,9 +334,9 @@ export function colWidth(sizes: Pick<SheetSizes, "cols">, col: SheetEditColumn):
 }
 
 /** The narrowest the table may get before it scrolls sideways inside its card (flexible Next step counted at its minimum). */
-export function sheetMinWidth(sizes: Pick<SheetSizes, "cols">, withNote: boolean): number {
+export function sheetMinWidth(sizes: Pick<SheetSizes, "cols">, withNote: boolean, columns: readonly SheetEditColumn[] = SHEET_EDIT_COLUMNS.filter((c) => c !== "notes")): number {
   let total = withNote ? NOTE_COL_WIDTH : 0;
-  for (const c of SHEET_EDIT_COLUMNS) total += colWidth(sizes, c) ?? NEXT_MIN_WIDTH;
+  for (const c of columns) total += colWidth(sizes, c) ?? NEXT_MIN_WIDTH;
   return total;
 }
 

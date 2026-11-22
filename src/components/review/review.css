@@ -76,19 +76,38 @@
   .lp-root:not(.rv-owner) .rv-sheet thead th { position: sticky; top: 0; z-index: 2; }
 }
 .rv-owner .rv-sheet-note { margin: 0; font-size: var(--fs-1); line-height: 1.45; color: var(--muted); }
-/* Sheet column widths (match the editable Sheet): Client never squeezes; a table wider than its card scrolls sideways inside it. */
+/* Sheet column widths (match the editable Sheet's defaults, by column id): Client never squeezes; a table wider than its card scrolls sideways inside it. */
 @media (min-width: 641px) {
-  .rv-owner .sheet-tbl.rv-sheet { --sheet-min: 1034px; table-layout: fixed; }
-  .rv-owner .rv-sheet th:nth-child(1) { width: 140px; }
-  .rv-owner .rv-sheet th:nth-child(2) { width: 130px; }
-  .rv-owner .rv-sheet th:nth-child(3) { width: 130px; }
-  .rv-owner .rv-sheet th:nth-child(5) { width: 110px; }
-  .rv-owner .rv-sheet th:nth-child(6) { width: 140px; }
-  .rv-owner .rv-sheet th:nth-child(7) { width: 100px; }
-  .rv-owner .rv-sheet th:nth-child(8) { width: 84px; }
+  .rv-owner .sheet-tbl.rv-sheet { table-layout: fixed; }
+  .rv-owner .rv-sheet th[data-column="client"] { width: 140px; }
+  .rv-owner .rv-sheet th[data-column="mark"] { width: 130px; }
+  .rv-owner .rv-sheet th[data-column="practiceArea"] { width: 120px; }
+  .rv-owner .rv-sheet th[data-column="serial"] { width: 100px; }
+  .rv-owner .rv-sheet th[data-column="status"] { width: 130px; }
+  .rv-owner .rv-sheet th[data-column="owner"] { width: 110px; }
+  .rv-owner .rv-sheet th[data-column="source"] { width: 100px; }
+  .rv-owner .rv-sheet th[data-column="start"] { width: 96px; }
+  .rv-owner .rv-sheet th[data-column="legalFee"] { width: 100px; }
+  .rv-owner .rv-sheet th[data-column="legalFeeDue"] { width: 110px; }
+  .rv-owner .rv-sheet th[data-column="govFee"] { width: 110px; }
+  .rv-owner .rv-sheet th[data-column="govFeeDue"] { width: 120px; }
+  .rv-owner .rv-sheet th[data-column="oaDue"] { width: 130px; }
+  .rv-owner .rv-sheet th[data-column="waiting"] { width: 140px; }
+  .rv-owner .rv-sheet th[data-column="contact"] { width: 84px; }
   .rv-owner .rv-sheet td:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .rv-owner .rv-sheet td:nth-child(5), .rv-owner .rv-sheet td:last-child { white-space: nowrap; }
 }
+/* The section note above each table, and the overdue office action date (--ox, the risk colour). */
+.rv-sheet-note { margin: 0; padding: 8px 12px; font-size: var(--fs-1); line-height: 1.45; color: var(--muted); }
+.rv-sheet .rv-oa-overdue, .rse-tbl .rv-oa-overdue { color: var(--ox); font-weight: 500; }
+/* The Columns chooser's panel. Tokens only. */
+.rv-cols-panel { display: grid; gap: 12px; padding: 10px 12px; max-height: 70vh; overflow: auto; }
+.rv-cols-sec { display: grid; gap: 6px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.rv-cols-legend { padding: 0; font-size: var(--fs-2); font-weight: 600; color: var(--ink); }
+.rv-cols-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.rv-cols-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: var(--ctl-h); }
+.rv-cols-name { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-2); color: var(--ink); min-width: 0; }
+.rv-cols-moves { display: inline-flex; gap: 4px; flex: none; }
+.rv-cols-note { margin: 0; }
 
 /* The collapsed USPTO / on-track lists under the board */
 .rv-rest { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
