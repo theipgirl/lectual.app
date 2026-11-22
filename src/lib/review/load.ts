@@ -54,7 +54,7 @@ function chunks<T>(items: readonly T[], size = CHUNK): T[][] {
  * would look complete while missing rows: if the pages run out of budget the read FAILS rather than
  * returning what it has.
  */
-async function readAllPages<T>(page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>): Promise<T[]> {
+export async function readAllPages<T>(page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>): Promise<T[]> {
   const all: T[] = [];
   for (let i = 0; i < MAX_PAGES; i++) {
     const { data, error } = await page(i * PAGE, i * PAGE + PAGE - 1);
@@ -66,7 +66,7 @@ async function readAllPages<T>(page: (from: number, to: number) => PromiseLike<{
   throw new Error("review read exceeded its page budget");
 }
 
-async function inChunks<T>(ids: readonly string[], read: (chunk: string[]) => Promise<T[]>): Promise<T[]> {
+export async function inChunks<T>(ids: readonly string[], read: (chunk: string[]) => Promise<T[]>): Promise<T[]> {
   if (ids.length === 0) return [];
   const parts = await Promise.all(chunks(ids).map(read));
   return parts.flat();

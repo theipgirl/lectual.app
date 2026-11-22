@@ -6,14 +6,16 @@ import { laneOf } from "@/lib/review/lanes";
 import { SHEET_COLUMNS, sheetSections, waitingCell } from "@/lib/review/sheet";
 import { LastChanged, openHref, type Common } from "./shared";
 import { SheetEdit } from "./SheetEdit";
+import { NotesCell } from "./NotesCell";
+import { noteCellFor, type SheetNotes } from "@/lib/review/sheet-notes";
 import type { SheetPerms } from "@/lib/review/sheet-edit";
 import { SheetCard, SheetScroll, SheetTable } from "@/components/ui/SheetTable";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { BLANK, LAST_CONTACT, OWNER_COLUMN, TEAMMATE, UNASSIGNED, SHEET_EMPTY_SECTION } from "@/lib/ui/words";
+import { BLANK, LAST_CONTACT, OWNER_COLUMN, TEAMMATE, UNASSIGNED, SHEET_EMPTY_SECTION, SHEET_NOTES_COLUMN } from "@/lib/ui/words";
 import "@/components/list-page/list-page.css";
 import "./review.css";
 
-function SheetSection({ id, title, rows, today, members, params }: Common & { id: string; title: string; rows: ReviewRow[] }) {
+function SheetSection({ id, title, rows, today, members, params, canWrite, notes }: Common & { id: string; title: string; rows: ReviewRow[]; notes: SheetNotes | null }) {
   const names = new Map(members.map((m) => [m.userId, m.name]));
   return (
     <SheetCard as="section" className="rv-sheet-sec" data-section={id} aria-labelledby={`rv-sheet-${id}`}>
@@ -62,6 +64,9 @@ function SheetSection({ id, title, rows, today, members, params }: Common & { id
                     <td data-label="Waiting on">{waitingCell(r, (d) => shortDate(d, today))}</td>
                     <td data-label="Source">{r.source ?? <span className="lx-note">{BLANK}</span>}</td>
                     <td data-label={LAST_CONTACT}>{lastContactText(r, today)}</td>
+                    <td data-label={SHEET_NOTES_COLUMN} className="rv-notes-td">
+                      <NotesCell kind={r.kind} id={r.id} client={r.client} cell={noteCellFor(notes, r)} canEdit={canWrite} today={today} />
+                    </td>
                   </tr>
                 );
               })}
@@ -74,13 +79,13 @@ function SheetSection({ id, title, rows, today, members, params }: Common & { id
 }
 
 /** The Excel tracker as one table: Trademarks, then Contracts, in pipeline order. Edits happen in the record card the Client link opens. */
-export function SheetView({ rows, owner, sheetEdit, ...common }: Common & { rows: ReviewRow[]; /** The owner view's editable sheet (owner view only). */ sheetEdit?: { perms: SheetPerms } }) {
-  if (owner && sheetEdit) return <SheetEdit rows={rows} perms={sheetEdit.perms} owner {...common} />;
+export function SheetView({ rows, owner, sheetEdit, notes = null, ...common }: Common & { rows: ReviewRow[]; /** The owner view's editable sheet (owner view only). */ sheetEdit?: { perms: SheetPerms }; /** The Notes column's reads (sheet-notes.ts). */ notes?: SheetNotes | null }) {
+  if (owner && sheetEdit) return <SheetEdit rows={rows} perms={sheetEdit.perms} notes={notes} owner {...common} />;
   const { trademarks, contracts } = sheetSections(rows);
   return (
     <div className="rv-sheets">
-      <SheetSection id="trademarks" title="Trademarks" rows={trademarks} {...common} />
-      <SheetSection id="contracts" title="Contracts" rows={contracts} {...common} />
+      <SheetSection id="trademarks" title="Trademarks" rows={trademarks} notes={notes} {...common} />
+      <SheetSection id="contracts" title="Contracts" rows={contracts} notes={notes} {...common} />
     </div>
   );
 }

@@ -67,7 +67,7 @@
 .rv-sheet-title { margin: 0; padding: 12px; background: var(--well); border-bottom: 1px solid var(--line-2); }
 .rv-sheet-title .lx-note { font-size: var(--fs-2); color: inherit; }
 .rv-sheet-sec > .rv-strip-note { padding: 12px; }
-@media (min-width: 641px) { .rv-sheet { --sheet-min: 980px; } }
+@media (min-width: 641px) { .rv-sheet { --sheet-min: 1100px; } .rv-sheet td.rv-notes-td { width: 180px; max-width: 220px; } }
 .rv-sheet .rv-sub, .rv-table .rv-sub { font-size: inherit; color: inherit; display: inline; }
 .rv-sheet .rv-sub::before, .rv-table .rv-sub::before { content: " · "; }
 .rv-sheet .rv-deadline-soon, .rv-table .rv-deadline-soon { color: var(--wine); font-weight: 500; }
@@ -78,16 +78,17 @@
 .rv-owner .rv-sheet-note { margin: 0; font-size: var(--fs-1); line-height: 1.45; color: var(--muted); }
 /* Sheet column widths (match the editable Sheet): Client never squeezes; a table wider than its card scrolls sideways inside it. */
 @media (min-width: 641px) {
-  .rv-owner .sheet-tbl.rv-sheet { --sheet-min: 1034px; table-layout: fixed; }
+  .rv-owner .sheet-tbl.rv-sheet { --sheet-min: 1104px; table-layout: fixed; }
   .rv-owner .rv-sheet th:nth-child(1) { width: 140px; }
-  .rv-owner .rv-sheet th:nth-child(2) { width: 130px; }
-  .rv-owner .rv-sheet th:nth-child(3) { width: 130px; }
+  .rv-owner .rv-sheet th:nth-child(2) { width: 116px; }
+  .rv-owner .rv-sheet th:nth-child(3) { width: 120px; }
   .rv-owner .rv-sheet th:nth-child(5) { width: 110px; }
-  .rv-owner .rv-sheet th:nth-child(6) { width: 140px; }
-  .rv-owner .rv-sheet th:nth-child(7) { width: 100px; }
+  .rv-owner .rv-sheet th:nth-child(6) { width: 130px; }
+  .rv-owner .rv-sheet th:nth-child(7) { width: 96px; }
   .rv-owner .rv-sheet th:nth-child(8) { width: 84px; }
+  .rv-owner .rv-sheet th:nth-child(9) { width: 150px; }
   .rv-owner .rv-sheet td:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .rv-owner .rv-sheet td:nth-child(5), .rv-owner .rv-sheet td:last-child { white-space: nowrap; }
+  .rv-owner .rv-sheet td:nth-child(5), .rv-owner .rv-sheet td:nth-child(8) { white-space: nowrap; }
 }
 
 /* The collapsed USPTO / on-track lists under the board */
@@ -169,3 +170,22 @@
 
 /* The quiet "Changed by ... · Nov 16" line on a card, a sheet row and in the panel. */
 .rv-changed { display: block; font-size: var(--fs-1); }
+
+/* The Sheet's Notes cell (both Sheets): one line, clipped, so the row keeps its height; the editor is one line that grows only by Shift+Enter. */
+.rv-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.rv-notes { display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; }
+.rv-note-btn, .rv-note-ro { display: flex; align-items: baseline; gap: 6px; min-width: 0; flex: 1 1 auto; overflow: hidden; white-space: nowrap; text-align: left; font: inherit; color: var(--body); }
+.rv-note-btn { background: none; border: 1px solid transparent; border-radius: var(--r-md); padding: 2px 6px; margin: -3px -7px; cursor: text; }
+.rv-note-btn:hover { border-color: var(--line); background: var(--card); }
+.rv-note-btn:focus-visible { outline: 2px solid var(--ox); outline-offset: 0; }
+.rv-note-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rv-note-date { flex: none; }
+.rv-note-add { color: var(--muted); }
+.rv-note-in { flex: 1 1 auto; min-width: 0; box-sizing: border-box; height: var(--ctl-h); max-height: 96px; padding: 6px 8px; resize: none; line-height: 1.35; border: 1px solid var(--line); border-radius: var(--r-md); font: var(--fs-3) var(--sans); color: var(--ink); background: var(--card); }
+.rv-note-in:focus-visible { outline: 2px solid var(--ox); outline-offset: 0; }
+.rv-note-status { flex: none; white-space: nowrap; }
+.rv-note-status.is-error { color: var(--wine); }
+@media (max-width: 640px) {
+  .rv-notes, .rv-note-btn, .rv-note-ro { white-space: normal; }
+  .rv-note-text { white-space: normal; }
+}

@@ -2470,3 +2470,16 @@ menu's "Your name"), `staff-mailbox` (connect your own Outlook on Integrations; 
 feature list hides it) and `staff-tour` (the account menu's "Show tips again"). The rule is one line in `flowVisible` (`requires.staffGuide`); the admin
 tier never sees those three and its hub is exactly what it was (pinned in `tests/onboarding/hub.test.ts`). Progress flags are unchanged: old ids still parse,
 the three new ids are known, unknown ids are dropped. "Your setup" (Outlook status) above the guides is unchanged.
+
+## Weekly review: an editable Notes cell in the Sheet (no schema)
+Both Sheets (`?view=sheet`: the plain `SheetView` and the owner's `SheetEditTable`) end with a Notes column. Logic in `src/lib/review/sheet-notes.ts`
+(pure), the read in `sheet-notes-load.ts`, the cell in `src/components/review/NotesCell.tsx`; `sheet.ts` / `SheetView.tsx` only add the column and the call.
+- **Read:** only for the Sheet, only for the rows on screen: `crm_activity` type `note` by `matter_id` / `lead_id` (a matter's own notes, like the Cards
+  note), chunks of 80 ids, paged, the scoped client; selects the ids, date and `payload->>note|body|text` only. Shows the newest note's first line (80
+  characters) and its firm-calendar date. Three states: a failed or cut-short read is "Couldn't load" in every cell, never blank; none is an empty cell.
+- **Write:** writers (`canWrite` = MATTER_WRITE_ROLES = CAN_WRITE_LEAD; the owner table: `canNote`, not on phones) click in and type; Enter (no Shift) or
+  leaving the cell saves ONE plain note through the existing `logWhatHappenedAction` (role and record re-checked, revalidates the review); Esc cancels;
+  empty saves nothing. `noteCommitter` is the one-save-per-edit rule (Enter then blur posts once). A failed save keeps the text and says "Couldn't save".
+  Other roles read the note with no editor. Note text is React text only.
+- The owner table's "+ Note" popover column is gone (one way to add a note); the Notes column is a resizable column (150px; four defaults and Next step's
+  minimum shrank so the defaults still fit 1440 with the rail open, 1,106px). Not verified in a real browser.

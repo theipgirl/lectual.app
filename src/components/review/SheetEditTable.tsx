@@ -23,7 +23,6 @@ import {
   MIN_COL,
   DEFAULT_COL_WIDTHS,
   NEXT_MIN_WIDTH,
-  NOTE_COL_WIDTH,
   colWidth,
   sheetMinWidth,
   MIN_ROW,
@@ -36,7 +35,6 @@ import {
   courtOf,
   matchPeople,
   nextEditableCell,
-  notePost,
   parseSizes,
   growHeight,
   normalizeNextStepTitle,
@@ -59,8 +57,6 @@ import {
   BLANK,
   OWNER_COLUMN,
   TEAMMATE,
-  SHEET_ADD_NOTE,
-  SHEET_CANCEL,
   SHEET_DUE,
   SHEET_EMPTY_SECTION,
   SHEET_ENTER_ESC,
@@ -74,35 +70,31 @@ import {
   SHEET_NO_ONE_FOUND,
   LAST_CONTACT,
   SHEET_NO_SOURCE,
-  SHEET_NOTE_BUTTON,
   SHEET_NOTE_NOT_SAVED,
+  SHEET_NOTES_COLUMN,
   SHEET_OVERDUE,
   SHEET_RESIZE_ROW,
   SHEET_SAVE_FAILED,
   SHEET_SOURCE_LABEL,
   SHEET_TRY_AFTER_REFRESH,
-  SHEET_WHAT_HAPPENED,
-  SHEET_WRITE_NOTE,
   sheetMoveLogged,
-  sheetNoteFor,
-  sheetNoteHint,
   sheetResizeColumn,
 } from "@/lib/ui/words";
 import { usePopPlacement } from "./pop-placement";
+import { NotesCell } from "./NotesCell";
 import { sheetStatusStore } from "./sheet-status-store";
 import { SheetCard, SheetScroll, SheetTable } from "@/components/ui/SheetTable";
 import "./review-sheet-edit.css";
 
 export type SheetPerson = { userId: string; name: string; /** What the cell shows. */ short: string; roleLabel: string };
 export type SheetSection = { id: string; title: string; rows: SheetEditRow[] };
-type OpenCell = { rowKey: string; col: EditableColumn | "note" };
+type OpenCell = { rowKey: string; col: EditableColumn };
 
 /** Drawing-only starting state (a preview harness opens editors with it). The default is everything closed. */
 export type SheetEditInitial = {
   open?: OpenCell[];
   /** The next-step editor's text, by row key. */
   nextDraft?: Record<string, { title: string; dueDate: string | null }>;
-  noteDraft?: Record<string, string>;
   /** A column whose resize grip and width tip are shown, and a row whose grip is shown. */
   activeColumn?: SheetEditColumn;
   activeRow?: string;
@@ -117,6 +109,7 @@ const HEADS: { col: SheetEditColumn; label: string }[] = [
   { col: "waiting", label: "Waiting on" },
   { col: "source", label: "Source" },
   { col: "contact", label: LAST_CONTACT },
+  { col: "notes", label: SHEET_NOTES_COLUMN },
 ];
 
 const ACTIONS: Record<SheetActionName, (prev: ReviewActionState, form: FormData) => Promise<ReviewActionState>> = {
@@ -241,7 +234,7 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
     return () => document.removeEventListener("pointerdown", onDown);
   }, [open]);
 
-  const focusCell = (rowKey: string, col: EditableColumn | "note") => {
+  const focusCell = (rowKey: string, col: EditableColumn) => {
     requestAnimationFrame(() => {
       const el = [...(document.getElementById(rootId)?.querySelectorAll<HTMLElement>("[data-rse-cell]") ?? [])].find((n) => n.dataset.rseCell === `${rowKey}|${col}`);
       el?.focus();
@@ -282,13 +275,9 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
     if (!serverHas) router.refresh();
   }
 
-  async function saveNote(row: SheetEditRow, body: string): Promise<boolean> {
-    const p = notePost(row, body);
-    const res = await post(p.action, p.fields);
-    if (res.ok) dispatch({ type: "note-saved", client: row.client });
-    else dispatch({ type: "note-failed", client: row.client, message: `${res.message ?? SHEET_SAVE_FAILED} ${SHEET_NOTE_NOT_SAVED}` });
-    return res.ok;
-  }
+  // The Notes cell saves itself (the same "Log what happened" action); its answer feeds the header's save line.
+  const noteResult = (client: string) => (ok: boolean, message: string | null) =>
+    dispatch(ok ? { type: "note-saved", client } : { type: "note-failed", client, message: `${message ?? SHEET_SAVE_FAILED} ${SHEET_NOTE_NOT_SAVED}` });
 
   // Column and row sizes: pointer drag or arrow keys on the grip; stored for this viewer only.
   const startColDrag = (col: SheetEditColumn) => (e: ReactPointerEvent<HTMLSpanElement>) => {
@@ -343,7 +332,7 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
   };
 
   const courtName = (id: string | null) => (id ? names.get(id) ?? TEAMMATE : UNASSIGNED_LANE);
-  const colCount = HEADS.length + (editing ? 1 : 0);
+  const colCount = HEADS.length;
 
   return (
     <div className="rse-wrap" id={rootId} data-editing={editing ? "true" : "false"}>
@@ -354,18 +343,17 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
       )}
       <SheetCard>
        <SheetScroll>
-        <SheetTable className="rse-tbl" fixed minWidth={sheetMinWidth(sizes, editing)}>
+        <SheetTable className="rse-tbl" fixed minWidth={sheetMinWidth(sizes)}>
           <colgroup>
             {HEADS.map((h) => {
               const cw = colWidth(sizes, h.col);
               return <col key={h.col} style={cw ? { width: cw } : undefined} />;
             })}
-            {editing && <col style={{ width: NOTE_COL_WIDTH }} />}
           </colgroup>
           <thead>
             <tr>
               {HEADS.map((h) => {
-                const typed = editing && (h.col === "status" || h.col === "next" || h.col === "court" || h.col === "source");
+                const typed = editing && (h.col === "status" || h.col === "next" || h.col === "court" || h.col === "source" || h.col === "notes");
                 const locked = h.col === "waiting" || h.col === "contact";
                 const w = colWidth(sizes, h.col);
                 const active = initial?.activeColumn === h.col || dragCol === h.col;
@@ -393,11 +381,6 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                   </th>
                 );
               })}
-              {editing && (
-                <th scope="col" className="rse-note-th">
-                  <span className="rse-sr">Note</span>
-                </th>
-              )}
             </tr>
           </thead>
           <tbody>
@@ -568,36 +551,9 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                       <td data-label={LAST_CONTACT} className="rse-locked" title={row.contactTitle ?? undefined}>
                         {row.contactText}
                       </td>
-                      {editing && (
-                        <td className="rse-note-td">
-                          {canNote(row.kind, perms) && (
-                            <>
-                              <button
-                                type="button"
-                                className={`lx-btn lx-btn-sec lx-btn-sm${isOpen(row.key, "note") ? " rse-on" : ""}`}
-                                aria-label={sheetNoteFor(row.client)}
-                                aria-expanded={isOpen(row.key, "note")}
-                                data-rse-cell={`${row.key}|note`}
-                                onClick={() => setOpen([{ rowKey: row.key, col: "note" }])}
-                              >
-                                {SHEET_NOTE_BUTTON}
-                              </button>
-                              {isOpen(row.key, "note") && (
-                                <NotePop
-                                  client={row.client}
-                                  draft={initial?.noteDraft?.[row.key]}
-                                  onSave={async (body) => {
-                                    const ok = await saveNote(raw, body);
-                                    if (ok) close(row.key, "note");
-                                    return ok;
-                                  }}
-                                  onCancel={() => close(row.key, "note")}
-                                />
-                              )}
-                            </>
-                          )}
-                        </td>
-                      )}
+                      <td data-label={SHEET_NOTES_COLUMN} className="rse-notes-td">
+                        <NotesCell kind={row.kind} id={row.id} client={row.client} cell={row.note ?? { state: "unavailable" }} canEdit={!phone && canNote(row.kind, perms)} today={today} onResult={noteResult(row.client)} />
+                      </td>
                     </tr>
                   );
                 })}
@@ -768,57 +724,5 @@ function NextEditor({ row, draft, onSave, onSaveAndMove, onCancel }: { row: Shee
         </p>
       )}
     </div>
-  );
-}
-
-function NotePop({ client, draft, onSave, onCancel }: { client: string; draft?: string; onSave: (body: string) => Promise<boolean>; onCancel: () => void }) {
-  const [body, setBody] = useState(draft ?? "");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const id = `rse-note-${useId().replace(/[^A-Za-z0-9_-]/g, "")}`;
-  const ref = useRef<HTMLFormElement>(null);
-  usePopPlacement(ref, "right");
-  return (
-    <form
-      ref={ref}
-      className="rse-pop rse-note-pop"
-      aria-label={sheetNoteFor(client)}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") {
-          e.preventDefault();
-          onCancel();
-        }
-      }}
-      onSubmit={async (e) => {
-        e.preventDefault();
-        if (!body.trim()) {
-          setError(SHEET_WRITE_NOTE);
-          return;
-        }
-        setBusy(true);
-        const ok = await onSave(body.trim());
-        setBusy(false);
-        if (!ok) setError(null);
-      }}
-    >
-      <label htmlFor={id} className="rse-note-label">
-        {SHEET_WHAT_HAPPENED}
-      </label>
-      <textarea id={id} rows={3} className="rse-in rse-textarea" value={body} maxLength={4000} autoFocus onChange={(e) => setBody(e.target.value)} />
-      <p className="rse-pop-foot">{sheetNoteHint(client)}</p>
-      {error && (
-        <p className="rse-ed-error" role="alert">
-          {error}
-        </p>
-      )}
-      <div className="rse-note-acts">
-        <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={onCancel}>
-          {SHEET_CANCEL}
-        </button>
-        <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={busy}>
-          {SHEET_ADD_NOTE}
-        </button>
-      </div>
-    </form>
   );
 }

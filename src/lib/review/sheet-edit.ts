@@ -1,5 +1,6 @@
 import type { ReviewKind, ReviewNextStep, ReviewRow } from "./buckets";
 import { courtTarget, laneOf, withCourt } from "./lanes";
+import type { NoteCell } from "./sheet-notes";
 
 /**
  * The owner view's editable Sheet. Pure: which cells a person may edit, which EXISTING review action each edit posts to
@@ -8,8 +9,11 @@ import { courtTarget, laneOf, withCourt } from "./lanes";
  * what is DRAWN and what is POSTED.
  */
 
-/** Columns, in table order. Four are typed by a person; Waiting on and Last contact are worked out and never edited here. */
-export const SHEET_EDIT_COLUMNS = ["client", "mark", "status", "next", "court", "waiting", "source", "contact"] as const;
+/**
+ * Columns, in table order. Four are typed by a person through a picker; Waiting on and Last contact are worked out and never
+ * edited here; Notes shows the newest plain note and a writer types a new one in place (its own inline editor, not a picker).
+ */
+export const SHEET_EDIT_COLUMNS = ["client", "mark", "status", "next", "court", "waiting", "source", "contact", "notes"] as const;
 export type SheetEditColumn = (typeof SHEET_EDIT_COLUMNS)[number];
 export const EDITABLE_COLUMNS = ["status", "next", "court", "source"] as const;
 export type EditableColumn = (typeof EDITABLE_COLUMNS)[number];
@@ -61,7 +65,7 @@ export function cellEditable(col: SheetEditColumn, kind: ReviewKind, perms: Shee
   return canWriteRow(kind, perms);
 }
 
-/** Whether "+ Note" is drawn on a row. */
+/** Whether a row's Notes cell can be typed in (the plain-note write roles). */
 export function canNote(kind: ReviewKind, perms: SheetPerms): boolean {
   return canWriteRow(kind, perms);
 }
@@ -90,6 +94,8 @@ export type SheetEditRow = {
   documentsText?: string | null;
   /** "Changed by Caitlyn · Nov 16"; null when the last-change read failed (no line is drawn). */
   changedText?: string | null;
+  /** The Notes cell: the newest plain note, none, or couldn't load. Absent reads as couldn't load (never as "no note"). */
+  note?: NoteCell;
 };
 
 /** The typed value of one cell, as the editor saves it and the table draws it. */
@@ -172,7 +178,7 @@ export function postFor(row: Pick<SheetEditRow, "kind" | "id" | "nextStep">, val
   }
 }
 
-/** "+ Note": the existing "Log what happened" path (a plain timeline note that counts as last contact). */
+/** A typed note: the existing "Log what happened" path (a plain timeline note that counts as last contact). */
 export function notePost(row: Pick<SheetEditRow, "kind" | "id">, body: string): SheetPost {
   return { action: "logWhatHappened", fields: { kind: row.kind, id: row.id, body } };
 }
@@ -293,18 +299,17 @@ export const NO_SIZES: SheetSizes = { cols: {}, rows: {} };
 /** Default column widths in px. Next step is flexible (no fixed width) and never narrower than `NEXT_MIN_WIDTH`. A stored width overrides these. */
 export const DEFAULT_COL_WIDTHS: Record<SheetEditColumn, number | null> = {
   client: 140,
-  mark: 130,
-  status: 130,
+  mark: 116,
+  status: 120,
   next: null,
   court: 110,
-  waiting: 140,
-  source: 100,
+  waiting: 130,
+  source: 96,
   contact: 84,
+  notes: 150,
 };
-/** With the Note column the defaults and this minimum sum to 1,110px, which fits the content area at 1440 with the rail open (1,114px). */
-export const NEXT_MIN_WIDTH = 200;
-/** The "+ Note" column, drawn only while editing. */
-export const NOTE_COL_WIDTH = 76;
+/** The defaults and this minimum sum to 1,106px, which fits the content area at 1440 with the rail open (1,114px). */
+export const NEXT_MIN_WIDTH = 160;
 
 /** The width a column is drawn at: this viewer's stored width, else the default; null = flexible (Next step). */
 export function colWidth(sizes: Pick<SheetSizes, "cols">, col: SheetEditColumn): number | null {
@@ -312,8 +317,8 @@ export function colWidth(sizes: Pick<SheetSizes, "cols">, col: SheetEditColumn):
 }
 
 /** The narrowest the table may get before it scrolls sideways inside its card (flexible Next step counted at its minimum). */
-export function sheetMinWidth(sizes: Pick<SheetSizes, "cols">, withNote: boolean): number {
-  let total = withNote ? NOTE_COL_WIDTH : 0;
+export function sheetMinWidth(sizes: Pick<SheetSizes, "cols">): number {
+  let total = 0;
   for (const c of SHEET_EDIT_COLUMNS) total += colWidth(sizes, c) ?? NEXT_MIN_WIDTH;
   return total;
 }

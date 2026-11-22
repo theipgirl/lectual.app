@@ -49,7 +49,8 @@ describe("Waiting on the review person", () => {
 
 describe("Sheet", () => {
   it("columns, in order", () => {
-    expect([...SHEET_COLUMNS]).toEqual(["Client", "Mark", "Status", "Next step", "Owner", "Waiting on", "Source", "Last contact"]);
+    // Changed on purpose: the Notes column (the newest plain note, typed in place) is last.
+    expect([...SHEET_COLUMNS]).toEqual(["Client", "Mark", "Status", "Next step", "Owner", "Waiting on", "Source", "Last contact", "Notes"]);
   });
   it("Trademarks = leads + TM/CR/PATENT (no type reads TM); Contracts = the rest; stage order then client", () => {
     const s = sheetSections([

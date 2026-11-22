@@ -195,8 +195,9 @@ describe("Tab and sizes", () => {
 
 describe("default column widths", () => {
   it("are the director's defaults, with Next step flexible", () => {
-    expect(DEFAULT_COL_WIDTHS).toEqual({ client: 140, mark: 130, status: 130, next: null, court: 110, waiting: 140, source: 100, contact: 84 });
-    expect(NEXT_MIN_WIDTH).toBe(200);
+    // Changed on purpose: the Notes column replaced "+ Note" (76px) and takes 150px, so four defaults and Next step's minimum shrank to keep 1440 unscrolled.
+    expect(DEFAULT_COL_WIDTHS).toEqual({ client: 140, mark: 116, status: 120, next: null, court: 110, waiting: 130, source: 96, contact: 84, notes: 150 });
+    expect(NEXT_MIN_WIDTH).toBe(160);
   });
   it("a stored width overrides the default; nothing stored reads the default", () => {
     expect(colWidth(parseSizes(null), "client")).toBe(140);
@@ -204,11 +205,11 @@ describe("default column widths", () => {
     const stored = parseSizes(JSON.stringify({ cols: { client: 220, next: 400 } }));
     expect(colWidth(stored, "client")).toBe(220);
     expect(colWidth(stored, "next")).toBe(400);
-    expect(colWidth(stored, "mark")).toBe(130);
+    expect(colWidth(stored, "mark")).toBe(116);
   });
-  it("the table's minimum is the sum, Next step counted at 200 and the note column only while editing", () => {
-    expect(sheetMinWidth(parseSizes(null), false)).toBe(140 + 130 + 130 + 200 + 110 + 140 + 100 + 84);
-    expect(sheetMinWidth(parseSizes(null), true)).toBe(1034 + 76);
+  it("the table's minimum is the sum, Next step counted at 160, and fits 1440 with the rail open (1,114px)", () => {
+    expect(sheetMinWidth(parseSizes(null))).toBe(140 + 116 + 120 + 160 + 110 + 130 + 96 + 84 + 150);
+    expect(sheetMinWidth(parseSizes(null))).toBeLessThanOrEqual(1114);
   });
 });
 

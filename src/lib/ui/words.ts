@@ -514,9 +514,9 @@ export const DECK_FOR = "for";
 
 /* ── Owner view: the weekly review's editable Sheet ── */
 export const SHEET_YOU_TYPE = "You type these";
-export const SHEET_YOU_TYPE_BODY = `Status (moves the stage), Next step (text and due date), ${OWNER_COLUMN} (a person), Source. Each change saves on its own and is logged on the record.`;
+export const SHEET_YOU_TYPE_BODY = `Status (moves the stage), Next step (text and due date), ${OWNER_COLUMN} (a person), Source, Notes (a new note on the timeline). Each change saves on its own and is logged on the record.`;
 export const SHEET_WORKED_OUT = "Lectual works these out";
-export const SHEET_WORKED_OUT_BODY = "Waiting on and Last contact come from next steps, mail and calls. They can't be edited here; log what happened with + Note instead.";
+export const SHEET_WORKED_OUT_BODY = "Waiting on and Last contact come from next steps, mail and calls. They can't be edited here; type what happened in Notes instead.";
 export const SHEET_LEGEND_LABEL = "Which columns you can edit";
 export const SHEET_KEYS_EDIT = "or click to edit";
 export const SHEET_KEYS_NEXT = "next cell";
@@ -528,11 +528,6 @@ export const SHEET_NO_ONE_FOUND = "No one matches.";
 export const SHEET_NEXT_STEP = NEXT_STEP;
 export const SHEET_DUE = "Due";
 export const SHEET_ENTER_ESC = "Enter to save · Esc to cancel";
-export const SHEET_NOTE_BUTTON = "+ Note";
-export const sheetNoteFor = (client: string) => `Add a note for ${client}`;
-export const SHEET_WHAT_HAPPENED = "What happened?";
-export const sheetNoteHint = (firstName: string) => `Goes on ${firstName}'s timeline as a note and counts as last contact.`;
-export const SHEET_ADD_NOTE = ADD_TO_TIMELINE;
 export const SHEET_CANCEL = CANCEL;
 export const SHEET_NO_SOURCE = "No source";
 export const SHEET_SOURCE_LABEL = "Source";
@@ -544,12 +539,20 @@ export const SHEET_PUT_BACK = "The earlier value is back.";
 export const SHEET_NOTE_NOT_SAVED = "The note wasn't saved.";
 export const SHEET_TRY_AFTER_REFRESH = "Couldn't save this yet. Refresh the page and try again.";
 export const SHEET_ENTER_TITLE = "Enter what happens next.";
-export const SHEET_WRITE_NOTE = "Write what happened.";
 export const SHEET_STAGES_UNREADABLE = "The stage list couldn't load, so Status can't be changed here right now. Refresh to try again.";
 export const sheetResizeColumn = (name: string) => `Resize ${name} column`;
 export const SHEET_RESIZE_ROW = "Resize row";
 export const SHEET_EMPTY_SECTION = noneYet("records in this view");
 export const SHEET_SAVE_FAILED = "Couldn't save this change.";
+/** The Sheet's Notes column: the newest plain note, typed in place (Enter or leaving the cell saves, Esc cancels). */
+export const SHEET_NOTES_COLUMN = "Notes";
+export const SHEET_NOTE_CANT_LOAD = DECK_COULDNT_LOAD;
+export const SHEET_NOTE_ADD = "Add a note";
+export const SHEET_NOTE_SAVING = "Saving…";
+export const SHEET_NOTE_SAVED = "Saved";
+export const SHEET_NOTE_SAVE_FAILED = "Couldn't save";
+export const SHEET_NOTE_KEYS = "Enter to save · Shift+Enter for a new line · Esc to cancel";
+export const sheetNoteCellLabel = (client: string) => `Note for ${client}`;
 
 /* Needs review (Today, both views): old hand-entered dates nobody confirmed. */
 export const NEEDS_REVIEW_HEADING = "Needs review";

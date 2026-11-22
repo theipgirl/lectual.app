@@ -6,6 +6,7 @@ import { lastChangedText } from "@/lib/review/last-changed";
 import { contactWords } from "@/lib/review/contact";
 import { EDITABLE_COLUMNS, cellEditable, type SheetEditRow, type SheetPerms } from "@/lib/review/sheet-edit";
 import { roleLabel } from "@/lib/auth/roles";
+import { noteCellFor, type SheetNotes } from "@/lib/review/sheet-notes";
 import { REFERRAL_SOURCES } from "@/lib/intake/referral-source";
 import { SHEET_LEGEND_LABEL, SHEET_STAGES_UNREADABLE, SHEET_WORKED_OUT, SHEET_WORKED_OUT_BODY, SHEET_YOU_TYPE, SHEET_YOU_TYPE_BODY } from "@/lib/ui/words";
 import { Icon } from "@/components/ui/Icon";
@@ -14,7 +15,7 @@ import { SheetEditTable, type SheetEditInitial, type SheetPerson } from "./Sheet
 import { openHref, type Common } from "./shared";
 import "./review-sheet-edit.css";
 
-function toSheetRow(r: ReviewRow, href: string, today: string, names: ReadonlyMap<string, string>): SheetEditRow {
+function toSheetRow(r: ReviewRow, href: string, today: string, names: ReadonlyMap<string, string>, notes: SheetNotes | null): SheetEditRow {
   return {
     key: r.key,
     kind: r.kind,
@@ -33,6 +34,7 @@ function toSheetRow(r: ReviewRow, href: string, today: string, names: ReadonlyMa
     documentsText: documentsTag(r.documentCount),
     changedText: lastChangedText(r.lastChange, names, today),
     contactTitle: r.contactKnown && r.lastContact ? lastContactText(r, today) : r.lastContact ? contactWords(r.lastContact.type) : null,
+    note: noteCellFor(notes, r),
   };
 }
 
@@ -41,12 +43,12 @@ function toSheetRow(r: ReviewRow, href: string, today: string, names: ReadonlyMa
  * are worked out and locked. Every edit goes through an existing review action, which re-resolves the role. A role that can't
  * write gets the same table with no editors. On a phone the rows stack and every edit happens in the record panel.
  */
-export function SheetEdit({ rows, today, members, params, perms, initial }: Common & { rows: ReviewRow[]; perms: SheetPerms; initial?: SheetEditInitial }) {
+export function SheetEdit({ rows, today, members, params, perms, initial, notes = null }: Common & { rows: ReviewRow[]; perms: SheetPerms; initial?: SheetEditInitial; notes?: SheetNotes | null }) {
   const names = new Map(members.map((m) => [m.userId, m.name]));
   const { trademarks, contracts } = sheetSections(rows);
   const sections = [
-    { id: "trademarks", title: "Trademarks", rows: trademarks.map((r) => toSheetRow(r, openHref(params, r), today, names)) },
-    { id: "contracts", title: "Contracts", rows: contracts.map((r) => toSheetRow(r, openHref(params, r), today, names)) },
+    { id: "trademarks", title: "Trademarks", rows: trademarks.map((r) => toSheetRow(r, openHref(params, r), today, names, notes)) },
+    { id: "contracts", title: "Contracts", rows: contracts.map((r) => toSheetRow(r, openHref(params, r), today, names, notes)) },
   ];
   const first = (n: string) => n.trim().split(/\s+/)[0] ?? n;
   const people: SheetPerson[] = members.map((m) => ({

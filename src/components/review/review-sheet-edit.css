@@ -44,7 +44,7 @@
 /* The next-step title: wraps at the cell width, grows from 2 to 4 lines (the height is set from its content), then scrolls. The cell never widens, so the row stays put. */
 .rv-owner .rse-tbl .rse-title-ta { display: block; box-sizing: border-box; line-height: 21px; min-height: 60px; max-height: 102px; overflow-y: auto; overflow-wrap: anywhere; }
 
-/* Popovers: the stage list, the person picker, the source list and "+ Note". */
+/* Popovers: the stage list, the person picker and the source list. */
 .rv-owner .rse-pop { position: absolute; z-index: 8; top: calc(100% - 2px); left: 4px; min-width: 230px; width: max-content; max-width: 340px; padding: 8px; border-radius: var(--r-lg); background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow-lift); display: flex; flex-direction: column; gap: 2px; text-align: left; white-space: normal; }
 .rv-owner .rse-pop-list { display: flex; flex-direction: column; gap: 2px; max-height: 300px; overflow: auto; }
 .rv-owner .rse-pop-eyebrow { padding: 4px 10px; font-size: var(--fs-1); font-weight: 500; color: var(--muted); }
@@ -57,18 +57,8 @@
 .rv-owner .rse-av.soft { background: var(--tint-ox); color: var(--ox); }
 .rv-owner .rse-pop .rse-in { margin-bottom: 4px; }
 
-.rv-owner .rse-note-th, .rv-owner .rse-note-td { white-space: nowrap; }
-/* The Note column sticks to the right edge of the scroll area (header and rows), so "+ Note" stays reachable when the table scrolls sideways. */
-.rv-owner .rse-tbl .rse-note-th, .rv-owner .rse-tbl .rse-note-td { position: sticky; right: 0; padding-left: 8px; padding-right: 8px; border-left: 1px solid var(--line); }
-.rv-owner .rse-tbl thead th.rse-note-th { position: sticky; z-index: 5; background: var(--well); }
-.rv-owner .rse-tbl .rse-note-td { z-index: 4; background: var(--card); }
-.rv-owner .rse-tbl tbody tr:nth-child(even) td.rse-note-td { background: color-mix(in srgb, var(--well) 35%, var(--card)); }
-/* A row with an open popover rises above the other sticky cells. */
-.rv-owner .rse-tbl td.rse-note-td:has(.rse-pop) { z-index: 7; }
-.rv-owner .rse-note-pop { width: 270px; gap: 8px; padding: 12px; }
-.rv-owner .rse-note-label { font-size: var(--fs-2); font-weight: 600; color: var(--ink); }
-.rv-owner .rse-note-pop .rse-pop-foot { padding: 0; }
-.rv-owner .rse-note-acts { display: flex; gap: 8px; justify-content: flex-end; }
+/* The Notes column: one clipped line (the cell itself is in review.css, shared with the plain Sheet). */
+.rv-owner .rse-tbl .rse-notes-td { white-space: nowrap; overflow: hidden; }
 
 /* Column edge and row grips: a per-viewer convenience, shown on hover and focus. */
 .rv-owner .rse-col-grip { position: absolute; top: 4px; bottom: 4px; right: -3px; width: 6px; border-radius: var(--r-sm); cursor: col-resize; z-index: 3; background: transparent; }
