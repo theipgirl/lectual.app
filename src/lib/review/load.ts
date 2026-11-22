@@ -287,7 +287,7 @@ export async function loadReview(now: Date = new Date(), options: { withFees?: b
 
   const dependsOnRecords = failedCritical.length === 0;
   const proposalLeadIds = [...new Set([...leadIds, ...matters.filter((m) => m.status === "open" || m.status === "on_hold").map((m) => m.lead_id).filter((x): x is string => !!x)])];
-  const [tasksS, activityS, deadlinesS, changesS, proposalsS, countsS, sendersS, changeRowsS] = dependsOnRecords
+  const [tasksS, activityS, deadlinesS, changesS, proposalsS, countsS, sendersS, changeRowsS, feeProposalsS, feeTrackerS] = dependsOnRecords
     ? await Promise.allSettled([
         readOpenTasks(db, matterIds, leadIds),
         // A matter shows its lead's mail too (the emails were filed on the lead before it signed), so the lead ids behind matters are read as well.
@@ -298,16 +298,16 @@ export async function loadReview(now: Date = new Date(), options: { withFees?: b
         readDocumentCounts(db, matterIds, leadIds),
         readFirmSenders(db),
         readChangeRows(db, matterIds, proposalLeadIds, now),
+        // Owner-only money, in the same parallel batch (each read's failure stays its own). Asked for only when the page's re-resolved role may see it.
+        withFees ? feeReads.acceptedProposalFees(db, matterIds, proposalLeadIds) : Promise.resolve([] as Awaited<ReturnType<FeeReads["acceptedProposalFees"]>>),
+        withFees ? feeReads.trackerFees(db, matterIds) : Promise.resolve([] as Awaited<ReturnType<FeeReads["trackerFees"]>>),
       ])
-    : ([null, null, null, null, null, null, null, null] as const);
+    : ([null, null, null, null, null, null, null, null, null, null] as const);
   if (dependsOnRecords && tasksS && tasksS.status === "rejected") failedCritical.push("tasks");
   if (failedCritical.length > 0) return { status: "unavailable", failed: failedCritical };
 
-  // Owner-only money: asked for only when the page's re-resolved role may see it. One source, `fees`: either read failing (or being cut
-  // short) leaves the fee fields absent on every row. The same scoped client reads both; nothing here builds another.
-  const feesS = withFees
-    ? await Promise.allSettled([feeReads.acceptedProposalFees(db, matterIds, proposalLeadIds), feeReads.trackerFees(db, matterIds)])
-    : null;
+  // One source, `fees`: either read failing (or being cut short) leaves the fee fields absent on every row.
+  const feesS = withFees && feeProposalsS && feeTrackerS ? ([feeProposalsS, feeTrackerS] as const) : null;
 
   const failed: OptionalSource[] = [];
   const activityOk = activityS?.status === "fulfilled";

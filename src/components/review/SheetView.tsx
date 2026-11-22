@@ -57,7 +57,8 @@ function SheetSection({ id, title, rows, today, members, params, columns, initia
       source: <td data-label={label("source")}>{r.source ?? dash}</td>,
       contact: <td data-label={label("contact")}>{lastContactText(r, today)}</td>,
     };
-    for (const f of FACT_COLUMN_IDS) cells[f] = <SheetFactTd cell={facts[f]} label={label(f)} />;
+    // Only the columns this viewer is allowed: no fee cell is built (or shipped to the browser) for anyone else.
+    for (const f of FACT_COLUMN_IDS) if (columns.some((c) => c.id === f)) cells[f] = <SheetFactTd cell={facts[f]} label={label(f)} />;
     return { key: r.key, cells };
   });
   return (

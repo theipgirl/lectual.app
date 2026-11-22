@@ -1,4 +1,5 @@
 import type { FactCell } from "@/lib/review/sheet-cells";
+import { BLANK } from "@/lib/ui/words";
 
 /**
  * One read-only cell of the List's spreadsheet columns (serial, dates, practice area, owner-only fees). No hooks and no client code, so
@@ -6,8 +7,8 @@ import type { FactCell } from "@/lib/review/sheet-cells";
  * and a past-due office action date carries the risk class.
  */
 export function SheetFactTd({ cell, label, className, quiet = "lx-note" }: { cell: FactCell | undefined; label: string; className?: string; quiet?: string }) {
-  const c: FactCell = cell ?? { text: "—", tone: "none" };
-  const classes = [className, c.overdue ? "rv-oa-overdue" : null].filter(Boolean).join(" ") || undefined;
+  const c: FactCell = cell ?? { text: BLANK, tone: "none" };
+  const classes = [className, c.overdue ? "rv-oa-overdue" : null, c.tone === "failed" ? "rv-fact-failed" : null].filter(Boolean).join(" ") || undefined;
   return (
     <td data-label={label} className={classes} title={c.title}>
       {c.tone === "value" ? c.text : <span className={quiet}>{c.text}</span>}

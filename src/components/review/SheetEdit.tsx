@@ -1,8 +1,8 @@
 import type { ReviewRow } from "@/lib/review/buckets";
 import { lastContactText, shortDate } from "@/lib/review/format";
 import { sheetSections, waitingCell } from "@/lib/review/sheet";
-import { factCells } from "@/lib/review/sheet-cells";
-import { NOTES_PRESENT, columnsFor } from "@/lib/review/sheet-columns";
+import { factCells, type FactCells } from "@/lib/review/sheet-cells";
+import { MONEY_COLUMNS, NOTES_PRESENT, columnsFor } from "@/lib/review/sheet-columns";
 import type { PrefsDocument } from "@/lib/review/column-prefs-storage";
 import { documentsTag } from "@/lib/review/documents";
 import { lastChangedText } from "@/lib/review/last-changed";
@@ -17,7 +17,10 @@ import { SheetEditTable, type SheetEditInitial, type SheetPerson, type SheetSect
 import { openHref, type Common } from "./shared";
 import "./review-sheet-edit.css";
 
-function toSheetRow(r: ReviewRow, href: string, today: string, names: ReadonlyMap<string, string>): SheetEditRow {
+function toSheetRow(r: ReviewRow, href: string, today: string, names: ReadonlyMap<string, string>, canSeeMoney: boolean): SheetEditRow {
+  const facts = factCells(r, today);
+  // A viewer who may not see fees never receives a fee cell, drawn or not.
+  if (!canSeeMoney) for (const id of MONEY_COLUMNS) delete (facts as Partial<FactCells>)[id as keyof FactCells];
   return {
     key: r.key,
     kind: r.kind,
@@ -35,7 +38,7 @@ function toSheetRow(r: ReviewRow, href: string, today: string, names: ReadonlyMa
     contactText: r.contactKnown && r.lastContact ? shortDate(r.lastContact.date, today) : lastContactText(r, today),
     documentsText: documentsTag(r.documentCount),
     changedText: lastChangedText(r.lastChange, names, today),
-    facts: factCells(r, today),
+    facts,
     contactTitle: r.contactKnown && r.lastContact ? lastContactText(r, today) : r.lastContact ? contactWords(r.lastContact.type) : null,
   };
 }
@@ -49,8 +52,8 @@ export function SheetEdit({ rows, today, members, params, perms, initial, canSee
   const names = new Map(members.map((m) => [m.userId, m.name]));
   const { trademarks, contracts } = sheetSections(rows);
   const sections: SheetSection[] = [
-    { id: "trademarks", title: "Trademarks", rows: trademarks.map((r) => toSheetRow(r, openHref(params, r), today, names)) },
-    { id: "contracts", title: "Contracts", rows: contracts.map((r) => toSheetRow(r, openHref(params, r), today, names)) },
+    { id: "trademarks", title: "Trademarks", rows: trademarks.map((r) => toSheetRow(r, openHref(params, r), today, names, canSeeMoney)) },
+    { id: "contracts", title: "Contracts", rows: contracts.map((r) => toSheetRow(r, openHref(params, r), today, names, canSeeMoney)) },
   ];
   const first = (n: string) => n.trim().split(/\s+/)[0] ?? n;
   const columns = { trademarks: columnsFor("trademarks", { canSeeMoney, hasNotes: NOTES_PRESENT }), contracts: columnsFor("contracts", { canSeeMoney, hasNotes: NOTES_PRESENT }) };

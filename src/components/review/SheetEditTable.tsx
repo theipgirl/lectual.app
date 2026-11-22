@@ -253,7 +253,9 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
   };
   const moveFrom = (rowKey: string, col: EditableColumn, dir: 1 | -1) => {
     setOpen([]);
-    const to = nextEditableCell(allRows, { rowKey, col }, perms, dir);
+    // Tab follows what is DRAWN: each row's section columns (after the chooser), in drawn order.
+    const sectionOf = new Map(sections.flatMap((s) => s.rows.map((r) => [r.key, s.id] as const)));
+    const to = nextEditableCell(allRows, { rowKey, col }, perms, dir, (r) => drawnBy[sectionOf.get(r.key) ?? "trademarks"].filter((c) => c.editable).map((c) => editColumnOf(c.id)));
     if (to) focusCell(to.rowKey, to.col);
   };
 
@@ -356,6 +358,9 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
         const labelOf = (col: SheetEditColumn) => columns[sec.id].find((c) => editColumnOf(c.id) === col)?.header ?? "";
         return (
       <SheetCard key={sec.id} className="rse-sec-card">
+       <h2 id={`rse-sheet-${sec.id}`} className="lx-h3 rv-sheet-title">
+         {sec.title} <span className="lx-note">{sec.rows.length}</span>
+       </h2>
        <SectionNote section={sec.id} />
        <SheetScroll>
         <SheetTable className="rse-tbl" fixed minWidth={sheetMinWidth(sizes, editing, drawn.map((c) => editColumnOf(c.id)))}>
@@ -649,11 +654,6 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
 function SectionRows({ sec, colCount, children }: { sec: SheetSection; colCount: number; children: React.ReactNode }) {
   return (
     <>
-      <tr className="sheet-sec" data-section={sec.id}>
-        <th colSpan={colCount} scope="colgroup">
-          {sec.title} · {sec.rows.length}
-        </th>
-      </tr>
       {sec.rows.length === 0 ? (
         <tr className="sheet-empty">
           <td colSpan={colCount}>{SHEET_EMPTY_SECTION}</td>

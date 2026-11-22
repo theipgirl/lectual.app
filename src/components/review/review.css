@@ -188,3 +188,4 @@
 
 /* The quiet "Changed by ... · Nov 16" line on a card, a sheet row and in the panel. */
 .rv-changed { display: block; font-size: var(--fs-1); }
+td.rv-fact-failed { white-space: nowrap; }

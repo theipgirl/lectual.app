@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { COLUMN_IDS } from "@/lib/review/sheet-columns";
+import { COLUMN_IDS, NOTES_PRESENT, columnsFor, type SheetSectionId } from "@/lib/review/sheet-columns";
 import {
   growHeight,
   normalizeNextStepTitle,
@@ -186,6 +186,45 @@ describe("Tab and sizes", () => {
     expect(nextEditableCell(rows, { rowKey: "a", col: "source" }, perms)).toEqual({ rowKey: "b", col: "next" });
     expect(nextEditableCell(rows, { rowKey: "b", col: "next" }, perms, -1)).toEqual({ rowKey: "a", col: "source" });
     expect(nextEditableCell(rows, { rowKey: "b", col: "source" }, perms)).toBeNull();
+  });
+
+  describe("Tab follows the DRAWN editable cells (each section's columns, after the chooser)", () => {
+    const drawn = (sec: SheetSectionId, hide: string[] = []) =>
+      columnsFor(sec, { canSeeMoney: true, hasNotes: NOTES_PRESENT }).filter((c) => c.editable && !hide.includes(c.id)).map((c) => editColumnOf(c.id));
+    const rows = [
+      { key: "t1", kind: "matter" as const, sec: "trademarks" as const },
+      { key: "t2", kind: "matter" as const, sec: "trademarks" as const },
+      { key: "c1", kind: "matter" as const, sec: "contracts" as const },
+      { key: "c2", kind: "matter" as const, sec: "contracts" as const },
+    ];
+    const walk = (from: { rowKey: string; col: EditableColumnT }, dir: 1 | -1 = 1, hide: Record<string, string[]> = {}) =>
+      nextEditableCell(rows, from, OWNER, dir, (r) => {
+        const sec = rows.find((x) => x.key === r.key)!.sec;
+        return drawn(sec, hide[sec]);
+      });
+    type EditableColumnT = (typeof EDITABLE_COLUMNS)[number];
+
+    it("Contracts: Tab from court goes to the next row's status; Shift+Tab from status goes to the previous row's court", () => {
+      expect(drawn("contracts")).toEqual(["status", "next", "court"]);
+      expect(walk({ rowKey: "c1", col: "court" })).toEqual({ rowKey: "c2", col: "status" });
+      expect(walk({ rowKey: "c2", col: "status" }, -1)).toEqual({ rowKey: "c1", col: "court" });
+    });
+    it("Trademarks: Tab goes status, source, court, next (the drawn order)", () => {
+      expect(walk({ rowKey: "t1", col: "status" })).toEqual({ rowKey: "t1", col: "source" });
+      expect(walk({ rowKey: "t1", col: "source" })).toEqual({ rowKey: "t1", col: "court" });
+      expect(walk({ rowKey: "t1", col: "court" })).toEqual({ rowKey: "t1", col: "next" });
+      expect(walk({ rowKey: "t1", col: "next" })).toEqual({ rowKey: "t2", col: "status" });
+    });
+    it("a hidden status is skipped", () => {
+      expect(walk({ rowKey: "t1", col: "next" }, 1, { trademarks: ["status"] })).toEqual({ rowKey: "t2", col: "source" });
+      expect(walk({ rowKey: "c1", col: "court" }, 1, { contracts: ["status"] })).toEqual({ rowKey: "c2", col: "next" });
+    });
+    it("crossing from the last Trademarks row to the first Contracts row lands on a drawn cell, and back", () => {
+      const to = walk({ rowKey: "t2", col: "next" });
+      expect(to).toEqual({ rowKey: "c1", col: "status" });
+      expect(drawn("contracts")).toContain(to!.col);
+      expect(walk({ rowKey: "c1", col: "status" }, -1)).toEqual({ rowKey: "t2", col: "next" });
+    });
   });
 
   it("stored widths are read defensively and clamped", () => {

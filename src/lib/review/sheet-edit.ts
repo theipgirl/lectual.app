@@ -102,7 +102,7 @@ export type SheetEditRow = {
   /** "Changed by Caitlyn · Nov 16"; null when the last-change read failed (no line is drawn). */
   changedText?: string | null;
   /** The read-only cells of the spreadsheet's other columns (serial, dates, practice area, owner-only fees), worked out by the server. */
-  facts?: FactCells;
+  facts?: Partial<FactCells>;
 };
 
 /** The typed value of one cell, as the editor saves it and the table draws it. */
@@ -285,9 +285,11 @@ export function nextEditableCell(
   from: { rowKey: string; col: EditableColumn },
   perms: SheetPerms,
   dir: 1 | -1 = 1,
+  /** The columns a row DRAWS, in drawn order (its section's columns after the chooser). Default: every editable column in the fixed order. */
+  columnsFor?: (row: Pick<SheetEditRow, "key" | "kind">) => readonly SheetEditColumn[],
 ): { rowKey: string; col: EditableColumn } | null {
   const cells: { rowKey: string; col: EditableColumn }[] = [];
-  for (const r of rows) for (const col of EDITABLE_COLUMNS) if (cellEditable(col, r.kind, perms)) cells.push({ rowKey: r.key, col });
+  for (const r of rows) for (const col of columnsFor ? columnsFor(r) : EDITABLE_COLUMNS) if (isEditableColumn(col) && cellEditable(col, r.kind, perms)) cells.push({ rowKey: r.key, col });
   const at = cells.findIndex((c) => c.rowKey === from.rowKey && c.col === from.col);
   if (at < 0) return cells[dir === 1 ? 0 : cells.length - 1] ?? null;
   return cells[at + dir] ?? null;
@@ -315,10 +317,10 @@ export const DEFAULT_COL_WIDTHS: Record<SheetEditColumn, number | null> = {
   source: 100,
   notes: 220,
   start: 96,
-  legalFee: 100,
-  legalFeeDue: 110,
-  govFee: 110,
-  govFeeDue: 120,
+  legalFee: 128,
+  legalFeeDue: 128,
+  govFee: 128,
+  govFeeDue: 128,
   oaDue: 130,
   waiting: 140,
   contact: 84,

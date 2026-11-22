@@ -84,7 +84,7 @@ describe("loadReview({ withFees })", () => {
   });
 
   it("withFees true: each read is called once, with the loader's own scoped client and the record ids", async () => {
-    const reads = { acceptedProposalFees: vi.fn(async () => []), trackerFees: vi.fn(async () => []) };
+    const reads = { acceptedProposalFees: vi.fn(async (...args: unknown[]) => (void args, [] as never[])), trackerFees: vi.fn(async (...args: unknown[]) => (void args, [] as never[])) };
     const r = okLoad(await load({ withFees: true, reads }));
     expect(reads.acceptedProposalFees).toHaveBeenCalledTimes(1);
     expect(reads.trackerFees).toHaveBeenCalledTimes(1);
@@ -263,5 +263,20 @@ describe("the reads themselves", () => {
   it("truncated tracker read rejects rather than returning a capped page, and so does an error", async () => {
     await expect(readTrackerFees(fakeDb(() => ({ data: Array.from({ length: FEES_PAGE }, () => ledger()) })).db, ["m1"])).rejects.toThrow();
     await expect(readTrackerFees(fakeDb(() => ({ data: null, error: { code: "x" } })).db, ["m1"])).rejects.toThrow();
+  });
+});
+
+describe("fee reads run beside the other optional reads", () => {
+  it("both fee reads start while another read in the same batch is still pending", async () => {
+    // A task read that never answers keeps the batch open; the fee reads must already have been called.
+    dbRef.current = {
+      from: () => ({ select: () => { const b: Record<string, unknown> = { eq: () => b, in: () => b, order: () => b, range: () => b, then: () => undefined }; return b; } }),
+    };
+    matters.list = [matter("m1")];
+    const reads = { acceptedProposalFees: vi.fn(async (...args: unknown[]) => (void args, [] as never[])), trackerFees: vi.fn(async (...args: unknown[]) => (void args, [] as never[])) };
+    void load({ withFees: true, reads });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(reads.acceptedProposalFees).toHaveBeenCalledTimes(1);
+    expect(reads.trackerFees).toHaveBeenCalledTimes(1);
   });
 });
