@@ -27,10 +27,10 @@ export function valueStore(opts: { field?: FieldRow | null; role?: () => Promise
       return r && ("type" in r) === (kind === "matter") ? r : null;
     }),
     readMembers: vi.fn(async () => (opts.members ?? [PERSON]).map((userId) => ({ userId }))),
-    readValueRow: vi.fn(async () => (opts.existing === undefined ? null : opts.existing)),
-    insertValue: vi.fn(async () => {}),
-    updateValue: vi.fn(async () => 1),
-    deleteValue: vi.fn(async () => 1),
+    readValueRow: vi.fn<ValueDeps["readValueRow"]>(async () => (opts.existing === undefined ? null : opts.existing)),
+    insertValue: vi.fn<ValueDeps["insertValue"]>(async () => {}),
+    updateValue: vi.fn<ValueDeps["updateValue"]>(async () => 1),
+    deleteValue: vi.fn<ValueDeps["deleteValue"]>(async () => 1),
     revalidate: vi.fn(),
   } satisfies ValueDeps;
   const writes = () => deps.insertValue.mock.calls.length + deps.updateValue.mock.calls.length + deps.deleteValue.mock.calls.length;
@@ -110,7 +110,7 @@ describe("F10: writes, one row per request", () => {
   it("a new value inserts exactly org_id (from the record row), field_id, the record column and the kind's column", async () => {
     const s = valueStore({ records: { [LEAD]: { id: LEAD, org_id: "00000000-0000-4000-8000-0000000000bb" } } });
     expect(await post(s.deps)).toEqual({ saved: true });
-    const row = s.deps.insertValue.mock.calls[0][0] as Record<string, unknown>;
+    const row = s.deps.insertValue.mock.calls[0][0] as unknown as Record<string, unknown>;
     expect(Object.keys(row).sort()).toEqual(["field_id", "lead_id", "org_id", "value_choice"]);
     expect(row).toEqual({ org_id: "00000000-0000-4000-8000-0000000000bb", field_id: F, lead_id: LEAD, value_choice: "High" });
     expect(s.deps.revalidate).toHaveBeenCalledWith("lead", LEAD);

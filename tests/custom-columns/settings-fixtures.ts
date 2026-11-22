@@ -15,4 +15,4 @@ export const LIVE: SettingsField[] = [
   f({ id: S.review, label: "Review date", section: "contracts", kind: "date", position: 3 }),
 ];
 export const ARCHIVED: SettingsField[] = [f({ id: S.old, label: "Old flag", archived: true, position: 4 })];
-export const OK: ColumnsSettingsState = { status: "ok", live: LIVE, archived: ARCHIVED, dropped: 0, use: { status: "ok", counts: { [S.priority]: { High: 3, Low: 1 } } } };
+export const OK: Extract<ColumnsSettingsState, { status: "ok" }> = { status: "ok", live: LIVE, archived: ARCHIVED, dropped: 0, use: { status: "ok", counts: { [S.priority]: { High: 3, Low: 1 } } } };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_LIVE, createField, nextPosition, updateField, type FieldDeps } from "@/lib/custom-columns/field-actions";
+import { MAX_LIVE, createField, nextPosition, updateField, type FieldDeps, type UpdateInput } from "@/lib/custom-columns/field-actions";
 import { fieldsForSection, type CustomColumnField } from "@/lib/review/sheet-columns";
 import * as W from "@/lib/ui/words";
 import { ORG, field, fid, makeStore, type FakeField } from "./field-fake";
@@ -246,7 +246,7 @@ describe("F7: rename, archive, restore", () => {
       it(name, async () => {
         const s = makeStore([field(1)]);
         arrange(s);
-        expect(await updateField(s.deps, { id: fid(1), ...input })).toEqual({ error: want });
+        expect(await updateField(s.deps, { id: fid(1), ...input } as UpdateInput)).toEqual({ error: want });
         expect(s.writes()).toEqual([]);
         expect(s.deps.readLiveFields).not.toHaveBeenCalled();
       });

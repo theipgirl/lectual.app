@@ -91,6 +91,8 @@ try {
   {
     const page = await open("review-sheet-edit-custom", { viewport: { width: 1440, height: 900 } });
     const m = await page.evaluate(() => {
+      // Several editors carry autofocus in this static page; whichever won focus would carry the focus border. Compare at rest.
+      document.activeElement?.blur?.();
       const cell = (key) => document.querySelector(`[data-rse-cell="${key}"]`)?.closest("td");
       const props = ["fontFamily", "fontSize", "fontWeight", "lineHeight", "borderTopWidth", "borderTopStyle", "borderTopColor", "borderRadius", "paddingTop", "paddingRight", "paddingBottom", "paddingLeft"];
       const pick = (el) => (el ? Object.fromEntries(props.map((p) => [p, getComputedStyle(el)[p]])) : null);
@@ -101,9 +103,9 @@ try {
         const b = pop.getBoundingClientRect();
         return { ok: b.left >= a.left - 0.5 && b.left < a.right, why: `pop ${Math.round(b.left)} td ${Math.round(a.left)}-${Math.round(a.right)}` };
       };
-      const keys = [...document.querySelectorAll("[data-rse-cell]")].map((e) => e.dataset.rseCell);
-      const pri = cell(keys.find((k) => k.startsWith("matter:1|cf:")));
-      const fee = cell(keys.find((k) => k.startsWith("matter:2|cf:")));
+      // The screen's field ids (custom-columns.screen.tsx): Priority 7102, Quoted fee 7101.
+      const pri = cell("matter:1|cf:00000000-0000-4000-8000-000000007102");
+      const fee = cell("matter:2|cf:00000000-0000-4000-8000-000000007101");
       const src = cell("lead:3|source");
       const nextDate = document.querySelector(".rse-next-ed input[type=date]");
       return {

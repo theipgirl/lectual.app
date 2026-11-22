@@ -30,7 +30,13 @@ export function makeStore(initial: FakeField[], opts: { role?: string | null | (
     const sorted = opts.order ? opts.order(l) : [...l].sort((a, b) => a.position - b.position || byteCmp(a.label, b.label) || byteCmp(a.id, b.id));
     return sorted.map(({ id, section, label, kind, options, position }) => ({ id, section, label, kind, options, position }));
   };
-  const role = typeof opts.role === "function" ? opts.role : async () => (opts.role === undefined ? "owner" : opts.role);
+  const given = opts.role;
+  let role: () => Promise<string | null>;
+  if (typeof given === "function") role = given;
+  else {
+    const fixed: string | null = given === undefined ? "owner" : given;
+    role = async () => fixed;
+  }
   const deps = {
     role: vi.fn(role),
     orgId: vi.fn(async () => ORG),

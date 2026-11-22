@@ -114,7 +114,7 @@ describe("N4: two Renames in a row in the same tab", () => {
   it("the hidden stamp is the one rendered from the latest read", () => {
     const first = render(OK);
     const later = "2026-11-20T10:05:00.654321+00:00";
-    const second = render({ ...OK, live: OK.status === "ok" ? OK.live.map((f) => (f.id === S.priority ? { ...f, label: "Urgency", updatedAt: later } : f)) : [] });
+    const second = render({ ...OK, live: OK.live.map((f) => (f.id === S.priority ? { ...f, label: "Urgency", updatedAt: later } : f)) });
     expect(first).toContain(`value="${STAMP}"`);
     expect(second).toContain(`name="updatedAt" value="${later}"`);
     expect(second).toContain('defaultValue="Urgency"'.replace("defaultValue", "value"));
