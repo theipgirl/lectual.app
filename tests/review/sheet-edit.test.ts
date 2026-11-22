@@ -233,7 +233,7 @@ describe("Tab and sizes", () => {
     describe("the Notes cell is a Tab stop in its drawn place", () => {
       const withNotes = (sec: SheetSectionId, hide: string[] = []) =>
         columnsFor(sec, { canSeeMoney: true, hasNotes: NOTES_PRESENT }).filter((c) => (c.editable || c.id === "notes") && !hide.includes(c.id)).map((c) => editColumnOf(c.id));
-      const walkN = (from: { rowKey: string; col: EditableColumnT | "notes" }, dir: 1 | -1 = 1, perms = OWNER, hide: Record<string, string[]> = {}, rs = rows) =>
+      const walkN = (from: { rowKey: string; col: EditableColumnT | "notes" }, dir: 1 | -1 = 1, perms = OWNER, hide: Record<string, string[]> = {}, rs: readonly { key: string; kind: "matter" | "lead"; sec: SheetSectionId }[] = rows) =>
         nextEditableCell(rs, from, perms, dir, (r) => withNotes(rs.find((x) => x.key === r.key)!.sec, hide[rs.find((x) => x.key === r.key)!.sec]));
       it("Trademarks: status, source, Notes, court, next (Notes after Source)", () => {
         expect(withNotes("trademarks")).toEqual(["status", "source", "notes", "court", "next"]);
