@@ -70,8 +70,9 @@ describe("AT20: hygiene over src/lib/esign and src/app/api/esign", () => {
 
   it("AT20: @/lib/db/admin only in the allow-listed e-sign files; never under src/app/dashboard", () => {
     for (const f of ESIGN) if (read(f).includes("@/lib/db/admin")) expect(ADMIN_ALLOWED.has(f), f).toBe(true);
-    // Under src/app/dashboard: nothing new. The one file there at the base commit (49efd5e) is the Meetings import action,
-    // which predates this sprint and is not e-sign code.
+    // Under src/app/dashboard: nothing new. The one file there at the base commit (49efd5e),
+    // src/app/dashboard/settings/integrations/meetings/actions.ts (the Meetings import), is a PRE-EXISTING exception tracked
+    // separately (AGENTS.md, Sprint 5a note); it is not e-sign code.
     const before = new Set(execFileSync("git", ["grep", "-l", "@/lib/db/admin", "49efd5e", "--", "src/app/dashboard"], { encoding: "utf8" }).split("\n").filter(Boolean).map((l) => l.replace(/^49efd5e:/, "")));
     expect([...before]).toEqual(["src/app/dashboard/settings/integrations/meetings/actions.ts"]);
     for (const f of walk("src/app/dashboard")) if (!before.has(f)) expect(read(f), f).not.toContain("@/lib/db/admin");

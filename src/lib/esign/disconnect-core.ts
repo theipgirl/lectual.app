@@ -40,7 +40,9 @@ export async function runDisconnectAdobe(deps: DisconnectDeps): Promise<Disconne
 
   let cancelFailed = 0;
   let signedNotCopied = 0;
-  const open = (await deps.listOpen(conn.org_id)) ?? [];
+  // A list we couldn't read is never "nothing open": stop before anything changes.
+  const open = await deps.listOpen(conn.org_id);
+  if (open === null) return { ok: false, reason: "read" };
   for (const req of open) {
     if (!req.agreementId) {
       await deps.closeRequest(conn.org_id, req, { status: "cancelled" });

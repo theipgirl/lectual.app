@@ -111,6 +111,13 @@ describe("AT11: disconnect with open requests", () => {
     expect(h.order.some((o) => o.startsWith("re-read") || o.startsWith("cancel:"))).toBe(false);
   });
 
+  it("REQUIRED 3: an open list that can't be read stops before markRevoked, with nothing changed", async () => {
+    const h = harness([], { listOpen: async () => null });
+    expect(await runDisconnectAdobe(h.deps)).toEqual({ ok: false, reason: "read" });
+    expect(h.order).toEqual(["scoped-read", "token-read"]);
+    expect(h.closed).toEqual([]);
+  });
+
   it("AT11: the scoped revoke refused (0 rows) stops before Adobe's revoke and the delete", async () => {
     const h = harness([], { markRevoked: async () => false });
     expect(await runDisconnectAdobe(h.deps)).toEqual({ ok: false, reason: "permission" });

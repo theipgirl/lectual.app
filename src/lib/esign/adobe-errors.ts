@@ -46,8 +46,12 @@ export class AdobeCallError extends Error {
   }
 }
 
-/** Adobe codes that mean the firm's access token or grant is no longer good. */
-const REAUTH_CODES = new Set(["INVALID_ACCESS_TOKEN", "EXPIRED_ACCESS_TOKEN", "NO_AUTHORIZATION_HEADER", "INVALID_USER", "USER_NOT_AUTHORIZED"]);
+/**
+ * Adobe codes that mean the firm's access token itself is no longer good (beside any 401). Only these pause the firm.
+ * `INVALID_USER` / `USER_NOT_AUTHORIZED` and the like are a refusal of ONE request (`adobe_refused`), never firm-wide.
+ * UNVERIFIED until the sandbox spike: the exact codes Adobe sends for a dead token.
+ */
+const REAUTH_CODES = new Set(["INVALID_ACCESS_TOKEN", "EXPIRED_ACCESS_TOKEN"]);
 /** `signingUrls` just after creation: Adobe is still processing the document. Retried, never an error on its own. */
 const NOT_READY_CODES = new Set(["AGREEMENT_NOT_EXPOSED", "DOCUMENTS_NOT_YET_PROCESSED"]);
 

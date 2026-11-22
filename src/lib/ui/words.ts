@@ -1467,6 +1467,14 @@ export function adobeCancelFailedLine(n: number): string {
 export function adobeNotCopiedLine(n: number): string {
   return `The signed letter for ${n} ${n === 1 ? "client" : "clients"} is in your Adobe account; it couldn't be copied into Lectual.`;
 }
+/**
+ * Staff-facing: when Adobe recorded the signature, read from `client_proposal_signature.provider_signed_at` (lectual 0113;
+ * `signed_at` stays the server clock). `when` is the firm-zone text with its zone named ("November 12, 2026 at 2:14 PM EST").
+ * Drawn by the staff card in Sprint 5b.
+ */
+export function adobeSignedAtLine(when: string): string {
+  return `Signed in Adobe at ${when}.`;
+}
 /** The callback's outcomes (`?esign=` / `?esign_error=`), fixed sentences only. */
 export const ADOBE_OUTCOME: Record<string, string> = {
   connected: "Adobe Acrobat Sign is connected.",

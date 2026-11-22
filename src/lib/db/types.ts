@@ -4119,6 +4119,8 @@ export type Database = {
           provider?: string | null
           adobe_agreement_id?: string | null
           esign_request_id?: string | null
+          // Adobe's own completion time (signed_at stays the server clock, as 0106 stamps it). Null for an in-app signature.
+          provider_signed_at?: string | null
         }
         Insert: Record<string, never>
         Update: Record<string, never>

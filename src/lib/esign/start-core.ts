@@ -10,6 +10,7 @@ import {
   ADOBE_SIGN_HERE_INSTEAD,
   ESIGN_BUSY_SENTENCE,
   ESIGN_PAUSED_SENTENCE,
+  ESIGN_SIGNED_WAITING_SENTENCE,
   SIGN_MESSAGES,
 } from "@/lib/loe/client-words";
 import { AdobeCallError, errorForThrown, type LastErrorCode } from "./adobe-errors";
@@ -17,16 +18,18 @@ import {
   cancelAgreement,
   createAgreement,
   fetchSigningUrl,
+  readAgreementStatus,
   registerWebhook,
   uploadTransientDocument,
   type AdobeAccess,
   type AdobeFetch,
+  type AgreementStatus,
 } from "./adobe-client";
 import type { AdobeAccessResult } from "./adobe-connection";
 import { OPEN_REQUEST_STATUSES, isNotSetUpError, type EsignDb } from "./db";
 import { isAdobeSigningUrl } from "./host-rule";
 import { agreementPayload, expirationInstant, postSignRedirect, SIGNING_FILE_NAME, webhookPayload } from "./payload";
-import { closeStuckCreating } from "./path";
+import { closeOrphanedRequest, closeStuckCreating } from "./path";
 
 /**
  * `startAdobeSigning` (Sprint 5a, contract item 7), with every dependency injected so it runs against fakes. Public and
@@ -38,9 +41,11 @@ import { closeStuckCreating } from "./path";
  *     factored out of `signAndAccept`, D10): the typed name is the signer name (never `client_name`), both date fields are the
  *     firm-zone date of THIS call (D11), and the browser's canonical fingerprint must equal ours (`stale` otherwise). No row and
  *     no Adobe call before this passes.
- *  2. An open request for this version: unchanged choices resume (a fresh `signingUrls`), even with the switch off; changed
- *     choices cancel it (cancellation emails off) and, with the switch on, start again; with the switch off, the page falls back
- *     to in-app. A request still being created is "busy".
+ *  2. An open request for this version: unchanged choices resume (a fresh `signingUrls`), even with the switch off. Changed
+ *     choices, or a resume whose `signingUrls` fails, re-read the agreement FIRST (`settleOpen`): signed → a waiting sentence and
+ *     nothing else; closed at Adobe, or our cancel succeeded → close it and start again (switch on) or in-app (switch off); a
+ *     failed re-read or refused cancel → paused, the request left open. A request whose connection is gone is closed and the
+ *     page is in-app. A request still being created is "busy".
  *  3. Readiness for a NEW agreement: the switch is exactly on, the firm's connection is active, the letter copy is the firm's
  *     current one, and the client email is a real address. Otherwise in-app.
  *  4. The `for-signature` PDF is rendered BEFORE anything is written. The request is opened through
@@ -199,22 +204,39 @@ export async function runStartAdobeSigning(input: StartInput, deps: StartDeps): 
   if (open.open) {
     const o = open.open;
     if (o.status === "creating") return fail(ESIGN_BUSY_SENTENCE);
-    if (!o.connectionId) return fallback(ADOBE_SIGN_HERE_INSTEAD);
+    // The request's connection is gone (null, revoked, deleted): close it, fenced on its status, and sign in-app.
+    const orphaned = async (): Promise<StartResult> => {
+      await closeOrphanedRequest(db, { proposalId, orgId }, { id: o.id, status: o.status, connectionId: o.connectionId });
+      return fallback(ADOBE_SIGN_HERE_INSTEAD);
+    };
+    if (!o.connectionId) return orphaned();
     const access = await deps.access(orgId, o.connectionId);
+    if (access.kind === "none") return orphaned();
+    // reauth, unavailable (or 0113 vanished): the request stays open; never in-app, never a new agreement.
     if (access.kind !== "ok") return fail(ESIGN_PAUSED_SENTENCE);
     const acc: AdobeAccess = { accessPoint: access.accessPoint, accessToken: access.accessToken };
+    const settleCtx = { id: o.id, orgId, agreementId: o.agreementId, access: acc, connectionId: access.connectionId };
+
     if (o.fingerprint === canonical && o.agreementId) {
       // Unchanged choices: resume (allowed with the switch off, D18).
       try {
         return { ok: true, url: await signingUrlWithRetry(deps, acc, o.agreementId) };
       } catch (err) {
-        return failRequest(deps, { id: o.id, orgId, from: ["out_for_signature"], agreementId: o.agreementId, access: acc, connectionId: access.connectionId }, err);
+        if (err instanceof AdobeCallError && err.reauth) {
+          await deps.markReauth(orgId, access.connectionId);
+          return fail(ESIGN_PAUSED_SENTENCE);
+        }
+        // Never `failRequest` here: the client may already have signed. Ask Adobe first.
+        const settled = await settleOpen(deps, settleCtx);
+        if (settled !== "closed") return settled;
+        if (!deps.switchOn) return fallback(ADOBE_SIGN_HERE_INSTEAD);
       }
+    } else {
+      // Changed choices: ask Adobe before cancelling or closing anything.
+      const settled = await settleOpen(deps, settleCtx);
+      if (settled !== "closed") return settled;
+      if (!deps.switchOn) return fallback(ADOBE_SIGN_HERE_INSTEAD);
     }
-    // Changed choices: the old agreement is cancelled (emails off) and the old request closed, fenced on its status.
-    const cancelled = o.agreementId ? await cancelAt(deps, acc, o.agreementId, orgId, access.connectionId) : true;
-    await moveRequest(db, o.id, orgId, [o.status], { status: "cancelled", ...(cancelled ? {} : { cancel_failed: true }) });
-    if (!deps.switchOn) return fallback(ADOBE_SIGN_HERE_INSTEAD);
   }
 
   // 3. Readiness for a NEW agreement.
@@ -333,6 +355,42 @@ export async function runStartAdobeSigning(input: StartInput, deps: StartDeps): 
   } catch (err) {
     return failRequest(deps, { id: requestId, orgId, from: ["out_for_signature"], agreementId, access: acc, connectionId: access.connectionId }, err);
   }
+}
+
+const CLOSED_AT_ADOBE: Partial<Record<AgreementStatus, string>> = { CANCELLED: "cancelled", EXPIRED: "expired", DECLINED: "declined" };
+
+/**
+ * An open request this press would replace or could not resume. Adobe's own status decides (one version is never signed twice):
+ *  - SIGNED → nothing is cancelled, closed or created and the client is NOT sent in-app; a fixed waiting sentence (5b's
+ *    completion path records it);
+ *  - CANCELLED / EXPIRED / DECLINED at Adobe → the request is closed to match, and the caller continues;
+ *  - still open → cancelled at Adobe (emails off); only when that cancel succeeds is the request closed and the caller continues;
+ *  - a re-read that fails, or a cancel Adobe refuses → the request stays `out_for_signature`: paused.
+ */
+async function settleOpen(
+  deps: StartDeps,
+  r: { id: string; orgId: string; agreementId: string | null; access: AdobeAccess; connectionId: string },
+): Promise<"closed" | StartResult> {
+  if (!r.agreementId) {
+    await moveRequest(deps.db, r.id, r.orgId, ["out_for_signature"], { status: "cancelled" });
+    return "closed";
+  }
+  let status: AgreementStatus;
+  try {
+    status = await readAgreementStatus(deps.fetchImpl, r.access, r.agreementId);
+  } catch (err) {
+    if (err instanceof AdobeCallError && err.reauth) await deps.markReauth(r.orgId, r.connectionId);
+    return fail(ESIGN_PAUSED_SENTENCE);
+  }
+  if (status === "SIGNED") return fail(ESIGN_SIGNED_WAITING_SENTENCE);
+  const closedAs = CLOSED_AT_ADOBE[status];
+  if (closedAs) {
+    await moveRequest(deps.db, r.id, r.orgId, ["out_for_signature"], { status: closedAs });
+    return "closed";
+  }
+  if (!(await cancelAt(deps, r.access, r.agreementId, r.orgId, r.connectionId))) return fail(ESIGN_PAUSED_SENTENCE);
+  await moveRequest(deps.db, r.id, r.orgId, ["out_for_signature"], { status: "cancelled" });
+  return "closed";
 }
 
 /** A creation (or resume) failure: `failed` with a closed-set code, the agreement cancelled, in-app for this visit. */

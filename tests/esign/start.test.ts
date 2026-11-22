@@ -5,7 +5,7 @@ vi.mock("next/server", () => ({ after: () => {} }));
 vi.mock("@/lib/proposals/accept-followups", () => ({ runAcceptanceFollowups: async () => {} }));
 
 import { acceptPublicProposal } from "@/lib/proposals/public";
-import { ADOBE_FALLBACK_SENTENCE, ADOBE_SIGN_HERE_INSTEAD, ESIGN_BUSY_SENTENCE, SIGN_MESSAGES } from "@/lib/loe/client-words";
+import { ADOBE_FALLBACK_SENTENCE, ADOBE_SIGN_HERE_INSTEAD, ESIGN_BUSY_SENTENCE, ESIGN_PAUSED_SENTENCE, ESIGN_SIGNED_WAITING_SENTENCE, SIGN_MESSAGES } from "@/lib/loe/client-words";
 import { assembleAgreement, letterDateText } from "@/lib/loe/signing";
 import { buildExhibit } from "@/lib/loe/exhibit";
 import { money } from "@/components/client-proposal/format";
@@ -292,7 +292,8 @@ describe("AT6 / D18: an open request and the switch", () => {
     const adobe = happyAdobe();
     const { result } = await start(w, adobe, changed, { switchOn: false });
     expect(result).toEqual({ ok: false, fallback: "in_app", message: ADOBE_SIGN_HERE_INSTEAD });
-    expect(adobe.calls.map((c) => c.method)).toEqual(["PUT"]);
+    // Adobe is asked first (REQUIRED 1), then the cancel.
+    expect(adobe.calls.map((c) => c.method)).toEqual(["GET", "PUT"]);
     expect(req(w)[0].status).toBe("cancelled");
     expect(req(w)).toHaveLength(1);
   });
@@ -364,6 +365,118 @@ describe("readiness", () => {
     if (input) {
       const r = await runStartAdobeSigning(input, deps(w, adobe));
       expect(r).toMatchObject({ fallback: "in_app" });
+      expect(adobe.calls).toHaveLength(0);
+    }
+  });
+});
+
+describe("REQUIRED 1: never signed twice: Adobe is asked before an open request is cancelled or replaced", () => {
+  async function openedWorld() {
+    const w = startWorld();
+    const input = await pageInput(w);
+    await start(w, happyAdobe(), input);
+    expect(req(w)[0].status).toBe("out_for_signature");
+    return { w, input };
+  }
+  const signed = { "GET /agreements/[^/]+": () => json({ id: "agr-1", status: "SIGNED" }) };
+  const created = (adobe: ReturnType<typeof happyAdobe>) => adobe.calls.filter((c) => c.method === "POST" && c.url.endsWith("/agreements")).length;
+
+  it("signed in Adobe, back on the page, pressed again (signingUrls fails): the waiting sentence, no fallback, no new agreement, nothing closed", async () => {
+    for (const switchOn of [true, false]) {
+      const { w, input } = await openedWorld();
+      const adobe = happyAdobe({ ...signed, "GET /signingUrls": () => json({ code: "AGREEMENT_NOT_EXPOSED" }, 404) });
+      const { result } = await start(w, adobe, input, { switchOn });
+      expect(result).toEqual({ ok: false, message: ESIGN_SIGNED_WAITING_SENTENCE });
+      expect(result).not.toHaveProperty("fallback");
+      expect(created(adobe)).toBe(0);
+      expect(adobe.calls.some((c) => c.method === "PUT")).toBe(false);
+      expect(req(w)).toHaveLength(1);
+      expect(req(w)[0].status).toBe("out_for_signature");
+    }
+  });
+
+  it("a signingUrls failure on resume never calls failRequest: still open at Adobe → our cancel succeeds → only then a new agreement (switch on)", async () => {
+    const { w, input } = await openedWorld();
+    const adobe = happyAdobe({ "GET /signingUrls": (() => { let n = 0; return () => (++n <= 1 ? json({}, 500) : json({ signingUrlSetInfos: [{ signingUrls: [{ esignUrl: ESIGN_URL }] }] })); })() });
+    const { result } = await start(w, adobe, input);
+    const methods = adobe.calls.map((c) => `${c.method} ${new URL(c.url).pathname.split("/").slice(-1)[0]}`);
+    expect(methods.indexOf("GET agr-1")).toBeLessThan(methods.indexOf("PUT state"));
+    expect(req(w)[0]).toMatchObject({ status: "cancelled", last_error: null });
+    expect(result).toEqual({ ok: true, url: ESIGN_URL });
+    expect(req(w)[1].status).toBe("out_for_signature");
+  });
+
+  it("changed choices on a SIGNED agreement: no cancel, no close, no new agreement, no in-app", async () => {
+    const { w } = await openedWorld();
+    const changed = await pageInput(w, { selection: { "ci-logo": true } });
+    for (const switchOn of [true, false]) {
+      const adobe = happyAdobe(signed);
+      const { result } = await start(w, adobe, changed, { switchOn });
+      expect(result).toEqual({ ok: false, message: ESIGN_SIGNED_WAITING_SENTENCE });
+      expect(adobe.calls.map((c) => c.method)).toEqual(["GET"]);
+      expect(req(w)).toHaveLength(1);
+      expect(req(w)[0].status).toBe("out_for_signature");
+    }
+  });
+
+  it("changed choices with the cancel refused: paused, the request left open, no second agreement", async () => {
+    const { w } = await openedWorld();
+    const changed = await pageInput(w, { selection: { "ci-logo": true } });
+    const adobe = happyAdobe({ "PUT /state": () => json({ code: "INVALID_AGREEMENT_STATE" }, 400) });
+    const { result } = await start(w, adobe, changed);
+    expect(result).toEqual({ ok: false, message: ESIGN_PAUSED_SENTENCE });
+    expect(created(adobe)).toBe(0);
+    expect(w.rpcCalls.filter((c) => c.fn === "client_proposal_esign_open")).toHaveLength(1);
+    expect(req(w)).toHaveLength(1);
+    expect(req(w)[0]).toMatchObject({ status: "out_for_signature", cancel_failed: false });
+  });
+
+  it("changed choices with the re-read failing: paused, nothing cancelled or closed", async () => {
+    const { w } = await openedWorld();
+    const changed = await pageInput(w, { selection: { "ci-logo": true } });
+    const adobe = happyAdobe({ "GET /agreements/[^/]+": () => json({}, 503) });
+    const { result } = await start(w, adobe, changed);
+    expect(result).toEqual({ ok: false, message: ESIGN_PAUSED_SENTENCE });
+    expect(adobe.calls.map((c) => c.method)).toEqual(["GET"]);
+    expect(req(w)[0].status).toBe("out_for_signature");
+  });
+
+  it("changed choices on an agreement Adobe already reports CANCELLED / EXPIRED / DECLINED: closed to match, no cancel call, then a new one", async () => {
+    for (const [adobeStatus, ours] of [["CANCELLED", "cancelled"], ["EXPIRED", "expired"], ["DECLINED", "declined"]] as const) {
+      const { w } = await openedWorld();
+      const changed = await pageInput(w, { selection: { "ci-logo": true } });
+      const adobe = happyAdobe({ "GET /agreements/[^/]+": () => json({ status: adobeStatus }) });
+      const { result } = await start(w, adobe, changed);
+      expect(result).toEqual({ ok: true, url: ESIGN_URL });
+      expect(adobe.calls.some((c) => c.method === "PUT")).toBe(false);
+      expect(req(w).map((r) => r.status)).toEqual([ours, "out_for_signature"]);
+    }
+  });
+});
+
+describe("REQUIRED 2: an open request whose connection is gone is closed, then in-app", () => {
+  const open = (connection_id: string | null) => ({ id: "req-9", proposal_id: "prop-2", org_id: "org-1", status: "out_for_signature", connection_id, adobe_agreement_id: "agr-9", canonical_fingerprint: "f".repeat(64), created_at: new Date(NOW.getTime() - 60 * 60 * 1000).toISOString() });
+
+  it("connection_id null, or the connection revoked / deleted (access none): cancelled + cancel_failed (fenced on status), in-app", async () => {
+    for (const [row, access] of [[open(null), undefined], [open("conn-1"), async () => ({ kind: "none" as const })]] as const) {
+      const w = startWorld({ requests: [row] });
+      const adobe = happyAdobe();
+      const { result } = await start(w, adobe, await pageInput(w), access ? { access } : {});
+      expect(result).toEqual({ ok: false, fallback: "in_app", message: ADOBE_SIGN_HERE_INSTEAD });
+      expect(req(w)[0]).toMatchObject({ status: "cancelled", cancel_failed: true });
+      const close = w.calls.find((c) => c.op === "update" && (c.payload as Row).status === "cancelled")!;
+      expect(close.filters).toContainEqual(["eq", "status", "out_for_signature"]);
+      expect(adobe.calls).toHaveLength(0);
+    }
+  });
+
+  it("reauth or unavailable stays paused: the request left open, no in-app, no Adobe call", async () => {
+    for (const kind of ["reauth", "unavailable"] as const) {
+      const w = startWorld({ requests: [open("conn-1")] });
+      const adobe = happyAdobe();
+      const { result } = await start(w, adobe, await pageInput(w), { access: async () => ({ kind }) });
+      expect(result).toEqual({ ok: false, message: ESIGN_PAUSED_SENTENCE });
+      expect(req(w)[0].status).toBe("out_for_signature");
       expect(adobe.calls).toHaveLength(0);
     }
   });

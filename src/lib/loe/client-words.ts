@@ -108,5 +108,9 @@ export const ADOBE_FALLBACK_SENTENCE = "Adobe Acrobat Sign didn't answer, so you
 export const ADOBE_SIGN_HERE_INSTEAD = "You can sign here instead.";
 /** An open request while the firm's Adobe connection needs attention (D6): no in-app form and no Adobe call. */
 export const ESIGN_PAUSED_SENTENCE = "Signing is paused for a moment. Please come back later.";
+/** Adobe says the letter is already signed: the page waits for Lectual to record it (never in-app, never a second agreement). */
+export const ESIGN_SIGNED_WAITING_SENTENCE = "Your signature is being recorded. This page will update shortly.";
+/** Too many presses of the Adobe button for one proposal in an hour (a courtesy limit). */
+export const ESIGN_LIMIT_SENTENCE = "Too many tries just now. Please wait a few minutes and try again.";
 /** A request is being created right now (a second press within moments). */
 export const ESIGN_BUSY_SENTENCE = "Your letter is being prepared for signing. Please wait a moment and try again.";

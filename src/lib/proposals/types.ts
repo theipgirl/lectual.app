@@ -506,6 +506,8 @@ export type AcceptedAgreement = {
   /** lectual 0113 (Sprint 5a/5b): absent = signed in Lectual (0106); "adobe_sign" = signed with Adobe Acrobat Sign. */
   provider?: "lectual" | "adobe_sign";
   adobe_agreement_id?: string;
+  /** lectual 0113: Adobe's own completion time. `signed_at` stays the server clock (0106's guard). */
+  provider_signed_at?: string;
 };
 
 export type AcceptedSigning = {

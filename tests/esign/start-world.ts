@@ -51,6 +51,8 @@ export function happyAdobe(over: Record<string, (c: import("./esign-db").FetchCa
     "POST /webhooks": () => json({ id: "wh-1" }, 201),
     "GET /signingUrls": () => json({ signingUrlSetInfos: [{ signingUrls: [{ email: "callum@example.com", esignUrl: ESIGN_URL }] }] }),
     "PUT /state": () => new Response(null, { status: 204 }),
+    // GET /agreements/{id}: the re-read before an open request is cancelled or replaced.
+    "GET /agreements/[^/]+": () => json({ id: "agr-1", status: "OUT_FOR_SIGNATURE" }),
     ...over,
   });
 }

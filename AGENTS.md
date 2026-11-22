@@ -2508,5 +2508,13 @@ the webhook, the sweep) is Sprint 5b's; this is the 5a note only.
   `for-signature`, step 3 on `/p/<token>` (`signingPathFor`; in-app passes nothing, so the 0106 page is byte-identical, pinned against
   49efd5e in `tests/esign/`). The agreement half is `prepareAcceptance` + `checkSignerFields` + `buildSigningAgreement` in
   `public.ts`, shared with `signAndAccept`, never copied. 0113 isn't applied, so every e-sign read answers "not set up" = in-app.
-- **0113 open items** (in the proposal file's header, for the director): SECURITY DEFINER vs 0106's invoker-only lifecycle, the
-  `signed_at` / `accepted_at` stamping, and 0106's append-only guard vs the `esign_request_id` SET NULL.
+- **0113 rulings (director, Nov 22):** `client_proposal_adobe_complete` is SECURITY INVOKER (0106's reason); 0106's triggers are
+  NOT amended, so `signed_at` / `accepted_at` stay the server clock and Adobe's time is `client_proposal_signature.provider_signed_at`
+  (staff text "Signed in Adobe at ..."); the replaced signature guard is 0106's body plus one `esign_request_id` FK null-out, held
+  by `tests/esign/guard-diff.test.ts` against `tests/esign/__fixtures__/0106-signature-guard.sql.txt`.
+- **Never signed twice on a re-press.** Before an open request is cancelled or replaced (changed choices, or a resume whose
+  `signingUrls` failed), Adobe is asked: SIGNED → "Your signature is being recorded" and nothing else; a failed re-read or a refused
+  cancel → paused, the request left open; only CANCELLED / EXPIRED / DECLINED at Adobe, or our own successful cancel, closes it.
+  "Continue to Adobe to sign" has a courtesy limit of 10 per token per hour (`start-limit.ts`).
+- **Known exception, tracked separately:** `src/app/dashboard/settings/integrations/meetings/actions.ts` imported `@/lib/db/admin`
+  before this sprint (the Meetings import). It is not e-sign code; AT20's hygiene test allows that one file and fails on any new one.

@@ -5,7 +5,9 @@ import { acceptPublicProposal, savePublicDetailsAddress } from "@/lib/proposals/
 import { reviewLetterPdf, signedLetterPdf, type LetterPdfResult } from "@/lib/proposals/public-letter";
 import type { ProposalAcceptResult } from "@/components/client-proposal/ProposalDocument";
 import { safeHttpsUrl } from "@/components/client-proposal/format";
-import { PDF_MESSAGES, SIGN_MESSAGES } from "@/lib/loe/client-words";
+import { ESIGN_LIMIT_SENTENCE, PDF_MESSAGES, SIGN_MESSAGES } from "@/lib/loe/client-words";
+import { createHash } from "node:crypto";
+import { adobeStartTokenLimiter } from "@/lib/esign/start-limit";
 import { startAdobeSigning } from "@/lib/esign/start";
 import { inAppBlockedByOpenRequest } from "@/lib/esign/path";
 import { readPublicProposal } from "@/lib/proposals/public";
@@ -125,6 +127,10 @@ export async function startAdobeSigningAction(
   fingerprint: unknown,
 ): Promise<AdobeStartResult> {
   try {
+    // A courtesy limit per token, before anything is read.
+    const key = `t:${createHash("sha256").update(String(token ?? "")).digest("hex")}`;
+    if (!adobeStartTokenLimiter.allowed(key)) return { ok: false, message: ESIGN_LIMIT_SENTENCE };
+    adobeStartTokenLimiter.record(key);
     const r = await startAdobeSigning({ token: String(token ?? ""), selection, clientClasses, details, typedName, fingerprint });
     if (r.ok) return { ok: true, url: r.url };
     return "fallback" in r ? { ok: false, fallback: "in_app", message: r.message } : { ok: false, message: r.message };

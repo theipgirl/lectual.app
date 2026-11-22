@@ -155,7 +155,7 @@ export default async function IntegrationsPage({
     // Adobe Acrobat Sign (Sprint 5a): three-state, and the waiting count only for `reauth`.
     loadAdobeRow(hasRole(session.role, "senior_admin")),
   ]);
-  const esignOutcome = esign_error ? ADOBE_OUTCOME[esign_error] ?? ADOBE_OUTCOME.failed : esign === "connected" ? ADOBE_OUTCOME.connected : null;
+  const esignOutcome = esign_error ? (Object.hasOwn(ADOBE_OUTCOME, esign_error) ? ADOBE_OUTCOME[esign_error] : ADOBE_OUTCOME.failed) : esign === "connected" ? ADOBE_OUTCOME.connected : null;
   const meetingSources = meetingConns.ok ? meetingConns.connections : [];
   const meetingsNeedAttention = meetingSources.some((c) => c.status !== "active");
   const lp = lawpay.ok ? lawpay.connection : null;

@@ -18,29 +18,24 @@
 --     open-request check) and the ENGAGEMENT LETTER block of `client_proposal_lifecycle()`.
 --   * 0080_lawpay_connection.sql was read for the connection table's shape (column grants, the four policies).
 --   * Nothing here was run against any database.
+--   * The composite FK (proposal_id, org_id) -> client_proposal (id, org_id) needs a unique key on client_proposal(id, org_id).
+--     It exists: `client_proposal_id_org_uniq`, created by 0089 and re-asserted (guarded) by 0106 section 4 (lines ~365-375).
+--     This file therefore adds none.
 --
--- ┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
--- │ OPEN ITEMS FOR THE DIRECTOR (the contract does not cover them; this file does NOT pick, it states the conflict)      │
--- ├────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
--- │ A. SECURITY DEFINER vs 0106's lifecycle. The contract says every new function is SECURITY DEFINER. 0106's lifecycle  │
--- │    trigger accepts a letter proposal ONLY when `auth.uid() is null and current_user = 'service_role'` and a signature │
--- │    row inserted by this very transaction (xmin) exists; 0106 made sign_and_accept SECURITY INVOKER for exactly that   │
--- │    reason ("a definer function would run as its owner and fail that test"). A DEFINER client_proposal_adobe_complete │
--- │    would therefore always be refused (`loe_signature_required` / the service-role test). Below, adobe_complete is     │
--- │    written SECURITY INVOKER (granted to service_role only) WITH THIS NOTE, so it can work at all; esign_open does not │
--- │    change the proposal and is SECURITY DEFINER as the contract says. Confirm or redirect.                              │
--- │ B. signed_at = accepted_at = p_signed_at. 0106's `client_proposal_signature_guard()` forces `new.signed_at := now()`  │
--- │    on every insert, and the lifecycle sets `new.accepted_at := now()` on sent -> accepted. The contract wants both to │
--- │    be Adobe's completion time. That needs BOTH 0106 triggers amended, which the contract does not mention. This file  │
--- │    puts p_signed_at where the function itself controls it (the snapshot's `accepted_at` and `agreement.signed_at`)    │
--- │    and leaves the two columns as 0106 stamps them. The exact amendment is written out, COMMENTED, in PART 7; isolation │
--- │    case 9's "signed_at = accepted_at = p_signed_at" holds only once the director accepts PART 7.                       │
--- │ C. The FK table (signature.esign_request_id -> request ON DELETE SET NULL) collides with 0106's append-only guard:    │
--- │    the SET NULL is an UPDATE of a signature row, which the guard refuses for anything but template_id. Isolation case │
--- │    13 (the owner's family delete with a completed request) would fail. PART 3 replaces the guard with 0106's body plus │
--- │    the SAME FK-action exception for `esign_request_id`. It is the smallest change that makes the contract's FK table  │
--- │    work; review it against 0106 lines 423-446.                                                                         │
--- └────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+-- DIRECTOR'S RULINGS (Nov 22) on the three conflicts the first draft raised:
+--   A. ACCEPTED. client_proposal_adobe_complete is SECURITY INVOKER, granted to service_role only, matching 0106's
+--      sign_and_accept: 0106's lifecycle accepts a letter proposal only when `auth.uid() is null and current_user =
+--      'service_role'` and a signature row inserted by this very transaction exists, so a DEFINER function (running as its
+--      owner) would always be refused. client_proposal_esign_open stays SECURITY DEFINER (it never changes the proposal).
+--      BEFORE APPLYING, someone must confirm against 0106's lifecycle body (lines 726-1004; this session read lines 908-925,
+--      where sent -> accepted only REQUIRES accepted_snapshot to be non-null and sets `accepted_at := now()`) that the lifecycle
+--      does not rewrite `accepted_snapshot.agreement` or the snapshot's `accepted_at` on that transition.
+--   B. 0106's triggers are NOT amended. `client_proposal_signature.signed_at` and `client_proposal.accepted_at` stay at the
+--      server clock exactly as 0106 stamps them. Adobe's completion time is recorded in a NEW provider column,
+--      `client_proposal_signature.provider_signed_at`, and in the snapshot's agreement block (`provider_signed_at`).
+--   C. ACCEPTED on a condition: the replaced signature guard is 0106's body copied EXACTLY plus ONE narrow exception, a
+--      referential-action null-out of `esign_request_id` (pg_trigger_depth() > 1, every other column unchanged), mirroring
+--      the template_id exception. A test in lectual.app (tests/esign/guard-diff.test.ts) diffs the two bodies line by line.
 --
 -- Lock order everywhere: a function that locks both takes the REQUEST row first, then the PROPOSAL (`FOR UPDATE`).
 -- Every function: `set search_path = ''`, schema-qualified names, REVOKE from public, anon, authenticated; GRANT EXECUTE to
@@ -105,6 +100,10 @@ begin
   if new.status = 'revoked' then
     new.access_token_enc := null;
     new.refresh_token_enc := null;
+  end if;
+  -- A reconnect (status becomes active) clears the reauth code.
+  if new.status = 'active' and (tg_op = 'INSERT' or old.status is distinct from 'active') then
+    new.last_error := null;
   end if;
   new.updated_at := now();
   return new;
@@ -282,7 +281,9 @@ $$;
 alter table public.client_proposal_signature
   add column if not exists provider text null default 'lectual',
   add column if not exists adobe_agreement_id text null,
-  add column if not exists esign_request_id uuid null;
+  add column if not exists esign_request_id uuid null,
+  -- Adobe's own completion time (signed_at stays the server clock, as 0106 stamps it). Null for an in-app signature.
+  add column if not exists provider_signed_at timestamptz null;
 
 do $$
 begin
@@ -300,11 +301,11 @@ begin
 end
 $$;
 
--- 0106's table grant to authenticated is `select` (no column list), so the three columns are readable under 0106's
+-- 0106's table grant to authenticated is `select` (no column list), so the four columns are readable under 0106's
 -- staff select policy with no new grant; 0106's grants are NOT widened. No insert or update for authenticated.
 
--- OPEN ITEM C: 0106's append-only guard, copied from 0106 (lines 423-446) with ONE change: the FK's own ON DELETE SET NULL may
--- also clear `esign_request_id` (the owner's family delete removes the request by cascade). Nothing else may change.
+-- RULING C: 0106's append-only guard (0106 lines 423-444), copied EXACTLY, plus ONE exception: the request's own ON DELETE SET NULL
+-- of `esign_request_id` (the owner's family delete removes the request by cascade). Lines marked 0113 are the only additions.
 create or replace function public.client_proposal_signature_guard()
 returns trigger
 language plpgsql
@@ -312,18 +313,23 @@ set search_path = ''
 as $$
 begin
   if tg_op = 'UPDATE' then
-    -- The FK's own ON DELETE SET NULL (template_id, and from 0113 esign_request_id) arrives from inside the
+    -- The FK's own ON DELETE SET NULL (template_id) arrives from inside the
     -- referential-action trigger; nothing else may change.
     if pg_trigger_depth() > 1
-       and (to_jsonb(new) - 'template_id' - 'esign_request_id') = (to_jsonb(old) - 'template_id' - 'esign_request_id')
-       and (new.template_id is null or new.template_id is not distinct from old.template_id)
-       and (new.esign_request_id is null or new.esign_request_id is not distinct from old.esign_request_id) then
+       and (to_jsonb(new) - 'template_id') = (to_jsonb(old) - 'template_id')
+       and new.template_id is null then
+      return new;
+    end if;
+    -- 0113: the same for esign_request_id (the signing request's ON DELETE SET NULL).
+    if pg_trigger_depth() > 1
+       and (to_jsonb(new) - 'esign_request_id') = (to_jsonb(old) - 'esign_request_id')
+       and new.esign_request_id is null then
       return new;
     end if;
     raise exception 'loe_signature_append_only: a signature record is never changed'
       using errcode = '23514';
   end if;
-  -- INSERT: the server clock, whatever the caller sent. (OPEN ITEM B: PART 7 proposes the Adobe exception.)
+  -- INSERT: the server clock, whatever the caller sent.
   new.signed_at := now();
   return new;
 end
@@ -334,6 +340,7 @@ revoke all on function public.client_proposal_signature_guard() from public, ano
 -- Replaces a plain insert (D21): locks the proposal, checks it is still the same live version with a letter and that the
 -- connection is this proposal's firm's and active, checks the sha256 of the text, and inserts the request as `creating`
 -- with org_id = the PROPOSAL's. A second open request for the version fails on the partial unique index (23505).
+-- signer_email is the PROPOSAL ROW's own client_email, as 0106 stores it; p_signer_email is accepted and ignored.
 create or replace function public.client_proposal_esign_open(
   p_proposal_id           uuid,
   p_org_id                uuid,
@@ -397,7 +404,7 @@ begin
     v_row.org_id, v_row.id, v_row.family_id, v_row.version, p_connection_id, 'adobe_sign', btrim(p_signer_name),
     nullif(btrim(coalesce(p_signer_title, '')), ''), nullif(btrim(coalesce(p_entity_name, '')), ''), p_address,
     p_template_version, p_canonical_fingerprint, p_agreement_text, p_agreement_sha256, p_sent_pdf_sha256, p_selection, p_snapshot,
-    p_details, p_signer_email, 'creating'
+    p_details, v_row.client_email, 'creating'
   )
   returning id into v_id;
   return v_id;
@@ -413,7 +420,8 @@ grant execute on function public.client_proposal_esign_open(
 
 -- ── 5. client_proposal_adobe_complete (service role) ─────────────────────────────────────────────────────────────────
 -- D16: no p_org_id (the org is the locked request row's), no signer parameters (they are the request's frozen columns).
--- Returns (signature_id, completed_now). OPEN ITEM A: SECURITY INVOKER, for the same reason 0106 gives for sign_and_accept.
+-- Returns (signature_id, completed_now). RULING A: SECURITY INVOKER, for the same reason 0106 gives for sign_and_accept.
+-- RULING B: signed_at and accepted_at are the server clock (0106's triggers); Adobe's time is provider_signed_at.
 -- NO EXCEPTION BLOCK, NO SAVEPOINT (0106: the lifecycle looks for a signature row with this transaction's own xid).
 create or replace function public.client_proposal_adobe_complete(
   p_request_id       uuid,
@@ -431,6 +439,7 @@ declare
   v_req          public.client_proposal_esign_request%rowtype;
   v_row          public.client_proposal%rowtype;
   v_signature_id uuid := gen_random_uuid();
+  v_signed_at    timestamptz;
 begin
   -- Lock order: the request first, then the proposal.
   select * into v_req from public.client_proposal_esign_request r where r.id = p_request_id for update;
@@ -470,16 +479,17 @@ begin
   end if;
 
   -- The signature, from the request's FROZEN columns. ip and user_agent are null: Adobe's audit report holds them.
-  -- (OPEN ITEM B: until PART 7, 0106's guard stamps signed_at := now().)
-  perform set_config('lectual.esign_signed_at', p_signed_at::text, true);
+  -- signed_at is 0106's guard's own clock; Adobe's completion time is provider_signed_at.
   insert into public.client_proposal_signature (
     id, org_id, proposal_id, family_id, version, signer_name, signer_title, entity_name, address, signer_email, ip, user_agent,
-    agreement_text, agreement_sha256, template_id, template_version, provider, adobe_agreement_id, esign_request_id
+    agreement_text, agreement_sha256, template_id, template_version, provider, adobe_agreement_id, esign_request_id,
+    provider_signed_at
   ) values (
     v_signature_id, v_row.org_id, v_row.id, v_row.family_id, v_row.version, v_req.signer_name, v_req.signer_title,
     v_req.entity_name, v_req.address, v_req.signer_email, null, null, v_req.agreement_text, v_req.agreement_sha256, null,
-    v_req.template_version, 'adobe_sign', v_req.adobe_agreement_id, v_req.id
-  );
+    v_req.template_version, 'adobe_sign', v_req.adobe_agreement_id, v_req.id, p_signed_at
+  )
+  returning signed_at into v_signed_at;
 
   -- 0106's statement and trigger bypass, copied: the transaction-local marker the lifecycle looks for, then the one
   -- conditional update fenced on `status = 'sent'`.
@@ -489,11 +499,12 @@ begin
          accepted_selection = v_req.selection,
          accepted_snapshot = v_req.snapshot || jsonb_build_object(
            'schema', 2,
-           'accepted_at', p_signed_at,
+           'accepted_at', v_signed_at,
            'agreement', jsonb_build_object(
              'signature_id', v_signature_id,
              'signer_name', v_req.signer_name,
-             'signed_at', p_signed_at,
+             'signed_at', v_signed_at,
+             'provider_signed_at', p_signed_at,
              'sha256', v_req.agreement_sha256,
              'template_version', v_req.template_version,
              'provider', 'adobe_sign',
@@ -505,7 +516,6 @@ begin
     raise exception 'esign_proposal_changed: only a live proposal can be accepted' using errcode = '23514';
   end if;
   perform set_config('lectual.loe_signing', '', true);
-  perform set_config('lectual.esign_signed_at', '', true);
 
   update public.client_proposal_esign_request r
      set status = 'completed', signature_id = v_signature_id, completed_at = now()
@@ -670,22 +680,6 @@ revoke all on function public.client_proposal_sign_and_accept(
 grant execute on function public.client_proposal_sign_and_accept(
   uuid, uuid, text, text, text, jsonb, inet, text, text, text, jsonb, jsonb) to service_role;
 
--- ── 7. OPEN ITEM B: the proposed timing amendment (COMMENTED OUT; the director decides) ──────────────────────────────
--- (i) In client_proposal_signature_guard() above, replace `new.signed_at := now();` with:
---       if current_user = 'service_role' and auth.uid() is null
---          and coalesce(current_setting('lectual.esign_signed_at', true), '') <> ''
---          and new.provider = 'adobe_sign' then
---         new.signed_at := current_setting('lectual.esign_signed_at', true)::timestamptz;
---       else
---         new.signed_at := now();
---       end if;
--- (ii) In client_proposal_lifecycle() (0106 lines 726-1004), in the sent -> accepted branch, replace the ONE line
---       `new.accepted_at := now();` (0106 line ~917, just above the "ENGAGEMENT LETTER (0106)" comment) with the same test,
---       reading `lectual.esign_signed_at` only when `lectual.loe_signing` names this row. The rest of that body must be copied
---       from 0106 byte for byte; it is NOT re-written here.
--- Without (i) and (ii), an Adobe signature's `signed_at` and the proposal's `accepted_at` are the completion call's now();
--- the snapshot's `accepted_at` and `agreement.signed_at` are Adobe's completion time either way.
-
 -- =====================================================================================================================
 -- ISOLATION CASES for lectual's tests/tenant-isolation.test.ts (D5: copy in the same PR as this migration; they are NOT run
 -- in lectual.app). Same helpers as the 0080 and 0106 blocks there: seedOrg, clientFor, admin, SeededOrg, and the 0106
@@ -805,11 +799,11 @@ describe.skipIf(noDb)("adobe sign connection, signing requests and completion (0
     expect((await complete(request, agreement)).error).toBeNull();
     const c = await clientFor(a);
     const { data: sig } = await admin().from("client_proposal_signature").select("id").eq("esign_request_id", request).single();
-    expect((await c.from("client_proposal_signature").update({ provider: "lectual", adobe_agreement_id: "x", esign_request_id: null }).eq("id", (sig as { id: string }).id)).error).not.toBeNull();
+    expect((await c.from("client_proposal_signature").update({ provider: "lectual", adobe_agreement_id: "x", esign_request_id: null, provider_signed_at: null }).eq("id", (sig as { id: string }).id)).error).not.toBeNull();
     expect((await c.from("client_proposal_signature").insert({ org_id: a.orgId, provider: "adobe_sign" })).error).not.toBeNull();
   });
 
-  it("0113 case 9: completion is idempotent, copies the frozen columns, and each refusal changes nothing", async () => {
+  it("0113 case 9: completion is idempotent, copies the frozen columns, records provider_signed_at, and each refusal changes nothing", async () => {
     const a = await seedOrg("as113_c9"); const { request, agreement, proposal } = await openRequest(a);
     const ahead = new Date(Date.now() + 4 * 60 * 1000).toISOString();
     const first = await complete(request, agreement, ahead);
@@ -819,16 +813,19 @@ describe.skipIf(noDb)("adobe sign connection, signing requests and completion (0
     const [row2] = (await complete(request, agreement, ahead)).data as Array<{ signature_id: string; completed_now: boolean }>;
     expect(row2).toEqual({ signature_id: row1.signature_id, completed_now: false });
     expect((await complete(request, "another-agreement", ahead)).error?.message).toMatch(/^esign_request_closed/);
-    const { data: sig } = await admin().from("client_proposal_signature").select("signer_name, entity_name, address, template_version, signed_at, provider").eq("id", row1.signature_id).single();
+    const { data: sig } = await admin().from("client_proposal_signature").select("signer_name, entity_name, address, template_version, signed_at, provider, provider_signed_at").eq("id", row1.signature_id).single();
     expect(sig).toMatchObject({ signer_name: "Jordan Sample", entity_name: "Sample Co", address: { street: "1 Main St" }, template_version: 1, provider: "adobe_sign" });
+    const ss = sig as { signed_at: string; provider_signed_at: string };
+    // Ruling B: Adobe's completion time is provider_signed_at; signed_at is the server clock (0106's guard).
+    expect(new Date(ss.provider_signed_at).toISOString()).toBe(ahead);
     const { data: p } = await admin().from("client_proposal").select("status, accepted_at, accepted_snapshot").eq("id", proposal).single();
-    const pp = p as { status: string; accepted_at: string; accepted_snapshot: { accepted_at: string; agreement: { signed_at: string; provider: string } } };
+    const pp = p as { status: string; accepted_at: string; accepted_snapshot: { accepted_at: string; agreement: { signed_at: string; provider_signed_at: string; provider: string } } };
     expect(pp.status).toBe("accepted");
-    expect(new Date(pp.accepted_snapshot.accepted_at).toISOString()).toBe(ahead);
-    expect(new Date(pp.accepted_snapshot.agreement.signed_at).toISOString()).toBe(ahead);
-    // OPEN ITEM B: these two hold only once PART 7 is accepted.
-    expect(new Date((sig as { signed_at: string }).signed_at).toISOString()).toBe(ahead);
-    expect(new Date(pp.accepted_at).toISOString()).toBe(ahead);
+    expect(new Date(pp.accepted_snapshot.agreement.provider_signed_at).toISOString()).toBe(ahead);
+    expect(pp.accepted_snapshot.agreement.provider).toBe("adobe_sign");
+    // signed_at and accepted_at are the server clock, the same instant in the row and the snapshot.
+    expect(new Date(pp.accepted_snapshot.agreement.signed_at).toISOString()).toBe(new Date(ss.signed_at).toISOString());
+    expect(Math.abs(new Date(ss.signed_at).getTime() - Date.now())).toBeLessThan(60_000);
     // The four refusals, each on a fresh request, each leaving rows unchanged.
     const b = await seedOrg("as113_c9_b");
     const r1 = await openRequest(b);
