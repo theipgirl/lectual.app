@@ -10,6 +10,8 @@
 .cs-meta, .cs-choices { font-size: var(--fs-2); overflow-wrap: anywhere; }
 .cs-acts { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; min-width: 0; max-width: 100%; }
 .cs-move { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+/* Move up / Move down: one form per button, laid out as if the buttons were siblings. */
+.cs-move-one { display: contents; }
 .cs-more { min-width: 0; max-width: 100%; }
 .cs-more > summary { list-style: none; cursor: pointer; }
 .cs-more > summary::-webkit-details-marker { display: none; }

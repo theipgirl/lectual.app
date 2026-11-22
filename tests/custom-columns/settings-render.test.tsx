@@ -47,14 +47,38 @@ describe("P4: the one list and its controls", () => {
     const tag = (label: string) => new RegExp(`<button[^>]*aria-label="${label}"[^>]*>`).exec(html)?.[0] ?? "missing";
     const up = (label: string) => tag(W.columnsMoveUp(label));
     const down = (label: string) => tag(W.columnsMoveDown(label));
-    expect(up("Priority")).toContain('value="up"');
-    expect(up("Priority")).toContain('name="dir"');
+    // Changed on purpose (Sprint 3 evaluation, item 1): the direction is a hidden field of each button's own form, not the button's name.
+    expect(up("Priority")).not.toContain("name=");
+    expect(down("Priority")).not.toContain("name=");
     expect(up("Quoted fee")).toContain("disabled");
     expect(up("Priority")).not.toContain("disabled");
     expect(down("Review date")).toContain("disabled");
     expect(down("Priority")).not.toContain("disabled");
-    const moveForm = /<form class="cs-move"[^>]*>([\s\S]*?)<\/form>/.exec(html)![1];
-    expect([...moveForm.matchAll(/name="(\w+)"/g)].map((m) => m[1]).sort()).toEqual(["dir", "dir", "id", "op"]);
+    const moveForms = [...html.matchAll(/<form class="cs-move-one"[^>]*>([\s\S]*?)<\/form>/g)].map((m) => m[1]);
+    expect(moveForms).toHaveLength(6);
+    for (const f of moveForms) expect([...f.matchAll(/name="(\w+)"/g)].map((m) => m[1]).sort()).toEqual(["dir", "id", "op"]);
+  });
+  /**
+   * What each Move form POSTS, worked out from the markup the way a browser builds the form data: every named control inside the form, plus
+   * the submitter's own name/value. `dropSubmitter` models React 19.2's `createFormDataWithSubmitter`, which loses a named submitter when the
+   * form holds an input named "id" (`form.id` is then that input). Either way each form must post exactly op, id and its own dir.
+   */
+  it("each Move button's form posts op, id and its own dir, even when the submitter's name is dropped (React 19.2)", () => {
+    const posted = (form: string, dropSubmitter: boolean) => {
+      const fields: [string, string][] = [];
+      for (const m of form.matchAll(/<input type="hidden" name="(\w+)" value="([^"]*)"\/?>/g)) fields.push([m[1], m[2]]);
+      const btn = /<button[^>]*>/.exec(form)![0];
+      const name = /name="(\w+)"/.exec(btn)?.[1];
+      const value = /value="([^"]*)"/.exec(btn)?.[1] ?? "";
+      if (name && !dropSubmitter) fields.push([name, value]);
+      return fields.sort();
+    };
+    const forms = [...html.matchAll(/<form class="cs-move-one" data-dir="(up|down)"[^>]*>([\s\S]*?)<\/form>/g)];
+    const forRow = forms.filter((m) => m[2].includes(`value="${S.priority}"`));
+    expect(forRow.map((m) => m[1])).toEqual(["up", "down"]);
+    for (const [, dir, form] of forRow) {
+      for (const drop of [false, true]) expect(posted(form, drop), `${dir} drop=${drop}`).toEqual([["dir", dir], ["id", S.priority], ["op", "move"]]);
+    }
   });
   it("Rename and Edit choices post the rendered updated_at; Edit choices only on a Choice column", () => {
     expect((html.match(/name="op" value="rename"/g) ?? []).length).toBe(3);

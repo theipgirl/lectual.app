@@ -154,21 +154,29 @@ export function ChoicesForm({ id, label, options, updatedAt, use }: { id: string
   );
 }
 
-/** Move up / Move down in the firm's ONE column order. Posts only the id, the op and the direction. */
+/**
+ * Move up / Move down in the firm's ONE column order. Each button is the only control of its OWN form, and that form carries `op`, `id` and
+ * `dir` as hidden fields: nothing depends on the submitter's name. (React 19.2's submitter path copies a named submitter into a temporary
+ * input owned by `form.id`; here `form.id` is the hidden INPUT named "id", so a named `dir` button was dropped. Sprint 3 evaluation, item 1.)
+ */
 export function MoveColumn({ id, label, first, last }: { id: string; label: string; first: boolean; last: boolean }) {
   const [state, action, pending] = useActionState(updateFieldAction, EMPTY);
-  return (
-    <form action={action} className="cs-move">
+  const one = (dir: "up" | "down", disabled: boolean) => (
+    <form action={action} className="cs-move-one" data-dir={dir}>
       <input type="hidden" name="op" value="move" />
       <input type="hidden" name="id" value={id} />
-      <button type="submit" name="dir" value="up" className="lx-btn lx-btn-sec lx-btn-sm" aria-label={columnsMoveUp(label)} disabled={first || pending}>
-        {COLUMNS_MOVE_UP}
+      <input type="hidden" name="dir" value={dir} />
+      <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" aria-label={dir === "up" ? columnsMoveUp(label) : columnsMoveDown(label)} disabled={disabled || pending}>
+        {dir === "up" ? COLUMNS_MOVE_UP : COLUMNS_MOVE_DOWN}
       </button>
-      <button type="submit" name="dir" value="down" className="lx-btn lx-btn-sec lx-btn-sm" aria-label={columnsMoveDown(label)} disabled={last || pending}>
-        {COLUMNS_MOVE_DOWN}
-      </button>
-      <Outcome state={state} />
     </form>
+  );
+  return (
+    <div className="cs-move">
+      {one("up", first)}
+      {one("down", last)}
+      <Outcome state={state} />
+    </div>
   );
 }
 
