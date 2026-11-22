@@ -1,0 +1,646 @@
+-- PROPOSAL ONLY. NOT A MIGRATION OF THIS REPO. NOT APPLIED ANYWHERE (not lectual-dev, not lectual-prod).
+-- =====================================================================================================================
+-- 0115_custom_columns.sql (proposed): a firm's own columns on the Weekly review List.
+--
+-- This file is a draft for the `lectual` repo (theipgirl/lectual), where migrations live (lectual.app AGENTS.md: "No migrations
+-- in this repo"). To use it: copy it to `lectual/supabase/migrations/0115_custom_columns.sql` (first-merged-wins numbering:
+-- 0108 and 0110-0114 are spoken for; renumber if 0115 is taken too), review it there, add the isolation cases at the end of this
+-- file to tests/tenant-isolation.test.ts, apply to lectual-dev first, run the isolation cases there, and apply to lectual-prod
+-- only with the owner's OK. Apply to BOTH projects (lectual AGENTS.md, "Database").
+--
+-- Checked against this repo's types and lectual migrations 0085, 0089, 0097, 0099, 0103, 0104, 0105, 0106, 0107, NOT a live
+-- database. Every borrowed pattern names its source below.
+--
+-- Depends on: 0001 (crm_org, crm_org_member unique (org_id, user_id)), 0002 (current_org_id / current_org_role),
+-- 0104 (crm_lead_id_org_uniq, crm_matter_id_org_uniq), 0107 (crm_lead.merged_into_id).
+--
+-- WHAT IT ADDS
+--   crm_custom_field   one row per column a firm defines: section (trademarks | contracts | both, the List's two sections; a
+--                      trademarks field applies to leads and TM / CR / PATENT matters, as the app's isTrademarkRow), label (1..60,
+--                      stored trimmed), kind (text | date | money | choice | person), options (choice only), position, archived.
+--                      At most 40 live fields per firm. kind and section never change after insert.
+--   crm_custom_value   one row per field and record: exactly one of lead_id / matter_id and exactly one typed value column, the
+--                      field kind's.
+--   No existing table, policy, grant or trigger changes. No seed rows: a firm's "Priority" column is created by the firm in the
+--   app (Settings -> Columns), never by a migration ("Content is not schema").
+--
+-- NAMES
+--   The spec calls the value rules trigger `crm_custom_value_check`. Here it is `crm_custom_value_rules` (function) and
+--   `crm_custom_value_rules_trg` (trigger), 0103's `_rules` / `_rules_trg` form. Nothing in the app names either.
+--
+-- OPEN QUESTION FOR THE FIRM (custom money visibility)
+--   A `money` custom column is NOT under the app's owner-only fee rule. Default here and in lectual.app: every member who can
+--   read the table sees it (the SELECT policy below is every member). These are the firm's own working figures. If the owner
+--   says "owner only", change the value SELECT policy for money fields, the app's `columnsFor` predicate and its test together.
+--
+-- APPLYING IT
+--   Additive and idempotent: create table if not exists, create index if not exists, create or replace function, and do $$
+--   blocks that test pg_constraint / pg_trigger / pg_policies first (0103's form). Nothing is removed and no row is deleted, so
+--   one Supabase MCP apply_migration is safe (see 0093 for what hangs it). Statement order (each object exists before its first
+--   use): the options function, the parent-key guards, the tables (the field CHECK calls the function), the indexes, the trigger
+--   functions, the triggers, revokes and grants, row level security and policies, comments.
+--
+-- WRITES (for the app's Sprint 3, recorded here so it is not lost)
+--   * Read the row first, then `insert`, or `update ... eq(id)`. A 23505 on insert means another write landed first: re-read and
+--     update. PostgREST's conflict-update form names every payload column in its SET list and Postgres needs UPDATE privilege on
+--     each; org_id, field_id, lead_id and matter_id have none, and that grant is not widened.
+--   * One row per request, one transaction: never several value rows in one statement, and never a value write and an option or
+--     archive change in one transaction (see "Lock order").
+-- =====================================================================================================================
+
+
+-- ── 1. Helper: what a field's options may hold ─────────────────────────────────────────────────────────────────────
+-- Pure. Execute stays with PUBLIC: a CHECK runs it as the inserting role.
+create or replace function public.crm_custom_field_options_valid(p_kind text, p_options jsonb)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select case
+    when p_kind = 'choice' then
+      pg_catalog.jsonb_typeof(p_options) = 'array'
+      and pg_catalog.jsonb_array_length(p_options) between 1 and 30
+      and not exists (
+        select 1 from pg_catalog.jsonb_array_elements(p_options) as e(v)
+        where pg_catalog.jsonb_typeof(e.v) <> 'string'
+           or pg_catalog.char_length(e.v #>> '{}') not between 1 and 40
+           or (e.v #>> '{}') <> pg_catalog.btrim(e.v #>> '{}')
+      )
+      and (
+        select pg_catalog.count(distinct pg_catalog.lower(e.v #>> '{}'))
+        from pg_catalog.jsonb_array_elements(p_options) as e(v)
+      ) = pg_catalog.jsonb_array_length(p_options)
+    else p_options = '[]'::jsonb
+  end
+$$;
+
+
+-- ── 2. Tables ──────────────────────────────────────────────────────────────────────────────────────────────────────
+-- The parent keys the composite FKs below point at (0104's guarded form; both exist on lectual-dev and lectual-prod since 0104).
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'crm_lead_id_org_uniq') then
+    alter table public.crm_lead add constraint crm_lead_id_org_uniq unique (id, org_id);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'crm_matter_id_org_uniq') then
+    alter table public.crm_matter add constraint crm_matter_id_org_uniq unique (id, org_id);
+  end if;
+end
+$$;
+
+create table if not exists public.crm_custom_field (
+  id          uuid        primary key default gen_random_uuid(),
+  org_id      uuid        not null references public.crm_org(id) on delete cascade,
+  section     text        not null,
+  label       text        not null,
+  kind        text        not null,
+  options     jsonb       not null default '[]',
+  position    int         not null default 0,
+  archived    boolean     not null default false,
+  -- Who made it. No INSERT grant for authenticated: the trigger stamps auth.uid() (0106's template trigger does the same).
+  created_by  uuid        default auth.uid() references auth.users(id) on delete set null,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  constraint crm_custom_field_section check (section in ('trademarks', 'contracts', 'both')),
+  constraint crm_custom_field_label_len check (char_length(label) between 1 and 60),
+  -- What is stored is what the label index compares; the app trims before sending.
+  constraint crm_custom_field_label_trimmed check (label = btrim(label)),
+  constraint crm_custom_field_kind check (kind in ('text', 'date', 'money', 'choice', 'person')),
+  constraint crm_custom_field_options check (public.crm_custom_field_options_valid(kind, options)),
+  constraint crm_custom_field_position check (position between 0 and 1000),
+  -- The composite-FK parent key (0104 / 0105 form).
+  constraint crm_custom_field_id_org_uniq unique (id, org_id)
+);
+
+create table if not exists public.crm_custom_value (
+  id             uuid        primary key default gen_random_uuid(),
+  org_id         uuid        not null references public.crm_org(id) on delete cascade,
+  field_id       uuid        not null,
+  lead_id        uuid,
+  matter_id      uuid,
+  value_text     text,
+  value_date     date,
+  value_cents    bigint,
+  value_choice   text,
+  value_user_id  uuid,
+  -- Who last wrote it. No INSERT or UPDATE grant for authenticated: the trigger stamps auth.uid() (null = the system, 0085).
+  updated_by     uuid        default auth.uid() references auth.users(id) on delete set null,
+  updated_at     timestamptz not null default now(),
+  -- Backstops: the trigger answers first with its prefixed message.
+  constraint crm_custom_value_one_record check (num_nonnulls(lead_id, matter_id) = 1),
+  constraint crm_custom_value_one_value check (num_nonnulls(value_text, value_date, value_cents, value_choice, value_user_id) = 1),
+  -- A text value is never empty: an emptied value is deleted instead.
+  constraint crm_custom_value_text_len check (char_length(value_text) between 1 and 500),
+  constraint crm_custom_value_cents_range check (value_cents between 0 and 100000000000),
+  constraint crm_custom_value_choice_len check (char_length(value_choice) <= 40),
+  -- One value per field and record. A real constraint (NULLs never distinct), not a partial index.
+  constraint crm_custom_value_one_per_record unique nulls not distinct (field_id, lead_id, matter_id),
+  -- Composite FKs (0104 / 0105 naming): every pointer stays inside the row's own firm, even for the service role.
+  constraint crm_custom_value_field_org_fk foreign key (field_id, org_id)
+    references public.crm_custom_field (id, org_id) match simple on update no action on delete cascade,
+  constraint crm_custom_value_lead_org_fk foreign key (lead_id, org_id)
+    references public.crm_lead (id, org_id) match simple on update no action on delete cascade,
+  constraint crm_custom_value_matter_org_fk foreign key (matter_id, org_id)
+    references public.crm_matter (id, org_id) match simple on update no action on delete cascade,
+  -- The person must be a member of THIS firm (0103's target_user_id precedent). A null value_user_id is not checked.
+  constraint crm_custom_value_value_user_org_fk foreign key (org_id, value_user_id)
+    references public.crm_org_member (org_id, user_id) match simple on update no action on delete cascade
+);
+-- Why the person FK cascades instead of the spec's referential set-null on value_user_id: the row must keep exactly one typed value
+-- (crm_custom_value_one_value). A referential SET NULL would empty the row's only typed column; the CHECK is evaluated on that UPDATE
+-- and no trigger can bypass a CHECK, so removing the member (or deleting their auth user, which cascades to crm_org_member) would
+-- fail with 23514. A person row holds nothing but that person, so deleting it gives what the spec asks for: no value and no
+-- dangling id. Only that member's person values in that firm go.
+
+
+-- ── 3. Indexes ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- One live label per firm and section, ignoring case (the backstop; the trigger answers first and also covers `both`).
+create unique index if not exists crm_custom_field_label_live_uniq
+  on public.crm_custom_field (org_id, section, lower(btrim(label))) where not archived;
+create index if not exists crm_custom_field_org_position_idx on public.crm_custom_field (org_id, position);
+-- For the auth.users ON DELETE SET NULL on created_by (as 0106 does).
+create index if not exists crm_custom_field_created_by_idx on public.crm_custom_field (created_by);
+
+create index if not exists crm_custom_value_org_lead_idx on public.crm_custom_value (org_id, lead_id);
+create index if not exists crm_custom_value_org_matter_idx on public.crm_custom_value (org_id, matter_id);
+create index if not exists crm_custom_value_field_idx on public.crm_custom_value (field_id);
+-- Serves the person cascade from crm_org_member.
+create index if not exists crm_custom_value_org_user_idx on public.crm_custom_value (org_id, value_user_id);
+-- For the auth.users ON DELETE SET NULL on updated_by.
+create index if not exists crm_custom_value_updated_by_idx on public.crm_custom_value (updated_by);
+
+
+-- ── 4. Trigger functions ───────────────────────────────────────────────────────────────────────────────────────────
+-- Lock order (why there is no hang, and where a deadlock can still happen):
+--   * Value writes take only the per-field SHARED advisory lock ('crm_custom_value_field:' || field id). Field writes take the per-org
+--     lock ('crm_custom_field:' || org id), then, when options or archived change, the per-field EXCLUSIVE lock: always in that order.
+--     A value write's later FK check takes KEY SHARE on the field row, which does not conflict with a field update's NO KEY UPDATE row
+--     lock (the key columns never change). The referential-action branches return before any lock, so deleting an auth user, a
+--     member, a lead, a matter or the firm takes no advisory lock.
+--   * This is deadlock-free ONLY for single-row statements, each in its own transaction (every PostgREST write, and the app's one-cell
+--     writes). A multi-row statement (a field UPDATE changing options on two fields while a multi-row value INSERT names the same two in
+--     the other order), or a transaction that mixes value writes with option or archive changes, can deadlock: Postgres detects it
+--     after deadlock_timeout and aborts one statement with 40P01, which the caller retries. Nothing hangs. The app's rule: one row per
+--     request, one transaction, and never a value write and an option or archive change in one transaction.
+--   * A caller can hold another firm's org lock only for the length of its own refused statement (the field trigger locks before RLS's
+--     WITH CHECK refuses it). Likewise the value trigger takes the shared per-field lock BEFORE it knows the field is the caller's: a
+--     foreign field id briefly holds another firm's field key for the length of the refused statement. Both are harmless.
+--   * Under READ COMMITTED (PostgREST's level) each later statement of these volatile functions takes a fresh snapshot, so the checks
+--     after a lock see the rows committed by the transaction that held it.
+--   * A staff DELETE is serialized too: crm_custom_value_delete_rules takes the same shared per-field lock and then re-reads the field,
+--     because RLS's USING (not f.archived) was judged on the scan's snapshot and is not judged again after the wait.
+
+create or replace function public.crm_custom_field_rules()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_live bigint;
+begin
+  -- 1. The FK's own ON DELETE SET NULL of created_by arrives from inside the referential-action trigger: let exactly that through
+  --    (0106's form), no lock and no stamp.
+  if tg_op = 'UPDATE' and pg_trigger_depth() > 1 and (to_jsonb(new) - 'created_by') = (to_jsonb(old) - 'created_by') and new.created_by is null then
+    return new;
+  end if;
+
+  -- 2. Immutable, for every caller including the service role (a signed-in caller is stopped earlier by the column grants: 42501).
+  if tg_op = 'UPDATE' then
+    if new.id is distinct from old.id
+       or new.org_id is distinct from old.org_id
+       or new.kind is distinct from old.kind
+       or new.section is distinct from old.section
+       or new.created_by is distinct from old.created_by
+       or new.created_at is distinct from old.created_at then
+      raise exception 'custom_field_immutable: a field''s kind, section, firm and creation stamps never change'
+        using errcode = '23514';
+    end if;
+  end if;
+
+  -- 3. Locks: the firm's fields one writer at a time; an option or archive change waits for value writes on this field.
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('crm_custom_field:' || new.org_id::text, 0));
+  if tg_op = 'UPDATE' then
+    if new.options is distinct from old.options or new.archived is distinct from old.archived then
+      perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('crm_custom_value_field:' || new.id::text, 0));
+    end if;
+  end if;
+
+  -- 4. At most 40 live fields per firm: an insert of a live row, or a restore.
+  if not new.archived and (tg_op = 'INSERT' or (tg_op = 'UPDATE' and old.archived)) then
+    select pg_catalog.count(*) into v_live
+      from public.crm_custom_field f
+     where f.org_id = new.org_id and not f.archived and f.id <> new.id;
+    if v_live >= 40 then
+      raise exception 'custom_field_limit: a firm has at most 40 live columns'
+        using errcode = '23514';
+    end if;
+  end if;
+
+  -- 5. One live label per firm and section, ignoring case; a `both` field shares its label with neither section.
+  if not new.archived and (tg_op = 'INSERT' or (tg_op = 'UPDATE' and (old.archived or new.label is distinct from old.label))) then
+    if exists (
+      select 1 from public.crm_custom_field f
+       where f.org_id = new.org_id
+         and not f.archived
+         and f.id <> new.id
+         and pg_catalog.lower(pg_catalog.btrim(f.label)) = pg_catalog.lower(pg_catalog.btrim(new.label))
+         and (f.section = new.section or f.section = 'both' or new.section = 'both')
+    ) then
+      raise exception 'custom_field_label_taken: another live column of this firm already has this name'
+        using errcode = '23505';
+    end if;
+  end if;
+
+  -- 6. An option still held by a value cannot be removed.
+  if tg_op = 'UPDATE' then
+    if new.options is distinct from old.options then
+      if exists (
+        select 1 from public.crm_custom_value v
+         where v.field_id = new.id
+           and v.org_id = new.org_id
+           and v.value_choice is not null
+           and not (new.options ? v.value_choice)
+      ) then
+        raise exception 'custom_field_options_in_use: a value still holds an option being removed'
+          using errcode = '23514';
+      end if;
+    end if;
+  end if;
+
+  -- 7. Stamps: the server's clock; on insert the creator from the session (the service role may name it, as 0103 notes).
+  if tg_op = 'INSERT' then
+    new.created_at := now();
+    if auth.uid() is not null then
+      new.created_by := auth.uid();
+    end if;
+  end if;
+  new.updated_at := now();
+  return new;
+end;
+$$;
+
+create or replace function public.crm_custom_value_rules()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_kind text;
+  v_section text;
+  v_options jsonb;
+  v_archived boolean;
+  v_merged uuid;
+  v_type text;
+  v_record_section text;
+  v_ok boolean;
+begin
+  -- 1. The FK's own ON DELETE SET NULL of updated_by arrives from inside the referential-action trigger: let exactly that through
+  --    (0106's form), no re-stamp and no check, so deleting an auth user who last edited a value on an archived field succeeds.
+  if tg_op = 'UPDATE' and pg_trigger_depth() > 1 and (to_jsonb(new) - 'updated_by') = (to_jsonb(old) - 'updated_by') and new.updated_by is null then
+    return new;
+  end if;
+
+  -- 2. Immutable, for every caller including the service role.
+  if tg_op = 'UPDATE' then
+    if new.id is distinct from old.id
+       or new.org_id is distinct from old.org_id
+       or new.field_id is distinct from old.field_id
+       or new.lead_id is distinct from old.lead_id
+       or new.matter_id is distinct from old.matter_id then
+      raise exception 'custom_value_immutable: a value''s field and record never change; delete it and add another'
+        using errcode = '23514';
+    end if;
+  end if;
+
+  -- 3. Exactly one record.
+  if num_nonnulls(new.lead_id, new.matter_id) <> 1 then
+    raise exception 'custom_value_one_record: a value belongs to exactly one lead or one matter'
+      using errcode = '23514';
+  end if;
+
+  -- 4. The shared per-field lock, BEFORE the field is read: an option removal or an archive in flight is either finished (and seen)
+  --    or waits for this write to commit (and then sees it).
+  perform pg_catalog.pg_advisory_xact_lock_shared(pg_catalog.hashtextextended('crm_custom_value_field:' || new.field_id::text, 0));
+
+  -- 5. The field, by id AND firm, under the caller's RLS. Not found reads the same whatever the cause (another firm's field is
+  --    invisible to a signed-in caller; for the service role a forged org_id makes the pair not exist): no oracle. This runs before
+  --    the FK check (an AFTER trigger), so the caller sees the prefix.
+  select kind, section, options, archived
+    into v_kind, v_section, v_options, v_archived
+    from public.crm_custom_field
+   where id = new.field_id and org_id = new.org_id;
+  if not found then
+    raise exception 'custom_value_no_field: no such column'
+      using errcode = '23503';
+  end if;
+
+  -- 6. The record, by id AND firm. 7. A merged lead (0107) takes no value: write to its keeper.
+  if new.lead_id is not null then
+    select merged_into_id
+      into v_merged
+      from public.crm_lead
+     where id = new.lead_id and org_id = new.org_id;
+    if not found then
+      raise exception 'custom_value_no_record: no such record'
+        using errcode = '23503';
+    end if;
+    if v_merged is not null then
+      raise exception 'custom_value_merged_lead: this lead was merged; its values are kept but not changed'
+        using errcode = '23514';
+    end if;
+    v_record_section := 'trademarks';
+  else
+    select type::text
+      into v_type
+      from public.crm_matter
+     where id = new.matter_id and org_id = new.org_id;
+    if not found then
+      raise exception 'custom_value_no_record: no such record'
+        using errcode = '23503';
+    end if;
+    -- The app's isTrademarkRow: a matter with no type reads as TM.
+    v_record_section := case when coalesce(v_type, 'TM') in ('TM', 'CR', 'PATENT') then 'trademarks' else 'contracts' end;
+  end if;
+
+  -- 8. An archived field takes no new or changed value.
+  if v_archived then
+    raise exception 'custom_value_field_archived: this column is archived; restore it to change its values'
+      using errcode = '23514';
+  end if;
+
+  -- 9. The record's section must fit the field's (a `both` field fits either).
+  if v_section <> 'both' and v_section <> v_record_section then
+    raise exception 'custom_value_wrong_section: this column is not in this record''s section'
+      using errcode = '23514';
+  end if;
+
+  -- 10. Exactly the kind's column.
+  if num_nonnulls(new.value_text, new.value_date, new.value_cents, new.value_choice, new.value_user_id) = 0 then
+    raise exception 'custom_value_empty: an empty value is deleted, not stored'
+      using errcode = '23514';
+  end if;
+  v_ok := num_nonnulls(new.value_text, new.value_date, new.value_cents, new.value_choice, new.value_user_id) = 1
+    and case v_kind
+          when 'text' then new.value_text is not null
+          when 'date' then new.value_date is not null
+          when 'money' then new.value_cents is not null
+          when 'choice' then new.value_choice is not null
+          when 'person' then new.value_user_id is not null
+          else false
+        end;
+  if not v_ok then
+    raise exception 'custom_value_wrong_kind: the value does not match the column''s kind'
+      using errcode = '23514';
+  end if;
+
+  -- 11. A choice is exactly one of the field's options.
+  if v_kind = 'choice' and not (v_options ? new.value_choice) then
+    raise exception 'custom_value_bad_choice: not one of this column''s choices'
+      using errcode = '23514';
+  end if;
+
+  -- 12. Stamps, overwriting what was sent: the writer from the session (null = the system, 0085) and the server's clock.
+  new.updated_by := auth.uid();
+  new.updated_at := now();
+  return new;
+end;
+$$;
+
+-- R2-1: a DELETE waits for an archive (or an option removal) in flight on the same field, then re-reads the field. A delete that
+-- comes from a referential action (a lead, matter, member, field or firm being deleted: pg_trigger_depth() > 1) takes no lock.
+create or replace function public.crm_custom_value_delete_rules()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if pg_trigger_depth() > 1 then
+    return old;
+  end if;
+  perform pg_catalog.pg_advisory_xact_lock_shared(pg_catalog.hashtextextended('crm_custom_value_field:' || old.field_id::text, 0));
+  if exists (
+    select 1 from public.crm_custom_field f
+     where f.id = old.field_id and f.org_id = old.org_id and f.archived
+  ) then
+    raise exception 'custom_value_field_archived: this column is archived; its values are kept'
+      using errcode = '23514';
+  end if;
+  return old;
+end;
+$$;
+
+
+-- ── 5. Triggers ────────────────────────────────────────────────────────────────────────────────────────────────────
+do $$
+begin
+  if not exists (select 1 from pg_trigger
+      where tgname = 'crm_custom_field_rules_trg'
+        and tgrelid = 'public.crm_custom_field'::regclass) then
+    create trigger crm_custom_field_rules_trg
+      before insert or update on public.crm_custom_field
+      for each row execute function public.crm_custom_field_rules();
+  end if;
+  if not exists (select 1 from pg_trigger
+      where tgname = 'crm_custom_value_rules_trg'
+        and tgrelid = 'public.crm_custom_value'::regclass) then
+    create trigger crm_custom_value_rules_trg
+      before insert or update on public.crm_custom_value
+      for each row execute function public.crm_custom_value_rules();
+  end if;
+  if not exists (select 1 from pg_trigger
+      where tgname = 'crm_custom_value_delete_trg'
+        and tgrelid = 'public.crm_custom_value'::regclass) then
+    create trigger crm_custom_value_delete_trg
+      before delete on public.crm_custom_value
+      for each row execute function public.crm_custom_value_delete_rules();
+  end if;
+end
+$$;
+
+
+-- ── 6. Revokes and grants (0099 / 0103 order: table-level revoke, column grants, then the explicit re-revoke) ──────────────
+revoke all on public.crm_custom_field from anon;
+revoke insert, update, delete, truncate, references, trigger on public.crm_custom_field from authenticated;
+grant select on public.crm_custom_field to authenticated;
+grant insert (org_id, section, label, kind, options, position) on public.crm_custom_field to authenticated;
+grant update (label, options, position, archived) on public.crm_custom_field to authenticated;
+-- No DELETE grant: a column is archived, never deleted, so a value is never lost by a click.
+revoke truncate, references, trigger on public.crm_custom_field from anon, authenticated;
+
+revoke all on public.crm_custom_value from anon;
+revoke insert, update, delete, truncate, references, trigger on public.crm_custom_value from authenticated;
+grant select, delete on public.crm_custom_value to authenticated;
+grant insert (org_id, field_id, lead_id, matter_id, value_text, value_date, value_cents, value_choice, value_user_id) on public.crm_custom_value to authenticated;
+grant update (value_text, value_date, value_cents, value_choice, value_user_id) on public.crm_custom_value to authenticated;
+revoke truncate, references, trigger on public.crm_custom_value from anon, authenticated;
+
+-- So a signed-in caller who names id, created_by, created_at or updated_at (fields) or id, updated_by or updated_at (values), or changes
+-- any column outside the UPDATE lists, gets 42501 before RLS or a trigger runs.
+
+revoke all on function public.crm_custom_field_rules() from public, anon, authenticated;
+revoke all on function public.crm_custom_value_rules() from public, anon, authenticated;
+revoke all on function public.crm_custom_value_delete_rules() from public, anon, authenticated;
+
+
+-- ── 7. Row level security ──────────────────────────────────────────────────────────────────────────────────────────
+-- Every policy is keyed on the active firm. A platform admin (0050) inside a firm carries that firm's role claim; no policy names
+-- platform_admin. Referential cascades are not subject to RLS, so a lead, matter, member or firm delete still removes values.
+alter table public.crm_custom_field enable row level security;
+alter table public.crm_custom_value enable row level security;
+
+do $$
+begin
+  if not exists (select 1 from pg_policies where schemaname = 'public'
+      and tablename = 'crm_custom_field' and policyname = 'crm_custom_field_select_member') then
+    create policy crm_custom_field_select_member on public.crm_custom_field
+      for select using (org_id = public.current_org_id());
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public'
+      and tablename = 'crm_custom_field' and policyname = 'crm_custom_field_insert_admin') then
+    create policy crm_custom_field_insert_admin on public.crm_custom_field
+      for insert with check (
+        org_id = public.current_org_id()
+        and public.current_org_role() in ('owner', 'admin', 'senior_admin')
+      );
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public'
+      and tablename = 'crm_custom_field' and policyname = 'crm_custom_field_update_admin') then
+    create policy crm_custom_field_update_admin on public.crm_custom_field
+      for update
+      using (
+        org_id = public.current_org_id()
+        and public.current_org_role() in ('owner', 'admin', 'senior_admin')
+      )
+      with check (
+        org_id = public.current_org_id()
+        and public.current_org_role() in ('owner', 'admin', 'senior_admin')
+      );
+  end if;
+  -- No DELETE policy on crm_custom_field (and no DELETE grant).
+
+  if not exists (select 1 from pg_policies where schemaname = 'public'
+      and tablename = 'crm_custom_value' and policyname = 'crm_custom_value_select_member') then
+    create policy crm_custom_value_select_member on public.crm_custom_value
+      for select using (org_id = public.current_org_id());
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public'
+      and tablename = 'crm_custom_value' and policyname = 'crm_custom_value_insert_staff') then
+    create policy crm_custom_value_insert_staff on public.crm_custom_value
+      for insert with check (
+        org_id = public.current_org_id()
+        and public.current_org_role() in ('owner', 'admin', 'senior_admin', 'attorney', 'intake', 'paralegal', 'law_clerk', 'clerk')
+      );
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public'
+      and tablename = 'crm_custom_value' and policyname = 'crm_custom_value_update_staff') then
+    create policy crm_custom_value_update_staff on public.crm_custom_value
+      for update
+      using (
+        org_id = public.current_org_id()
+        and public.current_org_role() in ('owner', 'admin', 'senior_admin', 'attorney', 'intake', 'paralegal', 'law_clerk', 'clerk')
+      )
+      with check (
+        org_id = public.current_org_id()
+        and public.current_org_role() in ('owner', 'admin', 'senior_admin', 'attorney', 'intake', 'paralegal', 'law_clerk', 'clerk')
+      );
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public'
+      and tablename = 'crm_custom_value' and policyname = 'crm_custom_value_delete_staff') then
+    create policy crm_custom_value_delete_staff on public.crm_custom_value
+      for delete using (
+        org_id = public.current_org_id()
+        and public.current_org_role() in ('owner', 'admin', 'senior_admin', 'attorney', 'intake', 'paralegal', 'law_clerk', 'clerk')
+        and exists (
+          select 1 from public.crm_custom_field f
+           where f.id = crm_custom_value.field_id and f.org_id = crm_custom_value.org_id and not f.archived
+        )
+        and (
+          crm_custom_value.lead_id is null
+          or exists (
+            select 1 from public.crm_lead l
+             where l.id = crm_custom_value.lead_id and l.org_id = crm_custom_value.org_id and l.merged_into_id is null
+          )
+        )
+      );
+  end if;
+end
+$$;
+
+
+-- ── 8. Comments ────────────────────────────────────────────────────────────────────────────────────────────────────
+comment on table public.crm_custom_field is
+  'A firm''s own List columns (0115): section, label, kind, choice options, position, archived. Archived, never deleted through the API. At most 40 live per firm.';
+comment on table public.crm_custom_value is
+  'One value per custom field and lead or matter (0115): exactly one typed column, the field kind''s. Stamped by the rules trigger.';
+comment on column public.crm_custom_value.updated_by is
+  'Who last wrote it: always auth.uid() (null = the system). authenticated has no INSERT or UPDATE grant on this column.';
+
+-- KNOWN LIMITS AND BEHAVIOUR
+--   * Archive keeps every value row. The field leaves the List, the column chooser and the record card. Its values cannot be inserted
+--     or changed (custom_value_field_archived) or deleted by staff (the DELETE policy; the delete trigger closes the race with an
+--     archive in flight). Restore re-checks the 40-column limit and the label rule and makes the values writable again.
+--   * Delete of a field: there is no DELETE policy and no DELETE grant. Only the firm's own deletion removes fields, and their values go
+--     by the field FK in the same statement.
+--   * Delete of a lead or a matter cascades its values. Removed member: that member's person value rows in that firm are deleted (the
+--     person FK cascades; see the note under the value table for why it is not a referential set-null: the one-value CHECK).
+--   * Merge (0107): crm_merge_leads moves no value and touches no value row. The loser's values stay on the loser, cannot be written
+--     (custom_value_merged_lead) or deleted by staff, and lectual.app reads them through the merged set: they show on the keeper,
+--     marked "From a merged duplicate". The app's writes go to the keeper (keeperForWrite).
+--   * A lead's values do not copy to its matter; lectual.app shows the lead's value read-only on a Trademarks matter ("From the lead").
+--   * Matter type change: nothing stops crm_matter.type changing (TM -> BL). A trademarks value on that matter is kept but sits outside
+--     its field's section: the app does not show it, the trigger refuses changing it (custom_value_wrong_section), and staff can still
+--     delete it at the database level. Changing the type back shows it again.
+--   * Concurrency: the limit, the label rule, option-in-use and archive (against inserts, updates and deletes) are serialized by the
+--     advisory locks above, under the single-row precondition stated in "Lock order".
+--   * The app's writes (Sprint 3): read first, then insert, or update by id; a 23505 on insert means re-read and update. One row per
+--     request, one transaction.
+
+-- Cases to add to lectual tests/tenant-isolation.test.ts (NOT written into any lectual file yet). "signed-in" = an authenticated JWT
+-- with active_org_id; "service role" = no session.
+--   1. Firm B reads 0 of firm A's fields and 0 of its values.
+--   2. Firm B's signed-in staff insert a value with org_id = B naming firm A's field: 23503 custom_value_no_field; naming B's field and
+--      A's lead, or A's matter: 23503 custom_value_no_record; a person value naming a member of A only: 23503
+--      (crm_custom_value_value_user_org_fk). Firm B's admin inserting a field with org_id = A: refused (RLS, 42501).
+--   3. The same pointers as the service role with a forged org_id: org_id = A, A's lead, B's field: custom_value_no_field; org_id = A,
+--      A's field, B's lead: custom_value_no_record; B's matter: custom_value_no_record; value_user_id = a member of B only: 23503 on the
+--      member FK. Each 23503.
+--   4. A value with org_id = A on A's own lead whose field belongs to B: 23503 custom_value_no_field (signed-in A staff and service role).
+--   5. No oracle: the error message for a foreign field id equals the message for a random uuid, and the same for a foreign vs random
+--      lead and matter id.
+--   6. Firm B's signed-in staff UPDATE and DELETE of firm A's values affect 0 rows; firm B's admin UPDATE of firm A's field (rename,
+--      archive) affects 0 rows.
+--   7. A person value naming a user who exists in auth.users but has no crm_org_member row in the firm: 23503.
+--   8. viewer and social_media: value insert refused (42501); value update and delete affect 0 rows (a valid value is used so the
+--      trigger passes and RLS decides); field insert refused (42501); field update affects 0 rows; both read fields and values.
+--   9. attorney, intake, paralegal, law_clerk and clerk insert, update and delete a value; none of them can insert a field (42501);
+--      their rename or archive of a field affects 0 rows.
+--  10. owner, admin and senior_admin insert and update a field; DELETE of a field is refused for everyone, owner included (42501, no grant).
+--  11. Value rules, each with its prefix or code: wrong kind; two typed columns; choice not in options; value on an archived field;
+--      trademarks field on a BL matter; contracts field on a lead; second value for the same field and record (23505); both lead_id and
+--      matter_id, and neither (custom_value_one_record); all typed columns null (custom_value_empty).
+--  12. Immutables: a signed-in caller changing a value's field_id, lead_id, matter_id or org_id: 42501; the service role:
+--      custom_value_immutable. A signed-in admin changing a field's kind, section or org_id: 42501; the service role:
+--      custom_field_immutable.
+--  13. Field rules: the 41st live field and a restore that would make 41 (custom_field_limit); a duplicate live label differing only in
+--      case (custom_field_label_taken); the same label in trademarks and contracts is allowed; a both field and a trademarks field with
+--      one label are refused in BOTH directions, on insert, on rename and on restore (custom_field_label_taken); a label with a leading
+--      space (CHECK, 23514); removing an option a value holds (custom_field_options_in_use).
+--  14. A signed-in caller naming updated_by, created_by, id, created_at or updated_at: 42501. A signed-in admin inserting a field with
+--      created_by = a colleague: 42501. Stored created_by and updated_by equal the caller; updated_at is the server's.
+--  15. anon reads nothing and writes nothing; TRUNCATE is refused for authenticated on both tables.
+--  16. Archive keeps the values (count unchanged); staff cannot insert, update (custom_value_field_archived) or delete (0 rows) them;
+--      restore makes them writable again.
+--  17. Deleting a lead or a matter cascades its values; deleting the firm in ONE statement removes its fields and values (the delete
+--      trigger takes no lock on a cascade).
+--  18. Removing a member who holds person values succeeds; that member's person value rows are deleted; the firm's other value rows and
+--      the other members' person values are untouched.
+--  19. Deleting an auth user who created a field and last updated a value on an ARCHIVED field succeeds; created_by and updated_by
+--      become null; no other column of either row changes (updated_at included).
+--  20. Merged leads: (a) inserting or updating a value on a merged lead is refused with custom_value_merged_lead, signed-in and service
+--      role; staff DELETE of a merged lead's value affects 0 rows. (b) crm_merge_leads succeeds when both leads hold values; the loser's
+--      values stay on the loser, count unchanged; the keeper's are unchanged; no value row's updated_at or updated_by changes.
+--  21. The existing 0104 / 0105 / 0107 cases stay green (this file adds no trigger on crm_lead or crm_matter).
+-- Manual check (not a vitest case): two sessions on lectual-dev, one removing an option, one writing that option; the second waits and
+-- then fails with custom_value_bad_choice. And: one session archiving a field while another deletes one of its values; the delete waits
+-- and then fails with custom_value_field_archived.
