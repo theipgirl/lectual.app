@@ -55,18 +55,27 @@ export function fieldStore(db: StoreClient) {
       return data as LiveField[];
     },
 
-    /** How many values hold each of `options`, paged; a page budget that runs out fails the read. */
+    /**
+     * How many values hold each of `options`: ONE filter per option with `.eq`, paged on id; a page budget that runs out fails the read.
+     * Never `.in(...)`: PostgREST's `in.(...)` list is comma-separated and quoted, so a choice holding a comma and a double quote could
+     * not be matched, and such a choice could never be removed (Sprint 3 evaluation, item 3). `eq.` takes the rest of the value literally.
+     * Rows are counted only when they hold the option exactly, whatever the filter did.
+     */
     async readOptionUse(fieldId: string, options: string[]): Promise<Record<string, number>> {
       const counts: Record<string, number> = Object.fromEntries(options.map((o) => [o, 0]));
-      for (let i = 0; i < OPTION_USE_MAX_PAGES; i++) {
-        const from = i * OPTION_USE_PAGE;
-        const { data, error } = await db.from("crm_custom_value").select("id, value_choice").eq("field_id", fieldId).in("value_choice", options).order("id").range(from, from + OPTION_USE_PAGE - 1);
-        if (error) throw error;
-        if (!Array.isArray(data)) throw cutShort();
-        for (const r of data as { value_choice?: unknown }[]) if (typeof r.value_choice === "string" && r.value_choice in counts) counts[r.value_choice] += 1;
-        if (data.length < OPTION_USE_PAGE) return counts;
+      for (const option of [...new Set(options)]) {
+        let done = false;
+        for (let i = 0; i < OPTION_USE_MAX_PAGES && !done; i++) {
+          const from = i * OPTION_USE_PAGE;
+          const { data, error } = await db.from("crm_custom_value").select("id, value_choice").eq("field_id", fieldId).eq("value_choice", option).order("id").range(from, from + OPTION_USE_PAGE - 1);
+          if (error) throw error;
+          if (!Array.isArray(data)) throw cutShort();
+          for (const r of data as { value_choice?: unknown }[]) if (r.value_choice === option) counts[option] += 1;
+          if (data.length < OPTION_USE_PAGE) done = true;
+        }
+        if (!done) throw cutShort();
       }
-      throw cutShort();
+      return counts;
     },
 
     async insertField(row: FieldInsert): Promise<void> {

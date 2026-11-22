@@ -67,10 +67,49 @@ describe("fieldStore", () => {
     await fieldStore(r.client).insertField(row);
     expect(r.chains[0]).toEqual([["from", "crm_custom_field"], ["insert", row], ["select", "id"]]);
   });
-  it("readOptionUse counts per option, paged on id", async () => {
+  // Changed on purpose (Sprint 3 evaluation, item 3): one `.eq` per option instead of one `.in(...)` list.
+  it("readOptionUse counts per option, one eq filter per option, paged on id", async () => {
     const r = recorder({ data: [{ id: "a", value_choice: "High" }, { id: "b", value_choice: "High" }, { id: "c", value_choice: "Low" }], error: null });
     expect(await fieldStore(r.client).readOptionUse(ID, ["High", "Low", "Medium"])).toEqual({ High: 2, Low: 1, Medium: 0 });
-    expect(r.chains[0]).toEqual([["from", "crm_custom_value"], ["select", "id, value_choice"], ["eq", "field_id", ID], ["in", "value_choice", ["High", "Low", "Medium"]], ["order", "id"], ["range", 0, 999]]);
+    expect(r.chains).toEqual(
+      ["High", "Low", "Medium"].map((o) => [["from", "crm_custom_value"], ["select", "id, value_choice"], ["eq", "field_id", ID], ["eq", "value_choice", o], ["order", "id"], ["range", 0, 999]]),
+    );
+    expect(r.chains.flat().some((step) => step[0] === "in")).toBe(false);
+  });
+  it("readOptionUse: a page budget that runs out fails the read (never a short count)", async () => {
+    const full = recorder({ data: Array.from({ length: 1000 }, (_, i) => ({ id: String(i), value_choice: "High" })), error: null });
+    await expect(fieldStore(full.client).readOptionUse(ID, ["High"])).rejects.toBeInstanceOf(Error);
+    expect(full.chains).toHaveLength(10);
+  });
+  /**
+   * The real query builder (supabase-js, a fake fetch that answers from a table in memory the way PostgREST reads `eq.`): a choice holding
+   * a comma AND a double quote is asked for literally and counted, so it can be found and removed. `in.(...)` would have split it.
+   */
+  it("readOptionUse with a choice holding a comma and a double quote: asked for literally through the real builder, and counted", async () => {
+    const { createClient } = await import("@supabase/supabase-js");
+    const tricky = 'Smith, "Jr." & Co';
+    const rows = [
+      { id: "1", field_id: ID, value_choice: tricky },
+      { id: "2", field_id: ID, value_choice: tricky },
+      { id: "3", field_id: ID, value_choice: "Smith" },
+      { id: "4", field_id: ID, value_choice: '"Jr." & Co' },
+    ];
+    const urls: URL[] = [];
+    const fetch = async (input: RequestInfo | URL) => {
+      const url = new URL(String(input instanceof Request ? input.url : input));
+      urls.push(url);
+      const eq = (col: string) => url.searchParams.getAll(col).map((v) => (v.startsWith("eq.") ? v.slice(3) : null));
+      const [field] = eq("field_id");
+      const [choice] = eq("value_choice");
+      const hits = rows.filter((r) => r.field_id === field && r.value_choice === choice).map(({ id, value_choice }) => ({ id, value_choice }));
+      return new Response(JSON.stringify(hits), { status: 200, headers: { "content-type": "application/json" } });
+    };
+    const db = createClient("https://example.supabase.co", "anon-key", { global: { fetch }, auth: { persistSession: false, autoRefreshToken: false } });
+    const counts = await fieldStore(db as unknown as StoreClient).readOptionUse(ID, [tricky, "Smith"]);
+    expect(counts).toEqual({ [tricky]: 2, Smith: 1 });
+    expect(urls).toHaveLength(2);
+    expect(urls[0].searchParams.getAll("value_choice")).toEqual([`eq.${tricky}`]);
+    for (const u of urls) expect([...u.searchParams.values()].some((v) => v.startsWith("in."))).toBe(false);
   });
 });
 
