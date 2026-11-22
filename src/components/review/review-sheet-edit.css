@@ -74,7 +74,7 @@
 
 /* Phone: stacked rows, no inline editing (edits open the record panel from the Client link). */
 @media (max-width: 640px) {
-  .rv-owner .rse-keys, .rv-owner .rse-col-grip, .rv-owner .rse-row-grip, .rv-owner .rse-col-tip, .rv-owner .rse-note-th, .rv-owner .rse-note-td, .rv-owner .rse-pop { display: none; }
+  .rv-owner .rse-keys, .rv-owner .rse-col-grip, .rv-owner .rse-row-grip, .rv-owner .rse-col-tip, .rv-owner .rse-pop { display: none; }
   .rv-owner .rse-cell { pointer-events: none; width: auto; margin: 0; padding: 0; border: 0; box-shadow: none; text-align: right; }
   .rv-owner .rse-tbl td.pri { white-space: normal; overflow: visible; }
   .rv-owner .rse-legend { grid-template-columns: 1fr; padding: 14px 16px; }

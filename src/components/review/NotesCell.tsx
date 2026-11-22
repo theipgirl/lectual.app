@@ -12,9 +12,10 @@ type Status = "idle" | "saving" | "saved" | "failed" | "unsaved";
 
 /**
  * One Notes cell of the Weekly review's Sheet. Shows the newest plain note (first line, clipped, and its date); a writer
- * clicks in and types. Enter (without Shift) or leaving the cell saves ONE plain `note` through the existing review action
- * (`logWhatHappenedAction`, which re-checks the role and the record and revalidates the review); Esc cancels; empty text
- * saves nothing. A failed save keeps the typed text. The note is React text only.
+ * clicks in and types. Enter (without Shift) saves ONE plain `note` through the existing review action
+ * (`logWhatHappenedAction`, which re-checks the role and the record and revalidates the review). Leaving the cell never
+ * saves: typed text stays with "Not saved yet. Press Enter to save." Esc cancels; empty text saves nothing. A failed save
+ * keeps the typed text. The note is React text only.
  */
 export function NotesCell({
   kind,
@@ -67,7 +68,7 @@ export function NotesCell({
     if (ok) {
       setSaved({ note: { text: noteFirstLine(body) ?? body, date: today }, over: serverKey });
       setStatus("saved");
-      // Text typed while the save was in flight is kept, in a fresh session (it is a new note, saved by Enter or leaving the cell).
+      // Text typed while the save was in flight is kept, in a fresh session (it is a new note, saved by Enter).
       const { keep } = afterNoteSaved(body, draftRef.current);
       if (keep === null) {
         setDraftText("");
