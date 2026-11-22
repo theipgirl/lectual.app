@@ -4,7 +4,8 @@ import { currentRole } from "@/lib/auth/current-role";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { canSeeSetup } from "@/lib/setup/roles";
 import { pageTitle } from "@/lib/ui/page-title";
-import { COLUMNS_SETTINGS_NAME } from "@/lib/ui/words";
+import { COLUMNS_SETTINGS_NAME, COLUMNS_SETTINGS_SUB } from "@/lib/ui/words";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { loadColumnsSettings, type ColumnsSettingsState } from "@/lib/custom-columns/settings-load";
 import { ColumnsSettings } from "@/components/settings/ColumnsSettings";
 
@@ -24,5 +25,10 @@ export default async function ColumnsSettingsPage() {
   } catch {
     state = { status: "unavailable" };
   }
-  return <ColumnsSettings state={state} />;
+  return (
+    <>
+      <PageHeader title={COLUMNS_SETTINGS_NAME} sub={COLUMNS_SETTINGS_SUB} tour="columns-head" />
+      <ColumnsSettings state={state} />
+    </>
+  );
 }

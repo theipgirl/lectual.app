@@ -1,13 +1,11 @@
 import type { ColumnsSettingsState, SettingsField } from "@/lib/custom-columns/settings-load";
 import { CUSTOM_KIND_WORDS } from "@/lib/review/sheet-columns";
-import { PageHeader } from "@/components/ui/PageHeader";
 import {
   CANT_SHOW,
   COLUMNS_ADD,
   COLUMNS_AT_LIMIT,
   COLUMNS_NONE,
   COLUMNS_SETTINGS_NAME,
-  COLUMNS_SETTINGS_SUB,
   CUSTOM_COLUMNS_NOT_READY,
   CUSTOM_SECTION_WORDS,
   archivedHeading,
@@ -17,34 +15,26 @@ import { AddColumnForm, ArchiveColumn, ChoicesForm, MoveColumn, RenameForm, Rest
 import "./columns-settings.css";
 
 /**
- * Settings -> Columns, drawn from props only (the page gates the role and reads). Three states, never two: not switched on (the
- * sentence, no form, no alert), couldn't load (an alert, no form), and the firm's ONE list of live columns in List order, then the
- * archived ones, then "Add a column". `initialConfirm` opens one Archive question (a test or preview).
+ * Settings -> Columns' body, drawn from props only (the page gates the role, reads, and draws the one h1). Three states, never two: not
+ * switched on (the sentence, no form, no alert), couldn't load (an alert, no form), and the firm's ONE list of live columns in List
+ * order, then the archived ones, then "Add a column". `initialConfirm` opens one Archive question (a test or preview).
  */
 export function ColumnsSettings({ state, initialConfirm }: { state: ColumnsSettingsState; initialConfirm?: string }) {
-  const head = <PageHeader title={COLUMNS_SETTINGS_NAME} sub={COLUMNS_SETTINGS_SUB} tour="columns-head" />;
   if (state.status === "not-set-up") {
     return (
-      <>
-        {head}
-        <p className="lx-note cs-note">{CUSTOM_COLUMNS_NOT_READY}</p>
-      </>
+      <p className="lx-note cs-note">{CUSTOM_COLUMNS_NOT_READY}</p>
     );
   }
   if (state.status === "unavailable") {
     return (
-      <>
-        {head}
-        <p className="lx-note cs-note" role="alert">
-          {CANT_SHOW}
-        </p>
-      </>
+      <p className="lx-note cs-note" role="alert">
+        {CANT_SHOW}
+      </p>
     );
   }
   const { live, archived, use } = state;
   return (
     <>
-      {head}
       <p className="lx-note cs-note" data-columns-count="">
         {columnsCount(live.length)}
       </p>
