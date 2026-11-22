@@ -141,7 +141,7 @@ export function courtOf(row: Pick<SheetEditRow, "nextStep" | "assignedTo">): str
   return laneOf(row);
 }
 
-export type SheetActionName = "moveStage" | "closeLead" | "updateNextStep" | "setNextStep" | "assignRecord" | "setSource" | "logWhatHappened";
+export type SheetActionName = "moveStage" | "closeLead" | "updateNextStep" | "setNextStep" | "assignRecord" | "setSource";
 export type SheetPost = { action: SheetActionName; fields: Record<string, string> };
 
 /**
@@ -178,10 +178,6 @@ export function postFor(row: Pick<SheetEditRow, "kind" | "id" | "nextStep">, val
   }
 }
 
-/** A typed note: the existing "Log what happened" path (a plain timeline note that counts as last contact). */
-export function notePost(row: Pick<SheetEditRow, "kind" | "id">, body: string): SheetPost {
-  return { action: "logWhatHappened", fields: { kind: row.kind, id: row.id, body } };
-}
 
 /** The field name in the "Saved · <client>, <field>" line. */
 export const FIELD_WORDS: Record<EditableColumn | "note", string> = { status: "status", next: "next step", court: "whose court", source: "source", note: "note" };

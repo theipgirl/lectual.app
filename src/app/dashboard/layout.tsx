@@ -18,6 +18,7 @@ import { CopilotLauncher } from "@/components/copilot/CopilotLauncher";
 import { aiConfigured } from "@/lib/ai/claude";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { GettingStartedRunner } from "@/components/onboarding/GettingStartedRunner";
+import { connectableProviders } from "@/lib/mailbox/config";
 import { FeedbackTrailRecorder } from "@/components/feedback/FeedbackTrailRecorder";
 import { FeedbackDialog } from "@/components/feedback/FeedbackDialog";
 import { NavProgress } from "@/components/shell/NavProgress";
@@ -157,7 +158,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       ) : (
         <OnboardingTour open={shouldShowTour(user.user_metadata) && !actingAsStaff} role={role} navSlugs={drawn.map((i) => i.slug)} firmName={org.name} aiConfigured={aiConfigured()} />
       )}
-      <GettingStartedRunner role={role} modules={org.modules} aiConfigured={aiConfigured()} />
+      <GettingStartedRunner role={role} modules={org.modules} aiConfigured={aiConfigured()} outlookConnectable={connectableProviders().microsoft} />
     </div>
   );
 }

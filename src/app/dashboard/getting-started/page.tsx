@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { aiConfigured } from "@/lib/ai/claude";
+import { connectableProviders } from "@/lib/mailbox/config";
 import { hubTracks, parseHubProgress } from "@/lib/onboarding/hub";
 import { pickHubRecordsAction } from "@/lib/onboarding/hub-actions";
 import { FlowList } from "@/components/onboarding/FlowList";
@@ -25,7 +26,7 @@ export default async function GettingStartedPage() {
   if (session.kind !== "ok") return null; // the layout already handled this
 
   const modules = session.org.modules;
-  const tracks = hubTracks({ role: session.role, modules, aiConfigured: aiConfigured() });
+  const tracks = hubTracks({ role: session.role, modules, aiConfigured: aiConfigured(), outlookConnectable: connectableProviders().microsoft });
   const progress = parseHubProgress(session.user.user_metadata);
   const picks = await pickHubRecordsAction();
   const yourSetup = await loadYourSetup({ id: session.user.id, role: session.role }, modules);

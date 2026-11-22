@@ -28,7 +28,7 @@ import {
 } from "@/lib/onboarding/hub";
 
 const ALL = ["mailbox", "proposals", "agents", "agent-toolkit", "litigation", "inbox", "document-center", "lawmatics-import"];
-const ctx = (role: string, modules: string[] | null = ALL, aiConfigured = true): HubContext => ({ role, modules, aiConfigured });
+const ctx = (role: string, modules: string[] | null = ALL, aiConfigured = true, outlookConnectable = true): HubContext => ({ role, modules, aiConfigured, outlookConnectable });
 const flowIds = (c: HubContext) => visibleFlows(c).map((f) => f.id);
 const trackIds = (c: HubContext) => hubTracks(c).map((t) => t.id);
 
@@ -307,6 +307,25 @@ describe("the staff guide (roles outside the admin tier)", () => {
   it.each(STAFF)("%s: no mailbox guide without the Mailboxes feature, or with the feature list unreadable", (role) => {
     expect(flowIds(ctx(role, ALL.filter((m) => m !== "mailbox")))).toEqual(["staff-name", "staff-tour"]);
     expect(flowIds(ctx(role, null))).toEqual(["staff-name", "staff-tour"]);
+  });
+
+  it.each(STAFF)("%s: no mailbox guide when this deployment can't connect Outlook (or it isn't said)", (role) => {
+    expect(flowIds(ctx(role, ALL, true, false))).toEqual(["staff-name", "staff-tour"]);
+    expect(flowIds({ role, modules: ALL, aiConfigured: true })).toEqual(["staff-name", "staff-tour"]);
+  });
+
+  it("the admin tier's hub doesn't depend on Outlook being connectable", () => {
+    expect(flowIds(ctx("owner", ALL, true, false))).toEqual(flowIds(ctx("owner")));
+  });
+
+  it("the guide's words point at what is really on the page, and say nothing about signing drafts", async () => {
+    const steps = visibleFlows(ctx("paralegal")).flatMap((f) => f.steps);
+    const mailbox = steps.find((s) => s.id === "mailbox")!.body;
+    expect(mailbox).toMatch(/Connect Outlook at the top of this page/);
+    expect(mailbox).not.toMatch(/Under Mailboxes/);
+    for (const s of steps) expect(s.body).not.toMatch(/sign(ed|s)? /i);
+    const page = readFileSync("src/app/dashboard/settings/integrations/page.tsx", "utf8");
+    expect(page).toContain("Connect {PROVIDER_LABEL[p]}");
   });
 
   it("points at the account menu (Your name, Show tips again) and the Integrations page", () => {

@@ -136,10 +136,6 @@ vi.mock("@/lib/review/detail-load", async (orig) => {
 vi.mock("@/lib/review/sheet-edit-load", () => ({
   loadSheetStages: async () => (state as { sheetStages?: unknown }).sheetStages ?? { matter: null, lead: null },
 }));
-// The Sheet's Notes column: `state.sheetNotes` (a SheetNotes), else none read yet ("ok" with no notes).
-vi.mock("@/lib/review/sheet-notes-load", () => ({
-  loadSheetNotes: async () => (state as { sheetNotes?: unknown }).sheetNotes ?? { status: "ok", byKey: new Map() },
-}));
 vi.mock("@/components/review/SheetEditTable", async (orig) => {
   const m = await orig<typeof import("@/components/review/SheetEditTable")>();
   const { createElement } = await import("react");

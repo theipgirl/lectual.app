@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useId, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import {
   closeLeadAction,
-  logWhatHappenedAction,
   moveStageAction,
   assignRecordAction,
   setNextStepAction,
@@ -30,6 +29,7 @@ import {
   SHEET_SIZES_KEY,
   canNote,
   cellEditable,
+  isEditableColumn,
   cellKey,
   clampSize,
   courtOf,
@@ -119,7 +119,6 @@ const ACTIONS: Record<SheetActionName, (prev: ReviewActionState, form: FormData)
   setNextStep: (p, f) => setNextStepAction(p, f),
   assignRecord: (p, f) => assignRecordAction(p, f),
   setSource: (p, f) => setSourceAction(p, f),
-  logWhatHappened: (p, f) => logWhatHappenedAction(p, f),
 };
 
 async function post(action: SheetActionName, fields: Record<string, string>): Promise<{ ok: boolean; message: string | null }> {
@@ -353,7 +352,8 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
           <thead>
             <tr>
               {HEADS.map((h) => {
-                const typed = editing && (h.col === "status" || h.col === "next" || h.col === "court" || h.col === "source" || h.col === "notes");
+                // The pencil only on a column someone here can type in: Notes by the note rule, the four pickers by their own.
+                const typed = editing && (h.col === "notes" ? allRows.some((r) => canNote(r.kind, perms)) : isEditableColumn(h.col) && allRows.some((r) => cellEditable(h.col, r.kind, perms)));
                 const locked = h.col === "waiting" || h.col === "contact";
                 const w = colWidth(sizes, h.col);
                 const active = initial?.activeColumn === h.col || dragCol === h.col;

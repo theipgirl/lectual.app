@@ -3,7 +3,7 @@
 import { useId, useRef, useState } from "react";
 import { logWhatHappenedAction } from "@/app/dashboard/review/actions";
 import { shortDate } from "@/lib/review/format";
-import { noteCommitter, noteFirstLine, noteKeyIntent, type NoteCell, type SheetNote } from "@/lib/review/sheet-notes";
+import { afterNoteSaved, noteCommitter, noteFirstLine, noteKeyIntent, type NoteCell, type NoteCommitHow, type SheetNote } from "@/lib/review/sheet-notes";
 import type { ReviewKind } from "@/lib/review/buckets";
 import { NOTE_MAX_LENGTH } from "@/lib/pipeline/lead-input";
 import { SHEET_NOTE_ADD, SHEET_NOTE_CANT_LOAD, SHEET_NOTE_KEYS, SHEET_NOTE_SAVE_FAILED, SHEET_NOTE_SAVED, SHEET_NOTE_SAVING, SHEET_SAVE_FAILED, sheetNoteCellLabel } from "@/lib/ui/words";
@@ -40,6 +40,8 @@ export function NotesCell({
   // The note this cell just saved, with the server state it was saved over: once fresh rows arrive they are the truth.
   const [saved, setSaved] = useState<{ note: SheetNote; over: string } | null>(null);
   const committer = useRef<ReturnType<typeof noteCommitter> | null>(null);
+  // What the field holds right now (a save that answers late compares against it, not against its own closure).
+  const draftRef = useRef("");
   const buttonRef = useRef<HTMLButtonElement>(null);
   const fieldId = `rv-note-${useId().replace(/[^A-Za-z0-9_-]/g, "")}`;
 
@@ -64,9 +66,15 @@ export function NotesCell({
     }
     if (ok) {
       setSaved({ note: { text: noteFirstLine(body) ?? body, date: today }, over: serverKey });
-      setDraft("");
-      setEditing(false);
       setStatus("saved");
+      // Text typed while the save was in flight is kept, in a fresh session (it is a new note, saved by Enter or leaving the cell).
+      const { keep } = afterNoteSaved(body, draftRef.current);
+      if (keep === null) {
+        setDraftText("");
+        setEditing(false);
+      } else {
+        committer.current = noteCommitter(save);
+      }
     } else {
       setStatus("failed");
     }
@@ -80,15 +88,21 @@ export function NotesCell({
     setEditing(true);
   }
 
-  async function commit() {
+  function setDraftText(v: string) {
+    draftRef.current = v;
+    setDraft(v);
+  }
+
+  async function commit(how: NoteCommitHow) {
     const c = committer.current;
     if (!c) return;
-    const out = await c.commit(draft);
+    const out = await c.commit(draftRef.current, how);
     if (out === "empty") setEditing(false);
   }
 
   function cancel() {
     committer.current?.cancel();
+    setDraftText("");
     setEditing(false);
     setStatus("idle");
     requestAnimationFrame(() => buttonRef.current?.focus());
@@ -125,18 +139,18 @@ export function NotesCell({
             autoFocus
             aria-describedby={`${fieldId}-keys`}
             aria-busy={status === "saving" || undefined}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => setDraftText(e.target.value)}
             onKeyDown={(e) => {
               const intent = noteKeyIntent(e.key, e.shiftKey, e.nativeEvent.isComposing);
               if (intent === "commit") {
                 e.preventDefault();
-                void commit();
+                void commit("enter");
               } else if (intent === "cancel") {
                 e.preventDefault();
                 cancel();
               }
             }}
-            onBlur={() => void commit()}
+            onBlur={() => void commit("blur")}
           />
           <span id={`${fieldId}-keys`} className="rv-sr">
             {SHEET_NOTE_KEYS}

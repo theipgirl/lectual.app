@@ -60,6 +60,16 @@ describe("the owner's editable Sheet", () => {
     expect(leadCourt.slice(0, 300)).toContain(">Unassigned<");
   });
 
+  it("a header's pencil is drawn only on a column someone here can type in", async () => {
+    const th = (html: string, label: string) => html.match(new RegExp(`<th[^>]*>${label}[\\s\\S]*?</th>`))?.[0] ?? "";
+    const noStages = await render({ ...OWNER, matterStages: null, leadStages: null });
+    expect(th(noStages, "Status")).not.toContain("<svg");
+    expect(th(noStages, "Notes")).toContain("<svg");
+    const leadOnly = await render({ ...OWNER, writeMatter: false, moveLead: false, matterStages: null, leadStages: null });
+    expect(th(leadOnly, "Notes")).toContain("<svg");
+    expect(th(leadOnly, "Status")).not.toContain("<svg");
+  });
+
   it("a read-only role sees the same table with no editors, grips, + Note or legend", async () => {
     const html = await render(READ_ONLY);
     expect(html).not.toContain("<button");

@@ -62,7 +62,7 @@ type CatalogStep = HubStep & { bodyReadOnly?: string };
  * What a flow needs. Every named rail section must be visible to the person (the rail's own data). `staffGuide` marks the short
  * staff guide: those flows are the ONLY ones a role outside the admin tier sees, and the admin tier never sees them.
  */
-export type HubRequires = { nav: readonly string[]; admin?: boolean; ai?: boolean; staff?: boolean; staffGuide?: boolean };
+export type HubRequires = { nav: readonly string[]; admin?: boolean; ai?: boolean; staff?: boolean; staffGuide?: boolean; /** Outlook can be connected on this deployment. */ outlook?: boolean };
 
 export type HubFlow = {
   id: string;
@@ -105,7 +105,8 @@ const FLOWS: readonly CatalogFlow[] = [
     title: STAFF_GUIDE_MAILBOX_TITLE,
     summary: STAFF_GUIDE_MAILBOX_SUMMARY,
     // Only with the Mailboxes feature (the Mail row is its rail section; an unreadable module list hides it).
-    requires: { nav: ["mail"], staffGuide: true },
+    // ...and only when this deployment can connect Outlook at all (the Integrations page offers the button).
+    requires: { nav: ["mail"], staffGuide: true, outlook: true },
     steps: [{ id: "mailbox", path: INTEGRATIONS_PATH, target: "integrations-head", side: "bottom", title: STAFF_GUIDE_MAILBOX_TITLE, body: STAFF_GUIDE_MAILBOX_BODY }],
   },
   {
@@ -599,6 +600,8 @@ export type HubContext = {
   /** `null` = the module list could not be read: treated as none, and the page says so. */
   modules: readonly string[] | null;
   aiConfigured: boolean;
+  /** `connectableProviders().microsoft`, read on the server. Absent or false hides the "Connect your Outlook" guide (fails closed). */
+  outlookConnectable?: boolean;
 };
 
 function isKnownRole(role: string): role is Role {
@@ -627,6 +630,7 @@ function flowVisible(flow: CatalogFlow, ctx: HubContext, slugs: Set<string>): bo
   if (flow.requires.admin && !canSeeSetup(ctx.role)) return false;
   if (flow.requires.staff && hubReadOnly(ctx.role)) return false;
   if (flow.requires.ai && !ctx.aiConfigured) return false;
+  if (flow.requires.outlook && ctx.outlookConnectable !== true) return false;
   return flow.requires.nav.every((slug) => slugs.has(slug));
 }
 

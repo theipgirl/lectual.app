@@ -15,7 +15,6 @@ import {
   sheetMinWidth,
   courtOf,
   nextEditableCell,
-  notePost,
   parseSizes,
   postFor,
   sheetLeadStages,
@@ -102,10 +101,10 @@ describe("each editable cell posts to an existing review action", () => {
     expect(courtOf(sheetRow())).toBe(U1);
   });
 
-  it("Source -> setSource; + Note -> logWhatHappened", () => {
+  // Changed on purpose: notePost is gone (the Notes cell posts through logWhatHappenedAction itself; see tests/review/sheet-notes.test.tsx).
+  it("Source -> setSource", () => {
     expect(postFor(sheetRow({ kind: "lead" }), { col: "source", source: "Referral" })).toEqual({ action: "setSource", fields: { kind: "lead", id: ID, source: "Referral" } });
     expect(postFor(sheetRow(), { col: "source", source: null })?.fields.source).toBe("");
-    expect(notePost(sheetRow(), "Called")).toEqual({ action: "logWhatHappened", fields: { kind: "matter", id: ID, body: "Called" } });
   });
 });
 

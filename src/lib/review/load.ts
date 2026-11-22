@@ -19,6 +19,8 @@ import { proposalExpiryTag, type ProposalExpiryIn } from "./proposal-expiry";
 import { CHANGE_SELECT, CHANGE_TYPES, changeWindowStart, lastChangeFor, pickLastChanges, withoutPeople, type ChangeRowIn } from "./last-changed";
 import { closeStagesOf, type CloseStage } from "./close-stage";
 import { OPTIONAL_SOURCES, type CriticalSource, type OptionalSource } from "./notes";
+import { readSheetNotes, type NotesDb } from "./sheet-notes-load";
+import type { SheetNotes } from "./sheet-notes";
 
 type ScopedClient = Awaited<ReturnType<typeof getScopedClient>>;
 type ActivityType = Database["public"]["Tables"]["crm_activity"]["Row"]["type"];
@@ -40,6 +42,8 @@ export type ReviewLoad =
       failed: OptionalSource[];
       /** The firm's lost / nurture stages, for the Lost / Nurture button. Empty hides the button. */
       closeStages: CloseStage[];
+      /** The Sheet's Notes column (only when asked for): the newest plain note per row, or `unavailable`. */
+      notes?: SheetNotes;
     }
   | { status: "unavailable"; failed: CriticalSource[] };
 
@@ -54,7 +58,7 @@ function chunks<T>(items: readonly T[], size = CHUNK): T[][] {
  * would look complete while missing rows: if the pages run out of budget the read FAILS rather than
  * returning what it has.
  */
-export async function readAllPages<T>(page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>): Promise<T[]> {
+async function readAllPages<T>(page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>): Promise<T[]> {
   const all: T[] = [];
   for (let i = 0; i < MAX_PAGES; i++) {
     const { data, error } = await page(i * PAGE, i * PAGE + PAGE - 1);
@@ -66,7 +70,7 @@ export async function readAllPages<T>(page: (from: number, to: number) => Promis
   throw new Error("review read exceeded its page budget");
 }
 
-export async function inChunks<T>(ids: readonly string[], read: (chunk: string[]) => Promise<T[]>): Promise<T[]> {
+async function inChunks<T>(ids: readonly string[], read: (chunk: string[]) => Promise<T[]>): Promise<T[]> {
   if (ids.length === 0) return [];
   const parts = await Promise.all(chunks(ids).map(read));
   return parts.flat();
@@ -255,7 +259,7 @@ function proposalsFor(row: ReviewRow, all: readonly ProposalExpiryRead[], matter
  * tasks are CRITICAL: if any fails there are no sections (a failed task read must not put everyone
  * under "Needs a next step"). The rest only enrich a row and are named when they fail.
  */
-export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
+export async function loadReview(now: Date = new Date(), opts: { /** Read each row's newest note (the Sheet's Notes column). */ notes?: boolean } = {}): Promise<ReviewLoad> {
   const db = await getScopedClient();
   const [mattersS, leadsS, stagesS, membersS, tzS, queueS] = await Promise.allSettled([
     listMatters(),
@@ -283,7 +287,8 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
 
   const dependsOnRecords = failedCritical.length === 0;
   const proposalLeadIds = [...new Set([...leadIds, ...matters.filter((m) => m.status === "open" || m.status === "on_hold").map((m) => m.lead_id).filter((x): x is string => !!x)])];
-  const [tasksS, activityS, deadlinesS, changesS, proposalsS, countsS, sendersS, changeRowsS] = dependsOnRecords
+  const noteRows = [...matterIds.map((id) => ({ kind: "matter" as const, id })), ...leadIds.map((id) => ({ kind: "lead" as const, id }))];
+  const [tasksS, activityS, deadlinesS, changesS, proposalsS, countsS, sendersS, changeRowsS, notesS] = dependsOnRecords
     ? await Promise.allSettled([
         readOpenTasks(db, matterIds, leadIds),
         // A matter shows its lead's mail too (the emails were filed on the lead before it signed), so the lead ids behind matters are read as well.
@@ -294,8 +299,10 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
         readDocumentCounts(db, matterIds, leadIds),
         readFirmSenders(db),
         readChangeRows(db, matterIds, proposalLeadIds, now),
+        // In parallel with the rest, one bounded query per record (sheet-notes-load.ts); never throws, failure is `unavailable`.
+        opts.notes ? readSheetNotes(db as unknown as NotesDb, noteRows, timeZone) : Promise.resolve(null),
       ])
-    : ([null, null, null, null, null, null, null, null] as const);
+    : ([null, null, null, null, null, null, null, null, null] as const);
   if (dependsOnRecords && tasksS && tasksS.status === "rejected") failedCritical.push("tasks");
   if (failedCritical.length > 0) return { status: "unavailable", failed: failedCritical };
 
@@ -376,6 +383,7 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
     status: "ok",
     rows: changed,
     closeStages: closeStagesOf(leadStages),
+    ...(opts.notes ? { notes: notesS?.status === "fulfilled" && notesS.value ? notesS.value : ({ status: "unavailable" } as const) } : {}),
     today,
     timeZone,
     members: memberList.map((m) => ({ userId: m.userId, name: m.displayName || m.email || "Teammate", role: m.role })),

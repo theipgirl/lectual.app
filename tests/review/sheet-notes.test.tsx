@@ -1,10 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
-import { noteCellFor, noteCommitter, noteFirstLine, noteKeyIntent, pickLatestNotes, SHEET_NOTE_CLIP, type SheetNotes } from "@/lib/review/sheet-notes";
-import { readSheetNotes, type NotesDb } from "@/lib/review/sheet-notes-load";
+import { afterNoteSaved, noteCellFor, noteCommitter, noteFirstLine, noteKeyIntent, pickLatestNotes, SHEET_NOTE_CLIP, type SheetNotes } from "@/lib/review/sheet-notes";
+import { NOTES_PARALLEL, readSheetNotes, type NotesDb } from "@/lib/review/sheet-notes-load";
 import { SHEET_COLUMNS } from "@/lib/review/sheet";
 import { row, TODAY } from "./fixtures";
+import { makeWorld, seedTables } from "../files/helpers";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock("@/app/dashboard/review/actions", () => ({
@@ -15,22 +16,25 @@ vi.mock("@/app/dashboard/review/actions", () => ({
 const M1 = "00000000-0000-4000-8000-000000000001";
 const L1 = "00000000-0000-4000-8000-000000000002";
 
-/** A fake scoped client: records each query's filters and answers from `answer`. */
-function fakeDb(answer: (q: { eqs: [string, string][]; ins: [string, readonly string[]][]; from: number }) => { data: unknown[] | null; error: unknown }) {
-  const calls: { table: string; select: string; eqs: [string, string][]; ins: [string, readonly string[]][]; from: number }[] = [];
+/** A fake scoped client: records each query's filters and answers from `answer`. Tracks how many queries are open at once. */
+function fakeDb(answer: (q: { eqs: [string, string][]; limit: number | null }) => { data: unknown[] | null; error: unknown }) {
+  const calls: { table: string; select: string; eqs: [string, string][]; limit: number | null; orders: string[] }[] = [];
+  let open = 0;
+  let peak = 0;
   const db: NotesDb = {
     from(table: string) {
       return {
         select(select: string) {
-          const c = { table, select, eqs: [] as [string, string][], ins: [] as [string, readonly string[]][], from: 0 };
+          const c = { table, select, eqs: [] as [string, string][], limit: null as number | null, orders: [] as string[] };
           calls.push(c);
           const q = {
             eq(col: string, v: string) { c.eqs.push([col, v]); return q; },
-            in(col: string, v: readonly string[]) { c.ins.push([col, v]); return q; },
-            order() { return q; },
-            range(from: number) { c.from = from; return q; },
+            order(col: string) { c.orders.push(col); return q; },
+            limit(n: number) { c.limit = n; return q; },
             then(res: (v: { data: unknown[] | null; error: unknown }) => unknown, rej?: (e: unknown) => unknown) {
-              return Promise.resolve(answer(c)).then(res as never, rej);
+              open += 1;
+              peak = Math.max(peak, open);
+              return new Promise((r) => setTimeout(r, 1)).then(() => { open -= 1; return answer(c); }).then(res as never, rej);
             },
           };
           return q as never;
@@ -38,7 +42,7 @@ function fakeDb(answer: (q: { eqs: [string, string][]; ins: [string, readonly st
       };
     },
   };
-  return { db, calls };
+  return { db, calls, peak: () => peak };
 }
 
 describe("the latest note per row (pure)", () => {
@@ -74,38 +78,90 @@ describe("the latest note per row (pure)", () => {
   });
 });
 
-describe("the loader (three states, batched, plain notes only)", () => {
-  it("reads type note, by matter and by lead, one query per chunk of 80", async () => {
-    const matters = Array.from({ length: 81 }, (_, i) => ({ kind: "matter" as const, id: `m${i}` }));
-    const { db, calls } = fakeDb((q) => ({ data: q.ins[0][1].includes("m0") ? [{ matter_id: "m0", lead_id: null, created_at: "2026-11-16T15:00:00Z", note: "Hello" }] : [], error: null }));
-    const out = await readSheetNotes(db, [...matters, { kind: "lead", id: L1 }], "America/New_York");
+describe("the loader (three states, one bounded query per record)", () => {
+  it("asks each record for its newest plain note only (limit 1), in bounded parallel batches", async () => {
+    const rows = [...Array.from({ length: 30 }, (_, i) => ({ kind: "matter" as const, id: `m${i}` })), { kind: "lead" as const, id: L1 }, { kind: "lead" as const, id: L1 }];
+    const { db, calls, peak } = fakeDb((q) => ({ data: q.eqs.some(([c, v]) => c === "matter_id" && v === "m0") ? [{ matter_id: "m0", lead_id: null, created_at: "2026-11-16T15:00:00Z", note: "Hello" }] : [], error: null }));
+    const out = await readSheetNotes(db, rows, "America/New_York");
     expect(out.status).toBe("ok");
-    expect(calls).toHaveLength(3);
+    expect(calls).toHaveLength(31); // the repeated lead is asked once
     for (const c of calls) {
       expect(c.table).toBe("crm_activity");
       expect(c.eqs).toContainEqual(["type", "note"]);
+      expect(c.limit).toBe(1);
+      expect(c.orders[0]).toBe("created_at");
       expect(c.select).not.toMatch(/\*/);
     }
-    expect(calls.map((c) => c.ins[0][1].length).sort((a, b) => a - b)).toEqual([1, 1, 80]);
+    expect(calls.filter((c) => c.eqs.some(([col]) => col === "lead_id"))).toHaveLength(1);
+    expect(peak()).toBeGreaterThan(1);
+    expect(peak()).toBeLessThanOrEqual(NOTES_PARALLEL);
     if (out.status === "ok") expect(out.byKey.get("matter:m0")).toEqual({ text: "Hello", date: "2026-11-16" });
   });
 
-  it("a read that found nothing is ok and empty", async () => {
-    const { db } = fakeDb(() => ({ data: [], error: null }));
+  it("a read that found nothing is ok and empty; no rows asks nothing", async () => {
+    const { db, calls } = fakeDb(() => ({ data: [], error: null }));
     const out = await readSheetNotes(db, [{ kind: "matter", id: M1 }], "UTC");
     expect(out.status).toBe("ok");
     if (out.status === "ok") expect(out.byKey.size).toBe(0);
+    expect((await readSheetNotes(db, [], "UTC")).status).toBe("ok");
+    expect(calls).toHaveLength(1);
   });
 
-  it("an error is unavailable, never 'no notes'", async () => {
-    const { db } = fakeDb(() => ({ data: null, error: { code: "500" } }));
-    expect(await readSheetNotes(db, [{ kind: "matter", id: M1 }], "UTC")).toEqual({ status: "unavailable" });
+  it("any failed query is unavailable for the whole column, never 'no notes'", async () => {
+    const { db } = fakeDb((q) => (q.eqs.some(([, v]) => v === "m3") ? { data: null, error: { code: "500" } } : { data: [], error: null }));
+    const rows = Array.from({ length: 5 }, (_, i) => ({ kind: "matter" as const, id: `m${i}` }));
+    expect(await readSheetNotes(db, rows, "UTC")).toEqual({ status: "unavailable" });
   });
 
-  it("a read that runs out of pages is unavailable, not cut short", async () => {
-    const full = Array.from({ length: 1000 }, () => ({ matter_id: M1, lead_id: null, created_at: "2026-11-16T15:00:00Z", note: "n" }));
-    const { db } = fakeDb(() => ({ data: full, error: null }));
-    expect(await readSheetNotes(db, [{ kind: "matter", id: M1 }], "UTC")).toEqual({ status: "unavailable" });
+  it("runs inside the review's one parallel read, only when the Sheet asks", () => {
+    const src = readFileSync("src/lib/review/load.ts", "utf8");
+    const settled = src.slice(src.indexOf("await Promise.allSettled([\n        readOpenTasks"));
+    const block = settled.slice(0, settled.indexOf("])"));
+    expect(block).toContain("readSheetNotes(");
+    expect(block).toContain("opts.notes ?");
+    const page = readFileSync("src/app/dashboard/review/page.tsx", "utf8");
+    expect(page).toContain('loadReview(new Date(), { notes: params.view === "sheet" })');
+    expect(page).not.toContain("loadSheetNotes");
+  });
+});
+
+describe("loadReview with notes", () => {
+  beforeEach(() => vi.resetModules());
+  afterEach(() => vi.restoreAllMocks());
+
+  function mockAll(notes: () => Promise<unknown>) {
+    const world = makeWorld({ tables: seedTables({}) });
+    vi.doMock("@/lib/db/scoped-client", () => ({ getScopedClient: vi.fn(async () => world.client) }));
+    vi.doMock("@/lib/org/modules", () => ({ orgHasModule: vi.fn(async () => false), activeOrgModulesOrNull: vi.fn(async () => []) }));
+    vi.doMock("@/lib/matters", () => ({ listMatters: vi.fn(async () => [{ id: M1, status: "open", lead_id: null, title: "Acme", owner_name: "Acme", matter_number: "TM-1", stage_id: null, type: "TM" }]) }));
+    vi.doMock("@/lib/pipeline", () => ({ listLeads: vi.fn(async () => []), listStages: vi.fn(async () => []) }));
+    vi.doMock("@/lib/members/directory", () => ({ listMemberDirectory: vi.fn(async () => []) }));
+    vi.doMock("@/lib/queue/load", () => ({ loadActiveQueue: vi.fn(async () => ({ status: "unconfigured" })) }));
+    vi.doMock("@/lib/queue/lead-pending", () => ({ loadPendingApprovalsByLead: vi.fn(async () => ({ status: "ok", byLead: {} })) }));
+    vi.doMock("@/lib/org/profile", () => ({ getFirmTimeZone: vi.fn(async () => "UTC") }));
+    vi.doMock("@/app/dashboard/matters/list-utils", () => ({ matterIdsNeedingReview: () => new Set() }));
+    const spy = vi.fn(notes);
+    vi.doMock("@/lib/review/sheet-notes-load", () => ({ readSheetNotes: spy }));
+    return spy;
+  }
+
+  it("attaches the notes when asked, for the review's rows, and not otherwise", async () => {
+    const spy = mockAll(async () => ({ status: "ok", byKey: new Map([[`matter:${M1}`, { text: "Hi", date: "2026-11-16" }]]) }));
+    const { loadReview } = await import("../../src/lib/review/load");
+    const r = await loadReview(new Date("2026-11-17T15:00:00Z"), { notes: true });
+    if (r.status !== "ok") return expect.unreachable();
+    expect(r.notes?.status).toBe("ok");
+    expect(spy.mock.calls[0][1]).toEqual([{ kind: "matter", id: M1 }]);
+    const plain = await loadReview(new Date("2026-11-17T15:00:00Z"));
+    expect(plain.status === "ok" && plain.notes).toBeUndefined();
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it("a notes read that rejects is unavailable", async () => {
+    mockAll(async () => { throw new Error("x"); });
+    const { loadReview } = await import("../../src/lib/review/load");
+    const r = await loadReview(new Date("2026-11-17T15:00:00Z"), { notes: true });
+    expect(r.status === "ok" && r.notes).toEqual({ status: "unavailable" });
   });
 });
 
@@ -122,8 +178,8 @@ describe("the editor's save rule", () => {
     let release: (v: { ok: boolean }) => void = () => {};
     const save = vi.fn(() => new Promise<{ ok: boolean }>((r) => (release = r)));
     const c = noteCommitter(save);
-    const enter = c.commit("Called Ana");
-    const blur = c.commit("Called Ana");
+    const enter = c.commit("Called Ana", "enter");
+    const blur = c.commit("Called Ana", "blur");
     release({ ok: true });
     expect(await enter).toBe("saved");
     expect(await blur).toBe("ignored");
@@ -135,7 +191,7 @@ describe("the editor's save rule", () => {
   it("blur alone saves once (trimmed)", async () => {
     const save = vi.fn(async () => ({ ok: true }));
     const c = noteCommitter(save);
-    expect(await c.commit("  Left a message  ")).toBe("saved");
+    expect(await c.commit("  Left a message  ", "blur")).toBe("saved");
     expect(save).toHaveBeenCalledWith("Left a message");
   });
 
@@ -155,13 +211,30 @@ describe("the editor's save rule", () => {
     expect(save).not.toHaveBeenCalled();
   });
 
-  it("a failed save keeps the session open (the text stays) and can be tried again", async () => {
-    const save = vi.fn().mockResolvedValueOnce({ ok: false, message: "nope" }).mockResolvedValueOnce({ ok: true });
+  it("after a failed save, leaving the cell does NOT post again; only Enter retries (the text stays)", async () => {
+    const save = vi.fn().mockResolvedValueOnce({ ok: false, message: "timed out" }).mockResolvedValueOnce({ ok: true });
     const c = noteCommitter(save);
-    expect(await c.commit("Called Ana")).toBe("failed");
+    expect(await c.commit("Called Ana", "enter")).toBe("failed");
     expect(c.ended).toBe(false);
-    expect(await c.commit("Called Ana")).toBe("saved");
+    expect(c.failed).toBe(true);
+    expect(await c.commit("Called Ana", "blur")).toBe("ignored");
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(await c.commit("Called Ana", "enter")).toBe("saved");
     expect(save).toHaveBeenCalledTimes(2);
+  });
+
+  it("a blur that failed also waits for Enter", async () => {
+    const save = vi.fn().mockResolvedValue({ ok: false });
+    const c = noteCommitter(save);
+    expect(await c.commit("x", "blur")).toBe("failed");
+    expect(await c.commit("x", "blur")).toBe("ignored");
+    expect(save).toHaveBeenCalledTimes(1);
+  });
+
+  it("text typed while the save was in flight is kept after it succeeds", () => {
+    expect(afterNoteSaved("Called Ana", "  Called Ana ")).toEqual({ keep: null });
+    expect(afterNoteSaved("Called Ana", "Called Ana\nand she wants a call back")).toEqual({ keep: "Called Ana\nand she wants a call back" });
+    expect(afterNoteSaved("Called Ana", "")).toEqual({ keep: "" });
   });
 
   it("a save that throws counts as failed", async () => {
@@ -171,13 +244,18 @@ describe("the editor's save rule", () => {
     expect(await c.commit("a")).toBe("failed");
   });
 
-  it("the component only clears the typed text after a save that worked", () => {
+  it("the component clears the typed text only after a save that worked with nothing new typed, or on Esc", () => {
     const src = readFileSync("src/components/review/NotesCell.tsx", "utf8");
     const ok = src.indexOf("if (ok) {");
-    const clear = src.indexOf('setDraft("")');
+    const keep = src.indexOf("afterNoteSaved(body, draftRef.current)");
+    const clears = [...src.matchAll(/setDraftText\(""\)/g)].map((m) => m.index!);
     expect(ok).toBeGreaterThan(0);
-    expect(clear).toBeGreaterThan(ok);
-    expect(src.indexOf('setDraft("")', clear + 1)).toBe(-1);
+    expect(keep).toBeGreaterThan(ok);
+    expect(clears).toHaveLength(2);
+    expect(clears[0]).toBeGreaterThan(keep);
+    expect(src.slice(src.indexOf("function cancel()"), src.indexOf("function cancel()") + 200)).toContain('setDraftText("")');
+    expect(src).toContain('void commit("blur")');
+    expect(src).toContain('void commit("enter")');
     expect(src).not.toMatch(/dangerouslySetInnerHTML/);
   });
 });

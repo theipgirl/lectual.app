@@ -80,17 +80,23 @@ export function noteKeyIntent(key: string, shift: boolean, composing = false): "
 export type NoteSaveResult = { ok: boolean; message?: string | null };
 export type NoteCommitOutcome = "empty" | "saved" | "failed" | "ignored";
 
+/** How a commit was asked for: Enter (an explicit save) or leaving the cell. */
+export type NoteCommitHow = "enter" | "blur";
+
 /**
  * One edit session's save rule. Enter, then the blur that follows it, post ONCE: while a save is in flight, or after the
- * session ended (saved, emptied or cancelled), a commit is ignored. Empty text saves nothing. A failed save reopens the
- * session so the person can try again with the text they typed (the text is never thrown away here).
+ * session ended (saved, emptied or cancelled), a commit is ignored. Empty text saves nothing. After a FAILED save only an
+ * explicit Enter tries again: leaving the cell does not re-post (a "failure" may have been a timeout whose note did land,
+ * and a second post would duplicate it). The text is never thrown away here.
  */
 export function noteCommitter(save: (body: string) => Promise<NoteSaveResult>) {
   let busy = false;
   let ended = false;
+  let failed = false;
   return {
-    async commit(raw: string): Promise<NoteCommitOutcome> {
+    async commit(raw: string, how: NoteCommitHow = "enter"): Promise<NoteCommitOutcome> {
       if (busy || ended) return "ignored";
+      if (failed && how === "blur") return "ignored";
       const body = raw.trim();
       if (!body) {
         ended = true;
@@ -104,6 +110,7 @@ export function noteCommitter(save: (body: string) => Promise<NoteSaveResult>) {
         ok = false;
       }
       busy = false;
+      failed = !ok;
       if (ok) ended = true;
       return ok ? "saved" : "failed";
     },
@@ -116,5 +123,16 @@ export function noteCommitter(save: (body: string) => Promise<NoteSaveResult>) {
     get ended() {
       return ended;
     },
+    get failed() {
+      return failed;
+    },
   };
+}
+
+/**
+ * After a save worked: what is left in the field. Text typed while the save was in flight (the field no longer reads
+ * exactly what was saved) is kept, and the editor stays open for it; otherwise the field empties and the editor closes.
+ */
+export function afterNoteSaved(savedBody: string, currentDraft: string): { keep: string | null } {
+  return currentDraft.trim() === savedBody.trim() ? { keep: null } : { keep: currentDraft };
 }

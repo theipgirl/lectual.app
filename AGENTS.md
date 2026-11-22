@@ -2466,20 +2466,24 @@ still visible). Tests: `tests/nav/admin-tier-rows.test.ts`.
 ## Getting started: the short staff guide (no schema)
 Outside the admin tier (`canSeeSetup` false, which also covers an unknown or unreadable role: fails closed) the Getting started hub and the Today
 `GettingStartedCard` offer ONLY the staff guide, track `start` ("Your first steps", words in `words.ts` `STAFF_GUIDE_*`): `staff-name` (the account
-menu's "Your name"), `staff-mailbox` (connect your own Outlook on Integrations; needs the Mail rail section, i.e. the Mailboxes feature; an unreadable
-feature list hides it) and `staff-tour` (the account menu's "Show tips again"). The rule is one line in `flowVisible` (`requires.staffGuide`); the admin
+menu's "Your name"), `staff-mailbox` (the "Connect Outlook" button at the top of Integrations; needs the Mail rail section, i.e. the Mailboxes feature, AND
+`connectableProviders().microsoft` on the deployment, passed in as `HubContext.outlookConnectable`; an unreadable feature list or an absent flag hides it) and `staff-tour` (the account menu's "Show tips again"). The rule is one line in `flowVisible` (`requires.staffGuide`); the admin
 tier never sees those three and its hub is exactly what it was (pinned in `tests/onboarding/hub.test.ts`). Progress flags are unchanged: old ids still parse,
 the three new ids are known, unknown ids are dropped. "Your setup" (Outlook status) above the guides is unchanged.
 
 ## Weekly review: an editable Notes cell in the Sheet (no schema)
 Both Sheets (`?view=sheet`: the plain `SheetView` and the owner's `SheetEditTable`) end with a Notes column. Logic in `src/lib/review/sheet-notes.ts`
 (pure), the read in `sheet-notes-load.ts`, the cell in `src/components/review/NotesCell.tsx`; `sheet.ts` / `SheetView.tsx` only add the column and the call.
-- **Read:** only for the Sheet, only for the rows on screen: `crm_activity` type `note` by `matter_id` / `lead_id` (a matter's own notes, like the Cards
-  note), chunks of 80 ids, paged, the scoped client; selects the ids, date and `payload->>note|body|text` only. Shows the newest note's first line (80
+- **Read:** only for the Sheet (`loadReview(now, { notes: true })`, inside the review's one parallel read), for the review's records: ONE bounded query
+  per record (`crm_activity` type `note`, its `matter_id` / `lead_id`, newest first, `limit(1)`; PostgREST has no newest-per-group), 12 at a time,
+  the scoped client; selects the ids, date and `payload->>note|body|text` only (a matter's own notes, like the Cards note). Shows the newest note's first line (80
   characters) and its firm-calendar date. Three states: a failed or cut-short read is "Couldn't load" in every cell, never blank; none is an empty cell.
 - **Write:** writers (`canWrite` = MATTER_WRITE_ROLES = CAN_WRITE_LEAD; the owner table: `canNote`, not on phones) click in and type; Enter (no Shift) or
   leaving the cell saves ONE plain note through the existing `logWhatHappenedAction` (role and record re-checked, revalidates the review); Esc cancels;
-  empty saves nothing. `noteCommitter` is the one-save-per-edit rule (Enter then blur posts once). A failed save keeps the text and says "Couldn't save".
+  empty saves nothing. `noteCommitter` is the one-save-per-edit rule (Enter then blur posts once). A failed save keeps the text and says "Couldn't save";
+  after a failure only Enter retries (leaving the cell never re-posts: the "failure" may have been a timeout that landed). Text typed while a save is in
+  flight is kept (`afterNoteSaved`) and the editor stays open for it.
   Other roles read the note with no editor. Note text is React text only.
 - The owner table's "+ Note" popover column is gone (one way to add a note); the Notes column is a resizable column (150px; four defaults and Next step's
-  minimum shrank so the defaults still fit 1440 with the rail open, 1,106px). Not verified in a real browser.
+  minimum shrank so the defaults still fit 1440 with the rail open, 1,106px). The plain Sheet's floor is 940px (Notes a fixed 150px), under the 954px
+  a 1280 window leaves with the rail pinned. A header's pencil shows only on a column someone here can type in. Not verified in a real browser.

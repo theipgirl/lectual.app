@@ -13,7 +13,6 @@ import { DeadlinesStrip, KpiStrip, ReviewBoard, ViewSwitch, WaitingOnStrip } fro
 import { SheetView } from "@/components/review/SheetView";
 import { SheetSaveStatus } from "@/components/review/SheetSaveStatus";
 import { loadSheetStages } from "@/lib/review/sheet-edit-load";
-import { loadSheetNotes } from "@/lib/review/sheet-notes-load";
 import { READ_ONLY_PERMS, type SheetPerms } from "@/lib/review/sheet-edit";
 import { CardsDeck, PersonChips } from "@/components/review/CardsDeck";
 import { ReviewCardAside } from "@/components/review/ReviewCardExtras";
@@ -51,7 +50,7 @@ type SearchParams = { since?: string | string[]; who?: string | string[]; kind?:
 export default async function ReviewPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;
   const params = parseReviewParams(sp);
-  const [load, session] = await Promise.all([loadReview(), resolveFirmSession()]);
+  const [load, session] = await Promise.all([loadReview(new Date(), { notes: params.view === "sheet" }), resolveFirmSession()]);
   const role = session.kind === "ok" ? session.role : null;
   const userId = session.kind === "ok" ? session.user.id : null;
   const canWrite = !!role && MATTER_WRITE_ROLES.includes(role);
@@ -91,8 +90,8 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
     const stages = canWrite || moveLead ? await loadSheetStages() : { matter: null, lead: null };
     sheetPerms = canWrite || writeLead ? { writeMatter: canWrite, writeLead, moveLead, matterStages: canWrite ? stages.matter : null, leadStages: moveLead ? stages.lead : null } : READ_ONLY_PERMS;
   }
-  // The Notes column: the newest plain note of each row ON SCREEN, read only for the Sheet (three-state; a failed read says so in the cells).
-  const sheetNotes = params.view === "sheet" && shown.length > 0 ? await loadSheetNotes(shown, load.timeZone) : null;
+  // The Notes column: read with the review's other reads, only for the Sheet (three-state; a failed read says so in the cells).
+  const sheetNotes = load.notes ?? null;
   const approvalsKnown = !load.failed.includes("approvals");
   // An approver sees the strip about THEM ("Waiting on you"); anyone else sees it about the review person, as before.
   const isApprover = !!role && !!userId && QUEUE_APPROVE_ROLES.includes(role);

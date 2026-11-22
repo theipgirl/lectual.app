@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { aiConfigured } from "@/lib/ai/claude";
+import { connectableProviders } from "@/lib/mailbox/config";
 import { HUB_PATH, hubTracks, overallCount, parseHubProgress, shouldShowHubCard } from "@/lib/onboarding/hub";
 import { HideHubCard } from "./HideHubCard";
 import "./hub.css";
@@ -17,7 +18,7 @@ export async function GettingStartedCard() {
   try {
     const session = await resolveFirmSession();
     if (session.kind !== "ok") return null;
-    const tracks = hubTracks({ role: session.role, modules: session.org.modules, aiConfigured: aiConfigured() });
+    const tracks = hubTracks({ role: session.role, modules: session.org.modules, aiConfigured: aiConfigured(), outlookConnectable: connectableProviders().microsoft });
     const progress = parseHubProgress(session.user.user_metadata);
     if (!shouldShowHubCard(tracks, progress)) return null;
     const { done, total } = overallCount(tracks, progress.done);

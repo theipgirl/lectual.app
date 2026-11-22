@@ -67,7 +67,13 @@
 .rv-sheet-title { margin: 0; padding: 12px; background: var(--well); border-bottom: 1px solid var(--line-2); }
 .rv-sheet-title .lx-note { font-size: var(--fs-2); color: inherit; }
 .rv-sheet-sec > .rv-strip-note { padding: 12px; }
-@media (min-width: 641px) { .rv-sheet { --sheet-min: 1100px; } .rv-sheet td.rv-notes-td { width: 180px; max-width: 220px; } }
+/* Floor 940px: 1280 with the rail pinned leaves 1280 - 294 (rail slot) - 26 (content padding) - 4 (page padding) - 2 (card border) = 954px,
+   so the plain Sheet does not scroll sideways there. Notes is a fixed 150px (130 + 2 x 10 padding); the other columns wrap into the rest. */
+@media (min-width: 641px) {
+  .lp-root:not(.rv-owner) .rv-sheet { --sheet-min: 940px; }
+  .rv-sheet td.rv-notes-td { width: 150px; max-width: 150px; }
+  .rv-sheet td.rv-notes-td .rv-notes { width: 130px; }
+}
 .rv-sheet .rv-sub, .rv-table .rv-sub { font-size: inherit; color: inherit; display: inline; }
 .rv-sheet .rv-sub::before, .rv-table .rv-sub::before { content: " · "; }
 .rv-sheet .rv-deadline-soon, .rv-table .rv-deadline-soon { color: var(--wine); font-weight: 500; }
