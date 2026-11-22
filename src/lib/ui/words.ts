@@ -1436,3 +1436,46 @@ export const STAFF_GUIDE_MAILBOX_BODY = "Choose Connect Outlook at the top of th
 export const STAFF_GUIDE_TOUR_TITLE = "Take the tour";
 export const STAFF_GUIDE_TOUR_SUMMARY = "A quick look at the main screens.";
 export const STAFF_GUIDE_TOUR_BODY = "Choose Show tips again in this menu for a short tour of the main screens. You can take it as often as you like.";
+
+/* ── Adobe Acrobat Sign (Sprint 5a): the firm-facing words. Client words are in src/lib/loe/client-words.ts. ── */
+export const ADOBE_SIGN_NAME = "Adobe Acrobat Sign";
+export const ADOBE_NOT_CONNECTED_HELP = "Connect your firm's own Adobe Acrobat Sign account so clients can sign their engagement letter with Adobe.";
+export const ADOBE_NOT_SET_UP = notReadyYet(ADOBE_SIGN_NAME);
+export const ADOBE_COULDNT_CHECK = "We couldn't check your Adobe Acrobat Sign connection just now.";
+export const ADOBE_REAUTH_HELP = "Adobe Acrobat Sign needs you to sign in again.";
+/** Connected, while Lectual has not switched on signing with Adobe for clients (ADOBE_SIGN_CLIENT_SIGNING off). */
+export const ADOBE_SWITCH_OFF_LINE = "Clients sign in Lectual until Lectual turns on signing with Adobe.";
+export function adobeConnectedAs(email: string | null): string {
+  return email ? `Connected as ${email}.` : "Connected.";
+}
+/** `reauth`: how many clients are waiting (the firm's open Adobe letters). Left out when the count couldn't be read. */
+export function adobeWaitingLine(n: number): string {
+  return n === 1 ? "1 client is waiting to sign until you reconnect." : `${n} clients are waiting to sign until you reconnect.`;
+}
+export const ADOBE_CONNECT = "Connect Adobe Acrobat Sign";
+export const ADOBE_RECONNECT = "Reconnect";
+export const ADOBE_DISCONNECT = "Disconnect";
+export const ADOBE_DISCONNECT_QUESTION =
+  "Disconnect Adobe Acrobat Sign? Letters still open in Adobe are cancelled there, and those clients sign in Lectual on their next visit.";
+export const ADOBE_DISCONNECTED = "Adobe Acrobat Sign is disconnected.";
+export const ADOBE_DISCONNECT_FORBIDDEN = `${ADMIN_TIER_PHRASE} can disconnect Adobe Acrobat Sign.`;
+export const ADOBE_DISCONNECT_READ_FAILED = "We couldn't read your Adobe Acrobat Sign connection. Refresh to try again.";
+export const ADOBE_DISCONNECT_FAILED = "Adobe Acrobat Sign couldn't be disconnected just now. Try again.";
+export function adobeCancelFailedLine(n: number): string {
+  return `${n} ${n === 1 ? "letter" : "letters"} couldn't be cancelled in Adobe. Cancel them in your Adobe account.`;
+}
+export function adobeNotCopiedLine(n: number): string {
+  return `The signed letter for ${n} ${n === 1 ? "client" : "clients"} is in your Adobe account; it couldn't be copied into Lectual.`;
+}
+/** The callback's outcomes (`?esign=` / `?esign_error=`), fixed sentences only. */
+export const ADOBE_OUTCOME: Record<string, string> = {
+  connected: "Adobe Acrobat Sign is connected.",
+  forbidden: `${ADMIN_TIER_PHRASE} can connect Adobe Acrobat Sign.`,
+  unconfigured: ADOBE_NOT_SET_UP,
+  denied: "Adobe Acrobat Sign wasn't connected: the sign-in was cancelled.",
+  expired: "That sign-in took too long or was started elsewhere. Try connecting again.",
+  "wrong-session": "That sign-in was started by someone else or for another firm. Try connecting again.",
+  host: "Adobe sent back an address Lectual doesn't accept, so nothing was saved.",
+  "save-failed": "Adobe Acrobat Sign couldn't be saved just now. Try again.",
+  failed: "Adobe Acrobat Sign couldn't be connected just now. Try again.",
+};

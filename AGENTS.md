@@ -2487,3 +2487,26 @@ Both Sheets (`?view=sheet`: the plain `SheetView` and the owner's `SheetEditTabl
 - The owner table's "+ Note" popover column is gone (one way to add a note); the Notes column is a resizable column (150px; four defaults and Next step's
   minimum shrank so the defaults still fit 1440 with the rail open, 1,106px). The plain Sheet's floor is 940px (Notes a fixed 150px), under the 954px
   a 1280 window leaves with the rail pinned. A header's pencil shows only on a column someone here can type in. Not verified in a real browser.
+
+## Sprint 5a: Adobe Acrobat Sign, connection and agreement creation (PGE; switch OFF; the database half is lectual 0113, proposed, NOT applied)
+Contract `docs/pge/2026-11-17-agentic-ip-os/sprint-5ab-adobe.md` (v4). The full "Adobe Acrobat Sign" section (completion, files, Lawmatics,
+the webhook, the sweep) is Sprint 5b's; this is the 5a note only.
+- **Blockers (contract, verbatim in substance).** (1) OPEN BLOCKER for Taylor and Rebecca: RPB's Adobe account is an Acrobat Pro
+  subscription registered to the managing attorney, which has no API; production needs the firm's own API-tier Acrobat Sign account, and
+  the sender is whoever owns it (their name is in Adobe's audit report). Until they decide, Adobe stays "not set up" in production and RPB
+  keeps the in-app signature. (2) Development uses the free Acrobat Sign DEVELOPER account Taylor creates under a non-attorney email, with
+  test signers only (Lectual-controlled addresses, no client data). (3) A person (Taylor) runs the sandbox spike before 5a merges: email
+  suppression and whether Adobe sends its own copy email, text-tag syntax, `signingUrls` timing and the `esignUrl` host, the completion-time
+  field, the `GET /users/me` shape, the developer watermark. No test or CI calls Adobe. (4) `ADOBE_SIGN_CLIENT_SIGNING` stays OFF in
+  production until the spike shows no Adobe email reaches the client (or Taylor says that email is acceptable) AND 0113's isolation cases
+  pass on lectual-dev.
+- **The switch.** `ADOBE_SIGN_CLIENT_SIGNING`: a NEW Adobe agreement is created only when it is exactly `on`; anything else, unset included,
+  is in-app for every firm (finishing a request already open still works). Unset `ADOBE_SIGN_OAUTH_CLIENT_ID` / `_SECRET`, or an
+  `ADOBE_SIGN_AUTHORIZE_URL` that is not https on `*.adobesign.com`, means "not set up". There is no deployment-wide Adobe credential.
+- **Code:** `src/lib/esign/` (config, host rule, OAuth + state cookie, connection, client, payload, errors, path, start, disconnect),
+  `/api/esign/connect/` and `/api/esign/callback/` (admin tier in the route), the Settings -> Integrations row, `pdf.ts` mode
+  `for-signature`, step 3 on `/p/<token>` (`signingPathFor`; in-app passes nothing, so the 0106 page is byte-identical, pinned against
+  49efd5e in `tests/esign/`). The agreement half is `prepareAcceptance` + `checkSignerFields` + `buildSigningAgreement` in
+  `public.ts`, shared with `signAndAccept`, never copied. 0113 isn't applied, so every e-sign read answers "not set up" = in-app.
+- **0113 open items** (in the proposal file's header, for the director): SECURITY DEFINER vs 0106's invoker-only lifecycle, the
+  `signed_at` / `accepted_at` stamping, and 0106's append-only guard vs the `esign_request_id` SET NULL.

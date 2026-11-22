@@ -93,6 +93,15 @@ const fieldSchemas = {
   // Must match the Zoom app's registered redirect exactly. Unset = derived
   // from the request origin: <origin>/api/meetings/zoom/callback/.
   ZOOM_OAUTH_REDIRECT_URI: z.string().optional(),
+  // Adobe Acrobat Sign (Sprint 5a, src/lib/esign/adobe-config.ts). Each firm connects ITS OWN Adobe account by OAuth; there is
+  // no deployment-wide Adobe token, account or API key anywhere. Either OAuth id unset = "not set up" (every proposal signs in
+  // Lectual). ADOBE_SIGN_AUTHORIZE_URL, when set, must be https on a host ending .adobesign.com, or Adobe is "not set up".
+  // ADOBE_SIGN_CLIENT_SIGNING: a NEW Adobe agreement is created only when it is exactly "on" (default off).
+  ADOBE_SIGN_OAUTH_CLIENT_ID: z.string().optional(),
+  ADOBE_SIGN_OAUTH_CLIENT_SECRET: z.string().optional(),
+  ADOBE_SIGN_OAUTH_REDIRECT_URI: z.string().optional(),
+  ADOBE_SIGN_AUTHORIZE_URL: z.string().optional(),
+  ADOBE_SIGN_CLIENT_SIGNING: z.string().optional(),
   // Set by Vercel itself (host only, no scheme). Last-resort site address when
   // a call has no request and SITE_URL is unset; see src/lib/site-origin.ts.
   VERCEL_PROJECT_PRODUCTION_URL: z.string().optional(),

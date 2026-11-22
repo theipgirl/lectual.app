@@ -5,7 +5,7 @@ import { join } from "node:path";
 import PDFDocument from "pdfkit";
 import { REVIEW_COPY_MARK } from "./client-words";
 import type { LetterLogo } from "./letter-logo";
-import type { Exhibit } from "./exhibit";
+import { exhibitLines, type Exhibit } from "./exhibit";
 import { hasStyle, splitFirstLine } from "./letter-styles";
 import type { LetterBlock } from "./render";
 import type { SignerDetails } from "./signing";
@@ -26,7 +26,20 @@ import type { SignerDetails } from "./signing";
  * own creation date. Logs nothing.
  */
 
-export type PdfMode = "review" | "signed";
+/**
+ * `review`: the client's copy before signing (banner on every page). `signed`: the copy after signing (signature record).
+ * `for-signature` (Sprint 5a): the document uploaded to the firm's Adobe Acrobat Sign account. Its words are exactly the stored
+ * agreement text (`agreementText(blocks, exhibit)`: the letter's paragraphs, then Exhibit A as the same lines), with no banner and
+ * no signature record; ONE signature block follows, drawn after and outside the words, carrying Adobe's text tags for one signer
+ * (a signature field and Adobe's own date field). The block is not part of the text, the canonical form or any sha256.
+ */
+export type PdfMode = "review" | "signed" | "for-signature";
+
+/** Starts the appended signature block of a `for-signature` PDF. Everything before it is the agreement text. */
+export const SIGNATURE_BLOCK_HEADING = "Client signature";
+/** Adobe Acrobat Sign text tags for ONE signer (unverified syntax: checked in the sandbox spike). */
+export const ADOBE_SIGNATURE_TAG = "{{Sig_es_:signer1:signature}}";
+export const ADOBE_DATE_TAG = "{{Dte_es_:signer1:date}}";
 
 export type PdfSignature = {
   signerName: string;
@@ -192,6 +205,12 @@ export async function buildLetterPdf(input: BuildLetterPdfInput): Promise<Uint8A
       doc.font("Regular").text(para, { width });
       doc.moveDown(GAP / BODY);
     }
+  } else if (input.mode === "for-signature") {
+    // The words are exactly the stored agreement text: every paragraph (styles are drawing only), then Exhibit A as the very
+    // lines `agreementText` joins. Then the one signature block, after and outside the words.
+    for (const block of input.blocks) writeBlock(doc, block, left, width);
+    writeExhibitLines(doc, input.exhibit, left, width);
+    writeSignatureTags(doc, left, width);
   } else {
     // The full letter: every paragraph, in order, bold lead-in first, each drawn in the template's own style.
     for (const block of input.blocks) writeBlock(doc, block, left, width);
@@ -339,5 +358,35 @@ function writeSignature(doc: PDFKit.PDFDocument, sig: PdfSignature, details: Sig
   if (details.entity_name) line("On behalf of", details.entity_name);
   if (details.title) line("Title", details.title);
   line("Fingerprint (sha256)", sig.fingerprint);
+  doc.x = left;
+}
+
+/** Exhibit A for the `for-signature` copy: a new page, then each line of `exhibitLines` as it is in the stored text. */
+function writeExhibitLines(doc: PDFKit.PDFDocument, exhibit: Exhibit, left: number, width: number) {
+  doc.addPage();
+  doc.x = left;
+  const lines = exhibitLines(exhibit);
+  lines.forEach((line, i) => {
+    if (line.length === 0) {
+      doc.moveDown(0.5);
+      return;
+    }
+    ensureRoom(doc, 30);
+    doc.font(i === 0 ? "Bold" : "Regular").fontSize(i === 0 ? 12 : BODY).text(line.trim(), left + (line.startsWith("  ") ? 8 : 0), doc.y, { width: width - 8 });
+    doc.x = left;
+  });
+  doc.font("Regular").fontSize(BODY);
+}
+
+/** The one signature block for Adobe: one signer, a signature field and Adobe's own date field, as text tags. */
+function writeSignatureTags(doc: PDFKit.PDFDocument, left: number, width: number) {
+  doc.moveDown(1.5);
+  ensureRoom(doc, 140);
+  doc.x = left;
+  doc.font("Bold").fontSize(11).text(SIGNATURE_BLOCK_HEADING, left, doc.y, { width });
+  doc.moveDown(0.8);
+  doc.font("Regular").fontSize(BODY).text(ADOBE_SIGNATURE_TAG, left, doc.y, { width });
+  doc.moveDown(1.2);
+  doc.text(ADOBE_DATE_TAG, left, doc.y, { width });
   doc.x = left;
 }

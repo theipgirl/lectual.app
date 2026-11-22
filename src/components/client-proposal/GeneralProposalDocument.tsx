@@ -14,7 +14,8 @@ import { letterLogoForBrand } from "@/lib/loe/letter-logo";
 import { LoeLetterPanel } from "./LoeLetterPanel";
 import { DownloadPdfButton, LoeSignedLetter } from "./LoeReceipt";
 import { LoeSideAction } from "./LoeSideAction";
-import { LoeSignPanel } from "./LoeSignPanel";
+import { LoeSignSlot } from "./LoeSignSlot";
+import { adobeSideProps, useAdobeSigning } from "./adobe-flow";
 import { LoeStepBar } from "./LoeStepBar";
 import { saveDetailsInBackground, showsSavedNote, useLoeFlow } from "./loe-flow";
 import { brandForSlug, formatCivilDate, money, paragraphs, richSegments, safeHttpsUrl, type ProposalBrand } from "./format";
@@ -83,6 +84,8 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
   });
   const loeOn = loeFlow.enabled;
   const stepOne = !loeOn || accepted || loeFlow.step === 1;
+  // Sprint 5a: the signing path the server chose (absent = in-app, drawn exactly as before).
+  const adobe = useAdobeSigning({ path: mode === "live" ? props.signingPath : undefined, onStart: props.onStartAdobe, loeFlow, selection: {}, clientClasses: { entries: {}, added: {} } });
   // The letter shown as SIGNED: the server's verified copy on a receipt; on the just-signed page the page's own letter, and only
   // when its text hashed to the sha256 the server stored (`letterVerified`). Otherwise nothing is shown under that label.
   const signedView = letter?.signed ?? (done?.letterVerified ? loeFlow.agreement : null);
@@ -186,7 +189,7 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
                   label={DOWNLOAD_REVIEW_LABEL}
                   onDownload={onDownloadReview ? () => onDownloadReview({}, { entries: {}, added: {} }, loeFlow.cleaned) : undefined}
                 />
-                <LoeSignPanel typedName={loeFlow.typedName} onName={loeFlow.setTypedName} agree={loeFlow.agree} onAgree={loeFlow.setAgree} />
+                <LoeSignSlot adobe={adobe} loeFlow={loeFlow} />
               </section>
             ) : null}
             {stepOne ? (
@@ -341,6 +344,7 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
                       requestAnimationFrame(() => document.getElementById("cp-letter-preview")?.scrollIntoView({ block: "start" }));
                     }}
                     onDownloadSigned={onDownloadSigned}
+                    {...adobeSideProps(adobe)}
                   />
                 ) : accepted ? (
                   <>

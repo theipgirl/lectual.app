@@ -503,6 +503,9 @@ export type AcceptedAgreement = {
   signed_at: string;
   sha256: string;
   template_version: number | null;
+  /** lectual 0113 (Sprint 5a/5b): absent = signed in Lectual (0106); "adobe_sign" = signed with Adobe Acrobat Sign. */
+  provider?: "lectual" | "adobe_sign";
+  adobe_agreement_id?: string;
 };
 
 export type AcceptedSigning = {
