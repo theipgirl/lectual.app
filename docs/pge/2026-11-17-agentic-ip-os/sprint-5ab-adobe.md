@@ -1,6 +1,6 @@
 # Sprint 5a/5b contract: Adobe Acrobat Sign for the engagement letter (PGE, STRICT)
 
-**Status:** v4: RATIFIED by the strict evaluator (Nov 22) after two rounds of changes; final for the director. Not built. Nothing is built.
+**Status:** v4: RATIFIED by the strict evaluator (Nov 22) after two rounds of changes; final for the director. Nothing is built.
 
 **Size:** two sprints (5a, then 5b). **Schema:** lectual **0113**, a PROPOSAL FILE ONLY (`docs/pge/2026-11-17-agentic-ip-os/0113-proposed.sql.txt`). Nothing is applied to lectual-dev or lectual-prod. **Evaluator: STRICT** (signatures). **Design input:** `adobe-sign-design.md`. That note calls its migration "0108"; in plan numbering it is 0113. Where the note and this contract disagree, this contract's Decisions section wins; anything not covered there, the generator stops and asks. It does not pick.
 **Out of this contract, ON HOLD:** Sprint 5 items 1–3 and 6–8: the one-card approval, the pay link and invoice, the email, pay, the signed-and-paid hired chain, and the won move.
