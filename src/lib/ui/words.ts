@@ -1481,3 +1481,87 @@ export const CUSTOM_KIND_DATE = "Date";
 export const CUSTOM_KIND_MONEY = "Money";
 export const CUSTOM_KIND_CHOICE = "Choice";
 export const CUSTOM_KIND_PERSON = "Person";
+
+/* ── Settings -> Columns and the custom-column writes (Sprint 3; lectual 0115, proposed) ── */
+export const COLUMNS_SETTINGS_NAME = "Columns";
+export const COLUMNS_SETTINGS_SUB =
+  "Your firm's own columns on the Weekly review List. Everyone in the firm sees them, money columns included. A column's kind and section can't change after it's added. Archiving a column keeps its values.";
+export const columnsCount = (n: number) => `${n} of 40 columns`;
+export const COLUMNS_ADD = "Add a column";
+export const COLUMNS_NAME_LABEL = "Name";
+export const COLUMNS_SECTION_LABEL = "Section";
+export const COLUMNS_KIND_LABEL = "Kind";
+export const COLUMNS_CHOICES_LABEL = "Choices (one per line)";
+export const COLUMNS_CHOICES_HINT = "Only for a Choice column";
+/** The List's two sections, and a column that shows in both. */
+export const CUSTOM_SECTION_WORDS = { trademarks: "Trademarks", contracts: "Contracts", both: "Both" } as const;
+export const archiveQuestion = (label: string) => `Archive ${label}? It leaves the List; its values are kept.`;
+export const archivedHeading = (n: number) => `Archived columns (${n})`;
+export const COLUMNS_ARCHIVE = "Archive";
+export const COLUMNS_RESTORE = "Restore";
+export const COLUMNS_RENAME = "Rename";
+export const COLUMNS_EDIT_CHOICES = "Edit choices";
+export const COLUMNS_SAVE_NAME = "Save name";
+export const COLUMNS_SAVE_CHOICES = "Save choices";
+export const columnsRenameLabel = (label: string) => `New name for ${label}`;
+export const columnsChoicesFor = (label: string) => `Choices for ${label}, one per line`;
+export const columnsRestoreLabel = (label: string) => `Restore ${label}`;
+export const columnsArchiveLabel = (label: string) => `Archive ${label}`;
+export const COLUMNS_AT_LIMIT = "Your firm has 40 columns, the most it can have. Archive one to add another.";
+export const COLUMNS_NONE = "No columns yet. Add one below.";
+export const choiceUse = (option: string, n: number) => `${option}: used on ${n} ${n === 1 ? "record" : "records"}`;
+export const COLUMNS_USE_UNCOUNTED = "Couldn't count which choices are in use. Saving still checks.";
+/** The field actions' role gate (the admin tier). It starts with the phrase, as everywhere else in the app. */
+export const COLUMNS_NO_PERMISSION = `${ADMIN_TIER_PHRASE} can change the firm's columns.`;
+
+/** The fixed sentences the custom-column actions and the error mapper answer with. Never any part of a database message. */
+export const CUSTOM_COLUMNS_NOT_READY = `${CUSTOM_COLUMNS_NOT_ON} Lectual will turn it on.`;
+export const CUSTOM_FIELD_IMMUTABLE = "A column's kind and where it shows can't be changed after it's added.";
+export const CUSTOM_LIMIT = "Your firm is at its limit of 40. Archive a column first.";
+export const CUSTOM_LABEL_TAKEN = "That name is in use by one of your firm's columns. Pick a different name.";
+export const CUSTOM_OPTIONS_IN_USE = "One of the choices you took out is still used on a record. Keep it, or change those records first.";
+export const CUSTOM_VALUE_IMMUTABLE = "A saved value stays with the column and the lead or matter it was saved on. Clear it, then type the new one.";
+export const CUSTOM_VALUE_ONE_RECORD = "Each saved value is for a single record.";
+export const CUSTOM_FIELD_GONE = "That column couldn't be found. It may have been archived or removed.";
+export const CUSTOM_VALUE_MERGED = "That lead is now part of another lead. Change the value there.";
+export const CUSTOM_COLUMN_ARCHIVED = `Archived columns can't be changed. ${ADMIN_TIER_PHRASE} can bring it back in Settings.`;
+export const CUSTOM_WRONG_SECTION = "Wrong part of the List for that column.";
+export const CUSTOM_VALUE_EMPTY = "Clear the cell to remove a value.";
+export const CUSTOM_WRONG_KIND = "That entry isn't the right type for this column.";
+export const CUSTOM_CHOICE_BAD = "Pick a choice from the list.";
+export const CUSTOM_LABEL_TOO_LONG = "Names can be up to 60 characters.";
+export const CUSTOM_LABEL_SPACES = "Take the spaces off the start and end of the name.";
+export const CUSTOM_CHOICES_INVALID = "Choices need 1 to 30 different entries of up to 40 characters each.";
+export const CUSTOM_BAD_SECTION = "Choose Trademarks, Contracts or Both.";
+export const CUSTOM_BAD_KIND = "Choose Text, Date, Money, Choice or Person.";
+export const CUSTOM_MOVE_FAILED = "The order couldn't be saved. Refresh and try again.";
+export const CUSTOM_TEXT_TOO_LONG = "Text can be up to 500 characters.";
+export const CUSTOM_MONEY_TOO_BIG = "That amount is too large.";
+export const CUSTOM_PERSON_NOT_MEMBER = "Choose someone on your firm's team.";
+export const CUSTOM_VALUE_CHANGED = "This cell was changed by someone else just now. Refresh and try again.";
+export const CUSTOM_VALUE_NOT_ALLOWED = "Your role can't change this value. Ask an attorney or an admin.";
+export const CUSTOM_BUSY = "Someone else was changing this column at the same moment. Try again.";
+export const CUSTOM_SAVE_FAILED = "The column couldn't be saved. Try again.";
+export const CUSTOM_VALUE_SAVE_FAILED = "The value couldn't be saved. Try again.";
+export const CUSTOM_FIELD_CHANGED = "This column was changed by someone else just now. Refresh and try again.";
+export const CUSTOM_ORDER_CHANGED = "The order changed while you were looking. Refresh and try again.";
+export const CUSTOM_SAVE_FAILED_READ = "Couldn't check the firm's columns just now, so nothing was saved. Try again.";
+export const CUSTOM_LABEL_EMPTY = "Give the column a name.";
+export const CUSTOM_CHOICES_COUNT = "A Choice column needs 1 to 30 choices.";
+export const CUSTOM_CHOICE_TOO_LONG = "Choices can be up to 40 characters.";
+export const choiceRepeated = (choice: string) => `${choice} is listed twice. Each choice must be different.`;
+export const labelIsBuiltin = (label: string) => `${label} is already a column on the List. Choose another name.`;
+export const labelTaken = (label: string) => `${label} is already one of your firm's columns. Choose another name.`;
+export const optionInUse = (option: string, n: number) => `${option} is still used on ${n} ${n === 1 ? "record" : "records"}.`;
+export const CUSTOM_DATE_BAD = "Choose a date.";
+export const CUSTOM_MONEY_BAD = "Enter an amount like 1,250 or 1250.00.";
+export const CUSTOM_TEAM_UNREADABLE = "Couldn't check the team list right now, so nothing was saved. Try again.";
+
+/** The custom-cell editors (owner Sheet and the opened card). */
+export const fromLeadHint = (text: string) => `${CUSTOM_FROM_LEAD}: ${text}`;
+export const fromMergedHint = (text: string) => `${CUSTOM_FROM_MERGED}: ${text}`;
+export const noLongerAChoice = (value: string) => `${value} (no longer a choice)`;
+export const CUSTOM_NO_ONE = "No one";
+export const CUSTOM_FROM_LEAD_KEPT = "Cleared. The lead's value still shows here.";
+export const CUSTOM_FROM_MERGED_KEPT = "Cleared. The merged duplicate's value still shows here.";
+export const customCellLabel = (label: string, value: string) => `${label}: ${value}`;

@@ -88,9 +88,20 @@ export function fieldsForSection<F extends CustomColumnField>(fields: readonly F
     .sort((a, b) => a.position - b.position || a.label.localeCompare(b.label, "en") || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 
-/** A custom field as a List column: read only, never money-gated, never pinned; the header is the firm's label, the hover text its kind. */
+/**
+ * A custom field as a List column: never money-gated, never pinned; the header is the firm's label, the hover text its kind. It CAN be
+ * typed (Sprint 3); whether a given person may type in a given row is `cellEditable`'s call (role, section), never this flag's.
+ */
 export function customColumn(field: CustomColumnField): SheetColumn {
-  return { id: customColumnId(field.id), header: field.label, title: CUSTOM_KIND_WORDS[field.kind], money: false, pinned: false, editable: false, kind: field.kind };
+  return { id: customColumnId(field.id), header: field.label, title: CUSTOM_KIND_WORDS[field.kind], money: false, pinned: false, editable: true, kind: field.kind };
+}
+
+/**
+ * A label as the clash rules compare it: every run of whitespace (a tab and a non-breaking space included) becomes one space, the
+ * ends lose their spaces, lower case. " Status " and "status" are the same name. Used by the built-in clash, the column clash and CO3.
+ */
+export function labelKey(label: string): string {
+  return label.replace(/\s+/g, " ").replace(/^ +| +$/g, "").toLowerCase();
 }
 
 /**
@@ -177,6 +188,28 @@ export const NOT_TRACKED: Record<SheetSectionId, readonly string[]> = {
   trademarks: [NT_PRIORITY, NT_OPINION_LETTER_DUE, NT_COMPLETION_DATE, NT_OFFICE_ACTION_FEE],
   contracts: [NT_PRIORITY, NT_COMPLETION_DATE],
 };
+
+/**
+ * Every header the registry has for a section, whoever is looking (the money and Notes headers included): a custom column may not
+ * take one of these names, so it never sits next to a column with the same header.
+ */
+export function builtinHeaders(section: SheetSectionId): string[] {
+  return SHEET_SECTION_COLUMNS[section].map((id) => sheetColumn(id, section).header);
+}
+
+/** The part of a custom-columns state the "Not tracked" rule needs (the full type lives in `@/lib/custom-columns/rules`). */
+export type CustomStateLike = { status: string; fields?: readonly Pick<CustomColumnField, "label" | "section">[] } | null | undefined;
+
+/**
+ * CO3: the "Not tracked in Lectual yet" names for a section, without the ones the firm has added as a LIVE custom column that shows in
+ * that section (same `labelKey`). When the custom state is not `ok` (not read, not switched on, couldn't load), nothing is dropped.
+ */
+export function notTrackedFor(section: SheetSectionId, state: CustomStateLike): string[] {
+  const names = NOT_TRACKED[section];
+  if (!state || state.status !== "ok" || !state.fields) return [...names];
+  const taken = new Set(state.fields.filter((f) => fieldFits(f, section)).map((f) => labelKey(f.label)));
+  return names.filter((n) => !taken.has(labelKey(n)));
+}
 
 /* ── The per-person chooser: pure rules over `{ order, hidden }` ── */
 

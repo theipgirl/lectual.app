@@ -15,7 +15,10 @@ import {
   type SheetSectionId,
 } from "@/lib/review/sheet-columns";
 import { formatCents } from "@/lib/quotes/money";
+import type { Role } from "@/lib/auth/roles";
 import { BLANK, COL_COULDNT_LOAD, CUSTOM_FROM_LEAD, CUSTOM_FROM_MERGED, CUSTOM_NO_LONGER_ON_TEAM } from "@/lib/ui/words";
+import { centsToInput, parseValueInput } from "./input";
+import { cutCodePoints, optionsShapeOk, sqlLabelOk } from "./text";
 
 /**
  * A firm's own List columns (lectual 0115, proposed): the rules of the READ side. Pure: rows from the two tables in, cells out.
@@ -56,6 +59,12 @@ export type CustomData = {
 /** What the List and the card get: the data, "not switched on" (the tables aren't there yet), or "couldn't load". */
 export type CustomColumnsState = ({ status: "ok" } & CustomData) | { status: "not-set-up" } | { status: "unavailable" };
 
+/** What the section note needs of a state (CO3, CO4): the status and the live fields' labels and sections. Null when not read. */
+export function noteStateOf(state: CustomColumnsState | null | undefined): { status: CustomColumnsState["status"]; fields?: { label: string; section: CustomSection }[] } | null {
+  if (!state) return null;
+  return state.status === "ok" ? { status: "ok", fields: state.fields.map((f) => ({ label: f.label, section: f.section })) } : { status: state.status };
+}
+
 /** The row facts the rules need; `ReviewRow` itself is not changed. */
 export type CustomRow = Pick<ReviewRow, "kind" | "id" | "matterType">;
 
@@ -69,23 +78,23 @@ export const OPTIONS_MAX = 30;
 export const OPTION_MAX = 40;
 export const TEXT_MAX = 500;
 
+/**
+ * Who may type a custom value: 0115's value insert / update / delete policy list, equal to `MATTER_WRITE_ROLES` and `CAN_WRITE_LEAD`
+ * (a test pins all four). viewer and social_media read only.
+ */
+export const CUSTOM_VALUE_WRITE_ROLES: readonly Role[] = ["owner", "admin", "senior_admin", "attorney", "intake", "paralegal", "law_clerk", "clerk"];
+export const canWriteCustomValue = (role: string | null | undefined): boolean => !!role && (CUSTOM_VALUE_WRITE_ROLES as readonly string[]).includes(role);
+
 const isKind = (x: unknown): x is CustomKind => typeof x === "string" && (CUSTOM_KINDS as readonly string[]).includes(x);
 const isSection = (x: unknown): x is CustomSection => typeof x === "string" && (CUSTOM_SECTIONS as readonly string[]).includes(x);
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-/** The proposal's `crm_custom_field_options_valid`: a choice holds 1 to 30 distinct (ignoring case) trimmed strings of 1 to 40; every other kind none. */
+/**
+ * CO1: the shape `crm_custom_field_options_valid` accepts (`text.ts`), without re-judging "distinct ignoring case": the database did that
+ * with `lower()`, and a field it stored is drawn.
+ */
 export function optionsValid(kind: CustomKind, options: unknown): options is string[] {
-  if (!Array.isArray(options)) return false;
-  if (kind !== "choice") return options.length === 0;
-  if (options.length < 1 || options.length > OPTIONS_MAX) return false;
-  const seen = new Set<string>();
-  for (const o of options) {
-    if (typeof o !== "string" || o.length < 1 || o.length > OPTION_MAX || o !== o.trim()) return false;
-    const k = o.toLowerCase();
-    if (seen.has(k)) return false;
-    seen.add(k);
-  }
-  return true;
+  return optionsShapeOk(kind, options);
 }
 
 /** A field row as read, or null when anything is off (it is then not drawn at all, never drawn half). */
@@ -94,7 +103,8 @@ export function parseField(raw: unknown): CustomField | null {
   const r = raw as Record<string, unknown>;
   if (!isFieldId(r.id) || !isSection(r.section) || !isKind(r.kind)) return null;
   const label = r.label;
-  if (typeof label !== "string" || label.length < 1 || label.length > LABEL_MAX || label !== label.trim()) return null;
+  // CO1: exactly the label CHECKs (1..60 code points, `label = btrim(label)`): a tab or a non-breaking space at the end is the database's to allow.
+  if (!sqlLabelOk(label)) return null;
   const position = r.position;
   if (typeof position !== "number" || !Number.isInteger(position) || position < 0 || position > POSITION_MAX) return null;
   if (!optionsValid(r.kind, r.options)) return null;
@@ -200,7 +210,7 @@ export function formatValue(field: Pick<CustomField, "kind">, value: CustomValue
   if (!value) return blank;
   switch (field.kind) {
     case "text":
-      return value.text === null ? blank : { text: value.text.length > TEXT_MAX ? `${value.text.slice(0, TEXT_MAX)}…` : value.text, tone: "value" };
+      return value.text === null ? blank : { text: cutCodePoints(value.text, TEXT_MAX) === value.text ? value.text : `${cutCodePoints(value.text, TEXT_MAX)}…`, tone: "value" };
     case "date":
       return value.date === null ? blank : { text: shortDate(value.date, today), tone: "value" };
     case "money":
@@ -245,15 +255,144 @@ export function customCells(
   return out;
 }
 
+/* ── What a row's editor starts from (Sprint 3) ── */
+
+/**
+ * The value a row shows when it has NO own value: a lead's merged duplicate's; a Trademarks matter's lead's (or a lead merged into its
+ * lead); a Contracts matter, none. Present whether or not the row has an own value, so the editors can say what would still show.
+ */
+export function inheritedFor(row: CustomRow, field: Pick<CustomField, "id" | "section">, custom: CustomData): { value: CustomValue; from: "lead" | "merged" } | null {
+  const section = rowSection(row);
+  if (!fieldFits(field, section)) return null;
+  const idx = indexOf(custom);
+  if (row.kind === "lead") {
+    const merged = fromMergedChildren(idx, field.id, row.id);
+    return merged ? { value: merged, from: "merged" } : null;
+  }
+  if (section !== "trademarks") return null;
+  const leadId = custom.leadOfMatter[row.id];
+  if (!leadId) return null;
+  const lead = idx.byLead.get(`${field.id}|${leadId}`);
+  if (lead) return { value: lead, from: "lead" };
+  const merged = fromMergedChildren(idx, field.id, leadId);
+  return merged ? { value: merged, from: "merged" } : null;
+}
+
+/** The record's OWN value for a field, or null. */
+export function ownValueFor(row: CustomRow, field: Pick<CustomField, "id" | "section">, custom: CustomData): CustomValue | null {
+  if (!fieldFits(field, rowSection(row))) return null;
+  const idx = indexOf(custom);
+  return (row.kind === "lead" ? idx.byLead.get(`${field.id}|${row.id}`) : idx.byMatter.get(`${field.id}|${row.id}`)) ?? null;
+}
+
+/** A stored value in the editors' form: text as stored, a date YYYY-MM-DD, money "1250.00", a choice as stored, a person's user id. */
+export function editorValue(field: Pick<CustomField, "kind">, value: CustomValue | null): string | null {
+  if (!value) return null;
+  switch (field.kind) {
+    case "text":
+      return value.text;
+    case "date":
+      return value.date;
+    case "money":
+      return value.cents === null ? null : centsToInput(value.cents);
+    case "choice":
+      return value.choice;
+    case "person":
+      return value.userId;
+  }
+}
+
+export type InheritedCell = { from: "lead" | "merged"; cell: FactCell };
+export type CustomEditInput = { own: Record<string, string | null>; inherited: Record<string, InheritedCell> };
+
+function inheritedCell(row: CustomRow, field: CustomField, custom: CustomData, members: readonly CustomMember[] | null, today: string): InheritedCell | null {
+  const hit = inheritedFor(row, field, custom);
+  if (!hit) return null;
+  return { from: hit.from, cell: { ...formatValue(field, hit.value, members, today), title: hit.from === "lead" ? CUSTOM_FROM_LEAD : CUSTOM_FROM_MERGED } };
+}
+
+/** Every row's own values (editor form) and inherited cells, by row key then `cf:<field id>`: plain objects, for the client table. */
+export function customEditInputs(
+  rows: readonly (CustomRow & { key: string })[],
+  fields: readonly CustomField[],
+  custom: CustomData,
+  members: readonly CustomMember[] | null,
+  today: string,
+): Record<string, CustomEditInput> {
+  const out: Record<string, CustomEditInput> = {};
+  for (const r of rows) {
+    const own: Record<string, string | null> = {};
+    const inherited: Record<string, InheritedCell> = {};
+    for (const f of fieldsForSection(fields, rowSection(r))) {
+      const id = customColumnId(f.id);
+      own[id] = editorValue(f, ownValueFor(r, f, custom));
+      const inh = inheritedCell(r, f, custom, members, today);
+      if (inh) inherited[id] = inh;
+    }
+    out[r.key] = { own, inherited };
+  }
+  return out;
+}
+
+/**
+ * The cell a just-typed value draws while it saves (and until fresh rows arrive): formatted as the server would format the stored
+ * value. A value that doesn't parse draws as typed (the save will be refused and the cell put back).
+ */
+export function typedCell(field: Pick<CustomField, "kind" | "options">, raw: string, members: readonly CustomMember[] | null, today: string): FactCell {
+  const p = parseValueInput(field.kind, raw, field.kind === "choice" ? [...field.options, raw] : field.options);
+  if (!p.ok) return { text: raw, tone: "value" };
+  if (p.value === null) return blank;
+  const v: CustomValue = { id: "", fieldId: "", leadId: null, matterId: null, text: null, date: null, cents: null, choice: null, userId: null, updatedAt: "" };
+  if (field.kind === "text") v.text = String(p.value);
+  else if (field.kind === "date") v.date = String(p.value);
+  else if (field.kind === "money") v.cents = Number(p.value);
+  else if (field.kind === "choice") v.choice = String(p.value);
+  else v.userId = String(p.value);
+  return formatValue(field, v, members, today);
+}
+
 /** The opened card's "Firm columns": the record's section's fields in order, each with its cell. */
 export function firmColumnsFor(record: CustomRow, custom: CustomData, members: readonly CustomMember[] | null, today: string): { label: string; cell: FactCell }[] {
   return fieldsForSection(custom.fields, rowSection(record)).map((f) => ({ label: f.label, cell: cellFor(record, f, custom, members, today) }));
 }
 
-/** What the card block draws, from a custom state and the record. */
-export type FirmColumnsBlock = { status: "ok"; items: { label: string; cell: FactCell }[] } | { status: "not-set-up" } | { status: "unavailable" };
+/** What a staff member's card offers for one item: the field, its own value (editor form), what shows without it, and the record to write. */
+export type FirmColumnEdit = {
+  fieldId: string;
+  kind: CustomKind;
+  options: string[];
+  own: string | null;
+  inherited?: { from: "lead" | "merged"; text: string };
+  recordKind: "lead" | "matter";
+  recordId: string;
+};
+export type FirmColumnItem = { label: string; cell: FactCell; edit?: FirmColumnEdit };
 
-export function firmColumnsBlock(state: CustomColumnsState, record: CustomRow, members: readonly CustomMember[] | null, today: string): FirmColumnsBlock {
+/** What the card block draws, from a custom state and the record. */
+export type FirmColumnsBlock = { status: "ok"; items: FirmColumnItem[] } | { status: "not-set-up" } | { status: "unavailable" };
+
+/**
+ * `canWrite` comes from the page's re-resolved role (`canWriteCustomValue`); without it the items carry no `edit` and the card draws the
+ * values only. The record is the one the card SHOWS (a merged lead's keeper, the matter for a matter).
+ */
+export function firmColumnsBlock(state: CustomColumnsState, record: CustomRow, members: readonly CustomMember[] | null, today: string, canWrite = false): FirmColumnsBlock {
   if (state.status !== "ok") return { status: state.status };
-  return { status: "ok", items: firmColumnsFor(record, state, members, today) };
+  const items = fieldsForSection(state.fields, rowSection(record)).map((f): FirmColumnItem => {
+    const item: FirmColumnItem = { label: f.label, cell: cellFor(record, f, state, members, today) };
+    if (!canWrite) return item;
+    const inh = inheritedFor(record, f, state);
+    return {
+      ...item,
+      edit: {
+        fieldId: f.id,
+        kind: f.kind,
+        options: [...f.options],
+        own: editorValue(f, ownValueFor(record, f, state)),
+        ...(inh ? { inherited: { from: inh.from, text: formatValue(f, inh.value, members, today).text } } : {}),
+        recordKind: record.kind,
+        recordId: record.id,
+      },
+    };
+  });
+  return { status: "ok", items };
 }
