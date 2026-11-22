@@ -18,17 +18,20 @@ import type { FactCell, FactCells } from "./sheet-cells";
 export const SHEET_EDIT_COLUMNS = ["client", "mark", "practiceArea", "serial", "status", "next", "court", "source", "notes", "start", "legalFee", "legalFeeDue", "govFee", "govFeeDue", "oaDue", "waiting", "contact"] as const;
 export type SheetEditColumn = (typeof SHEET_EDIT_COLUMNS)[number];
 
-/** The registry's id as this file's column id. */
-export function editColumnOf(id: BuiltinColumnId): SheetEditColumn {
-  return id === "owner" ? "court" : id;
-}
-
 /** A column the Sheet draws and sizes: one of its own, or a firm's custom column (read only, never typed in this sprint). */
 export type SizedColumn = SheetEditColumn | CustomColumnId;
 
-/** The registry's id as the key the Sheet draws and sizes it by (a custom column keeps its `cf:` id). */
+/** The registry's id as this file's column id (a firm's custom column keeps its `cf:` id). */
+export function editColumnOf(id: BuiltinColumnId): SheetEditColumn;
+export function editColumnOf(id: ColumnId): SizedColumn;
+export function editColumnOf(id: ColumnId): SizedColumn {
+  if (isCustomColumnId(id)) return id;
+  return id === "owner" ? "court" : id;
+}
+
+/** The key the Sheet draws and sizes a registry column by: `editColumnOf` for any id. */
 export function sizeKeyOf(id: ColumnId): SizedColumn {
-  return isCustomColumnId(id) ? id : editColumnOf(id);
+  return editColumnOf(id);
 }
 export const EDITABLE_COLUMNS = ["status", "next", "court", "source"] as const;
 export type EditableColumn = (typeof EDITABLE_COLUMNS)[number];

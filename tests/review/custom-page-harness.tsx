@@ -1,0 +1,42 @@
+import { vi } from "vitest";
+import { renderToStaticMarkup } from "react-dom/server";
+
+/**
+ * The page.test.tsx harness, for the custom-column page tests: `loadReview`, the session, the record card and the card's own custom
+ * read are mocked; everything else is the real page. Invented names only.
+ */
+export const spies = {
+  loadReview: vi.fn(),
+  cardCustom: vi.fn(),
+  cardLoad: vi.fn(),
+};
+
+export function mockPage(opts: { load: unknown; role: string | null; roleViews?: boolean; card?: unknown; cardCustom?: unknown }) {
+  spies.loadReview = vi.fn(async () => opts.load);
+  spies.cardLoad = vi.fn(async () => opts.card ?? { status: "not-found" });
+  spies.cardCustom = vi.fn(async () => opts.cardCustom ?? { status: "ok", fields: [], values: [], mergedInto: {}, leadOfMatter: {} });
+  vi.doMock("@/lib/review/load", () => ({ loadReview: spies.loadReview }));
+  vi.doMock("@/lib/custom-columns/card-load", () => ({ loadCardCustomColumns: spies.cardCustom }));
+  vi.doMock("@/lib/firm/session", () => ({
+    resolveFirmSession: vi.fn(async () =>
+      opts.role === null
+        ? { kind: "signed-out", redirectTo: "/" }
+        : { kind: "ok", role: opts.role, user: { id: "u-reb", user_metadata: {} }, org: { id: "o1", modules: opts.roleViews ? ["role-views"] : [] }, actingAsStaff: false },
+    ),
+  }));
+  vi.doMock("@/app/dashboard/review/actions", () => ({
+    setNextStepAction: vi.fn(), completeNextStepAction: vi.fn(), logWhatHappenedAction: vi.fn(), closeLeadAction: vi.fn(),
+    updateNextStepAction: vi.fn(), snoozeNextStepAction: vi.fn(), moveStageAction: vi.fn(), assignRecordAction: vi.fn(), setSourceAction: vi.fn(),
+  }));
+  vi.doMock("@/lib/record-card/load", () => ({ loadRecordCard: spies.cardLoad }));
+  vi.doMock("@/lib/review/sheet-edit-load", () => ({ loadSheetStages: vi.fn(async () => ({ matter: [], lead: [] })) }));
+  vi.doMock("@/lib/review/detail-load", () => ({
+    loadLatestNote: vi.fn(async () => ({ status: "ok", text: "" })),
+    loadDeckDocuments: vi.fn(async () => ({ ok: true, read: { files: { status: "ok", files: [], capped: false }, letters: null } })),
+  }));
+}
+
+export async function renderPage(params: Record<string, string> = {}) {
+  const { default: Page } = await import("../../src/app/dashboard/review/page");
+  return renderToStaticMarkup(await Page({ searchParams: Promise.resolve(params) }));
+}

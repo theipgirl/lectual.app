@@ -50,6 +50,33 @@ describe("chooser markup", () => {
   });
 });
 
+describe("custom columns in the chooser (Sprint 2)", () => {
+  const customFields = [
+    { id: "00000000-0000-4000-8000-00000000a001", section: "trademarks" as const, label: "Priority", kind: "choice" as const, position: 0 },
+    { id: "00000000-0000-4000-8000-00000000a002", section: "contracts" as const, label: "Signed on", kind: "date" as const, position: 0 },
+  ];
+  const withCustom: ChooserSection[] = [
+    { id: "trademarks", title: "Trademarks", columns: columnsFor("trademarks", { canSeeMoney: false, hasNotes: false, customFields }) },
+    { id: "contracts", title: "Contracts", columns: columnsFor("contracts", { canSeeMoney: false, hasNotes: false, customFields }) },
+  ];
+  it("lists them after the spreadsheet columns with their kind word, each with a checkbox and moves", () => {
+    const html = renderToStaticMarkup(<ColumnChooserPanel sections={withCustom} />);
+    const tm = html.slice(0, html.indexOf('data-section-columns="Contracts"'));
+    expect(tm.indexOf("Last contact")).toBeLessThan(tm.indexOf('aria-label="Show Priority"'));
+    expect(tm).toMatch(/aria-label="Show Priority"[^>]*\/> Priority <span class="lx-note" data-column-kind="choice">Choice<\/span>/);
+    expect(tm).toContain('aria-label="Move up: Priority"');
+    expect(html.slice(html.indexOf('data-section-columns="Contracts"'))).toContain('data-column-kind="date">Date</span>');
+    expect(tm).not.toContain("Signed on");
+  });
+  it("the checkbox reflects a hidden custom column (a checkbox carries its own pressed state)", () => {
+    const cols = withCustom[0].columns;
+    const prefs = { order: cols.map((c) => c.id), hidden: ["cf:00000000-0000-4000-8000-00000000a001" as const] };
+    const html = renderToStaticMarkup(<ColumnChooserSection title="Trademarks" columns={cols} prefs={prefs} onChange={() => {}} />);
+    expect(html).toMatch(/<input type="checkbox" aria-label="Show Priority"\/>/);
+    expect(html).toMatch(/<input type="checkbox" aria-label="Show Serial No\." checked=""\/>/);
+  });
+});
+
 describe("pure reducer: hide, move, reset", () => {
   const allowed = columnsFor("trademarks", { canSeeMoney: true, hasNotes: false }).map((c) => c.id);
   it("hide, then move, then Reset returns to the spreadsheet's order", () => {

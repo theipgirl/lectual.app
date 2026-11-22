@@ -17,6 +17,9 @@ const CLIENT_AND_NEW = [
   "src/lib/review/sheet-cells.ts",
   "src/lib/review/fees-cells.ts",
   "src/lib/review/fees-load.ts",
+  // Sprint 2: the custom-columns read side and the card's Firm columns block
+  "src/lib/custom-columns/rules.ts",
+  "src/components/review/ReviewCardExtras.tsx",
 ];
 
 describe("no new write path", () => {

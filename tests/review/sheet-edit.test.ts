@@ -215,6 +215,17 @@ describe("Tab and sizes", () => {
       expect(walk({ rowKey: "t1", col: "court" })).toEqual({ rowKey: "t1", col: "next" });
       expect(walk({ rowKey: "t1", col: "next" })).toEqual({ rowKey: "t2", col: "status" });
     });
+    it("custom columns (read only) are never a stop: with firm columns drawn, Tab visits the same cells as before", () => {
+      const customFields = [
+        { id: "00000000-0000-4000-8000-00000000a001", section: "trademarks" as const, label: "Priority", kind: "choice" as const, position: 0 },
+        { id: "00000000-0000-4000-8000-00000000a002", section: "both" as const, label: "Signed on", kind: "date" as const, position: 1 },
+      ];
+      const withCustom = (sec: SheetSectionId) => columnsFor(sec, { canSeeMoney: true, hasNotes: NOTES_PRESENT, customFields }).map((c) => editColumnOf(c.id));
+      expect(withCustom("trademarks")).toContain("cf:00000000-0000-4000-8000-00000000a001");
+      const walkCustom = (from: { rowKey: string; col: EditableColumnT }, dir: 1 | -1 = 1) => nextEditableCell(rows, from, OWNER, dir, (r) => withCustom(rows.find((x) => x.key === r.key)!.sec));
+      const starts: { rowKey: string; col: EditableColumnT }[] = rows.flatMap((r) => (["status", "next", "court", "source"] as const).map((col) => ({ rowKey: r.key, col })));
+      for (const from of starts) for (const dir of [1, -1] as const) expect(walkCustom(from, dir), `${from.rowKey}|${from.col}|${dir}`).toEqual(walk(from, dir));
+    });
     it("a hidden status is skipped", () => {
       expect(walk({ rowKey: "t1", col: "next" }, 1, { trademarks: ["status"] })).toEqual({ rowKey: "t2", col: "source" });
       expect(walk({ rowKey: "c1", col: "court" }, 1, { contracts: ["status"] })).toEqual({ rowKey: "c2", col: "next" });
