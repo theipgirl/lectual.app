@@ -46,6 +46,7 @@
 --     each; org_id, field_id, lead_id and matter_id have none, and that grant is not widened.
 --   * One row per request, one transaction: never several value rows in one statement, and never a value write and an option or
 --     archive change in one transaction (see "Lock order").
+--   * Move in Settings -> Columns is two single-row position updates in two requests, never one statement or one transaction.
 -- =====================================================================================================================
 
 
@@ -475,6 +476,17 @@ grant insert (org_id, field_id, lead_id, matter_id, value_text, value_date, valu
 grant update (value_text, value_date, value_cents, value_choice, value_user_id) on public.crm_custom_value to authenticated;
 revoke truncate, references, trigger on public.crm_custom_value from anon, authenticated;
 
+-- PostgreSQL 17 adds the MAINTAIN privilege (VACUUM, ANALYZE, REINDEX, CLUSTER, REFRESH, LOCK TABLE). Neither role needs it on these
+-- tables. The version guard keeps this file applying on PostgreSQL 16, where the privilege does not exist.
+do $$
+begin
+  if pg_catalog.current_setting('server_version_num')::int >= 170000 then
+    execute 'revoke maintain on public.crm_custom_field from anon, authenticated';
+    execute 'revoke maintain on public.crm_custom_value from anon, authenticated';
+  end if;
+end
+$$;
+
 -- So a signed-in caller who names id, created_by, created_at or updated_at (fields) or id, updated_by or updated_at (values), or changes
 -- any column outside the UPDATE lists, gets 42501 before RLS or a trigger runs.
 
@@ -595,6 +607,8 @@ comment on column public.crm_custom_value.updated_by is
 --     advisory locks above, under the single-row precondition stated in "Lock order".
 --   * The app's writes (Sprint 3): read first, then insert, or update by id; a 23505 on insert means re-read and update. One row per
 --     request, one transaction.
+--   * lectual.app mirrors the label and option CHECKs exactly (Postgres `btrim` default characters, `char_length` in code points); its writes clean whitespace and control characters first.
+--   * A failed Move can leave two columns sharing a position; they then order by label. A further Move repairs it; if it can't, archive and restore one of them.
 
 -- Cases to add to lectual tests/tenant-isolation.test.ts (NOT written into any lectual file yet). "signed-in" = an authenticated JWT
 -- with active_org_id; "service role" = no session.
@@ -629,6 +643,7 @@ comment on column public.crm_custom_value.updated_by is
 --  14. A signed-in caller naming updated_by, created_by, id, created_at or updated_at: 42501. A signed-in admin inserting a field with
 --      created_by = a colleague: 42501. Stored created_by and updated_by equal the caller; updated_at is the server's.
 --  15. anon reads nothing and writes nothing; TRUNCATE is refused for authenticated on both tables.
+--      On PostgreSQL 17, `has_table_privilege` for `authenticated` and `anon` with `MAINTAIN` on both tables is false.
 --  16. Archive keeps the values (count unchanged); staff cannot insert, update (custom_value_field_archived) or delete (0 rows) them;
 --      restore makes them writable again.
 --  17. Deleting a lead or a matter cascades its values; deleting the firm in ONE statement removes its fields and values (the delete
