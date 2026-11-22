@@ -43,6 +43,14 @@ describe("the owner's editable Sheet", () => {
     expect(html).toContain('role="separator"');
   });
 
+  it("legend names new columns: Serial No., Start Date, Practice Area and Office Action Due Date are worked out, not typed", async () => {
+    const html = await render(OWNER);
+    const legend = html.slice(html.indexOf("Lectual works these out"));
+    for (const name of ["Serial No.", "Start Date", "Practice Area", "Office Action Due Date"]) expect(legend).toContain(name);
+    // no fee mention here: this render is for a viewer who may not see money
+    expect(legend).not.toMatch(/fee column/i);
+  });
+
   it("Waiting on and Last contact are locked: no editor, styled as locked", async () => {
     const html = await render(OWNER);
     expect(html).not.toMatch(/data-rse-cell="[^"]*\|(waiting|contact|client|mark)"/);
