@@ -91,6 +91,9 @@ export type CardMatterRow = {
   stage_id: string | null;
   assigned_to: string | null;
   referral_source: string | null;
+  /** The matter type (a missing one reads as TM) and its lead: the review card's firm columns need the section and the lead's values. */
+  type?: string | null;
+  lead_id?: string | null;
 };
 
 /** What every card on one page shares: who is looking, the firm's lists and where the page is. */

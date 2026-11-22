@@ -21,7 +21,6 @@ import {
   MAX_COL,
   MAX_ROW,
   MIN_COL,
-  DEFAULT_COL_WIDTHS,
   NEXT_MIN_WIDTH,
   NOTE_COL_WIDTH,
   colWidth,
@@ -46,11 +45,12 @@ import {
   sheetReducer,
   shownRow,
   stageChoices,
-  editColumnOf,
+  sizeKeyOf,
   type CellValue,
   type EditableColumn,
   type SheetActionName,
   type SheetEditColumn,
+  type SizedColumn,
   type SheetEditRow,
   type SheetPerms,
   type SheetSizes,
@@ -200,7 +200,7 @@ function nextText(row: SheetEditRow, today: string): { text: string; overdue: bo
   return { text: due ? `${row.nextStep.title} · ${shortDate(due, today)}` : row.nextStep.title, overdue: !!due && due < today };
 }
 
-export function SheetEditTable({ sections, people, perms, sources, today, initial, columns, initialPrefs }: { sections: SheetSection[]; people: SheetPerson[]; perms: SheetPerms; sources: string[]; today: string; initial?: SheetEditInitial; /** What `columnsFor` allowed this viewer, per section (the server decides; the chooser only thins and reorders). */ columns: Record<SheetSectionId, SheetColumn[]>; /** Drawing-only starting column choices (a test or preview). */ initialPrefs?: PrefsDocument }) {
+export function SheetEditTable({ sections, people, perms, sources, today, initial, columns, initialPrefs, customNotOn = false }: { sections: SheetSection[]; people: SheetPerson[]; perms: SheetPerms; sources: string[]; today: string; initial?: SheetEditInitial; /** What `columnsFor` allowed this viewer, per section (the server decides; the chooser only thins and reorders). */ columns: Record<SheetSectionId, SheetColumn[]>; /** Drawing-only starting column choices (a test or preview). */ initialPrefs?: PrefsDocument; /** The firm's custom columns aren't switched on yet: each section note says so. */ customNotOn?: boolean }) {
   // One hook per section, always both: the chooser's choices apply to this table and to the read-only List alike.
   const drawnBy: Record<SheetSectionId, SheetColumn[]> = {
     trademarks: useColumnPrefs("trademarks", columns.trademarks, initialPrefs).columns,
@@ -210,7 +210,7 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
   const [open, setOpen] = useState<OpenCell[]>(initial?.open ?? []);
   const sizes = useSyncExternalStore(sizeStore.subscribe, sizeStore.get, sizeStore.server);
   const setSizes = sizeStore.update;
-  const [dragCol, setDragCol] = useState<SheetEditColumn | null>(null);
+  const [dragCol, setDragCol] = useState<SizedColumn | null>(null);
   const phone = useSyncExternalStore(subscribePhone, isPhone, () => false);
   const rootId = `rse-${useId().replace(/[^A-Za-z0-9_-]/g, "")}`;
   const names = useMemo(() => new Map(people.map((p) => [p.userId, p.short])), [people]);
@@ -255,7 +255,7 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
     setOpen([]);
     // Tab follows what is DRAWN: each row's section columns (after the chooser), in drawn order.
     const sectionOf = new Map(sections.flatMap((s) => s.rows.map((r) => [r.key, s.id] as const)));
-    const to = nextEditableCell(allRows, { rowKey, col }, perms, dir, (r) => drawnBy[sectionOf.get(r.key) ?? "trademarks"].filter((c) => c.editable).map((c) => editColumnOf(c.id)));
+    const to = nextEditableCell(allRows, { rowKey, col }, perms, dir, (r) => drawnBy[sectionOf.get(r.key) ?? "trademarks"].filter((c) => c.editable).map((c) => sizeKeyOf(c.id)));
     if (to) focusCell(to.rowKey, to.col);
   };
 
@@ -292,7 +292,7 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
   }
 
   // Column and row sizes: pointer drag or arrow keys on the grip; stored for this viewer only.
-  const startColDrag = (col: SheetEditColumn) => (e: ReactPointerEvent<HTMLSpanElement>) => {
+  const startColDrag = (col: SizedColumn) => (e: ReactPointerEvent<HTMLSpanElement>) => {
     const th = (e.currentTarget as HTMLElement).closest("th");
     if (!th) return;
     e.preventDefault();
@@ -309,11 +309,11 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
     document.addEventListener("pointermove", onMove);
     document.addEventListener("pointerup", onUp);
   };
-  const colKey = (col: SheetEditColumn) => (e: ReactKeyboardEvent<HTMLSpanElement>) => {
+  const colKey = (col: SizedColumn) => (e: ReactKeyboardEvent<HTMLSpanElement>) => {
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
     e.preventDefault();
     const th = (e.currentTarget as HTMLElement).closest("th");
-    const now = sizes.cols[col] ?? th?.getBoundingClientRect().width ?? DEFAULT_COL_WIDTHS[col] ?? NEXT_MIN_WIDTH;
+    const now = sizes.cols[col] ?? th?.getBoundingClientRect().width ?? colWidth(NO_SIZES, col) ?? NEXT_MIN_WIDTH;
     const next = { ...sizes, cols: { ...sizes.cols, [col]: clampSize(now + (e.key === "ArrowRight" ? 16 : -16), MIN_COL, MAX_COL) } };
     setSizes(next);
     writeSizes(next);
@@ -355,18 +355,18 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
       {sections.map((sec) => {
         const drawn = drawnBy[sec.id];
         const colCount = drawn.length + (editing ? 1 : 0);
-        const labelOf = (col: SheetEditColumn) => columns[sec.id].find((c) => editColumnOf(c.id) === col)?.header ?? "";
+        const labelOf = (col: SizedColumn) => columns[sec.id].find((c) => sizeKeyOf(c.id) === col)?.header ?? "";
         return (
       <SheetCard key={sec.id} className="rse-sec-card">
        <h2 id={`rse-sheet-${sec.id}`} className="lx-h3 rv-sheet-title">
          {sec.title} <span className="lx-note">{sec.rows.length}</span>
        </h2>
-       <SectionNote section={sec.id} />
+       <SectionNote section={sec.id} customNotOn={customNotOn} />
        <SheetScroll>
-        <SheetTable className="rse-tbl" fixed minWidth={sheetMinWidth(sizes, editing, drawn.map((c) => editColumnOf(c.id)))}>
+        <SheetTable className="rse-tbl" fixed minWidth={sheetMinWidth(sizes, editing, drawn.map((c) => sizeKeyOf(c.id)))}>
           <colgroup>
             {drawn.map((c) => {
-              const cw = colWidth(sizes, editColumnOf(c.id));
+              const cw = colWidth(sizes, sizeKeyOf(c.id));
               return <col key={c.id} style={cw ? { width: cw } : undefined} />;
             })}
             {editing && <col style={{ width: NOTE_COL_WIDTH }} />}
@@ -374,7 +374,7 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
           <thead>
             <tr>
               {drawn.map((c) => {
-                const h = { col: editColumnOf(c.id), label: c.header };
+                const h = { col: sizeKeyOf(c.id), label: c.header };
                 const typed = editing && c.editable;
                 const locked = !c.editable && !c.pinned && c.id !== "mark";
                 const w = colWidth(sizes, h.col);
@@ -439,7 +439,7 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                   });
                   const stages = stageChoices(row.kind, perms) ?? [];
                   const fact = (col: SheetEditColumn) => <SheetFactTd cell={row.facts?.[col as keyof NonNullable<SheetEditRow["facts"]>]} label={labelOf(col)} className="rse-locked" quiet="rse-dash" />;
-                  const cells: Partial<Record<SheetEditColumn, React.ReactNode>> = {
+                  const cells: Partial<Record<SizedColumn, React.ReactNode>> = {
                       client: (
                       <td className="pri" title={row.client}>
                         <Link href={row.openHref} className="sheet-link" scroll={false}>
@@ -605,7 +605,7 @@ export function SheetEditTable({ sections, people, perms, sources, today, initia
                   return (
                     <tr key={row.key} style={h ? { height: h } : undefined} data-row={row.key}>
                       {drawn.map((c) => (
-                        <Fragment key={c.id}>{cells[editColumnOf(c.id)] ?? null}</Fragment>
+                        <Fragment key={c.id}>{c.kind ? <SheetFactTd cell={row.custom?.[c.id]} label={c.header} className="rse-locked" quiet="rse-dash" /> : cells[sizeKeyOf(c.id)] ?? null}</Fragment>
                       ))}
                       {editing && (
                         <td className="rse-note-td">

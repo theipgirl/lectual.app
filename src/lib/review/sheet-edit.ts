@@ -1,7 +1,7 @@
 import type { ReviewKind, ReviewNextStep, ReviewRow } from "./buckets";
 import { courtTarget, laneOf, withCourt } from "./lanes";
-import type { ColumnId } from "./sheet-columns";
-import type { FactCells } from "./sheet-cells";
+import { isCustomColumnId, type BuiltinColumnId, type ColumnId, type CustomColumnId } from "./sheet-columns";
+import type { FactCell, FactCells } from "./sheet-cells";
 
 /**
  * The owner view's editable Sheet. Pure: which cells a person may edit, which EXISTING review action each edit posts to
@@ -19,8 +19,16 @@ export const SHEET_EDIT_COLUMNS = ["client", "mark", "practiceArea", "serial", "
 export type SheetEditColumn = (typeof SHEET_EDIT_COLUMNS)[number];
 
 /** The registry's id as this file's column id. */
-export function editColumnOf(id: ColumnId): SheetEditColumn {
+export function editColumnOf(id: BuiltinColumnId): SheetEditColumn {
   return id === "owner" ? "court" : id;
+}
+
+/** A column the Sheet draws and sizes: one of its own, or a firm's custom column (read only, never typed in this sprint). */
+export type SizedColumn = SheetEditColumn | CustomColumnId;
+
+/** The registry's id as the key the Sheet draws and sizes it by (a custom column keeps its `cf:` id). */
+export function sizeKeyOf(id: ColumnId): SizedColumn {
+  return isCustomColumnId(id) ? id : editColumnOf(id);
 }
 export const EDITABLE_COLUMNS = ["status", "next", "court", "source"] as const;
 export type EditableColumn = (typeof EDITABLE_COLUMNS)[number];
@@ -103,6 +111,8 @@ export type SheetEditRow = {
   changedText?: string | null;
   /** The read-only cells of the spreadsheet's other columns (serial, dates, practice area, owner-only fees), worked out by the server. */
   facts?: Partial<FactCells>;
+  /** The firm's own columns' read-only cells, by `cf:<field id>`, worked out by the server (absent when there are none to draw). */
+  custom?: Record<string, FactCell>;
 };
 
 /** The typed value of one cell, as the editor saves it and the table draws it. */
@@ -285,8 +295,8 @@ export function nextEditableCell(
   from: { rowKey: string; col: EditableColumn },
   perms: SheetPerms,
   dir: 1 | -1 = 1,
-  /** The columns a row DRAWS, in drawn order (its section's columns after the chooser). Default: every editable column in the fixed order. */
-  columnsFor?: (row: Pick<SheetEditRow, "key" | "kind">) => readonly SheetEditColumn[],
+  /** The columns a row DRAWS, in drawn order (its section's columns after the chooser). Default: every editable column in the fixed order. A custom column is never editable here, so it is never a stop. */
+  columnsFor?: (row: Pick<SheetEditRow, "key" | "kind">) => readonly SizedColumn[],
 ): { rowKey: string; col: EditableColumn } | null {
   const cells: { rowKey: string; col: EditableColumn }[] = [];
   for (const r of rows) for (const col of columnsFor ? columnsFor(r) : EDITABLE_COLUMNS) if (isEditableColumn(col) && cellEditable(col, r.kind, perms)) cells.push({ rowKey: r.key, col });
@@ -302,7 +312,7 @@ export const MIN_COL = 72;
 export const MAX_COL = 640;
 export const MIN_ROW = 40;
 export const MAX_ROW = 320;
-export type SheetSizes = { cols: Partial<Record<SheetEditColumn, number>>; rows: Record<string, number> };
+export type SheetSizes = { cols: Partial<Record<SizedColumn, number>>; rows: Record<string, number> };
 export const NO_SIZES: SheetSizes = { cols: {}, rows: {} };
 
 /** Default column widths in px. Next step is flexible (no fixed width) and never narrower than `NEXT_MIN_WIDTH`. A stored width overrides these. */
@@ -325,18 +335,22 @@ export const DEFAULT_COL_WIDTHS: Record<SheetEditColumn, number | null> = {
   waiting: 140,
   contact: 84,
 };
+/** A firm's custom column, until this viewer resizes it. */
+export const CUSTOM_COL_WIDTH = 140;
+/** At most this many stored custom widths are kept (a firm has at most 40 live fields). */
+const MAX_CUSTOM_SIZES = 64;
 /** The "+ Note" column (the editing aid) adds `NOTE_COL_WIDTH` to whatever a section draws; each section table scrolls sideways inside its card when wider. */
 export const NEXT_MIN_WIDTH = 200;
 /** The "+ Note" column, drawn only while editing. */
 export const NOTE_COL_WIDTH = 76;
 
 /** The width a column is drawn at: this viewer's stored width, else the default; null = flexible (Next step). */
-export function colWidth(sizes: Pick<SheetSizes, "cols">, col: SheetEditColumn): number | null {
-  return sizes.cols[col] ?? DEFAULT_COL_WIDTHS[col];
+export function colWidth(sizes: Pick<SheetSizes, "cols">, col: SizedColumn): number | null {
+  return sizes.cols[col] ?? (isCustomColumnId(col) ? CUSTOM_COL_WIDTH : DEFAULT_COL_WIDTHS[col]);
 }
 
 /** The narrowest the table may get before it scrolls sideways inside its card (flexible Next step counted at its minimum). */
-export function sheetMinWidth(sizes: Pick<SheetSizes, "cols">, withNote: boolean, columns: readonly SheetEditColumn[] = SHEET_EDIT_COLUMNS.filter((c) => c !== "notes")): number {
+export function sheetMinWidth(sizes: Pick<SheetSizes, "cols">, withNote: boolean, columns: readonly SizedColumn[] = SHEET_EDIT_COLUMNS.filter((c) => c !== "notes")): number {
   let total = withNote ? NOTE_COL_WIDTH : 0;
   for (const c of columns) total += colWidth(sizes, c) ?? NEXT_MIN_WIDTH;
   return total;
@@ -362,6 +376,15 @@ export function parseSizes(raw: string | null | undefined): SheetSizes {
     for (const c of SHEET_EDIT_COLUMNS) {
       const v = (cols as Record<string, unknown>)[c];
       if (typeof v === "number" && Number.isFinite(v)) out.cols[c] = clampSize(v, MIN_COL, MAX_COL);
+    }
+    // A firm's custom column keeps its width by its `cf:` id; anything else stored is dropped.
+    let kept = 0;
+    for (const [k, v] of Object.entries(cols as Record<string, unknown>)) {
+      if (kept >= MAX_CUSTOM_SIZES) break;
+      if (isCustomColumnId(k) && typeof v === "number" && Number.isFinite(v)) {
+        out.cols[k] = clampSize(v, MIN_COL, MAX_COL);
+        kept += 1;
+      }
     }
   }
   const rows = (data as { rows?: unknown }).rows;

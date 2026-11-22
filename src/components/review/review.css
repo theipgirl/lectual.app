@@ -189,3 +189,10 @@
 /* The quiet "Changed by ... · Nov 16" line on a card, a sheet row and in the panel. */
 .rv-changed { display: block; font-size: var(--fs-1); }
 td.rv-fact-failed { white-space: nowrap; }
+/* The read-only List's failed cell ("Couldn't load") stays on one line: the td's nowrap never reached the text, because `.lx-note`
+   (globals.css, 0,1,0) sets the span's own text-wrap to pretty (mode: wrap). This rule targets the span itself, at (0,1,2). */
+td.rv-fact-failed > span { white-space: nowrap; text-wrap: nowrap; }
+/* The opened card's "Firm columns" block: the same label, spacing and text size as the facts above it. */
+.rv-cardx-firm { display: grid; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); min-width: 0; }
+.rv-cardx-firm > h4 { margin: 0; }
+.rv-cardx-firm > p { margin: 0; }

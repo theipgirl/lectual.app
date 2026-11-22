@@ -241,6 +241,8 @@ async function loadMatter(id: string, role: Role, now: Date): Promise<RecordCard
       stage_id: matter.stage_id,
       assigned_to: matter.assigned_to,
       referral_source: matter.referral_source,
+      type: matter.type ?? null,
+      lead_id: matter.lead_id ?? null,
     },
     stages,
     members,

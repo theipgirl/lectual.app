@@ -1469,3 +1469,15 @@ export const columnsShow = (header: string) => `Show ${header}`;
 export const columnsMoveUp = (header: string) => `${COLUMNS_MOVE_UP}: ${header}`;
 export const columnsMoveDown = (header: string) => `${COLUMNS_MOVE_DOWN}: ${header}`;
 export const columnsSectionLabel = (section: string) => `${section} columns`;
+/** Firm-defined custom columns (lectual 0115, proposed). Read only until Settings -> Columns exists. */
+export const CUSTOM_COLUMNS_NOT_ON = "Custom columns aren't switched on for your firm yet.";
+export const CUSTOM_FROM_LEAD = "From the lead";
+export const CUSTOM_FROM_MERGED = "From a merged duplicate";
+export const CUSTOM_NO_LONGER_ON_TEAM = "Someone no longer on the team";
+export const FIRM_COLUMNS_HEADING = "Firm columns";
+/** The five kinds of custom column, as the chooser and a header's hover text name them. */
+export const CUSTOM_KIND_TEXT = "Text";
+export const CUSTOM_KIND_DATE = "Date";
+export const CUSTOM_KIND_MONEY = "Money";
+export const CUSTOM_KIND_CHOICE = "Choice";
+export const CUSTOM_KIND_PERSON = "Person";

@@ -27,6 +27,8 @@ import { loadReview } from "@/lib/review/load";
 import { canSeeBilling } from "@/lib/billing/can-see";
 import { ColumnChooser, type ChooserSection } from "@/components/review/ColumnChooser";
 import { NOTES_PRESENT, columnsFor } from "@/lib/review/sheet-columns";
+import { loadCardCustomColumns } from "@/lib/custom-columns/card-load";
+import { firmColumnsBlock, type FirmColumnsBlock } from "@/lib/custom-columns/rules";
 import { reviewBuckets, reviewSubline } from "@/lib/review/buckets";
 import { boardLanes, kpis, meetingPosition, offBoard } from "@/lib/review/lanes";
 import { deadlinesOut, reviewPerson, waitingOnPerson } from "@/lib/review/strips";
@@ -59,7 +61,9 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const role = session.kind === "ok" ? session.role : null;
   const canSeeMoney = canSeeBilling(role);
   const withFees = canSeeMoney && params.view === "sheet";
-  const load = await loadReview(new Date(), { withFees });
+  // The firm's own columns are the List's too: only the List reads them (the opened card reads its own record when needed).
+  const withCustom = params.view === "sheet";
+  const load = await loadReview(new Date(), { withFees, withCustom });
   const userId = session.kind === "ok" ? session.user.id : null;
   const canWrite = !!role && MATTER_WRITE_ROLES.includes(role);
   const canMove = canWrite && CAN_MOVE_STAGE.includes(role);
@@ -90,6 +94,10 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
     actingAsStaff: session.actingAsStaff,
   }) === "owner";
   const common = { owner, today: load.today, members: load.members, canWrite, params };
+  // Custom columns: the state the List drew from (null when not read), and the directory for person cells (null = it couldn't be read).
+  const custom = load.custom ?? null;
+  const customFields = custom?.status === "ok" ? custom.fields : [];
+  const customMembers = load.failed.includes("team names") ? null : load.members;
   // The owner's Sheet edits in place. Each permission comes from the role re-resolved above; the stage lists are read only for a role that can move one.
   let sheetPerms: SheetPerms | null = null;
   if (owner && params.view === "sheet") {
@@ -103,8 +111,8 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
     params.view === "sheet" ? (
       <ColumnChooser
         sections={[
-          { id: "trademarks", title: "Trademarks", columns: columnsFor("trademarks", { canSeeMoney, hasNotes: NOTES_PRESENT }) },
-          { id: "contracts", title: "Contracts", columns: columnsFor("contracts", { canSeeMoney, hasNotes: NOTES_PRESENT }) },
+          { id: "trademarks", title: "Trademarks", columns: columnsFor("trademarks", { canSeeMoney, hasNotes: NOTES_PRESENT, customFields }) },
+          { id: "contracts", title: "Contracts", columns: columnsFor("contracts", { canSeeMoney, hasNotes: NOTES_PRESENT, customFields }) },
         ] satisfies ChooserSection[]}
       />
     ) : null;
@@ -146,6 +154,20 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const cardLoad = params.open ? await loadRecordCard(params.open) : null;
   const cardShownId = cardLoad?.status === "ok" ? (cardLoad.kind === "lead" ? cardLoad.lead.id : cardLoad.matter.id) : null;
   const cardRow = params.open && cardShownId ? (load.rows.find((r) => r.kind === params.open!.kind && r.id === cardShownId) ?? null) : null;
+  // "Firm columns" on the opened card: from the List's own read when the record is a row of it; otherwise ONE scoped read for the record the
+  // card shows (a merged lead opened by URL is its keeper). No card (not found, couldn't load) means no read at all.
+  let firmColumns: FirmColumnsBlock | null = null;
+  if (cardLoad?.status === "ok") {
+    const record =
+      cardLoad.kind === "lead"
+        ? { kind: "lead" as const, id: cardLoad.lead.id, matterType: null }
+        : { kind: "matter" as const, id: cardLoad.matter.id, matterType: cardLoad.matter.type ?? null };
+    const state =
+      custom && cardRow
+        ? custom
+        : await loadCardCustomColumns(cardLoad.kind === "lead" ? { kind: "lead", id: cardLoad.lead.id } : { kind: "matter", id: cardLoad.matter.id, leadId: cardLoad.matter.lead_id ?? null });
+    firmColumns = firmColumnsBlock(state, custom && cardRow ? cardRow : record, customMembers, load.today);
+  }
   // Close (and Back) land on the same review view: every other review param is kept, only `open` goes.
   const cardBase = reviewHref({ ...params, open: null });
   const cardParams = new URLSearchParams(cardBase.includes("?") ? cardBase.slice(cardBase.indexOf("?") + 1) : "");
@@ -168,6 +190,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
                 stagesFailed={cardLoad.status === "ok" && cardLoad.stages.status !== "ok" && cardEdits({ role: cardLoad.role, kind: cardLoad.kind }).stage}
                 closeStages={canMove ? load.closeStages : []}
                 deadlinesFailed={load.failed.includes("deadlines")}
+                firmColumns={firmColumns}
               />
             ),
           },
@@ -299,7 +322,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
       ) : params.view === "sheet" ? (
         <>
           {strips}
-          <SheetView rows={shown} canSeeMoney={canSeeMoney} {...common} {...(sheetPerms ? { sheetEdit: { perms: sheetPerms } } : {})} />
+          <SheetView rows={shown} canSeeMoney={canSeeMoney} custom={custom} customMembers={customMembers} {...common} {...(sheetPerms ? { sheetEdit: { perms: sheetPerms } } : {})} />
         </>
       ) : (
         <>

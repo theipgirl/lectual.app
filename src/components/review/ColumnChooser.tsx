@@ -28,6 +28,14 @@ export function ColumnChooserSection({ title, columns, prefs, onChange }: { titl
                 <>
                   <label className="rv-cols-name">
                     <input type="checkbox" checked={!hidden} onChange={() => onChange({ type: "toggle", id: c.id })} aria-label={columnsShow(c.header)} /> {c.header}
+                    {c.kind && c.title ? (
+                      <>
+                        {" "}
+                        <span className="lx-note" data-column-kind={c.kind}>
+                          {c.title}
+                        </span>
+                      </>
+                    ) : null}
                   </label>
                   <span className="rv-cols-moves">
                     <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" aria-label={columnsMoveUp(c.header)} disabled={i <= 1} onClick={() => onChange({ type: "move", id: c.id, dir: -1 })}>

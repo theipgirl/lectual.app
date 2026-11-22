@@ -19,6 +19,11 @@ import {
   COL_TRADEMARK_NAME,
   COL_TRADEMARK_OWNER,
   COL_WAITING,
+  CUSTOM_KIND_CHOICE,
+  CUSTOM_KIND_DATE,
+  CUSTOM_KIND_MONEY,
+  CUSTOM_KIND_PERSON,
+  CUSTOM_KIND_TEXT,
   LAST_CONTACT,
   NEXT_STEP,
   NT_COMPLETION_DATE,
@@ -42,7 +47,51 @@ export const SHEET_SECTIONS = ["trademarks", "contracts"] as const;
 export type SheetSectionId = (typeof SHEET_SECTIONS)[number];
 
 export const COLUMN_IDS = ["client", "mark", "serial", "status", "source", "notes", "owner", "start", "legalFee", "legalFeeDue", "govFee", "govFeeDue", "oaDue", "practiceArea", "next", "waiting", "contact"] as const;
-export type ColumnId = (typeof COLUMN_IDS)[number];
+/** The spreadsheet's own columns (Sprint 1). */
+export type BuiltinColumnId = (typeof COLUMN_IDS)[number];
+/** A firm's own column (lectual 0115, proposed): `cf:` and the field's id. */
+export type CustomColumnId = `cf:${string}`;
+export type ColumnId = BuiltinColumnId | CustomColumnId;
+
+/* ── Firm-defined custom columns: the part of a field the registry needs (the full rules live in `@/lib/custom-columns/rules`) ── */
+
+export const CUSTOM_KINDS = ["text", "date", "money", "choice", "person"] as const;
+export type CustomKind = (typeof CUSTOM_KINDS)[number];
+export const CUSTOM_SECTIONS = ["trademarks", "contracts", "both"] as const;
+export type CustomSection = (typeof CUSTOM_SECTIONS)[number];
+/** What `columnsFor` needs of a live field. */
+export type CustomColumnField = { id: string; section: CustomSection; label: string; kind: CustomKind; position: number };
+
+export const CUSTOM_KIND_WORDS: Record<CustomKind, string> = {
+  text: CUSTOM_KIND_TEXT,
+  date: CUSTOM_KIND_DATE,
+  money: CUSTOM_KIND_MONEY,
+  choice: CUSTOM_KIND_CHOICE,
+  person: CUSTOM_KIND_PERSON,
+};
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const isFieldId = (x: unknown): x is string => typeof x === "string" && UUID.test(x);
+export const customColumnId = (fieldId: string): CustomColumnId => `cf:${fieldId}`;
+export const isCustomColumnId = (x: unknown): x is CustomColumnId => typeof x === "string" && x.startsWith("cf:") && isFieldId(x.slice(3));
+const isBuiltinColumnId = (x: unknown): x is BuiltinColumnId => typeof x === "string" && (COLUMN_IDS as readonly string[]).includes(x);
+
+/** Whether a field belongs to a List section: a `both` field is in each. */
+export function fieldFits(field: Pick<CustomColumnField, "section">, section: SheetSectionId): boolean {
+  return field.section === "both" || field.section === section;
+}
+
+/** A section's live fields in their order: `position`, then label, then id (so two fields never swap between renders). */
+export function fieldsForSection<F extends CustomColumnField>(fields: readonly F[], section: SheetSectionId): F[] {
+  return fields
+    .filter((f) => fieldFits(f, section))
+    .sort((a, b) => a.position - b.position || a.label.localeCompare(b.label, "en") || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+
+/** A custom field as a List column: read only, never money-gated, never pinned; the header is the firm's label, the hover text its kind. */
+export function customColumn(field: CustomColumnField): SheetColumn {
+  return { id: customColumnId(field.id), header: field.label, title: CUSTOM_KIND_WORDS[field.kind], money: false, pinned: false, editable: false, kind: field.kind };
+}
 
 /**
  * Whether the Notes cell (another session's work) is present on this branch. It is not: no Notes header or cell is drawn.
@@ -51,14 +100,14 @@ export type ColumnId = (typeof COLUMN_IDS)[number];
 export const NOTES_PRESENT = false;
 
 /** Default orders, the spreadsheet's. */
-export const SHEET_SECTION_COLUMNS: Record<SheetSectionId, readonly ColumnId[]> = {
+export const SHEET_SECTION_COLUMNS: Record<SheetSectionId, readonly BuiltinColumnId[]> = {
   trademarks: ["client", "mark", "serial", "status", "source", "notes", "owner", "start", "legalFee", "legalFeeDue", "govFee", "govFeeDue", "oaDue", "next", "waiting", "contact"],
   contracts: ["client", "practiceArea", "mark", "status", "next", "notes", "owner", "start", "legalFee", "legalFeeDue", "waiting", "contact"],
 };
 
-export const MONEY_COLUMNS: readonly ColumnId[] = ["legalFee", "legalFeeDue", "govFee", "govFeeDue"];
+export const MONEY_COLUMNS: readonly BuiltinColumnId[] = ["legalFee", "legalFeeDue", "govFee", "govFeeDue"];
 /** The four a person types in the owner Sheet. */
-export const EDITABLE_COLUMN_IDS: readonly ColumnId[] = ["status", "next", "owner", "source"];
+export const EDITABLE_COLUMN_IDS: readonly BuiltinColumnId[] = ["status", "next", "owner", "source"];
 /** Only these are worked out by Lectual from the record, read only. */
 export const FACT_COLUMN_IDS = ["serial", "start", "practiceArea", "oaDue", "legalFee", "legalFeeDue", "govFee", "govFeeDue"] as const;
 export type FactColumnId = (typeof FACT_COLUMN_IDS)[number];
@@ -74,11 +123,13 @@ export type SheetColumn = {
   pinned: boolean;
   /** Typed in the owner Sheet (its editors); every other column is read only. */
   editable: boolean;
+  /** A firm's own column: its kind (the chooser names it). Absent on the spreadsheet's columns. */
+  kind?: CustomKind;
 };
 
 type Meta = { header: string | Record<SheetSectionId, string>; title?: string | Partial<Record<SheetSectionId, string>> };
 
-const META: Record<ColumnId, Meta> = {
+const META: Record<BuiltinColumnId, Meta> = {
   client: { header: { trademarks: COL_TRADEMARK_OWNER, contracts: COL_CLIENT_NAME } },
   mark: { header: { trademarks: COL_TRADEMARK_NAME, contracts: COL_CONTRACT_TYPE }, title: { contracts: COL_CONTRACT_TYPE_TITLE } },
   serial: { header: COL_SERIAL },
@@ -98,21 +149,27 @@ const META: Record<ColumnId, Meta> = {
   contact: { header: LAST_CONTACT },
 };
 
-export function sheetColumn(id: ColumnId, section: SheetSectionId): SheetColumn {
+/** The pinned column: the link to the record, first and never hidden. */
+export const isPinnedColumn = (id: ColumnId): boolean => id === "client";
+
+export function sheetColumn(id: BuiltinColumnId, section: SheetSectionId): SheetColumn {
   const meta = META[id];
   const header = typeof meta.header === "string" ? meta.header : meta.header[section];
   const title = typeof meta.title === "string" ? meta.title : meta.title?.[section];
-  return { id, header, ...(title ? { title } : {}), money: MONEY_COLUMNS.includes(id), pinned: id === "client", editable: EDITABLE_COLUMN_IDS.includes(id) };
+  return { id, header, ...(title ? { title } : {}), money: MONEY_COLUMNS.includes(id), pinned: isPinnedColumn(id), editable: EDITABLE_COLUMN_IDS.includes(id) };
 }
 
 /**
  * The columns this viewer may have, in default order. `canSeeMoney` comes from the page's re-resolved role
- * (`canSeeBilling`), never from a browser value; `hasNotes` is whether the Notes cell exists.
+ * (`canSeeBilling`), never from a browser value; `hasNotes` is whether the Notes cell exists. `customFields` are the firm's live
+ * fields (read through the scoped client): that section's come after the spreadsheet columns, in position order. A custom money
+ * column is NOT under the owner-only fee rule (an open question for the firm; changing it is this one predicate).
  */
-export function columnsFor(section: SheetSectionId, opts: { canSeeMoney: boolean; hasNotes: boolean }): SheetColumn[] {
-  return SHEET_SECTION_COLUMNS[section]
+export function columnsFor(section: SheetSectionId, opts: { canSeeMoney: boolean; hasNotes: boolean; customFields?: readonly CustomColumnField[] }): SheetColumn[] {
+  const builtin = SHEET_SECTION_COLUMNS[section]
     .filter((id) => (opts.canSeeMoney || !MONEY_COLUMNS.includes(id)) && (opts.hasNotes || id !== "notes"))
     .map((id) => sheetColumn(id, section));
+  return [...builtin, ...fieldsForSection(opts.customFields ?? [], section).map(customColumn)];
 }
 
 /** The "No home" spreadsheet columns, named once in the note above each section. */
@@ -127,14 +184,14 @@ export type SectionPrefs = { order: ColumnId[]; hidden: ColumnId[] };
 export type StoredPrefs = { v: 1; trademarks: SectionPrefs; contracts: SectionPrefs };
 
 export const COLUMN_PREFS_VERSION = 1;
-/** More ids than any section has: a longer stored list is cut, not trusted. */
+/** More ids than any section has (17 of the spreadsheet's plus at most 40 of the firm's): a longer stored list is cut, not trusted. */
 const MAX_STORED_IDS = 64;
 
-const isColumnId = (x: unknown): x is ColumnId => typeof x === "string" && (COLUMN_IDS as readonly string[]).includes(x);
+const isColumnId = (x: unknown): x is ColumnId => isBuiltinColumnId(x) || isCustomColumnId(x);
 
 /**
  * Cleans one section's stored `{ order, hidden }` against the columns `columnsFor` allowed. Unknown ids, ids not allowed (a stored
- * money id for a non-owner), duplicates and an over-long list are dropped; allowed ids missing from the stored order come back at
+ * money id for a non-owner, a `cf:` id of a field that is archived, of the other section or not given), duplicates and an over-long list are dropped; allowed ids missing from the stored order come back at
  * their default position (after the nearest earlier default column that is present); the pinned column is first and never hidden.
  */
 export function parseColumnPrefs(raw: unknown, allowed: readonly ColumnId[]): SectionPrefs {
@@ -155,7 +212,7 @@ export function parseColumnPrefs(raw: unknown, allowed: readonly ColumnId[]): Se
     }
     order.splice(at, 0, id);
   });
-  const pinned = order.filter((id) => sheetColumn(id, "trademarks").pinned);
+  const pinned = order.filter(isPinnedColumn);
   const withPinnedFirst = [...pinned, ...order.filter((id) => !pinned.includes(id))];
   const hidden: ColumnId[] = [];
   for (const id of list(obj.hidden)) if (!hidden.includes(id) && !pinned.includes(id)) hidden.push(id);
@@ -201,7 +258,7 @@ export type PrefsAction =
 export function prefsReducer(prefs: SectionPrefs, action: PrefsAction, allowed: readonly ColumnId[]): SectionPrefs {
   if (action.type === "reset") return defaultSectionPrefs(allowed);
   const cur = parseColumnPrefs(prefs, allowed);
-  if (!allowed.includes(action.id) || sheetColumn(action.id, "trademarks").pinned) return cur;
+  if (!allowed.includes(action.id) || isPinnedColumn(action.id)) return cur;
   if (action.type === "toggle") {
     return { ...cur, hidden: cur.hidden.includes(action.id) ? cur.hidden.filter((x) => x !== action.id) : [...cur.hidden, action.id] };
   }

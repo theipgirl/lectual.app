@@ -5,9 +5,14 @@ import { lastChangedText } from "@/lib/review/last-changed";
 import type { OpenRef } from "@/lib/review/open";
 import { REVIEW_SHOWS_PROPOSALS } from "@/lib/review/scope";
 import { waitingCell } from "@/lib/review/sheet";
+import type { FactCell } from "@/lib/review/sheet-cells";
+import type { FirmColumnsBlock } from "@/lib/custom-columns/rules";
 import { Pill } from "@/components/ui/Pill";
 import {
   BLANK,
+  CUSTOM_COLUMNS_NOT_ON,
+  DECK_COULDNT_LOAD,
+  FIRM_COLUMNS_HEADING,
   LAST_CHANGED_LABEL,
   LAST_CONTACT,
   LEAD_STEP_COULDNT_LOAD,
@@ -34,6 +39,45 @@ function Fact({ label, children }: { label: string; children: React.ReactNode })
   );
 }
 
+/** One firm column's value: plain text with its quiet title (from the lead, from a merged duplicate); a dash or "Couldn't load" is quiet. */
+function FirmCell({ cell }: { cell: FactCell }) {
+  return cell.tone === "value" ? (
+    <span title={cell.title}>{cell.text}</span>
+  ) : (
+    <span className="lx-note" title={cell.title}>
+      {cell.text}
+    </span>
+  );
+}
+
+/**
+ * "Firm columns": the firm's own columns for the record shown, read only. Three states, never two: the values (a dash where nothing is
+ * recorded), "not switched on" (a quiet line), and "Couldn't load". A firm with no column for this record's section draws nothing.
+ */
+export function FirmColumns({ block }: { block: FirmColumnsBlock | null | undefined }) {
+  if (!block || (block.status === "ok" && block.items.length === 0)) return null;
+  return (
+    <div className="rv-cardx-firm" data-firm-columns={block.status}>
+      <h4 className="lx-label">{FIRM_COLUMNS_HEADING}</h4>
+      {block.status === "not-set-up" ? (
+        <p className="lx-note">{CUSTOM_COLUMNS_NOT_ON}</p>
+      ) : block.status === "unavailable" ? (
+        <p className="lx-note" role="status">
+          {DECK_COULDNT_LOAD}
+        </p>
+      ) : (
+        <dl className="rv-cardx-facts">
+          {block.items.map((item, i) => (
+            <Fact key={`${i}:${item.label}`} label={item.label}>
+              <FirmCell cell={item.cell} />
+            </Fact>
+          ))}
+        </dl>
+      )}
+    </div>
+  );
+}
+
 /**
  * The Weekly review's own part of the opened record card (it replaced the review's drawer): the facts the review row
  * computed, which no other page has, and Lost / Nurture for a lead. Read-only roles see the same facts with no form: the
@@ -47,6 +91,7 @@ export function ReviewCardAside({
   stagesFailed,
   closeStages,
   deadlinesFailed = false,
+  firmColumns = null,
 }: {
   open: OpenRef;
   row: ReviewRow | null;
@@ -58,6 +103,8 @@ export function ReviewCardAside({
   closeStages: CloseStage[];
   /** The review's deadline read failed: a lead's USPTO deadline says "Couldn't load", never "—" (a failed read is never "none"). */
   deadlinesFailed?: boolean;
+  /** The firm's own columns for the record shown (read only), worked out by the page; null draws no block. */
+  firmColumns?: FirmColumnsBlock | null;
 }) {
   if (!row) {
     return (
@@ -66,6 +113,7 @@ export function ReviewCardAside({
         <p className="lx-note" role="status">
           {REVIEW_CARD_NOT_ON_REVIEW}
         </p>
+        <FirmColumns block={firmColumns} />
       </section>
     );
   }
@@ -107,6 +155,7 @@ export function ReviewCardAside({
           </Fact>
         )}
       </dl>
+      <FirmColumns block={firmColumns} />
       {open.kind === "lead" && closeStages.length > 0 && <LostNurture id={open.id} stages={closeStages} />}
     </section>
   );

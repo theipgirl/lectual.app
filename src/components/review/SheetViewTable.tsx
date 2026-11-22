@@ -2,7 +2,7 @@
 
 import { Fragment, type ReactNode } from "react";
 import { SheetScroll, SheetTable } from "@/components/ui/SheetTable";
-import { NO_SIZES, editColumnOf, sheetMinWidth } from "@/lib/review/sheet-edit";
+import { NO_SIZES, sheetMinWidth, sizeKeyOf } from "@/lib/review/sheet-edit";
 import type { PrefsDocument } from "@/lib/review/column-prefs-storage";
 import type { ColumnId, SheetColumn, SheetSectionId } from "@/lib/review/sheet-columns";
 import { useColumnPrefs } from "./use-column-prefs";
@@ -18,7 +18,7 @@ export function SheetViewTable({ section, columns, rows, initialPrefs }: { secti
   const { columns: drawn } = useColumnPrefs(section, columns, initialPrefs);
   return (
     <SheetScroll>
-      <SheetTable className="rv-sheet" minWidth={sheetMinWidth(NO_SIZES, false, drawn.map((c) => editColumnOf(c.id)))}>
+      <SheetTable className="rv-sheet" minWidth={sheetMinWidth(NO_SIZES, false, drawn.map((c) => sizeKeyOf(c.id)))}>
         <thead>
           <tr>
             {drawn.map((c) => (
