@@ -71,6 +71,28 @@ describe("both tables follow explicit prefs: hide, move, reset", () => {
   });
 });
 
+// Merge with the Notes cell (488dd3d): the chooser hides or moves Notes like any other column, in both tables.
+describe("Notes is an ordinary column for the chooser", () => {
+  it("hidden in Trademarks: no Notes header, cell or data-label there; Contracts keeps its Notes", async () => {
+    const prefs = { trademarks: { order: [...SHEET_SECTION_COLUMNS.trademarks], hidden: ["notes"] }, contracts: { order: [...SHEET_SECTION_COLUMNS.contracts], hidden: [] } };
+    for (const { name, html } of await both({ canSeeMoney: true, initialPrefs: prefs })) {
+      const [tm, ct] = tableHeaders(html);
+      expect(tm, name).not.toContain("Notes");
+      expect(ct, name).toContain("Notes");
+      expect(labelsOf(rowOf(html, "Acme Studio")), name).not.toContain("Notes");
+      expect(labelsOf(rowOf(html, "Birch Goods")), name).toContain("Notes");
+    }
+  });
+  it("moved to second place in Contracts: header and cells move together", async () => {
+    const prefs = { contracts: { order: ["client", "notes", ...SHEET_SECTION_COLUMNS.contracts.filter((id) => id !== "client" && id !== "notes")], hidden: [] } };
+    for (const { name, html } of await both({ canSeeMoney: true, initialPrefs: prefs })) {
+      const [, ct] = tableHeaders(html);
+      expect(ct.slice(0, 3), name).toEqual(["Client Name", "Notes", "Practice Area"]);
+      expect(labelsOf(rowOf(html, "Birch Goods")), name).toEqual(ct.slice(1));
+    }
+  });
+});
+
 describe("money id in prefs absent for non-owner", () => {
   it("a stored order or hidden list naming fee columns draws no fee header, cell or label for a viewer who may not see money", async () => {
     const prefs = { trademarks: { order: ["legalFee", "client", "govFee", "mark", "govFeeDue"], hidden: ["legalFeeDue"] }, contracts: { order: ["legalFee", "client"], hidden: [] } };
