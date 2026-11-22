@@ -1419,3 +1419,17 @@ export const CLOSE_OVERRIDE_BUTTON = "Close the matter";
 export const CLOSE_OVERRIDE_DONE = "Closed. The reason is on the timeline.";
 /** The pre-0110 override closed the matter, could not write its reason, and could not put the status back either. */
 export const CLOSE_OVERRIDE_UNRECORDED = "The matter was closed, but the reason couldn't be recorded. Tell Lectual.";
+
+/* Getting started: the short guide for staff roles (every role outside the admin tier). */
+export const STAFF_GUIDE_TRACK = "Your first steps";
+export const STAFF_GUIDE_TRACK_SUMMARY = "Your name, your own mailbox and a short tour.";
+export const STAFF_GUIDE_NAME_TITLE = "Add your name";
+export const STAFF_GUIDE_NAME_SUMMARY = "So the team and your drafts show who you are.";
+export const STAFF_GUIDE_NAME_STEP = "Your name";
+export const STAFF_GUIDE_NAME_BODY = "Open this menu and choose Your name. It is how the team sees you, and how drafts are signed.";
+export const STAFF_GUIDE_MAILBOX_TITLE = "Connect your Outlook";
+export const STAFF_GUIDE_MAILBOX_SUMMARY = "Your own mailbox, so your mail shows on your leads and matters.";
+export const STAFF_GUIDE_MAILBOX_BODY = "Under Mailboxes, connect your own Outlook. A personal mailbox is yours: colleagues don't see it here.";
+export const STAFF_GUIDE_TOUR_TITLE = "Take the tour";
+export const STAFF_GUIDE_TOUR_SUMMARY = "A quick look at the main screens.";
+export const STAFF_GUIDE_TOUR_BODY = "Choose Show tips again in this menu for a short tour of the main screens. You can take it as often as you like.";

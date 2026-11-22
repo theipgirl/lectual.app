@@ -2462,3 +2462,11 @@ The Forms, Proposals and older Quotes rows carry `minRole: ADMIN_TIER_MIN_ROLE` 
 Getting started hub (whose flows need those rows) drop them for every other role, and an unknown role never sees them. Navigation only: the pages and
 actions keep their own role and feature gates (a staff member with the link still reaches what those gates allow). The Intake report stays (Leads is
 still visible). Tests: `tests/nav/admin-tier-rows.test.ts`.
+
+## Getting started: the short staff guide (no schema)
+Outside the admin tier (`canSeeSetup` false, which also covers an unknown or unreadable role: fails closed) the Getting started hub and the Today
+`GettingStartedCard` offer ONLY the staff guide, track `start` ("Your first steps", words in `words.ts` `STAFF_GUIDE_*`): `staff-name` (the account
+menu's "Your name"), `staff-mailbox` (connect your own Outlook on Integrations; needs the Mail rail section, i.e. the Mailboxes feature; an unreadable
+feature list hides it) and `staff-tour` (the account menu's "Show tips again"). The rule is one line in `flowVisible` (`requires.staffGuide`); the admin
+tier never sees those three and its hub is exactly what it was (pinned in `tests/onboarding/hub.test.ts`). Progress flags are unchanged: old ids still parse,
+the three new ids are known, unknown ids are dropped. "Your setup" (Outlook status) above the guides is unchanged.
