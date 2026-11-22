@@ -21,6 +21,7 @@ const PAGES: Array<[file: string, constant: string]> = [
   ["src/app/dashboard/agents/page.tsx", "ASSISTANTS_NAME"],
   ["src/app/dashboard/settings/proposals/page.tsx", "PROPOSAL_SETTINGS_NAME"],
   ["src/app/dashboard/settings/approvals/page.tsx", "APPROVAL_SETTINGS_NAME"],
+  ["src/app/dashboard/settings/columns/page.tsx", "COLUMNS_SETTINGS_NAME"],
   ["src/app/dashboard/settings/integrations/lawmatics/page.tsx", "LAWMATICS_NAME"],
   ["src/app/dashboard/settings/integrations/meetings/page.tsx", "MEETINGS_INTEGRATION_NAME"],
 ];

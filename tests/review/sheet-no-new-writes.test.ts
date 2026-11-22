@@ -20,6 +20,9 @@ const CLIENT_AND_NEW = [
   // Sprint 2: the custom-columns read side and the card's Firm columns block
   "src/lib/custom-columns/rules.ts",
   "src/components/review/ReviewCardExtras.tsx",
+  // Sprint 3: the shared custom-value input and the Settings -> Columns presentational component (their forms live elsewhere)
+  "src/components/review/CustomValueInput.tsx",
+  "src/components/settings/ColumnsSettings.tsx",
 ];
 
 describe("no new write path", () => {
@@ -66,6 +69,18 @@ describe("no new write path", () => {
     expect(page).not.toMatch(/<form\b/);
     expect(page).not.toMatch(/\baction=/);
     expect(page).not.toMatch(/from ["'][^"']*\/(card-)?actions["']/);
+  });
+});
+
+describe("C2 (Sprint 3): which review components import an action", () => {
+  const dir = path.resolve(__dirname, "../../src/components/review");
+  const files = readdirSync(dir).filter((f) => /\.(ts|tsx)$/.test(f));
+  const importing = (re: RegExp) => files.filter((f) => re.test(code(`src/components/review/${f}`))).sort();
+  it("only FirmColumnsEdit.tsx and SheetEditTable.tsx import the custom-columns actions", () => {
+    expect(importing(/from ["']@\/lib\/custom-columns\/actions["']/)).toEqual(["FirmColumnsEdit.tsx", "SheetEditTable.tsx"]);
+  });
+  it("no other review component started importing an action: the importers are Sprint 2's four plus those two", () => {
+    expect(importing(/from ["'][^"']*\/(card-)?actions["']/)).toEqual(["ActForm.tsx", "CardsDeck.tsx", "DoneButton.tsx", "FirmColumnsEdit.tsx", "LostNurture.tsx", "SheetEditTable.tsx"]);
   });
 });
 

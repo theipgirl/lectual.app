@@ -101,3 +101,21 @@ describe("the field list the registry was given decides the columns", () => {
     }
   });
 });
+
+/* ── Sprint 3: what Settings -> Columns changes shows on the List (F3, F8 R1) ── */
+
+describe("F3 / F8: the List follows the one column order", () => {
+  const withFields = (fields: typeof customFields) => ({ ...customFixture, fields }) as typeof customFixture;
+  it("F3: a new Trademarks column (last position) comes after the spreadsheet columns, last", async () => {
+    const added = { id: "00000000-0000-4000-8000-00000000c0aa", section: "trademarks" as const, label: "Urgency", kind: "choice" as const, position: 99, options: ["High", "Low"] };
+    const [tm] = tableHeaders(await renderReadOnly({ canSeeMoney: false, custom: withFields([...customFields, added]) }));
+    expect(tm.slice(-6)).toEqual([...TM_CUSTOM, "Urgency"]);
+    expect(tm.slice(0, builtin("trademarks", false).length)).toEqual(builtin("trademarks", false));
+  });
+  it("R1: after a Move puts Trademarks 'Quoted fee' (position 4) above Both 'Review cycle' (position 3), it is drawn before it", async () => {
+    const moved = customFields.map((f) => (f.id === CF.quote ? { ...f, position: 3 } : f.id === CF.review ? { ...f, position: 4 } : f));
+    const [tm, ct] = tableHeaders(await renderReadOnly({ canSeeMoney: false, custom: withFields(moved) }));
+    expect(tm.slice(-5)).toEqual(["Priority", "Quoted fee", "Review cycle", "Brand note", "Reviewer"]);
+    expect(ct.slice(-2)).toEqual(["Signed on", "Review cycle"]);
+  });
+});

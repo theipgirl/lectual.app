@@ -191,3 +191,31 @@ describe("prefsReducer", () => {
     expect(prefsReducer(base, { type: "toggle", id: "legalFee" }, allowed)).toEqual(base);
   });
 });
+
+/* ── Sprint 3: labelKey, builtinHeaders, notTrackedFor ── */
+
+import { builtinHeaders as builtinHeadersS3, labelKey as labelKeyS3, notTrackedFor as notTrackedForS3 } from "@/lib/review/sheet-columns";
+import { COL_LEGAL_FEE, COL_NOTES, COL_STATUS, COL_TRADEMARK_NAME } from "@/lib/ui/words";
+
+describe("Sprint 3: the label rules the clash checks and CO3 share", () => {
+  it("labelKey: whitespace runs (tab, NBSP) collapse, ends go, lower case", () => {
+    expect(labelKeyS3(" Status ")).toBe("status");
+    expect(labelKeyS3(`Trademark${String.fromCodePoint(0xa0)}\tName`)).toBe("trademark name");
+    expect(labelKeyS3("PRIORITY")).toBe(labelKeyS3("priority"));
+  });
+  it("builtinHeaders: every header of the section, money and Notes included", () => {
+    const W3 = { notes: COL_NOTES, legal: COL_LEGAL_FEE, status: COL_STATUS, mark: COL_TRADEMARK_NAME };
+    for (const h of Object.values(W3)) expect(builtinHeadersS3("trademarks")).toContain(h);
+    expect(builtinHeadersS3("trademarks")).toHaveLength(16);
+    expect(builtinHeadersS3("contracts")).toHaveLength(12);
+    expect(builtinHeadersS3("contracts")).toContain("Client Name");
+    expect(builtinHeadersS3("trademarks")).not.toContain("Client Name");
+  });
+  it("notTrackedFor: drops a live field's name in its sections only; nothing dropped unless ok", () => {
+    expect(notTrackedForS3("trademarks", { status: "ok", fields: [{ label: "priority", section: "trademarks" }] })).toEqual(["Opinion Letter Due Date", "Completion Date", "Office Action Fee"]);
+    expect(notTrackedForS3("contracts", { status: "ok", fields: [{ label: "priority", section: "trademarks" }] })).toEqual(["Priority", "Completion Date"]);
+    expect(notTrackedForS3("contracts", { status: "ok", fields: [{ label: "Completion Date", section: "both" }] })).toEqual(["Priority"]);
+    expect(notTrackedForS3("trademarks", { status: "not-set-up" })).toHaveLength(4);
+    expect(notTrackedForS3("trademarks", null)).toHaveLength(4);
+  });
+});
