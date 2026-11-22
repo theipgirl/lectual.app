@@ -141,9 +141,11 @@ describe("resuming from sessionStorage", () => {
   });
 
   it("clears for a flow the person can no longer see", () => {
+    // Changed on purpose: an attorney now sees the staff guide (plus Consults and Approvals), so an Intake flow no longer resumes for them.
     const viewerFlows = visibleFlows({ role: "attorney", modules: [], aiConfigured: false });
     expect(resumeFlow("intake-reconcile:0", viewerFlows)).toEqual({ kind: "none" });
-    expect(resumeFlow("intake-lead:0", viewerFlows).kind).toBe("resume");
+    expect(resumeFlow("intake-lead:0", viewerFlows)).toEqual({ kind: "none" });
+    expect(resumeFlow("staff-name:0", viewerFlows).kind).toBe("resume");
   });
 });
 

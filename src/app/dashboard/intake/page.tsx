@@ -1,4 +1,5 @@
 import { listStages, type Stage } from "@/lib/pipeline";
+import { canSeeFormsAndProposals } from "@/lib/auth/forms-proposals";
 import type { Lead } from "@/lib/pipeline";
 import { listIntakeLeads } from "@/lib/intake/leads";
 import { loadLatestNotes, notesIncomplete, NOTE_LOOKBACK_DAYS } from "@/lib/intake/notes-read";
@@ -280,6 +281,7 @@ export default async function IntakePage({
       timeZone={firmZone}
       pendingApprovals={pendingApprovals}
       showReconcile={showReconcile}
+      showFormsLink={session?.kind === "ok" && canSeeFormsAndProposals(session.role)}
       agentMoves={agentMoves.status === "ok" ? { status: "ok", truncated: agentMoves.truncated } : { status: "unavailable" }}
       stageDecisions={decisions.status === "ok" ? { status: "ok", truncated: decisions.truncated } : { status: "unavailable" }}
     />

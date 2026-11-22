@@ -47,6 +47,12 @@ export type LoeSideActionProps = {
   onSign: () => void;
   onReadLetter: () => void;
   onDownloadSigned?: () => Promise<LetterPdfResult>;
+  /** Sprint 5a, the Adobe Acrobat Sign path only: the step-3 button's label, its pending label and the note beside it. */
+  signLabel?: string;
+  pendingLabel?: string;
+  signNeedNote?: string;
+  /** Sprint 5a: signing is paused (an open Adobe letter while the firm's connection needs attention): no sign button. */
+  hideSign?: boolean;
 };
 
 export function LoeSideAction(p: LoeSideActionProps) {
@@ -104,7 +110,7 @@ export function LoeSideAction(p: LoeSideActionProps) {
       ) : null}
       {p.step === 3 ? (
         <>
-          {preview ? (
+          {p.hideSign ? null : preview ? (
             <button type="button" className="cp-btn" disabled>
               Preview
             </button>
@@ -116,12 +122,12 @@ export function LoeSideAction(p: LoeSideActionProps) {
               disabled={!p.signable || p.pending}
               aria-describedby={p.signable ? undefined : "cp-sign-need"}
             >
-              {p.pending ? "Recording…" : SIGN_LABEL}
+              {p.pending ? (p.pendingLabel ?? "Recording…") : (p.signLabel ?? SIGN_LABEL)}
             </button>
           )}
-          {preview || p.signable ? null : (
+          {p.hideSign || preview || p.signable ? null : (
             <p className="cp-warn" id="cp-sign-need" role="status">
-              {SIGN_REQUIRED_NOTE}
+              {p.signNeedNote ?? SIGN_REQUIRED_NOTE}
             </p>
           )}
           <button type="button" className="cp-btn cp-btn-ghost" onClick={p.onBack} disabled={p.pending}>

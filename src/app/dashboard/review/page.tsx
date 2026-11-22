@@ -63,8 +63,10 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const canSeeMoney = canSeeBilling(role);
   const withFees = canSeeMoney && params.view === "sheet";
   // The firm's own columns are the List's too: only the List reads them (the opened card reads its own record when needed).
+  // So is the Notes column: each row's newest plain note is read with the review's other reads, only for the List (three-state).
   const withCustom = params.view === "sheet";
-  const load = await loadReview(new Date(), { withFees, withCustom });
+  const notes = params.view === "sheet";
+  const load = await loadReview(new Date(), { withFees, withCustom, notes });
   const userId = session.kind === "ok" ? session.user.id : null;
   const canWrite = !!role && MATTER_WRITE_ROLES.includes(role);
   const canMove = canWrite && CAN_MOVE_STAGE.includes(role);
@@ -121,6 +123,8 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
         ] satisfies ChooserSection[]}
       />
     ) : null;
+  // The Notes column: read with the review's other reads, only for the List (three-state; a failed read says so in the cells).
+  const sheetNotes = load.notes ?? null;
   const approvalsKnown = !load.failed.includes("approvals");
   // An approver sees the strip about THEM ("Waiting on you"); anyone else sees it about the review person, as before.
   const isApprover = !!role && !!userId && QUEUE_APPROVE_ROLES.includes(role);
@@ -328,7 +332,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
       ) : params.view === "sheet" ? (
         <>
           {strips}
-          <SheetView rows={shown} canSeeMoney={canSeeMoney} custom={custom} customMembers={customMembers} adminTier={adminTier} {...common} {...(sheetPerms ? { sheetEdit: { perms: sheetPerms } } : {})} />
+          <SheetView rows={shown} canSeeMoney={canSeeMoney} custom={custom} customMembers={customMembers} adminTier={adminTier} notes={sheetNotes} {...common} {...(sheetPerms ? { sheetEdit: { perms: sheetPerms } } : {})} />
         </>
       ) : (
         <>

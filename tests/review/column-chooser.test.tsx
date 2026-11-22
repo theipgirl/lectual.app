@@ -115,7 +115,8 @@ describe("storage key and shape", () => {
 describe("first render equals default order; throwing storage", () => {
   it("with nothing stored (and no browser at all) the List draws the default order, with no error shown", async () => {
     const [tm] = tableHeaders(await renderReadOnly({ canSeeMoney: true }));
-    expect(tm).toEqual(["Trademark Owner", "Trademark Name", "Serial No.", "Status", "Source", "Owner", "Start Date", "Legal Fee", "Legal Fee Due Date", "Government Filing fee", "Government Filing Fee Due Date", "Office Action Due Date", "Next step", "Waiting on", "Last contact"]);
+    // Changed on purpose (merge with the Notes cell): Notes is drawn after Source.
+    expect(tm).toEqual(["Trademark Owner", "Trademark Name", "Serial No.", "Status", "Source", "Notes", "Owner", "Start Date", "Legal Fee", "Legal Fee Due Date", "Government Filing fee", "Government Filing Fee Due Date", "Office Action Due Date", "Next step", "Waiting on", "Last contact"]);
   });
   it("throwing storage: reads give nothing and writes are dropped quietly, so the default order stays", () => {
     const throwing: StorageLike = {

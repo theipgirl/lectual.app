@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useId, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import {
   closeLeadAction,
-  logWhatHappenedAction,
   moveStageAction,
   assignRecordAction,
   setNextStepAction,
@@ -25,7 +24,6 @@ import {
   MAX_ROW,
   MIN_COL,
   NEXT_MIN_WIDTH,
-  NOTE_COL_WIDTH,
   colWidth,
   sheetMinWidth,
   MIN_ROW,
@@ -33,6 +31,7 @@ import {
   SHEET_SIZES_KEY,
   canNote,
   cellEditable,
+  isEditableColumn,
   cellKey,
   clampSize,
   fieldWord,
@@ -40,7 +39,6 @@ import {
   courtOf,
   matchPeople,
   nextEditableCell,
-  notePost,
   parseSizes,
   growHeight,
   normalizeNextStepTitle,
@@ -61,13 +59,12 @@ import {
   type SheetPerms,
   type SheetSizes,
   type StageChoice,
+  type TabStop,
 } from "@/lib/review/sheet-edit";
 import {
   BLANK,
   OWNER_COLUMN,
   TEAMMATE,
-  SHEET_ADD_NOTE,
-  SHEET_CANCEL,
   SHEET_DUE,
   SHEET_EMPTY_SECTION,
   SHEET_ENTER_ESC,
@@ -80,18 +77,14 @@ import {
   SHEET_NEXT_STEP,
   SHEET_NO_ONE_FOUND,
   SHEET_NO_SOURCE,
-  SHEET_NOTE_BUTTON,
   SHEET_NOTE_NOT_SAVED,
+  SHEET_NOTES_COLUMN,
   SHEET_OVERDUE,
   SHEET_RESIZE_ROW,
   SHEET_SAVE_FAILED,
   SHEET_SOURCE_LABEL,
   SHEET_TRY_AFTER_REFRESH,
-  SHEET_WHAT_HAPPENED,
-  SHEET_WRITE_NOTE,
   sheetMoveLogged,
-  sheetNoteFor,
-  sheetNoteHint,
   sheetResizeColumn,
   CUSTOM_NO_ONE,
   customCellLabel,
@@ -107,6 +100,7 @@ import { SectionNote } from "./SectionNote";
 import { SheetFactTd } from "./SheetFactTd";
 import { useColumnPrefs } from "./use-column-prefs";
 import { usePopPlacement } from "./pop-placement";
+import { NotesCell } from "./NotesCell";
 import { sheetStatusStore } from "./sheet-status-store";
 import { SheetCard, SheetScroll, SheetTable } from "@/components/ui/SheetTable";
 import "./review-sheet-edit.css";
@@ -115,14 +109,13 @@ export type SheetPerson = { userId: string; name: string; /** What the cell show
 export type SheetSection = { id: SheetSectionId; title: string; rows: SheetEditRow[] };
 /** What the table knows of a firm's live column, by `cf:<field id>`: enough to draw its editor and to say where it shows. */
 export type CustomFieldMeta = { label: string; kind: CustomKind; options: string[]; section: CustomSection };
-type OpenCell = { rowKey: string; col: EditableColumn | "note" };
+type OpenCell = { rowKey: string; col: EditableColumn };
 
 /** Drawing-only starting state (a preview harness opens editors with it). The default is everything closed. */
 export type SheetEditInitial = {
   open?: OpenCell[];
   /** The next-step editor's text, by row key. */
   nextDraft?: Record<string, { title: string; dueDate: string | null }>;
-  noteDraft?: Record<string, string>;
   /** A column whose resize grip and width tip are shown, and a row whose grip is shown. */
   activeColumn?: SheetEditColumn;
   activeRow?: string;
@@ -135,7 +128,6 @@ const ACTIONS: Record<SheetActionName, (prev: ReviewActionState, form: FormData)
   setNextStep: (p, f) => setNextStepAction(p, f),
   assignRecord: (p, f) => assignRecordAction(p, f),
   setSource: (p, f) => setSourceAction(p, f),
-  logWhatHappened: (p, f) => logWhatHappenedAction(p, f),
   setCustomValue: (p, f) => setCustomValueAction(p, f),
 };
 
@@ -293,10 +285,12 @@ export function SheetEditTable({
     return () => document.removeEventListener("pointerdown", onDown);
   }, [open]);
 
-  const focusCell = (rowKey: string, col: EditableColumn | "note") => {
+  const focusCell = (rowKey: string, col: TabStop) => {
     requestAnimationFrame(() => {
       const el = [...(document.getElementById(rootId)?.querySelectorAll<HTMLElement>("[data-rse-cell]") ?? [])].find((n) => n.dataset.rseCell === `${rowKey}|${col}`);
-      el?.focus();
+      // A picker cell's hook is its button; the Notes cell's hook is its cell, so focus goes to the cell's own button inside it.
+      const target = el && !el.matches("button, textarea, input, select, a[href]") ? el.querySelector<HTMLElement>("button, textarea") : el;
+      target?.focus();
     });
   };
   const isOpen = (rowKey: string, col: OpenCell["col"]) => open.some((o) => o.rowKey === rowKey && o.col === col);
@@ -307,7 +301,7 @@ export function SheetEditTable({
   const moveFrom = (rowKey: string, col: EditableColumn, dir: 1 | -1) => {
     setOpen([]);
     // Tab follows what is DRAWN: each row's section columns (after the chooser), in drawn order.
-    const to = nextEditableCell(allRows, { rowKey, col }, perms, dir, (r) => drawnBy[sectionOfRow.get(r.key) ?? "trademarks"].filter((c) => c.editable).map((c) => sizeKeyOf(c.id)), fit);
+    const to = nextEditableCell(allRows, { rowKey, col }, perms, dir, (r) => drawnBy[sectionOfRow.get(r.key) ?? "trademarks"].filter((c) => c.editable || c.id === "notes").map((c) => sizeKeyOf(c.id)), fit);
     if (to) focusCell(to.rowKey, to.col);
   };
 
@@ -338,13 +332,9 @@ export function SheetEditTable({
     if (!serverHas) router.refresh();
   }
 
-  async function saveNote(row: SheetEditRow, body: string): Promise<boolean> {
-    const p = notePost(row, body);
-    const res = await post(p.action, p.fields);
-    if (res.ok) dispatch({ type: "note-saved", client: row.client });
-    else dispatch({ type: "note-failed", client: row.client, message: `${res.message ?? SHEET_SAVE_FAILED} ${SHEET_NOTE_NOT_SAVED}` });
-    return res.ok;
-  }
+  // The Notes cell saves itself (the same "Log what happened" action); its answer feeds the header's save line.
+  const noteResult = (client: string) => (ok: boolean, message: string | null) =>
+    dispatch(ok ? { type: "note-saved", client } : { type: "note-failed", client, message: `${message ?? SHEET_SAVE_FAILED} ${SHEET_NOTE_NOT_SAVED}` });
 
   // Column and row sizes: pointer drag or arrow keys on the grip; stored for this viewer only.
   const startColDrag = (col: SizedColumn) => (e: ReactPointerEvent<HTMLSpanElement>) => {
@@ -405,6 +395,8 @@ export function SheetEditTable({
     const form = meta ? editorForm(meta.kind, raw, meta.kind === "choice" ? [...meta.options, raw] : meta.options) : undefined;
     return { col, raw: form === undefined ? raw : (form ?? ""), shown: meta ? typedCell(meta, raw, cellMembers, today) : undefined };
   };
+  // The Notes column's pencil: someone here can type a note on at least one row.
+  const anyNote = allRows.some((r) => canNote(r.kind, perms));
 
   return (
     <div className="rse-wrap" id={rootId} data-editing={editing ? "true" : "false"}>
@@ -415,7 +407,7 @@ export function SheetEditTable({
       )}
       {sections.map((sec) => {
         const drawn = drawnBy[sec.id];
-        const colCount = drawn.length + (editing ? 1 : 0);
+        const colCount = drawn.length;
         const labelOf = (col: SizedColumn) => columns[sec.id].find((c) => sizeKeyOf(c.id) === col)?.header ?? "";
         return (
       <SheetCard key={sec.id} className="rse-sec-card">
@@ -424,21 +416,22 @@ export function SheetEditTable({
        </h2>
        <SectionNote section={sec.id} customState={noteState} adminTier={adminTier} />
        <SheetScroll>
-        <SheetTable className="rse-tbl" fixed minWidth={sheetMinWidth(sizes, editing, drawn.map((c) => sizeKeyOf(c.id)))}>
+        <SheetTable className="rse-tbl" fixed minWidth={sheetMinWidth(sizes, drawn.map((c) => sizeKeyOf(c.id)))}>
           <colgroup>
             {drawn.map((c) => {
               const cw = colWidth(sizes, sizeKeyOf(c.id));
               return <col key={c.id} style={cw ? { width: cw } : undefined} />;
             })}
-            {editing && <col style={{ width: NOTE_COL_WIDTH }} />}
           </colgroup>
           <thead>
             <tr>
               {drawn.map((c) => {
                 const h = { col: sizeKeyOf(c.id), label: c.header };
-                // A firm's column is typed only by a role that may write custom values.
-                const typed = editing && c.editable && (!c.kind || !!perms.writeCustom);
-                const locked = (!c.editable || (!!c.kind && !perms.writeCustom)) && !c.pinned && c.id !== "mark";
+                // The pencil only on a column someone here can type in, in this table: Notes by the note rule (its own inline editor),
+                // every other typed column by the cells' own predicate (a firm's column also needs `writeCustom` and to be drawn here).
+                const notes = c.id === "notes";
+                const typed = editing && (notes ? sec.rows.some((r) => canNote(r.kind, perms)) : c.editable && isEditableColumn(h.col) && sec.rows.some((r) => cellEditable(h.col, r, perms, fit)));
+                const locked = (notes ? !anyNote : !c.editable || (!!c.kind && !perms.writeCustom)) && !c.pinned && c.id !== "mark";
                 const w = colWidth(sizes, h.col);
                 const active = initial?.activeColumn === h.col || dragCol === h.col;
                 return (
@@ -465,11 +458,6 @@ export function SheetEditTable({
                   </th>
                 );
               })}
-              {editing && (
-                <th scope="col" className="rse-note-th">
-                  <span className="rse-sr">Note</span>
-                </th>
-              )}
             </tr>
           </thead>
           <tbody>
@@ -480,6 +468,7 @@ export function SheetEditTable({
                   const nt = nextText(row, today);
                   const court = courtOf(row);
                   const can = (c: EditableColumn) => !phone && cellEditable(c, row, perms, fit);
+                  const canNoteHere = !phone && canNote(row.kind, perms);
                   const saving = (c: EditableColumn) => !!state.saving[cellKey(row.key, c)];
                   const dialogCell = (c: EditableColumn) => c === "next" || (isCustomColumnId(c) && ["text", "money", "date"].includes(fieldMeta[c]?.kind ?? ""));
                   const cellProps = (c: EditableColumn) => ({
@@ -730,6 +719,13 @@ export function SheetEditTable({
                         {row.contactText}
                       </td>
                       ),
+                      // The Notes cell (the newest plain note; a writer types a new one in place, saved on Enter only). The hook makes it a
+                      // Tab stop for the editors' Tab (`nextEditableCell`), only where it can be typed in.
+                      notes: (
+                      <td data-label={labelOf("notes")} className="rse-notes-td" {...(canNoteHere ? { "data-rse-cell": `${row.key}|notes` } : {})}>
+                        <NotesCell kind={row.kind} id={row.id} client={row.client} cell={row.note ?? { state: "unavailable" }} canEdit={canNoteHere} today={today} onResult={noteResult(row.client)} />
+                      </td>
+                      ),
                       practiceArea: fact("practiceArea"),
                       serial: fact("serial"),
                       start: fact("start"),
@@ -744,36 +740,6 @@ export function SheetEditTable({
                       {drawn.map((c) => (
                         <Fragment key={c.id}>{c.kind && isCustomColumnId(c.id) ? customTd(c.id, c.header) : cells[sizeKeyOf(c.id)] ?? null}</Fragment>
                       ))}
-                      {editing && (
-                        <td className="rse-note-td">
-                          {canNote(row.kind, perms) && (
-                            <>
-                              <button
-                                type="button"
-                                className={`lx-btn lx-btn-sec lx-btn-sm${isOpen(row.key, "note") ? " rse-on" : ""}`}
-                                aria-label={sheetNoteFor(row.client)}
-                                aria-expanded={isOpen(row.key, "note")}
-                                data-rse-cell={`${row.key}|note`}
-                                onClick={() => setOpen([{ rowKey: row.key, col: "note" }])}
-                              >
-                                {SHEET_NOTE_BUTTON}
-                              </button>
-                              {isOpen(row.key, "note") && (
-                                <NotePop
-                                  client={row.client}
-                                  draft={initial?.noteDraft?.[row.key]}
-                                  onSave={async (body) => {
-                                    const ok = await saveNote(raw, body);
-                                    if (ok) close(row.key, "note");
-                                    return ok;
-                                  }}
-                                  onCancel={() => close(row.key, "note")}
-                                />
-                              )}
-                            </>
-                          )}
-                        </td>
-                      )}
                     </tr>
                   );
                 })}
@@ -962,57 +928,5 @@ function NextEditor({ row, draft, onSave, onSaveAndMove, onCancel }: { row: Shee
         </p>
       )}
     </div>
-  );
-}
-
-function NotePop({ client, draft, onSave, onCancel }: { client: string; draft?: string; onSave: (body: string) => Promise<boolean>; onCancel: () => void }) {
-  const [body, setBody] = useState(draft ?? "");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const id = `rse-note-${useId().replace(/[^A-Za-z0-9_-]/g, "")}`;
-  const ref = useRef<HTMLFormElement>(null);
-  usePopPlacement(ref, "right");
-  return (
-    <form
-      ref={ref}
-      className="rse-pop rse-note-pop"
-      aria-label={sheetNoteFor(client)}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") {
-          e.preventDefault();
-          onCancel();
-        }
-      }}
-      onSubmit={async (e) => {
-        e.preventDefault();
-        if (!body.trim()) {
-          setError(SHEET_WRITE_NOTE);
-          return;
-        }
-        setBusy(true);
-        const ok = await onSave(body.trim());
-        setBusy(false);
-        if (!ok) setError(null);
-      }}
-    >
-      <label htmlFor={id} className="rse-note-label">
-        {SHEET_WHAT_HAPPENED}
-      </label>
-      <textarea id={id} rows={3} className="rse-in rse-textarea" value={body} maxLength={4000} autoFocus onChange={(e) => setBody(e.target.value)} />
-      <p className="rse-pop-foot">{sheetNoteHint(client)}</p>
-      {error && (
-        <p className="rse-ed-error" role="alert">
-          {error}
-        </p>
-      )}
-      <div className="rse-note-acts">
-        <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={onCancel}>
-          {SHEET_CANCEL}
-        </button>
-        <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={busy}>
-          {SHEET_ADD_NOTE}
-        </button>
-      </div>
-    </form>
   );
 }

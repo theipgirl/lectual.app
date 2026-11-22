@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { proposalsOut, reviewPerson, waitingOnPerson } from "@/lib/review/strips";
 import { isTrademarkRow, sheetSections, waitingCell } from "@/lib/review/sheet";
-import { columnsFor } from "@/lib/review/sheet-columns";
+import { NOTES_PRESENT, columnsFor } from "@/lib/review/sheet-columns";
 import { row, TODAY } from "./fixtures";
 
 const tag = (expiresOn: string, expired: boolean) => ({ text: "x", expiresOn, expired });
@@ -51,7 +51,9 @@ describe("Waiting on the review person", () => {
 describe("Sheet", () => {
   it("columns, in order", () => {
     // Sprint 1: the columns are the registry's (headers renamed to the spreadsheet's words, new read-only columns added; money is owner-only).
-    expect(columnsFor("trademarks", { canSeeMoney: false, hasNotes: false }).map((c) => c.header)).toEqual(["Trademark Owner", "Trademark Name", "Serial No.", "Status", "Source", "Owner", "Start Date", "Office Action Due Date", "Next step", "Waiting on", "Last contact"]);
+    // Merged with the Notes cell: Notes sits in the registry's slot, after Source.
+    expect(columnsFor("trademarks", { canSeeMoney: false, hasNotes: NOTES_PRESENT }).map((c) => c.header)).toEqual(["Trademark Owner", "Trademark Name", "Serial No.", "Status", "Source", "Notes", "Owner", "Start Date", "Office Action Due Date", "Next step", "Waiting on", "Last contact"]);
+    expect(columnsFor("trademarks", { canSeeMoney: false, hasNotes: false }).map((c) => c.header)).not.toContain("Notes");
   });
   it("Trademarks = leads + TM/CR/PATENT (no type reads TM); Contracts = the rest; stage order then client", () => {
     const s = sheetSections([

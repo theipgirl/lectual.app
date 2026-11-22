@@ -3,7 +3,7 @@
  * rule decides whether a cell's text may wrap. No browser: it parses the stylesheets the app ships and the markup React renders.
  *
  * Scope, on purpose: selectors of type, universal, class, id, attribute, the descendant / child / sibling combinators, structural and
- * state pseudo-classes, :not / :is / :where of those, and pseudo-elements (which never match an element). Media queries are evaluated at
+ * state pseudo-classes, :not / :is / :where / :has (descendant form) of those, and pseudo-elements (which never match an element). Media queries are evaluated at
  * one desktop width. Anything it cannot parse is REPORTED when the rule declares one of the three properties, so a test can fail on it
  * rather than silently ignore a rule that might win.
  */
@@ -58,7 +58,7 @@ export type Specificity = [number, number, number];
 
 const STATE = new Set(["hover", "focus", "focus-visible", "focus-within", "active", "visited", "link", "any-link", "checked", "disabled", "enabled", "target", "placeholder-shown", "invalid", "valid", "required", "indeterminate", "open", "popover-open", "default", "read-only", "read-write"]);
 const STRUCTURAL = new Set(["first-child", "last-child", "only-child", "nth-child", "nth-last-child", "first-of-type", "last-of-type", "root", "empty"]);
-const LIST = new Set(["not", "is", "where"]);
+const LIST = new Set(["not", "is", "where", "has"]);
 
 class Unparseable extends Error {}
 
@@ -130,6 +130,8 @@ function parseCompound(s: string): Compound {
         i = j + 1;
       }
       if (element || ["before", "after", "placeholder", "marker", "selection", "backdrop", "first-line", "first-letter"].includes(name) || name.startsWith("-webkit-") || name.startsWith("-moz-")) c.pseudos.push({ kind: "element", name });
+      // :has with a leading combinator (`:has(> .b)`, `:has(+ .b)`) is not the descendant form: reported, never guessed.
+      else if (name === "has" && arg !== undefined && /^\s*[>+~]/.test(arg)) throw new Unparseable(s);
       else if (LIST.has(name) && arg !== undefined) c.pseudos.push({ kind: "class", name, list: splitTop(arg, ",").map(parseComplexCompounds) });
       else if (STATE.has(name) || STRUCTURAL.has(name)) c.pseudos.push({ kind: "class", name, arg });
       else throw new Unparseable(s);
@@ -183,6 +185,7 @@ export function specificity(cx: Complex): Specificity {
 }
 
 const siblings = (el: El) => (el.parent ? el.parent.children : [el]);
+const descendants = (el: El): El[] => el.children.flatMap((c) => [c, ...descendants(c)]);
 
 function nth(arg: string | undefined, pos: number): boolean {
   const a = (arg ?? "").trim();
@@ -217,7 +220,8 @@ function matchCompound(c: Compound, el: El): boolean {
   for (const p of c.pseudos) {
     if (p.kind === "element") return false;
     if (p.list) {
-      const any = p.list.some((l) => matchCompound(l[0], el));
+      // :has(<compound>) is relational: some DESCENDANT matches (the Notes cell's rules use it; its specificity is :is's).
+      const any = p.name === "has" ? p.list.some((l) => descendants(el).some((d) => matchCompound(l[0], d))) : p.list.some((l) => matchCompound(l[0], el));
       if (p.name === "not" ? any : !any) return false;
       continue;
     }

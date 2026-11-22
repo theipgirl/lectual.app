@@ -80,7 +80,8 @@ describe("C2 (Sprint 3): which review components import an action", () => {
     expect(importing(/from ["']@\/lib\/custom-columns\/actions["']/)).toEqual(["FirmColumnsEdit.tsx", "SheetEditTable.tsx"]);
   });
   it("no other review component started importing an action: the importers are Sprint 2's four plus those two", () => {
-    expect(importing(/from ["'][^"']*\/(card-)?actions["']/)).toEqual(["ActForm.tsx", "CardsDeck.tsx", "DoneButton.tsx", "FirmColumnsEdit.tsx", "LostNurture.tsx", "SheetEditTable.tsx"]);
+    // Changed on purpose (merge with the Notes cell, 488dd3d): NotesCell.tsx posts the existing "Log what happened" action itself.
+    expect(importing(/from ["'][^"']*\/(card-)?actions["']/)).toEqual(["ActForm.tsx", "CardsDeck.tsx", "DoneButton.tsx", "FirmColumnsEdit.tsx", "LostNurture.tsx", "NotesCell.tsx", "SheetEditTable.tsx"]);
   });
 });
 

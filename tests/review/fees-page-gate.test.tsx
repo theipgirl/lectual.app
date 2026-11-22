@@ -117,7 +117,8 @@ describe("page.tsx source", () => {
     expect(src).toMatch(/const canSeeMoney = canSeeBilling\(/);
     expect(src).toMatch(/const withFees = canSeeMoney && params\.view === "sheet"/);
     // Sprint 2: the List also asks for the firm's custom columns (withCustom, the view alone, no role); withFees is still the money gate.
-    expect(src).toMatch(/loadReview\(new Date\(\), \{ withFees, withCustom \}\)/);
+    // Merge with the Notes cell: the List's Notes column is asked for in the same call (`notes`, the view alone, no role).
+    expect(src).toMatch(/loadReview\(new Date\(\), \{ withFees, withCustom, notes \}\)/);
     expect(src).toMatch(/const withCustom = params\.view === "sheet"/);
     expect(src.indexOf("await resolveFirmSession()")).toBeGreaterThan(-1);
     expect(src.indexOf("await resolveFirmSession()")).toBeLessThan(src.indexOf("await loadReview("));

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { resolveFirmSession } from "@/lib/firm/session";
+import { hasRole } from "@/lib/auth/roles";
 import { orgHasModule } from "@/lib/org/modules";
 import { canManageScope } from "@/lib/mailbox/access";
 import { connectableProviders } from "@/lib/mailbox/config";
@@ -26,6 +27,9 @@ import { pageTitle } from "@/lib/ui/page-title";
 import { BLANK, FROM_THEIR_EMAILS, integrationErrorLine, LAWPAY_NOT_ISSUED, MAIL_NAME, REFRESH_TO_TRY_AGAIN, SWITCH_ON_WORDS } from "@/lib/ui/words";
 import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 import { ClearResultParams } from "@/components/integrations/ClearResultParams";
+import { AdobeSignActions } from "@/components/integrations/AdobeSignActions";
+import { loadAdobeRow } from "@/lib/esign/settings-load";
+import { ADOBE_OUTCOME, ADOBE_SIGN_NAME } from "@/lib/ui/words";
 
 export const metadata: Metadata = { title: pageTitle("Integrations") };
 
@@ -134,7 +138,7 @@ function MailboxRow({ c, canManage, tz }: { c: MailboxConnection; canManage: boo
 export default async function IntegrationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ connected?: string; reconnected?: string; error?: string }>;
+  searchParams: Promise<{ connected?: string; reconnected?: string; error?: string; esign?: string; esign_error?: string }>;
 }) {
   // Integrations itself is open to every firm: Lawmatics uses the firm's own
   // token. The mailbox parts are what the `mailbox` module switches on.
@@ -142,13 +146,16 @@ export default async function IntegrationsPage({
   if (session.kind !== "ok") notFound();
   const hasMailbox = await orgHasModule("mailbox");
 
-  const { connected, reconnected, error } = await searchParams;
-  const [list, lawmatics, lawpay, meetingConns] = await Promise.all([
+  const { connected, reconnected, error, esign, esign_error } = await searchParams;
+  const [list, lawmatics, lawpay, meetingConns, adobeView] = await Promise.all([
     hasMailbox ? listConnections() : Promise.resolve({ ok: true as const, connections: [] }),
     getLawmaticsConnection(),
     getLawPayConnection(),
     listMeetingConnections(),
+    // Adobe Acrobat Sign (Sprint 5a): three-state, and the waiting count only for `reauth`.
+    loadAdobeRow(hasRole(session.role, "senior_admin")),
   ]);
+  const esignOutcome = esign_error ? (Object.hasOwn(ADOBE_OUTCOME, esign_error) ? ADOBE_OUTCOME[esign_error] : ADOBE_OUTCOME.failed) : esign === "connected" ? ADOBE_OUTCOME.connected : null;
   const meetingSources = meetingConns.ok ? meetingConns.connections : [];
   const meetingsNeedAttention = meetingSources.some((c) => c.status !== "active");
   const lp = lawpay.ok ? lawpay.connection : null;
@@ -185,7 +192,12 @@ export default async function IntegrationsPage({
     <>
       <PageHeader title="Integrations" tour="integrations-head" sub={<>Connect outside services to your firm.</>} />
 
-      {(connected || reconnected || error) && <ClearResultParams />}
+      {(connected || reconnected || error || esign || esign_error) && <ClearResultParams />}
+      {esignOutcome && (
+        <Notice tone={esign_error ? "risk" : "ok"} role={esign_error ? "alert" : "status"}>
+          {esignOutcome}
+        </Notice>
+      )}
       {connected && isProvider(connected) && (
         <Notice tone="ok" role="status">
           {PROVIDER_LABEL[connected]} {reconnected ? "reconnected" : "connected"}. The first sync
@@ -286,6 +298,14 @@ export default async function IntegrationsPage({
               {lp?.status === "active" ? "Manage LawPay" : lp ? "Reconnect" : lawpayReady ? "Connect LawPay" : "About LawPay"}
             </Link>
           }
+        />
+        <IntegrationRow
+          id="adobe-sign-title"
+          title={ADOBE_SIGN_NAME}
+          state={adobeView.state}
+          icon={<RowIcon path={ROW_ICON.esign} />}
+          help={adobeView.help}
+          actions={adobeView.connect || adobeView.disconnect ? <AdobeSignActions connect={adobeView.connect} disconnect={adobeView.disconnect} /> : null}
         />
         <IntegrationRow
           id="meetings-title"

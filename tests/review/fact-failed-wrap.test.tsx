@@ -89,8 +89,18 @@ describe("the failed fee cell's text-wrap-mode (computed from the shipped styles
 
 describe("the matcher itself", () => {
   it("reports a rule it cannot parse that declares one of the properties", () => {
-    const { problems } = parseSheets([{ name: "x.css", css: ".a:has(.b) { white-space: nowrap; } .c::before { white-space: nowrap; } @supports (display: grid) { .d { text-wrap: nowrap; } } .e { white-space: weird; }" }], WIDTH);
-    expect(problems).toEqual(['x.css: selector ".a:has(.b)"', 'x.css: media under ".d"', 'x.css: value "white-space: weird" under ".e"']);
+    // Changed on purpose (merge with the Notes cell, whose rules use `:has(.x)`): the helper now reads the descendant form of :has, so the
+    // unparseable example is the child form `:has(> .b)`, which it still reports.
+    const { problems } = parseSheets([{ name: "x.css", css: ".a:has(> .b) { white-space: nowrap; } .c::before { white-space: nowrap; } @supports (display: grid) { .d { text-wrap: nowrap; } } .e { white-space: weird; }" }], WIDTH);
+    expect(problems).toEqual(['x.css: selector ".a:has(> .b)"', 'x.css: media under ".d"', 'x.css: value "white-space: weird" under ".e"']);
+  });
+  it(":has(<compound>) matches when a descendant matches, with :is's specificity", () => {
+    const tree = parseHtml('<div class="a"><p><span class="b">a</span></p></div><div class="a"><span class="c">x</span></div>');
+    const [withB, withoutB] = findAll(tree, (e) => e.tag === "div");
+    const rules = parseSheets([{ name: "h.css", css: ".a:has(.b) { white-space: nowrap; } .a { text-wrap: pretty; }" }], WIDTH).rules;
+    expect(computedTextWrapMode(withB, rules).mode).toBe("nowrap");
+    expect(computedTextWrapMode(withB, rules).specificity).toEqual([0, 2, 0]);
+    expect(computedTextWrapMode(withoutB, rules).mode).toBe("wrap");
   });
   it("evaluates media at the given width and lets !important, then specificity, then source order decide", () => {
     const tree = parseHtml('<div class="t"><p><span class="x y">a</span></p></div>');

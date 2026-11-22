@@ -9,15 +9,16 @@ vi.mock("@/app/dashboard/review/actions", () => ({
   assignRecordAction: vi.fn(), setSourceAction: vi.fn(), logWhatHappenedAction: vi.fn(),
 }));
 
-const TRADEMARKS = ["Trademark Owner", "Trademark Name", "Serial No.", "Status", "Source", "Owner", "Start Date", "Legal Fee", "Legal Fee Due Date", "Government Filing fee", "Government Filing Fee Due Date", "Office Action Due Date", "Next step", "Waiting on", "Last contact"];
-const CONTRACTS = ["Client Name", "Practice Area", "Contract Type", "Status", "Next step", "Owner", "Start Date", "Legal Fee", "Legal Fee Due Date", "Waiting on", "Last contact"];
+// Changed on purpose (merge with the Notes cell, 488dd3d): Notes is drawn at the registry's slot in both tables.
+const TRADEMARKS = ["Trademark Owner", "Trademark Name", "Serial No.", "Status", "Source", "Notes", "Owner", "Start Date", "Legal Fee", "Legal Fee Due Date", "Government Filing fee", "Government Filing Fee Due Date", "Office Action Due Date", "Next step", "Waiting on", "Last contact"];
+const CONTRACTS = ["Client Name", "Practice Area", "Contract Type", "Status", "Next step", "Notes", "Owner", "Start Date", "Legal Fee", "Legal Fee Due Date", "Waiting on", "Last contact"];
 const NON_OWNER_ROLES = ["admin", "attorney", "paralegal", "viewer"];
 const MONEY_TEXT = /Legal Fee|Government Filing|Fee Due Date|\$1,250\.00|\$700\.00|\$4,750|From the accepted proposal|From the spreadsheet import/;
 
 beforeEach(() => vi.resetModules());
 
 describe("header order, both tables", () => {
-  it("the read-only List reads in the spreadsheet's order for the owner (Notes is not drawn: no Notes cell exists)", async () => {
+  it("the read-only List reads in the spreadsheet's order for the owner (Notes after Source / after Next step)", async () => {
     const [tm, ct] = tableHeaders(await renderReadOnly({ canSeeMoney: true }));
     expect(tm).toEqual(TRADEMARKS);
     expect(ct).toEqual(CONTRACTS);
@@ -27,10 +28,17 @@ describe("header order, both tables", () => {
     expect(tm).toEqual(TRADEMARKS);
     expect(ct).toEqual(CONTRACTS);
   });
-  it("no stand-in Notes header or cell is drawn", async () => {
+  // Changed on purpose (merge with the Notes cell): the Notes column is the merged NotesCell, once per table, one cell per row; no stand-in.
+  it("the Notes column is the merged Notes cell: one header per table and one NotesCell per row, in both tables", async () => {
     for (const html of [await renderReadOnly({ canSeeMoney: true }), await renderOwnerSheet({ canSeeMoney: true })]) {
-      expect(html).not.toContain(">Notes<");
-      expect(html).not.toContain('data-label="Notes"');
+      const [tm, ct] = tableHeaders(html);
+      expect(tm.filter((h) => h === "Notes")).toHaveLength(1);
+      expect(ct.filter((h) => h === "Notes")).toHaveLength(1);
+      expect(html.match(/data-label="Notes"/g)).toHaveLength(3);
+      expect(html.match(/data-notes-cell=""/g)).toHaveLength(3);
+      // The old "+ Note" popover column is gone.
+      expect(html).not.toContain("rse-note-td");
+      expect(html).not.toContain("+ Note");
     }
   });
 });
@@ -40,7 +48,9 @@ describe("single section note", () => {
     for (const html of [await renderReadOnly({ canSeeMoney: true }), await renderOwnerSheet({ canSeeMoney: true })]) {
       const notes = [...html.matchAll(/<p class="lx-note rv-sheet-note" data-section-note="(\w+)">([\s\S]*?)<\/p>/g)];
       expect(notes.map((n) => n[1])).toEqual(["trademarks", "contracts"]);
-      expect(notes[0][2]).toBe(W.notTrackedNote([W.NT_PRIORITY, W.NT_OPINION_LETTER_DUE, W.NT_COMPLETION_DATE, W.NT_OFFICE_ACTION_FEE]));
+      // Notes is present, so the Trademarks note also says Description and Notes are one column (Sprint 1's contract).
+      expect(notes[0][2]).toBe(`${W.notTrackedNote([W.NT_PRIORITY, W.NT_OPINION_LETTER_DUE, W.NT_COMPLETION_DATE, W.NT_OFFICE_ACTION_FEE])} ${W.NOT_TRACKED_NOTES_SENTENCE}`);
+      expect(W.NOT_TRACKED_NOTES_SENTENCE).toBe("Description and Notes are one column in Lectual: Notes.");
       expect(notes[1][2]).toBe("Not tracked in Lectual yet: Priority, Completion Date.");
       expect(html).not.toContain("lx-warn");
     }
@@ -173,7 +183,7 @@ describe("data-label equals header", () => {
 describe("new cells have no editor", () => {
   it("the owner Sheet's editors are only the four typed columns; the new cells hold no button or edit hook", async () => {
     const html = await renderOwnerSheet({ canSeeMoney: true });
-    expect(html).not.toMatch(/data-rse-cell="[^"]*\|(serial|start|practiceArea|oaDue|legalFee|legalFeeDue|govFee|govFeeDue|notes)"/);
+    expect(html).not.toMatch(/data-rse-cell="[^"]*\|(serial|start|practiceArea|oaDue|legalFee|legalFeeDue|govFee|govFeeDue)"/);
     for (const label of ["Serial No.", "Start Date", "Practice Area", "Office Action Due Date", "Legal Fee", "Legal Fee Due Date", "Government Filing fee", "Government Filing Fee Due Date"]) {
       for (const client of ["Acme Studio", "Birch Goods", "Jo Lee"]) {
         const cell = cellOf(rowOf(html, client), label);
@@ -185,6 +195,8 @@ describe("new cells have no editor", () => {
     }
     // the four editors are still there, on the row's own hooks
     for (const col of ["status", "next", "court", "source"]) expect(html).toContain(`data-rse-cell="m-tm|${col}"`);
+    // Merge with the Notes cell: the Notes cell is typed in place (its own button), and its td is the Tab hook.
+    expect(cellOf(rowOf(html, "Acme Studio"), "Notes")).toMatch(/^<td data-label="Notes" class="rse-notes-td" data-rse-cell="m-tm\|notes">[\s\S]*<button[^>]*class="rv-note-btn"/);
   });
   it("a read-only role gets the same table with no editors at all", async () => {
     const html = await renderOwnerSheet({ canSeeMoney: false, perms: { writeMatter: false, writeLead: false, moveLead: false, matterStages: null, leadStages: null } });

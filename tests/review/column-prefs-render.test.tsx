@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { labelsOf, renderOwnerSheet, renderReadOnly, rowOf, tableHeaders } from "./columns-fixtures";
-import { COLUMN_IDS, SHEET_SECTION_COLUMNS, columnsFor, type ColumnId } from "@/lib/review/sheet-columns";
+import { COLUMN_IDS, NOTES_PRESENT, SHEET_SECTION_COLUMNS, columnsFor, type ColumnId } from "@/lib/review/sheet-columns";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock("@/app/dashboard/review/actions", () => ({
@@ -9,12 +9,13 @@ vi.mock("@/app/dashboard/review/actions", () => ({
 }));
 beforeEach(() => vi.resetModules());
 
-const DEFAULT_TM = ["Trademark Owner", "Trademark Name", "Serial No.", "Status", "Source", "Owner", "Start Date", "Legal Fee", "Legal Fee Due Date", "Government Filing fee", "Government Filing Fee Due Date", "Office Action Due Date", "Next step", "Waiting on", "Last contact"];
-const DEFAULT_CT = ["Client Name", "Practice Area", "Contract Type", "Status", "Next step", "Owner", "Start Date", "Legal Fee", "Legal Fee Due Date", "Waiting on", "Last contact"];
+// Changed on purpose (merge with the Notes cell): Notes is drawn in the registry's slot (Trademarks after Source, Contracts after Next step).
+const DEFAULT_TM = ["Trademark Owner", "Trademark Name", "Serial No.", "Status", "Source", "Notes", "Owner", "Start Date", "Legal Fee", "Legal Fee Due Date", "Government Filing fee", "Government Filing Fee Due Date", "Office Action Due Date", "Next step", "Waiting on", "Last contact"];
+const DEFAULT_CT = ["Client Name", "Practice Area", "Contract Type", "Status", "Next step", "Notes", "Owner", "Start Date", "Legal Fee", "Legal Fee Due Date", "Waiting on", "Last contact"];
 
 /** The trademarks order with `status` moved to second place, as a stored choice (the missing ids come back at their default place). */
 const moved = (order: ColumnId[]) => ["client", "status", ...order.filter((x) => x !== "client" && x !== "status")] as ColumnId[];
-const trademarkOrder = SHEET_SECTION_COLUMNS.trademarks.filter((id) => id !== "notes");
+const trademarkOrder = [...SHEET_SECTION_COLUMNS.trademarks];
 
 const PREFS = {
   trademarks: { order: moved(trademarkOrder), hidden: ["serial", "source"] },
@@ -42,18 +43,19 @@ describe("both tables follow explicit prefs: hide, move, reset", () => {
     for (const { name, html } of await both({ canSeeMoney: true, initialPrefs: PREFS })) {
       const [tm] = tableHeaders(html);
       expect(tm.slice(0, 3), name).toEqual(["Trademark Owner", "Status", "Trademark Name"]);
-      expect(tm, name).toEqual(["Trademark Owner", "Status", "Trademark Name", "Owner", "Start Date", "Legal Fee", "Legal Fee Due Date", "Government Filing fee", "Government Filing Fee Due Date", "Office Action Due Date", "Next step", "Waiting on", "Last contact"]);
+      expect(tm, name).toEqual(["Trademark Owner", "Status", "Trademark Name", "Notes", "Owner", "Start Date", "Legal Fee", "Legal Fee Due Date", "Government Filing fee", "Government Filing Fee Due Date", "Office Action Due Date", "Next step", "Waiting on", "Last contact"]);
       expect(labelsOf(rowOf(html, "Acme Studio")), name).toEqual(tm.slice(1));
     }
   });
   it("sections are separate: Contracts follows its own choices", async () => {
     for (const { name, html } of await both({ canSeeMoney: true, initialPrefs: PREFS })) {
       const [, ct] = tableHeaders(html);
-      expect(ct, name).toEqual(["Client Name", "Contract Type", "Status", "Next step", "Owner", "Start Date", "Legal Fee", "Waiting on", "Last contact"]);
+      // The stored order does not name Notes: it comes back at its default place, after Next step.
+      expect(ct, name).toEqual(["Client Name", "Contract Type", "Status", "Next step", "Notes", "Owner", "Start Date", "Legal Fee", "Waiting on", "Last contact"]);
     }
   });
   it("reset: the default document (what Reset writes) gives the spreadsheet order again", async () => {
-    const reset = { trademarks: { order: trademarkOrder, hidden: [] }, contracts: { order: SHEET_SECTION_COLUMNS.contracts.filter((id) => id !== "notes"), hidden: [] } };
+    const reset = { trademarks: { order: trademarkOrder, hidden: [] }, contracts: { order: [...SHEET_SECTION_COLUMNS.contracts], hidden: [] } };
     for (const { name, html } of await both({ canSeeMoney: true, initialPrefs: reset })) {
       const [tm, ct] = tableHeaders(html);
       expect(tm, name).toEqual(DEFAULT_TM);
@@ -91,14 +93,15 @@ describe("money id in prefs absent for non-owner", () => {
 describe("the chooser can only thin and reorder what columnsFor allows", () => {
   it("every id drawn is one of the server's allowed columns, for any stored document", async () => {
     const hostile = { trademarks: { order: [...COLUMN_IDS, "notes", "nope"], hidden: [] }, contracts: { order: ["serial", "oaDue", "govFee"], hidden: ["client"] } };
-    const allowedTm = columnsFor("trademarks", { canSeeMoney: false, hasNotes: false }).map((c) => c.header);
-    const allowedCt = columnsFor("contracts", { canSeeMoney: false, hasNotes: false }).map((c) => c.header);
+    const allowedTm = columnsFor("trademarks", { canSeeMoney: false, hasNotes: NOTES_PRESENT }).map((c) => c.header);
+    const allowedCt = columnsFor("contracts", { canSeeMoney: false, hasNotes: NOTES_PRESENT }).map((c) => c.header);
     for (const { name, html } of await both({ canSeeMoney: false, initialPrefs: hostile })) {
       const [tm, ct] = tableHeaders(html);
       for (const h of tm) expect(allowedTm, `${name} ${h}`).toContain(h);
       for (const h of ct) expect(allowedCt, `${name} ${h}`).toContain(h);
       expect(tm).toHaveLength(allowedTm.length);
-      expect(tm, name).not.toContain("Notes");
+      // Changed on purpose (merge with the Notes cell): Notes is now one of the allowed columns, drawn once.
+      expect(tm.filter((h) => h === "Notes"), name).toHaveLength(1);
     }
   });
 });

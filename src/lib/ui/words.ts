@@ -514,9 +514,9 @@ export const DECK_FOR = "for";
 
 /* ── Owner view: the weekly review's editable Sheet ── */
 export const SHEET_YOU_TYPE = "You type these";
-export const SHEET_YOU_TYPE_BODY = `Status (moves the stage), Next step (text and due date), ${OWNER_COLUMN} (a person), Source. Each change saves on its own and is logged on the record.`;
+export const SHEET_YOU_TYPE_BODY = `Status (moves the stage), Next step (text and due date), ${OWNER_COLUMN} (a person), Source, Notes (a new note on the timeline). Each change saves on its own and is logged on the record.`;
 export const SHEET_WORKED_OUT = "Lectual works these out";
-export const SHEET_WORKED_OUT_BODY = "Waiting on and Last contact come from next steps, mail and calls. Serial No., Start Date, Practice Area and Office Action Due Date come from the record itself. None of these can be edited here; log what happened with + Note instead.";
+export const SHEET_WORKED_OUT_BODY = "Waiting on and Last contact come from next steps, mail and calls. Serial No., Start Date, Practice Area and Office Action Due Date come from the record itself. None of these can be edited here; type what happened in Notes instead.";
 /** Added to the legend for the viewer who may see fees (the owner) and nobody else. */
 export const SHEET_WORKED_OUT_FEES = "The fee columns come from the accepted proposal, else from the spreadsheet import.";
 export const SHEET_LEGEND_LABEL = "Which columns you can edit";
@@ -530,11 +530,6 @@ export const SHEET_NO_ONE_FOUND = "No one matches.";
 export const SHEET_NEXT_STEP = NEXT_STEP;
 export const SHEET_DUE = "Due";
 export const SHEET_ENTER_ESC = "Enter to save · Esc to cancel";
-export const SHEET_NOTE_BUTTON = "+ Note";
-export const sheetNoteFor = (client: string) => `Add a note for ${client}`;
-export const SHEET_WHAT_HAPPENED = "What happened?";
-export const sheetNoteHint = (firstName: string) => `Goes on ${firstName}'s timeline as a note and counts as last contact.`;
-export const SHEET_ADD_NOTE = ADD_TO_TIMELINE;
 export const SHEET_CANCEL = CANCEL;
 export const SHEET_NO_SOURCE = "No source";
 export const SHEET_SOURCE_LABEL = "Source";
@@ -546,12 +541,21 @@ export const SHEET_PUT_BACK = "The earlier value is back.";
 export const SHEET_NOTE_NOT_SAVED = "The note wasn't saved.";
 export const SHEET_TRY_AFTER_REFRESH = "Couldn't save this yet. Refresh the page and try again.";
 export const SHEET_ENTER_TITLE = "Enter what happens next.";
-export const SHEET_WRITE_NOTE = "Write what happened.";
 export const SHEET_STAGES_UNREADABLE = "The stage list couldn't load, so Status can't be changed here right now. Refresh to try again.";
 export const sheetResizeColumn = (name: string) => `Resize ${name} column`;
 export const SHEET_RESIZE_ROW = "Resize row";
 export const SHEET_EMPTY_SECTION = noneYet("records in this view");
 export const SHEET_SAVE_FAILED = "Couldn't save this change.";
+/** The Sheet's Notes column: the newest plain note, typed in place (Enter or leaving the cell saves, Esc cancels). */
+export const SHEET_NOTES_COLUMN = "Notes";
+export const SHEET_NOTE_CANT_LOAD = DECK_COULDNT_LOAD;
+export const SHEET_NOTE_ADD = "Add a note";
+export const SHEET_NOTE_SAVING = "Saving…";
+export const SHEET_NOTE_SAVED = "Saved";
+export const SHEET_NOTE_SAVE_FAILED = "Couldn't save";
+export const SHEET_NOTE_KEYS = "Enter to save · Shift+Enter for a new line · Esc to cancel";
+export const SHEET_NOTE_NOT_SAVED_YET = "Not saved yet. Press Enter to save.";
+export const sheetNoteCellLabel = (client: string) => `Note for ${client}`;
 
 /* Needs review (Today, both views): old hand-entered dates nobody confirmed. */
 export const NEEDS_REVIEW_HEADING = "Needs review";
@@ -1565,3 +1569,67 @@ export const CUSTOM_NO_ONE = "No one";
 export const CUSTOM_FROM_LEAD_KEPT = "Cleared. The lead's value still shows here.";
 export const CUSTOM_FROM_MERGED_KEPT = "Cleared. The merged duplicate's value still shows here.";
 export const customCellLabel = (label: string, value: string) => `${label}: ${value}`;
+/* Getting started: the short guide for staff roles (every role outside the admin tier). */
+export const STAFF_GUIDE_TRACK = "Your first steps";
+export const STAFF_GUIDE_TRACK_SUMMARY = "Your name, your own mailbox and a short tour.";
+export const STAFF_GUIDE_NAME_TITLE = "Add your name";
+export const STAFF_GUIDE_NAME_SUMMARY = "So your team sees who you are.";
+export const STAFF_GUIDE_NAME_STEP = "Your name";
+export const STAFF_GUIDE_NAME_BODY = "Open this menu and choose Your name. It's how your team sees you in Lectual.";
+export const STAFF_GUIDE_MAILBOX_TITLE = "Connect your Outlook";
+export const STAFF_GUIDE_MAILBOX_SUMMARY = "Your own mailbox, so your mail shows on your leads and matters.";
+export const STAFF_GUIDE_MAILBOX_BODY = "Choose Connect Outlook at the top of this page to connect your own mailbox. A personal mailbox is yours: colleagues don't see it here.";
+export const STAFF_GUIDE_TOUR_TITLE = "Take the tour";
+export const STAFF_GUIDE_TOUR_SUMMARY = "A quick look at the main screens.";
+export const STAFF_GUIDE_TOUR_BODY = "Choose Show tips again in this menu for a short tour of the main screens. You can take it as often as you like.";
+
+/* ── Adobe Acrobat Sign (Sprint 5a): the firm-facing words. Client words are in src/lib/loe/client-words.ts. ── */
+export const ADOBE_SIGN_NAME = "Adobe Acrobat Sign";
+export const ADOBE_NOT_CONNECTED_HELP = "Connect your firm's own Adobe Acrobat Sign account so clients can sign their engagement letter with Adobe.";
+export const ADOBE_NOT_SET_UP = notReadyYet(ADOBE_SIGN_NAME);
+export const ADOBE_COULDNT_CHECK = "We couldn't check your Adobe Acrobat Sign connection just now.";
+export const ADOBE_REAUTH_HELP = "Adobe Acrobat Sign needs you to sign in again.";
+/** Connected, while Lectual has not switched on signing with Adobe for clients (ADOBE_SIGN_CLIENT_SIGNING off). */
+export const ADOBE_SWITCH_OFF_LINE = "Clients sign in Lectual until Lectual turns on signing with Adobe.";
+export function adobeConnectedAs(email: string | null): string {
+  return email ? `Connected as ${email}.` : "Connected.";
+}
+/** `reauth`: how many clients are waiting (the firm's open Adobe letters). Left out when the count couldn't be read. */
+export function adobeWaitingLine(n: number): string {
+  return n === 1 ? "1 client is waiting to sign until you reconnect." : `${n} clients are waiting to sign until you reconnect.`;
+}
+export const ADOBE_CONNECT = "Connect Adobe Acrobat Sign";
+export const ADOBE_RECONNECT = "Reconnect";
+export const ADOBE_DISCONNECT = "Disconnect";
+export const ADOBE_DISCONNECT_QUESTION =
+  "Disconnect Adobe Acrobat Sign? Letters still open in Adobe are cancelled there, and those clients sign in Lectual on their next visit.";
+export const ADOBE_DISCONNECTED = "Adobe Acrobat Sign is disconnected.";
+export const ADOBE_DISCONNECT_FORBIDDEN = `${ADMIN_TIER_PHRASE} can disconnect Adobe Acrobat Sign.`;
+export const ADOBE_DISCONNECT_READ_FAILED = "We couldn't read your Adobe Acrobat Sign connection. Refresh to try again.";
+export const ADOBE_DISCONNECT_FAILED = "Adobe Acrobat Sign couldn't be disconnected just now. Try again.";
+export function adobeCancelFailedLine(n: number): string {
+  return `${n} ${n === 1 ? "letter" : "letters"} couldn't be cancelled in Adobe. Cancel them in your Adobe account.`;
+}
+export function adobeNotCopiedLine(n: number): string {
+  return `The signed letter for ${n} ${n === 1 ? "client" : "clients"} is in your Adobe account; it couldn't be copied into Lectual.`;
+}
+/**
+ * Staff-facing: when Adobe recorded the signature, read from `client_proposal_signature.provider_signed_at` (lectual 0113;
+ * `signed_at` stays the server clock). `when` is the firm-zone text with its zone named ("November 12, 2026 at 2:14 PM EST").
+ * Drawn by the staff card in Sprint 5b.
+ */
+export function adobeSignedAtLine(when: string): string {
+  return `Signed in Adobe at ${when}.`;
+}
+/** The callback's outcomes (`?esign=` / `?esign_error=`), fixed sentences only. */
+export const ADOBE_OUTCOME: Record<string, string> = {
+  connected: "Adobe Acrobat Sign is connected.",
+  forbidden: `${ADMIN_TIER_PHRASE} can connect Adobe Acrobat Sign.`,
+  unconfigured: ADOBE_NOT_SET_UP,
+  denied: "Adobe Acrobat Sign wasn't connected: the sign-in was cancelled.",
+  expired: "That sign-in took too long or was started elsewhere. Try connecting again.",
+  "wrong-session": "That sign-in was started by someone else or for another firm. Try connecting again.",
+  host: "Adobe sent back an address Lectual doesn't accept, so nothing was saved.",
+  "save-failed": "Adobe Acrobat Sign couldn't be saved just now. Try again.",
+  failed: "Adobe Acrobat Sign couldn't be connected just now. Try again.",
+};

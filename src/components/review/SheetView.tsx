@@ -13,6 +13,8 @@ import { SheetEdit } from "./SheetEdit";
 import { SectionNote } from "./SectionNote";
 import { SheetFactTd } from "./SheetFactTd";
 import { SheetViewTable, type SheetViewTableRow } from "./SheetViewTable";
+import { NotesCell } from "./NotesCell";
+import { noteCellFor, type SheetNotes } from "@/lib/review/sheet-notes";
 import type { SheetPerms } from "@/lib/review/sheet-edit";
 import { SheetCard } from "@/components/ui/SheetTable";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -20,7 +22,7 @@ import { BLANK, TEAMMATE, UNASSIGNED, SHEET_EMPTY_SECTION } from "@/lib/ui/words
 import "@/components/list-page/list-page.css";
 import "./review.css";
 
-function SheetSection({ id, title, rows, today, members, params, columns, initialPrefs, custom, noteState, adminTier }: Common & { id: SheetSectionId; title: string; rows: ReviewRow[]; columns: SheetColumn[]; initialPrefs?: PrefsDocument; /** The firm's columns' cells by row key, then `cf:<field id>`. */ custom: Record<string, Record<string, FactCell>>; /** What the section note needs of the custom state (null: not read). */ noteState: CustomStateLike; adminTier: boolean }) {
+function SheetSection({ id, title, rows, today, members, params, canWrite, columns, initialPrefs, custom, noteState, adminTier, notes }: Common & { id: SheetSectionId; title: string; rows: ReviewRow[]; columns: SheetColumn[]; initialPrefs?: PrefsDocument; /** The firm's columns' cells by row key, then `cf:<field id>`. */ custom: Record<string, Record<string, FactCell>>; /** What the section note needs of the custom state (null: not read). */ noteState: CustomStateLike; adminTier: boolean; /** The Notes column's reads (sheet-notes.ts). */ notes: SheetNotes | null }) {
   const names = new Map(members.map((m) => [m.userId, m.name]));
   const dash = <span className="lx-note">{BLANK}</span>;
   const tableRows: SheetViewTableRow[] = rows.map((r) => {
@@ -57,6 +59,12 @@ function SheetSection({ id, title, rows, today, members, params, columns, initia
       waiting: <td data-label={label("waiting")}>{waitingCell(r, (d) => shortDate(d, today))}</td>,
       source: <td data-label={label("source")}>{r.source ?? dash}</td>,
       contact: <td data-label={label("contact")}>{lastContactText(r, today)}</td>,
+      // The Notes cell at the registry's `notes` slot: the newest plain note; a writer types a new one in place (Enter saves).
+      notes: (
+        <td data-label={label("notes")} className="rv-notes-td">
+          <NotesCell kind={r.kind} id={r.id} client={r.client} cell={noteCellFor(notes, r)} canEdit={canWrite} today={today} />
+        </td>
+      ),
     };
     // Only the columns this viewer is allowed: no fee cell is built (or shipped to the browser) for anyone else.
     for (const f of FACT_COLUMN_IDS) if (columns.some((c) => c.id === f)) cells[f] = <SheetFactTd cell={facts[f]} label={label(f)} />;
@@ -80,7 +88,7 @@ function SheetSection({ id, title, rows, today, members, params, columns, initia
 }
 
 /** The Excel tracker as one table: Trademarks, then Contracts, in pipeline order. Edits happen in the record card the Client link opens. */
-export function SheetView({ rows, owner, sheetEdit, canSeeMoney = false, initialPrefs, custom = null, customMembers, adminTier = false, ...common }: Common & {
+export function SheetView({ rows, owner, sheetEdit, canSeeMoney = false, initialPrefs, custom = null, customMembers, adminTier = false, notes = null, ...common }: Common & {
   rows: ReviewRow[];
   /** The owner view's editable sheet (owner view only). */ sheetEdit?: { perms: SheetPerms };
   /** From the page's re-resolved role (`canSeeBilling`), never from the browser. */ canSeeMoney?: boolean;
@@ -88,8 +96,9 @@ export function SheetView({ rows, owner, sheetEdit, canSeeMoney = false, initial
   /** The firm's custom columns as the page read them (null: not read). Only `ok` adds columns. */ custom?: CustomColumnsState | null;
   /** The member directory for person cells; null when it couldn't be read (a person cell then says so). Defaults to `members`. */ customMembers?: CustomMember[] | null;
   /** The admin tier (`canSeeSetup` of the page's re-resolved role): the section note's "not switched on" line and "Add a column" link are theirs only. */ adminTier?: boolean;
+  /** The Notes column's reads (sheet-notes.ts). */ notes?: SheetNotes | null;
 }) {
-  if (owner && sheetEdit) return <SheetEdit rows={rows} perms={sheetEdit.perms} owner canSeeMoney={canSeeMoney} initialPrefs={initialPrefs} custom={custom} customMembers={customMembers} adminTier={adminTier} {...common} />;
+  if (owner && sheetEdit) return <SheetEdit rows={rows} perms={sheetEdit.perms} owner canSeeMoney={canSeeMoney} initialPrefs={initialPrefs} custom={custom} customMembers={customMembers} adminTier={adminTier} notes={notes} {...common} />;
   const { trademarks, contracts } = sheetSections(rows);
   const fields = custom?.status === "ok" ? custom.fields : [];
   const cells = custom?.status === "ok" ? customCells(rows, fields, custom, customMembers === undefined ? common.members : customMembers, common.today) : {};
@@ -97,8 +106,8 @@ export function SheetView({ rows, owner, sheetEdit, canSeeMoney = false, initial
   const columns = { trademarks: columnsFor("trademarks", { canSeeMoney, hasNotes: NOTES_PRESENT, customFields: fields }), contracts: columnsFor("contracts", { canSeeMoney, hasNotes: NOTES_PRESENT, customFields: fields }) };
   return (
     <div className="rv-sheets">
-      <SheetSection id="trademarks" title="Trademarks" rows={trademarks} columns={columns.trademarks} initialPrefs={initialPrefs} custom={cells} noteState={noteState} adminTier={adminTier} {...common} />
-      <SheetSection id="contracts" title="Contracts" rows={contracts} columns={columns.contracts} initialPrefs={initialPrefs} custom={cells} noteState={noteState} adminTier={adminTier} {...common} />
+      <SheetSection id="trademarks" title="Trademarks" rows={trademarks} columns={columns.trademarks} initialPrefs={initialPrefs} custom={cells} noteState={noteState} adminTier={adminTier} notes={notes} {...common} />
+      <SheetSection id="contracts" title="Contracts" rows={contracts} columns={columns.contracts} initialPrefs={initialPrefs} custom={cells} noteState={noteState} adminTier={adminTier} notes={notes} {...common} />
     </div>
   );
 }

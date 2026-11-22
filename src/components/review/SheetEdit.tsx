@@ -10,6 +10,7 @@ import { lastChangedText } from "@/lib/review/last-changed";
 import { contactWords } from "@/lib/review/contact";
 import { EDITABLE_COLUMNS, cellEditable, type SheetEditRow, type SheetPerms } from "@/lib/review/sheet-edit";
 import { roleLabel } from "@/lib/auth/roles";
+import { noteCellFor, type SheetNotes } from "@/lib/review/sheet-notes";
 import { REFERRAL_SOURCES } from "@/lib/intake/referral-source";
 import { SHEET_LEGEND_LABEL, SHEET_STAGES_UNREADABLE, SHEET_WORKED_OUT, SHEET_WORKED_OUT_BODY, SHEET_WORKED_OUT_FEES, SHEET_YOU_TYPE, SHEET_YOU_TYPE_BODY } from "@/lib/ui/words";
 import { Icon } from "@/components/ui/Icon";
@@ -18,7 +19,7 @@ import { SheetEditTable, type CustomFieldMeta, type SheetEditInitial, type Sheet
 import { openHref, type Common } from "./shared";
 import "./review-sheet-edit.css";
 
-function toSheetRow(r: ReviewRow, href: string, today: string, names: ReadonlyMap<string, string>, canSeeMoney: boolean, custom?: Record<string, FactCell>, edit?: CustomEditInput): SheetEditRow {
+function toSheetRow(r: ReviewRow, href: string, today: string, names: ReadonlyMap<string, string>, canSeeMoney: boolean, notes: SheetNotes | null, custom?: Record<string, FactCell>, edit?: CustomEditInput): SheetEditRow {
   const facts = factCells(r, today);
   // A viewer who may not see fees never receives a fee cell, drawn or not.
   if (!canSeeMoney) for (const id of MONEY_COLUMNS) delete (facts as Partial<FactCells>)[id as keyof FactCells];
@@ -43,6 +44,7 @@ function toSheetRow(r: ReviewRow, href: string, today: string, names: ReadonlyMa
     contactTitle: r.contactKnown && r.lastContact ? lastContactText(r, today) : r.lastContact ? contactWords(r.lastContact.type) : null,
     ...(custom ? { custom } : {}),
     ...(edit ? { customOwn: edit.own, customInherited: edit.inherited } : {}),
+    note: noteCellFor(notes, r),
   };
 }
 
@@ -51,7 +53,7 @@ function toSheetRow(r: ReviewRow, href: string, today: string, names: ReadonlyMa
  * are worked out and locked. Every edit goes through an existing review action, which re-resolves the role. A role that can't
  * write gets the same table with no editors. On a phone the rows stack and every edit happens in the record panel.
  */
-export function SheetEdit({ rows, today, members, params, perms, initial, canSeeMoney = false, initialPrefs, custom = null, customMembers, adminTier = false }: Common & {
+export function SheetEdit({ rows, today, members, params, perms, initial, canSeeMoney = false, initialPrefs, custom = null, customMembers, adminTier = false, notes = null }: Common & {
   rows: ReviewRow[];
   perms: SheetPerms;
   initial?: SheetEditInitial;
@@ -60,6 +62,7 @@ export function SheetEdit({ rows, today, members, params, perms, initial, canSee
   /** The firm's custom columns as the page read them. Typed in place when `perms.writeCustom` and the state is `ok`. */ custom?: CustomColumnsState | null;
   /** The member directory for person cells; null when it couldn't be read. Defaults to `members`. */ customMembers?: CustomMember[] | null;
   /** The admin tier (the page's re-resolved role): the section note's "not switched on" line and "Add a column" link. */ adminTier?: boolean;
+  /** The Notes column's reads (sheet-notes.ts); null or absent reads as couldn't load in every Notes cell. */ notes?: SheetNotes | null;
 }) {
   const names = new Map(members.map((m) => [m.userId, m.name]));
   const { trademarks, contracts } = sheetSections(rows);
@@ -69,7 +72,7 @@ export function SheetEdit({ rows, today, members, params, perms, initial, canSee
   // What each custom editor starts from: the record's own value and what shows without it (only when the state is ok).
   const edits = custom?.status === "ok" ? customEditInputs(rows, fields, custom, cellMembers, today) : null;
   const fieldMeta: Record<string, CustomFieldMeta> = Object.fromEntries(fields.map((f) => [customColumnId(f.id), { label: f.label, kind: f.kind, options: [...f.options], section: f.section }]));
-  const sheetRow = (r: ReviewRow) => toSheetRow(r, openHref(params, r), today, names, canSeeMoney, cells?.[r.key], edits?.[r.key]);
+  const sheetRow = (r: ReviewRow) => toSheetRow(r, openHref(params, r), today, names, canSeeMoney, notes, cells?.[r.key], edits?.[r.key]);
   const sections: SheetSection[] = [
     { id: "trademarks", title: "Trademarks", rows: trademarks.map(sheetRow) },
     { id: "contracts", title: "Contracts", rows: contracts.map(sheetRow) },

@@ -27,9 +27,11 @@ describe("F16 / CO3: a firm's live column takes its name off the 'Not tracked' l
     expect(note("trademarks", st)).toContain("Priority");
     expect(note("contracts", st)).toContain(W.notTrackedNote(["Completion Date"]));
   });
-  it("all four Trademarks names added: no 'Not tracked' sentence, and no <p> at all for a non-admin", () => {
+  // Changed on purpose (merge with the Notes cell): Notes is present, so the Trademarks note keeps the Notes sentence even when every
+  // "Not tracked" name is gone; the <p> holds that sentence alone.
+  it("all four Trademarks names added: no 'Not tracked' sentence; the one <p> holds only the Notes sentence for a non-admin", () => {
     const st = ok(["Priority", "Opinion Letter Due Date", "Completion Date", "Office Action Fee"].map((label) => ({ label, section: "trademarks" as const })));
-    expect(note("trademarks", st)).toBe("");
+    expect(note("trademarks", st)).toBe(`<p class="lx-note rv-sheet-note" data-section-note="trademarks">${W.NOT_TRACKED_NOTES_SENTENCE}</p>`);
     expect(note("trademarks", st, true)).not.toContain("Not tracked");
   });
   it("not switched on, couldn't load or not read: every name stays", () => {
@@ -52,9 +54,10 @@ describe("P5 / R11 / CO4: the admin tier's line and link", () => {
       expect(note("trademarks", null, admin)).not.toContain("<a ");
     });
   }
-  it("the link alone is still drawn inside the one <p>", () => {
+  // Changed on purpose (merge with the Notes cell): with every Trademarks name added, the Notes sentence stays, then the link, in the one <p>.
+  it("the Notes sentence and the link are drawn inside the one <p>", () => {
     const st = ok(["Priority", "Opinion Letter Due Date", "Completion Date", "Office Action Fee"].map((label) => ({ label, section: "trademarks" as const })));
-    expect(note("trademarks", st, true)).toBe('<p class="lx-note rv-sheet-note" data-section-note="trademarks"><a href="/dashboard/settings/columns/">Add a column</a></p>');
+    expect(note("trademarks", st, true)).toBe(`<p class="lx-note rv-sheet-note" data-section-note="trademarks">${W.NOT_TRACKED_NOTES_SENTENCE} <a href="/dashboard/settings/columns/">Add a column</a></p>`);
   });
   it("nothing to say and no link: no <p>", () => {
     const st = ok(["Priority", "Completion Date"].map((label) => ({ label, section: "contracts" as const })));

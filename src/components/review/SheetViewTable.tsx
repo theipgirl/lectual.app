@@ -18,7 +18,7 @@ export function SheetViewTable({ section, columns, rows, initialPrefs }: { secti
   const { columns: drawn } = useColumnPrefs(section, columns, initialPrefs);
   return (
     <SheetScroll>
-      <SheetTable className="rv-sheet" minWidth={sheetMinWidth(NO_SIZES, false, drawn.map((c) => sizeKeyOf(c.id)))}>
+      <SheetTable className="rv-sheet" minWidth={sheetMinWidth(NO_SIZES, drawn.map((c) => sizeKeyOf(c.id)))}>
         <thead>
           <tr>
             {drawn.map((c) => (

@@ -24,7 +24,7 @@ export type IntakeReport = {
  * Intake: where new clients come from, how many make it from first touch to
  * a signed engagement, and who is waiting on the firm.
  */
-export async function loadIntakeReport(period: ReportPeriod): Promise<IntakeReport> {
+export async function loadIntakeReport(period: ReportPeriod, opts: { /** `canSeeFormsAndProposals(role)`; absent = no Forms / Proposals tiles. */ canOpenForms?: boolean } = {}): Promise<IntakeReport> {
   const supabase = await getScopedClient();
 
   const [stages, allLeads, pnc, submissions, quotesSent] = await Promise.all([
@@ -85,17 +85,11 @@ export async function loadIntakeReport(period: ReportPeriod): Promise<IntakeRepo
       }))
     : [];
 
-  const links: LinkTile[] = [
-    { label: INTAKE_NAME, sub: "Every potential client not yet signed", href: intakeListHref(), count: pnc ? pnc.length : null },
-    { label: "Intake forms", sub: "Public intake and custom forms", href: "/dashboard/forms/", count: null },
-    {
-      label: PROPOSALS_NAME,
-      sub: "Sent and awaiting signature",
-      href: "/dashboard/quotes/",
-      count: quotesSent.status === "ok" ? quotesSent.quotes.length : null,
-    },
-    { label: "Pipeline", sub: "Every client from intake to registration", href: "/dashboard/pipeline/", count: null },
-  ];
+  const links = intakeReportLinks({
+    pncCount: pnc ? pnc.length : null,
+    proposalsSent: quotesSent.status === "ok" ? quotesSent.quotes.length : null,
+    canOpenForms: opts.canOpenForms === true,
+  });
 
   return {
     kpis: [newLeads, completions, hired, waitingCount],
@@ -103,4 +97,21 @@ export async function loadIntakeReport(period: ReportPeriod): Promise<IntakeRepo
     links,
     banner: !allLeads || !pnc ? "Some intake sources couldn't be loaded, so these figures may be incomplete." : null,
   };
+}
+
+/**
+ * The report's link tiles. The Forms ("Intake forms") and Proposals tiles are drawn only for a role shown those sections
+ * (`canSeeFormsAndProposals`, worked out by the page and passed in). Pure.
+ */
+export function intakeReportLinks(args: { pncCount: number | null; proposalsSent: number | null; canOpenForms: boolean }): LinkTile[] {
+  return [
+    { label: INTAKE_NAME, sub: "Every potential client not yet signed", href: intakeListHref(), count: args.pncCount },
+    ...(args.canOpenForms
+      ? [
+          { label: "Intake forms", sub: "Public intake and custom forms", href: "/dashboard/forms/", count: null },
+          { label: PROPOSALS_NAME, sub: "Sent and awaiting signature", href: "/dashboard/quotes/", count: args.proposalsSent },
+        ]
+      : []),
+    { label: "Pipeline", sub: "Every client from intake to registration", href: "/dashboard/pipeline/", count: null },
+  ];
 }

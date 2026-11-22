@@ -17,7 +17,6 @@ import {
   editColumnOf,
   courtOf,
   nextEditableCell,
-  notePost,
   parseSizes,
   postFor,
   sheetLeadStages,
@@ -104,10 +103,10 @@ describe("each editable cell posts to an existing review action", () => {
     expect(courtOf(sheetRow())).toBe(U1);
   });
 
-  it("Source -> setSource; + Note -> logWhatHappened", () => {
+  // Changed on purpose: notePost is gone (the Notes cell posts through logWhatHappenedAction itself; see tests/review/sheet-notes.test.tsx).
+  it("Source -> setSource", () => {
     expect(postFor(sheetRow({ kind: "lead" }), { col: "source", source: "Referral" })).toEqual({ action: "setSource", fields: { kind: "lead", id: ID, source: "Referral" } });
     expect(postFor(sheetRow(), { col: "source", source: null })?.fields.source).toBe("");
-    expect(notePost(sheetRow(), "Called")).toEqual({ action: "logWhatHappened", fields: { kind: "matter", id: ID, body: "Called" } });
   });
 });
 
@@ -223,8 +222,43 @@ describe("Tab and sizes", () => {
       const withCustom = (sec: SheetSectionId) => columnsFor(sec, { canSeeMoney: true, hasNotes: NOTES_PRESENT, customFields }).map((c) => editColumnOf(c.id));
       expect(withCustom("trademarks")).toContain("cf:00000000-0000-4000-8000-00000000a001");
       const walkCustom = (from: { rowKey: string; col: EditableColumnT }, dir: 1 | -1 = 1) => nextEditableCell(rows, from, OWNER, dir, (r) => withCustom(rows.find((x) => x.key === r.key)!.sec));
+      // Changed on purpose (merge with the Notes cell): every drawn column is handed in, so the comparison is with the same columns minus the
+      // firm's (Notes included on both sides: it is a stop where it can be typed in, see below).
+      const plain = (sec: SheetSectionId) => columnsFor(sec, { canSeeMoney: true, hasNotes: NOTES_PRESENT }).map((c) => editColumnOf(c.id));
+      const walkPlain = (from: { rowKey: string; col: EditableColumnT }, dir: 1 | -1 = 1) => nextEditableCell(rows, from, OWNER, dir, (r) => plain(rows.find((x) => x.key === r.key)!.sec));
       const starts: { rowKey: string; col: EditableColumnT }[] = rows.flatMap((r) => (["status", "next", "court", "source"] as const).map((col) => ({ rowKey: r.key, col })));
-      for (const from of starts) for (const dir of [1, -1] as const) expect(walkCustom(from, dir), `${from.rowKey}|${from.col}|${dir}`).toEqual(walk(from, dir));
+      for (const from of starts) for (const dir of [1, -1] as const) expect(walkCustom(from, dir), `${from.rowKey}|${from.col}|${dir}`).toEqual(walkPlain(from, dir));
+    });
+    // Merge with the Notes cell (488dd3d): Tab follows the drawn cells and lands on Notes where it can be typed in.
+    describe("the Notes cell is a Tab stop in its drawn place", () => {
+      const withNotes = (sec: SheetSectionId, hide: string[] = []) =>
+        columnsFor(sec, { canSeeMoney: true, hasNotes: NOTES_PRESENT }).filter((c) => (c.editable || c.id === "notes") && !hide.includes(c.id)).map((c) => editColumnOf(c.id));
+      const walkN = (from: { rowKey: string; col: EditableColumnT | "notes" }, dir: 1 | -1 = 1, perms = OWNER, hide: Record<string, string[]> = {}, rs = rows) =>
+        nextEditableCell(rs, from, perms, dir, (r) => withNotes(rs.find((x) => x.key === r.key)!.sec, hide[rs.find((x) => x.key === r.key)!.sec]));
+      it("Trademarks: status, source, Notes, court, next (Notes after Source)", () => {
+        expect(withNotes("trademarks")).toEqual(["status", "source", "notes", "court", "next"]);
+        expect(walkN({ rowKey: "t1", col: "source" })).toEqual({ rowKey: "t1", col: "notes" });
+        expect(walkN({ rowKey: "t1", col: "notes" })).toEqual({ rowKey: "t1", col: "court" });
+        expect(walkN({ rowKey: "t1", col: "court" }, -1)).toEqual({ rowKey: "t1", col: "notes" });
+      });
+      it("Contracts: status, next, Notes, court (Notes after Next step)", () => {
+        expect(withNotes("contracts")).toEqual(["status", "next", "notes", "court"]);
+        expect(walkN({ rowKey: "c1", col: "next" })).toEqual({ rowKey: "c1", col: "notes" });
+        expect(walkN({ rowKey: "c1", col: "notes" })).toEqual({ rowKey: "c1", col: "court" });
+      });
+      it("moved or hidden by the chooser, Notes follows: hidden is skipped", () => {
+        expect(walkN({ rowKey: "t1", col: "source" }, 1, OWNER, { trademarks: ["notes"] })).toEqual({ rowKey: "t1", col: "court" });
+      });
+      it("not a stop on a row whose note can't be typed (the note write roles)", () => {
+        const mixed = [
+          { key: "m1", kind: "matter" as const, sec: "trademarks" as const },
+          { key: "l1", kind: "lead" as const, sec: "trademarks" as const },
+        ];
+        const matterOnly = { ...OWNER, writeLead: false, moveLead: false };
+        expect(walkN({ rowKey: "m1", col: "source" }, 1, matterOnly, {}, mixed)).toEqual({ rowKey: "m1", col: "notes" });
+        // the lead row has no typed cell at all for this role: from the matter's last stop, Tab ends
+        expect(walkN({ rowKey: "m1", col: "next" }, 1, matterOnly, {}, mixed)).toBeNull();
+      });
     });
     it("a hidden status is skipped", () => {
       expect(walk({ rowKey: "t1", col: "next" }, 1, { trademarks: ["status"] })).toEqual({ rowKey: "t2", col: "source" });
@@ -247,8 +281,9 @@ describe("Tab and sizes", () => {
 
 describe("default column widths", () => {
   it("are the director's defaults, with Next step flexible", () => {
-    // The original eight are unchanged; Sprint 1 adds the new columns' widths (a test below checks every id is covered).
-    expect(DEFAULT_COL_WIDTHS).toMatchObject({ client: 140, mark: 130, status: 130, next: null, court: 110, waiting: 140, source: 100, contact: 84 });
+    // The original eight are unchanged; Sprint 1 adds the new columns' widths (a test below checks every id is covered). Notes is the
+    // merged Notes cell's own 150px (it replaced the "+ Note" column).
+    expect(DEFAULT_COL_WIDTHS).toMatchObject({ client: 140, mark: 130, status: 130, next: null, court: 110, waiting: 140, source: 100, contact: 84, notes: 150 });
     expect(NEXT_MIN_WIDTH).toBe(200);
   });
   it("a stored width overrides the default; nothing stored reads the default", () => {
@@ -259,16 +294,16 @@ describe("default column widths", () => {
     expect(colWidth(stored, "next")).toBe(400);
     expect(colWidth(stored, "mark")).toBe(130);
   });
-  it("the table's minimum is the sum, Next step counted at 200 and the note column only while editing", () => {
+  it("the table's minimum is the sum of the columns drawn, Next step counted at 200 (no separate note column any more)", () => {
     const eight = ["client", "mark", "status", "next", "court", "waiting", "source", "contact"] as const;
-    expect(sheetMinWidth(parseSizes(null), false, eight)).toBe(140 + 130 + 130 + 200 + 110 + 140 + 100 + 84);
-    expect(sheetMinWidth(parseSizes(null), true, eight)).toBe(1034 + 76);
+    expect(sheetMinWidth(parseSizes(null), eight)).toBe(140 + 130 + 130 + 200 + 110 + 140 + 100 + 84);
+    expect(sheetMinWidth(parseSizes(null), [...eight, "notes"])).toBe(1034 + 150);
   });
   it("widths cover every column id, and the minimum sums only the columns drawn", () => {
     for (const id of COLUMN_IDS) expect(DEFAULT_COL_WIDTHS, id).toHaveProperty(editColumnOf(id));
     const some = ["client", "serial", "oaDue"] as const;
-    expect(sheetMinWidth(parseSizes(null), false, some)).toBe(140 + 100 + 130);
-    expect(sheetMinWidth(parseSizes(JSON.stringify({ cols: { serial: 200 } })), false, some)).toBe(140 + 200 + 130);
+    expect(sheetMinWidth(parseSizes(null), some)).toBe(140 + 100 + 130);
+    expect(sheetMinWidth(parseSizes(JSON.stringify({ cols: { serial: 200 } })), some)).toBe(140 + 200 + 130);
   });
   it("stored widths for unknown ids are dropped; the new ids are kept and clamped", () => {
     expect(parseSizes(JSON.stringify({ cols: { oaDue: 9999, serial: 20, legalFee: 150, owner: 300, notAColumn: 100 } })).cols).toEqual({ oaDue: 640, serial: 72, legalFee: 150 });

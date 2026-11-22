@@ -2,6 +2,7 @@ import type { ReviewKind, ReviewNextStep, ReviewRow } from "./buckets";
 import { courtTarget, laneOf, withCourt } from "./lanes";
 import { isCustomColumnId, type BuiltinColumnId, type ColumnId, type CustomColumnId } from "./sheet-columns";
 import type { FactCell, FactCells } from "./sheet-cells";
+import type { NoteCell } from "./sheet-notes";
 import { BLANK, CUSTOM_FROM_LEAD_KEPT, CUSTOM_FROM_MERGED_KEPT } from "@/lib/ui/words";
 
 /**
@@ -13,7 +14,8 @@ import { BLANK, CUSTOM_FROM_LEAD_KEPT, CUSTOM_FROM_MERGED_KEPT } from "@/lib/ui/
 
 /**
  * Every column the Sheet can draw (the registry's, `sheet-columns.ts`; the section decides which and in what order). Four are typed
- * by a person; every other one is worked out and never edited here. The Owner column keeps its editor id `court` (this file's
+ * by a person through a picker; Notes shows the newest plain note and a writer types a new one in place (its own inline editor, not a
+ * picker); every other one is worked out and never edited here. The Owner column keeps its editor id `court` (this file's
  * tests and the `data-rse-cell="<row>|court"` hooks are pinned to it); the registry calls it `owner` (`editColumnOf`).
  */
 export const SHEET_EDIT_COLUMNS = ["client", "mark", "practiceArea", "serial", "status", "next", "court", "source", "notes", "start", "legalFee", "legalFeeDue", "govFee", "govFeeDue", "oaDue", "waiting", "contact"] as const;
@@ -99,7 +101,7 @@ export function cellEditable(col: SizedColumn, row: Pick<SheetEditRow, "key" | "
   return canWriteRow(kind, perms);
 }
 
-/** Whether "+ Note" is drawn on a row. */
+/** Whether a row's Notes cell can be typed in (the plain-note write roles). */
 export function canNote(kind: ReviewKind, perms: SheetPerms): boolean {
   return canWriteRow(kind, perms);
 }
@@ -136,6 +138,8 @@ export type SheetEditRow = {
   customOwn?: Record<string, string | null>;
   /** What a custom cell shows when the record has no own value (from the lead / a merged duplicate), present either way. */
   customInherited?: Record<string, { from: "lead" | "merged"; cell: FactCell }>;
+  /** The Notes cell: the newest plain note, none, or couldn't load. Absent reads as couldn't load (never as "no note"). */
+  note?: NoteCell;
 };
 
 /** The typed value of one cell, as the editor saves it and the table draws it. */
@@ -197,7 +201,7 @@ export function courtOf(row: Pick<SheetEditRow, "nextStep" | "assignedTo">): str
   return laneOf(row);
 }
 
-export type SheetActionName = "moveStage" | "closeLead" | "updateNextStep" | "setNextStep" | "assignRecord" | "setSource" | "logWhatHappened" | "setCustomValue";
+export type SheetActionName = "moveStage" | "closeLead" | "updateNextStep" | "setNextStep" | "assignRecord" | "setSource" | "setCustomValue";
 export type SheetPost = { action: SheetActionName; fields: Record<string, string> };
 
 /**
@@ -236,10 +240,6 @@ export function postFor(row: Pick<SheetEditRow, "kind" | "id" | "nextStep">, val
   }
 }
 
-/** "+ Note": the existing "Log what happened" path (a plain timeline note that counts as last contact). */
-export function notePost(row: Pick<SheetEditRow, "kind" | "id">, body: string): SheetPost {
-  return { action: "logWhatHappened", fields: { kind: row.kind, id: row.id, body } };
-}
 
 /** The field name in the "Saved · <client>, <field>" line. */
 export const FIELD_WORDS: Record<BuiltinEditableColumn | "note", string> = { status: "status", next: "next step", court: "whose court", source: "source", note: "note" };
@@ -360,18 +360,27 @@ export function shownRow(row: SheetEditRow, state: Pick<SheetEditState, "overrid
 
 /* ── Tab: the next (or previous) editable cell, row by row ── */
 
+/** A cell Tab can land on: a picker cell, a firm's column, or the Notes cell (its own inline editor) where it can be typed in. */
+export type TabStop = EditableColumn | "notes";
+
 export function nextEditableCell(
   rows: readonly Pick<SheetEditRow, "key" | "kind">[],
-  from: { rowKey: string; col: EditableColumn },
+  from: { rowKey: string; col: TabStop },
   perms: SheetPerms,
   dir: 1 | -1 = 1,
   /** The columns a row DRAWS, in drawn order (its section's columns after the chooser). Default: the four built-in typed columns in the fixed order. */
   columnsFor?: (row: Pick<SheetEditRow, "key" | "kind">) => readonly SizedColumn[],
   /** The render's own `fit`: a custom cell is a stop only where the render draws an editor for it. Absent = no custom cell is a stop. */
   fit?: CustomFit,
-): { rowKey: string; col: EditableColumn } | null {
-  const cells: { rowKey: string; col: EditableColumn }[] = [];
-  for (const r of rows) for (const col of columnsFor ? columnsFor(r) : EDITABLE_COLUMNS) if (isEditableColumn(col) && cellEditable(col, r, perms, fit)) cells.push({ rowKey: r.key, col });
+): { rowKey: string; col: TabStop } | null {
+  const cells: { rowKey: string; col: TabStop }[] = [];
+  for (const r of rows)
+    for (const col of columnsFor ? columnsFor(r) : EDITABLE_COLUMNS) {
+      // Notes is a stop only where it is drawn (the caller's columns) and the row's note can be typed (`canNote`, the cell's own rule).
+      if (col === "notes") {
+        if (canNote(r.kind, perms)) cells.push({ rowKey: r.key, col });
+      } else if (isEditableColumn(col) && cellEditable(col, r, perms, fit)) cells.push({ rowKey: r.key, col });
+    }
   const at = cells.findIndex((c) => c.rowKey === from.rowKey && c.col === from.col);
   if (at < 0) return cells[dir === 1 ? 0 : cells.length - 1] ?? null;
   return cells[at + dir] ?? null;
@@ -397,7 +406,6 @@ export const DEFAULT_COL_WIDTHS: Record<SheetEditColumn, number | null> = {
   next: null,
   court: 110,
   source: 100,
-  notes: 220,
   start: 96,
   legalFee: 128,
   legalFeeDue: 128,
@@ -406,15 +414,14 @@ export const DEFAULT_COL_WIDTHS: Record<SheetEditColumn, number | null> = {
   oaDue: 130,
   waiting: 140,
   contact: 84,
+  notes: 150,
 };
 /** A firm's custom column, until this viewer resizes it. */
 export const CUSTOM_COL_WIDTH = 140;
 /** At most this many stored custom widths are kept (a firm has at most 40 live fields). */
 const MAX_CUSTOM_SIZES = 64;
-/** The "+ Note" column (the editing aid) adds `NOTE_COL_WIDTH` to whatever a section draws; each section table scrolls sideways inside its card when wider. */
+/** Next step's narrowest; each section table scrolls sideways inside its card when the columns it draws are wider than the card. */
 export const NEXT_MIN_WIDTH = 200;
-/** The "+ Note" column, drawn only while editing. */
-export const NOTE_COL_WIDTH = 76;
 
 /** The width a column is drawn at: this viewer's stored width, else the default; null = flexible (Next step). */
 export function colWidth(sizes: Pick<SheetSizes, "cols">, col: SizedColumn): number | null {
@@ -422,8 +429,8 @@ export function colWidth(sizes: Pick<SheetSizes, "cols">, col: SizedColumn): num
 }
 
 /** The narrowest the table may get before it scrolls sideways inside its card (flexible Next step counted at its minimum). */
-export function sheetMinWidth(sizes: Pick<SheetSizes, "cols">, withNote: boolean, columns: readonly SizedColumn[] = SHEET_EDIT_COLUMNS.filter((c) => c !== "notes")): number {
-  let total = withNote ? NOTE_COL_WIDTH : 0;
+export function sheetMinWidth(sizes: Pick<SheetSizes, "cols">, columns: readonly SizedColumn[] = SHEET_EDIT_COLUMNS): number {
+  let total = 0;
   for (const c of columns) total += colWidth(sizes, c) ?? NEXT_MIN_WIDTH;
   return total;
 }

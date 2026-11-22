@@ -23,6 +23,8 @@ import type { CustomColumnsState } from "@/lib/custom-columns/rules";
 import { feesFor } from "./fees-cells";
 import { closeStagesOf, type CloseStage } from "./close-stage";
 import { OPTIONAL_SOURCES, type CriticalSource, type OptionalSource } from "./notes";
+import { readSheetNotes, type NotesDb } from "./sheet-notes-load";
+import type { SheetNotes } from "./sheet-notes";
 
 type ScopedClient = Awaited<ReturnType<typeof getScopedClient>>;
 type ActivityType = Database["public"]["Tables"]["crm_activity"]["Row"]["type"];
@@ -46,6 +48,8 @@ export type ReviewLoad =
       closeStages: CloseStage[];
       /** The firm's custom columns, when the page asked for them (the List): ok, not switched on, or couldn't load. Null when not asked. */
       custom?: CustomColumnsState | null;
+      /** The Sheet's Notes column (only when asked for): the newest plain note per row, or `unavailable`. */
+      notes?: SheetNotes;
     }
   | { status: "unavailable"; failed: CriticalSource[] };
 
@@ -263,13 +267,19 @@ function proposalsFor(row: ReviewRow, all: readonly ProposalExpiryRead[], matter
  */
 /** The optional reads `loadReview` can be handed (tests inject them; the page uses the defaults). */
 export type ReviewReads = FeeReads & { customColumns: typeof loadCustomColumns };
-export type ReviewLoadOptions = { withFees?: boolean; withCustom?: boolean; reads?: Partial<ReviewReads> };
+export type ReviewLoadOptions = {
+  withFees?: boolean;
+  withCustom?: boolean;
+  /** Read each row's newest note (the List's Notes column). */
+  notes?: boolean;
+  reads?: Partial<ReviewReads>;
+};
 
-export async function loadReview(now: Date = new Date(), options: ReviewLoadOptions = {}): Promise<ReviewLoad> {
-  const withFees = options.withFees === true;
-  const withCustom = options.withCustom === true;
-  const feeReads: FeeReads = { ...DEFAULT_FEE_READS, ...options.reads };
-  const customRead = options.reads?.customColumns ?? loadCustomColumns;
+export async function loadReview(now: Date = new Date(), opts: ReviewLoadOptions = {}): Promise<ReviewLoad> {
+  const withFees = opts.withFees === true;
+  const withCustom = opts.withCustom === true;
+  const feeReads: FeeReads = { ...DEFAULT_FEE_READS, ...opts.reads };
+  const customRead = opts.reads?.customColumns ?? loadCustomColumns;
   const db = await getScopedClient();
   const [mattersS, leadsS, stagesS, membersS, tzS, queueS] = await Promise.allSettled([
     listMatters(),
@@ -297,7 +307,8 @@ export async function loadReview(now: Date = new Date(), options: ReviewLoadOpti
 
   const dependsOnRecords = failedCritical.length === 0;
   const proposalLeadIds = [...new Set([...leadIds, ...matters.filter((m) => m.status === "open" || m.status === "on_hold").map((m) => m.lead_id).filter((x): x is string => !!x)])];
-  const [tasksS, activityS, deadlinesS, changesS, proposalsS, countsS, sendersS, changeRowsS, feeProposalsS, feeTrackerS, customS] = dependsOnRecords
+  const noteRows = [...matterIds.map((id) => ({ kind: "matter" as const, id })), ...leadIds.map((id) => ({ kind: "lead" as const, id }))];
+  const [tasksS, activityS, deadlinesS, changesS, proposalsS, countsS, sendersS, changeRowsS, feeProposalsS, feeTrackerS, customS, notesS] = dependsOnRecords
     ? await Promise.allSettled([
         readOpenTasks(db, matterIds, leadIds),
         // A matter shows its lead's mail too (the emails were filed on the lead before it signed), so the lead ids behind matters are read as well.
@@ -313,8 +324,10 @@ export async function loadReview(now: Date = new Date(), options: ReviewLoadOpti
         withFees ? feeReads.trackerFees(db, matterIds) : Promise.resolve([] as Awaited<ReturnType<FeeReads["trackerFees"]>>),
         // The firm's custom columns (the List only), in the same batch. A matter shows its lead's value, so the leads behind matters are read too.
         withCustom ? customRead(db, matterIds, proposalLeadIds, readMergedChildren) : Promise.resolve(null),
+        // In parallel with the rest, one bounded query per record (sheet-notes-load.ts); never throws, failure is `unavailable`.
+        opts.notes ? readSheetNotes(db as unknown as NotesDb, noteRows, timeZone) : Promise.resolve(null),
       ])
-    : ([null, null, null, null, null, null, null, null, null, null, null] as const);
+    : ([null, null, null, null, null, null, null, null, null, null, null, null] as const);
   if (dependsOnRecords && tasksS && tasksS.status === "rejected") failedCritical.push("tasks");
   if (failedCritical.length > 0) return { status: "unavailable", failed: failedCritical };
 
@@ -420,6 +433,7 @@ export async function loadReview(now: Date = new Date(), options: ReviewLoadOpti
     status: "ok",
     rows: withMoney,
     closeStages: closeStagesOf(leadStages),
+    ...(opts.notes ? { notes: notesS?.status === "fulfilled" && notesS.value ? notesS.value : ({ status: "unavailable" } as const) } : {}),
     today,
     timeZone,
     members: memberList.map((m) => ({ userId: m.userId, name: m.displayName || m.email || "Teammate", role: m.role })),

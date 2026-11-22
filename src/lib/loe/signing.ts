@@ -86,15 +86,29 @@ export function cleanTypedName(raw: unknown): string {
   return cleanClientText(raw);
 }
 
-/** Cleans and checks what was posted. The details are checked before the name, the name before the tick. */
-export function checkSigning(raw: unknown): SigningCheck {
+export type SignerFieldsCheck = { ok: true; typedName: string; details: SignerDetails } | { ok: false; reason: "name_required" | "details_required" };
+
+/**
+ * The name-and-details half of `checkSigning`, the ONE rule both signing paths call (the in-app signature through `checkSigning`,
+ * the Adobe Acrobat Sign path directly: Adobe's own signature act replaces the tick). Details before the name. Cleans with the
+ * signing normalisers, refuses nothing else, writes nothing.
+ */
+export function checkSignerFields(raw: unknown): SignerFieldsCheck {
   const src = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
   const details = cleanSigningDetails(src.details);
   if (missingDetails(details).length > 0) return { ok: false, reason: "details_required" };
   const typedName = cleanTypedName(src.typedName);
   if (typedName.length < MIN_SIGNED_NAME) return { ok: false, reason: "name_required" };
-  if (src.agree !== true) return { ok: false, reason: "agree_required" };
   return { ok: true, typedName, details };
+}
+
+/** Cleans and checks what was posted. The details are checked before the name, the name before the tick. */
+export function checkSigning(raw: unknown): SigningCheck {
+  const fields = checkSignerFields(raw);
+  if (!fields.ok) return fields;
+  const src = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  if (src.agree !== true) return { ok: false, reason: "agree_required" };
+  return { ok: true, typedName: fields.typedName, details: fields.details };
 }
 
 /** Whether the sign button may be pressed (the same rule the server applies, minus the fingerprint). Pure. */

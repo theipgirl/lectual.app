@@ -105,10 +105,11 @@ export function labelKey(label: string): string {
 }
 
 /**
- * Whether the Notes cell (another session's work) is present on this branch. It is not: no Notes header or cell is drawn.
- * When that work is merged it flips this and places its cell at the `notes` slot; nothing else here changes.
+ * Whether the Notes cell (the other session's work: `NotesCell`, `sheet-notes.ts`) is present on this branch. It is, since the merge of
+ * `claude/gracious-darwin-rceoyv` at 488dd3d: both tables draw it at the `notes` slot (Trademarks after Source, Contracts after Next
+ * step), and the chooser hides or moves it like any other column.
  */
-export const NOTES_PRESENT = false;
+export const NOTES_PRESENT = true;
 
 /** Default orders, the spreadsheet's. */
 export const SHEET_SECTION_COLUMNS: Record<SheetSectionId, readonly BuiltinColumnId[]> = {

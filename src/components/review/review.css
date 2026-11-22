@@ -67,7 +67,13 @@
 .rv-sheet-title { margin: 0; padding: 12px; background: var(--well); border-bottom: 1px solid var(--line-2); }
 .rv-sheet-title .lx-note { font-size: var(--fs-2); color: inherit; }
 .rv-sheet-sec > .rv-strip-note { padding: 12px; }
-@media (min-width: 641px) { .rv-sheet { --sheet-min: 980px; } }
+/* Floor 940px: 1280 with the rail pinned leaves 1280 - 294 (rail slot) - 26 (content padding) - 4 (page padding) - 2 (card border) = 954px,
+   so the plain Sheet does not scroll sideways there. Notes is a fixed 150px (130 + 2 x 10 padding); the other columns wrap into the rest. */
+@media (min-width: 641px) {
+  .lp-root:not(.rv-owner) .rv-sheet { --sheet-min: 940px; }
+  .rv-sheet td.rv-notes-td { width: 150px; max-width: 150px; }
+  .rv-sheet td.rv-notes-td .rv-notes { width: 130px; }
+}
 .rv-sheet .rv-sub, .rv-table .rv-sub { font-size: inherit; color: inherit; display: inline; }
 .rv-sheet .rv-sub::before, .rv-table .rv-sub::before { content: " · "; }
 .rv-sheet .rv-deadline-soon, .rv-table .rv-deadline-soon { color: var(--wine); font-weight: 500; }
@@ -86,6 +92,7 @@
   .rv-owner .rv-sheet th[data-column="status"] { width: 130px; }
   .rv-owner .rv-sheet th[data-column="owner"] { width: 110px; }
   .rv-owner .rv-sheet th[data-column="source"] { width: 100px; }
+  .rv-owner .rv-sheet th[data-column="notes"] { width: 150px; }
   .rv-owner .rv-sheet th[data-column="start"] { width: 96px; }
   .rv-owner .rv-sheet th[data-column="legalFee"] { width: 100px; }
   .rv-owner .rv-sheet th[data-column="legalFeeDue"] { width: 110px; }
@@ -196,3 +203,25 @@ td.rv-fact-failed > span { white-space: nowrap; text-wrap: nowrap; }
 .rv-cardx-firm { display: grid; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); min-width: 0; }
 .rv-cardx-firm > h4 { margin: 0; }
 .rv-cardx-firm > p { margin: 0; }
+
+/* The Sheet's Notes cell (both Sheets): one line, clipped, so the row keeps its height; the editor is one line that grows only by Shift+Enter. */
+.rv-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.rv-notes { display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; }
+.rv-note-btn, .rv-note-ro { display: flex; align-items: baseline; gap: 6px; min-width: 0; flex: 1 1 auto; overflow: hidden; white-space: nowrap; text-align: left; font: inherit; color: var(--body); }
+.rv-note-btn { background: none; border: 1px solid transparent; border-radius: var(--r-md); padding: 2px 6px; margin: -3px -7px; cursor: text; }
+.rv-note-btn:hover { border-color: var(--line); background: var(--card); }
+.rv-note-btn:focus-visible { outline: 2px solid var(--ox); outline-offset: 0; }
+.rv-note-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rv-note-date { flex: none; }
+.rv-note-add { color: var(--muted); }
+.rv-note-in { flex: 1 1 auto; min-width: 0; box-sizing: border-box; height: var(--ctl-h); max-height: 96px; padding: 6px 8px; resize: none; line-height: 1.35; border: 1px solid var(--line); border-radius: var(--r-md); font: var(--fs-3) var(--sans); color: var(--ink); background: var(--card); }
+.rv-note-in:focus-visible { outline: 2px solid var(--ox); outline-offset: 0; }
+.rv-note-status { flex: none; white-space: nowrap; }
+/* The longer "Not saved yet. Press Enter to save." takes its own line under the open editor (only while editing). */
+.rv-notes:has(.rv-note-in) { flex-wrap: wrap; }
+.rv-notes:has(.rv-note-in) .rv-note-status { flex: 1 1 100%; white-space: normal; }
+.rv-note-status.is-error { color: var(--wine); }
+@media (max-width: 640px) {
+  .rv-notes, .rv-note-btn, .rv-note-ro { white-space: normal; }
+  .rv-note-text { white-space: normal; }
+}

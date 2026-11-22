@@ -1,5 +1,5 @@
 /** The one-shot result params an OAuth return puts on the Integrations URL. */
-export const RESULT_PARAMS = ["connected", "reconnected", "error"] as const;
+export const RESULT_PARAMS = ["connected", "reconnected", "error", "esign", "esign_error"] as const;
 
 /**
  * The URL to show once the result banner has been painted: the same path and query without the one-shot
