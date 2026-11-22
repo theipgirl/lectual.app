@@ -44,10 +44,11 @@ describe("ReviewCardAside: the Firm columns block, three states, both branches",
         expect(await aside(r, { status: "ok", items: [] })).not.toContain("rv-cardx-firm");
         expect(await aside(r, null)).not.toContain("rv-cardx-firm");
       });
-      it("not switched on: one quiet line", async () => {
-        const b = block(await aside(r, { status: "not-set-up" }));
-        expect(b).toContain(`<p class="lx-note">${CUSTOM_COLUMNS_NOT_ON}</p>`);
-        expect(b).not.toContain("<dl");
+      it("not switched on: no block at all (CO4)", async () => {
+        const html = await aside(r, { status: "not-set-up" });
+        expect(html).not.toContain("rv-cardx-firm");
+        expect(html).not.toContain(FIRM_COLUMNS_HEADING);
+        expect(html).not.toContain(CUSTOM_COLUMNS_NOT_ON);
       });
       it("couldn't load: says so, never a dash", async () => {
         const b = block(await aside(r, { status: "unavailable" }));
@@ -75,9 +76,9 @@ const leadCard = (id: string, role = "attorney"): RecordCardLoad =>
     documents: { status: "ok", value: { files: { status: "ok", files: [], capped: false }, letters: null } },
     temperature: null, mergeAvailable: false, duplicateOf: null,
   }) as RecordCardLoad;
-const matterCard = (id: string, type: string | null, leadId: string | null): RecordCardLoad =>
+const matterCard = (id: string, type: string | null, leadId: string | null, role = "attorney"): RecordCardLoad =>
   ({
-    status: "ok", kind: "matter", role: "attorney", now: NOW, timeZone: TZ,
+    status: "ok", kind: "matter", role, now: NOW, timeZone: TZ,
     matter: { id, title: "Supply agreement", mark_text: null, owner_name: "Birch Goods", matter_number: "BL-1", stage_id: null, assigned_to: null, referral_source: null, type, lead_id: leadId },
     stages: { status: "ok", value: [] }, members: { status: "ok", value: [] }, tasks: { status: "ok", value: [] },
     activity: { status: "ok", value: { rows: [], truncated: false } }, deadline: { status: "ok", value: null },
@@ -94,12 +95,15 @@ describe("the page decides which read feeds the card's Firm columns", () => {
     const html = decode(await renderPage({ view: "sheet", open: `lead:${MERGED}` }));
     expect(spies.cardCustom).toHaveBeenCalledTimes(1);
     expect(spies.cardCustom.mock.calls[0][0]).toEqual({ kind: "lead", id: OTHER });
-    expect(html).toContain(CUSTOM_COLUMNS_NOT_ON);
+    // CO4: before 0115 the card draws no Firm columns block, for any role.
+    expect(html).not.toContain(CUSTOM_COLUMNS_NOT_ON);
+    expect(html).not.toContain(FIRM_COLUMNS_HEADING);
     expect(html).toContain("isn't on the weekly review");
   });
 
   it("a review row on the List: no extra read; the block comes from the List's own read", async () => {
-    mockPage({ load: load(customFixture), role: "attorney", card: leadCard(KEEPER) });
+    // A viewer: the read-only block (a staff role's card is editable, `firm-columns-edit.test.tsx`).
+    mockPage({ load: load(customFixture), role: "viewer", card: leadCard(KEEPER, "viewer") });
     const html = decode(await renderPage({ view: "sheet", open: `lead:${KEEPER}` }));
     expect(spies.cardCustom).not.toHaveBeenCalled();
     expect(html).toContain(FIRM_COLUMNS_HEADING);
@@ -116,7 +120,7 @@ describe("the page decides which read feeds the card's Firm columns", () => {
   });
 
   it("a matter not on the review reads with its own lead, and its section follows its type", async () => {
-    mockPage({ load: load(null), role: "attorney", card: matterCard("00000000-0000-4000-8000-0000000000b9", "BL", "00000000-0000-4000-8000-0000000000e7"), cardCustom: customFixture });
+    mockPage({ load: load(null), role: "viewer", card: matterCard("00000000-0000-4000-8000-0000000000b9", "BL", "00000000-0000-4000-8000-0000000000e7", "viewer"), cardCustom: customFixture });
     const html = decode(await renderPage({ open: "matter:00000000-0000-4000-8000-0000000000b9" }));
     expect(spies.cardCustom.mock.calls[0][0]).toEqual({ kind: "matter", id: "00000000-0000-4000-8000-0000000000b9", leadId: "00000000-0000-4000-8000-0000000000e7" });
     // a Contracts matter: the contracts and both fields only

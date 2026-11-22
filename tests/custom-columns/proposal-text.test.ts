@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -445,8 +446,8 @@ describe("0115 proposal: grants and RLS", () => {
   });
 });
 
-describe("0115 proposal: nothing in the app maps its prefixes yet (Sprint 3)", () => {
-  it("no file under src names one of the 14 prefixes", () => {
+describe("0115 proposal: the app maps its prefixes in ONE place (Sprint 3)", () => {
+  it("only src/lib/custom-columns/errors.ts names one of the 14 prefixes", () => {
     const prefixes = [...new Set([...sql.matchAll(/raise exception '([a-z_]+):/g)].map((m) => m[1]))];
     expect(prefixes).toHaveLength(14);
     const re = new RegExp(`\\b(${prefixes.join("|")})\\b`);
@@ -459,6 +460,79 @@ describe("0115 proposal: nothing in the app maps its prefixes yet (Sprint 3)", (
       }
     };
     walk(path.join(ROOT, "src"));
-    expect(hits).toEqual([]);
+    expect(hits).toEqual(["src/lib/custom-columns/errors.ts"]);
+  });
+});
+
+/* ── Sprint 3: CO2 (MAINTAIN), D8's five additions, R17, and the SQL that CO1's read side mirrors ── */
+
+describe("0115 proposal: Sprint 3 additions (D8)", () => {
+  const lines = raw.split("\n");
+  const lastGrant = Math.max(...lines.map((l, i) => (/^grant\b/.test(l.trim()) ? i : -1)));
+
+  it("CO2: MAINTAIN is revoked from anon and authenticated on both tables, inside one version-guarded do block after the last grant", () => {
+    const at = sql.indexOf("pg_catalog.current_setting('server_version_num')::int >= 170000");
+    expect(at).toBeGreaterThan(0);
+    const block = sql.slice(sql.lastIndexOf("do $$", at), sql.indexOf("$$;", at) + 3);
+    expect(flat(block)).toBe(
+      "do $$ begin if pg_catalog.current_setting('server_version_num')::int >= 170000 then execute 'revoke maintain on public.crm_custom_field from anon, authenticated'; execute 'revoke maintain on public.crm_custom_value from anon, authenticated'; end if; end $$;",
+    );
+    const blockLine = lines.findIndex((l) => l.includes("server_version_num"));
+    expect(blockLine).toBeGreaterThan(lastGrant);
+    // still inside section 6, before row level security
+    expect(at).toBeLessThan(sql.indexOf("alter table public.crm_custom_field enable row level security;"));
+    expect((SQL.match(/revoke maintain/g) ?? []).length).toBe(2);
+  });
+
+  it("the WRITES line about Move", () => {
+    const writes = raw.slice(raw.indexOf("-- WRITES"), raw.indexOf("-- ====", raw.indexOf("-- WRITES")));
+    expect(writes).toContain("--   * Move in Settings -> Columns is two single-row position updates in two requests, never one statement or one transaction.");
+  });
+
+  it("the two KNOWN LIMITS lines, verbatim (N4's wording for the second)", () => {
+    const limits = raw.slice(raw.indexOf("-- KNOWN LIMITS AND BEHAVIOUR"));
+    expect(limits).toContain(
+      "--   * lectual.app mirrors the label and option CHECKs exactly (Postgres `btrim` default characters, `char_length` in code points); its writes clean whitespace and control characters first.",
+    );
+    expect(limits).toContain(
+      "--   * A failed Move can leave two columns sharing a position; they then order by label. A further Move repairs it; if it can't, archive and restore one of them.",
+    );
+  });
+
+  it("R17: isolation case 15 names the MAINTAIN check", () => {
+    const cases = raw.slice(raw.indexOf("-- Cases to add to lectual tests/tenant-isolation.test.ts"));
+    const c15 = cases.slice(cases.search(/--\s+15\. /), cases.search(/--\s+16\. /));
+    expect(c15).toContain("On PostgreSQL 17, `has_table_privilege` for `authenticated` and `anon` with `MAINTAIN` on both tables is false.");
+  });
+
+  it("exactly the five additions over Sprint 2's file, and nothing else changed (the file without them is byte for byte Sprint 2's)", () => {
+    const single = [
+      "--   * Move in Settings -> Columns is two single-row position updates in two requests, never one statement or one transaction.\n",
+      "--   * lectual.app mirrors the label and option CHECKs exactly (Postgres `btrim` default characters, `char_length` in code points); its writes clean whitespace and control characters first.\n",
+      "--   * A failed Move can leave two columns sharing a position; they then order by label. A further Move repairs it; if it can't, archive and restore one of them.\n",
+      "--      On PostgreSQL 17, `has_table_privilege` for `authenticated` and `anon` with `MAINTAIN` on both tables is false.\n",
+    ];
+    let without = raw;
+    for (const l of single) {
+      expect(without.split(l)).toHaveLength(2);
+      without = without.replace(l, "");
+    }
+    const start = without.indexOf("\n-- PostgreSQL 17 adds the MAINTAIN privilege");
+    const end = without.indexOf("end\n$$;\n", start) + "end\n$$;\n".length;
+    expect(start).toBeGreaterThan(0);
+    without = without.slice(0, start) + without.slice(end);
+    // md5 of docs/pge/2026-11-17-agentic-ip-os/0115-proposed.sql.txt at dbec367 (the end of Sprint 2).
+    expect(createHash("md5").update(without).digest("hex")).toBe("9a366b25be82ef207dcbd410f6daa106");
+  });
+
+  it("CO1: the SQL the app's read side mirrors", () => {
+    expect(SQL).toContain("constraint crm_custom_field_label_len check (char_length(label) between 1 and 60)");
+    expect(SQL).toContain("constraint crm_custom_field_label_trimmed check (label = btrim(label))");
+    const opts = flat(body("crm_custom_field_options_valid"));
+    expect(opts).toContain("pg_catalog.jsonb_array_length(p_options) between 1 and 30");
+    expect(opts).toContain("pg_catalog.char_length(e.v #>> '{}') not between 1 and 40");
+    expect(opts).toContain("(e.v #>> '{}') <> pg_catalog.btrim(e.v #>> '{}')");
+    expect(opts).toContain("pg_catalog.count(distinct pg_catalog.lower(e.v #>> '{}'))");
+    expect(opts).toContain("else p_options = '[]'::jsonb");
   });
 });

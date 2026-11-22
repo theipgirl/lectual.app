@@ -33,9 +33,9 @@ describe("columnsFor with the firm's fields", () => {
     expect(ids("contracts").slice(-2)).toEqual([customColumnId(C), customColumnId(B)]);
   });
 
-  it("a custom column is read only, not money, not pinned; header = label, title = the kind word", () => {
+  it("a custom column is typeable (cellEditable decides per role and row), not money, not pinned; header = label, title = the kind word", () => {
     const [fee, prio] = columnsFor("trademarks", opts()).slice(-2);
-    expect(fee).toEqual({ id: `cf:${C}`, header: "Quoted fee", title: CUSTOM_KIND_MONEY, money: false, pinned: false, editable: false, kind: "money" });
+    expect(fee).toEqual({ id: `cf:${C}`, header: "Quoted fee", title: CUSTOM_KIND_MONEY, money: false, pinned: false, editable: true, kind: "money" });
     expect(prio.title).toBe(CUSTOM_KIND_CHOICE);
     expect(columnsFor("contracts", opts()).at(-1)?.title).toBe(CUSTOM_KIND_DATE);
   });

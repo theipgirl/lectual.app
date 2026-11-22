@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NOTES_PRESENT, columnsFor } from "@/lib/review/sheet-columns";
-import { CUSTOM_COLUMNS_NOT_ON } from "@/lib/ui/words";
+import { COLUMNS_ADD, CUSTOM_COLUMNS_NOT_ON } from "@/lib/ui/words";
 import { customFixture, members, rows, tableHeaders, TODAY } from "./columns-fixtures";
 import { mockPage, renderPage, spies } from "./custom-page-harness";
 
@@ -23,7 +23,7 @@ const LISTS = [
 describe.each(LISTS)("the %s with each custom state", (_name, who) => {
   beforeEach(() => vi.resetModules());
 
-  it("not switched on: every Sprint 1 column, no custom column, the sentence in the section note, no alert, not in the details note", async () => {
+  it("not switched on: every Sprint 1 column, no custom column, the sentence only for the admin tier (CO4), no alert, not in the details note", async () => {
     mockPage({ load: { ...base, failed: [], custom: { status: "not-set-up" } }, role: who.role, roleViews: who.roleViews });
     const html = decode(await renderPage({ view: "sheet" }));
     expect(html).toContain(who.marker);
@@ -32,7 +32,12 @@ describe.each(LISTS)("the %s with each custom state", (_name, who) => {
     expect(ct).toEqual(builtin("contracts", who.money));
     const notes = [...html.matchAll(/<p class="lx-note rv-sheet-note" data-section-note="(\w+)">([^<]*)<\/p>/g)];
     expect(notes).toHaveLength(2);
-    for (const n of notes) expect(n[2]).toContain(CUSTOM_COLUMNS_NOT_ON);
+    // The owner is the admin tier; the attorney is not.
+    for (const n of notes) {
+      if (who.role === "owner") expect(n[2]).toContain(CUSTOM_COLUMNS_NOT_ON);
+      else expect(n[2]).not.toContain(CUSTOM_COLUMNS_NOT_ON);
+    }
+    expect(html).not.toContain(COLUMNS_ADD);
     expect(alertTexts(html)).toEqual([]);
     expect(html).not.toContain("custom columns)");
   });
@@ -81,4 +86,40 @@ describe("only the List reads the firm's columns", () => {
       }
     }
   });
+});
+
+/* ── CO4 / R18: before 0115, the "not switched on" sentence is the admin tier's only, on the List; never a link ── */
+
+const ROLES = ["owner", "admin", "senior_admin", "attorney", "intake", "paralegal", "law_clerk", "clerk", "viewer", "social_media"] as const;
+
+describe("CO4: not switched on, every role and a signed-out caller", () => {
+  beforeEach(() => vi.resetModules());
+
+  for (const role of [...ROLES, null]) {
+    const adminTier = role === "owner" || role === "admin" || role === "senior_admin";
+    it(`${role ?? "null"}: the sentence is ${adminTier ? "in both section notes" : "absent"}, and there is no "Add a column" link`, async () => {
+      // The owner gets the editable Sheet (role views on); everyone else the read-only List.
+      mockPage({ load: { ...base, failed: [], custom: { status: "not-set-up" } }, role, roleViews: role === "owner" });
+      const html = decode(await renderPage({ view: "sheet" }));
+      if (role === "owner") expect(html).toContain('class="rse-root"');
+      else if (role !== null) expect(html).toContain('class="rv-sheets"');
+      const count = html.split(CUSTOM_COLUMNS_NOT_ON).length - 1;
+      expect(count).toBe(adminTier ? 2 : 0);
+      expect(html).not.toContain(COLUMNS_ADD);
+      expect(html).not.toContain("/dashboard/settings/columns/");
+    });
+  }
+});
+
+describe("P5 on the page: the admin tier's \"Add a column\" link appears with the custom state ok", () => {
+  beforeEach(() => vi.resetModules());
+  for (const role of ROLES) {
+    const adminTier = role === "owner" || role === "admin" || role === "senior_admin";
+    it(`${role}: ${adminTier ? "a link in each section note" : "no link"}`, async () => {
+      mockPage({ load: { ...base, failed: [], custom: customFixture }, role, roleViews: role === "owner" });
+      const html = decode(await renderPage({ view: "sheet" }));
+      const links = html.split('href="/dashboard/settings/columns/"').length - 1;
+      expect(links).toBe(adminTier ? 2 : 0);
+    });
+  }
 });

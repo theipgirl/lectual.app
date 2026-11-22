@@ -114,22 +114,22 @@ describe("each editable cell posts to an existing review action", () => {
 describe("who may edit what", () => {
   it("locked columns, the client link and the mark never get an editor", () => {
     for (const col of [...LOCKED_COLUMNS, "client", "mark"] as const) {
-      expect(cellEditable(col, "matter", OWNER)).toBe(false);
-      expect(cellEditable(col, "lead", OWNER)).toBe(false);
+      expect(cellEditable(col, { key: "m", kind: "matter" }, OWNER)).toBe(false);
+      expect(cellEditable(col, { key: "l", kind: "lead" }, OWNER)).toBe(false);
     }
-    expect(SHEET_EDIT_COLUMNS.filter((c) => cellEditable(c, "matter", OWNER))).toEqual([...EDITABLE_COLUMNS]);
+    expect(SHEET_EDIT_COLUMNS.filter((c) => cellEditable(c, { key: "m", kind: "matter" }, OWNER))).toEqual([...EDITABLE_COLUMNS]);
   });
 
   it("read-only roles get no editors at all", () => {
-    for (const col of SHEET_EDIT_COLUMNS) for (const kind of ["matter", "lead"] as const) expect(cellEditable(col, kind, READ_ONLY_PERMS)).toBe(false);
+    for (const col of SHEET_EDIT_COLUMNS) for (const kind of ["matter", "lead"] as const) expect(cellEditable(col, { key: "r", kind }, READ_ONLY_PERMS)).toBe(false);
   });
 
   it("a lead's Status needs the move-stage role; an unreadable stage list gives no Status editor", () => {
     const noMove = { ...OWNER, moveLead: false };
-    expect(cellEditable("status", "lead", noMove)).toBe(false);
-    expect(cellEditable("next", "lead", noMove)).toBe(true);
-    expect(cellEditable("status", "matter", { ...OWNER, matterStages: null })).toBe(false);
-    expect(cellEditable("status", "matter", { ...OWNER, matterStages: [] })).toBe(false);
+    expect(cellEditable("status", { key: "l", kind: "lead" }, noMove)).toBe(false);
+    expect(cellEditable("next", { key: "l", kind: "lead" }, noMove)).toBe(true);
+    expect(cellEditable("status", { key: "m", kind: "matter" }, { ...OWNER, matterStages: null })).toBe(false);
+    expect(cellEditable("status", { key: "m", kind: "matter" }, { ...OWNER, matterStages: [] })).toBe(false);
   });
 });
 

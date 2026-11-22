@@ -33,11 +33,12 @@ describe("parseField", () => {
     expect(parseField(null)).toBeNull();
     expect(parseField("x")).toBeNull();
   });
-  it("a choice needs 1 to 30 distinct (ignoring case) trimmed options of at most 40; another kind none", () => {
+  it("a choice needs 1 to 30 options of 1 to 40 code points equal to their btrim; another kind none (CO1: distinctness is the database's)", () => {
     expect(parseField({ ...ok, options: [] })).toBeNull();
     expect(parseField({ ...ok, options: Array.from({ length: 31 }, (_, i) => `o${i}`) })).toBeNull();
     expect(parseField({ ...ok, options: Array.from({ length: 30 }, (_, i) => `o${i}`) })).not.toBeNull();
-    expect(parseField({ ...ok, options: ["High", "high"] })).toBeNull();
+    // CO1: the database judged distinctness with lower(); a field it stored is drawn, so the read side does not re-judge it.
+    expect(parseField({ ...ok, options: ["High", "high"] })).not.toBeNull();
     expect(parseField({ ...ok, options: ["x".repeat(41)] })).toBeNull();
     expect(parseField({ ...ok, options: [" High"] })).toBeNull();
     expect(parseField({ ...ok, options: [3] })).toBeNull();

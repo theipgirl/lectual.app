@@ -19,9 +19,11 @@ describe("P5: 'not switched on' and 'couldn't load' are different, and each says
     expect([W.CUSTOM_KIND_TEXT, W.CUSTOM_KIND_DATE, W.CUSTOM_KIND_MONEY, W.CUSTOM_KIND_CHOICE, W.CUSTOM_KIND_PERSON]).toEqual(["Text", "Date", "Money", "Choice", "Person"]);
   });
 
-  it("on the List: the section note adds the not-switched-on sentence; a failed read is the details note", () => {
-    const off = text(renderToStaticMarkup(<SectionNote section="trademarks" customNotOn />));
+  it("on the List: the section note adds the not-switched-on sentence for the admin tier only (CO4); a failed read is the details note", () => {
+    const off = text(renderToStaticMarkup(<SectionNote section="trademarks" customState={{ status: "not-set-up" }} adminTier />));
+    const staff = text(renderToStaticMarkup(<SectionNote section="trademarks" customState={{ status: "not-set-up" }} adminTier={false} />));
     const on = text(renderToStaticMarkup(<SectionNote section="trademarks" />));
+    expect(staff).not.toContain(W.CUSTOM_COLUMNS_NOT_ON);
     expect(off.endsWith(W.CUSTOM_COLUMNS_NOT_ON)).toBe(true);
     expect(on).not.toContain(W.CUSTOM_COLUMNS_NOT_ON);
     const failed = detailsNote(["custom columns"]);
@@ -30,12 +32,10 @@ describe("P5: 'not switched on' and 'couldn't load' are different, and each says
     for (const s of [off, failed!]) expect(s).not.toMatch(BANNED);
   });
 
-  it("on the card: two different lines, each exactly its constant", () => {
-    const off = text(renderToStaticMarkup(<FirmColumns block={{ status: "not-set-up" }} />));
+  it("on the card: not switched on draws nothing at all (CO4); couldn't load is its own line", () => {
+    expect(renderToStaticMarkup(<FirmColumns block={{ status: "not-set-up" }} />)).toBe("");
     const down = text(renderToStaticMarkup(<FirmColumns block={{ status: "unavailable" }} />));
-    expect(off).toBe(`${W.FIRM_COLUMNS_HEADING} ${W.CUSTOM_COLUMNS_NOT_ON}`);
     expect(down).toBe(`${W.FIRM_COLUMNS_HEADING} ${W.DECK_COULDNT_LOAD}`);
-    expect(off).not.toBe(down);
-    for (const s of [off, down]) expect(s).not.toMatch(BANNED);
+    expect(down).not.toMatch(BANNED);
   });
 });
