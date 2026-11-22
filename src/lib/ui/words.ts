@@ -1501,6 +1501,8 @@ export const COLUMNS_CHOICES_HINT = "Only for a Choice column";
 export const CUSTOM_SECTION_WORDS = { trademarks: "Trademarks", contracts: "Contracts", both: "Both" } as const;
 export const archiveQuestion = (label: string) => `Archive ${label}? It leaves the List; its values are kept.`;
 export const archivedHeading = (n: number) => `Archived columns (${n})`;
+/** Settings -> Columns lists the first `n` archived columns; there are more (never an error page). */
+export const archivedShownNote = (n: number) => `Showing the first ${n} archived columns.`;
 export const COLUMNS_ARCHIVE = "Archive";
 export const COLUMNS_RESTORE = "Restore";
 export const COLUMNS_RENAME = "Rename";

@@ -156,6 +156,11 @@ describe("V1: tokens only", () => {
 
 describe("the loader: three states, the database's order, archived kept apart, the count its own state", () => {
   type Answer = { data: unknown; error: unknown };
+  /**
+   * A fake scoped client. Changed on purpose (Sprint 3 evaluation, item 4): live and archived columns are two reads, so the fake answers
+   * `crm_custom_field` by its `archived` filter (rows given as one list are split by their own flag, in the order given) and honours `range`.
+   * `fields` may also be a plain answer (an error, a non-list), returned to both reads.
+   */
   const client = (fields: Answer, values: Answer = { data: [], error: null }) => {
     const calls: string[][] = [];
     return {
@@ -164,13 +169,23 @@ describe("the loader: three states, the database's order, archived kept apart, t
         from(table: string) {
           const chain: string[] = [table];
           calls.push(chain);
+          let archived: boolean | null = null;
+          let range: [number, number] | null = null;
           const q: Record<string, unknown> = {};
           for (const m of ["select", "eq", "in", "not", "order", "range", "limit"])
             q[m] = (...a: unknown[]) => {
               chain.push(`${m}(${a.map((x) => JSON.stringify(x)).join(",")})`);
+              if (m === "eq" && a[0] === "archived") archived = a[1] as boolean;
+              if (m === "range") range = [a[0] as number, a[1] as number];
               return q;
             };
-          q.then = (res: (a: Answer) => unknown) => Promise.resolve(table === "crm_custom_field" ? fields : values).then(res);
+          q.then = (res: (a: Answer) => unknown) => {
+            if (table !== "crm_custom_field") return Promise.resolve(values).then(res);
+            if (fields.error || !Array.isArray(fields.data) || archived === null) return Promise.resolve(fields).then(res);
+            let rows = (fields.data as { archived?: unknown }[]).filter((r) => (r.archived === true) === archived);
+            if (range) rows = rows.slice(range[0], range[1] + 1);
+            return Promise.resolve({ data: rows, error: null }).then(res);
+          };
           return q;
         },
       },
@@ -186,14 +201,57 @@ describe("the loader: three states, the database's order, archived kept apart, t
     expect(st.live.map((f) => f.label)).toEqual(["Review date", "Quoted fee"]);
     expect(st.archived.map((f) => f.label)).toEqual(["Old flag"]);
     expect(st.dropped).toBe(1);
-    expect(c.calls[0]).toEqual(["crm_custom_field", 'select("id, section, label, kind, options, position, archived, updated_at")', 'order("position")', 'order("label")', 'order("id")', "limit(1000)"]);
+    expect(st.archivedMore).toBeUndefined();
+    const select = 'select("id, section, label, kind, options, position, archived, updated_at")';
+    expect(c.calls[0]).toEqual(["crm_custom_field", select, 'eq("archived",false)', 'order("position")', 'order("label")', 'order("id")', "limit(1000)"]);
+    expect(c.calls[1]).toEqual(["crm_custom_field", select, 'eq("archived",true)', 'order("position")', 'order("label")', 'order("id")', "range(0,200)"]);
   });
   it("not-set-up and unavailable", async () => {
     expect(await loadColumnsSettings(client({ data: null, error: { code: "42P01" } }).db)).toEqual({ status: "not-set-up" });
     expect(await loadColumnsSettings(client({ data: null, error: { code: "PGRST205" } }).db)).toEqual({ status: "not-set-up" });
     expect(await loadColumnsSettings(client({ data: null, error: { code: "XX000" } }).db)).toEqual({ status: "unavailable" });
     expect(await loadColumnsSettings(client({ data: "x", error: null }).db)).toEqual({ status: "unavailable" });
-    expect(await loadColumnsSettings(client({ data: Array.from({ length: 1000 }, () => ({})), error: null }).db)).toEqual({ status: "unavailable" });
+    // 1,000 LIVE rows is a cut-short read (a firm has at most 40 live): still unavailable.
+    expect(await loadColumnsSettings(client({ data: Array.from({ length: 1000 }, () => ({ archived: false })), error: null }).db)).toEqual({ status: "unavailable" });
+  });
+  it("past 1,000 columns in all (archived ones piling up) the page still draws: the first 200 archived, and a note that there are more", async () => {
+    const live = [raw(LIVE[0]), raw(LIVE[1]), raw(LIVE[2])];
+    const archived = Array.from({ length: 1200 }, (_, i) => ({
+      ...raw(ARCHIVED[0]),
+      id: `00000000-0000-4000-8000-${String(100000000000 + i).padStart(12, "0")}`,
+      label: `Old ${i}`,
+      position: 100 + i,
+    }));
+    const c = client({ data: [...live, ...archived], error: null });
+    const st = await loadColumnsSettings(c.db);
+    expect(st.status).toBe("ok");
+    if (st.status !== "ok") return;
+    expect(st.live).toHaveLength(3);
+    expect(st.archived).toHaveLength(200);
+    expect(st.archived[0].label).toBe("Old 0");
+    expect(st.archivedMore).toBe(true);
+    // Use counts are read for the LIVE choice columns only, never for 1,200 archived ids.
+    const valueReads = c.calls.filter((ch) => ch[0] === "crm_custom_value");
+    expect(valueReads.length).toBeGreaterThan(0);
+    for (const ch of valueReads) {
+      expect(ch.join(" ")).toContain(S.priority);
+      expect(ch.join(" ")).not.toMatch(/8000-10000000/);
+    }
+    const html = render(st);
+    expect(html).toContain(W.archivedHeading(200));
+    expect(html).toContain(W.archivedShownNote(200));
+    expect(html).toContain("Showing the first 200 archived columns.");
+    expect(html).not.toContain('role="alert"');
+    expect(html.match(/data-column-row=/g)).toHaveLength(203);
+  });
+  it("exactly 200 archived: all listed, no note", async () => {
+    const archived = Array.from({ length: 200 }, (_, i) => ({ ...raw(ARCHIVED[0]), id: `00000000-0000-4000-8000-${String(200000000000 + i).padStart(12, "0")}`, label: `Gone ${i}` }));
+    const st = await loadColumnsSettings(client({ data: [raw(LIVE[0]), ...archived], error: null }).db);
+    expect(st).toMatchObject({ status: "ok" });
+    if (st.status !== "ok") return;
+    expect(st.archived).toHaveLength(200);
+    expect(st.archivedMore).toBeUndefined();
+    expect(render(st)).not.toContain("data-archived-more");
   });
   it("a failed count read leaves the page ok", async () => {
     const st = await loadColumnsSettings(client({ data: [raw(LIVE[1])], error: null }, { data: null, error: { code: "XX000" } }).db);

@@ -9,6 +9,7 @@ import {
   CUSTOM_COLUMNS_NOT_READY,
   CUSTOM_SECTION_WORDS,
   archivedHeading,
+  archivedShownNote,
   columnsCount,
 } from "@/lib/ui/words";
 import { AddColumnForm, ArchiveColumn, ChoicesForm, MoveColumn, RenameForm, RestoreColumn } from "./ColumnsSettingsForms";
@@ -62,6 +63,7 @@ export function ColumnsSettings({ state, initialConfirm }: { state: ColumnsSetti
       {archived.length > 0 && (
         <details className="lx-card cs-card cs-archived">
           <summary className="cs-summary">{archivedHeading(archived.length)}</summary>
+          {state.archivedMore && <p className="lx-note cs-note" data-archived-more="">{archivedShownNote(archived.length)}</p>}
           <ol className="cs-list">
             {archived.map((f) => (
               <li key={f.id} className="cs-row" data-column-row={f.id}>
