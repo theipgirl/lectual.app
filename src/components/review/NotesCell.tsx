@@ -3,12 +3,12 @@
 import { useId, useRef, useState } from "react";
 import { logWhatHappenedAction } from "@/app/dashboard/review/actions";
 import { shortDate } from "@/lib/review/format";
-import { afterNoteSaved, noteCommitter, noteFirstLine, noteKeyIntent, type NoteCell, type NoteCommitHow, type SheetNote } from "@/lib/review/sheet-notes";
+import { afterNoteSaved, noteBlurOutcome, noteCommitter, noteFirstLine, noteKeyIntent, type NoteCell, type SheetNote } from "@/lib/review/sheet-notes";
 import type { ReviewKind } from "@/lib/review/buckets";
 import { NOTE_MAX_LENGTH } from "@/lib/pipeline/lead-input";
-import { SHEET_NOTE_ADD, SHEET_NOTE_CANT_LOAD, SHEET_NOTE_KEYS, SHEET_NOTE_SAVE_FAILED, SHEET_NOTE_SAVED, SHEET_NOTE_SAVING, SHEET_SAVE_FAILED, sheetNoteCellLabel } from "@/lib/ui/words";
+import { SHEET_NOTE_ADD, SHEET_NOTE_CANT_LOAD, SHEET_NOTE_KEYS, SHEET_NOTE_NOT_SAVED_YET, SHEET_NOTE_SAVE_FAILED, SHEET_NOTE_SAVED, SHEET_NOTE_SAVING, SHEET_SAVE_FAILED, sheetNoteCellLabel } from "@/lib/ui/words";
 
-type Status = "idle" | "saving" | "saved" | "failed";
+type Status = "idle" | "saving" | "saved" | "failed" | "unsaved";
 
 /**
  * One Notes cell of the Weekly review's Sheet. Shows the newest plain note (first line, clipped, and its date); a writer
@@ -93,11 +93,23 @@ export function NotesCell({
     setDraft(v);
   }
 
-  async function commit(how: NoteCommitHow) {
+  async function commit() {
     const c = committer.current;
     if (!c) return;
-    const out = await c.commit(draftRef.current, how);
+    const out = await c.commit(draftRef.current);
     if (out === "empty") setEditing(false);
+  }
+
+  /** Leaving the cell never saves (Enter only): empty closes, text stays with a quiet "Not saved yet" (a failure keeps its own line). */
+  function leave() {
+    const out = noteBlurOutcome(draftRef.current, !!committer.current?.busy);
+    if (out === "close") {
+      committer.current?.cancel();
+      setEditing(false);
+      setStatus("idle");
+    } else if (out === "unsaved") {
+      setStatus((s) => (s === "failed" ? s : "unsaved"));
+    }
   }
 
   function cancel() {
@@ -121,7 +133,15 @@ export function NotesCell({
     ) : null;
 
   const statusLine =
-    status === "saving" ? SHEET_NOTE_SAVING : status === "saved" ? SHEET_NOTE_SAVED : status === "failed" ? SHEET_NOTE_SAVE_FAILED : null;
+    status === "saving"
+      ? SHEET_NOTE_SAVING
+      : status === "saved"
+        ? SHEET_NOTE_SAVED
+        : status === "failed"
+          ? SHEET_NOTE_SAVE_FAILED
+          : status === "unsaved"
+            ? SHEET_NOTE_NOT_SAVED_YET
+            : null;
 
   return (
     <div className="rv-notes" data-notes-cell="" data-state={shown.state}>
@@ -144,13 +164,13 @@ export function NotesCell({
               const intent = noteKeyIntent(e.key, e.shiftKey, e.nativeEvent.isComposing);
               if (intent === "commit") {
                 e.preventDefault();
-                void commit("enter");
+                void commit();
               } else if (intent === "cancel") {
                 e.preventDefault();
                 cancel();
               }
             }}
-            onBlur={() => void commit("blur")}
+            onBlur={leave}
           />
           <span id={`${fieldId}-keys`} className="rv-sr">
             {SHEET_NOTE_KEYS}

@@ -105,7 +105,10 @@ export default function IntakeWorkspace({
   nurtureUnavailable = false,
   now: nowIso,
   timeZone,
+  showFormsLink = false,
 }: {
+  /** `canSeeFormsAndProposals(role)`: offer "Open your intake form" in the empty state. Absent = not offered. */
+  showFormsLink?: boolean;
   /** The rows of the server's set: the intake list, or the lost leads when `lostView`. */
   rows: IntakeRow[];
   /** What each role gets on each lead's card and row (the open link, controls, next step). Absent: the plain list, as before. */
@@ -434,7 +437,7 @@ export default function IntakeWorkspace({
       <p className="lx-note">{NO_LEADS_YET}</p>
       <span className="ix-empty-actions">
         <AddLeadDialog stages={intakeStages} members={members} />
-        <Link href="/dashboard/forms/">Open your intake form</Link>
+        {showFormsLink && <Link href="/dashboard/forms/">Open your intake form</Link>}
       </span>
     </>
   ) : filtersActive ? (

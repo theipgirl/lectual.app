@@ -2,6 +2,7 @@ import type { OrgModule } from "@/lib/org/modules";
 import { INTAKE_LIST_PATH } from "@/lib/intake/list-href";
 import { MATTERS_LIST_PATH } from "@/lib/matters/list-href";
 import { hasRole, type Role } from "@/lib/auth/roles";
+import { canSeeFormsAndProposals } from "@/lib/auth/forms-proposals";
 import { AI_TOOLS_GROUP, APPROVALS_NAME, ASSISTANTS_NAME, COPILOT_NAME, FIRM_NOTES_NAME, FORMS_NAME, INTAKE_LEADS_ROW, INTAKE_NAME, MAIL_NAME, PROPOSALS_NAME, REVIEW_NAME, SHORTCUTS_NAME } from "@/lib/ui/words";
 
 /**
@@ -28,6 +29,8 @@ export type NavItem = {
   module?: OrgModule;
   /** Caller must be at least this privileged. */
   minRole?: Role;
+  /** A named role rule (a string, so the item stays plain data for the client rail): `forms-proposals` = `canSeeFormsAndProposals`. */
+  roleRule?: "forms-proposals";
   /** Other path prefixes that belong to this section (a lead's page is part of Intake). */
   also?: readonly string[];
   /** Build step that delivers the real page (docs/MVP-PLAN.md); 7 = after the MVP plan. */
@@ -65,9 +68,6 @@ export const ICON = {
   video: "M3 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1zM15 10l6-3.5v11L15 14",
 } as const;
 
-/** The lowest role of the admin tier (owner, admin, senior_admin): `minRole` ranks, so this admits exactly those three. */
-export const ADMIN_TIER_MIN_ROLE: Role = "senior_admin";
-
 export const NAV: readonly NavItem[] = [
   { slug: "", label: "Today", href: "/dashboard/", icon: ICON.clock, step: 6 },
   { slug: "mail", label: MAIL_NAME, href: "/dashboard/mail/", icon: ICON.env, module: "mailbox", step: 4 },
@@ -80,12 +80,12 @@ export const NAV: readonly NavItem[] = [
   { slug: "meetings", label: "Meetings", href: "/dashboard/meetings/", icon: ICON.video, step: 7 },
   { slug: "calendar", label: "Calendar", href: "/dashboard/calendar/", icon: ICON.cal, step: 6 },
   { slug: "intake", label: INTAKE_NAME, railLabel: INTAKE_LEADS_ROW, href: "/dashboard/intake/", linkHref: INTAKE_LIST_PATH, also: ["/dashboard/leads/"], icon: ICON.users, step: 6 },
-  // Forms and Proposals are drawn for the admin tier only (owner/admin/senior_admin). Navigation only: the pages and actions keep
-  // their own role and feature gates. An unknown role ranks nowhere, so it never sees them.
-  { slug: "forms", label: FORMS_NAME, railLabel: FORMS_NAME, href: "/dashboard/forms/", icon: ICON.form, step: 7, minRole: ADMIN_TIER_MIN_ROLE },
-  { slug: "quotes", label: PROPOSALS_NAME, href: "/dashboard/quotes/", icon: ICON.tag, step: 7, minRole: ADMIN_TIER_MIN_ROLE },
+  // Forms and Proposals are drawn for the admin tier and intake (`canSeeFormsAndProposals`). Navigation only: the pages and actions
+  // keep their own role and feature gates. An unknown role never sees them.
+  { slug: "forms", label: FORMS_NAME, railLabel: FORMS_NAME, href: "/dashboard/forms/", icon: ICON.form, step: 7, roleRule: "forms-proposals" },
+  { slug: "quotes", label: PROPOSALS_NAME, href: "/dashboard/quotes/", icon: ICON.tag, step: 7, roleRule: "forms-proposals" },
   // The client trademark proposal (brand names x marks x classes, a named approver, a /p/<token> page). Opt-in per firm.
-  { slug: "proposals", label: PROPOSALS_NAME, railLabel: PROPOSALS_NAME, href: "/dashboard/proposals/", icon: ICON.send, module: "proposals", step: 7, minRole: ADMIN_TIER_MIN_ROLE },
+  { slug: "proposals", label: PROPOSALS_NAME, railLabel: PROPOSALS_NAME, href: "/dashboard/proposals/", icon: ICON.send, module: "proposals", step: 7, roleRule: "forms-proposals" },
   // One board from referral to registration (src/lib/lifecycle). No module: it reads only the firm's own leads and matters.
   { slug: "pipeline", label: "Pipeline", href: "/dashboard/pipeline/", icon: ICON.bars, step: 7 },
   { slug: "matters", label: "Matters", railLabel: "All matters", href: "/dashboard/matters/", linkHref: MATTERS_LIST_PATH, icon: ICON.case, step: 6 },
@@ -194,6 +194,7 @@ export function navItemAllowed(item: NavItem, modules: readonly string[], role: 
   if (item.built === false) return false;
   if (item.module && !modules.includes(item.module)) return false;
   if (item.minRole && !hasRole(role, item.minRole)) return false;
+  if (item.roleRule === "forms-proposals" && !canSeeFormsAndProposals(role)) return false;
   return true;
 }
 

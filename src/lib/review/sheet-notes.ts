@@ -80,23 +80,18 @@ export function noteKeyIntent(key: string, shift: boolean, composing = false): "
 export type NoteSaveResult = { ok: boolean; message?: string | null };
 export type NoteCommitOutcome = "empty" | "saved" | "failed" | "ignored";
 
-/** How a commit was asked for: Enter (an explicit save) or leaving the cell. */
-export type NoteCommitHow = "enter" | "blur";
-
 /**
- * One edit session's save rule. Enter, then the blur that follows it, post ONCE: while a save is in flight, or after the
- * session ended (saved, emptied or cancelled), a commit is ignored. Empty text saves nothing. After a FAILED save only an
- * explicit Enter tries again: leaving the cell does not re-post (a "failure" may have been a timeout whose note did land,
- * and a second post would duplicate it). The text is never thrown away here.
+ * One edit session's save rule. A note is saved ONLY by Enter (Taylor, Nov 2026): leaving the cell never posts. While a save is
+ * in flight, or after the session ended (saved, emptied or cancelled), a commit is ignored, so a second Enter can't post twice.
+ * Empty text saves nothing. After a failed save the session stays open and the next Enter tries again; the text is never
+ * thrown away here.
  */
 export function noteCommitter(save: (body: string) => Promise<NoteSaveResult>) {
   let busy = false;
   let ended = false;
-  let failed = false;
   return {
-    async commit(raw: string, how: NoteCommitHow = "enter"): Promise<NoteCommitOutcome> {
+    async commit(raw: string): Promise<NoteCommitOutcome> {
       if (busy || ended) return "ignored";
-      if (failed && how === "blur") return "ignored";
       const body = raw.trim();
       if (!body) {
         ended = true;
@@ -110,7 +105,6 @@ export function noteCommitter(save: (body: string) => Promise<NoteSaveResult>) {
         ok = false;
       }
       busy = false;
-      failed = !ok;
       if (ok) ended = true;
       return ok ? "saved" : "failed";
     },
@@ -123,10 +117,16 @@ export function noteCommitter(save: (body: string) => Promise<NoteSaveResult>) {
     get ended() {
       return ended;
     },
-    get failed() {
-      return failed;
-    },
   };
+}
+
+/**
+ * Leaving the cell (a click away or Tab) never saves. With nothing typed the editor closes; with text it stays, keeps the
+ * text and says "Not saved yet. Press Enter to save." While a save is in flight nothing changes.
+ */
+export function noteBlurOutcome(draft: string, saving: boolean): "close" | "unsaved" | "none" {
+  if (saving) return "none";
+  return draft.trim() ? "unsaved" : "close";
 }
 
 /**

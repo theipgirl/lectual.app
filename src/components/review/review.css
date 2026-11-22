@@ -190,6 +190,9 @@
 .rv-note-in { flex: 1 1 auto; min-width: 0; box-sizing: border-box; height: var(--ctl-h); max-height: 96px; padding: 6px 8px; resize: none; line-height: 1.35; border: 1px solid var(--line); border-radius: var(--r-md); font: var(--fs-3) var(--sans); color: var(--ink); background: var(--card); }
 .rv-note-in:focus-visible { outline: 2px solid var(--ox); outline-offset: 0; }
 .rv-note-status { flex: none; white-space: nowrap; }
+/* The longer "Not saved yet. Press Enter to save." takes its own line under the open editor (only while editing). */
+.rv-notes:has(.rv-note-in) { flex-wrap: wrap; }
+.rv-notes:has(.rv-note-in) .rv-note-status { flex: 1 1 100%; white-space: normal; }
 .rv-note-status.is-error { color: var(--wine); }
 @media (max-width: 640px) {
   .rv-notes, .rv-note-btn, .rv-note-ro { white-space: normal; }

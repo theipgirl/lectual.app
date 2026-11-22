@@ -552,6 +552,7 @@ export const SHEET_NOTE_SAVING = "Saving…";
 export const SHEET_NOTE_SAVED = "Saved";
 export const SHEET_NOTE_SAVE_FAILED = "Couldn't save";
 export const SHEET_NOTE_KEYS = "Enter to save · Shift+Enter for a new line · Esc to cancel";
+export const SHEET_NOTE_NOT_SAVED_YET = "Not saved yet. Press Enter to save.";
 export const sheetNoteCellLabel = (client: string) => `Note for ${client}`;
 
 /* Needs review (Today, both views): old hand-entered dates nobody confirmed. */

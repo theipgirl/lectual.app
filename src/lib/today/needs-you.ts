@@ -1,3 +1,4 @@
+import { intakeListHref } from "@/lib/intake/list-href";
 import type { StalledMatter } from "@/lib/matters/docket-summary";
 import type { DigestFailure } from "@/lib/agents/digest";
 
@@ -99,6 +100,8 @@ export type NeedsYouInput = {
   submissions: readonly NeedsYouSubmission[] | null;
   hotLeads: ReadonlyArray<{ id: string; name: string; reason: string | null }>;
   stalled: readonly StalledMatter[] | null;
+  /** `canSeeFormsAndProposals(role)`: the submissions item links to Forms; otherwise (and when absent) to the Leads list. */
+  canOpenForms?: boolean;
 };
 
 export type NeedsYou = { items: NeedsYouItem[]; unavailable: string[] };
@@ -315,6 +318,8 @@ export function buildNeedsYou(input: NeedsYouInput): NeedsYou {
   }
 
   // ── Intake submissions nobody has reviewed ───────────────────────────────
+  // Every submission is filed as a lead first (contact first), so a role that isn't shown Forms reviews it from the Leads list.
+  const submissionsHref = input.canOpenForms === true ? "/dashboard/forms/?tab=performance" : intakeListHref();
   if (input.submissions === null) unavailable.push("intake submissions");
   else if (input.submissions.length > SUBMISSION_ROLLUP) {
     items.push({
@@ -324,7 +329,7 @@ export function buildNeedsYou(input: NeedsYouInput): NeedsYou {
       subject: "Intake forms",
       detail: null,
       forYou: false,
-      href: "/dashboard/forms/?tab=performance",
+      href: submissionsHref,
       cta: "Review",
       tone: "ox",
       score: 330,
@@ -338,7 +343,7 @@ export function buildNeedsYou(input: NeedsYouInput): NeedsYou {
         subject: s.name,
         detail: null,
         forYou: false,
-        href: "/dashboard/forms/?tab=performance",
+        href: submissionsHref,
         cta: "Review",
         tone: "ox",
         score: 320,

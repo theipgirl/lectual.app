@@ -2457,6 +2457,7 @@ their own click). Contract: `docs/pge/2026-11-17-agentic-ip-os/sprint-4.md`. App
 
 
 ## Rail: Forms and Proposals for the admin tier only (no schema)
+**Superseded (Taylor, Nov 2026):** intake is shown them too, through one predicate; see "Forms and Proposals: shown to the admin tier and intake" below.
 The Forms, Proposals and older Quotes rows carry `minRole: ADMIN_TIER_MIN_ROLE` (`senior_admin`, ranked, so owner / admin / senior_admin) in
 `NAV` (`src/lib/nav.ts`), the existing role filter inside `navItemAllowed` / `visibleNav`. So the rail, the phone bar's More sheet, the tour and the
 Getting started hub (whose flows need those rows) drop them for every other role, and an unknown role never sees them. Navigation only: the pages and
@@ -2464,6 +2465,7 @@ actions keep their own role and feature gates (a staff member with the link stil
 still visible). Tests: `tests/nav/admin-tier-rows.test.ts`.
 
 ## Getting started: the short staff guide (no schema)
+**Updated (Taylor, Nov 2026):** a queue approver outside the admin tier (attorney) also keeps the Consults and Approvals walkthroughs; see "Getting started: approvers keep their walkthroughs" below.
 Outside the admin tier (`canSeeSetup` false, which also covers an unknown or unreadable role: fails closed) the Getting started hub and the Today
 `GettingStartedCard` offer ONLY the staff guide, track `start` ("Your first steps", words in `words.ts` `STAFF_GUIDE_*`): `staff-name` (the account
 menu's "Your name"), `staff-mailbox` (the "Connect Outlook" button at the top of Integrations; needs the Mail rail section, i.e. the Mailboxes feature, AND
@@ -2472,6 +2474,7 @@ tier never sees those three and its hub is exactly what it was (pinned in `tests
 the three new ids are known, unknown ids are dropped. "Your setup" (Outlook status) above the guides is unchanged.
 
 ## Weekly review: an editable Notes cell in the Sheet (no schema)
+**Updated (Taylor, Nov 2026):** a note saves on Enter ONLY; leaving the cell never posts. See "Sheet notes save on Enter only" below; where this section says leaving the cell saves, that rule wins.
 Both Sheets (`?view=sheet`: the plain `SheetView` and the owner's `SheetEditTable`) end with a Notes column. Logic in `src/lib/review/sheet-notes.ts`
 (pure), the read in `sheet-notes-load.ts`, the cell in `src/components/review/NotesCell.tsx`; `sheet.ts` / `SheetView.tsx` only add the column and the call.
 - **Read:** only for the Sheet (`loadReview(now, { notes: true })`, inside the review's one parallel read), for the review's records: ONE bounded query
@@ -2518,3 +2521,22 @@ the webhook, the sweep) is Sprint 5b's; this is the 5a note only.
   "Continue to Adobe to sign" has a courtesy limit of 10 per token per hour (`start-limit.ts`).
 - **Known exception, tracked separately:** `src/app/dashboard/settings/integrations/meetings/actions.ts` imported `@/lib/db/admin`
   before this sprint (the Meetings import). It is not e-sign code; AT20's hygiene test allows that one file and fails on any new one.
+
+## Forms and Proposals: shown to the admin tier and intake (no schema)
+ONE rule, `canSeeFormsAndProposals(role)` (`src/lib/auth/forms-proposals.ts`: owner, admin, senior_admin, intake; fails closed on anything else),
+decides every way in that is DRAWN (Taylor, Nov 2026): the Forms, Proposals and older Quotes rail rows (`roleRule: "forms-proposals"` on the `NAV` rows,
+applied in `navItemAllowed`; this replaced their `minRole: senior_admin`), so the phone More sheet, the tour and the Getting started hub follow; Today's
+"Needs you" submissions item (`canOpenForms`: the item stays, linking to Forms only when shown, else to the Leads list, where every submission is already
+a lead); the Intake report's "Intake forms" and Proposals tiles (`intakeReportLinks`); the Leads page's "Open your intake form" (`showFormsLink`).
+Navigation only: the pages and actions keep their own role and feature gates. Tests: `tests/nav/forms-proposals-roles.test.ts` (every role, and a grep
+that each place uses the one predicate).
+
+## Getting started: approvers keep their walkthroughs (no schema)
+Outside the admin tier, a queue approver (`QUEUE_APPROVE_ROLES`: attorney) gets the short staff guide AND the Consults and Approvals walkthroughs
+(`STAFF_APPROVER_TRACKS` in `hub.ts`, with the queue step's approver wording; a walkthrough whose rail section the person isn't shown still drops, e.g.
+the proposal ones). Every other non-admin role gets only the staff guide. The admin tier's hub is unchanged (still pinned in `tests/onboarding/hub.test.ts`).
+
+## Sheet notes save on Enter only (no schema)
+In both Sheets a note saves on Enter (no Shift) ONLY. Leaving the cell never posts (`noteBlurOutcome`): with text the editor stays open, keeps the text and
+says "Not saved yet. Press Enter to save." (`SHEET_NOTE_NOT_SAVED_YET`; a failed save keeps its own "Couldn't save"); with nothing typed it closes. Esc
+cancels. `noteCommitter` keeps one post per Enter (a second Enter while saving is ignored); after a failure the next Enter retries.

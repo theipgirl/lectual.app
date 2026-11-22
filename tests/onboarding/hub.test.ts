@@ -89,10 +89,12 @@ describe("role x module matrix", () => {
   });
 
   // Changed on purpose: outside the admin tier the hub is the short staff guide only.
-  it.each(ROLES)("%s: the Intake track is for the admin tier; everyone else gets the staff guide only", (role) => {
+  // Changed on purpose (Taylor, Nov 2026): an approver outside the admin tier (attorney) also keeps the Consults and Approvals walkthroughs.
+  it.each(ROLES)("%s: the Intake track is for the admin tier; approvers add Consults and Approvals; everyone else the staff guide only", (role) => {
     const tier = ["owner", "admin", "senior_admin"].includes(role);
     expect(trackIds(ctx(role)).includes("intake")).toBe(tier);
-    expect(trackIds(ctx(role))).toEqual(tier ? ["intake", "consults", "matters", "approvals", "admin"] : ["start"]);
+    const expected = tier ? ["intake", "consults", "matters", "approvals", "admin"] : canApproveQueue(role) ? ["start", "consults", "approvals"] : ["start"];
+    expect(trackIds(ctx(role))).toEqual(expected);
   });
 
   it("without proposals the proposal flows go", () => {
@@ -158,7 +160,7 @@ describe("read-only wording", () => {
     expect(flowIds(ctx("mystery"))).not.toContain("approvals-queue");
   });
 
-  it.each(ROLES.filter((r) => canApproveQueue(r) && ["owner", "admin", "senior_admin"].includes(r)))("%s gets the approver wording", (role) => {
+  it.each(ROLES.filter((r) => canApproveQueue(r)))("%s gets the approver wording", (role) => {
     expect(queueBody(role)).toMatch(/Nothing goes to a client until someone approves it/);
     expect(queueBody(role)).toMatch(/then approve or reject it/);
   });
@@ -298,7 +300,21 @@ describe("record picking", () => {
 });
 
 describe("the staff guide (roles outside the admin tier)", () => {
-  const STAFF = ROLES.filter((r) => !["owner", "admin", "senior_admin"].includes(r));
+  // Non-approver staff: the short guide only (an approver outside the admin tier is covered below).
+  const STAFF = ROLES.filter((r) => !["owner", "admin", "senior_admin"].includes(r) && !canApproveQueue(r));
+
+  it("an attorney (a queue approver) gets the staff guide plus the Consults and Approvals walkthroughs, with approver wording", () => {
+    const ids = flowIds(ctx("attorney"));
+    expect(ids.slice(0, 3)).toEqual(["staff-name", "staff-mailbox", "staff-tour"]);
+    expect(ids).toContain("approvals-queue");
+    expect(ids).toContain("consults-calendar");
+    expect(ids.every((id) => /^(staff|consults|approvals)-/.test(id))).toBe(true);
+    // The proposal walkthroughs need the Proposals row, which an attorney is not shown.
+    expect(ids).not.toContain("consults-proposal");
+    expect(ids.filter((id) => /^(intake|matters|admin)-/.test(id))).toEqual([]);
+    const queue = visibleFlows(ctx("attorney")).find((f) => f.id === "approvals-queue")!.steps.find((st) => st.id === "queue")!.body;
+    expect(queue).toMatch(/then approve or reject it/);
+  });
 
   it.each(STAFF)("%s: name, own mailbox and the tour, nothing else", (role) => {
     expect(flowIds(ctx(role))).toEqual(["staff-name", "staff-mailbox", "staff-tour"]);

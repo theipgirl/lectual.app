@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
-import { afterNoteSaved, noteCellFor, noteCommitter, noteFirstLine, noteKeyIntent, pickLatestNotes, SHEET_NOTE_CLIP, type SheetNotes } from "@/lib/review/sheet-notes";
+import { afterNoteSaved, noteBlurOutcome, noteCellFor, noteCommitter, noteFirstLine, noteKeyIntent, pickLatestNotes, SHEET_NOTE_CLIP, type SheetNotes } from "@/lib/review/sheet-notes";
 import { NOTES_PARALLEL, readSheetNotes, type NotesDb } from "@/lib/review/sheet-notes-load";
 import { SHEET_COLUMNS } from "@/lib/review/sheet";
 import { row, TODAY } from "./fixtures";
+import { SHEET_NOTE_NOT_SAVED_YET } from "@/lib/ui/words";
 import { makeWorld, seedTables } from "../files/helpers";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
@@ -151,7 +152,7 @@ describe("loadReview with notes", () => {
     const r = await loadReview(new Date("2026-11-17T15:00:00Z"), { notes: true });
     if (r.status !== "ok") return expect.unreachable();
     expect(r.notes?.status).toBe("ok");
-    expect(spy.mock.calls[0][1]).toEqual([{ kind: "matter", id: M1 }]);
+    expect((spy.mock.calls[0] as unknown[])[1]).toEqual([{ kind: "matter", id: M1 }]);
     const plain = await loadReview(new Date("2026-11-17T15:00:00Z"));
     expect(plain.status === "ok" && plain.notes).toBeUndefined();
     expect(spy).toHaveBeenCalledTimes(1);
@@ -174,28 +175,37 @@ describe("the editor's save rule", () => {
     expect(noteKeyIntent("Enter", false, true)).toBe("none");
   });
 
-  it("Enter then the blur that follows posts once", async () => {
+  // Changed on purpose (Taylor, Nov 2026): a note saves on Enter ONLY; leaving the cell never posts.
+  it("Enter, then a second Enter while it saves, then the blur: one post", async () => {
     let release: (v: { ok: boolean }) => void = () => {};
     const save = vi.fn(() => new Promise<{ ok: boolean }>((r) => (release = r)));
     const c = noteCommitter(save);
-    const enter = c.commit("Called Ana", "enter");
-    const blur = c.commit("Called Ana", "blur");
+    const enter = c.commit("Called Ana");
+    const again = c.commit("Called Ana");
+    expect(noteBlurOutcome("Called Ana", c.busy)).toBe("none");
     release({ ok: true });
     expect(await enter).toBe("saved");
-    expect(await blur).toBe("ignored");
+    expect(await again).toBe("ignored");
     expect(await c.commit("Called Ana")).toBe("ignored");
     expect(save).toHaveBeenCalledTimes(1);
     expect(save).toHaveBeenCalledWith("Called Ana");
   });
 
-  it("blur alone saves once (trimmed)", async () => {
+  it("leaving the cell never saves: text stays with 'Not saved yet', an empty field closes", () => {
+    expect(noteBlurOutcome("  Left a message ", false)).toBe("unsaved");
+    expect(noteBlurOutcome("   ", false)).toBe("close");
+    expect(noteBlurOutcome("", false)).toBe("close");
+    expect(SHEET_NOTE_NOT_SAVED_YET).toBe("Not saved yet. Press Enter to save.");
+  });
+
+  it("Enter saves the trimmed text", async () => {
     const save = vi.fn(async () => ({ ok: true }));
     const c = noteCommitter(save);
-    expect(await c.commit("  Left a message  ", "blur")).toBe("saved");
+    expect(await c.commit("  Left a message  ")).toBe("saved");
     expect(save).toHaveBeenCalledWith("Left a message");
   });
 
-  it("Esc posts nothing, and the blur after it posts nothing", async () => {
+  it("Esc posts nothing, and nothing after it posts", async () => {
     const save = vi.fn(async () => ({ ok: true }));
     const c = noteCommitter(save);
     c.cancel();
@@ -211,24 +221,15 @@ describe("the editor's save rule", () => {
     expect(save).not.toHaveBeenCalled();
   });
 
-  it("after a failed save, leaving the cell does NOT post again; only Enter retries (the text stays)", async () => {
+  it("after a failed save the text stays and the next Enter tries again (leaving the cell posts nothing)", async () => {
     const save = vi.fn().mockResolvedValueOnce({ ok: false, message: "timed out" }).mockResolvedValueOnce({ ok: true });
     const c = noteCommitter(save);
-    expect(await c.commit("Called Ana", "enter")).toBe("failed");
+    expect(await c.commit("Called Ana")).toBe("failed");
     expect(c.ended).toBe(false);
-    expect(c.failed).toBe(true);
-    expect(await c.commit("Called Ana", "blur")).toBe("ignored");
+    expect(noteBlurOutcome("Called Ana", c.busy)).toBe("unsaved");
     expect(save).toHaveBeenCalledTimes(1);
-    expect(await c.commit("Called Ana", "enter")).toBe("saved");
+    expect(await c.commit("Called Ana")).toBe("saved");
     expect(save).toHaveBeenCalledTimes(2);
-  });
-
-  it("a blur that failed also waits for Enter", async () => {
-    const save = vi.fn().mockResolvedValue({ ok: false });
-    const c = noteCommitter(save);
-    expect(await c.commit("x", "blur")).toBe("failed");
-    expect(await c.commit("x", "blur")).toBe("ignored");
-    expect(save).toHaveBeenCalledTimes(1);
   });
 
   it("text typed while the save was in flight is kept after it succeeds", () => {
@@ -254,8 +255,9 @@ describe("the editor's save rule", () => {
     expect(clears).toHaveLength(2);
     expect(clears[0]).toBeGreaterThan(keep);
     expect(src.slice(src.indexOf("function cancel()"), src.indexOf("function cancel()") + 200)).toContain('setDraftText("")');
-    expect(src).toContain('void commit("blur")');
-    expect(src).toContain('void commit("enter")');
+    // Enter commits; leaving the cell only runs the blur rule, which never posts.
+    expect(src).toContain("onBlur={leave}");
+    expect(src.slice(src.indexOf("function leave()"), src.indexOf("function leave()") + 500)).not.toContain("commit(");
     expect(src).not.toMatch(/dangerouslySetInnerHTML/);
   });
 });

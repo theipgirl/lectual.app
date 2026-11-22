@@ -623,10 +623,15 @@ function visibleSlugs(ctx: HubContext): Set<string> {
   return new Set(visibleNav(ctx.modules ?? [], ctx.role).map((i) => i.slug));
 }
 
+/** The walkthroughs an approver outside the admin tier keeps beside the staff guide. */
+const STAFF_APPROVER_TRACKS: readonly HubTrackId[] = ["consults", "approvals"];
+
 function flowVisible(flow: CatalogFlow, ctx: HubContext, slugs: Set<string>): boolean {
-  // Outside the admin tier (an unknown or unreadable role included: canSeeSetup fails closed) only the staff guide is offered;
-  // the admin tier's hub is exactly what it was.
-  if (!!flow.requires.staffGuide !== !canSeeSetup(ctx.role)) return false;
+  // The admin tier's hub is exactly what it was (no staff guide). Outside it (an unknown or unreadable role included: canSeeSetup
+  // fails closed) the staff guide is offered, and a queue approver (attorney) also keeps the Consults and Approvals walkthroughs.
+  if (canSeeSetup(ctx.role)) {
+    if (flow.requires.staffGuide) return false;
+  } else if (!flow.requires.staffGuide && !(hubApproves(ctx.role) && STAFF_APPROVER_TRACKS.includes(flow.track))) return false;
   if (flow.requires.admin && !canSeeSetup(ctx.role)) return false;
   if (flow.requires.staff && hubReadOnly(ctx.role)) return false;
   if (flow.requires.ai && !ctx.aiConfigured) return false;
