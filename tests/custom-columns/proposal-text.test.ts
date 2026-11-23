@@ -117,7 +117,7 @@ describe("0115 proposal: header and prose", () => {
       20: /Merged leads: \(a\)/,
       21: /The existing 0104 \/ 0105 \/ 0107 cases stay green/,
       // Nov 23: custom money is owner only.
-      22: /Money is owner only \(Taylor, Nov 23\)[\s\S]*admin, senior_admin,\s+--\s+attorney, paralegal and viewer of firm A read 0 money values[\s\S]*firm B's owner reads nothing/,
+      22: /Money is owner only \(Taylor, Nov 23\)[\s\S]*firm B's owner reads nothing[\s\S]*admin, senior_admin, attorney, intake, paralegal, law_clerk, clerk, social_media and viewer each read 0 money\s+--\s+rows[\s\S]*count=exact[\s\S]*\(admin, senior_admin, attorney, intake, paralegal, law_clerk and clerk\)[\s\S]*No platform-admin assertion here on purpose/,
     };
     for (let n = 1; n <= 22; n++) {
       const start = cases.search(new RegExp(`--\\s+${n}\\. `));
@@ -533,8 +533,8 @@ describe("0115 proposal: Sprint 3 additions (D8)", () => {
     expect(start).toBeGreaterThan(0);
     without = without.slice(0, start) + without.slice(end);
     // Changed on purpose (Taylor, Nov 23): the owner-only money change is a deliberate edit, so the baseline is now the file with it
-    // (the money header, step 5b, the four policy predicates, a KNOWN LIMITS line and isolation case 22). Was 9a366b25be82ef207dcbd410f6daa106 (dbec367).
-    expect(createHash("md5").update(without).digest("hex")).toBe("20ee3205e2b79b8a3468b565555f9edf");
+    // (the money header, step 5b, the four policy predicates, a KNOWN LIMITS line and isolation case 22, widened to every role in the review fix). Was 9a366b25be82ef207dcbd410f6daa106 (dbec367).
+    expect(createHash("md5").update(without).digest("hex")).toBe("b47a383d518905f0dad0725e864b3e19");
   });
 
   it("CO1: the SQL the app's read side mirrors", () => {

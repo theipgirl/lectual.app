@@ -69,3 +69,21 @@ describe("custom Money columns are owner-only, like the fee columns", () => {
   });
 });
 
+
+describe("Settings -> Columns: the Money hint sits outside the kind label and describes the select (review fix)", () => {
+  it("aria-describedby ties the select to the hint; the hint is not inside the <label>", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync("src/components/settings/ColumnsSettingsForms.tsx", "utf8");
+    expect(src).toContain('aria-describedby="cs-kind-money-hint"');
+    const label = src.slice(src.indexOf("{COLUMNS_KIND_LABEL}"), src.indexOf("</label>", src.indexOf("{COLUMNS_KIND_LABEL}")));
+    expect(label).not.toContain("COLUMNS_KIND_MONEY_HINT");
+    expect(src).toMatch(/<\/label>\s*\{\/\*[^]*?\*\/\}\s*<span id="cs-kind-money-hint" className="lx-note">\s*\{COLUMNS_KIND_MONEY_HINT\}/);
+  });
+});
+
+describe("the review's matter input declares the stage's phase (review fix)", () => {
+  it("ReviewMatterIn's stage type carries phase, so the registered-mark rule can't be dropped silently", async () => {
+    const { readFileSync } = await import("node:fs");
+    expect(readFileSync("src/lib/review/build.ts", "utf8")).toMatch(/stage: \{ code: string; label: string; is_open: boolean; waiting_on: MatterWaitingOn; order_index\?: number; phase\?: string \| null \} \| null;/);
+  });
+});

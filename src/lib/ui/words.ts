@@ -1338,10 +1338,10 @@ export const UPDATED_AUTOMATICALLY = "Updated automatically";
 export const CAME_IN_THROUGH_A_FORM = "Came in through a form";
 /**
  * Weekly review's last-changed line when the form's staff name could be read (Taylor, Nov 23): "Came in through the UGW 2026 form".
- * A name that already ends in "form" is not given a second one. Any other case (failed read, no form, empty name) is CAME_IN_THROUGH_A_FORM.
+ * A name that already ends in "form" (a word or part of one, "Webform") is not given a second one. Any other case (failed read, no form, empty name) is CAME_IN_THROUGH_A_FORM.
  */
 export function cameInThroughForm(name: string): string {
-  return /\bform$/i.test(name) ? `Came in through the ${name}` : `Came in through the ${name} form`;
+  return /form$/i.test(name) ? `Came in through the ${name}` : `Came in through the ${name} form`;
 }
 export const OPENED_WHEN_CLIENT_SIGNED = "Opened when the client signed";
 /** The Stage Keeper is never named to a firm (the glossary bans it): its move reads as an automatic one. */

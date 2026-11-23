@@ -690,10 +690,15 @@ comment on column public.crm_custom_value.updated_by is
 --  21. The existing 0104 / 0105 / 0107 cases stay green (this file adds no trigger on crm_lead or crm_matter).
 --  22. Money is owner only (Taylor, Nov 23). With firm A holding a money value and a text value on one lead: admin, senior_admin,
 --      attorney, paralegal and viewer of firm A read 0 money values (select of crm_custom_value returns only the text row, also with
---      `value_cents=not.is.null` as a filter), the owner of firm A reads both, firm B's owner reads nothing. admin, attorney and
---      paralegal inserting a money value: 42501 custom_value_money_owner_only; their UPDATE and DELETE of the existing money value
---      affect 0 rows and leave it unchanged; their text value writes still work. The owner inserts, updates and deletes a money value.
+--      `value_cents=not.is.null` as a filter), the owner of firm A reads both, firm B's owner reads nothing. Run the read for EVERY
+--      non-owner role: admin, senior_admin, attorney, intake, paralegal, law_clerk, clerk, social_media and viewer each read 0 money
+--      rows, and a `count=exact` select with `value_cents=not.is.null` returns a count of 0 for each of them (1 for the owner).
+--      Writes, for EVERY staff non-owner role (admin, senior_admin, attorney, intake, paralegal, law_clerk and clerk): inserting a
+--      money value is 42501 custom_value_money_owner_only; their UPDATE and DELETE of the existing money value affect 0 rows and leave
+--      it unchanged; their text value writes still work. The owner inserts, updates and deletes a money value.
 --      The refusal reads the same whether or not the record already holds an amount (no 23505 for a non-owner).
+--      No platform-admin assertion here on purpose: whether a platform admin (0050) inside a firm, who carries that firm's role claim,
+--      should read money values is an open question for the director.
 -- Manual check (not a vitest case): two sessions on lectual-dev, one removing an option, one writing that option; the second waits and
 -- then fails with custom_value_bad_choice. And: one session archiving a field while another deletes one of its values; the delete waits
 -- and then fails with custom_value_field_archived.

@@ -27,6 +27,10 @@ describe("the line, from the pure rules", () => {
   });
   it("a name that already ends in 'form' gets no second one", () => {
     expect(line(new Map([[L1, "Website intake form"]]))).toBe("Came in through the Website intake form · Nov 1");
+    // Review fix: "form" at the end of a word counts too (no "Webform form").
+    expect(cameInThroughForm("Webform")).toBe("Came in through the Webform");
+    expect(cameInThroughForm("Contact FORM")).toBe("Came in through the Contact FORM");
+    expect(cameInThroughForm("Formal intake")).toBe("Came in through the Formal intake form");
   });
   it("not found (no entry for the lead): exactly the generic sentence", () => {
     expect(line(new Map())).toBe(`${CAME_IN_THROUGH_A_FORM} · Nov 1`);

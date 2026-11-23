@@ -71,17 +71,22 @@ export function AddColumnForm() {
           ))}
         </select>
       </label>
-      <label className="cs-field">
-        <span className="lx-label">{COLUMNS_KIND_LABEL}</span>
-        <select className="lx-input" name="kind" defaultValue="text">
-          {CUSTOM_KINDS.map((k) => (
-            <option key={k} value={k}>
-              {CUSTOM_KIND_WORDS[k]}
-            </option>
-          ))}
-        </select>
-        <span className="lx-note">{COLUMNS_KIND_MONEY_HINT}</span>
-      </label>
+      <div className="cs-field">
+        <label className="cs-field">
+          <span className="lx-label">{COLUMNS_KIND_LABEL}</span>
+          <select className="lx-input" name="kind" defaultValue="text" aria-describedby="cs-kind-money-hint">
+            {CUSTOM_KINDS.map((k) => (
+              <option key={k} value={k}>
+                {CUSTOM_KIND_WORDS[k]}
+              </option>
+            ))}
+          </select>
+        </label>
+        {/* Outside the label (so it isn't part of the select's name), tied to the select by aria-describedby. */}
+        <span id="cs-kind-money-hint" className="lx-note">
+          {COLUMNS_KIND_MONEY_HINT}
+        </span>
+      </div>
       <label className="cs-field cs-field-wide">
         <span className="lx-label">{COLUMNS_CHOICES_LABEL}</span>
         <textarea className="lx-input cs-textarea" name="choices" rows={3} />

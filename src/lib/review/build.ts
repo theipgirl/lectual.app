@@ -39,7 +39,8 @@ export type ReviewMatterIn = {
   created_at: string;
   lawmatics_id: string | null;
   lawmatics_synced_at: string | null;
-  stage: { code: string; label: string; is_open: boolean; waiting_on: MatterWaitingOn; order_index?: number } | null;
+  /** `phase` (crm_matter_stage.phase) is declared so the registered-mark deadline rule (`isRegisteredTrademark`) always gets it. */
+  stage: { code: string; label: string; is_open: boolean; waiting_on: MatterWaitingOn; order_index?: number; phase?: string | null } | null;
 };
 
 export type ReviewLeadIn = {
