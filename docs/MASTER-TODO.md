@@ -13,6 +13,11 @@ Newest section first. Tick an item when it is done; don't delete it.
       the box, and the two emails. Nothing is written for the firm by the app.
 - [ ] Answer Q1, Q2, Q4, Q6 and Q7 in `docs/pge/2026-11-23-loe-email-sign/questions.md` BEFORE `LOE_EMAIL_SIGNING=on` (Q3, Q5 and Q8 can wait).
 - [ ] Set `LOE_EMAIL_SIGNING=on` on the deployment (only after the three items above and 0117's isolation cases).
+- [ ] Fix before the switch goes on (final review): the step 3 line "the letter is dated the day you sign it" is false on the emailed path; the
+      "It works for 7 days" note is false when the proposal expires sooner; a `?sign=` URL with the switch off should render the normal page.
+- [ ] Cancel the TEST LOE signature request in Lawmatics and remove the TEST LOE items (field on the Default Matter View, fields, template,
+      automation, tag); rename the test contact back.
+- [ ] Optional: the email to Lawmatics support (API for e-signature, signed notices on the Team plan) is drafted, not sent.
 - [ ] Walk the whole flow once in a real browser on desktop and on a phone: email the link, open it, consent, draw and type a signature, sign, pay; then check
       the signed copy email, the file in Documents & files, the Lawmatics filing and the certificate page.
 
