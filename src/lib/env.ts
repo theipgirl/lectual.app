@@ -97,6 +97,15 @@ const fieldSchemas = {
   // a call has no request and SITE_URL is unset; see src/lib/site-origin.ts.
   VERCEL_PROJECT_PRODUCTION_URL: z.string().optional(),
   VERCEL_URL: z.string().optional(),
+  // Engagement letter by emailed link (lectual 0117; docs/pge/2026-11-23-loe-email-sign/). The deployment switch: the path is
+  // on only when this is exactly "on" (and the firm has mail, 0117 and approved signing words). Leave unset until lectual 0117's
+  // isolation cases pass, Sprint B has shipped, and the owner has answered Q1, Q2, Q4, Q6 and Q7
+  // (docs/pge/2026-11-23-loe-email-sign/questions.md).
+  LOE_EMAIL_SIGNING: z.string().optional(),
+  // The sender of the two owner-approved client emails, PER FIRM, beside FIRM_CLIENT_LINK_ORIGINS: JSON
+  // { "<org_id>": "Firm Name <signing@firm-domain.com>" } on the firm's own domain (verified on RESEND_API_KEY's account). An
+  // address on lectual.app or on SITE_URL's host is dropped; there is no default sender (src/lib/loe/email-signing/mail-config.ts).
+  FIRM_CLIENT_MAIL_FROM: z.string().optional(),
 } as const;
 
 type FieldSchemas = typeof fieldSchemas;

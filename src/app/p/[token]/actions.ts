@@ -5,7 +5,18 @@ import { acceptPublicProposal, savePublicDetailsAddress } from "@/lib/proposals/
 import { reviewLetterPdf, signedLetterPdf, type LetterPdfResult } from "@/lib/proposals/public-letter";
 import type { ProposalAcceptResult } from "@/components/client-proposal/ProposalDocument";
 import { safeHttpsUrl } from "@/components/client-proposal/format";
-import { PDF_MESSAGES } from "@/lib/loe/client-words";
+import { PDF_MESSAGES, SEND_MESSAGES, SIGN_LINK_MESSAGES } from "@/lib/loe/client-words";
+import type { ConsentResult } from "@/lib/loe/email-signing/link-actions";
+import {
+  entryCloseLink,
+  entryRecordConsent,
+  entryRecordOpened,
+  entrySendLink,
+  entrySign,
+  type RawAudit,
+} from "@/lib/loe/email-signing/public-entry";
+import type { SendResult } from "@/lib/loe/email-signing/send";
+import type { SignResult } from "@/lib/loe/email-signing/sign";
 
 /**
  * The server actions an ANONYMOUS visitor may invoke on a proposal: accept (and, when the proposal carries an engagement
@@ -89,5 +100,60 @@ export async function saveDetailsAction(token: string, details: unknown): Promis
     await savePublicDetailsAddress(String(token ?? ""), details, new Date(), undefined, { ip: h.get("x-forwarded-for") ?? h.get("x-real-ip") });
   } catch {
     // Silent by design.
+  }
+}
+
+/* ── The emailed signing link (lectual 0117, Sprint A) ─────────────────────────────────────────────────────────────────
+ * Five more anonymous entry points. The same rules as above: every argument is hostile, the proposal is re-resolved from the
+ * TOKEN alone, there is no id parameter, results are fixed sentences, and nothing is logged. The address an email goes to is the
+ * proposal row's own client email, never one from the browser. The work is in src/lib/loe/email-signing/public-entry.ts. */
+
+async function audit(): Promise<RawAudit> {
+  const h = await headers();
+  return { ip: h.get("x-forwarded-for") ?? h.get("x-real-ip"), userAgent: h.get("user-agent") };
+}
+
+/** Step 3's "Email me a link to sign": ticks, class words and details only. */
+export async function sendSigningLinkAction(token: string, selection: unknown, clientClasses: unknown, details: unknown): Promise<SendResult> {
+  try {
+    return await entrySendLink(String(token ?? ""), selection, clientClasses, details, await audit());
+  } catch {
+    return { ok: false, message: SEND_MESSAGES.send_failed };
+  }
+}
+
+/** New choices or details: close the link that was emailed (answers only whether one was closed). */
+export async function closeSigningLinkAction(token: string): Promise<{ closed: boolean }> {
+  try {
+    return await entryCloseLink(String(token ?? ""));
+  } catch {
+    return { closed: false };
+  }
+}
+
+/** The `?sign=` page posts this once after mount; nothing the page shows depends on it. */
+export async function recordOpenedAction(token: string, signToken: string): Promise<void> {
+  try {
+    await entryRecordOpened(String(token ?? ""), String(signToken ?? ""), await audit());
+  } catch {
+    // Silent by design.
+  }
+}
+
+/** The first click: consent. `consentSha256` is the sha256 of the consent text the page drew. */
+export async function recordConsentAction(token: string, signToken: string, consentSha256: unknown): Promise<ConsentResult> {
+  try {
+    return await entryRecordConsent(String(token ?? ""), String(signToken ?? ""), consentSha256, await audit());
+  } catch {
+    return { ok: false, message: SIGN_LINK_MESSAGES.try_again };
+  }
+}
+
+/** Sign: the typed full legal name and the drawn or typed signature. Signs and accepts in one database transaction. */
+export async function signByLinkAction(token: string, signToken: string, typedName: unknown, signature: unknown): Promise<SignResult> {
+  try {
+    return await entrySign(String(token ?? ""), String(signToken ?? ""), typedName, signature, await audit());
+  } catch {
+    return { ok: false, message: SIGN_LINK_MESSAGES.retry };
   }
 }

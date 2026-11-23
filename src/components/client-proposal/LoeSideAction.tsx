@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import {
   BACK_LABEL,
   CONTINUE_LABEL,
+  EMAIL_LINK_LABEL,
+  LINK_CLOSED_NOTE,
   DOWNLOAD_SIGNED_LABEL,
   PAYNOTE_AFTER_SIGNING,
   PAYNOTE_BEFORE_SIGNING,
@@ -47,6 +49,11 @@ export type LoeSideActionProps = {
   onSign: () => void;
   onReadLetter: () => void;
   onDownloadSigned?: () => Promise<LetterPdfResult>;
+  /**
+   * lectual 0117: present ONLY when the emailed signing link is on for this proposal (the live public page). Step 3 then offers
+   * "Email me a link to sign" in place of Sign. Absent: this panel is exactly today's.
+   */
+  emailLink?: { pending: boolean; note: string | null; closedNote: boolean; onSend: () => void };
 };
 
 export function LoeSideAction(p: LoeSideActionProps) {
@@ -102,7 +109,27 @@ export function LoeSideAction(p: LoeSideActionProps) {
           </button>
         </>
       ) : null}
-      {p.step === 3 ? (
+      {p.step === 3 && p.emailLink ? (
+        <>
+          <button type="button" className="cp-btn" onClick={p.emailLink.onSend} disabled={p.emailLink.pending || preview}>
+            {p.emailLink.pending ? "Sending…" : EMAIL_LINK_LABEL}
+          </button>
+          {p.emailLink.note ? (
+            <p className="cp-paynote" role="status">
+              {p.emailLink.note}
+            </p>
+          ) : null}
+          <button type="button" className="cp-btn cp-btn-ghost" onClick={p.onBack} disabled={p.emailLink.pending}>
+            {BACK_LABEL}
+          </button>
+        </>
+      ) : null}
+      {p.emailLink?.closedNote ? (
+        <p className="cp-warn" role="status">
+          {LINK_CLOSED_NOTE}
+        </p>
+      ) : null}
+      {p.step === 3 && !p.emailLink ? (
         <>
           {preview ? (
             <button type="button" className="cp-btn" disabled>

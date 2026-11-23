@@ -2582,3 +2582,41 @@ BEFORE `revoke_member_sessions` (whose order before the delete is kept for 0031'
 the database would refuse. Every other removal and re-role is unchanged. Tests: `tests/settings/owner-row-guard.test.ts`. lectual's ported
 copies need the same fix (`PORTED_FROM.md`).
 
+
+## Engagement letter by emailed link (lectual 0117; Sprint A)
+Owner's spec `docs/pge/2026-11-23-loe-email-sign/spec.md`; contract `sprint-a.md`; 0117 is a PROPOSAL FILE there, applied nowhere.
+Code: `src/lib/loe/email-signing/`, `src/lib/loe/signing-words*.ts`, `src/components/client-proposal/sign-link/`,
+Settings -> Client proposals -> Signing words.
+- **Off by default.** A firm gets the emailed link only when ALL hold (`emailSigningGate`, pure rule `gate-rules.ts`): `LOE_EMAIL_SIGNING`
+  is exactly `on`; `RESEND_API_KEY` plus a `FIRM_CLIENT_MAIL_FROM` entry for THAT firm (by org id, on its own domain; lectual.app and
+  `SITE_URL`'s host are dropped; no default sender); 0117 fully applied (`client_proposal_signing_probe()` answers 117, created last;
+  missing objects judged by CODE 42P01 / PGRST205 / 42883 / PGRST202); and the firm has APPROVED signing words.
+- **Every uncertainty resolves to in-app signing** (today's 0106 path, byte for byte; pinned by `tests/loe/email-signing/letter-baseline`
+  and `inapp-rpc-baseline`): the probe, the 5-minute runtime memo (`not-set-up.ts`: any `signing_*` call answering a missing-object code),
+  a replaced letter (`letterLiveCheck` not `current`), a `client_proposal_signing_readiness` answer other than `ok`, any read that fails, and
+  `SEND_FAILURE_FALLBACK` (3) counted send failures in 24 hours (every failure after the request exists closes it through `failSend`; an
+  uncertain mail answer and a refusal that is not a precondition are counted too; client-caused refusals never are). In-app signing is
+  refused (`signing_by_email`) ONLY while the email path is positively ready for that proposal.
+- **`LOE_EMAIL_SIGNING` stays off** until 0117's isolation cases pass on lectual-dev, Sprint B ships (a link signature must never print
+  without its certificate: until then every signed PDF of an `email_link` snapshot answers `unavailable`), and the owner answers Q1, Q2,
+  Q4, Q6 and Q7 in `questions.md`.
+- **Owner-approved exception (spec decision 7): Lectual now emails a client by itself**, exactly two emails and nothing else: the signing
+  link (sent because the client pressed "Email me a link to sign") and, in Sprint B, the signed copy (sent because the client signed).
+  Both go through the one mailer `src/lib/mail/internal-mail.ts` (the only Resend caller; attachments added there), to the PROPOSAL ROW's
+  own client email, never an address from the browser. Tests never send. Idempotency keys come from the request id.
+- **The attorney's words.** The consent line and text, the line beside Sign, the line under the signature box and both emails are the
+  firm's own approved words (`client_proposal_signing_words`, admin tier edits, a named approver approves, frozen once approved), snapshotted
+  (text + sha256) onto each request. No approved words = the path is off. Builders write only step labels and status sentences
+  (`client-words.ts`, `SIGNING_WORDS_*` in `words.ts`).
+- **The letter is final when the link is sent.** `buildServerAgreement` (`public.ts`, shared with in-app signing) builds it from the stored
+  letter, the cleaned details, `quoteForAcceptance` and the server's firm-zone date; the emailed review PDF, the `?sign=` page and the signing
+  all use that STORED text. Nothing from the browser is trusted.
+- **The token rule.** 32 random bytes, base64url; only its sha256 is stored; never logged; limiters key by its sha256. `verifyLinkPair`
+  (`verify.ts`) runs first on the page's read and every action: shapes, limiters, ONE read with the proposal embedded, a CONSTANT-TIME
+  `public_token` compare, the gate, the letter check, the state. **No write before it, and no write on a GET** (an email scanner may fetch
+  the link): "opened" is posted by the browser after mount; closes (expired, `proposal_changed`) are written only by POST actions. Every
+  failure reads "This link is no longer available." with no detail. The link is `/p/<token>/?sign=<token>`, built through `clientLinkUrl`.
+- **One signing, once:** `client_proposal_signing_sign` (0117, service role) signs and accepts in one transaction; a repeat changes nothing
+  and runs no follow-up. New choices or details close an open link (`closeSigningLinkAction`, armed by `close-arming.ts`). Rate limits are
+  in-memory courtesy limits. `pricing.ts` is untouched; snapshots are never re-priced.
+- Words for decisions D3/D4 (the name and the dates in the letter) are the builder's defaults, NOT the owner's answer (Q1, Q2).

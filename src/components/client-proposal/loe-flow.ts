@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { money } from "./format";
 import { buildExhibit } from "@/lib/loe/exhibit";
 import {
@@ -22,6 +22,8 @@ import {
 import type { PublicLetterView } from "@/lib/proposals/public";
 import type { ProposalContent, ProposalQuote } from "@/lib/proposals/types";
 import type { SignedLetterView } from "@/lib/loe/signed-letter";
+import { SEND_MESSAGES, linkSentNote } from "@/lib/loe/client-words";
+import { INITIAL_ARMING, closeArming, type ArmingEvent, type ArmingState } from "@/lib/loe/email-signing/close-arming";
 
 /**
  * The engagement-letter state of the client page: which step the client is on, what they typed, the letter and exhibit built
@@ -33,7 +35,7 @@ import type { SignedLetterView } from "@/lib/loe/signed-letter";
 
 export type LoeStep = 1 | 2 | 3;
 
-export type LoeLetterData = Pick<PublicLetterView, "dateText" | "clientEmail"> & { signed?: SignedLetterView | null };
+export type LoeLetterData = Pick<PublicLetterView, "dateText" | "clientEmail" | "emailSigning"> & { signed?: SignedLetterView | null };
 
 export type LoeFlowInput = {
   /** The letter the proposal carries, or null (no letter: the flow is off and nothing here runs). */
@@ -162,4 +164,85 @@ export function saveDetailsInBackground(save: ((details: SignerDetails) => Promi
     // A save that throws synchronously still never stops Continue.
   }
   return true;
+}
+
+/* ── The emailed signing link (lectual 0117, Sprint A item 17) ──────────────────────────────────────────────────────────
+ * Only when the public read said the emailed path is positively ready for this proposal (`letter.emailSigning`) AND the page was
+ * given the send action (the live public page only; a staff preview is never given it). Otherwise nothing here runs and the page
+ * is today's. */
+
+export type EmailLinkSendResult = { ok: true; sentTo: string; expiresText: string; uncertain?: true } | { ok: false; message: string };
+
+export function useEmailLink(input: {
+  enabled: boolean;
+  onSend?: () => Promise<EmailLinkSendResult>;
+  onClose?: () => Promise<{ closed: boolean }>;
+  /** Changes whenever the choices, the class words or the details change. */
+  changeKey: string;
+}) {
+  const on = input.enabled && typeof input.onSend === "function";
+  const arming = useRef<ArmingState>(INITIAL_ARMING);
+  const lastKey = useRef(input.changeKey);
+  const [pending, setPending] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [closedNote, setClosedNote] = useState(false);
+  const onClose = input.onClose;
+
+  function step(event: ArmingEvent): boolean {
+    const r = closeArming(arming.current, event);
+    arming.current = r.state;
+    return r.fire;
+  }
+
+  function fireClose() {
+    if (!onClose) {
+      step({ type: "close_done", reached: false });
+      return;
+    }
+    void Promise.resolve()
+      .then(() => onClose())
+      .then((r) => {
+        step({ type: "close_done", reached: true });
+        if (r?.closed) {
+          setClosedNote(true);
+          setNote(null);
+        }
+      })
+      .catch(() => step({ type: "close_done", reached: false }));
+  }
+
+  useEffect(() => {
+    if (!on) return;
+    if (lastKey.current === input.changeKey) return;
+    lastKey.current = input.changeKey;
+    if (step({ type: "change" })) fireClose();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- driven by the change key only.
+  }, [on, input.changeKey]);
+
+  async function send() {
+    if (!on || pending || !input.onSend) return;
+    setPending(true);
+    setError(null);
+    step({ type: "send_start" });
+    let ok = false;
+    try {
+      const r = await input.onSend();
+      if (r.ok) {
+        ok = true;
+        setClosedNote(false);
+        setNote(r.uncertain ? SEND_MESSAGES.uncertain : linkSentNote(r.sentTo));
+      } else {
+        setNote(null);
+        setError(r.message);
+      }
+    } catch {
+      setError(SEND_MESSAGES.send_failed);
+    } finally {
+      setPending(false);
+      if (step({ type: "send_done", ok })) fireClose();
+    }
+  }
+
+  return { on, pending, note, error, closedNote, send };
 }

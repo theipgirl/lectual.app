@@ -55,7 +55,7 @@ import { DownloadPdfButton, LoeSignedLetter } from "./LoeReceipt";
 import { LoeSideAction } from "./LoeSideAction";
 import { LoeSignPanel } from "./LoeSignPanel";
 import { LoeStepBar } from "./LoeStepBar";
-import { saveDetailsInBackground, showsSavedNote, useLoeFlow, type LoeLetterData, type LoeStep } from "./loe-flow";
+import { saveDetailsInBackground, showsSavedNote, useEmailLink, useLoeFlow, type EmailLinkSendResult, type LoeLetterData, type LoeStep } from "./loe-flow";
 import { RPB_FONT_VARS } from "./fonts";
 import {
   brandForSlug,
@@ -138,6 +138,13 @@ export type ProposalDocumentProps = {
    * writes the address to the firm's Lawmatics after its response; the page neither waits for it nor shows the outcome.
    */
   onSaveDetails?: (details: SignerDetails) => Promise<void>;
+  /**
+   * lectual 0117, live public page only: email the client a signing link (token bound server-side; ticks, class words and details
+   * only). Used only when `letter.emailSigning` is true; never given to a staff preview, so no client email can come from one.
+   */
+  onSendSigningLink?: (selection: Selection, clientClasses: ClientClassInput, details: SignerDetails) => Promise<EmailLinkSendResult>;
+  /** lectual 0117, live public page only: new choices or details close the link that was emailed. */
+  onCloseSigningLink?: () => Promise<{ closed: boolean }>;
   /** accepted, with a letter: "Signed November 12, 2026 at 2:14 PM EST by ..." for the receipt. */
   signedLine?: string | null;
   /** Starting step and typed values: for tests and the staff preview, never set by the public page. */
@@ -368,6 +375,13 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
     signedDateText: done?.letterDate ?? null,
   });
   const loeOn = loeFlow.enabled;
+  // The emailed signing link (lectual 0117): only when the server said it is ready AND this page was given the send action.
+  const emailLink = useEmailLink({
+    enabled: loeOn && mode === "live" && !accepted && letter?.emailSigning === true,
+    onSend: props.onSendSigningLink ? () => props.onSendSigningLink!(selection, { entries, added }, loeFlow.cleaned) : undefined,
+    onClose: props.onCloseSigningLink,
+    changeKey: JSON.stringify([selection, entries, added, loeFlow.details]),
+  });
   const stepOne = !loeOn || accepted || loeFlow.step === 1;
   // The letter shown as SIGNED: the server's verified copy on a receipt; on the just-signed page the page's own letter, and only
   // when its text hashed to the sha256 the server stored (`letterVerified`). Otherwise nothing is shown under that label.
@@ -615,12 +629,14 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
                   label={DOWNLOAD_REVIEW_LABEL}
                   onDownload={onDownloadReview ? () => onDownloadReview(selection, { entries, added }, loeFlow.cleaned) : undefined}
                 />
-                <LoeSignPanel
-                  typedName={loeFlow.typedName}
-                  onName={loeFlow.setTypedName}
-                  agree={loeFlow.agree}
-                  onAgree={loeFlow.setAgree}
-                />
+                {emailLink.on ? null : (
+                  <LoeSignPanel
+                    typedName={loeFlow.typedName}
+                    onName={loeFlow.setTypedName}
+                    agree={loeFlow.agree}
+                    onAgree={loeFlow.setAgree}
+                  />
+                )}
               </section>
             ) : null}
             {stepOne ? (
@@ -1208,7 +1224,7 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
                     detailsOk={loeFlow.detailsOk}
                     signable={loeFlow.signable}
                     pending={pending}
-                    error={error}
+                    error={error ?? (emailLink.on ? emailLink.error : null)}
                     describedBy={missingText ? "cp-describe" : undefined}
                     warning={
                       missingText ? (
@@ -1231,6 +1247,7 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
                       requestAnimationFrame(() => document.getElementById("cp-letter-preview")?.scrollIntoView({ block: "start" }));
                     }}
                     onDownloadSigned={onDownloadSigned}
+                    {...(emailLink.on ? { emailLink: { pending: emailLink.pending, note: emailLink.note, closedNote: emailLink.closedNote, onSend: () => void emailLink.send() } } : {})}
                   />
                 ) : accepted ? (
                   <>

@@ -4,7 +4,20 @@ import { ProposalDocument } from "@/components/client-proposal/ProposalDocument"
 import { ProposalNotice } from "@/components/client-proposal/ProposalNotice";
 import { readPublicProposal, recordProposalViewed } from "@/lib/proposals/public";
 import { isSignedInFirmMember } from "@/lib/proposals/staff-view";
-import { acceptProposalAction, saveDetailsAction, downloadReviewLetterAction, downloadSignedLetterAction } from "./actions";
+import { SignByLinkPage } from "@/components/client-proposal/sign-link/SignByLinkPage";
+import { entryReadLink } from "@/lib/loe/email-signing/public-entry";
+import { clientLinkUrl } from "@/lib/proposals/client-link-origin";
+import {
+  acceptProposalAction,
+  closeSigningLinkAction,
+  downloadReviewLetterAction,
+  downloadSignedLetterAction,
+  recordConsentAction,
+  recordOpenedAction,
+  saveDetailsAction,
+  sendSigningLinkAction,
+  signByLinkAction,
+} from "./actions";
 
 /**
  * `/p/<token>` — the client's proposal. No login; the token is the credential.
@@ -36,10 +49,20 @@ import { acceptProposalAction, saveDetailsAction, downloadReviewLetterAction, do
  */
 export const dynamic = "force-dynamic";
 
-export default async function PublicProposalPage({ params }: { params: Promise<{ token: string }> }) {
+export default async function PublicProposalPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ token: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { token } = await params;
   // One instant for the whole render: expiry and the `viewed` window agree.
   const now = new Date();
+
+  // lectual 0117: `?sign=<signing token>` is the emailed signing link. Without it the page below renders exactly as before.
+  const sign = searchParams ? (await searchParams).sign : undefined;
+  if (sign !== undefined) return <SigningLink token={token} sign={sign} />;
 
   const read = await readPublicProposal(token, now);
   if (read.status === "not_found" || read.status === "closed") notFound();
@@ -114,6 +137,48 @@ export default async function PublicProposalPage({ params }: { params: Promise<{
       // Passed on the live page too: the receipt this page turns into the moment signing succeeds offers the signed PDF
       // without a reload. The action is token-only and refuses until the proposal really is signed.
       onDownloadSigned={view.letter ? downloadSignedLetterAction.bind(null, token) : undefined}
+      // lectual 0117: only when the emailed signing link is positively ready for this proposal (a boolean from the read).
+      {...(view.letter?.emailSigning === true
+        ? { onSendSigningLink: sendSigningLinkAction.bind(null, token), onCloseSigningLink: closeSigningLinkAction.bind(null, token) }
+        : {})}
+    />
+  );
+}
+
+/**
+ * The emailed signing link (lectual 0117, Sprint A). This GET WRITES NOTHING (an email scanner may fetch it): the read verifies
+ * the pair and draws; "opened" is posted by the browser after mount. Every failure is the one "no longer available" state.
+ * The response keeps `Referrer-Policy: no-referrer` (this route's layout and next.config.ts).
+ */
+async function SigningLink({ token, sign }: { token: string; sign: string | string[] }) {
+  // Built only through the one /p/ link helper (an origin of "" gives the path).
+  const backHref = clientLinkUrl("", token);
+  if (typeof sign !== "string") return <SignByLinkPage state="unavailable" backHref={backHref} />;
+  const h = await headers();
+  const read = await entryReadLink(token, sign, h.get("x-forwarded-for") ?? h.get("x-real-ip"));
+  if (read.kind === "unavailable") return <SignByLinkPage state="unavailable" backHref={backHref} />;
+  if (read.kind === "signed") {
+    return (
+      <SignByLinkPage
+        state="signed"
+        backHref={backHref}
+        firm={read.firm}
+        signedLine={read.signedLine}
+        payUrl={read.payUrl}
+        onDownloadSigned={downloadSignedLetterAction.bind(null, token)}
+      />
+    );
+  }
+  return (
+    <SignByLinkPage
+      state="open"
+      backHref={backHref}
+      firm={read.firm}
+      view={read.view}
+      onOpened={recordOpenedAction.bind(null, token, sign)}
+      onConsent={recordConsentAction.bind(null, token, sign)}
+      onSign={signByLinkAction.bind(null, token, sign)}
+      onDownloadSigned={downloadSignedLetterAction.bind(null, token)}
     />
   );
 }

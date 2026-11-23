@@ -16,7 +16,7 @@ import { DownloadPdfButton, LoeSignedLetter } from "./LoeReceipt";
 import { LoeSideAction } from "./LoeSideAction";
 import { LoeSignPanel } from "./LoeSignPanel";
 import { LoeStepBar } from "./LoeStepBar";
-import { saveDetailsInBackground, showsSavedNote, useLoeFlow } from "./loe-flow";
+import { saveDetailsInBackground, showsSavedNote, useEmailLink, useLoeFlow } from "./loe-flow";
 import { brandForSlug, formatCivilDate, money, paragraphs, richSegments, safeHttpsUrl, type ProposalBrand } from "./format";
 import "./proposal.css";
 
@@ -82,6 +82,13 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
     signedDateText: done?.letterDate ?? null,
   });
   const loeOn = loeFlow.enabled;
+  // The emailed signing link (lectual 0117): only when the server said it is ready AND this page was given the send action.
+  const emailLink = useEmailLink({
+    enabled: loeOn && mode === "live" && !accepted && letter?.emailSigning === true,
+    onSend: props.onSendSigningLink ? () => props.onSendSigningLink!({}, { entries: {}, added: {} }, loeFlow.cleaned) : undefined,
+    onClose: props.onCloseSigningLink,
+    changeKey: JSON.stringify(loeFlow.details),
+  });
   const stepOne = !loeOn || accepted || loeFlow.step === 1;
   // The letter shown as SIGNED: the server's verified copy on a receipt; on the just-signed page the page's own letter, and only
   // when its text hashed to the sha256 the server stored (`letterVerified`). Otherwise nothing is shown under that label.
@@ -186,7 +193,7 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
                   label={DOWNLOAD_REVIEW_LABEL}
                   onDownload={onDownloadReview ? () => onDownloadReview({}, { entries: {}, added: {} }, loeFlow.cleaned) : undefined}
                 />
-                <LoeSignPanel typedName={loeFlow.typedName} onName={loeFlow.setTypedName} agree={loeFlow.agree} onAgree={loeFlow.setAgree} />
+                {emailLink.on ? null : <LoeSignPanel typedName={loeFlow.typedName} onName={loeFlow.setTypedName} agree={loeFlow.agree} onAgree={loeFlow.setAgree} />}
               </section>
             ) : null}
             {stepOne ? (
@@ -327,7 +334,7 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
                     detailsOk={loeFlow.detailsOk}
                     signable={loeFlow.signable}
                     pending={pending}
-                    error={error}
+                    error={error ?? (emailLink.on ? emailLink.error : null)}
                     legalTotalText={money(quote.legal_total_cents)}
                     onContinue={() => {
                       if (loeFlow.step === 2) saveDetailsInBackground(onSaveDetails, loeFlow.detailsOk, loeFlow.cleaned);
@@ -341,6 +348,7 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
                       requestAnimationFrame(() => document.getElementById("cp-letter-preview")?.scrollIntoView({ block: "start" }));
                     }}
                     onDownloadSigned={onDownloadSigned}
+                    {...(emailLink.on ? { emailLink: { pending: emailLink.pending, note: emailLink.note, closedNote: emailLink.closedNote, onSend: () => void emailLink.send() } } : {})}
                   />
                 ) : accepted ? (
                   <>
