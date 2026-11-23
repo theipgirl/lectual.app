@@ -3,6 +3,41 @@
 One list across sessions. Each session adds its action items here and checks them against Omi.
 Newest section first. Tick an item when it is done; don't delete it.
 
+## 2026-11-23 (later): the client lifecycle, written and drawn
+
+Recap: `docs/recaps/2026-11-23-client-lifecycle.md`. Document: `docs/rpb/client-lifecycle.md` (branch `claude/eager-fermi-0ff1w7`).
+Visual (private until shared): https://claude.ai/artifact/9CEapkxwyePAdAPDZ2WhS1 ("RPB Client Lifecycle"). Nothing was changed in any system.
+
+### Taylor
+- [ ] Walk the visual with the team at a Monday meeting.
+- [ ] Share the visual page with the people who need it. It is private; only you can open it.
+- [ ] Get the missing onboarding procedure (paying to the search) written, with an owner.
+- [ ] Have Rayn's post-filing walkthrough recorded, so the post-filing stretch can be checked. It rests on the SOP and the Nov 9 call.
+- [ ] Decide the items in the document's "Decisions the firm needs to make": 40 items under eight headings (Lawmatics and which system is the
+      record; Stages and names; Time targets, stalls and the weekly meeting; Money and invoices; Signing and the engagement letter; Emails and
+      reminders; Who does what; USPTO notices and deadlines).
+- [ ] Lawmatics tidy-up 1: one record per person.
+- [ ] Lawmatics tidy-up 2: mark hired clients the same way every time (status Hired with a conversion date).
+- [ ] Lawmatics tidy-up 3: fill in the matter title or "Name of Trademark".
+- [ ] Lawmatics tidy-up 4: check the "How did you hear about us?" field name against the SOP's "Where did you hear about us?".
+- [ ] Lawmatics tidy-up 5: check which tags start a client email.
+- [ ] Check in the database whether a lead that comes in through a Lectual form ever gets its Lawmatics id stored. If not, the acceptance note,
+      signed letter and address can't be filed for that client.
+- [ ] Copy the recap into the Obsidian second brain. This cloud session can't reach the vault.
+
+### Rebecca (through Taylor)
+- [ ] Package prices, the session fee and whether the $200 credit is standard on every proposal.
+- [ ] Order of payment, letter and signature: sign then pay in one flow (Nov 10), or pay first (intake SOP).
+- [ ] When a lead becomes a matter: at signed LOE and deposit, or at a signed application.
+- [ ] Which client emails a law clerk or intake person may approve without her, and whether Lectual may ever send one by itself.
+- [ ] How long a proposal stays open (Nov 10 said 7 days; Lectual's call-drafted proposals still use 10).
+- [ ] Payment plans and extra-search pricing: whether to offer them, and for whom.
+
+### Omi cross-check (2026-11-23, later)
+- Searched Omi action items for "client lifecycle onboarding SOP", "post-filing walkthrough Rayn" and "Lawmatics duplicates hired".
+  No item matches or duplicates anything above (the hits were unrelated, such as "Double-check the filing for anything missed").
+- Newest item any of the three searches returned: Oct 10. No matching item exists, so there is no matching date.
+
 ## 2026-11-23: phasing out Lawmatics (read of Caitlyn's SOPs)
 
 Recap: `docs/recaps/2026-11-23-lawmatics-phase-out-sop-read.md`. Nothing was changed anywhere.
