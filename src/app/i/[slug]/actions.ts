@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { after } from "next/server";
 import { cookies, headers } from "next/headers";
 import {
@@ -70,7 +71,7 @@ async function allowed(throttle: SlidingWindowThrottle, slug: string): Promise<b
   return key ? throttle.take(`${slug}:${key}`, Date.now()) : true;
 }
 
-export async function recordIntakeEventAction(slug: string, kind: unknown): Promise<void> {
+export const recordIntakeEventAction = previewSafe(async function recordIntakeEventAction(slug: string, kind: unknown): Promise<void> {
   if (kind !== "visit" && kind !== "start_conversation" && kind !== "start_form" && kind !== "start_assessment") return;
   if (typeof slug !== "string") return;
   const read = await readIntakeHandle(slug);
@@ -78,7 +79,7 @@ export async function recordIntakeEventAction(slug: string, kind: unknown): Prom
   if (!(await allowed(eventThrottle, slug))) return;
   const hash = sessionHash(await sessionId(), read.handle.formId, intakeSalt());
   await recordIntakeEvent(read.handle, kind, hash);
-}
+}, "redirect");
 
 /**
  * "This person reached this question" (0096), plus their answers so far. Fire
@@ -88,7 +89,7 @@ export async function recordIntakeEventAction(slug: string, kind: unknown): Prom
  * a question the live form doesn't ask (or the firm hid), an index that isn't
  * a whole number from 0 to 60. The org and form written are the live form's.
  */
-export async function recordIntakeStepAction(slug: unknown, payload: unknown): Promise<void> {
+export const recordIntakeStepAction = previewSafe(async function recordIntakeStepAction(slug: unknown, payload: unknown): Promise<void> {
   try {
     if (typeof slug !== "string" || typeof payload !== "object" || payload === null) return;
     const p = payload as { token?: unknown; stepIndex?: unknown; questionId?: unknown; progress?: unknown };
@@ -114,7 +115,7 @@ export async function recordIntakeStepAction(slug: unknown, payload: unknown): P
   } catch {
     // The page never learns whether this landed.
   }
-}
+}, "redirect");
 
 export type StartIntakeResult =
   | { ok: true; token: string }
@@ -127,7 +128,7 @@ export type StartIntakeResult =
  * written; its later Submit then takes the full-validation path, which drops
  * it quietly too.
  */
-export async function startIntakeAction(slug: string, payload: unknown): Promise<StartIntakeResult> {
+export const startIntakeAction = previewSafe(async function startIntakeAction(slug: string, payload: unknown): Promise<StartIntakeResult> {
   if (typeof slug !== "string") return { ok: false, error: "This intake isn't available." };
   const read = await readIntakeHandle(slug);
   if (read.status === "not_found" || read.status === "moved") return { ok: false, error: "This intake isn't taking submissions right now." };
@@ -159,13 +160,13 @@ export async function startIntakeAction(slug: string, payload: unknown): Promise
   const submissionId = outcome.submissionId;
   after(() => syncIntakeStart(handle, submissionId, start.contact, start.utm));
   return { ok: true, token: outcome.token };
-}
+}, "state");
 
 export type SubmitIntakeResult =
   | { ok: true; closing: string }
   | { ok: false; error: string; fields?: string[] };
 
-export async function submitIntakeAction(slug: string, payload: unknown): Promise<SubmitIntakeResult> {
+export const submitIntakeAction = previewSafe(async function submitIntakeAction(slug: string, payload: unknown): Promise<SubmitIntakeResult> {
   if (typeof slug !== "string") return { ok: false, error: "This intake isn't available." };
   const read = await readIntakeHandle(slug);
   if (read.status === "not_found" || read.status === "moved") return { ok: false, error: "This intake isn't taking submissions right now." };
@@ -245,7 +246,7 @@ export async function submitIntakeAction(slug: string, payload: unknown): Promis
     }),
   );
   return { ok: true, closing };
-}
+}, "state");
 
 export type CompleteAssessmentResult =
   | { ok: true; closing: string; result: AssessmentResultView | null }
@@ -258,7 +259,7 @@ export type CompleteAssessmentResult =
  * what they may see: the score, band, gaps and next step (when the firm shows
  * the score). The temperature never leaves the server.
  */
-export async function completeAssessmentAction(slug: string, payload: unknown): Promise<CompleteAssessmentResult> {
+export const completeAssessmentAction = previewSafe(async function completeAssessmentAction(slug: string, payload: unknown): Promise<CompleteAssessmentResult> {
   if (typeof slug !== "string") return { ok: false, error: "This assessment isn't available." };
   const read = await readIntakeHandle(slug);
   if (read.status === "not_found" || read.status === "moved") return { ok: false, error: "This assessment isn't taking answers right now." };
@@ -299,4 +300,4 @@ export async function completeAssessmentAction(slug: string, payload: unknown): 
     );
   }
   return { ok: true, closing, result: handle.config.assessment.showScore ? view : null };
-}
+}, "state");

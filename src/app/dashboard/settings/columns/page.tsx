@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { currentRole } from "@/lib/auth/current-role";
+import { viewerRole } from "@/lib/views/view-as";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { canSeeSetup } from "@/lib/setup/roles";
 import { pageTitle } from "@/lib/ui/page-title";
@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
  * an unreadable role and a signed-out caller get notFound. Every action behind it re-checks the role itself.
  */
 export default async function ColumnsSettingsPage() {
-  if (!canSeeSetup(await currentRole())) notFound();
+  if (!canSeeSetup(await viewerRole())) notFound();
   let state: ColumnsSettingsState;
   try {
     state = await loadColumnsSettings(await getScopedClient());

@@ -24,7 +24,7 @@ import {
 } from "@/lib/intake/rows";
 import { loadPendingApprovalsByLead } from "@/lib/queue/lead-pending";
 import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { previewingAs, resolveViewSession } from "@/lib/views/view-as";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
 import { loadAgentMoves, type AgentMovesRead } from "@/lib/stage-keeper/read";
@@ -187,13 +187,15 @@ export default async function IntakePage({
     leadNames[lead.id] = `${lead.first_name} ${lead.last_name}`.trim() || lead.email;
   }
   let time: IntakeTime | null = null;
+  // View as: the chip shows the teammate's running timer, and the stale-timer nudge (a write) never runs in a preview.
+  const viewing = await previewingAs();
   try {
     const [entries, running] = await Promise.all([
       listForLeads(
         leads.map((lead) => lead.id),
         startOfWeek(now),
       ),
-      runningForMe(),
+      runningForMe(viewing?.userId),
     ]);
     time = buildIntakeTime({ entries, running, now, leadNames });
 
@@ -203,7 +205,7 @@ export default async function IntakePage({
     // entry_id, so refreshing this page cannot raise a second nudge for the
     // same timer — and it nudges the entry's OWNER, who on this path is the
     // caller, so one person's refresh never rings somebody else's bell.
-    if (running) await notifyTimeRunning([running], now);
+    if (running && !viewing) await notifyTimeRunning([running], now);
   } catch {
     time = null;
   }
@@ -215,7 +217,7 @@ export default async function IntakePage({
   );
 
   // The "Reconcile stages" link is for the admin tier; the page and its actions check the role again.
-  const session = await resolveFirmSession().catch(() => null);
+  const session = await resolveViewSession().catch(() => null);
   const showReconcile = session?.kind === "ok" && canReconcile(session.role);
 
   const rows = buildIntakeRows({

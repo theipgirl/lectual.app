@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { orgHasModule } from "@/lib/org/modules";
@@ -13,7 +14,7 @@ import { RETRY_SENTENCES, runRetry, type RetryState } from "@/lib/documents/retr
  * "use server" function is its own POST entry point, so it re-checks the module and the matter
  * write role itself. Nothing is sent and nothing new is queued.
  */
-export async function retryDocumentAction(_prev: RetryState, formData: FormData): Promise<RetryState> {
+export const retryDocumentAction = previewSafe(async function retryDocumentAction(_prev: RetryState, formData: FormData): Promise<RetryState> {
   return runRetry(
     {
       gate: async () => {
@@ -37,4 +38,4 @@ export async function retryDocumentAction(_prev: RetryState, formData: FormData)
     },
     String(formData.get("draftId") ?? ""),
   );
-}
+}, "state");

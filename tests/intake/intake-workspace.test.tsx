@@ -405,7 +405,7 @@ describe("the Intake source", () => {
   it("no longer exports the hand-set temperature action", () => {
     const actions = read("src/app/dashboard/intake/actions.ts");
     expect(actions).not.toMatch(/setTemperature/i);
-    expect(actions).toContain("export async function setLaneAction");
+    expect(actions).toContain("async function setLaneAction");
   });
 
   it("uses the default filters and view state when nothing is in the URL", () => {

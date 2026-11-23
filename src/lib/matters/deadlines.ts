@@ -223,7 +223,7 @@ export async function createDeadline(input: CreateDeadlineInput): Promise<Matter
  */
 export async function confirmDeadline(id: string): Promise<MatterDeadline> {
   const supabase = await getScopedClient();
-  const { data: role, error: roleError } = await supabase.rpc("current_org_role");
+  const { data: role, error: roleError } = await supabase.rpc("current_org_role", undefined, { get: true });
   if (roleError) throw roleError;
   if (typeof role !== "string" || !(DEADLINE_CONFIRM_ROLES as readonly string[]).includes(role)) {
     throw new ReadableError(
@@ -467,7 +467,7 @@ export async function reopenDeadline(id: string): Promise<MatterDeadline> {
  */
 export async function deleteDeadline(id: string): Promise<void> {
   const supabase = await getScopedClient();
-  const { data: role, error: roleError } = await supabase.rpc("current_org_role");
+  const { data: role, error: roleError } = await supabase.rpc("current_org_role", undefined, { get: true });
   if (roleError) throw roleError;
   if (typeof role !== "string" || !(DEADLINE_DELETE_ROLES as readonly string[]).includes(role)) {
     throw new ReadableError("Only an owner or an admin can delete a deadline.");

@@ -6,6 +6,7 @@ export default defineConfig({
     environment: "node",
     hookTimeout: 30_000,
     testTimeout: 30_000,
+    setupFiles: ["./tests/setup-view-as.ts"],
   },
   resolve: {
     alias: {

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getMatter, resolveMatterClientName } from "@/lib/matters";
 import { matterLabel } from "@/lib/matters/docket-summary";
 import { hasRole } from "@/lib/auth/roles";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { orgHasModule } from "@/lib/org/modules";
 import {
@@ -61,7 +61,7 @@ export default async function Page({
   if (!matter) notFound();
 
   const [session, load, timeZone] = await Promise.all([
-    resolveFirmSession(),
+    resolveViewSession(),
     loadSignedQuotesForMatter(matter.id),
     getFirmTimeZone(),
   ]);

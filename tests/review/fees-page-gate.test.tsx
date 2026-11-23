@@ -124,8 +124,9 @@ describe("page.tsx source", () => {
     expect(src).toMatch(/const actingAsStaff = session\.kind === "ok" \? session\.actingAsStaff : true;/);
     expect(src).toMatch(/const customMoney = canSeeCustomMoney\(role, actingAsStaff\)/);
     expect(src).toMatch(/const withCustom = params\.view === "sheet"/);
-    expect(src.indexOf("await resolveFirmSession()")).toBeGreaterThan(-1);
-    expect(src.indexOf("await resolveFirmSession()")).toBeLessThan(src.indexOf("await loadReview("));
+    // View as (changed on purpose): the page reads the session as the VIEWER sees it; the order is unchanged.
+    expect(src.indexOf("await resolveViewSession()")).toBeGreaterThan(-1);
+    expect(src.indexOf("await resolveViewSession()")).toBeLessThan(src.indexOf("await loadReview("));
     expect(src).not.toMatch(/Promise\.all\(\[loadReview/);
     // the role comes from the resolved session, never from the request
     expect(src).not.toMatch(/sp\.(fees|canSeeMoney|withFees)|searchParams\.(fees|canSeeMoney)/);

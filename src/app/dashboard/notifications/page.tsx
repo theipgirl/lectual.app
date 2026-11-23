@@ -12,7 +12,8 @@ import { LoadFailedCard } from "@/components/ui/LoadFailed";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ViewToggle } from "@/components/ViewToggle";
 import { getFirmTimeZone } from "@/lib/org/profile";
-import { REFRESH_TO_TRY_AGAIN, SHOW_MORE } from "@/lib/ui/words";
+import { REFRESH_TO_TRY_AGAIN, SHOW_MORE, VIEW_AS_PRIVATE_BELL } from "@/lib/ui/words";
+import { previewingAs } from "@/lib/views/view-as";
 
 export const metadata: Metadata = { title: pageTitle("Notifications") };
 
@@ -45,6 +46,16 @@ export default async function NotificationsPage({
 }: {
   searchParams: Promise<{ tab?: string | string[]; page?: string | string[] }>;
 }) {
+  // View as: a teammate's notifications are private to them, and the owner's own are never shown in their place (D4).
+  const previewing = await previewingAs();
+  if (previewing) {
+    return (
+      <>
+        <PageHeader title="Notifications" />
+        <EmptyState>{VIEW_AS_PRIVATE_BELL(previewing.name)}</EmptyState>
+      </>
+    );
+  }
   const params = await searchParams;
   const tab: Tab = one(params.tab) === "unread" ? "unread" : "all";
   const page = parsePage(one(params.page));

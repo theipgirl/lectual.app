@@ -1,6 +1,7 @@
 import "server-only";
 import { getScopedClient } from "@/lib/db/scoped-client";
-import { resolveFirmSession } from "@/lib/firm/session";
+import type { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { effectiveTemperature } from "@/lib/intake/effective-temperature";
 import { loadTemperatureFacts } from "@/lib/intake/facts";
 import { loadLeadStepFacts } from "@/lib/lead-step/load";
@@ -75,7 +76,7 @@ export async function loadRecordCard(ref: CardRef, opts: LoadOptions = {}): Prom
   const now = opts.now ?? new Date();
   if (!UUID.test(ref.id)) return { status: "not-found" };
   try {
-    const session = await resolveFirmSession();
+    const session = await resolveViewSession();
     if (session.kind !== "ok") return { status: "unavailable" };
     const db = await getScopedClient();
     return ref.kind === "lead" ? await loadLead(db, ref.id, session.role, now, opts) : await loadMatter(ref.id, session.role, now);

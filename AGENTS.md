@@ -1679,7 +1679,8 @@ A second shell for the managing attorney, beside today's (the TECHNICIAN view, u
   sheet with the old calls). The deck page and every deck action answer `notFound()` without it.
 - **`src/lib/views/` (pure):** view ids technician, owner, attorney, matters-team, intake, office, marketing, read-only; `LIVE_VIEWS =
   ["owner"]` (every other role keeps today's shell). `viewFor({ role, preview, firmHasRoleViews, actingAsStaff })`: switch off -> technician.
-  **Firm members (owner and every other role) have NO view switch** (founder, 2026-11-10): their view is their role's alone (owner -> owner
+  **Firm members (owner and every other role) have NO view switch** (founder, 2026-11-10; View as below is a READ-ONLY look at a teammate,
+  not a switch of one's own view): their view is their role's alone (owner -> owner
   view, everyone else technician while only the owner view is live), and a stored preference is never read for them (the old account-wide
   `user_metadata.lectual_view` is ignored everywhere). **Only Lectual staff acting inside a firm** (`actingAsStaff`, which
   `resolveFirmSession` asks the database via `is_platform_admin`) get the switch (`canSwitchView`), and only when THAT firm has `role-views`:
@@ -2650,3 +2651,51 @@ BEFORE `revoke_member_sessions` (whose order before the delete is kept for 0031'
 the database would refuse. Every other removal and re-role is unchanged. Tests: `tests/settings/owner-row-guard.test.ts`. lectual's ported
 copies need the same fix (`PORTED_FROM.md`).
 
+
+## View as: an owner's read-only preview of a teammate (spec `docs/pge/2026-11-17-agentic-ip-os/spec-owner-view-as.md`, defaults D1-D15; needs lectual 0117 (PROPOSAL, NOT applied) after 0116 (applied to dev and prod))
+A real owner presses "View as" on a teammate's row in Settings -> Team (or "View as a teammate" in the account menu) and every dashboard page draws
+as that teammate would see it, under "Viewing as <name> (read-only)" with Exit. **The session stays the owner's**: no new token, no service role in
+dashboard code, RLS runs as the owner; only "whose view" changes. This is NOT a view switch of one's own (D15) and never "act as".
+- **Who:** only a REAL owner: an owner `crm_org_member` row in THIS firm (`isRealOwner`, `session.member?.role === "owner"`), never the claim and never
+  `!actingAsStaff` alone. A platform admin who is a real owner of the firm may (there only); staff with no row, or a non-owner row, may not. Not
+  yourself; the target must be a current member of the firm; owners may preview owners and admins. Rules: `src/lib/views/view-as-rules.ts` (pure).
+- **The database is the sole authority** (0117 `owner_view_as_event`, proposal file `docs/pge/2026-11-17-agentic-ip-os/0117-proposed.sql.txt`).
+  `owner_view_as_state()` is read ONCE per request for a real owner (`readPreviewState` in `src/lib/views/view-as-flag.ts`, memoized per request on
+  the request's headers object by `src/lib/views/request-memo.ts`, because React `cache` does not memoize in actions or route handlers); non-owners
+  make no read. Answers: on / off / not-set-up (42883, PGRST202, 42P01, PGRST205 by CODE, or 0116's guard missing: nothing offered, the Team page and
+  Enter say `notReadyYet("Viewing as a teammate")`) / unknown (a real owner's failed read: the "Couldn't check" banner, writes refused). The hint
+  cookie `lx_view_as` never decides anything; clearing it never ends a preview. 2 hours from Enter on the database clock (D1).
+- **Enter, Exit, sign-out are route handlers at fixed paths** (`/dashboard/view-as/enter/`, `/dashboard/view-as/exit/`, `/auth/sign-out/`; logic in
+  `src/lib/views/view-as-routes.ts`, deps injected): same-site POST, session re-read, 303. `signOutAction` is gone: every sign-out form posts to
+  `/auth/sign-out/`, which calls `owner_view_as_end('sign_out')` first (best effort), then signs out everywhere. Exit that can't be written keeps the
+  preview and the cookie and says `VIEW_AS_EXIT_FAILED`.
+- **The seam:** `resolveViewer()` (`src/lib/views/view-as.ts`, server-only, memoized) = `{ session, viewAs, viewer, previewState }`. Pages and server
+  components draw from the VIEWER: `resolveViewSession()` (resolveFirmSession as the viewer sees it: role, name, `user.id` and `member` are the
+  teammate's, `user_metadata` empty), and the twins `viewerRole()`, `viewerHasRole()`, `viewerQueueRole()`, `isViewerApprover()`, which outside a
+  preview ARE their session helpers. **No "use server" file and no route.ts imports `@/lib/views/view-as`** (`tests/views/view-as-no-viewer-in-actions`);
+  actions keep deciding with the session and are refused in a preview before deciding anything. Every session role read outside an entry point is
+  pinned and classified in `tests/views/view-as-role-reads.test.ts`; every `auth.getUser()` in `tests/views/view-as-getuser.test.ts`. A new one fails until classified.
+- **The write block, in layers** (a guard against accident, not a hostile owner):
+  (a) **every exported server action is `export const X = previewSafe(async function X(...) {...}, refusal)`** (`src/lib/views/preview-safe.ts`;
+  refusal `"state"` = `{ ok: false, error: VIEW_AS_READ_ONLY }`, `"redirect"` = back with `?notice=preview`, or a function for any other shape, checked
+  by TypeScript), and every mutating route handler `previewSafeRoute(...)` (409). The wrapper reads only the flag. The named read-only allowlist
+  (`previewReadOnly(fn, reason)`: contact search, the leads compare panel, Getting started's record picker, the three signed / review letter downloads)
+  writes nothing at all and is pinned with its reasons; `previewReconcileAction` stays refused (it refreshes mailbox tokens). The AST test
+  `tests/views/view-as-actions-guarded.test.ts` fails CI on an unwrapped action, a re-export, a factory, or an unclassified route.ts.
+  (b) **The database net inside `getScopedClient()`** (`previewNetFetch`, per client instance, never process-wide): while previewing (or unknown), any
+  non-GET to `/rest/v1/*` or `/storage/v1/*` and `PUT /auth/v1/user` answers 409 without being sent. GET reads, signed DOWNLOAD links, auth refresh /
+  logout and the three `owner_view_as_*` log functions pass. **Read RPCs are called as GET** (`rpc(fn, undefined, { get: true })`: `current_org_id`,
+  `current_org_role`, `is_platform_admin`, `platform_admin_orgs`, `org_member_directory` via `callMemberRpc`, `mailbox_connections_for_owner`; all
+  STABLE in lectual's migrations; `tests/views/view-as-read-rpcs.test.ts`). A read RPC left as POST fails closed in a preview.
+  (c) **The proxy** answers 409 to non-GET signed-in paths (and the OAuth connect / callback GETs) while the hint cookie is present: a quick refusal
+  only; it reads no state. (d) **Render-time provider reads are skipped** in a preview: Today's Zoom consults (`VIEW_AS_ZOOM`), My Mail's live Inbox
+  and reading pane (`VIEW_AS_LIVE_MAIL`), so no token is refreshed. (e) `ReadOnlyPreview` cancels form submits in the browser (courtesy).
+  Render-time writes are skipped too: the Forms page's first-draft create (`mayCreate: false`) and the Leads page's stale-timer nudge.
+- **Private places** show fixed sentences (`words.ts` `VIEW_AS_*`) and never the owner's own items: the bell (muted, `PreviewBell`) and the
+  notifications page, Copilot (page sentence, launcher hidden, the chat route refused), My Mail (firm SHARED mailboxes only, from stored rows), Today's
+  consults (source notes from firm connections only; the teammate's own Outlook is `VIEW_AS_PRIVATE_OUTLOOK`), the drafter's own Outlook on the
+  approval page and Settings -> Approvals. The tour, welcome deal, Getting started runner and card, and the name / deal-times / feedback dialogs do not
+  open; the account menu holds only "Viewing as <name>", Exit and Sign out. A teammate's own settings (deal times, tips) can't be read: firm defaults (D10).
+- **Tests:** the default for every suite is "not previewing" (`tests/setup-view-as.ts` mocks the flag off; the View as suites unmock it).
+  `tests/views/view-as-*.test.ts(x)`. **Not verified:** a real browser (desktop or 375px), 0117 on any database, PostgREST GET for the read RPCs on a
+  live project (they are STABLE in lectual's migration text), and Next's real memo behaviour of `headers()` across a server action plus its re-render.

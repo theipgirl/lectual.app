@@ -28,7 +28,7 @@ export const BRAIN_ADMIN_ROLES: Role[] = ["owner", "admin", "senior_admin"];
  * never cache a prior result across actions.
  */
 export async function requireBrainAdminRole(supabase: ScopedClient): Promise<Role> {
-  const { data, error } = await supabase.rpc("current_org_role");
+  const { data, error } = await supabase.rpc("current_org_role", undefined, { get: true });
   if (error) throw error;
   if (!isRole(data) || !BRAIN_ADMIN_ROLES.includes(data)) {
     throw new Error("You don't have permission to change the firm notes.");
@@ -38,7 +38,7 @@ export async function requireBrainAdminRole(supabase: ScopedClient): Promise<Rol
 
 /** Resolves the caller's active org id via the `current_org_id()` RPC. */
 async function currentOrgId(supabase: ScopedClient): Promise<string> {
-  const { data, error } = await supabase.rpc("current_org_id");
+  const { data, error } = await supabase.rpc("current_org_id", undefined, { get: true });
   if (error) throw error;
   if (!data) throw new Error("No active organization for the current session.");
   return data;

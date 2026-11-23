@@ -1,4 +1,6 @@
 "use server";
+
+import { previewSafe } from "@/lib/views/preview-safe";
 import { orgHasModule } from "@/lib/org/modules";
 
 import { redirect } from "next/navigation";
@@ -17,7 +19,7 @@ export type OpinionLetterState = { error?: string };
  * MatterStatusForm/MatterStageForm), not a bound argument — useActionState
  * requires the exact (prevState, formData) shape.
  */
-export async function generateOpinionLetterAction(
+export const generateOpinionLetterAction = previewSafe(async function generateOpinionLetterAction(
   _prev: OpinionLetterState,
   formData: FormData,
 ): Promise<OpinionLetterState> {
@@ -61,4 +63,4 @@ export async function generateOpinionLetterAction(
   }
 
   redirect(`/dashboard/queue/${result.queueItemId}/`);
-}
+}, "state");

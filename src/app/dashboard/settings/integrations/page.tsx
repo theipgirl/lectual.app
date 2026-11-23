@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { orgHasModule } from "@/lib/org/modules";
 import { canManageScope } from "@/lib/mailbox/access";
 import { connectableProviders } from "@/lib/mailbox/config";
@@ -138,7 +138,7 @@ export default async function IntegrationsPage({
 }) {
   // Integrations itself is open to every firm: Lawmatics uses the firm's own
   // token. The mailbox parts are what the `mailbox` module switches on.
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   if (session.kind !== "ok") notFound();
   const hasMailbox = await orgHasModule("mailbox");
 

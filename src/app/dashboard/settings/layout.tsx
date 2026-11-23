@@ -1,5 +1,5 @@
 import { activeOrgModules } from "@/lib/org/modules";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { loadSetupState } from "@/lib/setup/load";
 import { setupChecklist } from "@/lib/setup/checklist";
 import { ADMIN_TIER_PHRASE, canSeeSetup } from "@/lib/setup/roles";
@@ -28,7 +28,7 @@ const TABS: Tab[] = [
  * be read leaves the tab without a number rather than inventing one.
  */
 async function setupTab(): Promise<Tab[]> {
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   if (session.kind !== "ok" || !canSeeSetup(session.role)) return [];
   try {
     const checklist = setupChecklist(await loadSetupState());

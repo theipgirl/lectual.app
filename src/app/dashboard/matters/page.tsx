@@ -41,7 +41,7 @@ import {
 } from "@/lib/matters/phase-group";
 import { isHiredStage } from "@/lib/matters/hired-stage";
 import { searchPlaceholder, BLANK, MATTERS_NAME, OWNER_COLUMN, TEAMMATE, UNASSIGNED, MATTER_GROUPS_NAV, MATTER_GROUP_ALL, MATTER_INTAKE_STAGES, MATTER_INTAKE_SHOW, MATTER_SHOWING_INTAKE, MATTER_BACK_TO_PAST_INTAKE, MATTER_ALL_INTAKE_BODY, MATTER_ALL_INTAKE_TITLE, MATTER_GROUP_EMPTY, MATTER_GROUP_LABEL, MATTER_PHASES_UNAVAILABLE, MATTER_NO_HIRED_STAGE, MATTER_STATUS_NAV, DEADLINE_FLAGS_UNCHECKED, NO_MAINTENANCE_DEADLINE_HINT, NO_OPEN_DEADLINE, NO_OPEN_DEADLINE_HINT } from "@/lib/ui/words";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { isRegisteredTrademark, needsDeadlineCheck, noOpenDeadline, noOpenDeadlineHint } from "@/lib/matters/deadline-safety";
 import { loadOpenDeadlineMatterIds } from "@/lib/matters/open-deadlines-read";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
@@ -98,7 +98,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
     listLeads().catch(() => []),
     orgHasModule("litigation"),
     loadMatterStages().catch((error): MatterStageRead => ({ status: "unavailable", error })),
-    resolveFirmSession().then((x) => (x.kind === "ok" ? x.role : null)),
+    resolveViewSession().then((x) => (x.kind === "ok" ? x.role : null)),
     loadOpenDeadlineMatterIds(filedIds),
   ]);
   const openDeadlineIds = openDeadlineRead.status === "ok" ? openDeadlineRead.ids : null;

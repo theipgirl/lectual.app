@@ -19,7 +19,7 @@ import { ReviewCardAside } from "@/components/review/ReviewCardExtras";
 import { RecordCardHost } from "@/components/record-card/RecordCardHost";
 import { loadRecordCard } from "@/lib/record-card/load";
 import { cardEdits } from "@/lib/record-card/rules";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { NO_PREVIEW, previewFor, viewFor } from "@/lib/views";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import { CAN_MOVE_STAGE, CAN_WRITE_LEAD } from "@/lib/pipeline/leads";
@@ -58,7 +58,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const params = parseReviewParams(sp);
   // The session comes FIRST: whether this viewer may see fees is decided here from the re-resolved role, before anything is read, so
   // the money reads are never made for anyone else. Fees are the List's columns, so no other view pays for them.
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   const role = session.kind === "ok" ? session.role : null;
   const canSeeMoney = canSeeBilling(role);
   const withFees = canSeeMoney && params.view === "sheet";

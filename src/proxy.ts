@@ -4,6 +4,8 @@ import { frameAncestors, frameTarget } from "@/lib/intake-forms/frame-policy";
 import { safeNext } from "@/lib/auth/safe-next";
 import { RETURN_PATH_HEADER, dashboardReturnPath } from "@/lib/auth/return-path";
 import { readFrameDomains } from "@/lib/intake-forms/frame-lookup";
+import { VIEW_AS_COOKIE, proxyRefuses } from "@/lib/views/view-as-rules";
+import { VIEW_AS_READ_ONLY } from "@/lib/ui/words";
 
 /**
  * Session refresh — the piece scoped-client.ts has always assumed existed.
@@ -36,6 +38,14 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     target.searchParams.set("code", code);
     target.searchParams.set("next", safeNextPath);
     return NextResponse.redirect(target);
+  }
+
+  // View as, Layer c: a QUICK refusal only. While the hint cookie is present, a non-GET on a signed-in path (and the OAuth
+  // connect / callback GETs) gets 409 here, before any work. It reads no preview state and decides nothing: the guarantee
+  // is previewSafe() on every action and the database net in getScopedClient() (the matcher skips some paths, and server
+  // functions can fall outside it). Enter, Exit and sign-out are let through by path.
+  if (request.cookies.get(VIEW_AS_COOKIE)?.value && proxyRefuses(request.method, request.nextUrl.pathname)) {
+    return new NextResponse(VIEW_AS_READ_ONLY, { status: 409, headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" } });
   }
 
   const response = await refreshSession(request);

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { previewingAs, resolveViewSession } from "@/lib/views/view-as";
 import { orgHasModule } from "@/lib/org/modules";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { listConnections } from "@/lib/mailbox/connections";
@@ -12,7 +12,7 @@ import { groupMailByDay, mailTime, toMailRows, type MailActivity } from "@/lib/m
 import { relativeTime } from "@/lib/relative-time";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { EmptyState, LoadFailedCard, Notice, PageHeader, PageTabs } from "@/components/ui";
-import { MAIL_NAME, noneYet } from "@/lib/ui/words";
+import { MAIL_NAME, VIEW_AS_LIVE_MAIL, VIEW_AS_PRIVATE_MAIL, noneYet } from "@/lib/ui/words";
 import { ProviderMark } from "@/components/mailbox/ProviderMark";
 import { loadLiveInbox, loadLiveMessage, loadStoredMessage, type ReadState } from "@/lib/mailbox/read-message";
 import { liveMailReadDeps } from "@/lib/mailbox/read-message-live";
@@ -62,10 +62,14 @@ async function PaneLoader({ state, backHref, timeZone, listLabel }: { state: Pro
  */
 export default async function MyMailPage({ searchParams }: { searchParams: Promise<{ box?: string; f?: string; m?: string; tab?: string; live?: string }> }) {
   if (!(await orgHasModule("mailbox"))) notFound();
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   if (session.kind !== "ok") notFound();
   const { box, f, m, tab, live } = await searchParams;
-  const inboxTab = tab === "inbox";
+  // View as (D2, D11): only the firm's SHARED mailboxes, from stored rows. A personal mailbox (the owner's own, visible to
+  // them by RLS) is never shown in a teammate's view, and the live Inbox tab and reading pane are not fetched (a provider
+  // read may refresh a token, which a preview must never do).
+  const previewing = await previewingAs();
+  const inboxTab = tab === "inbox" && !previewing;
   const sent = f === "sent";
 
   const list = await listConnections();
@@ -73,7 +77,15 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
     // Unknown is not "none": never tell someone to connect a mailbox they may already have.
     return <LoadFailedCard role="alert" what="your mail" body="We couldn't load your mailbox connections, so we can't show your mail right now. Refresh to try again." />;
   }
-  const connections = list.connections.filter((c) => c.status !== "revoked");
+  const connections = list.connections.filter((c) => c.status !== "revoked" && (!previewing || c.scope === "firm"));
+  if (connections.length === 0 && previewing) {
+    return (
+      <>
+        <PageHeader title={MAIL_NAME} />
+        <EmptyState>{VIEW_AS_PRIVATE_MAIL(previewing.name)}</EmptyState>
+      </>
+    );
+  }
   if (connections.length === 0) return <ConnectMailbox />;
 
   const selected = connections.find((c) => c.id === box) ?? null;
@@ -124,9 +136,9 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
   };
 
   // The reading pane: `m` (a stored row) wins over `box` + `live`. Each re-checks access on this request.
-  const paneOpen = Boolean(m) || Boolean(live);
+  const paneOpen = !previewing && (Boolean(m) || Boolean(live));
   const backHref = href({ m: null, live: null });
-  const paneState = m ? loadStoredMessage(m, liveMailReadDeps) : live ? loadLiveMessage(box, live, liveMailReadDeps) : null;
+  const paneState = previewing ? null : m ? loadStoredMessage(m, liveMailReadDeps) : live ? loadLiveMessage(box, live, liveMailReadDeps) : null;
   const inbox = inboxTab ? await loadLiveInbox(box, liveMailReadDeps) : null;
 
   // The sidebar links and the phone's select are built from this one list, so they cannot disagree.
@@ -182,13 +194,19 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
           </Notice>
         )}
 
+        {previewing && (
+          <Notice tone="mute">
+            {VIEW_AS_PRIVATE_MAIL(previewing.name)} {VIEW_AS_LIVE_MAIL}
+          </Notice>
+        )}
+
         <MailFolderSelect select={folderSelect(navLinks)} />
 
         <PageTabs
           label="Mail views"
           tabs={[
             { href: href({ tab: null, m: null, live: null }), label: "Client mail", current: !inboxTab },
-            { href: href({ tab: "inbox", m: null, live: null, f: null }), label: "Inbox", current: inboxTab },
+            ...(previewing ? [] : [{ href: href({ tab: "inbox", m: null, live: null, f: null }), label: "Inbox", current: inboxTab }]),
           ]}
         />
 

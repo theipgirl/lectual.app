@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { refresh } from "next/cache";
 import { hasRole } from "@/lib/auth/roles";
 import { getScopedClient } from "@/lib/db/scoped-client";
@@ -52,7 +53,7 @@ async function adminSession() {
   return session;
 }
 
-export async function saveAgentSettingAction(_prev: AgentActionState, formData: FormData): Promise<AgentActionState> {
+export const saveAgentSettingAction = previewSafe(async function saveAgentSettingAction(_prev: AgentActionState, formData: FormData): Promise<AgentActionState> {
   const session = await adminSession();
   if (!session) return { error: `${ADMIN_TIER_PHRASE} can change assistants.` };
   const agent = formData.get("agent");
@@ -83,9 +84,9 @@ export async function saveAgentSettingAction(_prev: AgentActionState, formData: 
   }
   refresh();
   return { ok: true };
-}
+}, "state");
 
-export async function runAgentNowAction(_prev: AgentActionState, formData: FormData): Promise<AgentActionState> {
+export const runAgentNowAction = previewSafe(async function runAgentNowAction(_prev: AgentActionState, formData: FormData): Promise<AgentActionState> {
   // A forged request is refused with the same sentence the page prints beside the button: both ask decideRunNow.
   if (!(await orgHasModule("agents"))) return { error: RUN_NOW_REASON.role };
   const session = await resolveFirmSession();
@@ -143,7 +144,7 @@ export async function runAgentNowAction(_prev: AgentActionState, formData: FormD
     itemsIn: outcome.result?.itemsIn,
     draftsOut: outcome.result?.draftsOut,
   };
-}
+}, "state");
 
 // ── Autopilot (lectual 0082) ─────────────────────────────────────────────────
 
@@ -159,7 +160,7 @@ async function autopilotSession() {
  * The database enforces the same split (0082 policies + trigger) and stamps
  * who paused from the session, so the form cannot name someone else.
  */
-export async function setAutopilotAction(_prev: AgentActionState, formData: FormData): Promise<AgentActionState> {
+export const setAutopilotAction = previewSafe(async function setAutopilotAction(_prev: AgentActionState, formData: FormData): Promise<AgentActionState> {
   const session = await autopilotSession();
   if (!session) return { error: "Assistants aren't available for this firm." };
   const pause = formData.get("paused") === "true";
@@ -175,10 +176,10 @@ export async function setAutopilotAction(_prev: AgentActionState, formData: Form
   if (error) return { error: `Couldn't ${pause ? "pause" : "resume"} the assistants. Nothing was changed. Refresh to try again.` };
   refresh();
   return { ok: true, message: pause ? `${ASSISTANTS_PAUSED}. None will run until they are resumed.` : "Assistants resumed." };
-}
+}, "state");
 
 /** The firm's minutes-per-task estimate behind "Hours saved (est.)". Admins only. */
-export async function saveMinutesPerTaskAction(_prev: AgentActionState, formData: FormData): Promise<AgentActionState> {
+export const saveMinutesPerTaskAction = previewSafe(async function saveMinutesPerTaskAction(_prev: AgentActionState, formData: FormData): Promise<AgentActionState> {
   const session = await adminSession();
   if (!session) return { error: `${ADMIN_TIER_PHRASE} can change this.` };
   const parsed = parseMinutesForm(formData);
@@ -199,4 +200,4 @@ export async function saveMinutesPerTaskAction(_prev: AgentActionState, formData
   if (error) return { error: "Couldn't save. Nothing was changed. Refresh to try again." };
   refresh();
   return { ok: true, message: "Saved." };
-}
+}, "state");

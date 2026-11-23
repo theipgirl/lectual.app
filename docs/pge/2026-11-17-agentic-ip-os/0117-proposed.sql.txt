@@ -1,0 +1,476 @@
+-- =====================================================================================================================
+-- PROPOSAL ONLY. NOT A MIGRATION OF THIS REPO. NOT APPLIED ANYWHERE (not lectual-dev, not lectual-prod).
+-- =====================================================================================================================
+-- 0117_owner_view_as.sql (proposed): an owner's read-only "View as" preview of a teammate. The log IS the state.
+--
+-- This file is a draft for the `lectual` repo (theipgirl/lectual), where migrations live (lectual.app AGENTS.md: "No migrations
+-- in this repo"). To use it: copy it to `lectual/supabase/migrations/0117_owner_view_as.sql` (first-merged-wins numbering: 0108 and
+-- 0110-0116 are spoken for and the sibling spec proposes 0118; renumber if 0117 is taken), review it there, add the isolation cases at
+-- the end of this file to tests/tenant-isolation.test.ts and the migration-text cases to a new tests/owner-view-as.test.ts, run the
+-- read-only PRE-APPLY CHECKS below on lectual-dev, apply to lectual-dev, run the isolation cases there, then do the same on
+-- lectual-prod only with the owner's OK. Apply to BOTH projects (lectual AGENTS.md, "Database").
+--
+-- Spec: lectual.app docs/pge/2026-11-17-agentic-ip-os/spec-owner-view-as.md (approved Nov 23, defaults D1-D15).
+-- Checked against lectual migrations 0001, 0002, 0050, 0103, 0106 and the 0116 proposal in this folder, NOT a live database and not a
+-- local PostgreSQL run. Every borrowed pattern names its source below.
+--
+-- Depends on: 0001 (crm_org, crm_org_member unique (org_id, user_id)), 0002 (current_org_id), 0050 (platform admins carry the claim
+-- `owner` with no row; this file never reads the claim), and **0116** (crm_org_member_owner_guard_trg). 0116 IS APPLIED on lectual-dev
+-- and lectual-prod (Nov 23); its guard trigger is still checked at run time (shared check 2), so a database where it has been dropped
+-- or disabled refuses every view-as function (view_as_needs_member_guard). Without 0116 an admin could promote their own row to owner
+-- and start a preview (0116's THE GAP).
+--
+-- ── WHAT IT ADDS ────────────────────────────────────────────────────────────────────────────────────────────────────
+--   owner_view_as_event   one row per Enter and per exit: who (actor_id), whom (target_user_id), the auth session id (from the JWT
+--                         `session_id` claim, never sent by the browser), in or out, how it ended, when. No page, record or IP.
+--   owner_view_as_start(p_target uuid) returns timestamptz
+--   owner_view_as_end(p_reason text)   returns void
+--   owner_view_as_state()              returns table (target_user_id uuid, started_at timestamptz)
+--   A preview is ON exactly while owner_view_as_state() returns a row for this owner, this auth session and this firm. The app reads
+--   it on every dashboard request of a real owner; nothing else (no cookie) decides.
+--
+-- ── RULES ───────────────────────────────────────────────────────────────────────────────────────────────────────────
+--   * Only a REAL owner: a crm_org_member row (org_id = current_org_id(), user_id = auth.uid(), role = 'owner'). A table lookup,
+--     never current_org_role(), so a platform admin's `owner` claim does not count, and a platform admin who IS a real owner member
+--     of the firm passes there (and nowhere else).
+--   * Not yourself; the target must have a crm_org_member row in the same firm (any role, owners and admins included).
+--   * 2 hours from Enter on the database clock (D1).
+--   * The close rule: before anything else, every function writes an exit for each open enter of the caller in this firm, in ANY
+--     auth session: `timeout` (created_at = start + 2 hours) when over 2 hours old; `session_ended` when its auth_session_id is no
+--     longer in auth.sessions; `access_ended` when the caller no longer has an owner row or the target no longer has a row.
+--   * Append-only: no UPDATE, no direct DELETE (the service role included); rows go only by the firm's cascade (0106's form).
+--   * An enter is OPEN while no later row of the same (org, actor, auth session) exists. created_at is clock_timestamp(), so the
+--     `switch` exit and the new enter written in one call are ordered. Each function takes a per-(firm, actor) advisory lock.
+--
+-- ── ERROR PREFIXES ──────────────────────────────────────────────────────────────────────────────────────────────────
+--   view_as_no_session (42501), view_as_needs_member_guard (42501), view_as_not_owner (42501), view_as_self (23514),
+--   view_as_target_not_member (23514), view_as_bad_reason (23514), view_as_append_only (23514), view_as_no_delete (23514).
+--   view_as_bad_reason is not in the spec's list: owner_view_as_end refuses any reason other than exit / sign_out with it.
+--
+-- ── PRE-APPLY CHECKS (read-only; run on each project first, nothing here writes) ─────────────────────────────────────
+--   1. 0116 is applied and its guard is on (expect one row, tgenabled 'O'):
+--        select tgname, tgenabled from pg_trigger
+--         where tgrelid = 'public.crm_org_member'::regclass and tgname = 'crm_org_member_owner_guard_trg';
+--      No row: STOP, apply 0116 first (D14).
+--   2. The table does not exist yet (expect null): select to_regclass('public.owner_view_as_event');
+--   3. The token carries a session id (sign in on the project, then in SQL as that user: select auth.jwt() ->> 'session_id'; expect a
+--      uuid). Supabase has issued `session_id` in access tokens since 2023; if it is missing, every function answers
+--      view_as_no_session and the app never offers View as.
+--   4. auth.sessions is readable by the function owner (expect a count): select count(*) from auth.sessions;
+--   5. The applying role owns crm_org (the cascade) and can create functions in public: select pg_get_userbyid(relowner) from
+--      pg_class where oid = 'public.crm_org'::regclass;
+--
+-- ── APPLYING IT ──────────────────────────────────────────────────────────────────────────────────────────────────────
+-- Additive and idempotent: create table if not exists, create index if not exists, create or replace function, and do $$ blocks that
+-- test pg_trigger / pg_policies first (0103's form). No existing table, row, policy or grant changes; no drop. One Supabase MCP
+-- apply_migration should be safe; if it hangs (0093), send the numbered parts as execute_sql chunks in order plus a
+-- supabase_migrations.schema_migrations row. Order: table and index, append-only trigger functions and triggers, grants and policy,
+-- the shared helpers, the three functions and their grants, comments.
+--
+-- ── APP SIDE (lectual.app) ───────────────────────────────────────────────────────────────────────────────────────────
+--   Until this is applied, owner_view_as_state() is missing (42883 / PGRST202) and the table is missing (42P01 / PGRST205): the app
+--   reads that as "not set up", offers no preview, and the View as button says "Viewing as a teammate isn't switched on for your firm
+--   yet." Read by error CODE only.
+-- =====================================================================================================================
+
+
+-- ── 1. The table ───────────────────────────────────────────────────────────────────────────────────────────────────
+create table if not exists public.owner_view_as_event (
+  id              uuid primary key default gen_random_uuid(),
+  org_id          uuid not null references public.crm_org (id) on delete cascade,
+  -- No foreign key on the two user columns (0116 D5's reason): the record outlives someone leaving the firm or the auth user going.
+  actor_id        uuid not null,
+  target_user_id  uuid not null,
+  kind            text not null,
+  exit_reason     text,
+  auth_session_id uuid not null,
+  created_at      timestamptz not null default clock_timestamp(),
+  constraint owner_view_as_event_kind check (kind in ('enter', 'exit')),
+  constraint owner_view_as_event_reason check (
+    exit_reason is null or exit_reason in ('exit', 'sign_out', 'switch', 'timeout', 'session_ended', 'access_ended')
+  ),
+  constraint owner_view_as_event_reason_shape check (
+    (kind = 'enter' and exit_reason is null) or (kind = 'exit' and exit_reason is not null)
+  ),
+  constraint owner_view_as_event_not_self check (actor_id <> target_user_id)
+);
+
+create index if not exists owner_view_as_event_lookup_idx
+  on public.owner_view_as_event (org_id, actor_id, auth_session_id, created_at desc);
+
+
+-- ── 2. Append-only (0103 / 0106's form) ────────────────────────────────────────────────────────────────────────────
+create or replace function public.owner_view_as_event_no_update()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  raise exception 'view_as_append_only: a view-as record is never changed'
+    using errcode = '23514';
+end
+$$;
+
+create or replace function public.owner_view_as_event_delete_guard()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  -- Only the firm's ON DELETE CASCADE (a referential action, so depth > 1, with the firm already gone).
+  if pg_trigger_depth() > 1
+     and not exists (select 1 from public.crm_org o where o.id = old.org_id) then
+    return old;
+  end if;
+  raise exception 'view_as_no_delete: a view-as record is never deleted on its own; it goes only with its firm'
+    using errcode = '23514';
+end
+$$;
+
+do $$
+begin
+  if not exists (select 1 from pg_trigger
+      where tgname = 'owner_view_as_event_no_update_trg'
+        and tgrelid = 'public.owner_view_as_event'::regclass) then
+    create trigger owner_view_as_event_no_update_trg
+      before update on public.owner_view_as_event
+      for each row execute function public.owner_view_as_event_no_update();
+  end if;
+  if not exists (select 1 from pg_trigger
+      where tgname = 'owner_view_as_event_delete_guard_trg'
+        and tgrelid = 'public.owner_view_as_event'::regclass) then
+    create trigger owner_view_as_event_delete_guard_trg
+      before delete on public.owner_view_as_event
+      for each row execute function public.owner_view_as_event_delete_guard();
+  end if;
+end
+$$;
+
+revoke all on function public.owner_view_as_event_no_update() from public, anon, authenticated;
+revoke all on function public.owner_view_as_event_delete_guard() from public, anon, authenticated;
+
+
+-- ── 3. Grants and the one policy ───────────────────────────────────────────────────────────────────────────────────
+alter table public.owner_view_as_event enable row level security;
+
+revoke all on public.owner_view_as_event from anon;
+revoke insert, update, delete, truncate, references, trigger on public.owner_view_as_event from authenticated;
+grant select on public.owner_view_as_event to authenticated;
+-- The service role reads; its default write grants go (the triggers refuse them anyway). The cascade runs as the table owner.
+revoke insert, update, delete, truncate, references, trigger on public.owner_view_as_event from service_role;
+grant select on public.owner_view_as_event to service_role;
+
+do $$
+begin
+  if not exists (select 1 from pg_policies where schemaname = 'public'
+      and tablename = 'owner_view_as_event' and policyname = 'owner_view_as_event_select_owner') then
+    -- The table is named on both sides of the subquery, so `m.org_id = org_id` can never resolve to m.org_id = m.org_id and leak
+    -- across firms. A table lookup, never current_org_role(): a platform admin's `owner` claim does not count. Every real owner of
+    -- the firm reads every row of it (D8).
+    create policy owner_view_as_event_select_owner on public.owner_view_as_event
+      for select to authenticated
+      using (
+        owner_view_as_event.org_id = public.current_org_id()
+        and exists (
+          select 1 from public.crm_org_member m
+           where m.org_id = owner_view_as_event.org_id
+             and m.user_id = auth.uid()
+             and m.role = 'owner'
+        )
+      );
+  end if;
+end
+$$;
+
+
+-- ── 4. Shared helpers (not callable by API roles) ──────────────────────────────────────────────────────────────────
+-- Shared check 1: auth.uid() and the JWT session_id claim. Returns the session id, or raises view_as_no_session.
+create or replace function public.owner_view_as_session_id()
+returns uuid
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_raw text := auth.jwt() ->> 'session_id';
+begin
+  if auth.uid() is null or v_raw is null
+     or v_raw !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+    raise exception 'view_as_no_session: signed in with a session is required' using errcode = '42501';
+  end if;
+  return v_raw::uuid;
+end
+$$;
+
+-- Shared check 2: 0116's guard trigger is on crm_org_member and enabled.
+create or replace function public.owner_view_as_require_member_guard()
+returns void
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if not exists (
+    select 1 from pg_catalog.pg_trigger t
+     where t.tgrelid = 'public.crm_org_member'::regclass
+       and t.tgname = 'crm_org_member_owner_guard_trg'
+       and t.tgenabled <> 'D'
+  ) then
+    raise exception 'view_as_needs_member_guard: the membership guard (0116) must be on first' using errcode = '42501';
+  end if;
+end
+$$;
+
+-- Shared check 3's lookup: a REAL owner row of p_user in p_org.
+create or replace function public.owner_view_as_is_owner(p_org uuid, p_user uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select p_org is not null and p_user is not null and exists (
+    select 1 from public.crm_org_member m
+     where m.org_id = p_org and m.user_id = p_user and m.role = 'owner'
+  );
+$$;
+
+-- The close rule. Writes an exit for each open enter of p_actor in p_org, in ANY auth session. Returns how many it closed.
+create or replace function public.owner_view_as_close_stale(p_org uuid, p_actor uuid)
+returns integer
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  r record;
+  v_n integer := 0;
+  v_owner boolean := public.owner_view_as_is_owner(p_org, p_actor);
+  v_reason text;
+  v_at timestamptz;
+begin
+  for r in
+    select e.id, e.target_user_id, e.auth_session_id, e.created_at
+      from public.owner_view_as_event e
+     where e.org_id = p_org and e.actor_id = p_actor and e.kind = 'enter'
+       and not exists (
+         select 1 from public.owner_view_as_event x
+          where x.org_id = e.org_id and x.actor_id = e.actor_id
+            and x.auth_session_id = e.auth_session_id and x.created_at > e.created_at
+       )
+  loop
+    v_reason := null;
+    v_at := pg_catalog.clock_timestamp();
+    if r.created_at + interval '2 hours' <= v_at then
+      v_reason := 'timeout';
+      v_at := r.created_at + interval '2 hours';
+    elsif not exists (select 1 from auth.sessions s where s.id = r.auth_session_id) then
+      v_reason := 'session_ended';
+    elsif not v_owner
+       or not exists (select 1 from public.crm_org_member m where m.org_id = p_org and m.user_id = r.target_user_id) then
+      v_reason := 'access_ended';
+    end if;
+    if v_reason is not null then
+      insert into public.owner_view_as_event (org_id, actor_id, target_user_id, kind, exit_reason, auth_session_id, created_at)
+      values (p_org, p_actor, r.target_user_id, 'exit', v_reason, r.auth_session_id, v_at);
+      v_n := v_n + 1;
+    end if;
+  end loop;
+  return v_n;
+end
+$$;
+
+-- This session's open enter (after the close rule), or no row.
+create or replace function public.owner_view_as_open_entry(p_org uuid, p_actor uuid, p_session uuid)
+returns table (target_user_id uuid, started_at timestamptz)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select e.target_user_id, e.created_at
+    from public.owner_view_as_event e
+   where e.org_id = p_org and e.actor_id = p_actor and e.auth_session_id = p_session and e.kind = 'enter'
+     and not exists (
+       select 1 from public.owner_view_as_event x
+        where x.org_id = e.org_id and x.actor_id = e.actor_id
+          and x.auth_session_id = e.auth_session_id and x.created_at > e.created_at
+     )
+   order by e.created_at desc
+   limit 1;
+$$;
+
+revoke all on function public.owner_view_as_session_id() from public, anon, authenticated;
+revoke all on function public.owner_view_as_require_member_guard() from public, anon, authenticated;
+revoke all on function public.owner_view_as_is_owner(uuid, uuid) from public, anon, authenticated;
+revoke all on function public.owner_view_as_close_stale(uuid, uuid) from public, anon, authenticated;
+revoke all on function public.owner_view_as_open_entry(uuid, uuid, uuid) from public, anon, authenticated;
+
+
+-- ── 5. The three functions ─────────────────────────────────────────────────────────────────────────────────────────
+create or replace function public.owner_view_as_start(p_target uuid)
+returns timestamptz
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_org uuid := public.current_org_id();
+  v_session uuid := public.owner_view_as_session_id();   -- check 1
+  v_open record;
+  v_at timestamptz;
+begin
+  perform public.owner_view_as_require_member_guard();      -- check 2
+  if not public.owner_view_as_is_owner(v_org, v_uid) then   -- check 3
+    raise exception 'view_as_not_owner: only an owner of this firm can view the app as a teammate' using errcode = '42501';
+  end if;
+  if p_target is null or p_target = v_uid then
+    raise exception 'view_as_self: you cannot view the app as yourself' using errcode = '23514';
+  end if;
+  if not exists (select 1 from public.crm_org_member m where m.org_id = v_org and m.user_id = p_target) then
+    raise exception 'view_as_target_not_member: that person is not a member of this firm' using errcode = '23514';
+  end if;
+
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('owner_view_as:' || v_org::text || ':' || v_uid::text, 0));
+  perform public.owner_view_as_close_stale(v_org, v_uid);
+
+  select * into v_open from public.owner_view_as_open_entry(v_org, v_uid, v_session);
+  if found then
+    insert into public.owner_view_as_event (org_id, actor_id, target_user_id, kind, exit_reason, auth_session_id, created_at)
+    values (v_org, v_uid, v_open.target_user_id, 'exit', 'switch', v_session, pg_catalog.clock_timestamp());
+  end if;
+
+  v_at := pg_catalog.clock_timestamp();
+  insert into public.owner_view_as_event (org_id, actor_id, target_user_id, kind, exit_reason, auth_session_id, created_at)
+  values (v_org, v_uid, p_target, 'enter', null, v_session, v_at);
+  return v_at;
+end
+$$;
+
+create or replace function public.owner_view_as_end(p_reason text)
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_org uuid := public.current_org_id();
+  v_session uuid := public.owner_view_as_session_id();   -- check 1
+  v_open record;
+begin
+  perform public.owner_view_as_require_member_guard();      -- check 2
+  if p_reason is null or p_reason not in ('exit', 'sign_out') then
+    raise exception 'view_as_bad_reason: a preview ends by exit or sign_out' using errcode = '23514';
+  end if;
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('owner_view_as:' || v_org::text || ':' || v_uid::text, 0));
+
+  -- Check 3 is skipped while the caller has an open entry in this session, so a just-demoted owner can still close their own row.
+  select * into v_open from public.owner_view_as_open_entry(v_org, v_uid, v_session);
+  if not found and not public.owner_view_as_is_owner(v_org, v_uid) then
+    raise exception 'view_as_not_owner: only an owner of this firm can view the app as a teammate' using errcode = '42501';
+  end if;
+
+  perform public.owner_view_as_close_stale(v_org, v_uid);
+  select * into v_open from public.owner_view_as_open_entry(v_org, v_uid, v_session);
+  if found then
+    insert into public.owner_view_as_event (org_id, actor_id, target_user_id, kind, exit_reason, auth_session_id, created_at)
+    values (v_org, v_uid, v_open.target_user_id, 'exit', p_reason, v_session, pg_catalog.clock_timestamp());
+  end if;
+end
+$$;
+
+create or replace function public.owner_view_as_state()
+returns table (target_user_id uuid, started_at timestamptz)
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_org uuid := public.current_org_id();
+  v_session uuid := public.owner_view_as_session_id();   -- check 1
+begin
+  perform public.owner_view_as_require_member_guard();      -- check 2
+  if v_org is null then
+    return;
+  end if;
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('owner_view_as:' || v_org::text || ':' || v_uid::text, 0));
+  -- Check 3 is not an error here: a caller who is no longer an owner has their rows closed as access_ended and gets no row.
+  perform public.owner_view_as_close_stale(v_org, v_uid);
+  if not public.owner_view_as_is_owner(v_org, v_uid) then
+    return;
+  end if;
+  return query select o.target_user_id, o.started_at from public.owner_view_as_open_entry(v_org, v_uid, v_session) o;
+end
+$$;
+
+revoke all on function public.owner_view_as_start(uuid) from public, anon;
+revoke all on function public.owner_view_as_end(text) from public, anon;
+revoke all on function public.owner_view_as_state() from public, anon;
+grant execute on function public.owner_view_as_start(uuid) to authenticated;
+grant execute on function public.owner_view_as_end(text) to authenticated;
+grant execute on function public.owner_view_as_state() to authenticated;
+
+
+-- ── 6. Comments ────────────────────────────────────────────────────────────────────────────────────────────────────
+comment on table public.owner_view_as_event is
+  '0117: an owner''s read-only View as preview. Who, whom, auth session, enter/exit and how it ended. Written only by the owner_view_as_* functions; append-only; real owners of the firm read it.';
+comment on function public.owner_view_as_state() is
+  '0117: closes the caller''s stale previews (timeout, session_ended, access_ended), then returns this session''s open preview, if any. Called once per dashboard request by a real owner.';
+comment on function public.owner_view_as_start(uuid) is
+  '0117: a REAL owner (crm_org_member row, never the claim) starts a preview of another member of the firm. Needs 0116''s guard. Closes this session''s preview as switch first.';
+comment on function public.owner_view_as_end(text) is
+  '0117: ends this session''s preview (exit or sign_out). Allowed for a just-demoted owner with an open preview.';
+
+-- KNOWN LIMITS
+--   * The app's 2-hour check is the database's: an owner who makes no request leaves the row open until their next request (state
+--     closes it as timeout, created_at = start + 2 hours, so the log reads as if it ended on time).
+--   * auth.sessions is Supabase's table; if its shape changes, session_ended stops being detected (rows still time out).
+--   * A view-as row names the auth session, not the device; every tab of one sign-in shares the preview (D13).
+
+-- Migration-text cases (a new lectual tests/owner-view-as.test.ts, always run):
+--   T1. Every prefix above is listed in lectual AGENTS.md's 0117 section.
+--   T2. No foreign key on actor_id or target_user_id (the only FK is org_id -> crm_org on delete cascade).
+--   T3. `grant select on public.owner_view_as_event to authenticated` is present; no grant of insert, update or delete to
+--       authenticated; `revoke insert, update, delete, truncate, references, trigger ... from authenticated` is present.
+--   T4. The SELECT policy contains `owner_view_as_event.org_id = public.current_org_id()` and `m.org_id = owner_view_as_event.org_id`
+--       and does not contain current_org_role.
+--   T5. owner_view_as_state's body calls owner_view_as_require_member_guard and owner_view_as_close_stale.
+--   T6. owner_view_as_require_member_guard names crm_org_member_owner_guard_trg; start and end call it too.
+
+-- Cases to add to lectual tests/tenant-isolation.test.ts (fail until applied). Firm A: owners O1 and O2, admin AD, senior_admin SA,
+-- attorney AT, viewer V, paralegal P. Firm B: owner OB, member MB. PA: platform admin with no row in A (claim owner). PO: platform admin
+-- who is a real owner of firm D and has only an admin row in firm A2.
+--   1. OB (active B) selects from owner_view_as_event after O1 has entered and exited a preview of P in A: 0 rows. OB's
+--      owner_view_as_state(): no row.
+--   2. OB calls owner_view_as_start(P) (P is in A, not B): view_as_target_not_member. O1 calls owner_view_as_start(MB):
+--      view_as_target_not_member.
+--   3. AD, SA, AT and V call owner_view_as_start(P): view_as_not_owner, nothing written.
+--   4. PA (active A, claim owner, no row) calls owner_view_as_start(P): view_as_not_owner.
+--   5. O1 calls owner_view_as_start(O1): view_as_self. O1 calls owner_view_as_start(O2): succeeds (owners may preview owners);
+--      owner_view_as_start(AD) succeeds and writes one exit 'switch' then one enter.
+--   6. authenticated: insert, update and delete on owner_view_as_event are refused (permission denied). service role: update ->
+--      view_as_append_only (or permission denied), delete -> view_as_no_delete (or permission denied); no row changes.
+--   7. With crm_org_member_owner_guard_trg dropped (in a rolled-back transaction) or disabled, owner_view_as_start, _end and _state
+--      each raise view_as_needs_member_guard.
+--   8. O1 enters; the enter's created_at is moved back 2 hours 1 minute (as the table owner, in a rolled-back transaction): the next
+--      owner_view_as_state() returns no row and writes exactly one exit 'timeout' with created_at = start + 2 hours; a second call
+--      writes nothing. A token with another session_id: owner_view_as_state() returns no row.
+--   9. O1 enters, then O1's auth.sessions row is deleted: the next state call (from another session of O1) writes exactly one
+--      'session_ended'. O1 enters a preview of P, then P's crm_org_member row is removed: the next state call writes exactly one
+--      'access_ended' and returns no row. O1 enters, then O1 is demoted to admin (by O2): O1's state call writes one 'access_ended';
+--      O1's owner_view_as_end('exit') with no open entry is view_as_not_owner.
+--  10. owner_view_as_end('exit') writes one exit 'exit'; owner_view_as_end('sign_out') writes one 'sign_out';
+--      owner_view_as_end('timeout') is view_as_bad_reason.
+--  11. PO (a real owner of D, active D) starts a preview of a member of D: succeeds. PO active in A2 (admin row there): view_as_not_owner.
+--      PO active in A (no row): view_as_not_owner.
+--  12. Deleting firm A in one statement removes every owner_view_as_event row of A.
+--  13. Without a session_id claim (a service-role call or a token with none): view_as_no_session.

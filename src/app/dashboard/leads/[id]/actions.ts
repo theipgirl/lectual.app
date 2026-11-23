@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 // Ported from lectual src/app/(firm)/dashboard/leads/[id]/actions.ts: role gate,
 // assign, move stage, edit, note, tags, prep-consult and voice notes are
 // unchanged. Not ported: the founder link. New: reviewProposalAction.
@@ -52,9 +53,9 @@ function isRole(value: unknown): value is Role {
  * against LEAD_WRITE_ROLES. Re-checked on every call — never cache a prior
  * result across actions.
  */
-export async function requireLeadWriteRole(): Promise<Role> {
+export const requireLeadWriteRole = previewSafe(async function requireLeadWriteRole(): Promise<Role> {
   const supabase = await getScopedClient();
-  const { data, error } = await supabase.rpc("current_org_role");
+  const { data, error } = await supabase.rpc("current_org_role", undefined, { get: true });
   if (error) throw error;
   if (!isRole(data)) {
     throw new LeadWriteError("You don't have permission to edit leads.", { forbidden: true });
@@ -64,11 +65,13 @@ export async function requireLeadWriteRole(): Promise<Role> {
     throw new LeadWriteError("You don't have permission to edit leads.", { forbidden: true });
   }
   return role;
-}
+}, (message) => {
+  throw new LeadWriteError(message, { forbidden: true });
+});
 
 export type ActionState = { error?: string; fieldErrors?: Record<string, string> };
 
-export async function assignLeadAction(
+export const assignLeadAction = previewSafe(async function assignLeadAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
@@ -85,7 +88,7 @@ export async function assignLeadAction(
 
   revalidatePath(`/dashboard/leads/${leadId}/`);
   return {};
-}
+}, "state");
 
 
 /**
@@ -93,7 +96,7 @@ export async function assignLeadAction(
  * `moveLeadStageAction` the pipeline board uses (single source of truth for
  * the friendly-error translation) rather than re-implementing it.
  */
-export async function moveStageAction(
+export const moveStageAction = previewSafe(async function moveStageAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
@@ -104,7 +107,7 @@ export async function moveStageAction(
   const result = await moveLeadStageAction(leadId, stageId);
   if (!result.ok) return { error: result.error };
   return {};
-}
+}, "state");
 
 export type EditLeadState = ActionState & { saved?: boolean };
 
@@ -127,7 +130,7 @@ const EDITABLE_FIELDS = [
  * own. `updateLead` also diffs against the stored row, so a submit that
  * changed nothing writes nothing and logs nothing.
  */
-export async function editLeadAction(
+export const editLeadAction = previewSafe(async function editLeadAction(
   _prev: EditLeadState,
   formData: FormData,
 ): Promise<EditLeadState> {
@@ -160,7 +163,7 @@ export async function editLeadAction(
   revalidatePath(`/dashboard/leads/${leadId}/`);
   revalidatePath("/dashboard/intake/");
   return { saved: true };
-}
+}, "state");
 
 /**
  * Writes a human-authored note / call log / sent-email record onto the lead's
@@ -168,7 +171,7 @@ export async function editLeadAction(
  * 'email sent' record something a person already did outside the product; the
  * approval queue remains the only path by which anything reaches a client.
  */
-export async function addNoteAction(
+export const addNoteAction = previewSafe(async function addNoteAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
@@ -206,7 +209,7 @@ export async function addNoteAction(
   // The Weekly review opens the lead in the same card; a call or email logged here is its last contact and direction.
   revalidatePath("/dashboard/review/");
   return {};
-}
+}, "state");
 
 /**
  * Accept some fields of an email-intel proposal, or dismiss it.
@@ -217,7 +220,7 @@ export async function addNoteAction(
  * is appended to the timeline (crm_activity is append-only), which is what
  * takes the proposal out of the pending list.
  */
-export async function reviewProposalAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const reviewProposalAction = previewSafe(async function reviewProposalAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const leadId = String(formData.get("leadId") ?? "");
   const activityId = String(formData.get("activityId") ?? "");
   const decision = String(formData.get("decision") ?? "");
@@ -255,9 +258,9 @@ export async function reviewProposalAction(_prev: ActionState, formData: FormDat
 
   revalidatePath(`/dashboard/leads/${leadId}/`);
   return {};
-}
+}, "state");
 
-export async function applyTagAction(
+export const applyTagAction = previewSafe(async function applyTagAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
@@ -274,9 +277,9 @@ export async function applyTagAction(
 
   revalidatePath(`/dashboard/leads/${leadId}/`);
   return {};
-}
+}, "state");
 
-export async function removeTagAction(
+export const removeTagAction = previewSafe(async function removeTagAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
@@ -293,7 +296,7 @@ export async function removeTagAction(
 
   revalidatePath(`/dashboard/leads/${leadId}/`);
   return {};
-}
+}, "state");
 
 export type PrepConsultActionState = {
   error?: string;
@@ -309,7 +312,7 @@ export type PrepConsultActionState = {
  * or price). Like every other queue-writing action in this app, nothing here
  * sends anything — both drafts land in the approval queue for review.
  */
-export async function prepConsultAction(
+export const prepConsultAction = previewSafe(async function prepConsultAction(
   _prev: PrepConsultActionState,
   formData: FormData,
 ): Promise<PrepConsultActionState> {
@@ -343,7 +346,7 @@ export async function prepConsultAction(
           : "Something went wrong drafting the consult prep emails. Try again in a minute. If it keeps happening, use Send feedback.",
     };
   }
-}
+}, "state");
 
 /**
  * Saves a recorded voice note onto the lead's timeline. The audio arrives as
@@ -353,7 +356,7 @@ export async function prepConsultAction(
  * the activity row IS the mutation — failures surface to the person who
  * recorded it. Nothing is sent to the client.
  */
-export async function addVoiceNoteAction(
+export const addVoiceNoteAction = previewSafe(async function addVoiceNoteAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
@@ -390,4 +393,4 @@ export async function addVoiceNoteAction(
   // The Weekly review opens the lead in the same card; a call or email logged here is its last contact and direction.
   revalidatePath("/dashboard/review/");
   return {};
-}
+}, "state");

@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { getLawmaticsConnection } from "@/lib/lawmatics/connection";
 import { listConnections } from "@/lib/mailbox/connections";
 import { describeAvailability, type ConnectionCheck } from "@/lib/reconcile/availability";
@@ -44,7 +44,7 @@ async function mailboxCheck(): Promise<ConnectionCheck> {
  * behind it check the role again on every call.
  */
 export default async function ReconcilePage() {
-  const session = await resolveFirmSession({ signInNext: "/dashboard/intake/reconcile/" });
+  const session = await resolveViewSession({ signInNext: "/dashboard/intake/reconcile/" });
   if (session.kind !== "ok" || !canReconcile(session.role)) notFound();
 
   const [lawmatics, mailboxes] = await Promise.all([lawmaticsCheck(), mailboxCheck()]);

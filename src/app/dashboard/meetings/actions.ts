@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { REFRESH_TO_TRY_AGAIN } from "@/lib/ui/words";
 import { revalidatePath } from "next/cache";
 import { getScopedClient } from "@/lib/db/scoped-client";
@@ -42,7 +43,7 @@ async function staffSession() {
   return CAN_WRITE_LEAD.includes(session.role) ? session : null;
 }
 
-export async function linkMeetingAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const linkMeetingAction = previewSafe(async function linkMeetingAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   if (!(await staffSession())) return { error: "Your role can view meetings but not link them." };
   const meetingId = idOrNull(formData.get("meetingId"));
   const leadId = idOrNull(formData.get("leadId"));
@@ -78,7 +79,7 @@ export async function linkMeetingAction(_prev: ActionState, formData: FormData):
   if (leadId) revalidatePath(`/dashboard/leads/${leadId}/`);
   if (matterId) revalidatePath(`/dashboard/matters/${matterId}/`);
   return { ok: true, notice: leadId || matterId ? "Linked." : "Unlinked." };
-}
+}, "state");
 
 /**
  * Drafts the follow-up email for a meeting into the APPROVAL QUEUE, with the
@@ -88,7 +89,7 @@ export async function linkMeetingAction(_prev: ActionState, formData: FormData):
  * Gated like the post-consult agent: the firm must hold the `agents` module,
  * have an approval queue, and the caller must be staff. One draft per meeting.
  */
-export async function draftFollowUpAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const draftFollowUpAction = previewSafe(async function draftFollowUpAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const session = await staffSession();
   if (!session) return { error: "Your role can't draft client email." };
   if (!(await orgHasModule("agents"))) return { error: "Drafting isn't turned on for your firm." };
@@ -203,7 +204,7 @@ export async function draftFollowUpAction(_prev: ActionState, formData: FormData
         ? " The consult details couldn't be saved; you can enter them on the lead."
         : "";
   return { ok: true, notice: base + extra };
-}
+}, "state");
 
 /**
  * Drafts a client PROPOSAL and its email from a recorded call: the proposal as
@@ -215,7 +216,7 @@ export async function draftFollowUpAction(_prev: ActionState, formData: FormData
  * a lead to write to) plus the `proposals` module and the proposal staff
  * roles. One draft per meeting (the marker the approve gate also uses).
  */
-export async function draftProposalAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const draftProposalAction = previewSafe(async function draftProposalAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const session = await staffSession();
   if (!session) return { error: "Your role can't draft client email." };
   const refused = await gateStaffAction();
@@ -261,4 +262,4 @@ export async function draftProposalAction(_prev: ActionState, formData: FormData
   if (!done.ok) return { error: done.error };
   revalidatePath(`/dashboard/meetings/${meeting.id}/`);
   return { ok: true, notice: done.notice, href: done.href };
-}
+}, "state");

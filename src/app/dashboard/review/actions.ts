@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
 import { MERGE_POINTER_UNREADABLE } from "@/lib/ui/words";
 import { getScopedClient } from "@/lib/db/scoped-client";
@@ -45,7 +46,7 @@ function refresh() {
 }
 
 /** Adds the next step as an ordinary task on the matter or lead (the same createTask the matter page uses). */
-export async function setNextStepAction(_prev: ReviewActionState, formData: FormData): Promise<ReviewActionState> {
+export const setNextStepAction = previewSafe(async function setNextStepAction(_prev: ReviewActionState, formData: FormData): Promise<ReviewActionState> {
   const parsed = parseNextStep(formData);
   if (!parsed.ok) return { error: parsed.error };
   const { kind, title, dueAt, assigneeId } = parsed.value;
@@ -81,10 +82,10 @@ export async function setNextStepAction(_prev: ReviewActionState, formData: Form
   }
   refresh();
   return { saved: true };
-}
+}, "state");
 
 /** Marks the next step done. The task is read through the scoped client first. */
-export async function completeNextStepAction(_prev: ReviewActionState, formData: FormData): Promise<ReviewActionState> {
+export const completeNextStepAction = previewSafe(async function completeNextStepAction(_prev: ReviewActionState, formData: FormData): Promise<ReviewActionState> {
   const taskId = String(formData.get("taskId") ?? "").trim();
   if (!isUuid(taskId)) return { error: NOT_FOUND };
   try {
@@ -100,10 +101,10 @@ export async function completeNextStepAction(_prev: ReviewActionState, formData:
   }
   refresh();
   return { saved: true };
-}
+}, "state");
 
 /** A short note on the timeline (the existing note paths); it counts as last contact. Nothing is sent. */
-export async function logWhatHappenedAction(_prev: ReviewActionState, formData: FormData): Promise<ReviewActionState> {
+export const logWhatHappenedAction = previewSafe(async function logWhatHappenedAction(_prev: ReviewActionState, formData: FormData): Promise<ReviewActionState> {
   const parsed = parseWhatHappened(formData);
   if (!parsed.ok) return { error: parsed.error };
   const { kind, id, body } = parsed.value;
@@ -118,14 +119,14 @@ export async function logWhatHappenedAction(_prev: ReviewActionState, formData: 
   }
   refresh();
   return { saved: true };
-}
+}, "state");
 
 /**
  * Lost / Nurture on a LEAD: a person's explicit choice, through the same `moveLeadStage` a drag uses (it logs
  * `stage_changed`). Role, lead and target stage are all re-read here; only a `lost` or `nurture` stage is accepted,
  * whatever the browser posted. Tasks are left alone. The optional reason becomes a plain lead note.
  */
-export async function closeLeadAction(_prev: ReviewActionState, formData: FormData): Promise<ReviewActionState> {
+export const closeLeadAction = previewSafe(async function closeLeadAction(_prev: ReviewActionState, formData: FormData): Promise<ReviewActionState> {
   const parsed = parseCloseLead(formData);
   if (!parsed.ok) return { error: parsed.error };
   const { id, stageId, reason } = parsed.value;
@@ -157,7 +158,7 @@ export async function closeLeadAction(_prev: ReviewActionState, formData: FormDa
   }
   refresh();
   return noteSaved ? { saved: true } : { saved: true, error: "The lead was moved, but the reason couldn't be saved as a note." };
-}
+}, "state");
 
 /** The open task behind a step form, read through the scoped client: another firm's id reads as missing. */
 async function openTask(taskId: string): Promise<"missing" | "closed" | "open"> {
@@ -172,7 +173,7 @@ async function openTask(taskId: string): Promise<"missing" | "closed" | "open"> 
  * Edits the existing next step: title, due date and/or assignee (only the fields the form posts). It goes through
  * `updateTask`, the same call the matter page's task editor uses, which re-checks the role, validates and logs.
  */
-export async function updateNextStepAction(_prev: ReviewActionState, formData: FormData): Promise<ReviewActionState> {
+export const updateNextStepAction = previewSafe(async function updateNextStepAction(_prev: ReviewActionState, formData: FormData): Promise<ReviewActionState> {
   const taskId = String(formData.get("taskId") ?? "").trim();
   if (!isUuid(taskId)) return { error: NOT_FOUND };
   const assignee = String(formData.get("assigneeId") ?? "").trim();
@@ -194,10 +195,10 @@ export async function updateNextStepAction(_prev: ReviewActionState, formData: F
   }
   refresh();
   return { saved: true };
-}
+}, "state");
 
 /** Snooze: only the due date moves, to a date worked out here from the firm's own calendar day. */
-export async function snoozeNextStepAction(_prev: ReviewActionState, formData: FormData): Promise<ReviewActionState> {
+export const snoozeNextStepAction = previewSafe(async function snoozeNextStepAction(_prev: ReviewActionState, formData: FormData): Promise<ReviewActionState> {
   const taskId = String(formData.get("taskId") ?? "").trim();
   const when = formData.get("when");
   if (!isUuid(taskId)) return { error: NOT_FOUND };
@@ -221,7 +222,7 @@ export async function snoozeNextStepAction(_prev: ReviewActionState, formData: F
   }
   refresh();
   return { saved: true };
-}
+}, "state");
 
 /** Another firm's member ids are refused; an unreadable directory refuses the change rather than allowing it unchecked. */
 async function assigneeIsMember(userId: string): Promise<"yes" | "no" | "unknown"> {
@@ -237,7 +238,7 @@ async function assigneeIsMember(userId: string): Promise<"yes" | "no" | "unknown
  * move). A lead goes through `moveLeadStage` (the board's move), only to an open, lost or nurture stage: never `won`,
  * because that move runs the matter handoff. Role, record and target stage are all re-read here.
  */
-export async function moveStageAction(_prev: ReviewActionState, formData: FormData): Promise<ReviewActionState> {
+export const moveStageAction = previewSafe(async function moveStageAction(_prev: ReviewActionState, formData: FormData): Promise<ReviewActionState> {
   const kind = parseKind(formData.get("kind"));
   const id = String(formData.get("id") ?? "").trim();
   const stageId = String(formData.get("stageId") ?? "").trim();
@@ -268,10 +269,10 @@ export async function moveStageAction(_prev: ReviewActionState, formData: FormDa
   }
   refresh();
   return { saved: true };
-}
+}, "state");
 
 /** Assigned to, from the opened record card: the matter's owner or the lead's assignee. Empty unassigns. */
-export async function assignRecordAction(_prev: ReviewActionState, formData: FormData): Promise<ReviewActionState> {
+export const assignRecordAction = previewSafe(async function assignRecordAction(_prev: ReviewActionState, formData: FormData): Promise<ReviewActionState> {
   const kind = parseKind(formData.get("kind"));
   const id = String(formData.get("id") ?? "").trim();
   const userId = String(formData.get("userId") ?? "").trim();
@@ -292,14 +293,14 @@ export async function assignRecordAction(_prev: ReviewActionState, formData: For
   }
   refresh();
   return { saved: true };
-}
+}, "state");
 
 /**
  * Source, from the owner's Sheet. The existing write paths only: a lead through `setReferralSource` (the Leads list's
  * source menu, CAN_WRITE_LEAD re-checked inside, logs `lead_updated`), a matter through `updateMatterHeader` (the matter
  * page's "Came from", requireMatterWriteRole inside, logs `matter_updated`). Only one of REFERRAL_SOURCES, or blank to clear.
  */
-export async function setSourceAction(_prev: ReviewActionState, formData: FormData): Promise<ReviewActionState> {
+export const setSourceAction = previewSafe(async function setSourceAction(_prev: ReviewActionState, formData: FormData): Promise<ReviewActionState> {
   const kind = parseKind(formData.get("kind"));
   const id = String(formData.get("id") ?? "").trim();
   const raw = String(formData.get("source") ?? "").trim();
@@ -315,4 +316,4 @@ export async function setSourceAction(_prev: ReviewActionState, formData: FormDa
   }
   refresh();
   return { saved: true };
-}
+}, "state");

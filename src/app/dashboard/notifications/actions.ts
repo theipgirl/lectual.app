@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { REFRESH_TO_TRY_AGAIN } from "@/lib/ui/words";
 import { revalidatePath } from "next/cache";
 import { markAllRead, markRead } from "@/lib/notifications";
@@ -12,7 +13,7 @@ export type NotificationActionResult = { ok: true } | { error: string };
  * scoped client (RLS pins the rows to them), so neither takes a user id or an org
  * id: there is nothing to forge. A database error is logged, never shown.
  */
-export async function markNotificationRead(id: string): Promise<NotificationActionResult> {
+export const markNotificationRead = previewSafe(async function markNotificationRead(id: string): Promise<NotificationActionResult> {
   if (typeof id !== "string" || !UUID.test(id)) return { error: "That notification isn't valid." };
   try {
     await markRead(id);
@@ -22,9 +23,9 @@ export async function markNotificationRead(id: string): Promise<NotificationActi
   }
   revalidatePath("/dashboard", "layout");
   return { ok: true };
-}
+}, "state");
 
-export async function markAllNotificationsRead(): Promise<NotificationActionResult> {
+export const markAllNotificationsRead = previewSafe(async function markAllNotificationsRead(): Promise<NotificationActionResult> {
   try {
     await markAllRead();
   } catch (err) {
@@ -33,4 +34,4 @@ export async function markAllNotificationsRead(): Promise<NotificationActionResu
   }
   revalidatePath("/dashboard", "layout");
   return { ok: true };
-}
+}, "state");

@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { moveLeadStage } from "@/lib/pipeline";
@@ -75,7 +76,7 @@ function mailboxSearcher(): (address: string) => Promise<MailboxSearch> {
   return async (address) => searchPersonMail(address, await load());
 }
 
-export async function previewReconcileAction(formData: FormData): Promise<PreviewResult> {
+export const previewReconcileAction = previewSafe(async function previewReconcileAction(formData: FormData): Promise<PreviewResult> {
   const auth = await authorize();
   if (!auth.ok) return auth;
   const { supabase } = auth;
@@ -132,7 +133,7 @@ export async function previewReconcileAction(formData: FormData): Promise<Previe
     searchMail: mailboxSearcher(),
   });
   return { ok: true, view, plan, fingerprint: planFingerprint(plan) };
-}
+}, "state");
 
 // ── apply ────────────────────────────────────────────────────────────────────
 
@@ -193,7 +194,7 @@ async function applyLastTouch(supabase: Scoped, leadId: string, proposed: string
   return (await bumpLeadLastTouch(supabase, leadId, null, new Date(usable))) !== false;
 }
 
-export async function applyReconcileAction(input: unknown): Promise<ApplyResult> {
+export const applyReconcileAction = previewSafe(async function applyReconcileAction(input: unknown): Promise<ApplyResult> {
   const auth = await authorize();
   if (!auth.ok) return auth;
   const { supabase } = auth;
@@ -278,4 +279,4 @@ export async function applyReconcileAction(input: unknown): Promise<ApplyResult>
   }
   if (totals.moved + totals.already === 0) return { ok: false, error: MSG.allFailed, outcomes };
   return { ok: true, outcomes, totals };
-}
+}, "state");

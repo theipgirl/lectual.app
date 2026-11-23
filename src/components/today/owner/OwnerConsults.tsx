@@ -21,7 +21,7 @@ function clockOf(stamp: string): string {
  */
 export function OwnerConsults({ result, timeZone, today }: { result: TodayConsultsResult; timeZone: string; today: string }) {
   const sources = consultSources(result);
-  const notes = sources.map((s) => sourceNote(s.source, s.state)).filter((n): n is NonNullable<typeof n> => n !== null);
+  const notes = sources.map((s) => sourceNote(s.source, s.state, result.previewName)).filter((n): n is NonNullable<typeof n> => n !== null);
   const readOk = sources.filter((s) => s.state === "ok").map((s) => SOURCE_LABEL[s.source]);
   const todays = result.consults.filter((c) => civilInZone(new Date(c.startsAt), timeZone) === today);
 

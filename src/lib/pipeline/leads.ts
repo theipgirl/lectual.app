@@ -79,7 +79,7 @@ type ScopedClient = Awaited<ReturnType<typeof getScopedClient>>;
  * revoked between two requests must take effect on the very next one.
  */
 export async function resolveCurrentRole(supabase: ScopedClient): Promise<Role> {
-  const { data, error } = await supabase.rpc("current_org_role");
+  const { data, error } = await supabase.rpc("current_org_role", undefined, { get: true });
   if (error) throw error;
   if (!isRole(data)) {
     throw new LeadWriteError("Forbidden: no resolvable role for the active org", {
@@ -181,7 +181,7 @@ export async function createLead(input: CreateLeadInput): Promise<Lead> {
   // org_id is the caller's active org, never taken from the input. RLS's
   // WITH CHECK requires it to equal current_org_id() anyway, so this is the
   // single source of truth for the new lead's tenant.
-  const { data: orgId, error: orgError } = await supabase.rpc("current_org_id");
+  const { data: orgId, error: orgError } = await supabase.rpc("current_org_id", undefined, { get: true });
   if (orgError) throw orgError;
   if (!orgId) throw new LeadWriteError("No active organization for the current session.");
 

@@ -1,3 +1,4 @@
+import { previewSafeRoute } from "@/lib/views/preview-safe";
 import { NextResponse, type NextRequest } from "next/server";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { hasRole } from "@/lib/auth/roles";
@@ -17,7 +18,7 @@ const PAGE = "/dashboard/settings/integrations/meetings/";
  * are sealed before they are written, through the caller's own scoped client,
  * so RLS decides.
  */
-export async function GET(req: NextRequest) {
+export const GET = previewSafeRoute(async function GET(req: NextRequest) {
   const finish = (query: string) => {
     const res = NextResponse.redirect(new URL(`${PAGE}?${query}`, req.url));
     res.cookies.set(ZOOM_STATE_COOKIE, "", { path: ZOOM_STATE_PATH, maxAge: 0 });
@@ -57,4 +58,4 @@ export async function GET(req: NextRequest) {
     console.error("[meetings/zoom/callback]", err instanceof Error ? err.message : "unexpected error");
     return fail("failed");
   }
-}
+});

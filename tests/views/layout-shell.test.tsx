@@ -245,7 +245,8 @@ describe("the layout seam", () => {
     expect(src).not.toMatch(/getUser|getSession|getScopedClient/);
     expect(src).toContain("railIsPinned(cookieStore.get(RAIL_PIN_COOKIE)?.value)");
     expect(src.match(/drawnNav\(/g)).toHaveLength(1);
-    expect(src).toContain("const items = visibleNav(org.modules ?? [], role);");
+    // View as (changed on purpose): the rail is the VIEWER's (the teammate's while previewing, else the session's role).
+    expect(src).toContain("const items = visibleNav(org.modules ?? [], viewerRoleNow);");
     expect(src).toContain("navSlugs={drawn.map((i) => i.slug)}");
     expect(readFileSync("src/lib/nav.ts", "utf8")).not.toMatch(/views|drawnNav/);
   });

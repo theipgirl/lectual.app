@@ -1,3 +1,4 @@
+import { previewSafeRoute } from "@/lib/views/preview-safe";
 import { NextResponse, type NextRequest } from "next/server";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { hasRole } from "@/lib/auth/roles";
@@ -15,7 +16,7 @@ const PAGE = "/dashboard/settings/integrations/meetings/";
  * send them to Zoom's own sign-in. Inert until ZOOM_OAUTH_CLIENT_ID/SECRET
  * and MAILBOX_TOKEN_KEY are set.
  */
-export async function GET(req: NextRequest) {
+export const GET = previewSafeRoute(async function GET(req: NextRequest) {
   const session = await resolveFirmSession({ signInNext: PAGE });
   if (session.kind === "signed-out") return NextResponse.redirect(new URL(session.redirectTo, req.url));
   if (session.kind !== "ok") return new NextResponse(null, { status: 404 });
@@ -45,4 +46,4 @@ export async function GET(req: NextRequest) {
     maxAge: Math.floor(STATE_TTL_MS / 1000),
   });
   return res;
-}
+});

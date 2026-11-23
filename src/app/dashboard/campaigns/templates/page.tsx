@@ -1,4 +1,4 @@
-import { currentRole } from "@/lib/auth/current-role";
+import { viewerRole } from "@/lib/views/view-as";
 import { AUTOMATION_ADMIN_ROLES, listTemplates } from "@/lib/automation";
 import { relativeTime } from "@/lib/relative-time";
 import { NewTemplateForm } from "./_components/TemplateForms";
@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
  * `crm_email_template_insert_admin`.
  */
 export default async function CampaignTemplatesPage() {
-  const role = await currentRole();
+  const role = await viewerRole();
   const canManage = role !== null && AUTOMATION_ADMIN_ROLES.includes(role);
 
   let templates: Awaited<ReturnType<typeof listTemplates>> = [];

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Notice } from "@/components/ui/Notice";
 import { notFound } from "next/navigation";
 import { orgHasModule } from "@/lib/org/modules";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { loadActiveQueue } from "@/lib/queue/load";
 import { loadApprovalRouting } from "@/lib/queue/routing-load";
 import { loadCardState } from "@/lib/queue/card-state";
@@ -141,7 +141,7 @@ const roleName = (m: MemberIdentity) => `${memberName(m)} · ${roleLabel(m.role)
 
 export async function DeckView({ searchParams, initial }: { searchParams: Promise<Search>; initial?: DeckInitial }) {
   if (!(await orgHasModule("role-views"))) notFound();
-  const session = await resolveFirmSession().catch(() => null);
+  const session = await resolveViewSession().catch(() => null);
   if (!session || session.kind !== "ok") notFound();
 
   const params = await searchParams;

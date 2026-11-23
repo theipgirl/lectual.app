@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
 import { saveOrgProfile } from "@/lib/org/profile";
 import { friendlySettingsError } from "../team/errors";
@@ -7,7 +8,7 @@ import { friendlySettingsError } from "../team/errors";
 export type ProfileState = { error?: string; saved?: boolean };
 
 /** Admin gate and org come from @/lib/settings (and RLS), never the form. */
-export async function saveProfileAction(_prev: ProfileState, formData: FormData): Promise<ProfileState> {
+export const saveProfileAction = previewSafe(async function saveProfileAction(_prev: ProfileState, formData: FormData): Promise<ProfileState> {
   try {
     await saveOrgProfile({
       displayName: String(formData.get("displayName") ?? ""),
@@ -24,4 +25,4 @@ export async function saveProfileAction(_prev: ProfileState, formData: FormData)
   }
   revalidatePath("/dashboard/settings/firm/");
   return { saved: true };
-}
+}, "state");

@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { NAME_MESSAGES, validateName } from "./name";
 
@@ -10,7 +11,7 @@ export type SaveNameResult = { ok: true; fullName: string } | { ok: false; error
  * markTourSeenAction: the session's client only, no user or org argument, every other metadata key
  * kept, fixed sentences (a provider's message never reaches the screen).
  */
-export async function saveFullNameAction(input: unknown): Promise<SaveNameResult> {
+export const saveFullNameAction = previewSafe(async function saveFullNameAction(input: unknown): Promise<SaveNameResult> {
   const checked = validateName(input);
   if (!checked.ok) return checked;
   try {
@@ -28,4 +29,4 @@ export async function saveFullNameAction(input: unknown): Promise<SaveNameResult
   } catch {
     return { ok: false, error: NAME_MESSAGES.notSaved };
   }
-}
+}, "state");

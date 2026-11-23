@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { aiConfigured } from "@/lib/ai/claude";
 import { connectableProviders } from "@/lib/mailbox/config";
 import { hubTracks, parseHubProgress } from "@/lib/onboarding/hub";
@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
  * flows it starts write nothing but the person's own progress flag.
  */
 export default async function GettingStartedPage() {
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   if (session.kind !== "ok") return null; // the layout already handled this
 
   const modules = session.org.modules;

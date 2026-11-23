@@ -17,8 +17,9 @@ export async function loadColleagueMailboxes(role: string | null | undefined): P
   if (role !== "owner") return { kind: "not-asked" };
   try {
     const db = await getScopedClient();
-    const untyped = db as unknown as { rpc: (name: string) => PromiseLike<{ data: unknown; error: { code?: string } | null }> };
-    const { data, error } = await untyped.rpc("mailbox_connections_for_owner");
+    const untyped = db as unknown as { rpc: (name: string, args: undefined, options: { get: true }) => PromiseLike<{ data: unknown; error: { code?: string } | null }> };
+    // A read (STABLE): GET, so it passes View as's database net.
+    const { data, error } = await untyped.rpc("mailbox_connections_for_owner", undefined, { get: true });
     return readColleagueRows(data, error);
   } catch {
     return { kind: "unavailable" };

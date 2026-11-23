@@ -1667,3 +1667,28 @@ export const LAWMATICS_CONSULTS_RECONNECT = "Lawmatics no longer accepts your fi
 export const LAWMATICS_CONSULTS_NOT_READY = notReadyYet("Consults from Lawmatics");
 /** Stage suggestion reason for a consult booked in Lawmatics (it may have been booked by the client). */
 export const WHY_LAWMATICS_CONSULT = "This consult was booked in Lawmatics, possibly by the client, so a person decides.";
+
+/** View as (an owner's read-only look at a teammate's view). Spec docs/pge/2026-11-17-agentic-ip-os/spec-owner-view-as.md. */
+export const VIEW_AS_BANNER = (name: string) => `Viewing as ${name} (read-only)`;
+/** The phone banner: one short line. */
+export const VIEW_AS_BANNER_SHORT = (name: string) => `Viewing as ${name} · read-only`;
+export const VIEW_AS_EXIT = "Exit";
+export const VIEW_AS_READ_ONLY = "This is a read-only preview. Nothing was changed.";
+export const VIEW_AS_EXIT_FAILED = "Couldn't leave the preview. Try again, or sign out to end it.";
+export const VIEW_AS_PRIVATE_MAIL = (name: string) => `${name}'s own mailbox is private to them and isn't shown in a preview.`;
+export const VIEW_AS_LIVE_MAIL = "Live mail isn't read in a preview. Stored messages are shown.";
+export const VIEW_AS_PRIVATE_OUTLOOK = (name: string) => `${name}'s own Outlook isn't checked in a preview.`;
+export const VIEW_AS_PRIVATE_COPILOT = (name: string) => `${name}'s Copilot chats are private to them and aren't shown in a preview.`;
+export const VIEW_AS_PRIVATE_BELL = (name: string) => `${name}'s notifications are private to them and aren't shown in a preview.`;
+export const VIEW_AS_ZOOM = "Zoom consults aren't read in a preview.";
+export const VIEW_AS_NOT_ALLOWED = "Only an owner of this firm can view the app as a teammate.";
+export const VIEW_AS_TARGET_GONE = "That person isn't on your team any more.";
+export const VIEW_AS_UNCHECKED = "Couldn't check whether you're viewing as a teammate. Nothing can be changed until you refresh.";
+export const VIEW_AS_LINK = "View as";
+export const VIEW_AS_MENU = "View as a teammate";
+export const VIEW_AS_MENU_HEADER = (name: string) => `Viewing as ${name}`;
+export const VIEW_AS_NOT_READY = notReadyYet("Viewing as a teammate");
+/** Enter failed for a reason that is not one of the above (a read or write that didn't go through). */
+export const VIEW_AS_START_FAILED = "Couldn't start the preview. Try again.";
+/** The target's row could not be read from the team list while previewing. */
+export const VIEW_AS_TEAM_UNREADABLE = "Couldn't load your team. Refresh to try again.";

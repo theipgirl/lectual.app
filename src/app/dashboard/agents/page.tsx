@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { hasRole } from "@/lib/auth/roles";
 import { getScopedClient } from "@/lib/db/scoped-client";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { orgHasModule } from "@/lib/org/modules";
 import { aiConfigured } from "@/lib/ai/claude";
 import { AGENT_DEFS, AGENT_IDS, type AgentId, type Autonomy } from "@/lib/agents/types";
@@ -68,7 +68,7 @@ const STATUS_TONE: Record<string, string> = { ok: "var(--ok)", skipped: "var(--w
 
 export default async function AgentsPage() {
   if (!(await orgHasModule("agents"))) notFound();
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   if (session.kind !== "ok") notFound();
   const canManage = hasRole(session.role, "senior_admin");
 

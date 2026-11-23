@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { aiConfigured } from "@/lib/ai/claude";
-import { currentRole } from "@/lib/auth/current-role";
+import { viewerRole } from "@/lib/views/view-as";
 import { loadDraftBlock } from "@/lib/consult-proposal/draft-gate";
 import { DRAFT_BLOCK_NOTE } from "@/lib/consult-proposal/draft-availability";
 import { listMatters } from "@/lib/matters";
@@ -124,7 +124,7 @@ export default async function NewProposalPage({ searchParams }: { searchParams: 
   await requireProposalsModule();
   const params = await searchParams;
 
-  const role = await currentRole();
+  const role = await viewerRole();
   const canWrite = !!role && PROPOSAL_STAFF_WRITE_ROLES.includes(role);
   if (!canWrite) {
     return (

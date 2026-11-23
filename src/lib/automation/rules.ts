@@ -49,7 +49,7 @@ function isRole(value: unknown): value is Role {
  * rules.ts and drips.ts (config-write gate).
  */
 export async function requireAutomationAdminRole(supabase: ScopedClient): Promise<Role> {
-  const { data, error } = await supabase.rpc("current_org_role");
+  const { data, error } = await supabase.rpc("current_org_role", undefined, { get: true });
   if (error) throw error;
   if (!isRole(data) || !AUTOMATION_ADMIN_ROLES.includes(data)) {
     throw new ReadableError("You don't have permission to manage automation.");
@@ -63,7 +63,7 @@ export async function requireAutomationAdminRole(supabase: ScopedClient): Promis
  * rules.ts and drips.ts.
  */
 export async function requireAutomationStaffRole(supabase: ScopedClient): Promise<Role> {
-  const { data, error } = await supabase.rpc("current_org_role");
+  const { data, error } = await supabase.rpc("current_org_role", undefined, { get: true });
   if (error) throw error;
   if (!isRole(data) || !AUTOMATION_STAFF_ROLES.includes(data)) {
     throw new ReadableError("You don't have permission to do this.");
@@ -73,7 +73,7 @@ export async function requireAutomationStaffRole(supabase: ScopedClient): Promis
 
 /** Resolves the caller's active org id via the `current_org_id()` RPC. Shared by rules.ts and drips.ts. */
 export async function currentOrgId(supabase: ScopedClient): Promise<string> {
-  const { data, error } = await supabase.rpc("current_org_id");
+  const { data, error } = await supabase.rpc("current_org_id", undefined, { get: true });
   if (error) throw error;
   if (!data) throw new ReadableError("No active organization for the current session.");
   return data;

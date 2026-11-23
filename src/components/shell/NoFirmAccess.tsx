@@ -3,9 +3,9 @@
 import { useActionState } from "react";
 import {
   refreshAccessAction,
-  signOutAction,
   type RefreshAccessState,
 } from "@/lib/auth/actions";
+import { SIGN_OUT_PATH } from "@/lib/views/view-as-rules";
 import { NOT_A_LAW_FIRM_DISCLAIMER } from "@/lib/legal/disclaimer";
 import { NO_FIRM_ACCESS_TITLE, NO_FIRM_JUST_INVITED, REFRESH_MY_ACCESS, WRONG_ACCOUNT_SIGN_OUT } from "@/lib/ui/words";
 import "./shell-pages.css";
@@ -43,7 +43,7 @@ export function NoFirmAccess({ email }: { email: string | null | undefined }) {
             </p>
           )}
         </form>
-        <form action={signOutAction}>
+        <form action={SIGN_OUT_PATH} method="post">
           <button type="submit" className="lx-btn lx-btn-ghost lx-btn-sm">
             {WRONG_ACCOUNT_SIGN_OUT}
           </button>

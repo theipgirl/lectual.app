@@ -1,4 +1,6 @@
 "use server";
+
+import { previewSafe } from "@/lib/views/preview-safe";
 import { orgHasModule } from "@/lib/org/modules";
 
 import { redirect } from "next/navigation";
@@ -15,7 +17,7 @@ export type TrademarkClearanceState = { error?: string };
  * shape as generateOpinionLetterAction. matterId travels as a hidden field,
  * same convention as every other Document Center form.
  */
-export async function generateTrademarkClearanceAction(
+export const generateTrademarkClearanceAction = previewSafe(async function generateTrademarkClearanceAction(
   _prev: TrademarkClearanceState,
   formData: FormData,
 ): Promise<TrademarkClearanceState> {
@@ -60,4 +62,4 @@ export async function generateTrademarkClearanceAction(
   }
 
   redirect(`/dashboard/queue/${result.queueItemId}/`);
-}
+}, "state");

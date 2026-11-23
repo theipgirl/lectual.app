@@ -1,3 +1,4 @@
+import { previewSafeRoute } from "@/lib/views/preview-safe";
 import { NextResponse, type NextRequest } from "next/server";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { orgHasModule } from "@/lib/org/modules";
@@ -21,7 +22,7 @@ import { MAILBOXES_PATH, type OutcomeCode } from "@/lib/mailbox/outcome";
  * started this; see src/lib/mailbox/state.ts for everything that is checked.
  * The cookie is cleared on every exit so an attempt can only be finished once.
  */
-export async function GET(req: NextRequest, { params }: { params: Promise<{ provider: string }> }) {
+export const GET = previewSafeRoute(async function GET(req: NextRequest, { params }: { params: Promise<{ provider: string }> }) {
   const { provider } = await params;
   if (!isProvider(provider)) return new NextResponse(null, { status: 404 });
 
@@ -95,4 +96,4 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
     console.error(`[mailbox/callback] ${provider}: unexpected error`, err);
     return fail("failed");
   }
-}
+});

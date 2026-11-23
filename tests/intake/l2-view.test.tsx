@@ -33,7 +33,7 @@ describe("source guards", () => {
   const read = (f: string) => readFileSync(f, "utf8");
   it("the compare action resolves the role before any read, and counts proposals only for the proposals roles", () => {
     const src = read("src/app/dashboard/intake/actions.ts");
-    const body = src.slice(src.indexOf("export async function loadCompareAction"));
+    const body = src.slice(src.indexOf("async function loadCompareAction"));
     expect(body.indexOf("resolveCurrentRole(db)")).toBeGreaterThan(-1);
     expect(body.indexOf("resolveCurrentRole(db)")).toBeLessThan(body.indexOf("loadCompare("));
     expect(body).toContain("rules.mayCountProposals");

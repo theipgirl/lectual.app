@@ -1,5 +1,6 @@
 "use server";
 
+import { previewReadOnly, previewSafe } from "@/lib/views/preview-safe";
 import { headers } from "next/headers";
 import { acceptPublicProposal, savePublicDetailsAddress } from "@/lib/proposals/public";
 import { reviewLetterPdf, signedLetterPdf, type LetterPdfResult } from "@/lib/proposals/public-letter";
@@ -37,7 +38,7 @@ import { PDF_MESSAGES } from "@/lib/loe/client-words";
  * `payUrl` is "" when the firm has no usable https payment link on the row; the
  * acceptance is still recorded and the page says the firm will send the link.
  */
-export async function acceptProposalAction(token: string, selection: unknown, clientClasses?: unknown, signing?: unknown): Promise<ProposalAcceptResult> {
+export const acceptProposalAction = previewSafe(async function acceptProposalAction(token: string, selection: unknown, clientClasses?: unknown, signing?: unknown): Promise<ProposalAcceptResult> {
   try {
     const h = await headers();
     // The caller's address and browser, read as the quote engine reads them (`parseInet` and a 400-character cap, applied inside).
@@ -56,38 +57,38 @@ export async function acceptProposalAction(token: string, selection: unknown, cl
   } catch {
     return { ok: false, message: "We couldn’t record your acceptance. Please try again." };
   }
-}
+}, (message) => ({ ok: false as const, message }));
 
 /** The review copy: the letter with the client's details merged in, marked not yet signed. Token and details only. */
-export async function downloadReviewLetterAction(token: string, selection: unknown, clientClasses: unknown, details: unknown): Promise<LetterPdfResult> {
+export const downloadReviewLetterAction = previewReadOnly(async function downloadReviewLetterAction(token: string, selection: unknown, clientClasses: unknown, details: unknown): Promise<LetterPdfResult> {
   try {
     const h = await headers();
     return await reviewLetterPdf(String(token ?? ""), selection, clientClasses, details, new Date(), { ip: h.get("x-forwarded-for") ?? h.get("x-real-ip") });
   } catch {
     return { ok: false, message: PDF_MESSAGES.unavailable };
   }
-}
+}, "Public review-letter download: builds a PDF, writes nothing (its rate limit is in memory)");
 
 /** The signed copy, rebuilt from what was signed. Token only. */
-export async function downloadSignedLetterAction(token: string): Promise<LetterPdfResult> {
+export const downloadSignedLetterAction = previewReadOnly(async function downloadSignedLetterAction(token: string): Promise<LetterPdfResult> {
   try {
     const h = await headers();
     return await signedLetterPdf(String(token ?? ""), new Date(), { ip: h.get("x-forwarded-for") ?? h.get("x-real-ip") });
   } catch {
     return { ok: false, message: PDF_MESSAGES.unavailable };
   }
-}
+}, "Public signed-letter download: builds a PDF, writes nothing (its rate limit is in memory)");
 
 
 /**
  * Continue on "Your details": the typed mailing address goes to the firm's Lawmatics after the response (token and details only).
  * Answers nothing either way: the page neither waits on it nor shows whether it worked.
  */
-export async function saveDetailsAction(token: string, details: unknown): Promise<void> {
+export const saveDetailsAction = previewSafe(async function saveDetailsAction(token: string, details: unknown): Promise<void> {
   try {
     const h = await headers();
     await savePublicDetailsAddress(String(token ?? ""), details, new Date(), undefined, { ip: h.get("x-forwarded-for") ?? h.get("x-real-ip") });
   } catch {
     // Silent by design.
   }
-}
+}, "redirect");

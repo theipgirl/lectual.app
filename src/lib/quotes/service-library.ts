@@ -29,7 +29,7 @@ function isRole(value: unknown): value is Role {
 /** Resolves the caller's role and requires it be in QUOTE_LIBRARY_ADMIN_ROLES.
  * Mirrors `requireSettingsAdminRole` (src/lib/settings/admin.ts) exactly. */
 export async function requireQuoteLibraryAdminRole(supabase: ScopedClient): Promise<Role> {
-  const { data, error } = await supabase.rpc("current_org_role");
+  const { data, error } = await supabase.rpc("current_org_role", undefined, { get: true });
   if (error) throw error;
   if (!isRole(data) || !QUOTE_LIBRARY_ADMIN_ROLES.includes(data)) {
     throw new ReadableError("You don't have permission to edit the service library.");
@@ -84,7 +84,7 @@ export async function createServiceItem(input: CreateServiceItemInput): Promise<
   await requireQuoteLibraryAdminRole(supabase);
   const db = quotesDb(supabase);
 
-  const { data: orgId, error: orgError } = await supabase.rpc("current_org_id");
+  const { data: orgId, error: orgError } = await supabase.rpc("current_org_id", undefined, { get: true });
   if (orgError) throw orgError;
   if (!orgId) throw new ReadableError("No active organization for the current session.");
 

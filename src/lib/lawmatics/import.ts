@@ -338,7 +338,7 @@ export async function applyImport(
   if (plan.fingerprint !== expectedFingerprint) throw new PlanChangedError(preview);
 
   const supabase = await getScopedClient();
-  const { data: orgId, error: orgError } = await supabase.rpc("current_org_id");
+  const { data: orgId, error: orgError } = await supabase.rpc("current_org_id", undefined, { get: true });
   if (orgError) throw orgError;
   if (!orgId || typeof orgId !== "string") {
     throw new Error("No active org — refusing to import.");

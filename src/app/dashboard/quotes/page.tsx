@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { orgHasModule } from "@/lib/org/modules";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { hasRole } from "@/lib/auth/roles";
 import { loadLinesForQuotes, loadQuotes } from "@/lib/quotes/load";
 import { quoteClientLabels, quoteClientOptions } from "@/lib/quotes/clients";
@@ -71,7 +71,7 @@ export default async function QuotesPage({ searchParams }: { searchParams: Promi
   // Runs before the role gate: the proposals page is readable by the whole firm.
   if (await orgHasModule("proposals")) redirect("/dashboard/proposals/");
   const { status: statusRaw } = await searchParams;
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   if (session.kind !== "ok" || !hasRole(session.role, "attorney")) return <QuotesRestricted title={PROPOSALS_NAME} />;
 
   const now = new Date();

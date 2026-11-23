@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { redirect } from "next/navigation";
 import { parseConfirmLink } from "@/lib/auth/sign-in-errors";
 import { safeNext } from "@/lib/auth/safe-next";
@@ -10,7 +11,7 @@ import { getScopedClient } from "@/lib/db/scoped-client";
  * scanner that opens the emailed link (a GET) uses nothing up. A bad or spent token goes back to
  * /sign-in/ with the expired-link sentence; the provider's text is never shown.
  */
-export async function confirmSignIn(formData: FormData): Promise<void> {
+export const confirmSignIn = previewSafe(async function confirmSignIn(formData: FormData): Promise<void> {
   const next = safeNext(String(formData.get("next") ?? ""));
   const link = parseConfirmLink(formData.get("token_hash"), formData.get("type"));
   const back = `/sign-in/?error=otp_expired${next !== "/dashboard/" ? `&next=${encodeURIComponent(next)}` : ""}`;
@@ -22,4 +23,4 @@ export async function confirmSignIn(formData: FormData): Promise<void> {
     redirect(back);
   }
   redirect(next);
-}
+}, "redirect");

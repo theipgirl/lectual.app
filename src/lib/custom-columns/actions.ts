@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
 import { currentRole } from "@/lib/auth/current-role";
 import { getScopedClient } from "@/lib/db/scoped-client";
@@ -67,16 +68,16 @@ function valueDeps(): ValueDeps {
   };
 }
 
-export async function createFieldAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const createFieldAction = previewSafe(async function createFieldAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   return createField(fieldDeps(), {
     label: formData.get("label"),
     section: formData.get("section"),
     kind: formData.get("kind"),
     choices: formData.get("choices"),
   });
-}
+}, "state");
 
-export async function updateFieldAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const updateFieldAction = previewSafe(async function updateFieldAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   return updateField(fieldDeps(), {
     op: formData.get("op"),
     id: formData.get("id"),
@@ -85,13 +86,13 @@ export async function updateFieldAction(_prev: ActionState, formData: FormData):
     dir: formData.get("dir"),
     updatedAt: formData.get("updatedAt"),
   });
-}
+}, "state");
 
-export async function setCustomValueAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const setCustomValueAction = previewSafe(async function setCustomValueAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   return setCustomValue(valueDeps(), {
     fieldId: formData.get("fieldId"),
     kind: formData.get("kind"),
     id: formData.get("id"),
     value: formData.get("value"),
   });
-}
+}, "state");

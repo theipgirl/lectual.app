@@ -1,4 +1,6 @@
 "use server";
+
+import { previewSafe } from "@/lib/views/preview-safe";
 import { orgHasModule } from "@/lib/org/modules";
 
 import { redirect } from "next/navigation";
@@ -48,7 +50,7 @@ function sourceOf(prefill: LoePrefill | null, submitted: LoeSubmitted): LoeSigne
  * is printed for the approver. The template variant is not part of any of it:
  * it is read from the form and refused when absent, signed quote or not.
  */
-export async function generateLoeAction(_prev: LoeState, formData: FormData): Promise<LoeState> {
+export const generateLoeAction = previewSafe(async function generateLoeAction(_prev: LoeState, formData: FormData): Promise<LoeState> {
   const matterId = String(formData.get("matterId") ?? "");
   if (!matterId) return { error: "Missing matter." };
 
@@ -150,4 +152,4 @@ export async function generateLoeAction(_prev: LoeState, formData: FormData): Pr
 
   if (!result) return { error: "Something went wrong generating the LOE." };
   redirect(`/dashboard/queue/${result.queueItemId}/`);
-}
+}, "state");

@@ -1,3 +1,4 @@
+import { previewSafeRoute } from "@/lib/views/preview-safe";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { resolveFirmSession } from "@/lib/firm/session";
@@ -68,7 +69,7 @@ function toStreamEvent(ev: CopilotProgress): CopilotStreamEvent {
  * never another org's data) — fail closed before spending a model call on a
  * request that has no firm workspace to read.
  */
-export async function POST(req: NextRequest): Promise<Response> {
+export const POST = previewSafeRoute(async function POST(req: NextRequest): Promise<Response> {
   let body: unknown;
   try {
     body = await req.json();
@@ -159,4 +160,4 @@ export async function POST(req: NextRequest): Promise<Response> {
   });
 
   return new Response(stream, { status: 200, headers: STREAM_HEADERS });
-}
+});

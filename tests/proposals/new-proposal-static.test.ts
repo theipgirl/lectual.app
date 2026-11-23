@@ -63,7 +63,7 @@ describe("New proposal picker and pre-fill: what the code must not do", () => {
 
   it("the gate is still the first statement of the create action", () => {
     const action = read("src/app/dashboard/proposals/actions.ts");
-    expect(action).toMatch(/export async function createProposalAction\([^)]*\): Promise<ActionState> \{\n  const refused = await gateStaffAction\(\);/);
+    expect(action).toMatch(/async function createProposalAction\([^)]*\): Promise<ActionState> \{\n  const refused = await gateStaffAction\(\);/);
     expect(action.indexOf("gateStaffAction()")).toBeLessThan(action.indexOf("loadConsultForPrefill(leadId)"));
   });
 });

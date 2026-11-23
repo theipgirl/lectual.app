@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { refresh } from "next/cache";
 import { callerHasRole } from "@/lib/auth/current-role";
 import { mapLawPayAccount, unmapLawPayAccount } from "@/lib/payments/accounts";
@@ -19,7 +20,7 @@ export type LawPayActionState = { ok?: boolean; error?: string; message?: string
 
 const FORBIDDEN: LawPayActionState = { error: `${ADMIN_TIER_PHRASE} can manage LawPay.` };
 
-export async function mapAccountAction(_prev: LawPayActionState, formData: FormData): Promise<LawPayActionState> {
+export const mapAccountAction = previewSafe(async function mapAccountAction(_prev: LawPayActionState, formData: FormData): Promise<LawPayActionState> {
   if (!(await callerHasRole("senior_admin"))) return FORBIDDEN;
   const result = await mapLawPayAccount({
     // Explicit: the form names its role; there is no default.
@@ -30,17 +31,17 @@ export async function mapAccountAction(_prev: LawPayActionState, formData: FormD
   if (!result.ok) return { error: result.reason };
   refresh();
   return { ok: true, message: "Saved." };
-}
+}, "state");
 
-export async function unmapAccountAction(_prev: LawPayActionState, formData: FormData): Promise<LawPayActionState> {
+export const unmapAccountAction = previewSafe(async function unmapAccountAction(_prev: LawPayActionState, formData: FormData): Promise<LawPayActionState> {
   if (!(await callerHasRole("senior_admin"))) return FORBIDDEN;
   const result = await unmapLawPayAccount(formData.get("kind"));
   if (!result.ok) return { error: result.reason };
   refresh();
   return { ok: true };
-}
+}, "state");
 
-export async function refreshAccountsAction(): Promise<LawPayActionState> {
+export const refreshAccountsAction = previewSafe(async function refreshAccountsAction(): Promise<LawPayActionState> {
   if (!(await callerHasRole("senior_admin"))) return FORBIDDEN;
   const setup = lawPaySetup();
   if (!setup.ready) return { error: LAWPAY_NOT_ISSUED };
@@ -53,9 +54,9 @@ export async function refreshAccountsAction(): Promise<LawPayActionState> {
       ? `Accounts refreshed. LawPay no longer lists the ${result.unmapped.join(" and ")} account you had chosen — choose again.`
       : "Accounts refreshed.",
   };
-}
+}, "state");
 
-export async function disconnectAction(): Promise<LawPayActionState> {
+export const disconnectAction = previewSafe(async function disconnectAction(): Promise<LawPayActionState> {
   if (!(await callerHasRole("senior_admin"))) return FORBIDDEN;
   const result = await disconnectLawPay({ creds: lawPayClientCredentials() });
   refresh();
@@ -66,4 +67,4 @@ export async function disconnectAction(): Promise<LawPayActionState> {
       ? "LawPay disconnected, and Lectual's access was revoked at LawPay."
       : "LawPay disconnected here. LawPay didn't confirm the revocation — you can also remove Lectual under Authorized Applications in LawPay.",
   };
-}
+}, "state");

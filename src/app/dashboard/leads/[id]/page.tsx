@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { stageDisplayName } from "@/lib/matters/list-view";
 import { notFound, redirect } from "next/navigation";
 import { getScopedClient } from "@/lib/db/scoped-client";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { MailingAddressCard } from "@/components/loe/MailingAddressCard";
 import { loadSignedAddress } from "@/lib/loe/signed-address";
 import { CAN_MOVE_STAGE, CAN_WRITE_LEAD, getLead, listStages } from "@/lib/pipeline";
@@ -108,7 +108,7 @@ export default async function LeadPage({
 }) {
   const { id } = await params;
   const sp = (await searchParams) ?? {};
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   if (session.kind !== "ok") notFound();
 
   // Everything below reads through RLS: another firm's lead id is just "not found".

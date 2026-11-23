@@ -1,6 +1,6 @@
 import "server-only";
 import { getScopedClient } from "@/lib/db/scoped-client";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { CAN_MOVE_STAGE, getLead, listStages } from "@/lib/pipeline";
 import { mergedSetFor, resolveLeadId } from "@/lib/leads/live";
 import { activeOrgModulesOrNull } from "@/lib/org/modules";
@@ -387,7 +387,7 @@ async function readKeeper(supabase: Scoped, leadId: string): Promise<{ status: "
  */
 export async function loadLeadStepFacts(leadId: string, now: Date = new Date()): Promise<LeadStepLoad> {
   try {
-    const session = await resolveFirmSession();
+    const session = await resolveViewSession();
     if (session.kind !== "ok") return { status: "not-found" };
     const supabase = await getScopedClient();
     const found = await readKeeper(supabase, leadId);

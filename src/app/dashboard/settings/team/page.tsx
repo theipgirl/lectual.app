@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession, resolveViewer } from "@/lib/views/view-as";
+import { VIEW_AS_ENTER_PATH, canOfferViewAs, type ViewAsNotice } from "@/lib/views/view-as-rules";
 import { ROLES, hasRole } from "@/lib/auth/roles";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { QUEUE_APPROVE_ROLES } from "@/lib/queue/roles";
@@ -10,6 +11,7 @@ import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 import { inviteFormOpen } from "@/lib/team/invite-open";
 import { ADMIN_TIER_PHRASE, canSeeSetup } from "@/lib/setup/roles";
+import { VIEW_AS_LINK, VIEW_AS_NOT_ALLOWED, VIEW_AS_NOT_READY, VIEW_AS_START_FAILED, VIEW_AS_TARGET_GONE, VIEW_AS_EXIT_FAILED } from "@/lib/ui/words";
 import { DEADLINE_ALERTS_NONE_CHOSEN, DEADLINE_ALERTS_UNCHECKED, DEADLINE_ALERTS_SETTINGS_HEADING, DEADLINE_ALERTS_SETTINGS_HELP, TEAM_NAME } from "@/lib/ui/words";
 import { canReceiveDeadlineAlerts } from "@/lib/today/deadline-alerts";
 import { loadRecipientSetting } from "@/lib/today/deadline-alerts-store";
@@ -26,9 +28,28 @@ export const dynamic = "force-dynamic";
  * re-checked in @/lib/settings (rank ceilings, no self-change, never
  * ownerless) and again by RLS on crm_org_member.
  */
-export default async function TeamPage() {
-  const session = await resolveFirmSession();
+const VIEW_AS_NOTICE_TEXT: Partial<Record<ViewAsNotice, string>> = {
+  "view-as-not-allowed": VIEW_AS_NOT_ALLOWED,
+  "view-as-self": VIEW_AS_NOT_ALLOWED,
+  "view-as-gone": VIEW_AS_TARGET_GONE,
+  "view-as-not-ready": VIEW_AS_NOT_READY,
+  "view-as-failed": VIEW_AS_START_FAILED,
+  "view-as-exit-failed": VIEW_AS_EXIT_FAILED,
+};
+
+export default async function TeamPage(props?: { searchParams?: Promise<{ notice?: string | string[] }> }) {
+  const session = await resolveViewSession();
   if (session.kind !== "ok") notFound();
+  const sp = (await props?.searchParams) ?? {};
+  const noticeText = typeof sp.notice === "string" ? VIEW_AS_NOTICE_TEXT[sp.notice as ViewAsNotice] ?? null : null;
+  // View as: drawn only for a REAL owner (an owner row in this firm, never the claim), on a database with View as, and not
+  // while already previewing (the page is then drawn as the teammate). The route and the database re-check all of it.
+  const resolved = await resolveViewer().catch(() => null);
+  const ownerFacts =
+    resolved && resolved.previewState === "off" && resolved.viewAsAvailable
+      ? { userId: resolved.session.user.id, orgId: resolved.session.org.id, member: resolved.session.member }
+      : null;
+  const viewAsNotReady = Boolean(resolved && resolved.previewState === "off" && !resolved.viewAsAvailable && resolved.session.member?.role === "owner");
   const isAdmin = hasRole(session.role, "senior_admin");
   // You can grant only roles at or below your own.
   const grantable = ROLES.filter((r) => hasRole(session.role, r));
@@ -46,6 +67,12 @@ export default async function TeamPage() {
 
   return (
     <>
+      {noticeText && (
+        <p role="status" className="lx-note">
+          {noticeText}
+        </p>
+      )}
+      {viewAsNotReady && <p className="lx-note">{VIEW_AS_NOT_READY}</p>}
       <TeamHeader isAdmin={isAdmin} grantable={grantable} defaultOpen={inviteFormOpen(members.length, loadError)} />
 
       {loadError ? (
@@ -59,7 +86,7 @@ export default async function TeamPage() {
                   <th>Person</th>
                   <th>Role</th>
                   <th>Can approve client mail</th>
-                  {isAdmin && <th aria-label="Actions" />}
+                  {(isAdmin || ownerFacts) && <th aria-label="Actions" />}
                 </tr>
               </thead>
               <tbody>
@@ -78,7 +105,19 @@ export default async function TeamPage() {
                       <td data-label="Can approve client mail">
                         {QUEUE_APPROVE_ROLES.includes(m.role) ? <Pill tone="ok">Yes</Pill> : <Pill tone="mute">No</Pill>}
                       </td>
-                      {isAdmin && <td className="lx-stack-actions">{manageable && <RemoveMember userId={m.userId} name={name} />}</td>}
+                      {(isAdmin || ownerFacts) && (
+                        <td className="lx-stack-actions">
+                          {canOfferViewAs(ownerFacts, m.userId) && (
+                            <form action={VIEW_AS_ENTER_PATH} method="post" style={{ display: "inline" }}>
+                              <input type="hidden" name="targetUserId" value={m.userId} />
+                              <button type="submit" className="lx-btn lx-btn-ghost lx-btn-sm" aria-label={`${VIEW_AS_LINK} ${name}`}>
+                                {VIEW_AS_LINK}
+                              </button>
+                            </form>
+                          )}
+                          {isAdmin && manageable && <RemoveMember userId={m.userId} name={name} />}
+                        </td>
+                      )}
                     </tr>
                   );
                 })}

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { previewingAs, resolveViewSession } from "@/lib/views/view-as";
 import { aiConfigured } from "@/lib/ai/claude";
 import { connectableProviders } from "@/lib/mailbox/config";
 import { HUB_PATH, hubTracks, overallCount, parseHubProgress, shouldShowHubCard } from "@/lib/onboarding/hub";
@@ -16,7 +16,9 @@ export async function GettingStartedCard() {
   let heading = "Getting started";
   let hideable = false;
   try {
-    const session = await resolveFirmSession();
+    // View as: Getting started progress lives on the teammate's own account, which can't be read (D10): hidden.
+    if (await previewingAs()) return null;
+    const session = await resolveViewSession();
     if (session.kind !== "ok") return null;
     const tracks = hubTracks({ role: session.role, modules: session.org.modules, aiConfigured: aiConfigured(), outlookConnectable: connectableProviders().microsoft });
     const progress = parseHubProgress(session.user.user_metadata);

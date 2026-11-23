@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
 import {
-  signOutAction,
   switchFirmAction,
   type SwitchFirmState,
 } from "@/lib/auth/actions";
+import { SIGN_OUT_PATH, TEAM_SETTINGS_PATH, VIEW_AS_EXIT_PATH } from "@/lib/views/view-as-rules";
 import type { SwitchableFirmRef } from "@/lib/firm/session";
 import { requestTourAgain } from "@/lib/onboarding/tour";
 import { requestWelcomeAgain } from "@/lib/onboarding/welcome-deal";
@@ -15,7 +15,7 @@ import { requestNameDialog } from "@/lib/account/name";
 import { roleLabel } from "@/lib/auth/roles";
 import { isOutsidePress, menuKeyAction } from "@/lib/shell/menu-behaviour";
 import { requestDealTimesDialog } from "@/lib/deal/person-times";
-import { DEAL_TIMES_MENU_ITEM, HELP_AND_TIPS, SETTINGS_NAME, SAVING } from "@/lib/ui/words";
+import { DEAL_TIMES_MENU_ITEM, HELP_AND_TIPS, SETTINGS_NAME, SAVING, VIEW_AS_EXIT, VIEW_AS_MENU, VIEW_AS_MENU_HEADER } from "@/lib/ui/words";
 import type { ViewMenu } from "@/lib/views";
 import { ViewSwitch } from "./ViewSwitch";
 import "./account-menu.css";
@@ -34,6 +34,10 @@ type Props = {
   settingsInMenu?: boolean;
   /** "owner" draws the owner view's menu (the AccountMenu board); absent is today's menu, unchanged. */
   variant?: "owner";
+  /** A real owner on a database with View as: one "View as a teammate" line, linking to Team. */
+  viewAsLink?: boolean;
+  /** While previewing a teammate: the menu holds only "Viewing as <name>", Exit and Sign out (spec "Account menu"). */
+  previewing?: { name: string };
 };
 
 /** The avatar at the right of the top bar: who you are, which firm, sign out. */
@@ -48,6 +52,8 @@ export function AccountMenu({
   viewMenu,
   settingsInMenu = false,
   variant,
+  viewAsLink = false,
+  previewing,
 }: Props) {
   const [switchState, switchAction, switching] = useActionState<
     SwitchFirmState,
@@ -88,14 +94,32 @@ export function AccountMenu({
       onToggle={(e) => setOpen(e.currentTarget.open)}
     >
       <summary
-        className="lx-avatar lx-am-avatar"
+        className={previewing ? "lx-avatar lx-am-avatar lx-am-avatar--preview" : "lx-avatar lx-am-avatar"}
         data-tour="account"
         aria-label={`Account: ${name}`}
         title={`${name} · ${roleLabel(role)}`}
       >
         {initials}
       </summary>
-      {variant === "owner" ? (
+      {previewing ? (
+        <div className="lx-am">
+          <div className="lx-am-head">
+            <p className="lx-am-name">{VIEW_AS_MENU_HEADER(previewing.name)}</p>
+          </div>
+          <div role="menu" aria-label="Account" className="lx-am-menu">
+            <form action={VIEW_AS_EXIT_PATH} method="post" role="none">
+              <button type="submit" role="menuitem" className="lx-am-item">
+                {VIEW_AS_EXIT}
+              </button>
+            </form>
+            <form action={SIGN_OUT_PATH} method="post" role="none" className="lx-am-sep">
+              <button type="submit" role="menuitem" className="lx-am-item">
+                Sign out
+              </button>
+            </form>
+          </div>
+        </div>
+      ) : variant === "owner" ? (
         <div className="lx-am">
           <div className="lx-am-head">
             <p className="lx-am-name">{name}</p>
@@ -164,6 +188,12 @@ export function AccountMenu({
 
             {viewMenu && <ViewSwitch menu={viewMenu} onDone={closeMenu} />}
 
+            {viewAsLink && (
+              <Link href={TEAM_SETTINGS_PATH} role="menuitem" className="lx-am-item" onClick={closeMenu}>
+                {VIEW_AS_MENU}
+              </Link>
+            )}
+
             {settingsInMenu && (
               <Link
                 href="/dashboard/settings/"
@@ -219,7 +249,7 @@ export function AccountMenu({
               </button>
             </div>
 
-            <form action={signOutAction} role="none" className="lx-am-sep">
+            <form action={SIGN_OUT_PATH} method="post" role="none" className="lx-am-sep">
               <button type="submit" role="menuitem" className="lx-am-item">
                 Sign out
               </button>
@@ -294,6 +324,12 @@ export function AccountMenu({
 
             {viewMenu && <ViewSwitch menu={viewMenu} onDone={closeMenu} />}
 
+            {viewAsLink && (
+              <Link href={TEAM_SETTINGS_PATH} role="menuitem" className="lx-btn lx-btn-sec lx-btn-sm lx-am-btn" onClick={closeMenu}>
+                {VIEW_AS_MENU}
+              </Link>
+            )}
+
             <div role="group" aria-labelledby="lx-help-h" className="lx-am-stack">
               <div id="lx-help-h" className="lx-label">
                 {HELP_AND_TIPS}
@@ -331,7 +367,7 @@ export function AccountMenu({
               </button>
             </div>
 
-            <form action={signOutAction} role="none" className="lx-am-signout">
+            <form action={SIGN_OUT_PATH} method="post" role="none" className="lx-am-signout">
               <button type="submit" role="menuitem" className="lx-btn lx-btn-ghost lx-btn-sm lx-am-btn">
                 Sign out
               </button>

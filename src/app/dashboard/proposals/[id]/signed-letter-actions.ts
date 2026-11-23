@@ -1,5 +1,6 @@
 "use server";
 
+import { previewReadOnly } from "@/lib/views/preview-safe";
 import type { LetterPdfResult } from "@/lib/loe/pdf-result";
 import { runStaffDownload } from "@/lib/loe/staff-download";
 import { loadStaffFirmFacts } from "@/lib/loe/staff-firm";
@@ -16,7 +17,7 @@ import { gateSignedLetterDownload } from "../gate";
  * rebuilt text against the stored fingerprint and otherwise uses the stored signed text. Returns bytes (base64) saved by the browser through
  * a Blob link, like the client's own download; never raw error text.
  */
-export async function downloadSignedLetterStaffAction(proposalId: string): Promise<LetterPdfResult> {
+export const downloadSignedLetterStaffAction = previewReadOnly(async function downloadSignedLetterStaffAction(proposalId: string): Promise<LetterPdfResult> {
   return runStaffDownload(
     {
       gate: gateSignedLetterDownload,
@@ -32,4 +33,4 @@ export async function downloadSignedLetterStaffAction(proposalId: string): Promi
     },
     proposalId,
   );
-}
+}, "Signed letter download: builds a PDF from stored rows, writes nothing");

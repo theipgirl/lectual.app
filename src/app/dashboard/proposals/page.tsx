@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { currentRole } from "@/lib/auth/current-role";
+import { viewerRole } from "@/lib/views/view-as";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { firmCivilDate } from "@/lib/quotes/firm-time";
 import { firstNameOf } from "@/lib/proposal-editor/labels";
@@ -77,7 +77,7 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
   const sp = await searchParams;
   const segment: ProposalSegment = parseSegment(sp.segment) ?? parseSegment(sp.status) ?? "everything";
 
-  const role = await currentRole();
+  const role = await viewerRole();
   const canWrite = !!role && PROPOSAL_STAFF_WRITE_ROLES.includes(role);
   const canDraftFromTranscript = canWrite && CAN_WRITE_LEAD.includes(role);
 
