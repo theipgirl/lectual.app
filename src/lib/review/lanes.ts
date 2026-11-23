@@ -53,8 +53,6 @@ const FLAGGED: ReadonlySet<BucketKey> = new Set(BOARD_COLUMNS);
  * waiting on us). Waiting on the client wins over every bucket; a flagged bucket, or a row waiting on us or an approval, is "our" move.
  */
 export function placeOnBoard(row: ReviewRow, bucket: BucketKey): "our" | "client" | null {
-  // An admitted registered mark stays in the collapsed On track list (with its tag), never in a lane.
-  if (row.registeredNoDeadline) return null;
   if (row.waiting === "client") return "client";
   if (FLAGGED.has(bucket)) return "our";
   if (bucket === "track" && (row.waiting === "us" || row.waiting === "approval")) return "our";

@@ -2298,11 +2298,12 @@ deadline or changes `attorney_confirmed`. Rules are pure in `src/lib/matters/dea
   (a registered stage is `is_open = false`, so those matters sit under the Closed chip there, and only there: the default chip is unchanged),
   and on the Weekly review. **Registered marks become Weekly review rows (Taylor, Nov 23 follow-up):** `buildReviewRows` admits a matter that is
   NOT already an open row, `isRegisteredTrademark`, and `noOpenDeadline` (no open Section 8 / 9), only when the deadlines read worked (a failed
-  read admits none; the existing "Some details couldn't load (deadlines)" note covers it). Such a row carries `registeredNoDeadline: true`:
-  `bucketOf` puts it in On track whatever its step says, `placeOnBoard` keeps it off the lanes (it sits in the collapsed On track list with
-  its "No open deadline" tag), so the Cards deck skips it unless it waits on an approval, and the KPIs (overdue, week, needs, USPTO) never
-  count it; it is counted once, in the sub-line's total. A matter whose maintenance stage is open on the docket stays an ordinary row (no
-  second copy). The tag alone never moves a row of any other kind.
+  read admits none; the existing "Some details couldn't load (deadlines)" note covers it). Such a row carries `registeredNoDeadline: true`
+  and takes the ORDINARY bucket rules (Taylor, Nov 23, second answer): overdue, due this week, needs a next step, quiet 14+ days, else On
+  track, so an overdue step on a registered mark is in Overdue, its lane and the KPIs. It is never "waiting on the USPTO": `build.ts` sets
+  its waiting from mail and approvals only (`withUspto: false`), so no USPTO tag, no USPTO list or KPI, and the Sheet's Waiting column shows
+  Our turn / Client / Approval. The sub-line counts these rows apart, "N open · M registered" (`reviewOpenCounts`, words.ts; M only when
+  > 0). A matter whose maintenance stage is open on the docket stays an ordinary row (no second copy, its stage's waiting kept).
 - **Alerts** (Taylor C8): recipients are the firm note `crm_firm_brain_entry` (category `other`, key `deadline_alert_recipients`,
   `data.user_ids`), set by the admin tier in Settings -> Team ("Deadline alerts", `saveDeadlineAlertRecipientsAction`: role and every id
   re-checked against the member directory). Hidden from the Firm notes page. No names in code. A removed member's id is dropped on read.

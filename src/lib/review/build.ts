@@ -266,7 +266,8 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
       lastOutboundType,
       source: m.referral_source?.trim() || null,
       waiting: waitingOn({
-        withUspto: stageIsWithUspto(m.stage),
+        // An admitted registered mark is never "waiting on the USPTO" (Taylor, Nov 23): its stage's waiting_on is not a to-do here.
+        withUspto: admitted.has(m.id) ? false : stageIsWithUspto(m.stage),
         pendingApproval: input.pendingMatterIds?.has(m.id) ?? false,
         lastDirection: direction,
       }),

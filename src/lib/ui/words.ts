@@ -501,6 +501,8 @@ export const REVIEW_SINCE_SUSPENDED = "Showing all: some details couldn't load, 
 export const REVIEW_SHOW_ALL = "Show all";
 export const REVIEW_SHOWING_ALL = "Showing all";
 export const reviewOlderHidden = (n: number) => `${n} older hidden`;
+/** The Weekly review sub-line's counts: "5 open", or "5 open · 2 registered" when registered marks with no Section 8 / 9 deadline are shown. */
+export const reviewOpenCounts = (open: number, registered: number) => (registered > 0 ? `${open} open · ${registered} registered` : `${open} open`);
 export const reviewIntro = (shown: number) => `Every open matter and every lead past first contact. ${shown} shown.`;
 /** The strip that is about the signed-in approver. */
 export const WAITING_ON_YOU = "Waiting on you";

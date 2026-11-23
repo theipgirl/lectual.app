@@ -2,6 +2,7 @@ import type { Direction, Waiting } from "./waiting";
 import type { ContactKind } from "./contact";
 import type { ProposalExpiryTag } from "./proposal-expiry";
 import type { LastChange } from "./last-changed";
+import { reviewOpenCounts } from "@/lib/ui/words";
 
 /**
  * The weekly review's sections. Pure: rows in, buckets out. A row is in exactly ONE section, the
@@ -68,7 +69,9 @@ export type ReviewRow = {
   noOpenDeadline?: boolean;
   /**
    * A registered mark (docket phase maintenance, its stage closed on the docket) admitted ONLY because no Section 8 / Section 9
-   * deadline is open (Taylor, Nov 23). Always On track, off the board's lanes; its `noOpenDeadline` tag says why it is here.
+   * deadline is open (Taylor, Nov 23). It takes the ordinary bucket rules (overdue, this week, needs a next step, quiet, else On track)
+   * and its `noOpenDeadline` tag says why it is here. It is never waiting on the USPTO (build sets its waiting from the mail and
+   * approvals only), and the sub-line counts it apart ("N open · M registered").
    */
   registeredNoDeadline?: true;
   /** Every open deadline of the matter, soonest first (the Deadlines strip). Absent on a lead and when the read failed. */
@@ -133,8 +136,6 @@ export function addDays(date: string, days: number): string {
 }
 
 export function bucketOf(row: ReviewRow, today: string): BucketKey {
-  // An admitted registered mark is a safety tag, not a to-do: On track, whatever its step says (Taylor, Nov 23).
-  if (row.registeredNoDeadline) return "track";
   const due = row.nextStep?.dueDate ?? null;
   if (due && due < today) return "overdue";
   if (due && due <= addDays(today, WEEK_DAYS)) return "week";
@@ -181,5 +182,7 @@ export function reviewSubline(b: ReviewBuckets): string {
   if (b.counts.needs) parts.push(`${b.counts.needs} ${b.counts.needs === 1 ? "needs" : "need"} a next step`);
   if (b.counts.quiet) parts.push(`${b.counts.quiet} quiet 14+ days`);
   const attention = parts.length ? parts.join(" · ") : "Nothing needs attention";
-  return `${b.total} open · ${attention}`;
+  // Admitted registered marks are counted apart (Taylor, Nov 23): "N open · M registered", M only when there are some.
+  const registered = BUCKET_KEYS.reduce((n, k) => n + b.sections[k].filter((r) => r.registeredNoDeadline).length, 0);
+  return `${reviewOpenCounts(b.total - registered, registered)} · ${attention}`;
 }
