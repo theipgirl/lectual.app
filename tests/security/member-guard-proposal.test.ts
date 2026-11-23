@@ -91,8 +91,10 @@ describe("0116 proposal: header and prose", () => {
     expect(HEADER).toContain("r.rolname in ('authenticated', 'anon', 'authenticator', 'service_role', 'supabase_auth_admin')");
     expect(HEADER).toContain("'public.provision_org_for_owner(text,text,uuid,text,text,text)'::regprocedure");
     expect(HEADER).toContain("where table_schema = 'public' and table_name = 'crm_org_member' order by ordinal_position");
-    for (const q of ["Q1.", "Q2.", "Q3.", "Q4."]) expect(HEADER, q).toContain(`--   ${q}`);
-    expect(HEADER).toContain("Should a DENIED platform-admin attempt be audited too?");
+    for (const q of ["Q2.", "Q4.", "Q5."]) expect(HEADER, q).toContain(`--   ${q}`);
+    for (const q of ["Q1.", "Q3."]) expect(HEADER, q).not.toContain(`--   ${q}`);
+    for (const d of ["D5. (Nov 23, was Q1) The platform-admin audit trail outlives the staff account", "D6. (Nov 23, was Q3) Only SUCCESSFUL platform-admin membership changes are logged"]) expect(HEADER, d).toContain(d);
+    expect(HEADER).toContain("The director checks this on\n--       dev; PRE-APPLY CHECK 6 stays.");
     expect(HEADER).toContain("neither the REST API nor /graphql/v1 exposes schema `private`");
     expect(HEADER).toContain("PRODUCTION SHAPE (checked on prod by the director, Nov 23)");
   });
@@ -203,6 +205,31 @@ describe("0116 proposal: rank mirror and platform admin audit (Taylor, Nov 23)",
     expect(SQL.match(/insert into public\.platform_admin_audit/g)).toHaveLength(3);
   });
 
+  it("D5: drops only user_id's foreign key to auth.users, found by shape, keeps user_id NOT NULL as the actor and leaves org_id alone", () => {
+    expect(HEADER).toContain("so Postgres names the constraint platform_admin_audit_user_id_fkey (PRE-APPLY CHECK 9 shows the real name)");
+    expect(HEADER).toContain("This file DROPS that foreign key and keeps\n-- `user_id` as the actor column: NOT NULL, unchanged, no FK.");
+    expect(HEADER).toContain("--       insert into public.platform_admin_audit (user_id, org_id)\n--       values (auth.uid(), p_org_id);");
+    expect(HEADER).toContain("Listed as Q5.");
+    const at = raw.indexOf("-- ── 1c.");
+    expect(at).toBeGreaterThan(0);
+    const block = flat(raw.slice(at, raw.indexOf("-- ── 2.", at)).replace(/--.*$/gm, ""));
+    expect(block).toContain("c.conrelid = 'public.platform_admin_audit'::regclass and c.contype = 'f' and c.confrelid = 'auth.users'::regclass");
+    expect(block).toContain("a.attrelid = 'public.platform_admin_audit'::regclass and a.attname = 'user_id'");
+    expect(block).toContain("if v_n > 1 then raise exception");
+    expect(block).toContain("if v_n = 1 then perform pg_catalog.set_config('lock_timeout', '5s', true); execute pg_catalog.format('alter table public.platform_admin_audit drop constraint %I', v_name);");
+    expect(HEADER).toContain("if the apply fails with a lock timeout, nothing was changed; retry it.");
+    expect(HEADER).toContain("run the 1c do $$ block (the drop) as its own\n-- execute_sql chunk");
+    expect(HEADER).toContain("select pg_get_userbyid(relowner) from pg_class where oid = 'public.platform_admin_audit'::regclass;");
+    expect(HEADER).toContain("Dangling user ids there are expected after 0116, not a leak.");
+    expect(SQL).not.toMatch(/alter\s+column\s+user_id/i);
+    expect(SQL).not.toMatch(/drop not null/i);
+    expect(SQL).not.toMatch(/org_id_fkey/);
+    expect(SQL).not.toMatch(/create or replace function public\.audit_org_switch/);
+    expect(SQL).not.toContain("actor_user_id");
+    const cases = raw.slice(raw.indexOf("-- Cases to add to lectual tests/tenant-isolation.test.ts"));
+    for (const c of ["--  22. The audit outlives the staff account (D5)", "`supabase.auth.admin.deleteUser(PA)` returns error null; BOTH\n--      rows are still in platform_admin_audit", "(no backfill is needed: user_id is already the actor)", "Deleting firm A still\n--      deletes A's audit rows", "(the member_insert row keeps its org_id A, action 'member_insert', target_user_id and old_role null / new_role 'paralegal')", "`rpc('audit_org_switch', { p_org_id: A })` from a platform-admin client succeeds", "(e) pg_constraint has exactly ONE foreign key on\n--      platform_admin_audit: org_id -> public.crm_org, confdeltype 'c'."]) expect(cases, c).toContain(c);
+  });
+
   it("carries the audit and rank isolation cases", () => {
     const cases = raw.slice(raw.indexOf("-- Cases to add to lectual tests/tenant-isolation.test.ts"));
     for (const c of ["--  18. Platform admin audit", "exactly ONE new platform_admin_audit row", "add NO audit\n--      row; by the service role, none", "select from platform_admin_audit: 0 rows", "--  19. Rank (rule c2, member_owner_guard_rank)", "SA inserts (A, newUser, 'admin'): rank", "equal rank is allowed", "not bounded by rank",
@@ -220,7 +247,9 @@ describe("0116 proposal: rank mirror and platform admin audit (Taylor, Nov 23)",
 
 describe("0116 proposal: the SQL", () => {
   it("is additive: no drop, no delete, no policy change, and the only grant change on the table is the flagged revoke", () => {
-    expect(SQL).not.toMatch(/\bdrop\s/i);
+    // The one drop: platform_admin_audit's user_id foreign key to auth.users (D5), found by shape, inside a do $$ block.
+    expect(SQL.match(/\bdrop\s/gi)).toHaveLength(1);
+    expect(SQL).toContain("execute pg_catalog.format('alter table public.platform_admin_audit drop constraint %I', v_name);");
     expect(SQL).not.toMatch(/\bdelete\s+from\b/i);
     expect(SQL).not.toMatch(/\b(create|alter)\s+policy\b/i);
     const tableGrants = SQL.match(/\b(grant|revoke)\s+[a-z, ]+\s+on\s+(table\s+)?public\.crm_org_member\b[^;]*;/gi) ?? [];
@@ -328,9 +357,11 @@ describe("0116 proposal: the SQL", () => {
   });
 
   it("is pinned: any change to the file is deliberate", () => {
-    // Changed on purpose (re-review, Nov 23): no argument audit function, SECURITY DEFINER audit trigger with the self-delete skip,
+    // Changed on purpose (D5 review edits, Nov 23): lock_timeout before the drop, apply notes, check 11, the wipe() note, case 22 (a)/(c)/(e).
+    // Was 7154f979c18e9da4dcdeee257d11e129. Before that (D5/D6, Nov 23): the user_id foreign key drop, Q1/Q3 decided, Q5, case 22. Was 4d2a91d1a21578ec49528d75c06a91ad.
+    // Before that (re-review, Nov 23): no argument audit function, SECURITY DEFINER audit trigger with the self-delete skip,
     // NOT VALID + VALIDATE, narrowed parent_gone, the production shape (case 20), case 21, Q3/Q4. Was 4eb22683c0a5bf4c48c49f65552a195f
     // (Taylor's answers), before that 39f9e6208b131b4cd1798db7084a3a6f (8b4d8fc) and b0b8fe095abf6ccb39ced4e398e5c10a.
-    expect(createHash("md5").update(raw).digest("hex")).toBe("4d2a91d1a21578ec49528d75c06a91ad");
+    expect(createHash("md5").update(raw).digest("hex")).toBe("a37b630bffdd8d8ac8106bbd2045c311");
   });
 });

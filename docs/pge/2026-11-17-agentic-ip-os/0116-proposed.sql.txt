@@ -130,6 +130,32 @@
 -- member_delete (old_role set, new_role null), always with target_user_id. No jsonb column exists, so none is added; there was no
 -- event-kind CHECK to extend (0101's drop-and-re-add form is not needed). target_user_id has no foreign key on purpose: the record of
 -- a write must survive the target's account being deleted. RLS, policies and grants on the table are not changed.
+-- The audit outlives the STAFF account too (D5, Taylor, Nov 23). 0050 declares `user_id uuid not null references auth.users(id) on
+-- delete cascade` inline, so Postgres names the constraint platform_admin_audit_user_id_fkey (PRE-APPLY CHECK 9 shows the real name).
+-- With it, deleting a staff member's auth user deletes every audit row they ever wrote. This file DROPS that foreign key and keeps
+-- `user_id` as the actor column: NOT NULL, unchanged, no FK. Chosen over the alternative (user_id nullable + ON DELETE SET NULL + a
+-- new actor_user_id backfilled from user_id) because:
+--   * the actor is already in user_id on every row, so there is nothing to backfill and no second column that could disagree with it;
+--   * user_id stays NOT NULL, so no CHECK or reader has to handle a null actor, and the shape CHECK is untouched by account deletes;
+--   * audit_org_switch keeps working byte for byte (it inserts (auth.uid(), p_org_id) into (user_id, org_id)), and so does the new
+--     trigger; neither needs a body change. 0050's body, verbatim:
+--       if not public.is_platform_admin() then
+--         return;
+--       end if;
+--       insert into public.platform_admin_audit (user_id, org_id)
+--       values (auth.uid(), p_org_id);
+--   * 0050 stores no email, so there is no actor_email to add.
+-- What is lost: the database no longer proves user_id names an existing auth user. Every writer is a SECURITY DEFINER function that
+-- stamps auth.uid() (audit_org_switch, crm_org_member_platform_audit), RLS has no policies, and authenticated has no route to insert,
+-- so an id that never existed cannot get in through the API. After a staff deletion the id simply names a deleted account.
+-- The drop finds the foreign key by what it is (platform_admin_audit, column user_id, referencing auth.users) rather than trusting the
+-- name, drops it with format('%I'), and stops if there is more than one. The token hook does not read the table (it reads
+-- platform_admin), and the user_id index stays.
+-- org_id: 0050's `org_id ... references public.crm_org(id) on delete cascade` is NOT changed: deleting a firm still deletes that firm's
+-- audit rows. Dropping it is not trivially safe, because audit_org_switch takes p_org_id from the caller and today the foreign key is
+-- what refuses an org id that does not exist. Listed as Q5.
+-- On lectual-dev, lectual's tests' wipe() deletes `@example.com` fixture users; their audit rows are no longer removed with them when
+-- those rows sit under protected orgs that wipe() keeps. Dangling user ids there are expected after 0116, not a leak.
 -- The write: an AFTER INSERT OR UPDATE OR DELETE row trigger on crm_org_member (crm_org_member_platform_audit_trg) whose function,
 -- public.crm_org_member_platform_audit(), is itself SECURITY DEFINER (search_path = '') and takes NO arguments: it reads only NEW,
 -- OLD and TG_OP, so nobody can make it write a row about a firm, target or role they choose. EXECUTE on it is revoked from public,
@@ -257,14 +283,26 @@
 --   8. platform_admin_audit is still 0050's shape (id, user_id, org_id, created_at; no policies):
 --        select column_name from information_schema.columns where table_schema = 'public' and table_name = 'platform_admin_audit';
 --        select count(*) from pg_policies where schemaname = 'public' and tablename = 'platform_admin_audit';  -- expect 0
+--   9. The user_id foreign key this file drops (expect exactly one row, platform_admin_audit_user_id_fkey, confdeltype 'c'):
+--        select conname, confdeltype, pg_get_constraintdef(oid) from pg_constraint
+--         where conrelid = 'public.platform_admin_audit'::regclass and contype = 'f' and confrelid = 'auth.users'::regclass;
+--   10. The existing rows, to compare after applying (no row is changed; D5): select count(*), count(distinct user_id) from
+--        platform_admin_audit;
+--   11. The applying role owns the audit table (needed to drop its constraint):
+--        select pg_get_userbyid(relowner) from pg_class where oid = 'public.platform_admin_audit'::regclass;
 --
 -- ── APPLYING IT ──────────────────────────────────────────────────────────────────────────────────────────────────────
 -- Additive and idempotent: create schema if not exists, create or replace function, and do $$ blocks that test pg_trigger first
--- (0103's form). Nothing is dropped, no row is changed or deleted, no policy changes; the only grant change is the revoke above; the
--- only schema change outside crm_org_member is four nullable columns and one CHECK on platform_admin_audit (add column if not exists,
--- and a do $$ block that tests pg_constraint). One Supabase MCP apply_migration is safe (no drop, no delete; see 0093 for what hangs
--- it). The audit CHECK is added NOT VALID and then validated in its own statement (0104 / 0105's form). Statement order: the schema,
--- the audit columns and CHECK, the two helpers and their grants, the three trigger functions and their revokes, the three triggers,
+-- (0103's form). No row is changed or deleted, no policy changes; the only grant change is the revoke above. Outside crm_org_member:
+-- four nullable columns and one CHECK on platform_admin_audit (add column if not exists, and a do $$ block that tests pg_constraint),
+-- and ONE drop: platform_admin_audit's foreign key from user_id to auth.users (D5), in a do $$ block that finds it and does nothing if
+-- it is already gone. That drop may hang the Supabase MCP apply_migration (see 0093); if it does, send the file as execute_sql chunks
+-- in statement order plus a supabase_migrations.schema_migrations row; at the least, run the 1c do $$ block (the drop) as its own
+-- execute_sql chunk. The drop sets lock_timeout to 5s for its transaction (it takes ACCESS EXCLUSIVE on auth.users as well as on
+-- platform_admin_audit, and sign-ins must not queue behind it): if the apply fails with a lock timeout, nothing was changed; retry it.
+-- In a one-shot apply the 5s timeout stays for the rest of that transaction (checked locally), which only makes later steps fail fast.
+-- The applying role must own platform_admin_audit (PRE-APPLY CHECK 11). The audit CHECK is added NOT VALID and then validated in its own statement (0104 / 0105's form). Statement order: the schema,
+-- the audit columns and CHECK, the user_id foreign key drop, the two helpers and their grants, the three trigger functions and their revokes, the three triggers,
 -- the table revokes, comments.
 --
 -- ── DECISIONS (Taylor, Nov 23) ───────────────────────────────────────────────────────────────────────────────────────
@@ -273,6 +311,10 @@
 --   D2. The table revokes of TRUNCATE, REFERENCES, TRIGGER (and MAINTAIN) from anon and authenticated stay in.
 --   D3. Rank limits below owner are enforced in the database as well, mirroring the app exactly (rule c2, RANK MIRROR).
 --   D4. PRE-APPLY CHECK 4 only shows platform admins' membership rows; nothing removes them.
+--   D5. (Nov 23, was Q1) The platform-admin audit trail outlives the staff account: platform_admin_audit.user_id loses its foreign key to
+--       auth.users and stays the NOT NULL actor column (PLATFORM ADMIN AUDIT explains the choice). Isolation case 22.
+--   D6. (Nov 23, was Q3) Only SUCCESSFUL platform-admin membership changes are logged; denied attempts are not (a refused write rolls
+--       back its statement, audit row included, and nothing is written outside it).
 --   PRODUCTION SHAPE (checked on prod by the director, Nov 23): one platform admin is ALSO the sole real owner member of a firm (owner
 --   before becoming staff; the row stays). 0116 treats them as a MEMBER of that firm: every check uses their real owner row (facts reads
 --   it; rank and owner checks pass as an owner), the audit trigger writes nothing (they hold a row), they can add and re-role members,
@@ -281,15 +323,13 @@
 --   (deleting their own row) writes no audit row: the audit trigger skips a DELETE of the caller's own row. Deleting their auth user still succeeds and leaves the firm with no
 --   owner. Isolation case 20.
 -- ── REMAINING QUESTIONS ──────────────────────────────────────────────────────────────────────────────────────────────
---   Q1. 0050's platform_admin_audit.user_id is ON DELETE CASCADE, so deleting a staff member's auth user deletes their audit rows,
---       membership writes included. Not changed here (it would be a change to 0050's FK). Should the audit outlive the account?
---       (Kept as it is in this file.)
 --   Q2. A refused owner removal still signs the owner out, because lectual.app revokes sessions before the delete (being handled in
 --       lectual.app separately; listed so it is not lost).
---   Q3. Should a DENIED platform-admin attempt be audited too? Today only writes that succeed leave a row (a refused write rolls back
---       its statement, audit row included); recording denials would need a write outside the failing transaction.
 --   Q4. Confirm on lectual-dev that neither the REST API nor /graphql/v1 exposes schema `private` (PRE-APPLY CHECK 6 covers REST;
---       pg_graphql exposes only schemas granted to it and listed for it, check that `private` is not).
+--       pg_graphql exposes only schemas granted to it and listed for it, check that `private` is not). The director checks this on
+--       dev; PRE-APPLY CHECK 6 stays.
+--   Q5. Should the audit outlive the FIRM as well? 0050's org_id is ON DELETE CASCADE, so deleting a firm deletes its audit rows. Not
+--       changed: dropping that foreign key would also let audit_org_switch(p_org_id) record an org id that never existed.
 -- =====================================================================================================================
 
 
@@ -332,6 +372,36 @@ end
 $$;
 
 alter table public.platform_admin_audit validate constraint platform_admin_audit_member_write_shape;
+
+
+-- ── 1c. The audit outlives the staff account (D5): drop user_id's foreign key to auth.users ─────────────────────────
+do $$
+declare
+  v_n integer;
+  v_name text;
+begin
+  select count(*)::integer, min(c.conname) into v_n, v_name
+    from pg_catalog.pg_constraint c
+   where c.conrelid = 'public.platform_admin_audit'::regclass
+     and c.contype = 'f'
+     and c.confrelid = 'auth.users'::regclass
+     and c.conkey = array[(
+       select a.attnum from pg_catalog.pg_attribute a
+        where a.attrelid = 'public.platform_admin_audit'::regclass and a.attname = 'user_id'
+     )]::smallint[];
+  if v_n > 1 then
+    raise exception 'platform_admin_audit has % foreign keys from user_id to auth.users; resolve by hand before 0116', v_n;
+  end if;
+  if v_n = 1 then
+    -- Dropping the FK takes ACCESS EXCLUSIVE on auth.users too; without a timeout, sign-ins would queue behind it.
+    perform pg_catalog.set_config('lock_timeout', '5s', true);
+    execute pg_catalog.format('alter table public.platform_admin_audit drop constraint %I', v_name);
+  end if;
+end
+$$;
+
+comment on column public.platform_admin_audit.user_id is
+  '0116: the staff member who acted (auth.uid() when the row was written). No foreign key, so the row outlives the account.';
 
 
 -- ── 2. The lookups that must see past RLS ──────────────────────────────────────────────────────────────────────────
@@ -717,8 +787,9 @@ comment on function public.crm_org_member_last_owner_guard() is
 --   * Platform admins inside a firm they do not belong to can still invite, re-role and remove NON-owner members (D1), not bounded by
 --     rank, and each write is in platform_admin_audit. They can no longer add, change or remove an owner, and cannot join a firm
 --     themselves. Making a firm's owner is done with the service role (scripts/provision-tenant.ts) or by a real owner in the app.
---   * The audit row is deleted with the staff member's auth user (0050's ON DELETE CASCADE on user_id; Q1) and with the firm.
---   * Only successful platform-admin writes are audited (Q3).
+--   * The audit row outlives the staff member's auth user (D5); user_id then names a deleted account. It is still deleted with the
+--     firm (0050's org_id cascade, Q5).
+--   * Only successful platform-admin writes are audited (D6).
 --   * If a future policy lets a signed-in caller delete a crm_org row, the last-owner guard (which does not ask parent_gone for
 --     authenticated) would refuse that firm's owner rows: deleting the firm would fail closed until the guard is updated.
 --   * Stale tokens: the 0002 policies still read the claim, but rule c reads the table, so a demoted or removed admin can no longer
@@ -793,6 +864,12 @@ comment on function public.crm_org_member_last_owner_guard() is
 --      writes as a member: rank applies and no audit row is written. (h) An existing workspace-entry row (audit_org_switch, all four
 --      new columns null) still inserts; a row with action 'member_update' and no target is refused by
 --      platform_admin_audit_member_write_shape (23514).
+--      (i) Forging: no function writes a member_* audit row on request. `select public.crm_org_member_platform_audit()` as
+--      authenticated (and as service_role) is permission denied (and a trigger function cannot be called directly anyway);
+--      private.crm_org_member_audit does not exist (`to_regprocedure('private.crm_org_member_audit(text,uuid,uuid,text,text)')`
+--      is null); the only functions whose body inserts into platform_admin_audit are audit_org_switch (workspace entries, the four
+--      new columns null) and crm_org_member_platform_audit (trigger only). A platform admin's audit_org_switch(firm) writes an entry
+--      row with action null, never a member_* row.
 --  19. Rank (rule c2, member_owner_guard_rank), each with its allowed counterpart:
 --      (a) SA inserts (A, newUser, 'admin'): rank; SA inserts (A, newUser, 'senior_admin') and (A, newUser, 'attorney'): succeed.
 --      (b) SA updates P to admin: rank; SA updates P to senior_admin: succeeds.
@@ -803,12 +880,6 @@ comment on function public.crm_org_member_last_owner_guard() is
 --      (e) Owner-tier cases stay not_owner, not rank (AD inserting an owner is not_owner, checked first).
 --      (f) PA (platform admin, no row) inserts (A, newUser, 'admin'), and updates SA to paralegal: succeed (not bounded by rank; both
 --          audited).
---      (i) Forging: no function writes a member_* audit row on request. `select public.crm_org_member_platform_audit()` as
---      authenticated (and as service_role) is permission denied (and a trigger function cannot be called directly anyway);
---      private.crm_org_member_audit does not exist (`to_regprocedure('private.crm_org_member_audit(text,uuid,uuid,text,text)')`
---      is null); the only functions whose body inserts into platform_admin_audit are audit_org_switch (workspace entries, the four
---      new columns null) and crm_org_member_platform_audit (trigger only). A platform admin's audit_org_switch(firm) writes an entry
---      row with action null, never a member_* row.
 --  20. A platform admin who is ALSO a real member (production's demo firm). Firm D: PO is the ONLY owner and is in platform_admin
 --      (seeded with the service role; token claim org_role = owner from the membership row); DP is a paralegal of D.
 --      (a) PO, active in D, does each of these, and all succeed with NO new platform_admin_audit row: inserts (D, newUser, 'admin');
@@ -822,6 +893,16 @@ comment on function public.crm_org_member_last_owner_guard() is
 --          (A, newUser, 'paralegal') succeeds with exactly ONE audit row (user_id PO, org A, member_insert).
 --  21. Rank list and enum: the set of `enum_range(null::public.crm_role)` labels equals the set of the BEFORE guard's v_ranks (as
 --      SETS: the guard's order follows the app's ROLES, not the enum's).
+--  22. The audit outlives the staff account (D5). Seed: PA (platform admin, no row in A) has written one workspace-entry row
+--      (audit_org_switch(A)) and one member_insert row (case 18a). (a) `supabase.auth.admin.deleteUser(PA)` returns error null; BOTH
+--      rows are still in platform_admin_audit with user_id = PA's old id (unchanged, NOT NULL) and every other column unchanged
+--      (the member_insert row keeps its org_id A, action 'member_insert', target_user_id and old_role null / new_role 'paralegal');
+--      no foreign key from platform_admin_audit to auth.users remains (pg_constraint). (b) Existing rows: count and user_id per row
+--      are identical before and after applying 0116 (no backfill is needed: user_id is already the actor). (c) After 0116,
+--      `rpc('audit_org_switch', { p_org_id: A })` from a platform-admin client succeeds and writes (auth.uid(), A) as before, and the
+--      token hook still issues claims for a platform admin (it reads platform_admin, not this table). (d) Deleting firm A still
+--      deletes A's audit rows (0050's org_id cascade, unchanged; Q5). (e) pg_constraint has exactly ONE foreign key on
+--      platform_admin_audit: org_id -> public.crm_org, confdeltype 'c'.
 -- Manual check (not a vitest case): two sessions on lectual-dev, firm with owners O1 and O2; session 1 (O1) demotes O2 and holds the
 -- transaction open, session 2 (O2, still holding an owner row until session 1 commits) demotes O1; session 2 waits on the lock and,
 -- once session 1 commits, fails with member_owner_guard_not_owner or member_owner_guard_last_owner. The firm keeps one owner.
