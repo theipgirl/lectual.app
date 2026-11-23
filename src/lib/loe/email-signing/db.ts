@@ -1,7 +1,7 @@
 /**
  * The untyped service-role client shape the emailed-signing path uses (the same shape as `src/lib/proposals/public.ts`'s
  * `PublicProposalsDb`, plus `.in`-free reads), so tests drive it with a fake and nothing here can be handed a scoped client by
- * mistake at the type level. Production passes `getAdminClient()`.
+ * mistake at the type level. Production passes the public module's service-role client.
  */
 
 export type SigningDbError = { code?: string; message?: string } | null;

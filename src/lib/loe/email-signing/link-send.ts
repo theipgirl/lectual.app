@@ -63,7 +63,7 @@ export type SendResult =
   | { ok: false; message: string };
 
 export type SendDeps = {
-  /** The service-role client (production: `getAdminClient()` through `publicProposalsDb`). */
+  /** The service-role client (production: `publicProposalsDb()`). */
   db?: PublicProposalsDb;
   read?: (token: string, now: Date, db: PublicProposalsDb) => Promise<PublicProposalRead>;
   readiness?: (handle: { proposalId: string; orgId: string }, db: PublicProposalsDb) => Promise<Readiness>;
