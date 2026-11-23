@@ -39,7 +39,8 @@
 --   Design, and why RLS enforces it: a value row holds EXACTLY ONE typed column (crm_custom_value_one_value) and it is the field kind's
 --   (the rules trigger, custom_value_wrong_kind, for every caller including the service role). So `value_cents is not null` is true for
 --   exactly the money rows, and the money rows are a row-level set RLS can draw. Every value policy adds
---   `(value_cents is null or <an owner crm_org_member row for auth.uid() in the row's firm>)`: SELECT hides money rows from every other role (PostgREST cannot
+--   `(value_cents is null or (select exists (<an owner crm_org_member row for auth.uid() in current_org_id()>)))`, evaluated once per
+--   statement: SELECT hides money rows from every other role (PostgREST cannot
 --   return what the policy does not let the query see, a filter on value_cents included), UPDATE and DELETE cannot reach them, INSERT
 --   and UPDATE cannot write one. The rules trigger also refuses a signed-in non-owner's money write with its own prefix
 --   (custom_value_money_owner_only, 42501) right after the field is read, before the record or the one-per-record key is touched, so
@@ -561,11 +562,13 @@ begin
 
   if not exists (select 1 from pg_policies where schemaname = 'public'
       and tablename = 'crm_custom_value' and policyname = 'crm_custom_value_select_member') then
-    -- Money rows (value_cents is not null) only for a caller with an OWNER crm_org_member row in the firm (Taylor, Nov 23); every other row for every member.
+    -- Money rows (value_cents is not null) only for a caller with an OWNER crm_org_member row in the active firm (Taylor, Nov 23); every
+    -- other row for every member. The owner check is a scalar `(select exists (...))` keyed on current_org_id(), not on the row, so the
+    -- planner runs it ONCE per statement (an initPlan), not once per row. Every policy also requires org_id = current_org_id().
     create policy crm_custom_value_select_member on public.crm_custom_value
       for select using (
         org_id = public.current_org_id()
-        and (value_cents is null or exists (select 1 from public.crm_org_member m where m.org_id = crm_custom_value.org_id and m.user_id = auth.uid() and m.role = 'owner'))
+        and (value_cents is null or (select exists (select 1 from public.crm_org_member m where m.org_id = public.current_org_id() and m.user_id = auth.uid() and m.role = 'owner')))
       );
   end if;
   if not exists (select 1 from pg_policies where schemaname = 'public'
@@ -574,7 +577,7 @@ begin
       for insert with check (
         org_id = public.current_org_id()
         and public.current_org_role() in ('owner', 'admin', 'senior_admin', 'attorney', 'intake', 'paralegal', 'law_clerk', 'clerk')
-        and (value_cents is null or exists (select 1 from public.crm_org_member m where m.org_id = crm_custom_value.org_id and m.user_id = auth.uid() and m.role = 'owner'))
+        and (value_cents is null or (select exists (select 1 from public.crm_org_member m where m.org_id = public.current_org_id() and m.user_id = auth.uid() and m.role = 'owner')))
       );
   end if;
   if not exists (select 1 from pg_policies where schemaname = 'public'
@@ -584,12 +587,12 @@ begin
       using (
         org_id = public.current_org_id()
         and public.current_org_role() in ('owner', 'admin', 'senior_admin', 'attorney', 'intake', 'paralegal', 'law_clerk', 'clerk')
-        and (value_cents is null or exists (select 1 from public.crm_org_member m where m.org_id = crm_custom_value.org_id and m.user_id = auth.uid() and m.role = 'owner'))
+        and (value_cents is null or (select exists (select 1 from public.crm_org_member m where m.org_id = public.current_org_id() and m.user_id = auth.uid() and m.role = 'owner')))
       )
       with check (
         org_id = public.current_org_id()
         and public.current_org_role() in ('owner', 'admin', 'senior_admin', 'attorney', 'intake', 'paralegal', 'law_clerk', 'clerk')
-        and (value_cents is null or exists (select 1 from public.crm_org_member m where m.org_id = crm_custom_value.org_id and m.user_id = auth.uid() and m.role = 'owner'))
+        and (value_cents is null or (select exists (select 1 from public.crm_org_member m where m.org_id = public.current_org_id() and m.user_id = auth.uid() and m.role = 'owner')))
       );
   end if;
   if not exists (select 1 from pg_policies where schemaname = 'public'
@@ -598,7 +601,7 @@ begin
       for delete using (
         org_id = public.current_org_id()
         and public.current_org_role() in ('owner', 'admin', 'senior_admin', 'attorney', 'intake', 'paralegal', 'law_clerk', 'clerk')
-        and (value_cents is null or exists (select 1 from public.crm_org_member m where m.org_id = crm_custom_value.org_id and m.user_id = auth.uid() and m.role = 'owner'))
+        and (value_cents is null or (select exists (select 1 from public.crm_org_member m where m.org_id = public.current_org_id() and m.user_id = auth.uid() and m.role = 'owner')))
         and exists (
           select 1 from public.crm_custom_field f
            where f.id = crm_custom_value.field_id and f.org_id = crm_custom_value.org_id and not f.archived
@@ -645,8 +648,9 @@ comment on column public.crm_custom_value.updated_by is
 --     request, one transaction.
 --   * lectual.app mirrors the label and option CHECKs exactly (Postgres `btrim` default characters, `char_length` in code points); its writes clean whitespace and control characters first.
 --   * A failed Move can leave two columns sharing a position; they then order by label. A further Move repairs it; if it can't, archive and restore one of them.
---   * Money values are a real owner's (Taylor, Nov 23): every value policy carries `(value_cents is null or exists (an owner
---     crm_org_member row for auth.uid() in that firm))` and the rules trigger refuses any other signed-in caller's money write
+--   * Money values are a real owner's (Taylor, Nov 23): every value policy carries `(value_cents is null or (select exists (an owner
+--     crm_org_member row for auth.uid() in current_org_id())))` and the rules trigger (step 5b, per row, on new.org_id) refuses any
+--     other signed-in caller's money write
 --     (custom_value_money_owner_only), Lectual staff acting inside the firm included. A non-owner's options-in-use
 --     and archive checks never involve an amount (they read value_choice / the field row only).
 
@@ -708,6 +712,10 @@ comment on column public.crm_custom_value.updated_by is
 --      A platform admin (0050) acting inside firm A, who carries firm A's `owner` role claim but has no crm_org_member row there, is
 --      refused like any non-owner: 0 money rows read, the `count=exact` money count is 0, and inserting a money value is 42501
 --      custom_value_money_owner_only; their UPDATE and DELETE of the money value affect 0 rows (Taylor, Nov 23 follow-up).
+--      (a) A platform admin who IS an owner member of firm B, acting inside firm A (active_org_id = A, owner claim, no membership in
+--      A), reads 0 money rows in A (count 0) and their money insert in A is 42501 custom_value_money_owner_only: their owner row in B
+--      never counts in A. (b) The non-member platform admin inside firm A still reads A's NON-money values (the text row) and can
+--      insert, update and delete a non-money value there, as before.
 -- Manual check (not a vitest case): two sessions on lectual-dev, one removing an option, one writing that option; the second waits and
 -- then fails with custom_value_bad_choice. And: one session archiving a field while another deletes one of its values; the delete waits
 -- and then fails with custom_value_field_archived.

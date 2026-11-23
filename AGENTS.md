@@ -2544,7 +2544,7 @@ A firm's own List column of kind `money` is a REAL owner's only: `canSeeCustomMo
 custom money** (Nov 23 follow-up), even though their role reads `owner`; the built-in fee columns and the Billing card still follow
 `canSeeBilling` alone. The review page derives `customMoney` once (`actingAsStaff` from the session, `true` when it isn't ok) and passes it to
 `loadReview`, the card read, `withoutMoney`, `columnsFor`'s `canSeeCustomMoney` (a custom Money column needs it EXACTLY true; `canSeeMoney` no
-longer admits one) and `SheetView` / `SheetEdit` (`canSeeCustomMoney` prop, default false). `setCustomValue` asks `deps.actingAsStaff()` for a
+longer admits one) and `SheetView` / `SheetEdit` (`canSeeCustomMoney` prop, default false; each component also runs `withoutMoney` on its own `custom` when the prop is false, so no Money field, amount, editor or field meta reaches the client table whatever a caller passes; `tests/review/sheet-money-self-enforce.test.tsx`). `setCustomValue` asks `deps.actingAsStaff()` for a
 Money field only (a throw counts as staff). Nothing is hidden only in the browser: the server never reads an amount for anyone else.
 - **Reads closed:** `loadCustomColumns(db, matterIds, leadIds, readMerged, access)` takes a REQUIRED `{ canSeeMoney }` (missing = no). Without it Money
   fields are not returned (`visibleFields`), the value select is `VALUE_SELECT_NO_MONEY` (no `value_cents`) with `.is("value_cents", null)`, and a
@@ -2557,7 +2557,8 @@ Money field only (a throw counts as staff). Nothing is hidden only in the browse
   is read (decision: owner-only writes too, clears included). Field DEFINITIONS are still the admin tier's (Settings -> Columns says
   `COLUMNS_KIND_MONEY_HINT` under the kind), and a non-owner still sees a Money column's name in Settings -> Columns.
 - **0115 (proposal):** the money rows are a row-level set because a value row holds exactly one typed column, the field kind's, so every value policy adds
-  `(value_cents is null or exists (select 1 from public.crm_org_member m where m.org_id = crm_custom_value.org_id and m.user_id = auth.uid() and m.role = 'owner'))`
+  `(value_cents is null or (select exists (select 1 from public.crm_org_member m where m.org_id = public.current_org_id() and m.user_id = auth.uid() and m.role = 'owner')))`
+  (a scalar sub-select, run once per statement; trigger step 5b keeps its per-row check on `new.org_id`)
   (an owner MEMBERSHIP row, never the role claim, so a 0050 platform admin inside a firm is refused), and the rules trigger refuses any other signed-in caller's money write
   (`custom_value_money_owner_only`, 42501, mapped in `errors.ts`) right after the field read. Isolation case 22. Header explains why not a column grant,
   a separate table or a view. Tests: `tests/custom-columns/money-visibility.test.tsx`, `load.test.ts`, `value-actions.test.ts`, `registry.test.ts`,
