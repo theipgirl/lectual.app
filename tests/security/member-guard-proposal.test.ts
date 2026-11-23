@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { ROLES } from "@/lib/auth/roles";
 
 /**
  * The proposal file for lectual 0116 (crm_org_member self-insert and self-promotion guard), read as TEXT. Nothing here touches a
@@ -33,6 +34,7 @@ const PREFIXES = [
   "member_owner_guard_self_role",
   "member_owner_guard_not_admin",
   "member_owner_guard_not_owner",
+  "member_owner_guard_rank",
   "member_owner_guard_last_owner",
 ] as const;
 
@@ -80,13 +82,19 @@ describe("0116 proposal: header and prose", () => {
     expect(raw).toContain("Deleting the auth user of a firm's only owner (Supabase auth admin, or the service role) succeeds through the parent_gone test");
   });
 
-  it("flags the grant change, the pre-apply checks and the open questions", () => {
-    expect(HEADER).toContain("GRANT CHANGE (flagged)");
+  it("records Taylor's Nov 23 decisions, the pre-apply checks and the remaining questions", () => {
+    expect(HEADER).toContain("TABLE REVOKES (decided, Taylor, Nov 23: keep them)");
+    expect(raw).not.toContain("flagged");
+    for (const d of ["D1.", "D2.", "D3.", "D4."]) expect(HEADER, d).toContain(`--   ${d}`);
+    expect(HEADER).toContain("READ-ONLY: it shows the rows (ids and roles, no emails) and removes\n--      NOTHING");
+    expect(HEADER).toContain("select enum_range(null::public.crm_role);");
     expect(HEADER).toContain("r.rolname in ('authenticated', 'anon', 'authenticator', 'service_role', 'supabase_auth_admin')");
     expect(HEADER).toContain("'public.provision_org_for_owner(text,text,uuid,text,text,text)'::regprocedure");
     expect(HEADER).toContain("where table_schema = 'public' and table_name = 'crm_org_member' order by ordinal_position");
-    for (const q of ["Q1.", "Q2.", "Q3.", "Q4.", "Q5."]) expect(HEADER, q).toContain(`--   ${q}`);
-    expect(HEADER).toContain("should those writes be recorded in platform_admin_audit?");
+    for (const q of ["Q1.", "Q2.", "Q3.", "Q4."]) expect(HEADER, q).toContain(`--   ${q}`);
+    expect(HEADER).toContain("Should a DENIED platform-admin attempt be audited too?");
+    expect(HEADER).toContain("neither the REST API nor /graphql/v1 exposes schema `private`");
+    expect(HEADER).toContain("PRODUCTION SHAPE (checked on prod by the director, Nov 23)");
   });
 
   it("carries the isolation cases the requests asked for", () => {
@@ -112,6 +120,104 @@ describe("0116 proposal: header and prose", () => {
   });
 });
 
+describe("0116 proposal: rank mirror and platform admin audit (Taylor, Nov 23)", () => {
+  it("quotes the app's rank lines it mirrors, and each one is still in its named function (text, not line numbers)", () => {
+    for (const l of [
+      "export function hasRole(actual: Role, required: Role): boolean { return RANK[actual] <= RANK[required]; }",
+      "src/lib/settings/members.ts, inviteMember:   if (!hasRole(callerRole, role))",
+      "src/lib/settings/members.ts, removeMember:   if (!hasRole(callerRole, current))",
+      "src/lib/settings/admin.ts, setMemberRole:    if (!targetCurrentRole || !hasRole(callerRole, targetCurrentRole))",
+      "src/lib/settings/admin.ts, setMemberRole:    if (!hasRole(callerRole, role))",
+    ]) expect(HEADER, l).toContain(l);
+    expect(HEADER).not.toMatch(/src\/lib\/settings\/(members|admin)\.ts:\d+/);
+    expect(readFileSync(path.join(ROOT, "src/lib/auth/roles.ts"), "utf8")).toContain("return RANK[actual] <= RANK[required];");
+    /** The body of `export async function <name>(` up to the next top-level `export `. */
+    const bodyOf = (file: string, name: string) => {
+      const src = readFileSync(path.join(ROOT, file), "utf8");
+      const at = src.indexOf(`export async function ${name}(`);
+      expect(at, `${file} ${name}`).toBeGreaterThanOrEqual(0);
+      const next = src.indexOf("\nexport ", at + 1);
+      return src.slice(at, next === -1 ? undefined : next);
+    };
+    const count = (hay: string, needle: string) => hay.split(needle).length - 1;
+    const invite = bodyOf("src/lib/settings/members.ts", "inviteMember");
+    const remove = bodyOf("src/lib/settings/members.ts", "removeMember");
+    const setRole = bodyOf("src/lib/settings/admin.ts", "setMemberRole");
+    expect(count(invite, "if (!hasRole(callerRole, role)) {")).toBe(1);
+    expect(count(remove, "if (!hasRole(callerRole, current)) {")).toBe(1);
+    expect(count(setRole, "if (!targetCurrentRole || !hasRole(callerRole, targetCurrentRole)) {")).toBe(1);
+    expect(count(setRole, "if (!hasRole(callerRole, role)) {")).toBe(1);
+  });
+
+  it("the database's rank list is exactly the app's ROLES, in order", () => {
+    const m = SQL.match(/v_ranks constant text\[\] := array\[([^\]]+)\];/);
+    expect(m).not.toBeNull();
+    const list = m![1].split(",").map((x) => x.trim().replace(/^'|'$/g, ""));
+    expect(list).toEqual([...ROLES]);
+  });
+
+  it("the rank check reads the caller's real row and applies hasRole to the new and the old role", () => {
+    const f = fn("public.crm_org_member_owner_guard");
+    expect(f).toContain("if v_facts.caller_role is not null then v_caller_rank := pg_catalog.array_position(v_ranks, v_facts.caller_role);");
+    expect(f).toContain("(tg_op in ('INSERT', 'UPDATE') and coalesce(pg_catalog.array_position(v_ranks, new.role::text), 0) < v_caller_rank)");
+    expect(f).toContain("(tg_op in ('UPDATE', 'DELETE') and coalesce(pg_catalog.array_position(v_ranks, old.role::text), 0) < v_caller_rank)");
+    expect(f.indexOf("member_owner_guard_not_owner")).toBeLessThan(f.indexOf("member_owner_guard_rank"));
+  });
+
+  it("quotes 0050's audit table and adds only nullable columns and one CHECK", () => {
+    expect(HEADER).toContain("--     user_id    uuid not null references auth.users(id) on delete cascade,");
+    expect(SQL).toContain("alter table public.platform_admin_audit add column if not exists action text, add column if not exists target_user_id uuid, add column if not exists old_role public.crm_role, add column if not exists new_role public.crm_role;");
+    expect(SQL).toContain("add constraint platform_admin_audit_member_write_shape check ( (action is null and target_user_id is null and old_role is null and new_role is null) or (action = 'member_insert' and target_user_id is not null and old_role is null and new_role is not null) or (action = 'member_update' and target_user_id is not null and old_role is not null and new_role is not null) or (action = 'member_delete' and target_user_id is not null and old_role is not null and new_role is null) ) not valid;");
+    expect(SQL).toContain("end $$; alter table public.platform_admin_audit validate constraint platform_admin_audit_member_write_shape;");
+    expect(SQL).not.toMatch(/\b(grant|revoke)\b[^;]*\bon\s+(table\s+)?public\.platform_admin_audit\b/i);
+    expect(SQL).not.toMatch(/policy[^;]*platform_admin_audit/i);
+  });
+
+  it("the audit trigger is SECURITY DEFINER, takes no arguments, reads only NEW/OLD/TG_OP, and nothing else writes member rows", () => {
+    expect(sql).not.toContain("private.crm_org_member_audit");
+    const t = fn("public.crm_org_member_platform_audit");
+    expect(t).toContain("public.crm_org_member_platform_audit() returns trigger language plpgsql security definer set search_path = ''");
+    const order = [
+      "if v_uid is null then return null; end if;",
+      "if tg_op = 'DELETE' and old.user_id = v_uid then return null; end if;",
+      "if pg_catalog.pg_trigger_depth() > 1 then return null; end if;",
+      "if tg_op = 'DELETE' and (not exists (select 1 from public.crm_org o where o.id = v_org) or not exists (select 1 from auth.users u where u.id = v_target)) then return null; end if;",
+      "if exists (select 1 from public.crm_org_member m where m.org_id = v_org and m.user_id = v_uid) then return null; end if;",
+      "if not exists (select 1 from public.platform_admin p where p.user_id = v_uid) then return null; end if;",
+      "values (v_uid, v_org, 'member_insert', v_target, null, new.role);",
+      "values (v_uid, v_org, 'member_update', v_target, old.role, new.role);",
+      "values (v_uid, v_org, 'member_delete', v_target, old.role, null);",
+    ];
+    let last = -1;
+    for (const o of order) {
+      const at = t.indexOf(o);
+      expect(at, o).toBeGreaterThan(last);
+      last = at;
+    }
+    expect(t).not.toContain("current_user");
+    expect(t).not.toMatch(/exception\s+when/i);
+    for (const r of ["public", "anon", "authenticated", "service_role"]) expect(SQL).toContain(`revoke execute on function public.crm_org_member_platform_audit() from ${r};`);
+    expect(SQL).not.toMatch(/grant execute on function public\.crm_org_member_platform_audit/);
+    expect(SQL).toContain("create trigger crm_org_member_platform_audit_trg after insert or update or delete on public.crm_org_member for each row execute function public.crm_org_member_platform_audit();");
+    // The only statements in the file that insert into the audit table are the three branches of the trigger.
+    expect(SQL.match(/insert into public\.platform_admin_audit/g)).toHaveLength(3);
+  });
+
+  it("carries the audit and rank isolation cases", () => {
+    const cases = raw.slice(raw.indexOf("-- Cases to add to lectual tests/tenant-isolation.test.ts"));
+    for (const c of ["--  18. Platform admin audit", "exactly ONE new platform_admin_audit row", "add NO audit\n--      row; by the service role, none", "select from platform_admin_audit: 0 rows", "--  19. Rank (rule c2, member_owner_guard_rank)", "SA inserts (A, newUser, 'admin'): rank", "equal rank is allowed", "not bounded by rank",
+      "(i) Forging: no function writes a member_* audit row on request",
+      "--  20. A platform admin who is ALSO a real member (production's demo firm)",
+      "(b) With O2 still an owner, PO deletes their OWN row: succeeds, with NO audit row.",
+      "PO updates their own\n--          row to admin -> 42501 member_owner_guard_self_role",
+      "supabase.auth.admin.deleteUser(PO) returns error null",
+      "(A, newUser, 'paralegal') succeeds with exactly ONE audit row (user_id PO, org A, member_insert)",
+      "--  21. Rank list and enum", "as\n--      SETS",
+      "accept\n--      not_admin there",
+    ]) expect(cases, c).toContain(c);
+  });
+});
+
 describe("0116 proposal: the SQL", () => {
   it("is additive: no drop, no delete, no policy change, and the only grant change on the table is the flagged revoke", () => {
     expect(SQL).not.toMatch(/\bdrop\s/i);
@@ -126,18 +232,20 @@ describe("0116 proposal: the SQL", () => {
     expect(SQL).toContain("if pg_catalog.current_setting('server_version_num')::int >= 170000 then");
   });
 
-  it("puts both helpers in schema private, closed to public and anon", () => {
+  it("puts the two helpers in schema private, closed to public and anon, with EXECUTE narrowed", () => {
     expect(SQL).toContain("create schema if not exists private;");
     expect(SQL).toContain("revoke all on schema private from public;");
     expect(SQL).toContain("revoke all on schema private from anon;");
     expect(SQL).toContain("grant usage on schema private to authenticated;");
+    expect(SQL).not.toContain("grant usage on schema private to service_role;");
     expect(SQL).not.toMatch(/create or replace function public\.crm_org_member_(owner|caller)_facts/);
     for (const sig of ["private.crm_org_member_caller_facts(boolean)", "private.crm_org_member_parent_gone(uuid, uuid)"]) {
       expect(SQL, sig).toContain(`revoke all on function ${sig} from public;`);
       expect(SQL, sig).toContain(`revoke all on function ${sig} from anon;`);
-      expect(SQL, sig).toContain(`grant execute on function ${sig} to authenticated;`);
     }
-    expect(SQL).toContain("grant execute on function private.crm_org_member_parent_gone(uuid, uuid) to service_role;");
+    expect(SQL).toContain("grant execute on function private.crm_org_member_caller_facts(boolean) to authenticated;");
+    expect(SQL).toContain("revoke all on function private.crm_org_member_parent_gone(uuid, uuid) from authenticated;");
+    expect(SQL).not.toMatch(/grant execute on function private\.crm_org_member_parent_gone\(uuid, uuid\) to (authenticated|service_role)/);
     expect(SQL).toContain("execute 'grant execute on function private.crm_org_member_parent_gone(uuid, uuid) to supabase_auth_admin'");
   });
 
@@ -193,12 +301,11 @@ describe("0116 proposal: the SQL", () => {
     expect(f.indexOf("current_user = 'service_role'")).toBeLessThan(f.indexOf("member_owner_guard_no_session"));
   });
 
-  it("the AFTER guard lets cascades through FIRST, then keeps at least one owner under the lock", () => {
+  it("the AFTER guard lets GoTrue's cascade through (never asking for authenticated), then keeps at least one owner under the lock", () => {
     const f = fn("public.crm_org_member_last_owner_guard");
-    const gone = "if tg_op = 'DELETE' and private.crm_org_member_parent_gone(old.org_id, old.user_id) then return null; end if;";
+    const gone = "if tg_op = 'DELETE' and current_user <> 'authenticated' then if private.crm_org_member_parent_gone(old.org_id, old.user_id) then return null; end if; end if;";
     expect(f).toContain(gone);
-    expect(f.indexOf(gone)).toBeLessThan(f.indexOf("pg_catalog.pg_trigger_depth()"));
-    expect(f.indexOf(gone)).toBeLessThan(f.indexOf("current_user = 'service_role'"));
+    expect(f.indexOf("current_user = 'service_role'")).toBeLessThan(f.indexOf(gone));
     expect(f.indexOf(gone)).toBeLessThan(f.indexOf("member_owner_guard_wrong_org"));
     expect(f).toContain("if old.role is distinct from 'owner' then return null;");
     expect(f).toContain("from private.crm_org_member_caller_facts(true) f;");
@@ -213,15 +320,17 @@ describe("0116 proposal: the SQL", () => {
     expect(SQL.match(/errcode = '(\d+)'/g)?.every((m) => m.includes("42501"))).toBe(true);
   });
 
-  it("creates the two triggers idempotently", () => {
+  it("creates the three triggers idempotently", () => {
+    expect(SQL).toContain("create trigger crm_org_member_platform_audit_trg after insert or update or delete on public.crm_org_member");
     expect(SQL).toContain("create trigger crm_org_member_owner_guard_trg before insert or update or delete on public.crm_org_member for each row execute function public.crm_org_member_owner_guard();");
     expect(SQL).toContain("create trigger crm_org_member_last_owner_guard_trg after update or delete on public.crm_org_member for each row execute function public.crm_org_member_last_owner_guard();");
-    expect(SQL.match(/if not exists \( select 1 from pg_trigger/g)).toHaveLength(2);
+    expect(SQL.match(/if not exists \( select 1 from pg_trigger/g)).toHaveLength(3);
   });
 
   it("is pinned: any change to the file is deliberate", () => {
-    // Changed on purpose (strict review fixes, Nov 23): parent_gone, private schema, every-column immutability, real admin tier,
-    // table revokes, wider pre-apply checks, cases 7 / 12 / 16 / 17. Was b0b8fe095abf6ccb39ced4e398e5c10a.
-    expect(createHash("md5").update(raw).digest("hex")).toBe("39f9e6208b131b4cd1798db7084a3a6f");
+    // Changed on purpose (re-review, Nov 23): no argument audit function, SECURITY DEFINER audit trigger with the self-delete skip,
+    // NOT VALID + VALIDATE, narrowed parent_gone, the production shape (case 20), case 21, Q3/Q4. Was 4eb22683c0a5bf4c48c49f65552a195f
+    // (Taylor's answers), before that 39f9e6208b131b4cd1798db7084a3a6f (8b4d8fc) and b0b8fe095abf6ccb39ced4e398e5c10a.
+    expect(createHash("md5").update(raw).digest("hex")).toBe("4d2a91d1a21578ec49528d75c06a91ad");
   });
 });
