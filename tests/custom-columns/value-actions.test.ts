@@ -79,8 +79,8 @@ describe("F9: refusals, each with its sentence and nothing written", () => {
     ["a record kind that doesn't match the id", {}, { kind: "matter" }, W.RECORD_CARD_GONE],
     ["a person not in the directory", { field: fieldRow({ kind: "person", options: [] }), members: [] }, { value: PERSON }, W.CUSTOM_PERSON_NOT_MEMBER],
     ["a person value that isn't an id", { field: fieldRow({ kind: "person", options: [] }) }, { value: "Rebecca" }, W.CUSTOM_PERSON_NOT_MEMBER],
-    ["a malformed money string", { field: fieldRow({ kind: "money", options: [] }) }, { value: "1,25" }, W.CUSTOM_MONEY_BAD],
-    ["too much money", { field: fieldRow({ kind: "money", options: [] }) }, { value: "99999999999999999999" }, W.CUSTOM_MONEY_TOO_BIG],
+    ["a malformed money string", { field: fieldRow({ kind: "money", options: [] }), role: async () => "owner" }, { value: "1,25" }, W.CUSTOM_MONEY_BAD],
+    ["too much money", { field: fieldRow({ kind: "money", options: [] }), role: async () => "owner" }, { value: "99999999999999999999" }, W.CUSTOM_MONEY_TOO_BIG],
     ["a bad date", { field: fieldRow({ kind: "date", options: [] }) }, { value: "2026-02-30" }, W.CUSTOM_DATE_BAD],
     ["a choice not in the current options", {}, { value: "Urgent (old)" }, W.CUSTOM_CHOICE_BAD],
     ["text over 500 code points", { field: fieldRow({ kind: "text", options: [] }) }, { value: "x".repeat(501) }, W.CUSTOM_TEXT_TOO_LONG],
@@ -123,7 +123,7 @@ describe("F10: writes, one row per request", () => {
     expect(await post(s.deps)).toEqual({ error: W.CUSTOM_VALUE_CHANGED });
   });
   it("money is whole cents, a date its day, a person the id", async () => {
-    const money = valueStore({ field: fieldRow({ kind: "money", options: [] }) });
+    const money = valueStore({ field: fieldRow({ kind: "money", options: [] }), role: async () => "owner" });
     await post(money.deps, { value: "$1,250.5" });
     expect(money.deps.insertValue.mock.calls[0][0]).toMatchObject({ value_cents: 125050 });
     const date = valueStore({ field: fieldRow({ kind: "date", options: [] }) });
@@ -207,5 +207,30 @@ describe("C1: at most one write per call (plus the one retry update), never an a
         for (const c of s.deps.insertValue.mock.calls) for (const a of c as unknown[]) expect(Array.isArray(a)).toBe(false);
       }
     }
+  });
+});
+
+describe("Money columns are owner-only (Taylor, Nov 23)", () => {
+  const money = () => fieldRow({ kind: "money", options: [] });
+  for (const r of ["admin", "senior_admin", "attorney", "intake", "paralegal", "law_clerk", "clerk"])
+    it(`${r}: a Money value is refused before the record or the value is read, nothing written`, async () => {
+      const s = valueStore({ field: money(), role: async () => r });
+      expect(await post(s.deps, { value: "1250" })).toEqual({ error: W.CUSTOM_MONEY_OWNER_ONLY });
+      expect(s.deps.readRecord).not.toHaveBeenCalled();
+      expect(s.deps.readValueRow).not.toHaveBeenCalled();
+      expect(s.writes()).toBe(0);
+    });
+
+  it("a non-owner can't clear a Money value either (blank is a delete)", async () => {
+    const s = valueStore({ field: money(), role: async () => "admin", existing: { id: ROW } });
+    expect(await post(s.deps, { value: "" })).toEqual({ error: W.CUSTOM_MONEY_OWNER_ONLY });
+    expect(s.writes()).toBe(0);
+  });
+
+  it("the owner writes it; a non-money column is unchanged for everyone else", async () => {
+    const owner = valueStore({ field: money(), role: async () => "owner" });
+    expect(await post(owner.deps, { value: "1250" })).toEqual({ saved: true });
+    expect(owner.deps.insertValue.mock.calls[0][0]).toMatchObject({ value_cents: 125000 });
+    expect(await post(valueStore({ role: async () => "paralegal" }).deps)).toEqual({ saved: true });
   });
 });

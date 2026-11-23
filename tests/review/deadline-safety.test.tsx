@@ -46,6 +46,32 @@ describe("AT1 (Weekly review): a filed TM matter with no open deadline carries t
   });
 });
 
+describe("registered marks (Taylor, Nov 23): the review's flag rule, and buckets unchanged", () => {
+  const regStage = { code: "24", label: "Trademark Registered", is_open: true, waiting_on: "uspto", order_index: 24, phase: "maintenance" };
+  const dl = (kind: string) => ({ id: `d-${kind}`, matter_id: "m1", due_date: "2031-06-01", title: null, kind, attorney_confirmed: true });
+
+  it("a registered TM row with only an office action open is tagged; with an open Section 8 it isn't; the bucket never moves", () => {
+    // A firm whose maintenance stage is open on the docket (so the matter is a review row): the registered rule applies.
+    const [oaOnly] = buildReviewRows(base({ matters: [matter({ stage: regStage })] as never, deadlines: [dl("office_action_response")] }));
+    const [withS8] = buildReviewRows(base({ matters: [matter({ stage: regStage })] as never, deadlines: [dl("section_8_declaration")] }));
+    const [none] = buildReviewRows(base({ matters: [matter({ stage: regStage })] as never }));
+    expect(oaOnly.noOpenDeadline).toBe(true);
+    expect(none.noOpenDeadline).toBe(true);
+    expect(withS8.noOpenDeadline).toBe(false);
+    expect(rowTags(oaOnly, TODAY).map((t) => t.text)).toContain("No open deadline");
+    for (const r of [oaOnly, none]) expect(bucketOf(r, TODAY)).toBe(bucketOf({ ...r, noOpenDeadline: false }, TODAY));
+  });
+
+  it("a failed deadlines read tags nothing", () => {
+    const [row] = buildReviewRows(base({ matters: [matter({ stage: regStage })] as never, sources: { activity: "ok", deadlines: "unavailable" } }));
+    expect(row.noOpenDeadline).toBe(false);
+  });
+
+  it("membership is unchanged: a registered stage that is closed on the docket (is_open false) is still not a review row", () => {
+    expect(buildReviewRows(base({ matters: [matter({ stage: { ...regStage, is_open: false } })] as never }))).toHaveLength(0);
+  });
+});
+
 describe("Weekly review Deadlines strip", () => {
   const rows = buildReviewRows(
     base({

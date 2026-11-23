@@ -15,6 +15,8 @@ export function fakeDb(answer: (call: Call) => { data: unknown; error?: unknown 
           const b: Record<string, unknown> = {
             eq: (c: string, v: unknown) => (call.eq.push([c, v]), b),
             in: (c: string, v: readonly string[]) => (call.inn.push([c, v]), b),
+            // The non-owner's value read filters `value_cents is null` (Taylor, Nov 23: custom money is owner-only).
+            is: () => b,
             gte: () => b,
             order: () => b,
             range: (from: number, to: number) => ((call.range = [from, to]), b),

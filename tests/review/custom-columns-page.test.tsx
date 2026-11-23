@@ -66,7 +66,10 @@ describe.each(LISTS)("the %s with each custom state", (_name, who) => {
   it("ok with fields: they are drawn and the chooser lists them", async () => {
     mockPage({ load: { ...base, failed: [], custom: customFixture }, role: who.role, roleViews: who.roleViews });
     const html = decode(await renderPage({ view: "sheet" }));
-    expect(tableHeaders(html)[0].slice(-5)).toEqual(["Priority", "Review cycle", "Quoted fee", "Brand note", "Reviewer"]);
+    // Nov 23: the Money field ("Quoted fee") is drawn for the owner only.
+    const want = who.money ? ["Priority", "Review cycle", "Quoted fee", "Brand note", "Reviewer"] : ["Priority", "Review cycle", "Brand note", "Reviewer"];
+    expect(tableHeaders(html)[0].slice(-want.length)).toEqual(want);
+    if (!who.money) expect(html).not.toContain("$1,250.00");
   });
 });
 

@@ -139,3 +139,28 @@ describe("the page decides which read feeds the card's Firm columns", () => {
     }
   });
 });
+
+/* ── Taylor, Nov 23: the card's Money values are owner-only too ── */
+
+describe("the card's own custom read carries the viewer's money access; a non-owner's card draws no Money field", () => {
+  beforeEach(() => vi.resetModules());
+  // The fixture's TM matter (it holds a $1,250.00 Money value) opened while it is NOT a List row.
+  const tmId = customFixture.status === "ok" ? customFixture.values.find((v) => v.cents !== null)!.matterId! : "";
+
+  for (const [role, money] of [["owner", true], ["admin", false], ["senior_admin", false], ["attorney", false], ["paralegal", false]] as const)
+    it(`${role}: canSeeMoney ${money}`, async () => {
+      mockPage({ load: load(null), role, card: matterCard(tmId, "TM", null, role), cardCustom: customFixture });
+      const html = decode(await renderPage({ view: "board", open: `matter:${tmId}` }));
+      expect(spies.cardCustom).toHaveBeenCalledTimes(1);
+      expect(spies.cardCustom.mock.calls[0][1]).toEqual({ canSeeMoney: money });
+      // Even a card read that (wrongly) came back with an amount draws none for a non-owner: the page cleans it (withoutMoney).
+      if (money) {
+        expect(html).toContain("Quoted fee");
+        expect(html).toContain('value="1250.00"');
+      } else {
+        expect(html).not.toContain("Quoted fee");
+        expect(html).not.toContain("1250.00");
+        expect(html).not.toContain("1,250");
+      }
+    });
+});

@@ -16,6 +16,7 @@ import {
 } from "@/lib/review/sheet-columns";
 import { formatCents } from "@/lib/quotes/money";
 import type { Role } from "@/lib/auth/roles";
+import { canSeeBilling } from "@/lib/billing/can-see";
 import { BLANK, COL_COULDNT_LOAD, CUSTOM_FROM_LEAD, CUSTOM_FROM_MERGED, CUSTOM_NO_LONGER_ON_TEAM } from "@/lib/ui/words";
 import { centsToInput, parseValueInput } from "./input";
 import { cutCodePoints, optionsShapeOk, sqlLabelOk } from "./text";
@@ -84,6 +85,30 @@ export const TEXT_MAX = 500;
  */
 export const CUSTOM_VALUE_WRITE_ROLES: readonly Role[] = ["owner", "admin", "senior_admin", "attorney", "intake", "paralegal", "law_clerk", "clerk"];
 export const canWriteCustomValue = (role: string | null | undefined): boolean => !!role && (CUSTOM_VALUE_WRITE_ROLES as readonly string[]).includes(role);
+
+/**
+ * Who may see or type a value in a firm's own MONEY column: exactly who sees the built-in fee columns, `canSeeBilling` (the owner, nothing
+ * else; unknown or unreadable = no). Taylor, Nov 23. The read (`loadCustomColumns`) never selects an amount for anyone else, the write
+ * (`setCustomValue`) refuses, and 0115's value policies hide and refuse money rows for every other role.
+ */
+export const canSeeCustomMoney = (role: unknown): boolean => canSeeBilling(role);
+
+/** The live fields this viewer may have: Money fields only when `canSeeMoney`. */
+export function visibleFields<F extends { kind: CustomKind }>(fields: readonly F[], canSeeMoney: boolean): F[] {
+  return canSeeMoney ? [...fields] : fields.filter((f) => f.kind !== "money");
+}
+
+/**
+ * A custom state with every Money field and every amount removed, for a viewer who may not see money. The loader already never selects
+ * one for them; this is the page's second fence (a state handed over from elsewhere is cleaned the same way). Values of a removed field,
+ * and any value holding an amount, are dropped.
+ */
+export function withoutMoney(state: CustomColumnsState): CustomColumnsState {
+  if (state.status !== "ok") return state;
+  const fields = visibleFields(state.fields, false);
+  const ids = new Set(fields.map((f) => f.id));
+  return { ...state, fields, values: state.values.filter((v) => ids.has(v.fieldId) && v.cents === null) };
+}
 
 const isKind = (x: unknown): x is CustomKind => typeof x === "string" && (CUSTOM_KINDS as readonly string[]).includes(x);
 const isSection = (x: unknown): x is CustomSection => typeof x === "string" && (CUSTOM_SECTIONS as readonly string[]).includes(x);

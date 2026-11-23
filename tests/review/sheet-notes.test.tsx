@@ -123,7 +123,8 @@ describe("the loader (three states, one bounded query per record)", () => {
     const page = readFileSync("src/app/dashboard/review/page.tsx", "utf8");
     // Changed on purpose (merge with the column registry): the page passes `notes` with the List's other reads (fees, custom columns).
     expect(page).toContain('const notes = params.view === "sheet";');
-    expect(page).toContain("loadReview(new Date(), { withFees, withCustom, notes })");
+    // Changed on purpose (Nov 23): custom Money is owner-only, so the call also carries `customMoney`.
+    expect(page).toContain("loadReview(new Date(), { withFees, withCustom, notes, customMoney })");
     expect(page).not.toContain("loadSheetNotes");
   });
 });

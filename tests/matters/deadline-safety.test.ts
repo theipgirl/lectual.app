@@ -8,13 +8,20 @@ import {
   isCloseGuardRefusal,
   isFiledTrademark,
   isMissingOverrideFunction,
+  isRegisteredTrademark,
+  MAINTENANCE_DEADLINE_KINDS,
+  needsDeadlineCheck,
   noOpenDeadline,
+  noOpenDeadlineHint,
+  openDeadlineIndex,
   parseOverrideReason,
 } from "@/lib/matters/deadline-safety";
 import { DEADLINE_KINDS } from "@/lib/matters/deadline-rules";
 import { ROLES } from "@/lib/auth/roles";
 
 const openStage = { code: "17", label: "Application Filed", is_open: true, waiting_on: "uspto" as const };
+/** Changed on purpose (Nov 23): the flag takes an index (any open deadline, and an open Section 8 / renewal one), not a bare set. */
+const idx = (any: string[], maintenance: string[] = []) => ({ any: new Set(any), maintenance: new Set(maintenance) });
 const filed = (over: Record<string, unknown> = {}) => ({ id: "m1", status: "open", type: "TM", serial_number: "97123456", filing_date: null, stage: openStage, ...over });
 
 describe("AT1: a filed TM matter with no open deadline is flagged 'No open deadline'", () => {
@@ -33,8 +40,8 @@ describe("AT1: a filed TM matter with no open deadline is flagged 'No open deadl
   });
 
   it("flagged when no open deadline exists; not flagged when one does", () => {
-    expect(noOpenDeadline(filed(), new Set())).toBe(true);
-    expect(noOpenDeadline(filed(), new Set(["m1"]))).toBe(false);
+    expect(noOpenDeadline(filed(), idx([]))).toBe(true);
+    expect(noOpenDeadline(filed(), idx(["m1"]))).toBe(false);
   });
 
   it("a matter whose deadlines are only satisfied / waived is flagged too (only OPEN rows go in the set)", () => {
@@ -42,18 +49,72 @@ describe("AT1: a filed TM matter with no open deadline is flagged 'No open deadl
       { matter_id: "m1", status: "satisfied" },
       { matter_id: "m1", status: "waived" },
     ];
-    const open = new Set(rows.filter((r) => r.status === "open").map((r) => r.matter_id));
+    const open = openDeadlineIndex(rows.map((r) => ({ ...r, kind: "office_action_response" })));
     expect(noOpenDeadline(filed(), open)).toBe(true);
   });
 
   it("an unfiled matter is never flagged", () => {
-    expect(noOpenDeadline(filed({ serial_number: null }), new Set())).toBe(false);
+    expect(noOpenDeadline(filed({ serial_number: null }), idx([]))).toBe(false);
   });
 });
 
 describe("AT2: a failed deadlines read flags nothing", () => {
   it("null (the read failed) is unknown: no matter is flagged", () => {
     expect(noOpenDeadline(filed(), null)).toBe(false);
+  });
+});
+
+describe("registered marks (Taylor, Nov 23): no open Section 8 / renewal deadline is flagged too", () => {
+  // A registered docket stage: phase maintenance, and (as in RPB's data) is_open false, which isOpenMatter reads as closed.
+  const regStage = { code: "24", label: "Trademark Registered", is_open: false, waiting_on: "uspto" as const, phase: "maintenance" };
+  const registered = (over: Record<string, unknown> = {}) => filed({ stage: regStage, ...over });
+  const rows = (...r: [string, string][]) => openDeadlineIndex(r.map(([matter_id, kind]) => ({ matter_id, kind, status: "open" })));
+
+  it("which kinds count: Section 8 and Section 9 renewal only (Section 15 is optional, and an office action is not maintenance)", () => {
+    expect([...MAINTENANCE_DEADLINE_KINDS]).toEqual(["section_8_declaration", "section_9_renewal"]);
+    for (const k of MAINTENANCE_DEADLINE_KINDS) expect(DEADLINE_KINDS).toContain(k);
+  });
+
+  it("a registered TM matter is defined by the phase, not the stage's is_open or name; it is not 'filed' (isOpenMatter reads it closed)", () => {
+    expect(isRegisteredTrademark(registered())).toBe(true);
+    expect(isRegisteredTrademark(registered({ stage: { ...regStage, is_open: true } }))).toBe(true);
+    expect(isRegisteredTrademark(registered({ stage: { ...regStage, label: "Anything", code: "99" } }))).toBe(true);
+    expect(isFiledTrademark(registered())).toBe(false);
+    expect(needsDeadlineCheck(registered())).toBe(true);
+    for (const over of [{ status: "closed" }, { status: "on_hold" }, { type: "CR" }, { stage: { ...regStage, phase: "post_filing" } }, { stage: { ...regStage, phase: null } }, { stage: null }])
+      expect(isRegisteredTrademark(registered(over)), JSON.stringify(over)).toBe(false);
+    expect(isRegisteredTrademark(registered({ type: null }))).toBe(true);
+  });
+
+  it("registered with no open deadline at all: flagged", () => {
+    expect(noOpenDeadline(registered(), rows())).toBe(true);
+  });
+  it("registered with only an office-action deadline open: flagged", () => {
+    expect(noOpenDeadline(registered(), rows(["m1", "office_action_response"]))).toBe(true);
+  });
+  it("registered with only a Section 15 or 'other' deadline open: flagged", () => {
+    expect(noOpenDeadline(registered(), rows(["m1", "section_15_declaration"], ["m1", "other"]))).toBe(true);
+  });
+  it("registered with an open Section 8, or an open Section 9 renewal: not flagged", () => {
+    expect(noOpenDeadline(registered(), rows(["m1", "section_8_declaration"]))).toBe(false);
+    expect(noOpenDeadline(registered(), rows(["m1", "office_action_response"], ["m1", "section_9_renewal"]))).toBe(false);
+  });
+  it("a satisfied Section 8 is not open: still flagged", () => {
+    expect(noOpenDeadline(registered(), openDeadlineIndex([{ matter_id: "m1", kind: "section_8_declaration", status: "satisfied" }]))).toBe(true);
+  });
+  it("another matter's Section 8 doesn't satisfy this one", () => {
+    expect(noOpenDeadline(registered(), rows(["m2", "section_8_declaration"]))).toBe(true);
+  });
+  it("a failed deadlines read (null) flags nothing", () => {
+    expect(noOpenDeadline(registered(), null)).toBe(false);
+  });
+  it("the hint says which rule: registered wording for a registered mark, filed wording otherwise", () => {
+    const words = { filed: "F", registered: "R" };
+    expect(noOpenDeadlineHint(registered(), words)).toBe("R");
+    expect(noOpenDeadlineHint(filed(), words)).toBe("F");
+  });
+  it("a filed (not registered) matter is unchanged: any open deadline satisfies it", () => {
+    expect(noOpenDeadline(filed(), rows(["m1", "office_action_response"]))).toBe(false);
   });
 });
 

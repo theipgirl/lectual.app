@@ -3,6 +3,7 @@ import {
   CUSTOM_COLUMN_ARCHIVED,
   CUSTOM_COLUMNS_NOT_READY,
   CUSTOM_FIELD_GONE,
+  CUSTOM_MONEY_OWNER_ONLY,
   CUSTOM_PERSON_NOT_MEMBER,
   CUSTOM_TEAM_UNREADABLE,
   CUSTOM_VALUE_CHANGED,
@@ -14,7 +15,7 @@ import {
 } from "@/lib/ui/words";
 import { customColumnsError, isMissingTable, isOnePerRecordConflict } from "./errors";
 import { parseValueInput, type CustomInputValue } from "./input";
-import { canWriteCustomValue } from "./rules";
+import { canSeeCustomMoney, canWriteCustomValue } from "./rules";
 import { optionsShapeOk } from "./text";
 import type { ActionState, FieldRow } from "./field-actions";
 
@@ -82,6 +83,9 @@ export async function setCustomValue(deps: ValueDeps, input: ValueInput): Promis
   const fieldKind = field.kind as CustomKind;
   if (!(fieldKind in KIND_COLUMN) || !optionsShapeOk(fieldKind, field.options)) return refuse(CUSTOM_VALUE_SAVE_FAILED);
   const options = field.options as string[];
+  // 3b. A Money column is owner-only, reads and writes alike (Taylor, Nov 23; 0115's value policies say the same). Refused before
+  //     the record, the existing value or anything else is read, so a non-owner learns nothing about a stored amount.
+  if (fieldKind === "money" && !canSeeCustomMoney(role)) return refuse(CUSTOM_MONEY_OWNER_ONLY);
 
   // 4. A merged lead writes to its keeper.
   let recordId = postedId;

@@ -1,5 +1,5 @@
 import "server-only";
-import { parseField, parseValue, type CustomData, type CustomField, type CustomValue } from "./rules";
+import { parseField, parseValue, visibleFields, type CustomData, type CustomField, type CustomValue } from "./rules";
 
 /**
  * The read side of a firm's custom columns (lectual 0115, proposed). Takes the caller's SCOPED client as a parameter and never creates
@@ -8,6 +8,11 @@ import { parseField, parseValue, type CustomData, type CustomField, type CustomV
  *   not-set-up   either table is missing (42P01 / PGRST205): the custom columns aren't switched on for the firm yet. Not a failure;
  *   unavailable  anything else, a non-list answer, a read cut short by the page budget, or a failed merged-leads read.
  * Every select names its columns. Values are read in chunks of ids and paged; a page budget that runs out FAILS the read.
+ *
+ * Money is owner-only (Taylor, Nov 23). `access.canSeeMoney` comes from the caller's re-resolved role (`canSeeCustomMoney`), never from
+ * a browser value. Without it: Money fields are not returned, the value select does not name `value_cents` (VALUE_SELECT_NO_MONEY), and
+ * the query asks only for rows whose `value_cents` is null, so no amount ever leaves the database for that viewer. 0115's SELECT policy
+ * hides the same rows for every role but owner.
  */
 
 export const CUSTOM_CHUNK = 80;
@@ -18,6 +23,11 @@ export const FIELD_READ_LIMIT = 1000;
 
 export const FIELD_SELECT = "id, section, label, kind, options, position";
 export const VALUE_SELECT = "id, field_id, lead_id, matter_id, value_text, value_date, value_cents, value_choice, value_user_id, updated_at";
+/** The same columns without the amount: what a viewer who may not see money is read with. */
+export const VALUE_SELECT_NO_MONEY = "id, field_id, lead_id, matter_id, value_text, value_date, value_choice, value_user_id, updated_at";
+
+/** Who is reading: decided by the caller from the role it re-resolved. Required, so no read forgets it. */
+export type CustomReadAccess = { canSeeMoney: boolean };
 
 export const MISSING_TABLE_CODES: ReadonlySet<string> = new Set(["42P01", "PGRST205"]);
 
@@ -29,6 +39,7 @@ export type ReadMerged = (db: never, leadIds: readonly string[]) => Promise<Read
 type Answer = { data: unknown; error: unknown };
 type Q = PromiseLike<Answer> & {
   eq(column: string, value: unknown): Q;
+  is(column: string, value: null): Q;
   in(column: string, values: readonly string[]): Q;
   order(column: string): Q;
   range(from: number, to: number): Q;
@@ -73,18 +84,21 @@ async function readFields(raw: ReadClient): Promise<CustomField[]> {
   return data.map(parseField).filter((f): f is CustomField => f !== null);
 }
 
-async function readValues(raw: ReadClient, column: "matter_id" | "lead_id", ids: readonly string[]): Promise<unknown[]> {
+async function readValues(raw: ReadClient, column: "matter_id" | "lead_id", ids: readonly string[], canSeeMoney: boolean): Promise<unknown[]> {
   if (ids.length === 0) return [];
-  const parts = await Promise.all(
-    chunks(ids).map((chunk) => pages((from, to) => raw.from("crm_custom_value").select(VALUE_SELECT).in(column, chunk).order("id").range(from, to))),
-  );
+  const page = (chunk: string[]) => (from: number, to: number) =>
+    canSeeMoney
+      ? raw.from("crm_custom_value").select(VALUE_SELECT).in(column, chunk).order("id").range(from, to)
+      : raw.from("crm_custom_value").select(VALUE_SELECT_NO_MONEY).in(column, chunk).is("value_cents", null).order("id").range(from, to);
+  const parts = await Promise.all(chunks(ids).map((chunk) => pages(page(chunk))));
   return parts.flat();
 }
 
-export async function loadCustomColumns(db: unknown, matterIds: readonly string[], leadIds: readonly string[], readMerged: ReadMerged): Promise<CustomColumnsRead> {
+export async function loadCustomColumns(db: unknown, matterIds: readonly string[], leadIds: readonly string[], readMerged: ReadMerged, access: CustomReadAccess): Promise<CustomColumnsRead> {
   const raw = db as ReadClient;
+  const canSeeMoney = access?.canSeeMoney === true;
   try {
-    const fields = await readFields(raw);
+    const fields = visibleFields(await readFields(raw), canSeeMoney);
     if (fields.length === 0) return { status: "ok", fields: [], values: [], mergedInto: {} };
     let merged: ReadonlyMap<string, string>;
     try {
@@ -93,12 +107,13 @@ export async function loadCustomColumns(db: unknown, matterIds: readonly string[
       return { status: "unavailable" };
     }
     const allLeads = [...new Set([...leadIds, ...merged.keys()])];
-    const [m, l] = await Promise.all([readValues(raw, "matter_id", [...new Set(matterIds)]), readValues(raw, "lead_id", allLeads)]);
+    const [m, l] = await Promise.all([readValues(raw, "matter_id", [...new Set(matterIds)], canSeeMoney), readValues(raw, "lead_id", allLeads, canSeeMoney)]);
     const fieldIds = new Set(fields.map((f) => f.id));
     const byId = new Map<string, CustomValue>();
     for (const r of [...m, ...l]) {
       const v = parseValue(r, fieldIds);
-      if (v) byId.set(v.id, v);
+      // A third fence: an amount that reached here for a viewer who may not see money is dropped, never drawn.
+      if (v && (canSeeMoney || v.cents === null)) byId.set(v.id, v);
     }
     return { status: "ok", fields, values: [...byId.values()], mergedInto: Object.fromEntries(merged) };
   } catch (e) {

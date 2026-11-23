@@ -40,9 +40,9 @@ import {
   phaseGroupCounts,
 } from "@/lib/matters/phase-group";
 import { isHiredStage } from "@/lib/matters/hired-stage";
-import { searchPlaceholder, BLANK, MATTERS_NAME, OWNER_COLUMN, TEAMMATE, UNASSIGNED, MATTER_GROUPS_NAV, MATTER_GROUP_ALL, MATTER_INTAKE_STAGES, MATTER_INTAKE_SHOW, MATTER_SHOWING_INTAKE, MATTER_BACK_TO_PAST_INTAKE, MATTER_ALL_INTAKE_BODY, MATTER_ALL_INTAKE_TITLE, MATTER_GROUP_EMPTY, MATTER_GROUP_LABEL, MATTER_PHASES_UNAVAILABLE, MATTER_NO_HIRED_STAGE, MATTER_STATUS_NAV, DEADLINE_FLAGS_UNCHECKED, NO_OPEN_DEADLINE, NO_OPEN_DEADLINE_HINT } from "@/lib/ui/words";
+import { searchPlaceholder, BLANK, MATTERS_NAME, OWNER_COLUMN, TEAMMATE, UNASSIGNED, MATTER_GROUPS_NAV, MATTER_GROUP_ALL, MATTER_INTAKE_STAGES, MATTER_INTAKE_SHOW, MATTER_SHOWING_INTAKE, MATTER_BACK_TO_PAST_INTAKE, MATTER_ALL_INTAKE_BODY, MATTER_ALL_INTAKE_TITLE, MATTER_GROUP_EMPTY, MATTER_GROUP_LABEL, MATTER_PHASES_UNAVAILABLE, MATTER_NO_HIRED_STAGE, MATTER_STATUS_NAV, DEADLINE_FLAGS_UNCHECKED, NO_MAINTENANCE_DEADLINE_HINT, NO_OPEN_DEADLINE, NO_OPEN_DEADLINE_HINT } from "@/lib/ui/words";
 import { resolveFirmSession } from "@/lib/firm/session";
-import { isFiledTrademark, noOpenDeadline } from "@/lib/matters/deadline-safety";
+import { isRegisteredTrademark, needsDeadlineCheck, noOpenDeadline, noOpenDeadlineHint } from "@/lib/matters/deadline-safety";
 import { loadOpenDeadlineMatterIds } from "@/lib/matters/open-deadlines-read";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import { matterIdsNeedingReview } from "./list-utils";
@@ -89,9 +89,9 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
     loadError = true;
   }
 
-  // Deadline safety (PGE Sprint 3): which filed trademarks hold an open deadline. Only those matters are asked about;
-  // a failed read flags nothing and says so.
-  const filedIds = all.filter((m) => isFiledTrademark(m)).map((m) => m.id);
+  // Deadline safety (PGE Sprint 3): which filed and registered trademarks hold an open deadline (a registered one needs a
+  // Section 8 / renewal deadline, Taylor Nov 23). Only those matters are asked about; a failed read flags nothing and says so.
+  const filedIds = all.filter((m) => needsDeadlineCheck(m)).map((m) => m.id);
   const [queue, members, leads, canCreateLitigation, stageRead, role, openDeadlineRead] = await Promise.all([
     loadActiveQueue(),
     listMemberDirectory().catch(() => []),
@@ -271,6 +271,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
           reviewIds={reviewIds}
           reviewItems={reviewItems}
           noDeadlineIds={new Set(shown.filter((m) => noOpenDeadline(m, openDeadlineIds)).map((m) => m.id))}
+          registeredNoDeadlineIds={new Set(shown.filter((m) => noOpenDeadline(m, openDeadlineIds) && isRegisteredTrademark(m)).map((m) => m.id))}
           ownerName={(id) => (id ? memberName.get(id) ?? TEAMMATE : null)}
           cards={cards}
         />
@@ -339,7 +340,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
                             {noOpenDeadline(m, openDeadlineIds) && (
                               <>
                                 {" "}
-                                <Pill tone="risk" title={NO_OPEN_DEADLINE_HINT}>{NO_OPEN_DEADLINE}</Pill>
+                                <Pill tone="risk" title={noOpenDeadlineHint(m, { filed: NO_OPEN_DEADLINE_HINT, registered: NO_MAINTENANCE_DEADLINE_HINT })}>{NO_OPEN_DEADLINE}</Pill>
                               </>
                             )}
                             {reviewIds.has(m.id) && (

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { BoardCard, BoardColumn, Pill } from "@/components/ui";
-import { NO_OPEN_DEADLINE, NO_OPEN_DEADLINE_HINT, columnEmpty } from "@/lib/ui/words";
+import { NO_MAINTENANCE_DEADLINE_HINT, NO_OPEN_DEADLINE, NO_OPEN_DEADLINE_HINT, columnEmpty } from "@/lib/ui/words";
 import type { Matter } from "@/lib/matters";
 import type { MatterStage } from "@/lib/matters/stages";
 import { buildBoard } from "@/lib/matters/board";
@@ -34,6 +34,8 @@ export function MatterBoard(props: {
   ownerName: (id: string | null) => string | null;
   /** PGE Sprint 3: filed trademarks with no open deadline (a tag only). Absent or empty = none flagged. */
   noDeadlineIds?: ReadonlySet<string>;
+  /** Of `noDeadlineIds`, the registered marks (no Section 8 / renewal deadline open): their tag's hover text says so. */
+  registeredNoDeadlineIds?: ReadonlySet<string>;
   /** Sprint 10: what each role may do on each card, the open link and the lines. Absent: the plain board, as before. */
   cards?: Record<string, MatterCardData>;
 }) {
@@ -76,7 +78,7 @@ export function MatterBoard(props: {
                 ))}
               {needsReview && noDeadline && " "}
               {noDeadline && (
-                <Pill tone="risk" title={NO_OPEN_DEADLINE_HINT}>
+                <Pill tone="risk" title={props.registeredNoDeadlineIds?.has(m.id) ? NO_MAINTENANCE_DEADLINE_HINT : NO_OPEN_DEADLINE_HINT}>
                   {NO_OPEN_DEADLINE}
                 </Pill>
               )}

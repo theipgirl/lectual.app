@@ -9,6 +9,7 @@ import {
   COLUMNS_ADD,
   COLUMNS_ARCHIVE,
   COLUMNS_CHOICES_HINT,
+  COLUMNS_KIND_MONEY_HINT,
   COLUMNS_CHOICES_LABEL,
   COLUMNS_EDIT_CHOICES,
   COLUMNS_KIND_LABEL,
@@ -79,6 +80,7 @@ export function AddColumnForm() {
             </option>
           ))}
         </select>
+        <span className="lx-note">{COLUMNS_KIND_MONEY_HINT}</span>
       </label>
       <label className="cs-field cs-field-wide">
         <span className="lx-label">{COLUMNS_CHOICES_LABEL}</span>

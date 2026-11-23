@@ -89,11 +89,12 @@ export function fieldsForSection<F extends CustomColumnField>(fields: readonly F
 }
 
 /**
- * A custom field as a List column: never money-gated, never pinned; the header is the firm's label, the hover text its kind. It CAN be
- * typed (Sprint 3); whether a given person may type in a given row is `cellEditable`'s call (role, section), never this flag's.
+ * A custom field as a List column: never pinned; the header is the firm's label, the hover text its kind. A Money field is a money column
+ * (owner-only, Taylor Nov 23: `columnsFor` drops it for everyone else). It CAN be typed (Sprint 3); whether a given person may type in a
+ * given row is `cellEditable`'s call (role, section), never this flag's.
  */
 export function customColumn(field: CustomColumnField): SheetColumn {
-  return { id: customColumnId(field.id), header: field.label, title: CUSTOM_KIND_WORDS[field.kind], money: false, pinned: false, editable: true, kind: field.kind };
+  return { id: customColumnId(field.id), header: field.label, title: CUSTOM_KIND_WORDS[field.kind], money: field.kind === "money", pinned: false, editable: true, kind: field.kind };
 }
 
 /**
@@ -174,14 +175,15 @@ export function sheetColumn(id: BuiltinColumnId, section: SheetSectionId): Sheet
 /**
  * The columns this viewer may have, in default order. `canSeeMoney` comes from the page's re-resolved role
  * (`canSeeBilling`), never from a browser value; `hasNotes` is whether the Notes cell exists. `customFields` are the firm's live
- * fields (read through the scoped client): that section's come after the spreadsheet columns, in position order. A custom money
- * column is NOT under the owner-only fee rule (an open question for the firm; changing it is this one predicate).
+ * fields (read through the scoped client): that section's come after the spreadsheet columns, in position order. A custom Money
+ * column follows the fee columns' rule (Taylor, Nov 23): dropped unless `canSeeMoney`, so a non-owner's chooser never lists it and a
+ * stored pref naming it is dropped by `parseColumnPrefs`.
  */
 export function columnsFor(section: SheetSectionId, opts: { canSeeMoney: boolean; hasNotes: boolean; customFields?: readonly CustomColumnField[] }): SheetColumn[] {
   const builtin = SHEET_SECTION_COLUMNS[section]
     .filter((id) => (opts.canSeeMoney || !MONEY_COLUMNS.includes(id)) && (opts.hasNotes || id !== "notes"))
     .map((id) => sheetColumn(id, section));
-  return [...builtin, ...fieldsForSection(opts.customFields ?? [], section).map(customColumn)];
+  return [...builtin, ...fieldsForSection(opts.customFields ?? [], section).filter((f) => opts.canSeeMoney || f.kind !== "money").map(customColumn)];
 }
 
 /** The "No home" spreadsheet columns, named once in the note above each section. */

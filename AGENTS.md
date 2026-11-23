@@ -2270,6 +2270,7 @@ Intake and Matters, Board and List: temperature, source, owner, next step and st
   function (42883 / PGRST202) is "not switched on" and shows "Only <name> can see this"; any other failure is couldn't check. An answer is trusted only when it
   contains every connection the caller can see; an EMPTY answer is trusted (it reads "No Outlook mailbox connected yet.") only when the caller's own read is empty too.
 - **Weekly review's last-changed line** ("Changed by Caitlyn · Nov 16", `LastChanged` over `pickLastChanges`) draws nothing when its read failed, never "not changed".
+  A lead that came in through an intake form reads "Came in through the <form name> form" (Taylor, Nov 23; see "The form a lead came in through" below).
 - **A matter's lead mail** (filed on the lead before it signed) feeds the matter's Sent line and last contact date, NOT its direction: whose turn it is
   comes from the matter's own mail, so an overdue step is not moved to "Waiting on client" by the proposal email. A board card keeps its due chip when
   its bucket is overdue or due this week, in either list.
@@ -2287,8 +2288,16 @@ deadline or changes `attorney_confirmed`. Rules are pure in `src/lib/matters/dea
   only the filed TM ids) and the Weekly review (`row.noOpenDeadline`, `rowTags`). It never changes a bucket, sort or count. A failed
   deadlines read is "unknown": nothing is flagged, and the page says the deadlines couldn't load (the matter page no longer fails whole).
   The Weekly review's "Since Feb 2026" filter never hides a flagged row (`isOlderThanSince`).
-  **Registered marks are not flagged** (`isOpenMatter` reads a registered docket stage as closed). Kept on purpose: whether a registered
-  mark with no Section 8 or renewal deadline should be flagged is Rebecca's decision.
+  **Registered marks are flagged too (Taylor, Nov 23: Rebecca's question is answered).** `isRegisteredTrademark` is its own pure rule
+  (`isOpenMatter` reads a registered docket stage as closed, so `isFiledTrademark` never sees one): lifecycle `open`, type TM, docket stage
+  `phase = 'maintenance'` (never a stage name or code). Such a matter needs an OPEN deadline of a `MAINTENANCE_DEADLINE_KINDS` kind
+  (`section_8_declaration`, `section_9_renewal`; Section 15 is optional and does not count, nor does an office action or any other kind), else
+  it carries the same "No open deadline" tag with its own hint (`NO_MAINTENANCE_DEADLINE_HINT`, `noOpenDeadlineHint`). The registered rule is
+  asked first. The flag takes `openDeadlineIndex` (`{ any, maintenance }` matter id sets), never a bare set; `loadOpenDeadlineMatterIds` now
+  selects `matter_id, kind` for the filed AND registered ids (`needsDeadlineCheck`). Drawn on the matter page, the Matters list and board
+  (a registered stage is `is_open = false`, so those matters sit under the Closed chip there), and by the Weekly review's rule. **The Weekly
+  review's membership is unchanged:** it lists open docket stages only, so a registered matter on an `is_open = false` stage is not a review
+  row and shows no review tag; a firm whose maintenance stage is open on the docket gets the tag there. A tag only: never a bucket.
 - **Alerts** (Taylor C8): recipients are the firm note `crm_firm_brain_entry` (category `other`, key `deadline_alert_recipients`,
   `data.user_ids`), set by the admin tier in Settings -> Team ("Deadline alerts", `saveDeadlineAlertRecipientsAction`: role and every id
   re-checked against the member directory). Hidden from the Firm notes page. No names in code. A removed member's id is dropped on read.
@@ -2516,9 +2525,38 @@ The List's columns come from ONE registry (`src/lib/review/sheet-columns.ts`; `c
 Trademarks after Source, Contracts after Next step, not last. The chooser hides or moves Notes like any other column. The Trademarks section note
 says "Description and Notes are one column in Lectual: Notes." again. Nothing about the cell changed: it saves on Enter only, leaving it never posts,
 and its words are the same.
-- **Read:** `loadReview(now, { withFees, withCustom, notes })`, the three asked together for the List only, in the one parallel read.
+- **Read:** `loadReview(now, { withFees, withCustom, notes, customMoney })`, asked together for the List only, in the one parallel read
+  (`customMoney` added Nov 23: the firm's own Money columns are owner-only, see "Firm-defined Money columns are owner-only" below).
 - **Tab:** `nextEditableCell` treats `notes` as a stop where it is DRAWN and `canNote` says the row's note can be typed; the owner table's Notes
   `<td>` carries `data-rse-cell="<row>|notes"` only then, and `focusCell` focuses the cell's own button inside it. Native Tab follows the drawn
   order anyway (the cell is a button). The old "+ Note" popover column is gone; `sheetMinWidth(sizes, columns)` sums only the columns drawn.
 - `registry.editable` stays the four typed pickers (Status, Next step, Owner, Source) plus the firm's columns: Notes is typed in place by its own
   editor, so it is not `editable` in the registry; its header pencil follows `canNote`.
+
+## Firm-defined Money columns are owner-only (Taylor, Nov 23; lectual 0115 proposal updated, still NOT applied; no schema here)
+A firm's own List column of kind `money` follows the built-in fee columns' rule: `canSeeCustomMoney(role)` = `canSeeBilling(role)` (`owner`, exactly;
+unknown or unreadable = no). Nothing is hidden only in the browser: the server never reads an amount for anyone else.
+- **Reads closed:** `loadCustomColumns(db, matterIds, leadIds, readMerged, access)` takes a REQUIRED `{ canSeeMoney }` (missing = no). Without it Money
+  fields are not returned (`visibleFields`), the value select is `VALUE_SELECT_NO_MONEY` (no `value_cents`) with `.is("value_cents", null)`, and a
+  value that still carried an amount is dropped. Callers: the Weekly review List (`loadReview({ customMoney })`, from the page's re-resolved role) and the
+  opened card's own read (`loadCardCustomColumns(record, { canSeeMoney })`, the card's re-resolved role AND the page's). The page also cleans what it
+  draws with `withoutMoney` (List tables, the owner Sheet's editors, the card's Firm columns). `columnsFor` drops a Money field unless `canSeeMoney`
+  (`customColumn(...).money` is now true for one), so the column chooser never lists it and a stored pref naming it is dropped. No other path reads
+  `crm_custom_value` (Settings -> Columns reads `value_choice` counts only; no CSV, Matters/Leads list or Copilot reads custom values).
+- **Writes closed:** `setCustomValue` refuses a Money field for every non-owner with `CUSTOM_MONEY_OWNER_ONLY` before the record or the existing value
+  is read (decision: owner-only writes too, clears included). Field DEFINITIONS are still the admin tier's (Settings -> Columns says
+  `COLUMNS_KIND_MONEY_HINT` under the kind), and a non-owner still sees a Money column's name in Settings -> Columns.
+- **0115 (proposal):** the money rows are a row-level set because a value row holds exactly one typed column, the field kind's, so every value policy adds
+  `(value_cents is null or current_org_role() = 'owner')`, and the rules trigger refuses a signed-in non-owner's money write
+  (`custom_value_money_owner_only`, 42501, mapped in `errors.ts`) right after the field read. Isolation case 22. Header explains why not a column grant,
+  a separate table or a view. Tests: `tests/custom-columns/money-visibility.test.tsx`, `load.test.ts`, `value-actions.test.ts`, `registry.test.ts`,
+  `tests/review/record-card-review-custom.test.tsx`. Not verified against any database (0115 is unapplied).
+
+## The form a lead came in through, by name, on the Weekly review (Taylor, Nov 23; no schema)
+The last-changed line for a lead filed by an intake form reads "Came in through the <name> form" (`cameInThroughForm`, words.ts; a name already
+ending in "form" gets no second one). The name is `crm_intake_form.name` (never the slug or an id), read by `readIntakeFormNames` in the review's ONE
+parallel batch: the leads' `crm_intake_submission` rows (`id, lead_id, form_id, started_at` only; the lead's first submission) then the forms'
+`id, name`, both scoped and chunked. `withFormNames` (pure) names only `lead:` keys with a form actor; a matter shows its lead's line. A failed read, a
+missing form or an empty name keeps exactly "Came in through a form"; the failure is not added to the "Some details couldn't load" note (the line
+still says something true). React text only, tidied and cut at 80 characters (`cleanFormName`). Tests: `tests/review/form-name-line.test.ts`.
+

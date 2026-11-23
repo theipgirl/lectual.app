@@ -7,6 +7,7 @@ import {
   CHANGED_BY_LAWMATICS_SYNC,
   UPDATED_AUTOMATICALLY,
   CAME_IN_THROUGH_A_FORM,
+  cameInThroughForm,
   OPENED_WHEN_CLIENT_SIGNED,
   changedAutomaticallyLine,
   A_TEAMMATE,
@@ -62,7 +63,8 @@ export type ChangeRowIn = {
 
 export type ChangeActor =
   | { kind: "person"; userId: string | null }
-  | { kind: "form" }
+  /** `formName`: the intake form's staff-visible name (crm_intake_form.name), set by the loader only when it was read and is not empty. */
+  | { kind: "form"; formName?: string }
   | { kind: "signed" }
   | { kind: "stage-keeper" }
   | { kind: "lawmatics-sync" }
@@ -145,6 +147,32 @@ export function withoutPeople(change: LastChange | null): LastChange | null | un
   return change && change.actor.kind === "person" ? undefined : change;
 }
 
+/** A form name as drawn: whitespace runs to one space, trimmed, at most 80 characters (cut with "…"); empty is null. */
+export const FORM_NAME_MAX = 80;
+export function cleanFormName(name: unknown): string | null {
+  if (typeof name !== "string") return null;
+  const n = name.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim();
+  if (!n) return null;
+  const chars = [...n];
+  return chars.length > FORM_NAME_MAX ? `${chars.slice(0, FORM_NAME_MAX).join("").trimEnd()}…` : n;
+}
+
+/**
+ * Names a lead's "Came in through a form" change with the form's staff name. `formNames` is lead id -> name (from the review's batched
+ * read; `null` = that read failed, so every form line stays the generic sentence). Only `lead:` keys with a form actor are touched;
+ * a lead with no entry, or an empty name, keeps the generic sentence. Returns a new map; the input is not changed.
+ */
+export function withFormNames(changes: ReadonlyMap<string, LastChange>, formNames: ReadonlyMap<string, string> | null): Map<string, LastChange> {
+  const out = new Map(changes);
+  if (!formNames) return out;
+  for (const [key, c] of changes) {
+    if (c.actor.kind !== "form" || !key.startsWith("lead:")) continue;
+    const name = cleanFormName(formNames.get(key.slice(5)));
+    if (name) out.set(key, { ...c, actor: { kind: "form", formName: name } });
+  }
+  return out;
+}
+
 /** First word of a directory name, or null when it is an address (an email never reaches the page) or empty. */
 export function firstNameOf(name: string | null | undefined): string | null {
   const n = (name ?? "").trim();
@@ -175,8 +203,10 @@ export function lastChangedText(
       return changedByLine(CHANGED_BY_AUTOMATION, when);
     case "assistant":
       return changedByLine(CHANGED_BY_ASSISTANT, when);
-    case "form":
-      return `${CAME_IN_THROUGH_A_FORM} · ${when}`;
+    case "form": {
+      const name = cleanFormName(change.actor.formName);
+      return `${name ? cameInThroughForm(name) : CAME_IN_THROUGH_A_FORM} · ${when}`;
+    }
     case "signed":
       return `${OPENED_WHEN_CLIENT_SIGNED} · ${when}`;
     case "system":

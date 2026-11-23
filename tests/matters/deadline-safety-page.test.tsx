@@ -85,6 +85,42 @@ describe("AT2 (matter page): a failed deadlines read flags nothing and says the 
   });
 });
 
+describe("registered marks on the matter page (Taylor, Nov 23)", () => {
+  const regStage = { id: "stage-reg", org_id: "org-1", code: "24", label: "24. Trademark Registered", order_index: 24, is_open: false, waiting_on: "uspto", phase: "maintenance" };
+  const seedRegistered = (deadlines: Record<string, unknown>[]) => {
+    const seed = seedFiled(deadlines);
+    seed.crm_matter_stage = [...(seed.crm_matter_stage ?? []), regStage];
+    seed.crm_matter = seed.crm_matter.map((m) => (m.id === "matter-1" ? { ...m, stage_id: "stage-reg" } : m));
+    return seed;
+  };
+  const s8 = { ...openOa, id: "dl-s8", kind: "section_8_declaration", due_date: "2031-06-01" };
+
+  it("registered with no deadline at all: flagged, with the registered wording", async () => {
+    h.db = createFakeDb({ tables: seedRegistered([]) });
+    const html = await renderPage();
+    expect(html).toContain('data-flag="no-open-deadline"');
+    expect(html).toContain("This trademark is registered and no Section 8 or renewal deadline is open on its docket.");
+  });
+
+  it("registered with only an office-action deadline open: flagged", async () => {
+    h.db = createFakeDb({ tables: seedRegistered([openOa]) });
+    expect(await renderPage()).toContain('data-flag="no-open-deadline"');
+  });
+
+  it("registered with an open Section 8: not flagged", async () => {
+    h.db = createFakeDb({ tables: seedRegistered([openOa, s8]) });
+    expect(await renderPage()).not.toContain('data-flag="no-open-deadline"');
+  });
+
+  it("a failed deadlines read: not flagged, and the card says the deadlines couldn't load", async () => {
+    h.db = createFakeDb({ tables: seedRegistered([]) });
+    h.db.fail("crm_matter_deadline", "select");
+    const html = await renderPage();
+    expect(html).not.toContain('data-flag="no-open-deadline"');
+    expect(html).toContain("Deadlines couldn't load.");
+  });
+});
+
 describe("AT5 (matter page): the override is offered only to the override roles", () => {
   it("an attorney (and the owner) sees 'Close with an open deadline'; a paralegal does not", async () => {
     for (const [role, shown] of [["attorney", true], ["owner", true], ["paralegal", false], ["admin", false], ["senior_admin", false], ["viewer", false]] as const) {

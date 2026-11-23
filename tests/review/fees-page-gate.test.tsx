@@ -118,7 +118,9 @@ describe("page.tsx source", () => {
     expect(src).toMatch(/const withFees = canSeeMoney && params\.view === "sheet"/);
     // Sprint 2: the List also asks for the firm's custom columns (withCustom, the view alone, no role); withFees is still the money gate.
     // Merge with the Notes cell: the List's Notes column is asked for in the same call (`notes`, the view alone, no role).
-    expect(src).toMatch(/loadReview\(new Date\(\), \{ withFees, withCustom, notes \}\)/);
+    // Nov 23: custom Money columns are owner-only too, from the same re-resolved role (changed on purpose).
+    expect(src).toMatch(/loadReview\(new Date\(\), \{ withFees, withCustom, notes, customMoney \}\)/);
+    expect(src).toMatch(/const customMoney = canSeeCustomMoney\(role\)/);
     expect(src).toMatch(/const withCustom = params\.view === "sheet"/);
     expect(src.indexOf("await resolveFirmSession()")).toBeGreaterThan(-1);
     expect(src.indexOf("await resolveFirmSession()")).toBeLessThan(src.indexOf("await loadReview("));

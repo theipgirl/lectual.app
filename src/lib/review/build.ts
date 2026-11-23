@@ -9,7 +9,7 @@ import type { ReviewRow, ReviewNextStep } from "./buckets";
 import { summarizeContact, type ContactActivity } from "./contact";
 import type { FirmSenders } from "@/lib/mailbox/firm-sender";
 import { stageIsWithUspto, waitingOn } from "./waiting";
-import { noOpenDeadline } from "@/lib/matters/deadline-safety";
+import { noOpenDeadline, openDeadlineIndex } from "@/lib/matters/deadline-safety";
 import { MATTER_TYPE_LABELS } from "@/lib/matters/matter-types";
 import { deadlineKindLabel, type DeadlineKind } from "@/lib/matters/deadline-rules";
 
@@ -201,7 +201,8 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
   const activityByMatter = groupBy(input.activity, (a) => a.matter_id);
   const activityByLead = groupBy(input.activity, (a) => a.lead_id);
   const deadlinesByMatter = groupBy(input.deadlines, (d) => d.matter_id);
-  const openSet = new Set(deadlinesByMatter.keys());
+  // Any open deadline, and an open Section 8 / renewal one (a registered mark's flag, Taylor Nov 23). input.deadlines are the open ones.
+  const openSet = openDeadlineIndex(input.deadlines.map((d) => ({ matter_id: d.matter_id, kind: String(d.kind ?? "") })));
   const contactKnown = input.sources.activity === "ok";
 
   const contactOf = (list: readonly ContactActivity[] | undefined) => {
