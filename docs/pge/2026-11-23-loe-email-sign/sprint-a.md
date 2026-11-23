@@ -1,7 +1,7 @@
 # Sprint A contract: the emailed signing link and the signing (PGE, STRICT)
 
-**Status:** v2 (Nov 23): v1 refused by the strict evaluator; blocking B1-B7 and non-blocking N1-N12 answered below ("v2 rulings").
-Not yet ratified. Nothing is built.
+**Status:** v3 (Nov 23): v1 and v2 refused by the strict evaluator; v2's blocking B1-B7 / N1-N12 and v3's blocking B1-B5 and
+non-blocking notes are answered below ("v2 rulings", "v3 rulings"). Not yet ratified. Nothing is built.
 **Size:** large, one agent, one session. **Branch:** `claude/loe-email-sign` (never `main`; no push, no PR).
 **Schema:** lectual **0117**, a PROPOSAL FILE ONLY (`docs/pge/2026-11-23-loe-email-sign/0117-proposed.sql.txt`, written with this
 contract). Nothing is applied to lectual-dev or lectual-prod. **Evaluator: STRICT** (signatures, client email).
@@ -19,11 +19,12 @@ byte for byte). The signed-copy email, the certificate page, the Lectual file an
 
 ## Blockers (copied into the PR description; nothing here can be cleared by the generator)
 1. **0117 is not applied.** Until it is, every 0117 read answers 42P01 / PGRST205 / 42883 / PGRST202 and the gate is off (in-app).
-   Apply to lectual-dev, run the 22 isolation cases, then prod with the owner's OK. `LOE_EMAIL_SIGNING` stays unset until then.
+   Apply to lectual-dev, run the 33 isolation cases listed at the end of 0117, then prod with the owner's OK. `LOE_EMAIL_SIGNING` stays unset until then.
 2. **Resend sending domain per firm.** The firm's from-address must be on a domain verified on `RESEND_API_KEY`'s account. Not verified here.
 3. **The attorney's words.** The path stays off for a firm until its named approver approves signing words (spec rule). Lectual writes none.
 4. **Open questions Q1-Q8 in `questions.md`** are decided conservatively below (D3, D4, D9, D10, D13-D16); the owner may overrule them
-   before merge. **`LOE_EMAIL_SIGNING` is NOT set to `on` anywhere until Q4, Q6 and Q7 are answered** (v2 rulings B1, B3).
+   before merge. **`LOE_EMAIL_SIGNING` is NOT set to `on` anywhere until Q1, Q2, Q4, Q6 and Q7 are answered** (v2 rulings B1, B3;
+   v3 ruling D24: Q1 and Q2 decide what the signed letter's name and dates say, so they gate the switch too).
 5. **Sprint B must ship before `LOE_EMAIL_SIGNING=on`** (v2 ruling B6). Sprint A on its own lets a link signature happen with no
    certificate page; so in Sprint A every signed-PDF build for an `email_link` snapshot answers `unavailable` (item 12b), and the
    Lawmatics upload, the client's signed download and the staff Download all refuse it until Sprint B adds the certificate.
@@ -47,18 +48,28 @@ byte for byte). The signed-copy email, the certificate page, the Lectual file an
    0117 as not set up for 5 minutes in this server instance (the same idea as `src/lib/leads/live.ts`). While marked, the gate
    answers `not_set_up` without reading, so the page and `signAndAccept` fall back to in-app signing. A function dropped on its
    own after the probe passed is therefore caught by the first call that hits it.
-2. **Per-proposal readiness** (`src/lib/loe/email-signing/ready.ts`, pure over read facts): the gate is on AND the proposal carries `loe`
-   AND the proposal row's `client_email` passes the address check AND `letterLiveCheck` (`src/lib/loe/live-guard.ts`) answers `current`
-   (D10) AND **the send-failure fallback has not tripped (v2, B1; D13)**: fewer than `SEND_FAILURE_FALLBACK` (3) requests for THIS
-   proposal version closed `send_failed` in the last 24 hours (one service-role count, fenced on the proposal row's org and id;
-   a count that cannot be read = not ready). Otherwise this proposal signs in-app as today. **Every uncertainty resolves to in-app
-   signing** (today's path), never to a refusal: that is how a firm is never left with no way to sign.
+2. **Per-proposal readiness** (`src/lib/loe/email-signing/ready.ts`; pure decision `readyDecision(facts)` in `ready-rules.ts`, tested
+   without I/O). Ready only when ALL hold: the gate is on; the proposal carries `loe`; `letterLiveCheck`
+   (`src/lib/loe/live-guard.ts`) answers `current` (D10); the proposal row's `client_email` passes `isSigningAddress`
+   (`src/lib/loe/email-signing/address.ts`: `btrim` then EXACTLY 0117's pattern `^[^@\s]+@[^@\s]+$` and 3..320 characters, one
+   constant `SIGNING_ADDRESS_PATTERN` with a comment naming 0117's two places; v3, B1b); **ONE service-role
+   `rpc("client_proposal_signing_readiness", { p_proposal_id, p_org_id })` (0117 section 8b, v3) answers `state = "ok"`** (the
+   database runs signing_open's own preconditions: live version, unexpired, a letter, the address by the same regex, the letter
+   still current, approved words exist; so the app and 0117 can never disagree about a refusal signing_open would make);
+   **and `failures + localFailures(proposalId) < SEND_FAILURE_FALLBACK` (3)**, where `failures` is the rpc's count (requests of
+   this proposal row closed `send_failed` in 24 hours plus `client_proposal_signing_failure` rows in 24 hours) and
+   `localFailures` is the in-memory memo of item 9b (failures this server instance could not record in the database).
+   A readiness rpc that errors, answers an unknown shape, or a missing-object code (which also calls `markSigningNotSetUp()`)
+   = NOT ready. Otherwise this proposal signs in-app as today. **Every uncertainty resolves to in-app signing** (today's path),
+   never to a refusal: that is how a firm is never left with no way to sign.
 3. **`FIRM_CLIENT_MAIL_FROM`** (add to `src/lib/env.ts` as optional, documented beside `FIRM_CLIENT_LINK_ORIGINS`): JSON
    `{ "<org_id>": "Firm Name <signing@firm-domain.com>" }`, parsed in the import-free `src/lib/loe/email-signing/mail-config.ts`
    (`parseFirmMailFrom`): org ids must be uuids; the value must be a single address (display name optional, no CR/LF, at most 320
    characters); an address whose domain is `lectual.app` or any subdomain of it, or the host of `SITE_URL`, is dropped (no
    deployment-wide sender for client mail). Invalid entries are ignored. There is no default sender.
-4. **`LOE_EMAIL_SIGNING`** added to `src/lib/env.ts` (optional string). `.env.example` gains both vars, commented, unset.
+4. **`LOE_EMAIL_SIGNING`** added to `src/lib/env.ts` (optional string). `.env.example` gains both vars, commented, unset. The
+   comment beside `LOE_EMAIL_SIGNING` in both files says: "Leave unset until lectual 0117's isolation cases pass, Sprint B has
+   shipped, and the owner has answered Q1, Q2, Q4, Q6 and Q7 (docs/pge/2026-11-23-loe-email-sign/questions.md)." (v3, B4)
 
 ### Signing words (the attorney's, per firm)
 5. **Store** `src/lib/loe/signing-words-store.ts`: scoped client only (no service role), modelled on `templates-store.ts`
@@ -79,10 +90,20 @@ byte for byte). The signed-copy email, the certificate page, the Lectual file an
    `/dashboard/settings/proposals/` next to the Engagement letter link. Every member of a proposals firm reads; the eight fields with
    labels that NAME each field ("Consent button line", "Consent text", "Line beside Sign", "Line under the signature box", "Signing link
    email subject/body", "Signed copy email subject/body"); no placeholder or sample text that reads like consent or legal wording. A
-   status line says plainly whether the emailed link is on for the firm and why not, from the gate's reason: `switch_off` / `not_set_up`
-   / `no_mail` -> `notReadyYet("Emailed signing links")` (platform voice); `no_words` -> "Clients sign on the proposal page until a named
-   approver approves these words."; `unreadable` -> `CANT_SHOW`. Words in `src/lib/ui/words.ts` (`SIGNING_WORDS_*`). Not a Setup
-   checklist item.
+   status line says plainly whether the emailed link is on for the firm and why not. **v3 (B3): the page does NOT call
+   `emailSigningGate`** (it reads as the service role, and the probe and the approved-words read are service-role only; dashboard
+   code uses `getScopedClient()` only). It calls its own reader, `signingWordsStatus(orgId, db)` in
+   `src/lib/loe/email-signing/settings-status.ts` (`server-only`, imports nothing from `@/lib/db/admin`, never calls
+   `client_proposal_signing_probe` or any other `signing_*` rpc), with the session's org and the SCOPED client, in this order:
+   (a) `process.env.LOE_EMAIL_SIGNING !== "on"` -> `switch_off` (no read); (b) `RESEND_API_KEY` unset or no
+   `FIRM_CLIENT_MAIL_FROM` entry for the session's org (`parseFirmMailFrom`, item 3) -> `no_mail` (no read); (c) ONE scoped read
+   `from("client_proposal_signing_words").select("id").eq("status", "approved").limit(1)` (RLS fences it to the active org):
+   42P01 / PGRST205 by CODE -> `not_set_up`; any other error -> `unreadable`; zero rows -> `no_words`; one row -> `on`. Lines:
+   `switch_off` / `not_set_up` / `no_mail` -> `notReadyYet("Emailed signing links")` (platform voice); `no_words` -> "Clients sign
+   on the proposal page until a named approver approves these words."; `unreadable` -> `CANT_SHOW`; `on` ->
+   `SIGNING_WORDS_STATUS_ON` = "Clients get a signing link by email. If a check fails, they sign on the proposal page as before."
+   (true even when 0117 is only partly applied, which this reader cannot see: the gate then sends clients to in-app signing).
+   Words in `src/lib/ui/words.ts` (`SIGNING_WORDS_*`). Not a Setup checklist item.
 
 ### Sending the link (the client presses the button)
 9. **`sendSigningLinkAction(token, selection, clientClasses, details)`** in `src/app/p/[token]/actions.ts`, thin wiring over
@@ -105,24 +126,50 @@ byte for byte). The signed-copy email, the certificate page, the Lectual file an
       (`isProposalExpired`'s rule). The 5-minute margin (v2, N2) keeps an app clock that runs ahead of the database's from being
       refused by 0117's `<= now() + 7 days`. The page says "It works for 7 days." (the margin is not shown);
    8. ONE `rpc("client_proposal_signing_open", ...)` (service role, the client `public.ts` already uses), which closes any earlier link
-      for the version (`expired` if past its expiry, else `resent`) and returns the request id. `signing_letter_replaced` ->
-      `SEND_MESSAGES.unavailable` (the page then reloads to in-app signing: readiness is off for a replaced letter);
+      for the version (`expired` if past its expiry, else `resent`) and returns the request id. **v3 (B1b): every answer other than
+      an id is mapped, and none is a dead end.** `signOpenOutcome(error)` (pure, `send-outcomes.ts`) maps by prefix / code:
+      | answer | client sees | recorded |
+      |---|---|---|
+      | `signing_letter_replaced`, `signing_changed`, `signing_no_email` | `SEND_MESSAGES.unavailable` | nothing: readiness (item 2) already reports the same state from the database on the next load, so the reload signs in-app |
+      | 42883 / PGRST202 / 42P01 / PGRST205 | `SEND_MESSAGES.unavailable` | `markSigningNotSetUp()` (the reload signs in-app) |
+      | `signing_words_changed` (an approval landed mid-send), `signing_invalid` (an app-side hash or expiry fault), 23505 on `one_open`, 40P01, any other error or a timeout | `send_failed` (or `sign_here_instead` when this makes the version's count reach 3) | `note_failure(kind)`: `open_refused` for the two named prefixes, `open_error` for the rest (item 9b) |
+      No answer here leaves an open request (none exists yet);
    9. the review PDF from the STORED text: `buildLetterPdf` gains `storedText` support in `review` mode (`src/lib/loe/pdf.ts`; the review
       mark stays on every page; nothing else in review or signed mode changes, pinned by `tests/loe/pdf.test.ts`); its sha256 is written
       once to `review_pdf_sha256` (the one direct update 0117 allows);
    10. the email (item 10) with `idempotencyKey = "signing-link:" + requestId`;
-   11. `client_proposal_signing_mark_sent(requestId, sent)`. A failed send -> `false` (closed `send_failed`, no open request) and the
-       client sees `SEND_MESSAGES.send_failed` = "We couldn't send the email. Try again." Never Resend's text. When this is the
-       `SEND_FAILURE_FALLBACK`-th failure for the version, the answer is `SEND_MESSAGES.sign_here_instead` (a status sentence:
-       "We couldn't send the email. Reload the page to sign here instead.") and readiness (item 2) is off for the version from then on.
-       **The email went but `mark_sent(true)` answers `false`** (the request was closed in between by a newer send, a withdrawal or a
-       new version; v2, N6): the client sees `SEND_MESSAGES.superseded` = "This proposal changed or a newer link was sent. Reload the
-       page." (never "We emailed a link"). **`mark_sent` itself errors after the email went:** the request stays `sending` (the link
-       in that email reads `LINK_UNAVAILABLE`; the next send closes it `resent`) and the client sees `send_failed`. Known limit.
-   Any rpc here answering 42883 / PGRST202 / 42P01 / PGRST205 calls `markSigningNotSetUp()` and answers
-   `SEND_MESSAGES.sign_here_instead` (B1a); a 40P01 answers `send_failed` (N1).
-   Returns `{ ok: true, sentTo: maskedEmail, expiresText }` or `{ ok: false, message }`. `maskEmail` ("s•••@example.com") is pure in
-   `src/lib/loe/email-signing/mask.ts` (D9). Nothing in this function logs the address, the token, the letter or the words.
+   11. `client_proposal_signing_mark_sent(requestId, true)` when the mailer answered `sent`.
+   **v3 (B1a): after the id exists, EVERY failure closes the request through ONE helper, `failSend(requestId, kind)`**
+   (`send.ts`), and nothing returns before it has run: the review PDF build throwing, the `review_pdf_sha256` update erroring or
+   updating no row, the mailer answering `failed` (an HTTP status from Resend) or THROWING, and any exception between `signing_open`
+   and `mark_sent` (one `try/finally` around steps 9-11). `failSend`: (i) `mark_sent(requestId, false)` (closes `send_failed`,
+   counted by readiness); (ii) if that errors or answers `false` while the row may still be `sending`, `signing_close(requestId,
+   "send_failed")`; (iii) if THAT errors too, `note_failure(proposalId, "close_error")`; (iv) if that errors too, `noteLocalFailure
+   (proposalId)` (item 9b). So a failure is always counted somewhere readiness looks. The client sees `SEND_MESSAGES.send_failed`
+   = "We couldn't send the email. Try again.", or `SEND_MESSAGES.sign_here_instead` = "We couldn't send the email. Reload the page
+   to sign here instead." when the failure brings the version's count (readiness's `failures` read again, plus `localFailures`) to
+   `SEND_FAILURE_FALLBACK`; readiness is then off for the version and the reload signs in-app. Never Resend's text.
+   **Mail answers that are not a clear yes or no (v3, non-blocking):** the mailer answering `failed` with `http: null` (its 10 s
+   timeout, a network drop, an abort) is UNCERTAIN: Resend may have accepted it. Then the request is NOT closed (a delivered link
+   must not be killed): `mark_sent(requestId, true)` (the link works if it arrived), `note_failure(proposalId, "mail_uncertain")`
+   (so three uncertain sends also turn readiness off), and the client sees `SEND_MESSAGES.uncertain` = "We may not have sent the
+   email. Check your inbox. If the link isn't there in a few minutes, press the button again." (or `sign_here_instead` at the
+   threshold).
+   **The email went but `mark_sent(true)` answers `false`** (the request was closed in between by a newer send, a withdrawal or a
+   new version; v2, N6): the client sees `SEND_MESSAGES.superseded` = "This proposal changed or a newer link was sent. Reload the
+   page." (never "We emailed a link"); nothing is counted (the version moved on or a newer send is the live one).
+   **`mark_sent(true)` errors after the email went:** `failSend` runs (the link in that email then reads `LINK_UNAVAILABLE`, the
+   failure is counted) and the client sees `send_failed`. Known limit (a delivered email whose link was closed).
+   A 40P01 anywhere answers `send_failed` and is counted like any other error (N1). **Refusals caused by the client's own input are
+   NOT counted** (the limiters, `details_required`, nothing selected, an undescribed class): they are refused before any rpc, so a
+   holder of the bearer `/p/` link cannot trip the fallback and skip the email proof.
+   Returns `{ ok: true, sentTo: maskedEmail, expiresText }`, `{ ok: true, uncertain: true, sentTo, expiresText }` or
+   `{ ok: false, message }`. `maskEmail` ("s•••@example.com") is pure in `src/lib/loe/email-signing/mask.ts` (D9). Nothing in this
+   function logs the address, the token, the letter or the words.
+9b. **The failure memo** (`src/lib/loe/email-signing/send-failures.ts`, `noteLocalFailure(proposalId)`, `localFailures(proposalId)`):
+    an in-memory per-instance count, 24-hour window, used ONLY when the database could not record a failure (`note_failure` itself
+    errored). It is added to readiness's count on this instance. Per instance, like the limiters: on another instance an
+    unrecorded failure is not seen (known limit; a recorded one is seen everywhere because it lives in 0117).
 10. **The mailer** `src/lib/mail/internal-mail.ts`: header comment renamed to say it is the one Resend caller for internal mail, the
     worksheet AND the two owner-approved client emails (spec decision 7); `InternalMail` gains optional
     `attachments?: { filename: string; content: Uint8Array; contentType: "application/pdf" }[]` sent as Resend's
@@ -132,7 +179,9 @@ byte for byte). The signed-copy email, the certificate page, the Lectual file an
     (`signing_link` = `clientLinkUrl(await clientLinkOrigin(orgId), publicToken)` + `?sign=` + the token, built only there; `client_name`
     = details.client_name; `firm_name` = `firmDisplayName`; `link_expires` = the firm-zone date text), text only, `to` = the request's
     `sent_to` (the proposal row's `client_email`), `from` = the firm's `FIRM_CLIENT_MAIL_FROM` entry, attachment = the review PDF
-    (`<signer>-engagement-letter-review.pdf`). Builders add no sentence of their own to the email.
+    (`<signer>-engagement-letter-review.pdf`). Builders add no sentence of their own to the email. The mailer's result keeps the
+    difference `send.ts` needs (v3): `failed` with an HTTP status = Resend answered no; `failed` with `http: null` = no answer
+    (timeout, network, abort), treated as uncertain (item 9). A throw from the mailer is caught by `send.ts` and is a clear failure.
 
 ### The signing page (`?sign=`)
 11. **`src/app/p/[token]/page.tsx`** reads `searchParams.sign` (a Promise in this Next version: read
@@ -148,7 +197,11 @@ byte for byte). The signed-copy email, the certificate page, the Lectual file an
     3. sha256(signing token) hex;
     4. ONE read (service role) of the request by `token_sha256`, named columns only (`id, org_id, proposal_id, status, expires_at,
        opened_at, consent_at, signed_at, signature_id, agreement_text, agreement_sha256, consent_line, consent_text, consent_sha256,
-       sign_line, box_note, signer_name`), plus that proposal's `public_token, status, org_id, content` (a second read by id);
+       sign_line, box_note, signer_name`) WITH that proposal's `public_token, status, org_id, content` embedded through the
+       `(proposal_id, org_id)` foreign key in the SAME PostgREST request (v3, non-blocking: one round trip whether or not the hash
+       is found, so "not found" and "found, other proposal" take the same path up to step 5). The gate reads in step 6 happen
+       only after step 5 passes, so a matching pair still takes longer than a mismatch; that difference tells a caller only that
+       a pair is valid, which needs the 256-bit signing token and the `/p/` token already, so it is accepted (recorded in D25);
     5. the proposal's `public_token` compared with the page's `/p/` token in CONSTANT TIME (`timingSafeEqual` over equal-length
        buffers; unequal length = mismatch);
     6. the gate (item 1) for the proposal row's org, then `letterLiveCheck` for the proposal row (`current` required; B3);
@@ -191,7 +244,7 @@ byte for byte). The signed-copy email, the certificate page, the Lectual file an
     `LINK_UNAVAILABLE`, no write, and the `/p/` page signs in-app (gate off = in-app, item 18), so the client always has a way to sign.
 14. **The signature box** (`SignatureBox.tsx`, client component, no dependency): a `<canvas>` with pointer events (mouse, pen and touch;
     `touch-action: none` on the canvas only), Clear, and "Type it instead" (a radio between drawn and typed; typed draws the typed legal
-    name in one of two styles, `script` or `print`, rendered with fonts already served from `/_next/static/`). Keyboard users use the typed
+    name in the one `print` style below; there is no style picker). Keyboard users use the typed
     alternative (it is the default focus order). The drawn PNG is exported at most 600 x 200 px; a PNG over 100 KB is refused on the
     page and on the server. The typed full legal name input is always required. Under the box: the snapshotted `box_note`; beside Sign:
     the snapshotted `sign_line`. Assets only from `/_next/static/` or `/brand/` (`tests/proposals/public-assets.test.ts` stays green).
@@ -221,20 +274,28 @@ byte for byte). The signed-copy email, the certificate page, the Lectual file an
 17. `src/components/client-proposal/LoeSignPanel.tsx` / `LoeSideAction.tsx` / `loe-flow.ts`: when `view.letter.emailSigning` (a boolean
     the public read sets from item 2; the browser never gets a reason) is true, step 3 shows the letter as today (read-only) and, in place
     of the typed name / tick / Sign, a button "Email me a link to sign" (`EMAIL_LINK_LABEL`) and after success "We emailed a signing link
-    to s•••@example.com. It works for 7 days." (`linkSentNote`). Pressing it again sends a fresh link (the old one closes; the page says
-    the same). With `emailSigning` false the panel is byte for byte today's.
-17b. **New choices or details close the open link (spec decision 2; v2, B2).** While `view.letter.emailSigning` is true, the FIRST change
-    on a page load to the selection, a package pick, a client-typed class (step 1) or any detail (step 2) fires, without waiting,
+    to s•••@example.com. It works for 7 days." (`linkSentNote`); an uncertain send shows `SEND_MESSAGES.uncertain` instead (item 9).
+    Pressing it again sends a fresh link (the old one closes; the page says the same). With `emailSigning` false the panel is byte for byte today's.
+17b. **New choices or details close the open link (spec decision 2; v2, B2; v3, B2).** While `view.letter.emailSigning` is true, a
+    change to the selection, a package pick, a client-typed class (step 1) or any detail (step 2) fires, without waiting,
     `closeSigningLinkAction(token)` (`src/lib/loe/email-signing/close-on-change.ts` `closeOnChange(input, deps)`): the `/p/` token's
     shape check -> its own limiter (`closeTokenLimiter` 20 per `/p/` token per hour, courtesy) -> the proposal read by `public_token`
     (live, carries `loe`) -> the in-flight request for that proposal id (service role, `status in (sending, open)`) -> ONE
     `rpc("client_proposal_signing_close", { reason: "proposal_changed" })`. It answers only `{ closed: boolean }`; when `closed` is true
-    the page shows `LINK_CLOSED_NOTE` ("Your earlier signing link no longer works. Email yourself a new one on step 3."). It fires at
-    most once per page load (later changes are already covered: the link is closed), whether or not this page load sent the link (a
-    link sent from another tab or an earlier visit is closed too). The page does not compare old and new choices: any change closes.
-    A close that cannot reach the server leaves the old link open until the next send, a withdrawal, a new version or its 7 days;
-    that link still signs ONLY the letter, choices and price it was sent with (known limit, listed). Not fired when
-    `emailSigning` is false (the panel is today's).
+    the page shows `LINK_CLOSED_NOTE` ("Your earlier signing link no longer works. Email yourself a new one on step 3.").
+    **When it fires (v3, B2): the close is ARMED, and fires on the first change while armed.** The rules live in a pure reducer,
+    `closeArming` (`src/lib/loe/email-signing/close-arming.ts`), driven by `useLoeFlow`:
+    - armed on page load (a link sent from another tab or an earlier visit is closed by the first change);
+    - a change while armed fires the close and disarms;
+    - **every successful send re-arms** (`ok: true`, the uncertain answer included), so change -> send -> change fires a second
+      time and the link sent in between is closed;
+    - **a change made while a send is in flight** (pressed, not yet answered) is remembered (`changedDuringSend`); when that send
+      answers ok, the close fires at once (the link just sent was built from the choices posted at the press) and the state stays
+      disarmed; when it answers a failure, nothing more is needed (no link opened);
+    - a failed or unreachable close re-arms, so the next change tries again.
+    The page does not compare old and new choices: any change while armed closes. A close that cannot reach the server leaves the
+    old link open until the next change, the next send, a withdrawal, a new version or its 7 days; that link still signs ONLY the
+    letter, choices and price it was sent with (known limit, listed). Not fired when `emailSigning` is false (the panel is today's).
 18. **In-app signing is refused while the path is on** for that proposal: `signAndAccept` re-evaluates the gate AND readiness (item 2,
     the send-failure fallback and the runtime memo included) and, when both are on, refuses with a NEW reason `signing_by_email`
     (no write), mapped to the step sentence `SIGN_MESSAGES.signing_by_email` = "Reload this page to get your signing link by email."
@@ -242,8 +303,9 @@ byte for byte). The signed-copy email, the certificate page, the Lectual file an
     When the gate or readiness is off (or flips off, or cannot be read) the in-app path is exactly today's; a link still open then
     simply loses the race (0117 section 7 closes it when the proposal is accepted in-app). This item can never leave a client with no
     way to sign: the in-app refusal holds only while the email path is positively ready, and every failure the email path can detect
-    (0117 missing or partly applied, a missing function at runtime, repeated failed sends, a replaced letter, an unreadable gate) turns
-    readiness off (B1). The failures it CANNOT detect (a wrong address on file, a mail that bounces after Resend accepted it) are
+    (0117 missing or partly applied, a missing function at runtime, a readiness rpc that is not ok, any refusal `signing_open` could
+    make, three counted failures of any kind before or after the request exists, a replaced letter, an unreadable gate) turns
+    readiness off (B1; v3 B1). The failures it CANNOT detect (a wrong address on file, a mail that bounces after Resend accepted it) are
     Q7 in `questions.md`; until it is answered `LOE_EMAIL_SIGNING` stays off.
 
 ### Words, hygiene, docs
@@ -251,13 +313,42 @@ byte for byte). The signed-copy email, the certificate page, the Lectual file an
     `SEND_MESSAGES` (`unavailable`, `send_failed`, `sign_here_instead`, `superseded`), `SIGN_MESSAGES.signing_by_email`,
     `SIGN_LINK_MESSAGES`, `CONSENT_STEP_NAME`, `SIGNATURE_STEP_NAME`, `CLEAR_LABEL`, `TYPE_INSTEAD_LABEL`, `DRAW_INSTEAD_LABEL`) and
     `src/lib/ui/words.ts` (`SIGNING_WORDS_*`). No sentence about what consent, a signature or a letter means.
+    **Exact strings (v3; the generator uses these and no others):**
+    | constant | text |
+    |---|---|
+    | `EMAIL_LINK_LABEL` | Email me a link to sign |
+    | `linkSentNote(masked)` | We emailed a signing link to {masked}. It works for 7 days. |
+    | `LINK_UNAVAILABLE` | This link is no longer available. |
+    | `LINK_CLOSED_NOTE` | Your earlier signing link no longer works. Email yourself a new one on step 3. |
+    | `SEND_MESSAGES.unavailable` | Something on this page changed. Reload the page to continue. |
+    | `SEND_MESSAGES.send_failed` | We couldn't send the email. Try again. |
+    | `SEND_MESSAGES.sign_here_instead` | We couldn't send the email. Reload the page to sign here instead. |
+    | `SEND_MESSAGES.uncertain` | We may not have sent the email. Check your inbox. If the link isn't there in a few minutes, press the button again. |
+    | `SEND_MESSAGES.superseded` | This proposal changed or a newer link was sent. Reload the page. |
+    | `SIGN_MESSAGES.signing_by_email` | Reload this page to get your signing link by email. |
+    | `SIGN_LINK_MESSAGES.name_mismatch` | Type your full legal name as it appears on the letter. |
+    | `SIGN_LINK_MESSAGES.retry` | We couldn't record your signature. Please try again. |
+    | `SIGN_LINK_MESSAGES.reload` | Reload this page. |
+    | `SIGN_LINK_MESSAGES.try_again` | Please try again. |
+    | `CONSENT_STEP_NAME` | Before you sign |
+    | `SIGNATURE_STEP_NAME` | Your signature |
+    | `CLEAR_LABEL` | Clear |
+    | `TYPE_INSTEAD_LABEL` | Type it instead |
+    | `DRAW_INSTEAD_LABEL` | Draw it instead |
+    | `TYPED_SIGNATURE_LABEL` | Typed signature |
+    | `SIGNING_WORDS_STATUS_ON` | Clients get a signing link by email. If a check fails, they sign on the proposal page as before. |
+    `SEND_MESSAGES.unavailable` tells the client to reload because after a reload readiness is off for every case that answers it
+    (item 9's table) and the page signs in-app.
 20. **Hand-added types** in `src/lib/db/types.ts` for the three 0117 tables (Row / Insert / Update matching 0117's grants: words Insert has
     only the eight fields and `org_id`; request and event have no Insert or Update for the app) and the seven functions under `Functions`,
-    with the same "hand-added until codegen" comment as 0106's (nine functions in v2: the seven, plus `client_proposal_signing_probe`
-    and `client_proposal_signing_letter_current`).
+    with the same "hand-added until codegen" comment as 0106's (eleven functions in v3: the seven, plus `client_proposal_signing_probe`,
+    `client_proposal_signing_letter_current`, `client_proposal_signing_note_failure` and `client_proposal_signing_readiness`), and
+    `client_proposal_signing_failure` (Row only; no Insert or Update for the app: it is written only through `note_failure`).
 21. **AGENTS.md:** one short section "Engagement letter by emailed link (lectual 0117; Sprint A)" stating: off by default and the four
     conditions; every uncertainty resolves to in-app signing (the probe, the runtime memo, the send-failure fallback, a replaced
-    letter); `LOE_EMAIL_SIGNING` stays off until Sprint B ships and Q4, Q6, Q7 are answered; the owner-approved exception that Lectual
+    letter, a readiness rpc that answers anything but ok, any failed send after the request exists, three counted failures);
+    `LOE_EMAIL_SIGNING` stays off until 0117's isolation cases pass, Sprint B ships, and Q1, Q2, Q4, Q6 and Q7 are answered;
+    the owner-approved exception that Lectual
     now emails a client by itself (the signing link, because the client pressed the button; Sprint B adds the signed copy) and nothing
     else; the attorney's words rule; the token rule (sha256-keyed limiters, constant-time pair check before any write, no write on a
     GET); tests never send. Sprint B extends it.
@@ -269,8 +360,9 @@ one draft and one approved per firm, frozen once approved); `client_proposal_sig
 snapshot with `consent_sha256`, one in-flight row per proposal, changes only through functions); `client_proposal_signing_event`
 (append-only evidence: sent / opened / consent / signature / signed / closed, database clock, staff-readable like 0106's signature row);
 functions `signing_open`, `signing_mark_sent`, `signing_opened`, `signing_consent`, `signing_close`, `signing_sign` (INVOKER, the one
-signing transaction), `signing_letter_current` (v2, B3) and `signing_probe` (created last; v2, B1), and a trigger closing an in-flight
-link when the version leaves `sent`. Lock order: the proposal first, then the request, everywhere (v2, N1). 0106 is not amended.
+signing transaction), `signing_letter_current` (v2, B3), `signing_note_failure` and `signing_readiness` over the append-only
+`client_proposal_signing_failure` table (v3, B1), and `signing_probe` (created last; v2, B1), and a trigger closing an in-flight
+link when the version leaves `sent`. Every CHECK is `coalesce(<rule>, false)` and the typed-signature check is NULL-safe (v3, B5). Lock order: the proposal first, then the request, everywhere (v2, N1). 0106 is not amended.
 
 ## Decisions
 - **D1 Where the attorney's words live:** a versioned, approver-gated table in 0117 (`client_proposal_signing_words`), modelled on 0106's
@@ -282,8 +374,11 @@ link when the version leaves `sent`. Lock order: the proposal first, then the re
   full legal name the client gave in "Your details" (`details.client_name`, `letterValues`' existing fallback). At signing the typed full
   legal name must equal it with case and runs of spaces folded (checked in `signByLink` AND in `client_proposal_signing_sign`). A
   mismatch is refused with a step sentence; the client corrects the name or sends a fresh link from the proposal page.
+  Not the owner's answer: the switch stays off until Q1 is answered (D24).
 - **D4 The letter's dates (Open question Q2):** both `{{date}}` and `{{signed_date}}` are the firm-zone date on which the link was sent
   (the text is final then). The real signing time is the signature row's `signed_at` and goes on the certificate (Sprint B).
+  This puts a date in the signed letter that can be days before the signing, so it is NOT treated as a conservative pick: the
+  switch stays off until Q2 is answered (D24), and if the owner answers differently the merge changes before the switch goes on.
 - **D5 0106 is not amended.** No double signing is possible: whichever path signs first moves the proposal to `accepted`; the other is
   refused by its own `status = 'sent'` fence, and 0117's trigger closes the open link.
 - **D6 The token** is 32 random bytes, base64url, compared only as sha256 hex in the database lookup plus a constant-time comparison of
@@ -300,14 +395,18 @@ link when the version leaves `sent`. Lock order: the proposal first, then the re
 - **D12 Failed send leaves no open request:** the request is `sending` until the email is confirmed; a refusal closes it `send_failed`.
 
 ### v2 rulings (answers to the evaluator's refusal; each is a Decision)
-- **D13 (B1) No dead end.** The in-app refusal (item 18) holds only while the email path is positively ready. Readiness turns off,
-  and the client signs in-app, on: the switch off; no mail entry; the probe missing (0117 absent or partly applied); any `signing_*`
-  rpc or 0117 read answering a missing-object code at runtime (5-minute memo); `SEND_FAILURE_FALLBACK` (3) `send_failed` closures for
-  the version in 24 hours (covers an unverified domain, a bad key, Resend down); a replaced letter; any read that fails. Undetectable
+- **D13 (B1; v3 B1) No dead end.** The in-app refusal (item 18) holds only while the email path is positively ready. Readiness turns
+  off, and the client signs in-app, on: the switch off; no mail entry; the probe missing (0117 absent or partly applied); any
+  `signing_*` rpc or 0117 read answering a missing-object code at runtime (5-minute memo); `signing_readiness` not `ok` (the same
+  preconditions `signing_open` refuses on, judged by the database); `SEND_FAILURE_FALLBACK` (3) counted failures for the version in
+  24 hours, where a failure is ANY of: a `send_failed` closure (every failure after the id exists goes through `failSend`), a
+  `signing_open` refusal or error that is not a precondition (`note_failure`), an uncertain mail answer, or a failure the database
+  could not record (the per-instance memo); a replaced letter; any read that fails. Undetectable
   failures (wrong address, a bounce after acceptance) are Q7; the threshold and whether "sign here instead" is acceptable are Q6.
-  `LOE_EMAIL_SIGNING` stays off until Q6 and Q7 are answered.
-- **D14 (B2) New choices or details close the link** through the token-bound `closeSigningLinkAction` on the first change of a page
-  load (item 17b), plus the existing close-on-next-send. Pinned by T13.
+  `LOE_EMAIL_SIGNING` stays off until Q1, Q2, Q4, Q6 and Q7 are answered (D24).
+- **D14 (B2; v3 B2) New choices or details close the link** through the token-bound `closeSigningLinkAction`, armed on page load and
+  RE-ARMED after every successful send, with a change during an in-flight send closing the new link as soon as it is sent (item 17b),
+  plus the existing close-on-next-send. Pinned by T13.
 - **D15 (B3) A replaced letter closes the link.** The app re-checks `letterLiveCheck` in `verifyLinkPair` (read, opened, consent,
   sign) and closes with `proposal_changed` on a POST; 0117's `signing_letter_current` refuses `signing_open` and `signing_sign` as
   the backstop. The reading of "a new letter version" (a new letter TEMPLATE version as well as a new proposal version) is the
@@ -320,6 +419,27 @@ link when the version leaves `sent`. Lock order: the proposal first, then the re
 - **D19 (N1) Lock order** is proposal first, then request (0117 header); 40P01 maps to the fixed retry sentence on every action.
 - **D20 (N3) Name folding** is ASCII-only case folding plus whitespace, the same rule in `name-fold.ts` and 0117; `p_typed_name` is
   the cleaned name, the same string the typed signature hash covers.
+
+### v3 rulings (answers to the evaluator's second refusal; each is a Decision)
+- **D21 (B1a) Every failure after the request id exists closes it** through `failSend` (mark_sent(false) -> signing_close -> a
+  failure row -> the per-instance memo), so it is always counted. Item 9.
+- **D22 (B1b) Every `signing_open` answer is mapped** (item 9's table). Precondition refusals are not counted, because the database
+  itself reports them to readiness (`signing_readiness`, 0117 section 8b), so the reload signs in-app; the rest are counted by a
+  failure row. The app's address check uses 0117's exact pattern (`SIGNING_ADDRESS_PATTERN`), and readiness asks the database, so
+  the two can no longer disagree.
+- **D23 (B1c, non-blocking) Uncertain mail answers** (no HTTP answer) keep the link open and are counted; the client is told to
+  check the inbox. A refusal caused by the client's own input is never counted (no bypass of the email proof).
+- **D24 (B4) Q1 and Q2 gate the switch.** D3 (the name on the letter) and D4 (both letter dates = the send date) decide words in the
+  SIGNED letter, which is not a conservative pick to leave to the builder. The code is built as D3/D4 say, but
+  `LOE_EMAIL_SIGNING` is not set to `on` anywhere until the owner answers Q1 and Q2 (with Q4, Q6, Q7): blocker 4, item 21,
+  `questions.md` "When the switch may go on", the 0117 header and Sprint B item 12 all say so.
+- **D25 (non-blocking) Link-pair timing.** One embedded read for "not found" and "found, other proposal" (item 11 step 4). The
+  remaining difference (a valid pair goes on to the gate reads) reveals only that the pair is valid, which the caller already
+  holds; with 256-bit tokens it is accepted.
+- **D26 (B3) The Settings status line reads only through the scoped client** (`signingWordsStatus`, item 8); it never calls the
+  probe or imports the admin client.
+- **D27 (B5) NULL-safe database checks.** The typed branch of `signing_sign` uses `is null` / `is distinct from`; every CHECK in
+  0117 is `coalesce(<rule>, false)`. Isolation cases 28-30.
 
 ## Out of scope (Sprint B or never)
 The signed-copy email, the certificate page, the Lectual file step and the staff card states (Sprint B). Attorney countersignature.
@@ -347,10 +467,12 @@ Copying Lawmatics' consent text. A Setup checklist item.
   scheduled only when `signed_now = true`; nothing logged with content.
 - T11 In-app refused while the path is on (`signing_by_email`, its step sentence, no rpc call); NOT refused when the gate is off, the
   probe is missing, the memo is set, the fallback has tripped, the letter is replaced, or readiness can't be read (each case).
-- T13 (B2) After a send, changing a selection, a class text or a detail calls `closeSigningLinkAction` exactly once per page load;
-  the action calls `signing_close` with `proposal_changed` for the in-flight request it found by the proposal's id; a bad `/p/`
-  token, a withdrawn proposal or the limiter writes nothing; `{ closed: true }` shows `LINK_CLOSED_NOTE`; not fired with
-  `emailSigning` false.
+- T13 (B2; v3 B2) `closeArming` (pure) and the page: on load, the first change fires `closeSigningLinkAction` once and a second
+  change does not; **change -> send (ok) -> change fires a SECOND time** (and change -> send (uncertain) -> change too); change
+  during an in-flight send -> the send answers ok -> the close fires at once; change during an in-flight send that FAILS -> no
+  extra close; a failed close re-arms. The action calls `signing_close` with `proposal_changed` for the in-flight request it found
+  by the proposal's id; a bad `/p/` token, a withdrawn proposal or the limiter writes nothing; `{ closed: true }` shows
+  `LINK_CLOSED_NOTE`; not fired with `emailSigning` false.
 - T14 (B4, B5) The GET render makes NO rpc and NO write (spy on the service client): valid pair, wrong pair, expired. `opened` is
   written only by `recordOpenedAction`, only after `verifyLinkPair` passes; a valid signing token with another proposal's `/p/` token
   writes nothing in the read, opened, consent and sign paths and answers the identical `LINK_UNAVAILABLE`; the limiter keys are
@@ -363,9 +485,33 @@ Copying Lawmatics' consent text. A Setup checklist item.
   `staff-download.ts`, `accept-followups.ts` and `paid-flow.ts` each answer their existing failure for it; in-app fixtures unchanged.
 - T18 (N2, N3, N6) `expires_at` is now + 7 days − 5 minutes (fixed clock); `foldName` and the rpc arguments: `p_typed_name` equals the
   hashed name; "ZOË" vs "Zoë" refused, "  sam   CLIENT " vs "Sam Client" accepted; email ok + `mark_sent` false -> `superseded`.
+- T19 (v3 B1, every failure path counts) with injected deps and a fake db: (a) the review PDF build throws -> `mark_sent(false)`
+  called once, nothing else open, `send_failed`; (b) the `review_pdf_sha256` update errors, and separately updates no row -> same;
+  (c) the mailer answers `failed` with an HTTP status -> same; (d) the mailer THROWS -> same; (e) `mark_sent(false)` errors ->
+  `signing_close(send_failed)` called; (f) that errors too -> `note_failure("close_error")`; (g) that errors too ->
+  `localFailures` is 1; (h) `mark_sent(true)` errors after the mail went -> `failSend` runs; (i) mailer `http: null` ->
+  `mark_sent(true)`, `note_failure("mail_uncertain")`, `SEND_MESSAGES.uncertain`. Each `signing_open` answer in item 9's table
+  gives its listed message and its listed record (none for the three preconditions and the missing-object codes, which set the
+  memo; `open_refused` for `signing_words_changed` / `signing_invalid`; `open_error` for 23505, 40P01, an unknown error and a
+  timeout). The third counted failure of any kind answers `sign_here_instead`, and the next `readyDecision` is false, so the `/p/`
+  page renders today's in-app markup. A limiter refusal, `details_required`, nothing selected and an undescribed class write no
+  failure and call no rpc.
+- T20 (v3 B1b) Readiness: `readyDecision` is false for each `signing_readiness` state other than `ok`, for `failures` 3, for
+  `failures` 2 + `localFailures` 1, for an rpc error, an unknown shape, and a missing-object code (which also sets the memo).
+  `isSigningAddress` accepts and refuses exactly what 0117's pattern does over a fixed table (blank, spaces only, no `@`, two `@`,
+  inner space, leading/trailing spaces, 321 characters).
+- T21 (v3 B3) `signingWordsStatus`: each of the six results from env and scoped-read fakes (42P01 and PGRST205 -> `not_set_up`; any
+  other error -> `unreadable`; zero rows -> `no_words`; a row -> `on`); `switch_off` and `no_mail` make no read; the read is
+  `client_proposal_signing_words` through the client passed in; a grep test that `settings-status.ts` and the settings page import
+  nothing from `@/lib/db/admin` and contain no `signing_probe` / `rpc(` call (the existing no-admin-import test also covers it).
+- T22 (v3, staff preview) `ProposalDocument` / `ExpandablePreview` in the editor's preview with a letter fixture and
+  `emailSigning: true` render no "Email me a link to sign" button and are not given `sendSigningLinkAction` (props checked, and a
+  grep that `src/app/dashboard` and `src/components/proposal-editor` never import or name `sendSigningLinkAction` /
+  `closeSigningLinkAction`): no client email can come from a staff preview.
 - T12 Hygiene: `tests/proposals/public-assets.test.ts` green; no new dependency in `package.json`; `pricing.ts` has no diff; the only
   `/p/<token>/` URL builder is still `client-link-origin.ts`; client-words grep for denied phrases ("legally binding", "electronic
-  signature act", "ESIGN", "UETA", "consent to") in builder-written strings.
+  signature act", "ESIGN", "UETA", "consent to") in builder-written strings, and every string in item 19's table is present
+  verbatim and passes that grep.
 - `pnpm lint`, `pnpm test`, `pnpm build` green.
 
 ## Known limits
@@ -381,11 +527,18 @@ Copying Lawmatics' consent text. A Setup checklist item.
   that only fetches the URL writes nothing. Consent and signing are clicks a scanner does not make.
 - (B2) A close-on-change that cannot reach the server leaves the old link open (it still signs only what it was sent with).
 - (N6) An email sent but not marked (`mark_sent` errored) leaves a dead link in the client's inbox and a `sending` row until the next send.
+- (v3) The send limiter (5 per `/p/` token per hour) can refuse a client while in-app signing is still refused, so a client who
+  presses the button more than five times in an hour waits up to an hour (or loads the page on another server instance). A
+  limiter refusal deliberately does NOT turn readiness off: anyone holding the bearer `/p/` link could otherwise trip it on
+  purpose and sign in-app without proving control of the client's email address. Listed, not hidden.
+- (v3) A mail answer with no HTTP status is treated as uncertain: the link stays open and the failure is counted. If Resend
+  rejected it after all, the client presses again (fresh link); three such answers turn the emailed path off for the version.
+- (v3) A failure the database cannot record (`note_failure` errored) is counted only on the server instance that saw it.
 - (B1) A wrong address on file, or a mail that bounces after Resend accepted it, is not detected (Q7). Staff can start a new
   version with the corrected address (today's path); the page shows the masked address the link went to.
 
 ## NOT verified (listed, not hidden)
-A real browser (canvas drawing by mouse, pen and touch; focus order; 375px), a real database with 0117 (every function and the 22
+A real browser (canvas drawing by mouse, pen and touch; focus order; 375px), a real database with 0117 (every function and the 33
 isolation cases), real email delivery and Resend attachments, the firm's verified sending domain, the `next build` trace of fonts for the
 new server actions (`next.config.ts` already covers `/p/*`), and 0106's lifecycle accepting the new function's transaction (see 0117's
 "BEFORE APPLYING").

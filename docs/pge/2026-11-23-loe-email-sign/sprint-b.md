@@ -1,7 +1,9 @@
 # Sprint B contract: after signing (certificate, signed copy, Lectual file, staff card) (PGE, STRICT)
 
-**Status:** v2 (Nov 23): v1 refused by the strict evaluator; B6, B7, N8, N10, N11 answered below. Not yet ratified. Nothing is built.
-**Starts after Sprint A is built and evaluated.** `LOE_EMAIL_SIGNING` is set to `on` only after THIS sprint ships (Sprint A D18).
+**Status:** v3 (Nov 23): v1 refused by the strict evaluator; B6, B7, N8, N10, N11 answered in v2. v3 (with Sprint A v3): the switch
+conditions (Q1, Q2 added), item 12's Q1-Q8, and `skipped` re-runs (item 6). Not yet ratified. Nothing is built.
+**Starts after Sprint A is built and evaluated.** `LOE_EMAIL_SIGNING` is set to `on` only after THIS sprint ships (Sprint A D18), 0117's
+isolation cases pass on lectual-dev, and the owner has answered Q1, Q2, Q4, Q6 and Q7 (Sprint A D24).
 **Size:** medium-large, one agent, one session. **Branch:** `claude/loe-email-sign` (never `main`; no push, no PR).
 **Schema:** none new. Uses lectual 0117 as written for Sprint A (`0117-proposed.sql.txt`); if Sprint B needs a change to it, the generator
 stops and asks (the file is shared with Sprint A's contract). **Evaluator: STRICT.**
@@ -94,7 +96,10 @@ proposal page. The in-app (0106) path is untouched: its signed PDF has no certif
      and body = the request's snapshotted `copy_subject` / `copy_body` rendered with `renderEmailWords` (`client_name`, `firm_name`), the
      verified signed PDF with its certificate attached, `idempotencyKey = "signed-copy:" + requestId + ":" + round` (the reset round, so a
      re-signing after a reset is a new key);
-   - `skipped`: `LOE_EMAIL_SIGNING` is not `on`, or the firm has no mail entry or no `RESEND_API_KEY` (fixed reason sentences);
+   - `skipped`: `LOE_EMAIL_SIGNING` is not `on`, or the firm has no mail entry or no `RESEND_API_KEY` (fixed reason sentences).
+     **`skipped` is not the success word** (`sent`), so `stepSucceeded` is false and the step runs again on the next acceptance
+     follow-up run and on Try again: a link signer whose copy was skipped while the switch was off gets it once the switch and the
+     mail entry are back (v3, non-blocking). A test pins skipped -> switch on -> next run sends once;
    - `blocked`: the PDF is a mismatch (`STEP_TEXT.signedMismatch`) or the certificate does not verify;
    - `failed`: the mailer failed (`HTTP <status>` or "no response"), the evidence or firm facts could not be read, or the PDF could not be
      built. Retried by the next run or Try again.
@@ -147,7 +152,9 @@ proposal page. The in-app (0106) path is untouched: its signed PDF has no certif
     signing link's record is removed too." (fixed sentences in `vocabulary.ts`).
 
 ### Docs, harness
-11. **AGENTS.md:** complete the Sprint A section (same heading) with: the two new steps and when each runs; the certificate page and its
+11. **AGENTS.md:** complete the Sprint A section (same heading) with: the switch conditions restated (0117's isolation cases
+    pass, this sprint shipped, Q1, Q2, Q4, Q6 and Q7 answered); the two new steps and when each runs, and that `skipped` on either
+    is retried by the next run and Try again (it is not the success word); the certificate page and its
     verification rule (every `buildVerifiedSignedPdf` caller passes `readEvidence`; a link signature never prints without its page);
     the staff states and the three-state read; the owner-approved client-email exception restated (the signing link and the signed
     copy, nothing else), **including that a staff Try again of `signed_copy_email` is a retry of that same owner-approved email to the
@@ -155,7 +162,7 @@ proposal page. The in-app (0106) path is untouched: its signed PDF has no certif
     one sentence in the existing "Documents & files" section; NOT verified list.
 12. **`docs/MASTER-TODO.md`:** items for: apply 0117 (dev, isolation cases, prod); set `FIRM_CLIENT_MAIL_FROM` and verify the firm's
     Resend domain; the firm's approver approves signing words; set `LOE_EMAIL_SIGNING=on`; walk the flow once in a real browser on
-    desktop and phone; Q1-Q5 answers.
+    desktop and phone; the owner's answers to Q1-Q8, of which Q1, Q2, Q4, Q6 and Q7 must be in BEFORE `LOE_EMAIL_SIGNING=on`.
 13. **Design harness** `scripts/design-harness/screens/loe-email-sign.screen.tsx`: the client states (step 3 with the email button, link
     sent, `?sign=` read-only + consent, signature box drawn/typed, name mismatch, link unavailable, done) at 1440 and 375, no sideways
     overflow, fake names and `example.com` addresses only.

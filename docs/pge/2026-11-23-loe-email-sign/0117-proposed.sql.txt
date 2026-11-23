@@ -6,7 +6,8 @@
 -- the number against lectual/supabase/migrations first; 0108, 0110-0113, 0115 and 0116 are spoken for), review it there
 -- against 0106's own text (see "BEFORE APPLYING" below), COPY THE ISOLATION CASES AT THE END INTO lectual's
 -- `tests/tenant-isolation.test.ts` IN THE SAME PR, apply to lectual-dev, run them, and apply to lectual-prod only with the
--- owner's OK. The deployment switch `LOE_EMAIL_SIGNING` stays unset until those cases pass on lectual-dev.
+-- owner's OK. The deployment switch `LOE_EMAIL_SIGNING` stays unset until those cases pass on lectual-dev, Sprint B has
+-- shipped, AND the owner has answered Q1, Q2, Q4, Q6 and Q7 in questions.md (v3, evaluator B4).
 --
 -- Spec: docs/pge/2026-11-23-loe-email-sign/spec.md (owner, Nov 23). Contracts: sprint-a.md (this file is Sprint A's), sprint-b.md.
 -- Reused ideas (not code) from the paused Adobe design (git show db58275:docs/pge/2026-11-17-agentic-ip-os/0113-proposed.sql.txt):
@@ -27,7 +28,11 @@
 --   6. client_proposal_signing_letter_current(org, content): is the letter copy on the proposal still the firm's CURRENT
 --      approved letter (the database twin of the app's letterLiveCheck)? signing_open and signing_sign refuse when it is not
 --      (`signing_letter_replaced`), so a link never signs a letter the firm has since replaced (spec decision 2, v2 ruling B3).
---   7. client_proposal_signing_probe(): created LAST in this file. The app's gate calls it; a missing function (42883 /
+--   7. (v3, evaluator B1) client_proposal_signing_failure (append-only, kind + time only), client_proposal_signing_note_failure
+--      and client_proposal_signing_readiness(proposal, org): signing_open's own preconditions without a write, plus the
+--      number of failed sends for the version in 24 hours. The app's readiness check calls it, so a send that keeps failing,
+--      or that signing_open would refuse, turns the emailed path off for that proposal and the client signs in-app.
+--   8. client_proposal_signing_probe(): created LAST in this file. The app's gate calls it; a missing function (42883 /
 --      PGRST202) means 0117 is not fully applied and the client signs in-app as today (v2 ruling B1).
 --
 -- WHAT THIS DOES NOT DO
@@ -62,6 +67,7 @@
 --   * signing_sign: reads the request WITHOUT a lock only to learn its proposal id, locks the proposal, THEN locks the request
 --     and re-checks everything on the locked row.
 --   * signing_mark_sent, signing_opened, signing_consent, signing_close lock only the request (never the proposal).
+--   * signing_readiness and signing_note_failure lock nothing (a plain read; an insert into the failure table).
 -- So no two of these can wait on each other in opposite orders. If Postgres still reports a deadlock (40P01, e.g. with a
 -- 0106 path this session could not read), the transaction is rolled back whole and the app answers a fixed "try again" sentence.
 -- =====================================================================================================================
@@ -72,6 +78,9 @@
 -- write proposals. Approving retires the previous approved version. An approved or retired row is frozen.
 -- Merge fields: link_body must contain {{signing_link}} exactly once; the four email fields may use {{client_name}},
 -- {{firm_name}} and {{link_expires}} (link email only); the four page fields use none. Nothing else in double braces.
+-- v3 (evaluator B5, non-blocking): EVERY check constraint in this file is written `check (coalesce(<rule>, false))`. A CHECK
+-- that evaluates to NULL passes, so a rule over a nullable column (or a regex over one) would otherwise let a NULL through.
+-- The functions supply values today; the coalesce makes the tables refuse a NULL even if a future function does not.
 create table if not exists public.client_proposal_signing_words (
   id             uuid        primary key default gen_random_uuid(),
   org_id         uuid        not null references public.crm_org(id) on delete cascade,
@@ -94,10 +103,10 @@ create table if not exists public.client_proposal_signing_words (
   approved_at    timestamptz null,
   created_at     timestamptz not null default now(),
   updated_at     timestamptz not null default now(),
-  constraint client_proposal_signing_words_status check (status in ('draft', 'approved', 'retired')),
-  constraint client_proposal_signing_words_version_pos check (version >= 1),
+  constraint client_proposal_signing_words_status check (coalesce(status in ('draft', 'approved', 'retired'), false)),
+  constraint client_proposal_signing_words_version_pos check (coalesce(version >= 1, false)),
   constraint client_proposal_signing_words_org_version unique (org_id, version),
-  constraint client_proposal_signing_words_lens check (
+  constraint client_proposal_signing_words_lens check (coalesce(
         char_length(btrim(consent_line)) between 1 and 300
     and char_length(btrim(consent_text)) between 1 and 8000
     and char_length(btrim(sign_line))    between 1 and 600
@@ -106,10 +115,10 @@ create table if not exists public.client_proposal_signing_words (
     and char_length(btrim(link_body))    between 1 and 8000
     and char_length(btrim(copy_subject)) between 1 and 200
     and char_length(btrim(copy_body))    between 1 and 8000
-  ),
+  , false)),
   -- Subjects are one line.
-  constraint client_proposal_signing_words_subject_line check (link_subject !~ '[\r\n]' and copy_subject !~ '[\r\n]'),
-  constraint client_proposal_signing_words_approved_stamp check (status = 'draft' or (approved_by is not null and approved_at is not null))
+  constraint client_proposal_signing_words_subject_line check (coalesce(link_subject !~ '[\r\n]' and copy_subject !~ '[\r\n]', false)),
+  constraint client_proposal_signing_words_approved_stamp check (coalesce(status = 'draft' or (approved_by is not null and approved_at is not null), false))
 );
 
 create unique index if not exists client_proposal_signing_words_one_draft
@@ -349,28 +358,28 @@ create table if not exists public.client_proposal_signing_request (
   updated_at            timestamptz not null default now(),
   constraint client_proposal_signing_request_proposal_org_fk foreign key (proposal_id, org_id)
     references public.client_proposal (id, org_id) on delete cascade,
-  constraint client_proposal_signing_request_status check (status in ('sending', 'open', 'signed', 'closed')),
-  constraint client_proposal_signing_request_closed_reason check (
+  constraint client_proposal_signing_request_status check (coalesce(status in ('sending', 'open', 'signed', 'closed'), false)),
+  constraint client_proposal_signing_request_closed_reason check (coalesce(
     (status = 'closed') = (closed_reason is not null)
     and (closed_reason is null or closed_reason in (
       'resent', 'send_failed', 'expired', 'withdrawn', 'superseded', 'accepted_elsewhere', 'proposal_changed', 'reset'
     ))
-  ),
-  constraint client_proposal_signing_request_sha check (
+  , false)),
+  constraint client_proposal_signing_request_sha check (coalesce(
         token_sha256 ~ '^[0-9a-f]{64}$' and agreement_sha256 ~ '^[0-9a-f]{64}$' and canonical_fingerprint ~ '^[0-9a-f]{64}$'
     and consent_sha256 ~ '^[0-9a-f]{64}$' and words_sha256 ~ '^[0-9a-f]{64}$'
     and (review_pdf_sha256 is null or review_pdf_sha256 ~ '^[0-9a-f]{64}$')
-  ),
-  constraint client_proposal_signing_request_text_len check (char_length(agreement_text) between 1 and 204800),
-  constraint client_proposal_signing_request_name_len check (char_length(btrim(signer_name)) between 2 and 200),
-  constraint client_proposal_signing_request_email check (char_length(sent_to) between 3 and 320 and sent_to ~ '^[^@\s]+@[^@\s]+$'),
-  constraint client_proposal_signing_request_expiry check (expires_at > created_at and expires_at <= created_at + interval '7 days 1 minute'),
-  constraint client_proposal_signing_request_signed check ((status = 'signed') = (signature_id is not null and signed_at is not null)),
-  constraint client_proposal_signing_request_shapes check (
+  , false)),
+  constraint client_proposal_signing_request_text_len check (coalesce(char_length(agreement_text) between 1 and 204800, false)),
+  constraint client_proposal_signing_request_name_len check (coalesce(char_length(btrim(signer_name)) between 2 and 200, false)),
+  constraint client_proposal_signing_request_email check (coalesce(char_length(sent_to) between 3 and 320 and sent_to ~ '^[^@\s]+@[^@\s]+$', false)),
+  constraint client_proposal_signing_request_expiry check (coalesce(expires_at > created_at and expires_at <= created_at + interval '7 days 1 minute', false)),
+  constraint client_proposal_signing_request_signed check (coalesce((status = 'signed') = (signature_id is not null and signed_at is not null), false)),
+  constraint client_proposal_signing_request_shapes check (coalesce(
     jsonb_typeof(details) = 'object' and pg_column_size(details) <= 8192
     and (address is null or (jsonb_typeof(address) = 'object' and pg_column_size(address) <= 4096))
     and jsonb_typeof(snapshot) = 'object'
-  )
+  , false))
 );
 
 -- One request in flight per proposal version (sending or open).
@@ -472,9 +481,11 @@ create table if not exists public.client_proposal_signing_event (
   agreement_sha256  text        null,
   -- closed
   closed_reason     text        null,
-  constraint client_proposal_signing_event_kind check (kind in ('sent', 'opened', 'consent', 'signature', 'signed', 'closed')),
-  constraint client_proposal_signing_event_ua_len check (user_agent is null or char_length(user_agent) <= 400),
-  constraint client_proposal_signing_event_shape check (
+  constraint client_proposal_signing_event_kind check (coalesce(kind in ('sent', 'opened', 'consent', 'signature', 'signed', 'closed'), false)),
+  constraint client_proposal_signing_event_ua_len check (coalesce(user_agent is null or char_length(user_agent) <= 400, false)),
+  -- v3 (evaluator B5): wrapped in coalesce(..., false). A CHECK that evaluates to NULL PASSES, so without it a `consent` row
+  -- with a NULL consent_sha256 (NULL ~ regex = NULL), or a `signature` row with a NULL signature_sha256 or typed_style, passed.
+  constraint client_proposal_signing_event_shape check (coalesce(
     case kind
       when 'sent'      then sent_to is not null
       when 'opened'    then true
@@ -489,7 +500,7 @@ create table if not exists public.client_proposal_signing_event (
                             )
       when 'signed'    then agreement_sha256 ~ '^[0-9a-f]{64}$'
       when 'closed'    then closed_reason is not null
-    end
+    end, false)
   )
 );
 create index if not exists client_proposal_signing_event_request_idx on public.client_proposal_signing_event (request_id, at);
@@ -962,23 +973,28 @@ begin
                      'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz');
   v_fold_frozen := pg_catalog.translate(pg_catalog.regexp_replace(pg_catalog.btrim(v_req.signer_name), '\s+', ' ', 'g'),
                      'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz');
-  if char_length(v_fold_typed) < 2 or v_fold_typed <> v_fold_frozen then
+  if char_length(v_fold_typed) < 2 or v_fold_typed is distinct from v_fold_frozen then
     raise exception 'signing_name_mismatch: the typed name is not the name on the letter' using errcode = '23514';
   end if;
   if p_signature_sha256 is null or p_signature_sha256 !~ '^[0-9a-f]{64}$' then
     raise exception 'signing_bad_signature: no signature' using errcode = '23514';
   end if;
+  -- A NULL kind matches neither branch and is refused by the `else` (pinned by isolation case 29).
   if p_signature_kind = 'drawn' then
     if p_signature_png is null or octet_length(p_signature_png) > 102400
-       or substring(p_signature_png from 1 for 8) <> '\x89504e470d0a1a0a'::bytea
-       or pg_catalog.encode(pg_catalog.sha256(p_signature_png), 'hex') <> p_signature_sha256 then
+       or substring(p_signature_png from 1 for 8) is distinct from '\x89504e470d0a1a0a'::bytea
+       or pg_catalog.encode(pg_catalog.sha256(p_signature_png), 'hex') is distinct from p_signature_sha256 then
       raise exception 'signing_bad_signature: the drawn signature is not a PNG of at most 100 KB, or its hash differs' using errcode = '23514';
     end if;
   elsif p_signature_kind = 'typed' then
-    if p_signature_png is not null or p_typed_style not in ('script', 'print')
+    -- v3 (evaluator B5): every comparison is NULL-safe. `p_typed_style not in (...)` and `x <> y` are NULL when an input is
+    -- NULL, and `NULL or NULL` would not raise, so a NULL style with any 64-hex hash would pass unverified. Hence the explicit
+    -- `is null` and `is distinct from`.
+    if p_signature_png is not null or p_typed_style is null or p_typed_style not in ('script', 'print')
+       or p_typed_name is null
        -- p_typed_name is the app's cleanTypedName output (v2, N3), so btrim() is the identity here and both sides hash the
        -- same string: sha256(style || U+001F || cleaned name). Sprint A offers only 'print' (ruling N9); 'script' is reserved.
-       or pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(p_typed_style || chr(31) || pg_catalog.btrim(p_typed_name), 'UTF8')), 'hex') <> p_signature_sha256 then
+       or pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(p_typed_style || chr(31) || pg_catalog.btrim(p_typed_name), 'UTF8')), 'hex') is distinct from p_signature_sha256 then
       raise exception 'signing_bad_signature: the typed signature does not match its hash' using errcode = '23514';
     end if;
   else
@@ -1072,6 +1088,137 @@ $$;
 revoke all on function public.client_proposal_signing_sign(text, text, text, bytea, text, text, inet, text) from public, anon, authenticated;
 grant execute on function public.client_proposal_signing_sign(text, text, text, bytea, text, text, inet, text) to service_role;
 
+-- ── 8b. Send failures and readiness (v3, evaluator B1: "a firm is never left with no way to sign") ──────────────────────
+-- The app refuses in-app signing only while the emailed path is POSITIVELY ready for the proposal (sprint-a item 2 / 18).
+-- Readiness asks the database the SAME preconditions signing_open checks (so the app and 0117 can never disagree about an
+-- address, a replaced letter, the live version or the approved words), plus how many sends failed for this version in the
+-- last 24 hours. A failure that happens BEFORE signing_open returned an id (signing_open refused or errored, its own 23505,
+-- an rpc timeout) cannot close a request, so the app records it here instead. A failure AFTER the id exists closes the
+-- request `send_failed` (mark_sent(false), else signing_close) and is counted from the request table; it is not ALSO
+-- written here (no double count). Refusals caused by the client's own input (rate limit, missing details, nothing chosen,
+-- an undescribed class) are refused by the app before any rpc and are never recorded: a holder of the bearer /p/ link
+-- cannot trip the fallback and so skip the email proof.
+create table if not exists public.client_proposal_signing_failure (
+  id          uuid        primary key default gen_random_uuid(),
+  org_id      uuid        not null references public.crm_org(id) on delete cascade,
+  proposal_id uuid        not null,
+  kind        text        not null,
+  at          timestamptz not null default now(),
+  constraint client_proposal_signing_failure_proposal_org_fk foreign key (proposal_id, org_id)
+    references public.client_proposal (id, org_id) on delete cascade,
+  constraint client_proposal_signing_failure_kind check (coalesce(kind in (
+    'open_refused', 'open_error', 'mail_uncertain', 'close_error', 'other'
+  ), false))
+);
+create index if not exists client_proposal_signing_failure_proposal_idx
+  on public.client_proposal_signing_failure (proposal_id, at desc);
+comment on table public.client_proposal_signing_failure is
+  'Failed attempts to email a signing link that left no request to close (0117 v3). Kind and time only: no address, text, token or error text. Service role only; counted by client_proposal_signing_readiness.';
+alter table public.client_proposal_signing_failure enable row level security;
+revoke all on public.client_proposal_signing_failure from public, anon, authenticated;
+grant select, insert on public.client_proposal_signing_failure to service_role;
+-- No policy for authenticated: staff read nothing (kind and time only, nothing they act on). Append-only: no update or delete
+-- grant, and the trigger below refuses both even for the service role.
+-- A cascade (0102's owner family delete, or the firm's own removal) fires this row trigger with a trigger depth above 1, so
+-- a DELETE is allowed only then, the same rule as the evidence table. A direct UPDATE or DELETE is refused, the service
+-- role included.
+create or replace function public.client_proposal_signing_failure_guard()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if tg_op = 'INSERT' then
+    new.at := now();
+    return new;
+  end if;
+  if tg_op = 'DELETE' and pg_catalog.pg_trigger_depth() > 1 then
+    return old;
+  end if;
+  raise exception 'signing_failure_append_only: failures are never changed or removed' using errcode = '42501';
+end
+$$;
+revoke all on function public.client_proposal_signing_failure_guard() from public, anon, authenticated;
+do $$
+begin
+  if not exists (select 1 from pg_trigger where tgname = 'client_proposal_signing_failure_guard_trg'
+      and tgrelid = 'public.client_proposal_signing_failure'::regclass) then
+    create trigger client_proposal_signing_failure_guard_trg
+      before insert or update or delete on public.client_proposal_signing_failure
+      for each row execute function public.client_proposal_signing_failure_guard();
+  end if;
+end
+$$;
+
+-- Record one failure for a proposal. Fenced on the proposal row's org; at most 50 rows per proposal per 24 hours (beyond
+-- that the count is already far past the threshold). Returns whether a row was written. Never raises for a missing or
+-- foreign proposal (returns false): the app calls it from failure paths and must not fail twice.
+create or replace function public.client_proposal_signing_note_failure(p_proposal_id uuid, p_org_id uuid, p_kind text)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if p_kind is null or p_kind not in ('open_refused', 'open_error', 'mail_uncertain', 'close_error', 'other') then
+    return false;
+  end if;
+  if not exists (select 1 from public.client_proposal p where p.id = p_proposal_id and p.org_id = p_org_id) then
+    return false;
+  end if;
+  if (select count(*) from public.client_proposal_signing_failure f
+       where f.proposal_id = p_proposal_id and f.at > now() - interval '24 hours') >= 50 then
+    return false;
+  end if;
+  insert into public.client_proposal_signing_failure (org_id, proposal_id, kind) values (p_org_id, p_proposal_id, p_kind);
+  return true;
+end
+$$;
+revoke all on function public.client_proposal_signing_note_failure(uuid, uuid, text) from public, anon, authenticated;
+grant execute on function public.client_proposal_signing_note_failure(uuid, uuid, text) to service_role;
+
+-- Readiness for ONE proposal version: signing_open's own preconditions, without writing, plus the failure count.
+-- Returns jsonb { "state": "ok" | "changed" | "no_email" | "letter_replaced" | "no_words", "failures": <int> }.
+-- failures = requests of THIS proposal row closed `send_failed` in the last 24 hours + failure rows in the last 24 hours.
+-- The app treats anything but state "ok" with failures < 3, and any error, as NOT ready (the client signs in-app).
+create or replace function public.client_proposal_signing_readiness(p_proposal_id uuid, p_org_id uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_row      public.client_proposal%rowtype;
+  v_state    text := 'ok';
+  v_failures integer;
+begin
+  select * into v_row from public.client_proposal p where p.id = p_proposal_id;
+  if not found
+     or v_row.org_id is distinct from p_org_id
+     or v_row.status is distinct from 'sent'
+     or (v_row.expires_on is not null and v_row.expires_on < (now() at time zone 'Etc/GMT+12')::date)
+     or (jsonb_typeof(v_row.content -> 'loe') = 'object') is not true then
+    v_state := 'changed';
+  elsif v_row.client_email is null or btrim(v_row.client_email) !~ '^[^@\s]+@[^@\s]+$' then
+    v_state := 'no_email';
+  elsif not public.client_proposal_signing_letter_current(v_row.org_id, v_row.content) then
+    v_state := 'letter_replaced';
+  elsif not exists (select 1 from public.client_proposal_signing_words w where w.org_id = v_row.org_id and w.status = 'approved') then
+    v_state := 'no_words';
+  end if;
+  select (select count(*) from public.client_proposal_signing_request r
+            where r.proposal_id = p_proposal_id and r.org_id = p_org_id and r.status = 'closed'
+              and r.closed_reason = 'send_failed' and r.updated_at > now() - interval '24 hours')
+       + (select count(*) from public.client_proposal_signing_failure f
+            where f.proposal_id = p_proposal_id and f.org_id = p_org_id and f.at > now() - interval '24 hours')
+    into v_failures;
+  return jsonb_build_object('state', v_state, 'failures', coalesce(v_failures, 0));
+end
+$$;
+revoke all on function public.client_proposal_signing_readiness(uuid, uuid) from public, anon, authenticated;
+grant execute on function public.client_proposal_signing_readiness(uuid, uuid) to service_role;
+
 -- ── 9. client_proposal_signing_probe: LAST statement on purpose (v2, ruling B1) ──────────────────────────────────────
 -- The app's gate calls it as the service role. Missing (42883 / PGRST202) = 0117 is not (fully) applied = every firm signs
 -- in-app as today. Returns this file's number so a later amendment can be told apart.
@@ -1131,3 +1278,22 @@ grant execute on function public.client_proposal_signing_probe() to service_role
 --     the other is refused or waits; neither raises 40P01 (both lock the proposal first).
 -- 27. (v2, N3) sign() folds only ASCII case: "  sam   CLIENT " matches "Sam Client"; "ZOË" does NOT match "Zoë" (the app
 --     refuses the same pair, pinned by src tests).
+-- 28. (v3, B5) sign() with p_signature_kind = 'typed', p_typed_style NULL and any 64-hex p_signature_sha256 is refused
+--     (signing_bad_signature) and nothing is written; the same with p_typed_name NULL.
+-- 29. (v3, B5) sign() with p_signature_kind NULL is refused (signing_bad_signature: drawn or typed); nothing is written.
+-- 30. (v3, B5) A direct service-role insert into client_proposal_signing_event (inside a session that sets
+--     lectual.signing_fn, to get past the guard) of a `consent` row with consent_sha256 NULL, and of a `signature` row with
+--     signature_sha256 NULL or typed_style NULL, is refused by client_proposal_signing_event_shape (23514). Same for a
+--     request row whose review_pdf_sha256 is set to a non-hex value.
+-- 31. (v3, B1) signing_note_failure: refused for anon and authenticated; for the service role a foreign p_org_id or an
+--     unknown kind returns false and writes nothing; a valid call writes one row with the database's own time. A's owner
+--     and B's members read 0 rows of client_proposal_signing_failure. A service-role UPDATE or DELETE of a failure row is
+--     refused (signing_failure_append_only); the owner's family delete removes them by cascade.
+-- 32. (v3, B1) signing_readiness: refused for anon and authenticated. For the service role: 'ok' with failures 0 for a
+--     sent proposal with a letter, an address and approved words; 'changed' for another org, a withdrawn or expired one, or
+--     one with no letter; 'no_email' for a blank or malformed address (the same regex as signing_open); 'letter_replaced'
+--     after a new letter template is approved; 'no_words' with no approved words. failures counts send_failed closures
+--     plus failure rows of THAT proposal in 24 hours (another proposal's rows are not counted).
+-- 33. (v3, B1) Every state signing_readiness reports as not 'ok' is one signing_open refuses, and signing_open refuses
+--     nothing readiness reported as 'ok' for the same row and words, except signing_invalid (a bad hash or expiry from the
+--     app) and signing_words_changed (an approval landing between the two calls).
