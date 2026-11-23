@@ -2,6 +2,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
+import { isUseServerFile, nestedUseServer } from "./_entry";
 
 /**
  * View as, Layer a (spec "The write block"): EVERY exported server action is wrapped in previewSafe (or, for an action that
@@ -21,7 +22,7 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 const rel = (p: string) => path.relative(ROOT, p).split(path.sep).join("/");
 const files = walk(path.join(ROOT, "src"));
-const serverFiles = files.filter((f) => /^\s*["']use server["'];?/.test(readFileSync(f, "utf8")));
+const serverFiles = files.filter((f) => isUseServerFile(f));
 const routeFiles = files.filter((f) => /\/route\.ts$/.test(f));
 
 /** The named read-only allowlist: each writes nothing (no database write, no queue or provider call, no token refresh). */
@@ -30,8 +31,19 @@ export const READ_ONLY_ALLOWLIST: Record<string, string> = {
   loadCompareAction: "The leads compare panel: reads two leads and their counts, writes nothing",
   pickHubRecordsAction: "Getting started's record picker: reads one lead and one matter id, writes nothing",
   downloadSignedLetterStaffAction: "Signed letter download: builds a PDF from stored rows, writes nothing",
-  downloadReviewLetterAction: "Public review-letter download: builds a PDF, writes nothing (its rate limit is in memory)",
-  downloadSignedLetterAction: "Public signed-letter download: builds a PDF, writes nothing (its rate limit is in memory)",
+};
+
+/**
+ * Exports left UNWRAPPED on purpose, each with its reason. Only these may be a plain `export async function`. Signing in
+ * only creates a session (refusing it would be unfriendly and protects nothing), and the public proposal page's two
+ * downloads are anonymous, token-bound, service-role reads of a client's own letter that never use a signed-in session.
+ */
+export const UNWRAPPED: Record<string, string> = {
+  "src/app/sign-in/actions.ts#sendMagicLink": "signing in: sends a sign-in link, no signed-in caller",
+  "src/app/sign-in/actions.ts#verifySignInCode": "signing in: creates a session only",
+  "src/app/auth/confirm/actions.ts#confirmSignIn": "signing in: spends a one-time token to create a session",
+  "src/app/p/[token]/actions.ts#downloadReviewLetterAction": "public, anonymous, token-bound PDF read (service role on the token's own row); no session is used",
+  "src/app/p/[token]/actions.ts#downloadSignedLetterAction": "public, anonymous, token-bound PDF read (service role on the token's own row); no session is used",
 };
 
 /** Route handlers by path. Every route.ts must be named here. */
@@ -42,6 +54,7 @@ const NO_SIGNED_IN_CALLER: Record<string, string> = {
   "src/app/api/cron/mailbox-sync/route.ts": "cron (CRON_SECRET), no signed-in caller",
   "src/app/api/cron/meetings-import/route.ts": "cron (CRON_SECRET), no signed-in caller",
   "src/app/api/worksheet/route.ts": "the public worksheet form, no signed-in caller",
+  "src/app/auth/callback/route.ts": "signing in: exchanges a sign-in code for a session; creates a session only",
 };
 const READ_ONLY_ROUTES: Record<string, string> = {
   "src/app/dashboard/files/[id]/download/route.ts": "GET: mints a 60-second signed download link (a read)",
@@ -57,7 +70,6 @@ const MUTATING_ROUTES = [
   "src/app/api/meetings/zoom/callback/route.ts",
   "src/app/api/lawpay/connect/route.ts",
   "src/app/api/lawpay/callback/route.ts",
-  "src/app/auth/callback/route.ts",
 ];
 
 type Finding = { file: string; name: string; kind: "safe" | "read-only" | "route-safe" | "plain" | "bad"; reason?: string; refusal?: string };
@@ -115,6 +127,19 @@ function exportsOf(file: string, source?: string): Finding[] {
   return out;
 }
 
+describe("entry detection is by the AST", () => {
+  it("a leading comment or blank line doesn't hide a \"use server\" file", () => {
+    expect(isUseServerFile("m.ts", '// a comment\n\n"use server";\nexport async function a() {}')).toBe(true);
+    expect(isUseServerFile("m.ts", "/* doc */ 'use server';")).toBe(true);
+    expect(isUseServerFile("m.ts", 'import x from "y";\n"use server";')).toBe(false);
+  });
+
+  it("no function body under src/ carries its own \"use server\" (an inline action the wrapper test couldn't see)", () => {
+    expect(files.flatMap((f) => nestedUseServer(f))).toEqual([]);
+    expect(nestedUseServer("m.tsx", 'export function P() { async function act() { "use server"; } return null; }')).toHaveLength(1);
+  });
+});
+
 describe("every exported server action is wrapped", () => {
   const all = serverFiles.flatMap((f) => exportsOf(f));
 
@@ -123,13 +148,18 @@ describe("every exported server action is wrapped", () => {
   });
 
   it("no export is unwrapped, re-exported or made by a factory", () => {
-    const bad = all.filter((x) => x.kind !== "safe" && x.kind !== "read-only").map((x) => `${x.file} ${x.name}: ${x.kind}${x.reason ? ` (${x.reason})` : ""}`);
+    const bad = all.filter((x) => x.kind !== "safe" && x.kind !== "read-only" && !(x.kind === "plain" && UNWRAPPED[`${x.file}#${x.name}`])).map((x) => `${x.file} ${x.name}: ${x.kind}${x.reason ? ` (${x.reason})` : ""}`);
     expect(bad).toEqual([]);
   });
 
   it("the read-only allowlist is exactly the named list, each with its reason", () => {
     const ro = Object.fromEntries(all.filter((x) => x.kind === "read-only").map((x) => [x.name, x.reason]));
     expect(ro).toEqual(READ_ONLY_ALLOWLIST);
+  });
+
+  it("the unwrapped list is exact: every listed export is a plain function, and nothing else is", () => {
+    const plain = all.filter((x) => x.kind === "plain").map((x) => `${x.file}#${x.name}`).sort();
+    expect(plain).toEqual(Object.keys(UNWRAPPED).sort());
   });
 
   it("previewReconcileAction is refused, not allowlisted (it refreshes mailbox tokens)", () => {

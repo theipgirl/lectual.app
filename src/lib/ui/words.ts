@@ -1680,6 +1680,8 @@ export const VIEW_AS_LIVE_MAIL = "Live mail isn't read in a preview. Stored mess
 export const VIEW_AS_PRIVATE_OUTLOOK = (name: string) => `${name}'s own Outlook isn't checked in a preview.`;
 export const VIEW_AS_PRIVATE_COPILOT = (name: string) => `${name}'s Copilot chats are private to them and aren't shown in a preview.`;
 export const VIEW_AS_PRIVATE_BELL = (name: string) => `${name}'s notifications are private to them and aren't shown in a preview.`;
+/** A preview whose teammate couldn't be named (the state couldn't be checked, or the team list couldn't be read). */
+export const VIEW_AS_OUTLOOK_UNCHECKED = "Outlook calendars aren't checked in a preview.";
 export const VIEW_AS_ZOOM = "Zoom consults aren't read in a preview.";
 export const VIEW_AS_NOT_ALLOWED = "Only an owner of this firm can view the app as a teammate.";
 export const VIEW_AS_TARGET_GONE = "That person isn't on your team any more.";
@@ -1692,3 +1694,6 @@ export const VIEW_AS_NOT_READY = notReadyYet("Viewing as a teammate");
 export const VIEW_AS_START_FAILED = "Couldn't start the preview. Try again.";
 /** The target's row could not be read from the team list while previewing. */
 export const VIEW_AS_TEAM_UNREADABLE = "Couldn't load your team. Refresh to try again.";
+/** A hint cookie left behind by a preview that has already ended (closed by the database, or View as not switched on). */
+export const VIEW_AS_STALE = "Your earlier preview has ended.";
+export const VIEW_AS_LEAVE = "Leave preview";

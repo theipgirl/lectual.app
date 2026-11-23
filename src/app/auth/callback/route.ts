@@ -1,4 +1,3 @@
-import { previewSafeRoute } from "@/lib/views/preview-safe";
 import { NextRequest, NextResponse } from "next/server";
 import { SIGN_IN_HOME, safeNext } from "@/lib/auth/safe-next";
 import { getScopedClient } from "@/lib/db/scoped-client";
@@ -8,7 +7,7 @@ import { getScopedClient } from "@/lib/db/scoped-client";
  * writable in route handlers, so getScopedClient persists it), then forwards
  * to the requested in-app path.
  */
-export const GET = previewSafeRoute(async function GET(req: NextRequest): Promise<NextResponse> {
+export async function GET(req: NextRequest): Promise<NextResponse> {
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
   // Only ever redirect within the app; the default is Today.
@@ -38,4 +37,4 @@ export const GET = previewSafeRoute(async function GET(req: NextRequest): Promis
     }
   }
   return NextResponse.redirect(new URL(next, url.origin));
-});
+}

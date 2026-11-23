@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -9,8 +11,10 @@ import { renderToStaticMarkup } from "react-dom/server";
  * No live provider read runs (Zoom, the live Inbox, the reading pane): a refresh would rotate a token.
  */
 const previewing = vi.fn(async () => ({ userId: "22222222-2222-4222-8222-222222222222", name: "Dana Lee" }) as { userId: string; name: string } | null);
+const flagOn = vi.fn(async () => true);
 vi.mock("@/lib/views/view-as", () => ({
   previewingAs: () => previewing(),
+  inPreview: () => flagOn(),
   resolveViewSession: async () => ({
     kind: "ok",
     user: { id: "22222222-2222-4222-8222-222222222222", user_metadata: {} },
@@ -80,7 +84,7 @@ import MyMailPage from "@/app/dashboard/mail/page";
 import { consultDepsForViewer } from "@/lib/calendar/consult-deps-view";
 import { loadTodayConsults, sourceNote } from "@/lib/calendar/consult-sources";
 import { PreviewBell } from "@/components/views/PreviewBell";
-import { VIEW_AS_LIVE_MAIL, VIEW_AS_PRIVATE_BELL, VIEW_AS_PRIVATE_COPILOT, VIEW_AS_PRIVATE_MAIL, VIEW_AS_PRIVATE_OUTLOOK, VIEW_AS_ZOOM } from "@/lib/ui/words";
+import { VIEW_AS_OUTLOOK_UNCHECKED, VIEW_AS_LIVE_MAIL, VIEW_AS_PRIVATE_BELL, VIEW_AS_PRIVATE_COPILOT, VIEW_AS_PRIVATE_MAIL, VIEW_AS_PRIVATE_OUTLOOK, VIEW_AS_ZOOM } from "@/lib/ui/words";
 
 const html = (el: unknown) => renderToStaticMarkup(createElement("div", null, el as never));
 const NAME = "Dana Lee";
@@ -136,7 +140,7 @@ describe("in a preview", () => {
   });
 
   it("Today's Consults: firm (shared) Outlook connections only, the teammate's own Outlook unchecked, Zoom not read", async () => {
-    const deps = await consultDepsForViewer({ name: NAME });
+    const deps = await consultDepsForViewer({ name: NAME, sharedOnly: true });
     // Only the owner's PERSONAL Outlook is connected: never counted for the teammate.
     connections.mockResolvedValueOnce({ ok: true, connections: [OWNER_PERSONAL] });
     const result = await loadTodayConsults(new Date("2026-11-23T15:00:00Z"), "America/New_York", deps);
@@ -150,7 +154,7 @@ describe("in a preview", () => {
   });
 
   it("a firm (shared) Outlook calendar still shows its stored consults", async () => {
-    const deps = await consultDepsForViewer({ name: NAME });
+    const deps = await consultDepsForViewer({ name: NAME, sharedOnly: true });
     connections.mockResolvedValueOnce({ ok: true, connections: [OWNER_PERSONAL, { ...FIRM_SHARED, scopes: ["Calendars.Read"] }] });
     const result = await loadTodayConsults(new Date("2026-11-23T15:00:00Z"), "America/New_York", deps);
     expect(result.outlook).toBe("ok");
@@ -158,9 +162,37 @@ describe("in a preview", () => {
   });
 });
 
+describe("the provider skips key on the FLAG (on or couldn't be checked), not on a named teammate", () => {
+  it("state unknown (no teammate named): My Mail still reads no live mail and no reading pane", async () => {
+    previewing.mockResolvedValueOnce(null);
+    const out = html(await MyMailPage({ searchParams: Promise.resolve({ tab: "inbox", m: "88888888-8888-4888-8888-888888888888", live: "abc" }) }));
+    expect(loadLiveInbox).not.toHaveBeenCalled();
+    expect(loadLiveMessage).not.toHaveBeenCalled();
+    expect(loadStoredMessage).not.toHaveBeenCalled();
+    expect(out).toContain("Live mail isn");
+  });
+
+  it("state unknown: Zoom is not read, and the Outlook note reads without a name", async () => {
+    const deps = await consultDepsForViewer({ name: null, sharedOnly: true });
+    connections.mockResolvedValueOnce({ ok: true, connections: [OWNER_PERSONAL] });
+    const result = await loadTodayConsults(new Date("2026-11-23T15:00:00Z"), "America/New_York", deps);
+    expect(zoomAccess).not.toHaveBeenCalled();
+    expect(sourceNote("outlook", result.outlook, result.previewName)?.text).toBe(VIEW_AS_OUTLOOK_UNCHECKED);
+    expect(VIEW_AS_OUTLOOK_UNCHECKED).not.toMatch(/Their/);
+  });
+
+  it("the consults card and Today ask consultPreview (the flag), never previewingAs", () => {
+    for (const f of ["src/components/calendar/TodayConsults.tsx", "src/components/today/OwnerToday.tsx"]) {
+      const src = readFileSync(path.resolve(__dirname, "../..", f), "utf8");
+      expect(src, f).toMatch(/consultDepsForViewer\(await consultPreview\(\)\)/);
+    }
+    const mail = readFileSync(path.resolve(__dirname, "../../src/app/dashboard/mail/page.tsx"), "utf8");
+    expect(mail).toMatch(/const skipLive = await inPreview\(\);/);
+  });
+});
+
 describe("not previewing", () => {
   it("the live deps are used unchanged", async () => {
-    previewing.mockResolvedValueOnce(null);
     const deps = await consultDepsForViewer(null);
     const result = await loadTodayConsults(new Date("2026-11-23T15:00:00Z"), "America/New_York", deps);
     expect(result.previewName).toBeUndefined();

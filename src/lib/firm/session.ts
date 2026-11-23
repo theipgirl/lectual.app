@@ -1,6 +1,6 @@
 import "server-only";
 import { signInRedirect } from "@/lib/auth/return-path";
-import type { User } from "@supabase/supabase-js";
+import { isAuthSessionMissingError, type User } from "@supabase/supabase-js";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import type { Role } from "@/lib/auth/roles";
 import { perRequest } from "@/lib/views/request-memo";
@@ -30,11 +30,17 @@ export type FirmSession =
       actingAsStaff: boolean;
       switchableFirms: SwitchableFirmRef[];
       displayName: string;
+      /**
+       * A read behind this session errored (membership, firm or platform-admin): the session is still drawn, but View as's
+       * write block cannot tell whether a preview is open, so it treats the request as "couldn't check" and refuses writes.
+       */
+      readFailed?: boolean;
     };
 
 /** The memoized core: everything but the sign-in redirect, which depends on the caller's `signInNext`. */
 type FirmSessionCore =
-  | { kind: "signed-out" }
+  /** `authFailed`: the auth server answered with an error (not "no session"): a 5xx or a timeout, not a signed-out person. */
+  | { kind: "signed-out"; authFailed?: boolean }
   | { kind: "no-access"; user: User; memberReadFailed: boolean }
   | Extract<FirmSession, { kind: "ok" }>;
 
@@ -80,13 +86,16 @@ async function readFirmSessionCore(): Promise<FirmSessionCore> {
   const supabase = await getScopedClient();
   const {
     data: { user },
+    error: userError,
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return { kind: "signed-out" };
+    // "No session" is an ordinary signed-out visitor; any other error is the auth server failing, which View as must not read as "off".
+    const authFailed = Boolean(userError) && !isAuthSessionMissingError(userError);
+    return authFailed ? { kind: "signed-out", authFailed: true } : { kind: "signed-out" };
   }
 
-  const [{ data: member, error: memberError }, { data: org }, { data: isPlatformAdmin }] =
+  const [{ data: member, error: memberError }, { data: org, error: orgError }, { data: isPlatformAdmin, error: adminError }] =
     await Promise.all([
       supabase
         .from("crm_org_member")
@@ -110,8 +119,10 @@ async function readFirmSessionCore(): Promise<FirmSessionCore> {
   // Authenticated but not (yet) a member of any org visible under RLS — fail
   // closed with an explanation rather than a redirect loop back to sign-in
   // (they ARE signed in; they just have no firm workspace).
+  // Any errored read (not "no row"): View as reads this request as "couldn't check" (src/lib/views/view-as-flag.ts).
+  const readFailed = Boolean(memberError || orgError || adminError);
   if ((!member && !actingAsStaff) || !org) {
-    return { kind: "no-access", user, memberReadFailed: Boolean(memberError) };
+    return { kind: "no-access", user, memberReadFailed: readFailed };
   }
 
   // Staff hold no membership row, so their role comes from the org_role claim
@@ -144,5 +155,6 @@ async function readFirmSessionCore(): Promise<FirmSessionCore> {
     actingAsStaff,
     switchableFirms,
     displayName: displayNameOf(user),
+    ...(readFailed ? { readFailed: true } : {}),
   };
 }

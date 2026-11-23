@@ -146,3 +146,43 @@ describe("Sign out", () => {
     expect(r.status).toBe(303);
   });
 });
+
+describe("same-site checks behind a proxy", () => {
+  const behindProxy = (origin: string | null, referer?: string, proto = "https") => {
+    const headers: Record<string, string> = { "content-type": "application/x-www-form-urlencoded", host: "internal:3000", "x-forwarded-host": "app.example.test", "x-forwarded-proto": proto };
+    if (origin !== null) headers.origin = origin;
+    if (referer) headers.referer = referer;
+    return new NextRequest("http://internal:3000/dashboard/view-as/exit/", { method: "POST", headers, body: "" });
+  };
+
+  it("an Origin naming the forwarded host and protocol passes (Vercel)", async () => {
+    const { d, calls } = deps();
+    const r = await exitViewAs(behindProxy("https://app.example.test"), d);
+    expect(r.status).toBe(303);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("http vs https is a different origin", async () => {
+    const { d, calls } = deps();
+    expect((await exitViewAs(behindProxy("http://app.example.test"), d)).status).toBe(403);
+    expect((await exitViewAs(behindProxy("http://app.example.test", undefined, "http"), d)).status).toBe(303);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("Origin: null falls back to the Referer; neither is refused", async () => {
+    const { d } = deps();
+    expect((await exitViewAs(behindProxy("null", "https://app.example.test/dashboard/"), d)).status).toBe(303);
+    expect((await exitViewAs(behindProxy("null"), d)).status).toBe(403);
+    expect((await enterViewAs(behindProxy(null), d)).status).toBe(403);
+  });
+
+  it("sign-out is never blocked by the origin check", async () => {
+    const signOut = vi.fn(async () => undefined);
+    const { d } = deps({ signOut });
+    const r = await signOutRoute(post("/auth/sign-out/", {}, "https://evil.example"), d);
+    expect(r.status).toBe(303);
+    expect(signOut).toHaveBeenCalledTimes(1);
+    const r2 = await signOutRoute(behindProxy("null"), d);
+    expect(r2.status).toBe(303);
+  });
+});

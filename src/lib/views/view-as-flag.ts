@@ -1,8 +1,9 @@
 import "server-only";
+import { cookies } from "next/headers";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { loadFirmSessionCore } from "@/lib/firm/session";
 import { perRequest } from "@/lib/views/request-memo";
-import { PREVIEW_OFF, flagOf, isRealOwner, stateFromRpc, type PreviewFlag, type PreviewState } from "@/lib/views/view-as-rules";
+import { PREVIEW_OFF, VIEW_AS_COOKIE, flagOf, isRealOwner, stateFromRpc, type PreviewFlag, type PreviewState } from "@/lib/views/view-as-rules";
 
 /**
  * Whether this request is inside an owner's View as preview. The DATABASE is the sole authority (0117's
@@ -16,7 +17,10 @@ import { PREVIEW_OFF, flagOf, isRealOwner, stateFromRpc, type PreviewFlag, type 
  *   on        an open preview for this owner, this sign-in and this firm
  *   off       not a real owner, signed out, or no open preview
  *   not-set-up 0117 (or 0116's guard) is not on the database: nothing is offered
- *   unknown   a real owner whose state couldn't be read: writes are refused until a refresh
+ *   unknown   writes are refused until a refresh: a real owner whose state couldn't be read, ANY errored read behind the
+ *             session (membership, firm, platform admin), and, while the hint cookie is present, an auth-server failure or a
+ *             session that couldn't be resolved at all (without the cookie those read as off, so an auth outage doesn't lock
+ *             every person out)
  */
 export function readPreviewState(): Promise<PreviewState> {
   return perRequest("view-as-state", readStateOnce);
@@ -27,16 +31,22 @@ export async function previewFlag(): Promise<PreviewFlag> {
 }
 
 async function readStateOnce(): Promise<PreviewState> {
+  // The hint cookie never turns a preview ON. It only decides how a failure we can't attribute reads: a session that
+  // couldn't be resolved at all, or an auth-server failure, is "unknown" (writes refused) while the cookie says a preview
+  // may be open, and "off" without it, so an auth outage doesn't lock every person out of every write.
+  const hinted = await hasHintCookie();
   let core: Awaited<ReturnType<typeof loadFirmSessionCore>>;
   try {
     core = await loadFirmSessionCore();
   } catch {
-    // The session itself could not be resolved (no request, or the client could not be built): nobody is established as
-    // an owner, so there is no preview to read. The action's own reads fail the same way.
-    return PREVIEW_OFF;
+    return hinted ? { kind: "unknown" } : PREVIEW_OFF;
   }
-  if (core.kind === "signed-out") return PREVIEW_OFF;
+  if (core.kind === "signed-out") return core.authFailed && hinted ? { kind: "unknown" } : PREVIEW_OFF;
+  // Any errored read behind the session (membership, firm, platform admin): we can't tell who this is, so we can't tell
+  // whether a preview is open. A platform admin who is a real owner reads as staff with no row when the membership read
+  // fails, which must not read as "off".
   if (core.kind === "no-access") return core.memberReadFailed ? { kind: "unknown" } : PREVIEW_OFF;
+  if (core.readFailed) return { kind: "unknown" };
   if (!isRealOwner({ userId: core.user.id, orgId: core.org.id, member: core.member })) return PREVIEW_OFF;
   try {
     const supabase = await getScopedClient();
@@ -44,5 +54,13 @@ async function readStateOnce(): Promise<PreviewState> {
     return stateFromRpc(result as { data: unknown; error: { code?: string; message?: string } | null });
   } catch {
     return { kind: "unknown" };
+  }
+}
+
+async function hasHintCookie(): Promise<boolean> {
+  try {
+    return Boolean((await cookies()).get(VIEW_AS_COOKIE)?.value);
+  } catch {
+    return false;
   }
 }

@@ -9,6 +9,7 @@ import {
   isRealOwner,
   noticeBackPath,
   refusesWrites,
+  requestOrigins,
   sameOrigin,
   stateFromRpc,
   viewerOf,
@@ -91,6 +92,7 @@ describe("the database's answers", () => {
     expect(enterNotice(classifyViewAsError({ code: "23514", message: "view_as_target_not_member: x" }))).toBe("view-as-gone");
     expect(enterNotice(classifyViewAsError({ code: "PGRST202", message: "" }))).toBe("view-as-not-ready");
     expect(enterNotice(classifyViewAsError({ code: "08006", message: "boom" }))).toBe("view-as-failed");
+    expect(classifyViewAsError({ code: "23514", message: "view_as_bad_reason: x" })).toBe("bad-reason");
   });
 });
 
@@ -122,6 +124,10 @@ describe("resolveViewer swaps only 'whose view'", () => {
 describe("same-site and the notice path", () => {
   it("a POST is same-site only when its Origin (or Referer) is this host", () => {
     expect(sameOrigin("https://app.example.test/dashboard/view-as/exit/", "https://app.example.test", null)).toBe(true);
+    expect(sameOrigin(requestOrigins({ url: "http://internal:3000/x", forwardedHost: "app.example.test", forwardedProto: "https" }), "https://app.example.test", null)).toBe(true);
+    expect(sameOrigin(requestOrigins({ url: "http://internal:3000/x", siteUrl: "https://site.example.test/" }), "https://site.example.test", null)).toBe(true);
+    expect(sameOrigin(requestOrigins({ url: "http://internal:3000/x", forwardedHost: "evil.example/../", forwardedProto: "https" }), "https://evil.example", null)).toBe(false);
+    expect(sameOrigin("https://app.example.test/x", "null", null)).toBe(false);
     expect(sameOrigin("https://app.example.test/x", "https://evil.example", null)).toBe(false);
     expect(sameOrigin("https://app.example.test/x", null, "https://app.example.test/dashboard/")).toBe(true);
     expect(sameOrigin("https://app.example.test/x", null, null)).toBe(false);

@@ -37,7 +37,8 @@ import { YourNameDialog } from "@/components/account/YourNameDialog";
 import { NoShowNotices } from "@/components/record-card/NoShowNotices";
 import { drawnNav, NO_PREVIEW, previewFor, shellFor, viewFor, viewMenuFor } from "@/lib/views";
 import { resolveViewer } from "@/lib/views/view-as";
-import { isRealOwner } from "@/lib/views/view-as-rules";
+import { VIEW_AS_COOKIE, isRealOwner } from "@/lib/views/view-as-rules";
+import { StalePreviewCookie } from "@/components/views/StalePreviewCookie";
 import { ViewAsBanner } from "@/components/views/ViewAsBanner";
 import { PreviewBell } from "@/components/views/PreviewBell";
 import { ReadOnlyPreview } from "@/components/views/ReadOnlyPreview";
@@ -105,6 +106,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
   ]);
   const dealReady = nudge && nudge.ready ? dealReadyLine(nudge.label, nudge.count) : null;
   const railPinned = railIsPinned(cookieStore.get(RAIL_PIN_COOKIE)?.value);
+  // A hint cookie with no open preview behind it (closed by the database, or View as not on): clear it, or the proxy
+  // refuses every write until it expires.
+  const staleHint = Boolean(cookieStore.get(VIEW_AS_COOKIE)?.value) && resolved?.previewState === "off";
 
   return (
     <div className="lx-app">
@@ -117,6 +121,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <ViewAsBanner kind="unchecked" />
       ) : previewing ? (
         <ViewAsBanner kind="team" />
+      ) : staleHint ? (
+        <StalePreviewCookie />
       ) : null}
       {actingAsStaff && !viewAs && (
         <div role="status" className="lx-staff-bar">

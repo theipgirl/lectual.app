@@ -5,7 +5,7 @@ import { formatEventWhen, joinHref } from "@/lib/calendar/outlook-format";
 import { consultSources, loadTodayConsults, sourceNote, type TodayConsultsResult } from "@/lib/calendar/consult-sources";
 import { LAWMATICS_NAME } from "@/lib/ui/words";
 import { consultDepsForViewer } from "@/lib/calendar/consult-deps-view";
-import { previewingAs } from "@/lib/views/view-as";
+import { consultPreview } from "@/lib/views/view-as";
 import "./calendar.css";
 
 const SOURCE_LABEL = { outlook: "Outlook", lawmatics: LAWMATICS_NAME, zoom: "Zoom" } as const;
@@ -87,6 +87,6 @@ export function TodayConsultsView({ result, timeZone }: { result: TodayConsultsR
 /** Self-loading, so Today's page only mounts it. It never renders nothing. */
 export async function TodayConsults() {
   const timeZone = await getFirmTimeZone();
-  const result = await loadTodayConsults(new Date(), timeZone, await consultDepsForViewer(await previewingAs()));
+  const result = await loadTodayConsults(new Date(), timeZone, await consultDepsForViewer(await consultPreview()));
   return <TodayConsultsView result={result} timeZone={timeZone} />;
 }

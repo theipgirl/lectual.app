@@ -13,7 +13,7 @@ import { dealNudge, parseDeckSeen } from "@/lib/deal/nudge";
 import { loadDeckSummary, type DeckSummary } from "@/lib/queue/deck-summary";
 import { loadTodayConsults, type TodayConsultsResult } from "@/lib/calendar/consult-sources";
 import { consultDepsForViewer } from "@/lib/calendar/consult-deps-view";
-import { previewingAs } from "@/lib/views/view-as";
+import { consultPreview } from "@/lib/views/view-as";
 import { loadOwnerDeadlines, loadOwnerNeedsReview, loadOwnerProposals } from "@/lib/today/owner-load";
 import { cardsHero, deadlineChip, deadlineParts, proposalTone, weekdayDate, OWNER_PROPOSALS_SHOWN, OWNER_DEADLINES_SHOWN, weekStrip } from "@/lib/today/owner-rules";
 import { DECK_PATH } from "@/lib/views";
@@ -95,7 +95,7 @@ export async function OwnerToday({
   const dealTimes = parseDealTimes(metadata);
   const [deckS, consultsS, deadlinesS, reviewS, proposalsS, membersS] = await Promise.allSettled([
     loadDeckSummary({ userId, role }, dealTimes, now),
-    loadTodayConsults(now, tz, await consultDepsForViewer(await previewingAs())),
+    loadTodayConsults(now, tz, await consultDepsForViewer(await consultPreview())),
     loadOwnerDeadlines(now, tz),
     loadOwnerNeedsReview(now, tz),
     hasProposals ? loadOwnerProposals(now, tz) : Promise.resolve(null),

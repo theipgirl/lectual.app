@@ -131,3 +131,15 @@ export async function previewingAs(): Promise<{ userId: string; name: string } |
   const v = await resolveViewer().catch(() => null);
   return v?.viewAs ? { userId: v.viewAs.targetUserId, name: v.viewAs.targetName } : null;
 }
+
+/**
+ * Layer d (provider reads that may refresh a token): null outside a preview; otherwise skip every provider read. Keyed on
+ * the FLAG (on, or couldn't be checked), not on whether a teammate could be named: a token must never be refreshed while
+ * the state is unknown or the teammate is unreadable. `sharedOnly` when a teammate is shown (their view has no personal
+ * connection of the owner's).
+ */
+export async function consultPreview(): Promise<{ name: string | null; sharedOnly: boolean } | null> {
+  const v = await resolveViewer().catch(() => null);
+  if (!v || v.previewState === "off") return null;
+  return { name: v.viewAs?.targetName ?? null, sharedOnly: Boolean(v.viewAs) };
+}

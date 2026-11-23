@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
-import { previewingAs, resolveViewSession } from "@/lib/views/view-as";
+import { inPreview, previewingAs, resolveViewSession } from "@/lib/views/view-as";
 import { orgHasModule } from "@/lib/org/modules";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { listConnections } from "@/lib/mailbox/connections";
@@ -69,7 +69,9 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
   // them by RLS) is never shown in a teammate's view, and the live Inbox tab and reading pane are not fetched (a provider
   // read may refresh a token, which a preview must never do).
   const previewing = await previewingAs();
-  const inboxTab = tab === "inbox" && !previewing;
+  // Live reads are skipped on the FLAG (on, or couldn't be checked), not only when a teammate is named (Layer d).
+  const skipLive = await inPreview();
+  const inboxTab = tab === "inbox" && !skipLive;
   const sent = f === "sent";
 
   const list = await listConnections();
@@ -136,9 +138,9 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
   };
 
   // The reading pane: `m` (a stored row) wins over `box` + `live`. Each re-checks access on this request.
-  const paneOpen = !previewing && (Boolean(m) || Boolean(live));
+  const paneOpen = !skipLive && (Boolean(m) || Boolean(live));
   const backHref = href({ m: null, live: null });
-  const paneState = previewing ? null : m ? loadStoredMessage(m, liveMailReadDeps) : live ? loadLiveMessage(box, live, liveMailReadDeps) : null;
+  const paneState = skipLive ? null : m ? loadStoredMessage(m, liveMailReadDeps) : live ? loadLiveMessage(box, live, liveMailReadDeps) : null;
   const inbox = inboxTab ? await loadLiveInbox(box, liveMailReadDeps) : null;
 
   // The sidebar links and the phone's select are built from this one list, so they cannot disagree.
@@ -194,9 +196,10 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
           </Notice>
         )}
 
-        {previewing && (
+        {skipLive && (
           <Notice tone="mute">
-            {VIEW_AS_PRIVATE_MAIL(previewing.name)} {VIEW_AS_LIVE_MAIL}
+            {previewing ? `${VIEW_AS_PRIVATE_MAIL(previewing.name)} ` : ""}
+            {VIEW_AS_LIVE_MAIL}
           </Notice>
         )}
 
@@ -206,7 +209,7 @@ export default async function MyMailPage({ searchParams }: { searchParams: Promi
           label="Mail views"
           tabs={[
             { href: href({ tab: null, m: null, live: null }), label: "Client mail", current: !inboxTab },
-            ...(previewing ? [] : [{ href: href({ tab: "inbox", m: null, live: null, f: null }), label: "Inbox", current: inboxTab }]),
+            ...(skipLive ? [] : [{ href: href({ tab: "inbox", m: null, live: null, f: null }), label: "Inbox", current: inboxTab }]),
           ]}
         />
 

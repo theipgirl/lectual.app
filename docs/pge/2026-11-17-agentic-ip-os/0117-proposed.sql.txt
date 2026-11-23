@@ -48,8 +48,8 @@
 --   view_as_bad_reason is not in the spec's list: owner_view_as_end refuses any reason other than exit / sign_out with it.
 --
 -- ── PRE-APPLY CHECKS (read-only; run on each project first, nothing here writes) ─────────────────────────────────────
---   1. 0116 is applied and its guard is on (expect one row, tgenabled 'O'):
---        select tgname, tgenabled from pg_trigger
+--   1. 0116 is applied and its guard is on (expect one row, tgenabled 'O' or 'A', function crm_org_member_owner_guard):
+--        select tgname, tgenabled, tgfoid::regprocedure from pg_trigger
 --         where tgrelid = 'public.crm_org_member'::regclass and tgname = 'crm_org_member_owner_guard_trg';
 --      No row: STOP, apply 0116 first (D14).
 --   2. The table does not exist yet (expect null): select to_regclass('public.owner_view_as_event');
@@ -203,7 +203,8 @@ begin
 end
 $$;
 
--- Shared check 2: 0116's guard trigger is on crm_org_member and enabled.
+-- Shared check 2: 0116's guard trigger is on crm_org_member, enabled (origin or always; not disabled, not replica-only), and
+-- runs 0116's own guard function (a trigger of that name pointing elsewhere does not count).
 create or replace function public.owner_view_as_require_member_guard()
 returns void
 language plpgsql
@@ -216,7 +217,8 @@ begin
     select 1 from pg_catalog.pg_trigger t
      where t.tgrelid = 'public.crm_org_member'::regclass
        and t.tgname = 'crm_org_member_owner_guard_trg'
-       and t.tgenabled <> 'D'
+       and t.tgenabled in ('O', 'A')
+       and t.tgfoid = 'public.crm_org_member_owner_guard()'::regprocedure
   ) then
     raise exception 'view_as_needs_member_guard: the membership guard (0116) must be on first' using errcode = '42501';
   end if;
@@ -444,7 +446,8 @@ comment on function public.owner_view_as_end(text) is
 --   T4. The SELECT policy contains `owner_view_as_event.org_id = public.current_org_id()` and `m.org_id = owner_view_as_event.org_id`
 --       and does not contain current_org_role.
 --   T5. owner_view_as_state's body calls owner_view_as_require_member_guard and owner_view_as_close_stale.
---   T6. owner_view_as_require_member_guard names crm_org_member_owner_guard_trg; start and end call it too.
+--   T6. owner_view_as_require_member_guard names crm_org_member_owner_guard_trg, requires tgenabled in ('O','A') and tgfoid =
+--       crm_org_member_owner_guard(); start and end call it too.
 
 -- Cases to add to lectual tests/tenant-isolation.test.ts (fail until applied). Firm A: owners O1 and O2, admin AD, senior_admin SA,
 -- attorney AT, viewer V, paralegal P. Firm B: owner OB, member MB. PA: platform admin with no row in A (claim owner). PO: platform admin
@@ -474,3 +477,11 @@ comment on function public.owner_view_as_end(text) is
 --      PO active in A (no row): view_as_not_owner.
 --  12. Deleting firm A in one statement removes every owner_view_as_event row of A.
 --  13. Without a session_id claim (a service-role call or a token with none): view_as_no_session.
+--  14. Same-firm non-owners read nothing: after O1 has entered and exited a preview of P, AD, SA, AT and V (each active in A) select from
+--      owner_view_as_event: 0 rows each. PA (active in A, claim org_role = owner, NO membership row): 0 rows.
+--  15. A just-demoted owner with an OPEN entry can still close it: O1 enters a preview of P; O2 demotes O1 to admin; O1 (same
+--      session, an open entry) calls owner_view_as_end('exit'): succeeds and writes one exit. (Its close rule may first write
+--      'access_ended' for that entry; then the 'exit' finds no open entry and writes nothing. Accept exactly one exit row for the
+--      entry, reason access_ended or exit.) A second owner_view_as_end('exit') from O1, with nothing open, is view_as_not_owner.
+--  16. The guard check is strict: with crm_org_member_owner_guard_trg set ENABLE REPLICA (tgenabled 'R'), or pointed at another
+--      function, owner_view_as_state raises view_as_needs_member_guard.

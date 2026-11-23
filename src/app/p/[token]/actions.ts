@@ -1,6 +1,6 @@
 "use server";
 
-import { previewReadOnly, previewSafe } from "@/lib/views/preview-safe";
+import { previewSafe } from "@/lib/views/preview-safe";
 import { headers } from "next/headers";
 import { acceptPublicProposal, savePublicDetailsAddress } from "@/lib/proposals/public";
 import { reviewLetterPdf, signedLetterPdf, type LetterPdfResult } from "@/lib/proposals/public-letter";
@@ -60,24 +60,24 @@ export const acceptProposalAction = previewSafe(async function acceptProposalAct
 }, (message) => ({ ok: false as const, message }));
 
 /** The review copy: the letter with the client's details merged in, marked not yet signed. Token and details only. */
-export const downloadReviewLetterAction = previewReadOnly(async function downloadReviewLetterAction(token: string, selection: unknown, clientClasses: unknown, details: unknown): Promise<LetterPdfResult> {
+export async function downloadReviewLetterAction(token: string, selection: unknown, clientClasses: unknown, details: unknown): Promise<LetterPdfResult> {
   try {
     const h = await headers();
     return await reviewLetterPdf(String(token ?? ""), selection, clientClasses, details, new Date(), { ip: h.get("x-forwarded-for") ?? h.get("x-real-ip") });
   } catch {
     return { ok: false, message: PDF_MESSAGES.unavailable };
   }
-}, "Public review-letter download: builds a PDF, writes nothing (its rate limit is in memory)");
+}
 
 /** The signed copy, rebuilt from what was signed. Token only. */
-export const downloadSignedLetterAction = previewReadOnly(async function downloadSignedLetterAction(token: string): Promise<LetterPdfResult> {
+export async function downloadSignedLetterAction(token: string): Promise<LetterPdfResult> {
   try {
     const h = await headers();
     return await signedLetterPdf(String(token ?? ""), new Date(), { ip: h.get("x-forwarded-for") ?? h.get("x-real-ip") });
   } catch {
     return { ok: false, message: PDF_MESSAGES.unavailable };
   }
-}, "Public signed-letter download: builds a PDF, writes nothing (its rate limit is in memory)");
+}
 
 
 /**

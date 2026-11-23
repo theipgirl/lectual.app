@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { isEntryFile } from "./_entry";
 
 /**
  * Actions and route handlers decide with the SESSION. In a preview they are refused before deciding anything, so none may
@@ -20,7 +21,7 @@ const VIEWER_IMPORT = /from\s+["']@\/lib\/views\/view-as["']|import\(\s*["']@\/l
 
 describe("no server action or route handler imports the viewer", () => {
   const files = walk(path.join(ROOT, "src"));
-  const entry = files.filter((f) => /\/route\.ts$/.test(f) || /^\s*["']use server["']/.test(readFileSync(f, "utf8")));
+  const entry = files.filter((f) => isEntryFile(f));
 
   it("finds the entry points", () => {
     expect(entry.length).toBeGreaterThan(80);

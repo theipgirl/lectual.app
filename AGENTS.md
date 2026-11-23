@@ -2662,11 +2662,18 @@ dashboard code, RLS runs as the owner; only "whose view" changes. This is NOT a 
 - **The database is the sole authority** (0117 `owner_view_as_event`, proposal file `docs/pge/2026-11-17-agentic-ip-os/0117-proposed.sql.txt`).
   `owner_view_as_state()` is read ONCE per request for a real owner (`readPreviewState` in `src/lib/views/view-as-flag.ts`, memoized per request on
   the request's headers object by `src/lib/views/request-memo.ts`, because React `cache` does not memoize in actions or route handlers); non-owners
-  make no read. Answers: on / off / not-set-up (42883, PGRST202, 42P01, PGRST205 by CODE, or 0116's guard missing: nothing offered, the Team page and
+  make no read. **Fail closed** (fix of 9a209c0): any errored read behind the session (`readFailed` / `memberReadFailed` on
+  `loadFirmSessionCore`: membership, firm, `is_platform_admin`) is "unknown"; an auth-server error other than "no session" (`authFailed`) and
+  a session that can't be resolved at all are "unknown" while the hint cookie is present and "off" without it. Answers: on / off / not-set-up (42883, PGRST202, 42P01, PGRST205 by CODE, or 0116's guard missing: nothing offered, the Team page and
   Enter say `notReadyYet("Viewing as a teammate")`) / unknown (a real owner's failed read: the "Couldn't check" banner, writes refused). The hint
-  cookie `lx_view_as` never decides anything; clearing it never ends a preview. 2 hours from Enter on the database clock (D1).
+  cookie `lx_view_as` never turns a preview on; clearing it never ends one. A STALE cookie (present, state off or not set up) draws
+  `StalePreviewCookie` ("Your earlier preview has ended." + "Leave preview"), which also posts to Exit once in the background, so the proxy's 409s
+  stop. The per-request memo is forgotten after every wrapped action body (`forgetRequestMemo`), so a same-request re-render reads afresh.
+  2 hours from Enter on the database clock (D1).
 - **Enter, Exit, sign-out are route handlers at fixed paths** (`/dashboard/view-as/enter/`, `/dashboard/view-as/exit/`, `/auth/sign-out/`; logic in
-  `src/lib/views/view-as-routes.ts`, deps injected): same-site POST, session re-read, 303. `signOutAction` is gone: every sign-out form posts to
+  `src/lib/views/view-as-routes.ts`, deps injected): same-site POST (Origin, or the Referer when it is missing or "null", against the request
+  URL, Host / X-Forwarded-Host with X-Forwarded-Proto, and `SITE_URL`: `requestOrigins`), session re-read, 303. Sign-out is NEVER blocked by
+  the origin check. `signOutAction` is gone: every sign-out form posts to
   `/auth/sign-out/`, which calls `owner_view_as_end('sign_out')` first (best effort), then signs out everywhere. Exit that can't be written keeps the
   preview and the cookie and says `VIEW_AS_EXIT_FAILED`.
 - **The seam:** `resolveViewer()` (`src/lib/views/view-as.ts`, server-only, memoized) = `{ session, viewAs, viewer, previewState }`. Pages and server
@@ -2679,8 +2686,11 @@ dashboard code, RLS runs as the owner; only "whose view" changes. This is NOT a 
   (a) **every exported server action is `export const X = previewSafe(async function X(...) {...}, refusal)`** (`src/lib/views/preview-safe.ts`;
   refusal `"state"` = `{ ok: false, error: VIEW_AS_READ_ONLY }`, `"redirect"` = back with `?notice=preview`, or a function for any other shape, checked
   by TypeScript), and every mutating route handler `previewSafeRoute(...)` (409). The wrapper reads only the flag. The named read-only allowlist
-  (`previewReadOnly(fn, reason)`: contact search, the leads compare panel, Getting started's record picker, the three signed / review letter downloads)
-  writes nothing at all and is pinned with its reasons; `previewReconcileAction` stays refused (it refreshes mailbox tokens). The AST test
+  (`previewReadOnly(fn, reason)`: contact search, the leads compare panel, Getting started's record picker, the staff signed-letter download)
+  writes nothing at all and is pinned with its reasons (tested on realistic rows, a found signed proposal included). **Left unwrapped on purpose**
+  (`UNWRAPPED` in the AST test): signing in (`sendMagicLink`, `verifySignInCode`, `confirmSignIn`, the `auth/callback` route: they only create a
+  session) and the public proposal page's two letter downloads (anonymous, token-bound, service-role reads). Entry files are found through the AST
+  (a leading comment can't hide `"use server"`), and a nested inline `"use server"` anywhere under src/ fails; `previewReconcileAction` stays refused (it refreshes mailbox tokens). The AST test
   `tests/views/view-as-actions-guarded.test.ts` fails CI on an unwrapped action, a re-export, a factory, or an unclassified route.ts.
   (b) **The database net inside `getScopedClient()`** (`previewNetFetch`, per client instance, never process-wide): while previewing (or unknown), any
   non-GET to `/rest/v1/*` or `/storage/v1/*` and `PUT /auth/v1/user` answers 409 without being sent. GET reads, signed DOWNLOAD links, auth refresh /
@@ -2688,7 +2698,8 @@ dashboard code, RLS runs as the owner; only "whose view" changes. This is NOT a 
   `current_org_role`, `is_platform_admin`, `platform_admin_orgs`, `org_member_directory` via `callMemberRpc`, `mailbox_connections_for_owner`; all
   STABLE in lectual's migrations; `tests/views/view-as-read-rpcs.test.ts`). A read RPC left as POST fails closed in a preview.
   (c) **The proxy** answers 409 to non-GET signed-in paths (and the OAuth connect / callback GETs) while the hint cookie is present: a quick refusal
-  only; it reads no state. (d) **Render-time provider reads are skipped** in a preview: Today's Zoom consults (`VIEW_AS_ZOOM`), My Mail's live Inbox
+  only; it reads no state. (d) **Render-time provider reads are skipped** whenever the FLAG is on or unknown (`inPreview` /
+  `consultPreview`, not only when a teammate is named): Today's Zoom consults (`VIEW_AS_ZOOM`), My Mail's live Inbox
   and reading pane (`VIEW_AS_LIVE_MAIL`), so no token is refreshed. (e) `ReadOnlyPreview` cancels form submits in the browser (courtesy).
   Render-time writes are skipped too: the Forms page's first-draft create (`mayCreate: false`) and the Leads page's stale-timer nudge.
 - **Private places** show fixed sentences (`words.ts` `VIEW_AS_*`) and never the owner's own items: the bell (muted, `PreviewBell`) and the

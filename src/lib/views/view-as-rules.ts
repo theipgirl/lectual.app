@@ -88,7 +88,7 @@ export function isNotSetUpError(error: DbError): boolean {
  * and 23514 are shared by several of them, so the prefix tells them apart. `needs-guard` (0116's trigger missing) is read
  * as "not set up".
  */
-export type ViewAsDbRefusal = "not-set-up" | "not-owner" | "self" | "target-gone" | "no-session" | "other";
+export type ViewAsDbRefusal = "not-set-up" | "not-owner" | "self" | "target-gone" | "no-session" | "bad-reason" | "other";
 export function classifyViewAsError(error: DbError): ViewAsDbRefusal {
   if (isNotSetUpError(error)) return "not-set-up";
   const msg = error?.message ?? "";
@@ -97,6 +97,7 @@ export function classifyViewAsError(error: DbError): ViewAsDbRefusal {
   if (msg.startsWith("view_as_self")) return "self";
   if (msg.startsWith("view_as_target_not_member")) return "target-gone";
   if (msg.startsWith("view_as_no_session")) return "no-session";
+  if (msg.startsWith("view_as_bad_reason")) return "bad-reason";
   return "other";
 }
 
@@ -185,11 +186,35 @@ export function proxyRefuses(method: string, pathname: string): boolean {
   return false;
 }
 
-/** A same-site POST: the Origin (or, failing that, the Referer) names this host. */
-export function sameOrigin(requestUrl: string, origin: string | null, referer: string | null): boolean {
-  const own = new URL(requestUrl).origin;
-  const from = origin ?? (referer ? safeOrigin(referer) : null);
-  return from !== null && from === own;
+/**
+ * The origins this request may legitimately come from: the request URL's own, the Host and X-Forwarded-Host (Vercel's
+ * proxy) with the forwarded protocol, and the configured site origin. Only these hosts, never anything from the body.
+ */
+export function requestOrigins(args: { url: string; host?: string | null; forwardedHost?: string | null; forwardedProto?: string | null; siteUrl?: string | null }): Set<string> {
+  const out = new Set<string>();
+  const own = new URL(args.url);
+  out.add(own.origin);
+  const first = (v: string | null | undefined) => (v ?? "").split(",")[0].trim();
+  const proto = first(args.forwardedProto).replace(/:$/, "") || own.protocol.replace(/:$/, "");
+  for (const h of [first(args.forwardedHost), first(args.host)]) {
+    if (!h || !/^[A-Za-z0-9.-]+(:\d+)?$/.test(h)) continue;
+    const o = safeOrigin(`${proto}://${h}`);
+    if (o) out.add(o);
+  }
+  const site = args.siteUrl ? safeOrigin(args.siteUrl) : null;
+  if (site) out.add(site);
+  return out;
+}
+
+/**
+ * A same-site POST: the Origin (or, when it is missing or the literal "null", the Referer) is one of `allowed`. Neither
+ * present = not same-site.
+ */
+export function sameOrigin(allowed: string | Set<string>, origin: string | null, referer: string | null): boolean {
+  const set = typeof allowed === "string" ? new Set([new URL(allowed).origin]) : allowed;
+  const usableOrigin = origin && origin !== "null" ? origin : null;
+  const from = usableOrigin ?? (referer ? safeOrigin(referer) : null);
+  return from !== null && set.has(from);
 }
 function safeOrigin(url: string): string | null {
   try {

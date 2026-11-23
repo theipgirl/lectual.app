@@ -8,6 +8,7 @@ import {
   LAWMATICS_CONSULTS_NOT_READY,
   LAWMATICS_CONSULTS_RECONNECT,
   LAWMATICS_CONSULTS_UNAVAILABLE,
+  VIEW_AS_OUTLOOK_UNCHECKED,
   VIEW_AS_PRIVATE_OUTLOOK,
   VIEW_AS_ZOOM,
 } from "@/lib/ui/words";
@@ -49,7 +50,7 @@ export type ConsultItem = {
 };
 
 /** `lawmatics` is absent only when the caller didn't wire that source (it is then not named on the card). */
-export type TodayConsultsResult = { consults: ConsultItem[]; outlook: SourceState; zoom: SourceState; lawmatics?: SourceState; previewName?: string };
+export type TodayConsultsResult = { consults: ConsultItem[]; outlook: SourceState; zoom: SourceState; lawmatics?: SourceState; previewName?: string | null };
 
 export type OutlookConnections = { ok: true; active: number; withCalendar: number } | { ok: false };
 
@@ -74,7 +75,7 @@ export type ConsultDeps = {
    * View as: an owner previewing a teammate. Outlook source notes then come from the firm's SHARED connections only (the
    * deps' `outlookConnections` is filtered), and Zoom is not read at all (its token refresh would rotate the firm's token).
    */
-  preview?: { name: string };
+  preview?: { name: string | null };
 };
 
 /** One key for "the same call": a Zoom /j/<id> link and a Zoom meeting id agree, any other link is its own URL. */
@@ -248,11 +249,11 @@ const INTEGRATIONS = "/dashboard/settings/integrations/";
 const MEETINGS_SETTINGS = "/dashboard/settings/integrations/meetings/";
 const LAWMATICS_SETTINGS = "/dashboard/settings/integrations/lawmatics/";
 
-export function sourceNote(source: ConsultSourceName, state: SourceState, previewName?: string): SourceNote | null {
+export function sourceNote(source: ConsultSourceName, state: SourceState, previewName?: string | null): SourceNote | null {
   if (state === "ok") return null;
   if (state === "preview") {
     if (source === "zoom") return { source, text: VIEW_AS_ZOOM, link: null };
-    return { source, text: VIEW_AS_PRIVATE_OUTLOOK(previewName ?? "Their"), link: null };
+    return { source, text: previewName ? VIEW_AS_PRIVATE_OUTLOOK(previewName) : VIEW_AS_OUTLOOK_UNCHECKED, link: null };
   }
   if (source === "lawmatics") {
     switch (state) {

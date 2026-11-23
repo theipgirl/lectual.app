@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 
 const resolveFirmSession = vi.fn();
 vi.mock("@/lib/firm/session", () => ({ resolveFirmSession: (...a: unknown[]) => resolveFirmSession(...a) }));
@@ -18,7 +20,8 @@ const loadDealNudge = vi.fn(async (...args: unknown[]) => {
 });
 vi.mock("@/lib/queue/deal-nudge-load", () => ({ loadDealNudge: (...a: unknown[]) => loadDealNudge(...a) }));
 vi.mock("@/lib/nav-counts", () => ({ loadRailCounts: async () => ({}) }));
-vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }), headers: async () => new Headers() }));
+let hint: string | undefined;
+vi.mock("next/headers", () => ({ cookies: async () => ({ get: (n: string) => (n === "lx_view_as" && hint ? { value: hint } : undefined) }), headers: async () => new Headers() }));
 vi.mock("next/navigation", () => ({
   redirect: (to: string) => {
     throw new Error(`redirect:${to}`);
@@ -53,6 +56,7 @@ import { DealTimesDialog } from "@/components/deck/DealTimesDialog";
 import { ViewAsBanner } from "@/components/views/ViewAsBanner";
 import { PreviewBell } from "@/components/views/PreviewBell";
 import { ReadOnlyPreview } from "@/components/views/ReadOnlyPreview";
+import { StalePreviewCookie } from "@/components/views/StalePreviewCookie";
 import { drawnNav, viewFor, NO_PREVIEW } from "@/lib/views";
 import { visibleNav } from "@/lib/nav";
 import { SIGN_OUT_PATH, VIEW_AS_EXIT_PATH } from "@/lib/views/view-as-rules";
@@ -100,6 +104,7 @@ async function mount(modules: string[], viewer: unknown) {
 }
 
 beforeEach(() => {
+  hint = undefined;
   mineQueue.mockClear();
   loadDealNudge.mockClear();
 });
@@ -182,5 +187,32 @@ describe("not previewing", () => {
   it("before 0117: no menu line", async () => {
     const m = await mount(MODULES, { session: ownerSession(MODULES), viewAs: null, viewer: { userId: OWNER, role: "owner", displayName: "Owner Person" }, previewState: "off", teamUnreadable: false, viewAsAvailable: false });
     expect(m.one(AccountMenu)!.props.viewAsLink).toBe(false);
+  });
+});
+
+describe("a stale hint cookie (no open preview behind it)", () => {
+  const off = (available: boolean) => ({ session: ownerSession(MODULES), viewAs: null, viewer: { userId: OWNER, role: "owner", displayName: "Owner Person" }, previewState: "off", teamUnreadable: false, viewAsAvailable: available });
+
+  it("closed by the database, or View as not on: draws 'Leave preview' (which posts to Exit) and clears it in the background", async () => {
+    hint = "1";
+    for (const available of [true, false]) {
+      const m = await mount(MODULES, off(available));
+      expect(m.all(StalePreviewCookie)).toHaveLength(1);
+      expect(m.all(ViewAsBanner)).toHaveLength(0);
+      const html = renderToStaticMarkup(m.one(StalePreviewCookie)!);
+      expect(html).toContain("Leave preview");
+      expect(html).toContain(`action="${VIEW_AS_EXIT_PATH}"`);
+    }
+  });
+
+  it("not drawn without the cookie, nor while a preview is really on", async () => {
+    expect((await mount(MODULES, off(true))).all(StalePreviewCookie)).toHaveLength(0);
+    hint = "1";
+    expect((await mount(MODULES, previewing(MODULES))).all(StalePreviewCookie)).toHaveLength(0);
+  });
+
+  it("the background clear posts to the Exit route (which clears the cookie when nothing is open)", () => {
+    const src = readFileSync(path.resolve(__dirname, "../../src/components/views/StalePreviewCookie.tsx"), "utf8");
+    expect(src).toMatch(/fetch\(VIEW_AS_EXIT_PATH, \{ method: "POST"/);
   });
 });

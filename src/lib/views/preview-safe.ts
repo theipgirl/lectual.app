@@ -2,6 +2,7 @@ import "server-only";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { previewFlag } from "@/lib/views/view-as-flag";
+import { forgetRequestMemo } from "@/lib/views/request-memo";
 import { noticeBackPath, refusesWrites } from "@/lib/views/view-as-rules";
 import { VIEW_AS_READ_ONLY } from "@/lib/ui/words";
 
@@ -25,7 +26,12 @@ export function previewSafe<A extends unknown[], R>(fn: (...args: A) => Promise<
 export function previewSafe<A extends unknown[], R>(fn: (...args: A) => Promise<R>, refusal: Refusal<R> | "redirect"): (...args: A) => Promise<R> {
   return keepShape(fn, async (...args: A): Promise<R> => {
     if (refusesWrites(await previewFlag())) return refuse(refusal);
-    return fn(...args);
+    try {
+      return await fn(...args);
+    } finally {
+      // The page this action re-renders (same request) must read the session and the preview state afresh.
+      await forgetRequestMemo();
+    }
   });
 }
 
@@ -76,6 +82,10 @@ export function previewSafeRoute<A extends unknown[]>(handler: (...args: A) => P
         headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
       });
     }
-    return handler(...args);
+    try {
+      return await handler(...args);
+    } finally {
+      await forgetRequestMemo();
+    }
   });
 }

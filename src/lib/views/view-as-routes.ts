@@ -5,6 +5,7 @@ import { loadFirmSessionCore } from "@/lib/firm/session";
 import { listMemberDirectory } from "@/lib/members/directory";
 import type { Role } from "@/lib/auth/roles";
 import { signInRedirect } from "@/lib/auth/return-path";
+import { env } from "@/lib/env";
 import {
   SIGN_OUT_PATH,
   TEAM_SETTINGS_PATH,
@@ -15,6 +16,7 @@ import {
   enterDecision,
   enterNotice,
   noticeBackPath,
+  requestOrigins,
   sameOrigin,
   type ViewAsNotice,
 } from "@/lib/views/view-as-rules";
@@ -50,8 +52,23 @@ function to(req: NextRequest, path: string): NextResponse {
 function teamWith(req: NextRequest, notice: ViewAsNotice): NextResponse {
   return to(req, `${TEAM_SETTINGS_PATH}?notice=${notice}`);
 }
+function siteUrlOrNull(): string | null {
+  try {
+    return env.SITE_URL ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function notSameSite(req: NextRequest): boolean {
-  return !sameOrigin(req.url, req.headers.get("origin"), req.headers.get("referer"));
+  const allowed = requestOrigins({
+    url: req.url,
+    host: req.headers.get("host"),
+    forwardedHost: req.headers.get("x-forwarded-host"),
+    forwardedProto: req.headers.get("x-forwarded-proto"),
+    siteUrl: siteUrlOrNull(),
+  });
+  return !sameOrigin(allowed, req.headers.get("origin"), req.headers.get("referer"));
 }
 const forbidden = () => new NextResponse(null, { status: 403 });
 
@@ -108,9 +125,10 @@ export async function exitViewAs(req: NextRequest, deps: ViewAsRouteDeps = liveV
 /**
  * POST /auth/sign-out/ (replaces signOutAction). Ends any preview first, best effort (a failure never blocks signing out:
  * the row's sign-in is gone, so the next state read closes it as session_ended), then signs out everywhere, as before.
+ * No origin check: signing out is low-risk and must never be blocked (a proxy that rewrites the host must not keep
+ * someone signed in).
  */
 export async function signOutRoute(req: NextRequest, deps: ViewAsRouteDeps = liveViewAsDeps): Promise<NextResponse> {
-  if (notSameSite(req)) return forbidden();
   await deps.rpc("owner_view_as_end", { p_reason: "sign_out" }).catch(() => null);
   await deps.signOut().catch(() => null);
   const res = to(req, "/sign-in/?next=/dashboard");

@@ -1,9 +1,10 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { acceptedProposalRow, signedTrademark } from "../loe/signed-fixtures";
 
 /**
  * View as, the named read-only allowlist (spec Layer a). Each allowlisted action, run IN A PREVIEW (flag on) through the real
  * scoped client and its database net, with the network replaced by a spy, sends only reads: GET / HEAD, or POST only to
- * mint a signed download link or to the view-as log. No token refresh (no request to an OAuth token endpoint), no write.
+ * mint a signed download link or to the view-as log. Each is fed realistic rows, so the action runs its real path to the end. No token refresh (no request to an OAuth token endpoint), no write.
  * previewReconcileAction is NOT on the list: in a preview it is refused before its body runs.
  */
 vi.mock("@/lib/views/view-as-flag", () => ({ previewFlag: async () => "on", readPreviewState: async () => ({ kind: "on", targetUserId: "22222222-2222-4222-8222-222222222222", startedAt: "2026-11-23T10:00:00Z" }) }));
@@ -41,14 +42,56 @@ afterAll(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
 });
+const MATTER = "33333333-3333-4333-8333-333333333333";
+const LEAD = "44444444-4444-4444-8444-444444444444";
+const OTHER_LEAD = "55555555-5555-4555-8555-555555555555";
+const PROPOSAL = "66666666-6666-4666-8666-666666666666";
+const CONTACT = "99999999-9999-4999-8999-999999999999";
+
+/** Realistic rows for each table the real paths read: a firm, a matter and contacts, two leads, a found SIGNED proposal. */
+function rowsFor(path: string): unknown {
+  const table = path.replace(/^\/rest\/v1\//, "");
+  switch (table) {
+    case "rpc/current_org_role":
+      return "owner";
+    case "rpc/current_org_id":
+      return "00000000-0000-4000-8000-0000000000a1";
+    case "crm_org":
+      return [{ id: "00000000-0000-4000-8000-0000000000a1", name: "Example Firm", slug: "ex", modules: ["proposals", "document-center"] }];
+    case "crm_org_profile":
+      return [{ display_name: "Example Firm", time_zone: "America/New_York" }];
+    case "crm_contact":
+      return [{ id: CONTACT, first_name: "Ana", last_name: "Ruiz", business_name: null, email: "ana@example.com", phone: null, company_name: null }];
+    case "crm_matter_contact":
+      return [{ contact_id: CONTACT }];
+    case "crm_lead":
+      return [
+        { id: LEAD, first_name: "Ana", last_name: "Ruiz", business_name: "Acme", mark_text: "ACME", email: "ana@example.com", referral_source: null, created_at: "2026-11-01T00:00:00Z", current_stage_id: null },
+        { id: OTHER_LEAD, first_name: "Ana", last_name: "Ruiz", business_name: "Acme", mark_text: "ACME", email: "ana@example.com", referral_source: null, created_at: "2026-11-02T00:00:00Z", current_stage_id: null },
+      ];
+    case "crm_matter":
+      return [{ id: MATTER }];
+    case "client_proposal":
+      return [acceptedProposalRow(signedTrademark(), { id: PROPOSAL })];
+    default:
+      return [];
+  }
+}
+
 beforeEach(() => {
   sent.length = 0;
   vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
     sent.push({ method: (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase(), path: url.pathname });
-    // An empty, well-formed answer for every read: the action finds nothing and stops.
     if (url.pathname.startsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "11111111-1111-4111-8111-111111111111" }), { status: 200, headers: { "content-type": "application/json" } });
-    return new Response("[]", { status: 200, headers: { "content-type": "application/json" } });
+    const accept = new Headers(init?.headers).get("accept") ?? "";
+    let body = rowsFor(url.pathname);
+    // Honour an id filter, as PostgREST would.
+    const idEq = url.searchParams.get("id")?.match(/^eq\.(.+)$/)?.[1];
+    if (idEq && Array.isArray(body)) body = body.filter((r) => (r as { id?: string }).id === idEq);
+    // A single row asked for (.single() / .maybeSingle()): PostgREST answers the object.
+    if (accept.includes("vnd.pgrst.object") && Array.isArray(body)) body = body[0] ?? null;
+    return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
   });
 });
 
@@ -58,45 +101,37 @@ function onlyReads() {
   expect(sent.filter((s) => /\/token\b|oauth/i.test(s.path))).toEqual([]);
 }
 
-const MATTER = "33333333-3333-4333-8333-333333333333";
-const LEAD = "44444444-4444-4444-8444-444444444444";
-
 describe("each allowlisted action makes only reads in a preview", () => {
   it("searchContactsAction", async () => {
     const { searchContactsAction } = await import("@/app/dashboard/matters/[id]/actions");
     const fd = new FormData();
     fd.set("matterId", MATTER);
     fd.set("q", "Ana");
-    await searchContactsAction({}, fd);
-    expect(sent.length).toBeGreaterThan(0); // it really read, through the netted client
+    const out = await searchContactsAction({}, fd);
+    // The real path: the role read, the contact search and the link read all ran and found the contact.
+    expect(out.hits?.map((h) => h.id)).toEqual([CONTACT]);
     onlyReads();
   });
 
   it("loadCompareAction", async () => {
     const { loadCompareAction } = await import("@/app/dashboard/intake/actions");
-    await loadCompareAction(LEAD, "55555555-5555-4555-8555-555555555555");
-    expect(sent.length).toBeGreaterThan(0); // it really read, through the netted client
+    const out = (await loadCompareAction(LEAD, OTHER_LEAD)) as { ok: boolean };
+    expect(out.ok).toBe(true);
     onlyReads();
   });
 
   it("pickHubRecordsAction", async () => {
     const { pickHubRecordsAction } = await import("@/lib/onboarding/hub-actions");
-    await pickHubRecordsAction();
-    expect(sent.length).toBeGreaterThan(0); // it really read, through the netted client
+    expect(await pickHubRecordsAction()).toEqual({ lead: { status: "ok", id: LEAD }, matter: { status: "ok", id: MATTER } });
     onlyReads();
   });
 
   it("downloadSignedLetterStaffAction", async () => {
     const { downloadSignedLetterStaffAction } = await import("@/app/dashboard/proposals/[id]/signed-letter-actions");
-    await downloadSignedLetterStaffAction("66666666-6666-4666-8666-666666666666").catch(() => null);
-    onlyReads();
-  });
-
-  it("downloadReviewLetterAction and downloadSignedLetterAction (public pages)", async () => {
-    const { downloadReviewLetterAction, downloadSignedLetterAction } = await import("@/app/p/[token]/actions");
-    const token = "a".repeat(40);
-    await downloadReviewLetterAction(token, {}, {}, {});
-    await downloadSignedLetterAction(token);
+    const out = await downloadSignedLetterStaffAction(PROPOSAL);
+    // A found, signed proposal: the PDF is really built.
+    expect(out.ok).toBe(true);
+    expect(sent.some((s) => s.path === "/rest/v1/client_proposal")).toBe(true);
     onlyReads();
   });
 });

@@ -71,7 +71,8 @@ describe("the preview state read", () => {
     const action = previewSafe(body as () => Promise<{ ok: true } | { ok: false; error: string }>, "state");
     expect(await action()).toEqual({ ok: false, error: VIEW_AS_READ_ONLY });
     expect(body).not.toHaveBeenCalled();
-    expect(cookieGet).not.toHaveBeenCalled();
+    // No cookie was there (cookieGet answers undefined): the database alone turned the preview on.
+    expect(cookieGet.mock.results.every((r) => r.value === undefined)).toBe(true);
   });
 
   it("a failed read for an owner is 'unknown' and refuses writes", async () => {
@@ -127,5 +128,41 @@ describe("previewSafe's refusal shapes", () => {
     rpc.mockResolvedValue({ data: [], error: null });
     const body = vi.fn(async (a: number) => ({ ok: true as const, a }));
     expect(await previewSafe(body as (a: number) => Promise<{ ok: true; a: number } | { ok: false; error: string }>, "state")(7)).toEqual({ ok: true, a: 7 });
+  });
+});
+
+describe("the memo after an action (same-request re-render)", () => {
+  it("is forgotten when the wrapped body returns, so the re-render reads the session and the state again", async () => {
+    core.mockResolvedValue(session("owner"));
+    rpc.mockResolvedValue({ data: [], error: null });
+    const body = vi.fn(async () => {
+      // Inside the body the memo is still the one the wrapper read.
+      await readPreviewState();
+      return { ok: true as const };
+    });
+    await previewSafe(body as () => Promise<{ ok: true } | { ok: false; error: string }>, "state")();
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(core).toHaveBeenCalledTimes(1);
+    // The page re-render in the same request (same headers object):
+    await readPreviewState();
+    expect(rpc).toHaveBeenCalledTimes(2);
+    expect(core).toHaveBeenCalledTimes(2);
+  });
+
+  it("is forgotten when the body throws (a redirect, too)", async () => {
+    core.mockResolvedValue(session("owner"));
+    rpc.mockResolvedValue({ data: [], error: null });
+    await expect(previewSafe(async () => { throw new Error("redirect:/x"); }, "redirect")()).rejects.toThrow("redirect:/x");
+    await readPreviewState();
+    expect(rpc).toHaveBeenCalledTimes(2);
+  });
+
+  it("never carries from one request to another", async () => {
+    core.mockResolvedValue(session("owner"));
+    rpc.mockResolvedValue({ data: [{ target_user_id: TEAMMATE, started_at: "2026-11-23T10:00:00Z" }], error: null });
+    expect(await previewFlag()).toBe("on");
+    requestHeaders = new Headers();
+    core.mockResolvedValue(session("paralegal"));
+    expect(await previewFlag()).toBe("off");
   });
 });

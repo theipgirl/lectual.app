@@ -105,6 +105,9 @@ describe("View as sentences (spec 'Private places')", () => {
     expect(W.VIEW_AS_LINK).toBe("View as");
     expect(W.VIEW_AS_MENU).toBe("View as a teammate");
     expect(W.VIEW_AS_NOT_READY).toBe(W.notReadyYet("Viewing as a teammate"));
+    expect(W.VIEW_AS_OUTLOOK_UNCHECKED).toBe("Outlook calendars aren't checked in a preview.");
+    expect(W.VIEW_AS_STALE).toBe("Your earlier preview has ended.");
+    expect(W.VIEW_AS_LEAVE).toBe("Leave preview");
     const all = [W.VIEW_AS_BANNER("X"), W.VIEW_AS_READ_ONLY, W.VIEW_AS_EXIT_FAILED, W.VIEW_AS_PRIVATE_MAIL("X"), W.VIEW_AS_LIVE_MAIL, W.VIEW_AS_PRIVATE_OUTLOOK("X"), W.VIEW_AS_PRIVATE_COPILOT("X"), W.VIEW_AS_PRIVATE_BELL("X"), W.VIEW_AS_ZOOM, W.VIEW_AS_NOT_ALLOWED, W.VIEW_AS_TARGET_GONE, W.VIEW_AS_UNCHECKED, W.VIEW_AS_START_FAILED, W.VIEW_AS_TEAM_UNREADABLE, W.VIEW_AS_NOT_READY];
     for (const s of all) expect(s).not.toMatch(/impersonat|session|\bRLS\b|migration|database|token/i);
   });

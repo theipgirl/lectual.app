@@ -1,6 +1,5 @@
 "use server";
 
-import { previewSafe } from "@/lib/views/preview-safe";
 import { safeNext } from "@/lib/auth/safe-next";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { getSiteOrigin } from "@/lib/site-origin";
@@ -18,7 +17,7 @@ export type LoginState = { ok?: boolean; error?: string; email?: string };
  * layout.tsx renders "No firm access yet" for an authenticated non-member).
  * Fail-closed happens at the data layer, not the login form.
  */
-export const sendMagicLink = previewSafe(async function sendMagicLink(
+export async function sendMagicLink(
   _prev: LoginState,
   formData: FormData,
 ): Promise<LoginState> {
@@ -44,7 +43,7 @@ export const sendMagicLink = previewSafe(async function sendMagicLink(
     return { error: SIGN_IN_GENERIC };
   }
   return { ok: true, email };
-}, "state");
+}
 
 export type CodeState = { error?: string };
 
@@ -54,7 +53,7 @@ export type CodeState = { error?: string };
  * person holding the newest email. The code only works when the firm's Magic Link email template
  * includes {{ .Token }}. Session cookies are written by the scoped client; then on to the app.
  */
-export const verifySignInCode = previewSafe(async function verifySignInCode(_prev: CodeState, formData: FormData): Promise<CodeState> {
+export async function verifySignInCode(_prev: CodeState, formData: FormData): Promise<CodeState> {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const token = normalizeSignInCode(formData.get("code"));
   const next = safeNext(String(formData.get("next") ?? ""));
@@ -67,4 +66,4 @@ export const verifySignInCode = previewSafe(async function verifySignInCode(_pre
     return { error: SIGN_IN_CODE_BAD };
   }
   redirect(next);
-}, "state");
+}

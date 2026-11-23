@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { isEntryFile } from "./_entry";
 
 /**
  * View as, "Every role read is switched for drawing" (spec "The seam"). The session role helpers stay SESSION reads: actions
@@ -39,7 +40,7 @@ function inventory(): Record<string, Counts> {
   const out: Record<string, Counts> = {};
   for (const f of walk(path.join(ROOT, "src"))) {
     const raw = readFileSync(f, "utf8");
-    if (/\/route\.ts$/.test(f) || /^\s*["']use server["']/.test(raw)) continue;
+    if (isEntryFile(f)) continue;
     const src = strip(raw);
     const c: Counts = {};
     for (const h of HELPERS) {
