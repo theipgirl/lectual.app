@@ -3,6 +3,32 @@
 One list across sessions. Each session adds its action items here and checks them against Omi.
 Newest section first. Tick an item when it is done; don't delete it.
 
+## 2026-11-23: phasing out Lawmatics (read of Caitlyn's SOPs)
+
+Recap: `docs/recaps/2026-11-23-lawmatics-phase-out-sop-read.md`. Nothing was changed anywhere.
+
+### Taylor
+- [ ] Decide: stop building new things in Lawmatics now? The pre-filing and post-filing SOPs list about twenty items "to build" there
+      (six invoice templates, payment reminders, the "Filed" follow-ups, nurture, maintenance reminders, renaming stages to 8-27).
+- [ ] Say go on the inventory of what is live in Lawmatics. Data half: Claude, read-only, through the API and Lectual's synced data
+      (it reads production client data). Configuration half: Claude in Chrome on your computer, from a checklist Claude writes.
+- [ ] Decide with Rebecca: may Lectual ever send a client email by itself (form reminders, payment reminders, maintenance reminders),
+      or is every email a draft someone approves? Lawmatics sends these by itself today.
+- [ ] Decide what replaces booking the $200 strategy session (with payment) and the confirmation and reminder texts.
+- [ ] Check in Lawmatics whether any automation starts from a tag Lectual pushes (source tag, Hot / Warm / Cold Lead, "UTM: ...",
+      "Campaign: ..."). The agents SOP says tags start the email sequences.
+- [ ] Tell Caitlyn and Rebecca the phase-out is the direction, so the SOPs stop assuming Lawmatics stays.
+- [ ] Copy the recap into the Obsidian second brain. This cloud session can't reach the vault.
+
+### Open in the SOPs (Rebecca, through Taylor)
+- [ ] None of the four SOPs is signed off. Pre-filing has 9 decisions and 12 questions open; post-filing is a first draft.
+- [ ] The documents disagree: post-consult follow-ups sent by hand (intake SOP) or by Lawmatics at 48 and 96 hours (agents SOP);
+      consult credit $200 or $250; 11 stages or about 55.
+
+### Omi cross-check (2026-11-23)
+- Omi has no action item about Lawmatics, the SOPs or a phase-out. Nothing above duplicates an Omi item.
+- Omi's newest action items are still dated Oct 12. The four Omi items carried in the Nov 12 section below are unchanged.
+
 ## 2026-11-12 (night): merged #29, #30, #31; letter version 2 waiting for approval
 
 ### Taylor
