@@ -3,6 +3,33 @@
 One list across sessions. Each session adds its action items here and checks them against Omi.
 Newest section first. Tick an item when it is done; don't delete it.
 
+## 2026-11-23 (third part): Lawmatics inventory prompt, Lectual audit roundup
+
+Recap: `docs/recaps/2026-11-23-audit-roundup-and-chrome-prompt.md`. Prompt: `docs/rpb/lawmatics-inventory-chrome-prompt.md`.
+Roundup: `docs/audits/2026-11-23-lectual-audit-roundup.md`. Nothing was changed in any system.
+
+### Taylor
+- [ ] Run the Lawmatics inventory: sign in to Lawmatics in Chrome, paste the prompt into Claude in Chrome, type `next` between the 13
+      sections, stay and watch (about 1.5 to 3 hours). Paste the outputs back to Claude Code. If the account's client names being
+      on screen needs Rebecca's OK, get it first.
+- [ ] Give everyone working access to Lectual and connect the mailbox (Caitlyn's editing; Dawn's Microsoft approval).
+- [ ] Run one real Monday meeting from the Weekly review with Rayn, Dawn and Amor using it, and follow one client from lead to
+      filing. Take notes of every time someone reaches for the spreadsheet, Lawmatics or a text. Record it.
+- [ ] After that trial: decide only the process questions it shows are in the way.
+- [ ] Go through the 28 built things waiting to be switched on (roundup, section 4): switch on or drop each.
+- [ ] Choose one place per job, per person (roundup, section 6), and write it down.
+- [ ] Pick names once: the four "needs your pick" items on the Design Inconsistency Checklist, and Leads or Intake.
+- [ ] Mark the old design pages as retired, so there is one current picture.
+- [ ] Hold off on more screen-by-screen audits until the first four items are done.
+- [ ] Copy the recap into the Obsidian second brain. This cloud session can't reach the vault.
+
+### Rebecca (through Taylor)
+- [ ] Agree to the watched Monday-meeting trial run from Lectual.
+
+### Omi cross-check (2026-11-23, third part)
+- Not re-run for this part. The two checks earlier today found no Omi action item about Lawmatics, the SOPs, the client lifecycle or
+  onboarding, and Omi's newest items are dated Oct 10 to Oct 12.
+
 ## 2026-11-23 (later): the client lifecycle, written and drawn
 
 Recap: `docs/recaps/2026-11-23-client-lifecycle.md`. Document: `docs/rpb/client-lifecycle.md` (branch `claude/eager-fermi-0ff1w7`).
