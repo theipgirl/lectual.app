@@ -9,7 +9,7 @@ import {
   MEMBER_RPC_SWITCH_ON_HINT,
 } from "@/lib/members/rpc";
 import { normalizeEmail, isEmailAddress } from "@/lib/members/email";
-import { requireSettingsAdminRole, currentOrgId } from "./admin";
+import { assertCallerIsOwnerMember, requireSettingsAdminRole, currentOrgId } from "./admin";
 import { ReadableError } from "@/lib/ui/readable-error";
 
 
@@ -231,6 +231,10 @@ export async function removeMember(userId: string): Promise<RemoveMemberResult> 
       `You can only remove members at or below your own rank (${callerRole} cannot remove ${current}).`,
     );
   }
+
+  // b2) Removing an OWNER needs the caller's own OWNER membership row (not just an owner claim: a Lectual staff member has none).
+  // Checked BEFORE any session is revoked, so a removal that would be refused never signs the owner out first.
+  if (current === "owner") await assertCallerIsOwnerMember(supabase, user?.id);
 
   // c) Last-owner guard — an org must never be left ownerless.
   await assertNotLastOwner(supabase, current);

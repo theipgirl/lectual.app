@@ -173,6 +173,8 @@ read as settled) fixed in `payment-state.ts`; #4 (pre-signature "nothing is char
 package) fixed by answering from the firm's setup only (`firmTakesCardPayments`); #5 (5xx/429 as decline) kept
 fixed in `lawpay.ts`; #1 and #3 concern client line requests (0071/0073), which this app does not have.
 
+**lectual needs the same fix (Nov 23):** `src/lib/settings/members.ts` `removeMember` and `src/lib/settings/admin.ts` `setMemberRole` now require the caller's own OWNER `crm_org_member` row (`assertCallerIsOwnerMember`) before touching an owner row, checked before `revoke_member_sessions`; lectual's copies still trust the owner role claim alone.
+
 ## Ported from `lawmatics-mcp`
 
 Source commit: `73355ec`. Copy, don't import: lawmatics-mcp is a separate deployment.

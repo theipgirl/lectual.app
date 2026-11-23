@@ -1599,3 +1599,9 @@ export const STAFF_GUIDE_MAILBOX_BODY = "Choose Connect Outlook at the top of th
 export const STAFF_GUIDE_TOUR_TITLE = "Take the tour";
 export const STAFF_GUIDE_TOUR_SUMMARY = "A quick look at the main screens.";
 export const STAFF_GUIDE_TOUR_BODY = "Choose Show tips again in this menu for a short tour of the main screens. You can take it as often as you like.";
+
+// Team settings: touching an owner row (mirrors the lectual 0116 proposal's rule).
+/** Refused when the caller has no OWNER membership row in this firm (a Lectual staff member's owner claim alone is not enough). */
+export const OWNER_ROW_NEEDS_OWNER = "Only an owner of this firm can change or remove an owner.";
+/** Refused when the caller's own membership row couldn't be read: nothing was changed and nobody was signed out. */
+export const OWNER_ROW_CHECK_FAILED = "Couldn't confirm you're an owner of this firm, so nothing was changed. Refresh and try again.";

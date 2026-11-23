@@ -2573,3 +2573,12 @@ parallel batch: the leads' `crm_intake_submission` rows (`id, lead_id, form_id, 
 missing form or an empty name keeps exactly "Came in through a form"; the failure is not added to the "Some details couldn't load" note (the line
 still says something true). React text only, tidied and cut at 80 characters (`cleanFormName`). Tests: `tests/review/form-name-line.test.ts`.
 
+## Team settings: an owner row needs an owner membership row (Nov 23, no schema here; mirrors the lectual 0116 proposal)
+`removeMember` (`src/lib/settings/members.ts`) and `setMemberRole` (`src/lib/settings/admin.ts`) call `assertCallerIsOwnerMember` when the
+target is an owner (or, for a re-role, would become one): the caller's OWN `crm_org_member` row is read through the scoped client
+(`user_id` = the session user, RLS keeps it to the active org) and must say `owner`. A Lectual staff member acting inside a firm (owner role
+claim, no membership row) is refused with `OWNER_ROW_NEEDS_OWNER`; a failed read is `OWNER_ROW_CHECK_FAILED`. In `removeMember` the check runs
+BEFORE `revoke_member_sessions` (whose order before the delete is kept for 0031's check), so an owner is never signed out ahead of a delete
+the database would refuse. Every other removal and re-role is unchanged. Tests: `tests/settings/owner-row-guard.test.ts`. lectual's ported
+copies need the same fix (`PORTED_FROM.md`).
+

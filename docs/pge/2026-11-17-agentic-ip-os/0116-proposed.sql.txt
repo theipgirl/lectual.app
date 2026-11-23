@@ -1,0 +1,563 @@
+-- =====================================================================================================================
+-- PROPOSAL ONLY. NOT A MIGRATION OF THIS REPO. NOT APPLIED ANYWHERE (not lectual-dev, not lectual-prod).
+-- =====================================================================================================================
+-- 0116_member_owner_guard.sql (proposed): crm_org_member self-insert and self-promotion guard. SECURITY.
+--
+-- This file is a draft for the `lectual` repo (theipgirl/lectual), where migrations live (lectual.app AGENTS.md: "No migrations
+-- in this repo"). To use it: copy it to `lectual/supabase/migrations/0116_member_owner_guard.sql` (first-merged-wins numbering:
+-- renumber if 0116 is taken), review it there, add the isolation cases at the end of this file to tests/tenant-isolation.test.ts,
+-- run the read-only PRE-APPLY CHECKS below on lectual-dev, apply to lectual-dev, run the isolation cases there, then do the same
+-- on lectual-prod only with the owner's OK. Apply to BOTH projects (lectual AGENTS.md, "Database").
+--
+-- Checked against lectual migrations 0001, 0002, 0003, 0005, 0007, 0008, 0017, 0031, 0037, 0050, 0051 and the code of both repos
+-- (lectual HEAD via git, lectual.app this worktree), and run on a throwaway local PostgreSQL 16 with mocks of the Supabase roles
+-- (anon, authenticated, service_role, supabase_auth_admin), auth.uid() and the tables it touches. NOT against a Lectual database.
+--
+-- Depends on: 0001 (crm_org_member: id, org_id, user_id, role crm_role, created_at, unique (org_id, user_id)), 0002
+-- (current_org_id, current_org_role, the member_* policies), 0050 (platform_admin, is_platform_admin(); the token hook's `owner`
+-- claim for staff). Creates schema `private` if it is missing (0112 proposes the same schema; either may land first).
+--
+-- ── THE GAP ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+-- 0002_rls.sql, verbatim:
+--   create policy member_insert_admin on crm_org_member
+--     for insert with check (
+--       org_id = public.current_org_id()
+--       and public.current_org_role() in ('owner','admin','senior_admin')
+--     );
+--   create policy member_update_admin on crm_org_member
+--     for update using (
+--       org_id = public.current_org_id()
+--       and public.current_org_role() in ('owner','admin','senior_admin')
+--     ) with check (
+--       org_id = public.current_org_id()
+--       and public.current_org_role() in ('owner','admin','senior_admin')
+--     );
+--   create policy member_delete_admin on crm_org_member
+--     for delete using (
+--       org_id = public.current_org_id()
+--       and public.current_org_role() in ('owner','admin','senior_admin')
+--     );
+-- (plus member_select_own_org, and 0005's member_select_auth_admin for the token hook.) All three write policies trust the JWT
+-- role CLAIM and nothing else, and nothing compares the old row with the new one. So, through PostgREST:
+--   1. A Lectual platform admin (0050) inside a firm they do not belong to carries `org_role = owner` (0050's token hook,
+--      "org_role is 'owner' so the firm's role-gated RLS write policies behave as they would for the firm's own principal"). They
+--      can INSERT (firm, self, 'owner'), and after a token refresh the hook finds that row and they are a REAL owner of the firm,
+--      with no further platform_admin_audit entry. Self-inserting as admin or senior_admin gives admin-tier rights the same way.
+--   2. An admin or senior_admin can UPDATE their own row to owner (or admin -> senior_admin -> anything), and can change, demote or
+--      DELETE an existing owner's row, and can insert a new owner row for anyone (an accomplice, a second account).
+--   3. The UPDATE policy also lets an admin rewrite a row's user_id (move a paralegal's row onto themselves) or created_at.
+--   4. The "never leave the firm ownerless" rule exists only in the app (src/lib/settings/admin.ts, members.ts).
+--   5. The claim outlives the row: an admin who was demoted or removed keeps admin-tier membership writes until their token
+--      expires (up to an hour; 0031 revokes sessions on removal, but a token already issued still works until it expires).
+-- The app refuses most of these in its own checks (no self-change, rank ceilings, last-owner guard), but RLS is the boundary and
+-- anyone holding a session token can call PostgREST directly.
+--
+-- ── THE RULE (Taylor, Nov 23) ────────────────────────────────────────────────────────────────────────────────────────
+-- For a SIGNED-IN caller (any role that is not trusted, below), on public.crm_org_member:
+--   a. Nobody inserts their OWN row, whatever the role (member_owner_guard_self_insert). Recommended over "only not as owner": a
+--      real member already has a row (unique (org_id, user_id)), so the only callers who can ever self-insert are non-members
+--      holding an admin-tier claim, i.e. platform admins, and joining a firm as admin is an escalation too. No real flow
+--      self-inserts through the API: a new firm's first owner is made by provision_org / provision_org_for_owner (below).
+--   b. Nobody changes their OWN role, to anything (member_owner_guard_self_role). Wider than "never to owner" on purpose: an admin
+--      promoting themselves to senior_admin, or to attorney (0110's close override reads the attorney membership row), is an
+--      escalation too, and the app already refuses every self-change ("You can't change your own role.").
+--   c. EVERY membership write needs a REAL admin-tier row for the caller in the active firm (owner, admin or senior_admin, read from
+--      crm_org_member, not the claim), or the caller is Lectual staff (public.is_platform_admin(), 0050)
+--      (member_owner_guard_not_admin). This closes gap 5: a demoted or removed admin's still-valid token no longer writes membership.
+--   d. Inserting an owner row, changing a row to or from owner, or deleting an owner row needs a REAL owner: a crm_org_member row
+--      (org_id = the active firm, user_id = auth.uid(), role = 'owner'). That is a table lookup, never current_org_role(), so a
+--      platform admin's `owner` claim does not count and a demoted owner's stale token does not count (member_owner_guard_not_owner).
+--   e. Only `role` may change on UPDATE: every other column, today's and any added later, is compared as
+--      `(to_jsonb(new) - 'role') is distinct from (to_jsonb(old) - 'role')` (0115's form) (member_owner_guard_immutable).
+--   f. The firm keeps at least one owner after a signed-in update or delete (member_owner_guard_last_owner). Checked AFTER the
+--      statement's rows are written (an AFTER ROW trigger sees the whole statement), under a per-firm advisory lock, so two concurrent
+--      transactions each demoting one of two owners cannot both pass, and neither can one statement that removes both.
+--   g. A row whose org_id is not the caller's active firm is refused with one fixed sentence before anything else is read
+--      (member_owner_guard_wrong_org), so the guard is no oracle about another firm. RLS refuses those writes anyway.
+--   h. No session (auth.uid() null) through an untrusted role: member_owner_guard_no_session.
+-- All refusals are SQLSTATE 42501 with those stable prefixes. lectual.app's friendlySettingsError
+-- (src/app/dashboard/settings/team/errors.ts) already maps any 42501 to "You don't have permission to do that.", so no database
+-- text reaches a person and no app change is needed for the refusals themselves.
+--
+-- DELETE: 0002 has member_delete_admin (above). Deleting an owner row is "touching" one, so it needs a real owner (rule d), and a
+-- signed-in delete of the last owner is refused (rule f). Deleting a non-owner row needs a real admin-tier row (rule c). Leaving a
+-- firm by deleting your own non-owner row is allowed only for the admin tier (rule c; the app refuses self-removal anyway).
+--
+-- ── WHO IS TRUSTED (passes untouched) ────────────────────────────────────────────────────────────────────────────────
+--   * Rows whose parent is gone. Deleting a crm_org, or an auth.users row (Supabase GoTrue, which deletes as supabase_auth_admin),
+--     cascades into crm_org_member. The BEFORE trigger sees that delete at pg_trigger_depth() > 1 (0085's and 0107's form) and lets
+--     it through. The AFTER ROW trigger does NOT: the cascade's AFTER row events are run at the end of the outer statement, at
+--     depth 1, with current_user = the outer role (supabase_auth_admin through GoTrue), which is not trusted. So the AFTER guard's
+--     first test, for a DELETE, is private.crm_org_member_parent_gone(old.org_id, old.user_id): true when the crm_org row OR the
+--     auth.users row no longer exists, and then it passes. Consequence (Taylor's choice): deleting the auth user of a firm's only
+--     owner succeeds and leaves the firm with no owner; a signed-in "delete the only owner" still gets last_owner (both parents
+--     exist then). No trigger on any table reachable by an API role writes crm_org_member, so depth > 1 is never a way in for a
+--     signed-in caller; a future trigger that does must re-check.
+--   * current_user = 'service_role' (scripts, the server's admin client, tests' seed helpers).
+--   * current_user is the table's OWNER or a member of it (pg_has_role(current_user, relowner, 'MEMBER'); superusers are members of
+--     every role). This is what a SECURITY DEFINER function owned by postgres runs as, so provision_org() and
+--     provision_org_for_owner() keep creating a new firm's first owner. On Supabase the API roles are NOT members of postgres
+--     (postgres is a member of authenticated, not the reverse); PRE-APPLY CHECK 1 confirms it, and that both provisioning
+--     functions are owned by the table owner (or a member of it).
+-- For that reason the two GUARD functions are SECURITY INVOKER: current_user must be the caller's role. The lookups that have to see
+-- past RLS are two SECURITY DEFINER helpers in schema `private`, which PostgREST does not expose (0112's pattern; check
+-- `pgrst.db_schemas` does not list it), so no member can call them over rpc or take the owner lock directly. Owned by the table
+-- owner, they bypass RLS (the table is not FORCE ROW LEVEL SECURITY), so a guard's read never recurses through a crm_org_member
+-- policy. private.crm_org_member_caller_facts(p_lock) answers only for auth.uid() in current_org_id() (the caller's real role, whether
+-- they are Lectual staff, the firm's owner count). private.crm_org_member_parent_gone(org, user) answers only whether two rows exist.
+-- `authenticated` gets USAGE on `private` and EXECUTE on the facts helper because the invoker trigger runs as it; the parent_gone
+-- helper is also granted to service_role and supabase_auth_admin, the roles a cascade's AFTER event runs as.
+--
+-- WHY A TRIGGER, NOT ONLY TIGHTER POLICIES
+--   A policy cannot compare OLD with NEW (self role change, immutables, "touches an owner row"), a policy reading crm_org_member
+--   from a crm_org_member policy invites recursion, policies give no stable SQLSTATE prefix, and the last-owner rule needs the whole
+--   statement's result. The 0002 policies are left exactly as they are: they still decide WHO may write membership at all (the
+--   admin-tier claim) and the triggers only narrow it.
+--
+-- GRANT CHANGE (flagged): this file also revokes TRUNCATE, REFERENCES and TRIGGER (and MAINTAIN on PostgreSQL 17) on
+-- crm_org_member from anon and authenticated, as every later tenant table does (0098, 0099, 0103, 0115). TRUNCATE bypasses row
+-- triggers and RLS, so without the revoke an API role could still empty the table outside these guards if PostgREST ever exposed it.
+-- Nothing in either app needs those privileges. SELECT / INSERT / UPDATE / DELETE are untouched.
+--
+-- ── EVERY WRITER OF crm_org_member, AND HOW IT IS TREATED ────────────────────────────────────────────────────────────
+-- lectual.app (this repo):
+--   * src/lib/settings/members.ts inviteMember: INSERT through the scoped client (authenticated) of (active org, the INVITEE,
+--     role). Never the caller's own id (the existing-user lookup and inviteUserByEmail resolve the invitee). Non-owner roles: an
+--     owner, admin or senior_admin (with a real row) still invites a paralegal, attorney, intake etc. exactly as today, and so does
+--     Lectual staff. An owner invite now needs a real owner (the app already only lets an owner grant owner; a platform admin inside
+--     a non-member firm now gets 42501).
+--   * src/lib/settings/admin.ts setMemberRole: UPDATE of `role` only (`update({ role }).eq("user_id", ...)`), never the caller's own
+--     row (app refuses). Re-roling a non-owner (paralegal -> attorney) by the admin tier works as today. To or from owner needs a
+--     real owner; demoting the last owner is refused (the app refuses first).
+--   * src/lib/settings/members.ts removeMember: DELETE through the scoped client, never self (app refuses). Removing a non-owner:
+--     as today. Removing an owner: real owner only, never the last one (the app refuses the last one first). NOTE: the app calls
+--     revoke_member_sessions BEFORE the delete, so an owner delete that this file refuses still signs that owner out. That is an
+--     app-side ordering fix in lectual.app, tracked separately; it is not changed here.
+--   * scripts/seed-demo-firm.mts: service role (insert / upsert, owner included): trusted.
+--   * Reads only, untouched: src/lib/firm/session.ts, src/lib/pipeline/members.ts, src/lib/members/directory.ts,
+--     src/lib/proposals/staff-view.ts, src/lib/mailbox/sync.ts and src/lib/proposals/accept-followups.ts (service-role reads),
+--     src/lib/matters/close-guard.ts (comment).
+-- lectual:
+--   * src/lib/settings/members.ts, src/lib/settings/admin.ts: the same code as above (lectual.app ported it); same treatment.
+--   * scripts/invite-members.ts: service role INSERT (never upsert): trusted.
+--   * scripts/provision-tenant.ts: service role rpc provision_org_for_owner: trusted.
+--   * scripts/grant-platform-admin.ts (`pnpm platform-admin`): writes public.platform_admin only, adds NO crm_org_member row:
+--     unaffected.
+--   * scripts/import-intake-sheet.ts, scripts/sync-intake-email.ts, src/app/(booth)/booth/BoothPage.tsx, the marketing pages,
+--     src/lib/firm/session.ts and the dashboard pages: reads only.
+--   * tests/helpers/seed.ts: service role: trusted. Its wipe() deletes fixture users with `a.auth.admin.deleteUser(id)` inside
+--     Promise.all and never reads the returned `error`, so a refused user delete is SILENT there. Before the parent_gone fix in this
+--     file, deleting a sole-owner fixture user failed that way (wrong_org from the AFTER trigger) and left the user behind. Existing
+--     signed-in isolation cases that edit membership must not self-insert, self-re-role, write from a stale claim or touch an owner
+--     without a real owner row; run the whole suite after applying.
+--   * Migrations: provision_org(p_name, p_slug) (0007, 0017) is SECURITY DEFINER, granted to authenticated, and inserts
+--     (new org, auth.uid(), 'owner'): it runs as its owner, so it is trusted and self-serve firm creation keeps working. That is
+--     not an escalation: the caller owns a firm that did not exist. provision_org_for_owner (0037, 0051): service role only:
+--     trusted. 0027 inserts orgs only. 0031's functions read (revoke_member_sessions deletes auth.sessions, not members). 0050's
+--     set_active_org writes user_org_preference only. custom_access_token_hook (0003/0008/0029/0050) reads only.
+--   * supabase/functions: lectual has none (supabase/ holds config.toml and migrations only).
+--   * Supabase GoTrue: inviteUserByEmail / createUser write auth.users only; deleteUser cascades into crm_org_member (parent_gone).
+--
+-- ── 0115 DEPENDENCY ──────────────────────────────────────────────────────────────────────────────────────────────────
+-- 0115 (custom columns) makes a money amount visible and writable only to a caller with an OWNER crm_org_member row. That rule is
+-- only as sound as the owner rows: without 0116 a platform admin or an admin can mint themselves an owner row through PostgREST and
+-- read every amount. Apply 0116 BEFORE 0115, or in the same deploy. 0110's close override (owner / attorney membership row) gains
+-- the same soundness from rules a, b, c and d.
+--
+-- ── PRE-APPLY CHECKS (read-only; run on each project first, nothing here writes) ─────────────────────────────────────
+--   1. No API or auth role is a member of the table owner, and both provisioning functions run as the table owner (or a member):
+--        select r.rolname, pg_has_role(r.rolname, c.relowner, 'MEMBER') from pg_class c, pg_roles r
+--         where c.oid = 'public.crm_org_member'::regclass
+--           and r.rolname in ('authenticated', 'anon', 'authenticator', 'service_role', 'supabase_auth_admin');
+--      authenticated, anon, authenticator and supabase_auth_admin must be false. service_role is trusted by name anyway; if it is
+--      true, note it. If any of the other four is true, STOP: the trust test below would let that role through.
+--        select p.oid::regprocedure, pg_get_userbyid(p.proowner), pg_has_role(p.proowner, c.relowner, 'MEMBER')
+--          from pg_proc p, pg_class c
+--         where c.oid = 'public.crm_org_member'::regclass
+--           and p.oid in ('public.provision_org(text,text)'::regprocedure,
+--                         'public.provision_org_for_owner(text,text,uuid,text,text,text)'::regprocedure);
+--      Both must be true, or the first owner of a new firm can no longer be created.
+--   2. No other trigger on the table: select tgname from pg_trigger where tgrelid = 'public.crm_org_member'::regclass and not tgisinternal;
+--   3. Firms with no owner (after 0116 only the service role can give one an owner):
+--        select o.id from crm_org o where not exists (select 1 from crm_org_member m where m.org_id = o.id and m.role = 'owner');
+--   4. Was the hole used? Platform admins holding membership rows (review each by hand; prints ids and roles, no emails):
+--        select m.org_id, m.user_id, m.role, m.created_at from crm_org_member m join platform_admin p on p.user_id = m.user_id;
+--   5. The table's actual columns (rule e compares every column but `role`; expect id, org_id, user_id, role, created_at):
+--        select column_name, data_type from information_schema.columns
+--         where table_schema = 'public' and table_name = 'crm_org_member' order by ordinal_position;
+--   6. `private` is not exposed: show pgrst.db_schemas (or the API settings' exposed schemas) must not list `private`.
+--
+-- ── APPLYING IT ──────────────────────────────────────────────────────────────────────────────────────────────────────
+-- Additive and idempotent: create schema if not exists, create or replace function, and do $$ blocks that test pg_trigger first
+-- (0103's form). Nothing is dropped, no row is changed, no policy changes; the only grant change is the revoke above. One Supabase MCP
+-- apply_migration is safe (no drop, no delete; see 0093 for what hangs it). Statement order: the schema, the two helpers and their
+-- grants, the two guard functions and their revokes, the two triggers, the table revokes, comments.
+--
+-- ── OPEN QUESTIONS FOR TAYLOR (not built) ────────────────────────────────────────────────────────────────────────────
+--   Q1. Lectual staff (platform admins) with no membership in a firm can still invite, re-role and remove NON-owner members there
+--       (rule c lets is_platform_admin() through). They could, for example, invite a second account of their own as admin. Should
+--       they be able to write membership at all, and should those writes be recorded in platform_admin_audit?
+--   Q2. The table-level revoke of TRUNCATE, REFERENCES, TRIGGER (and MAINTAIN) from anon and authenticated: OK to include here?
+--   Q3. Rank ceilings below owner (a senior_admin granting admin, anyone granting above their own rank) stay app-only. Enforce them
+--       in the database too?
+--   Q4. A refused owner removal still signs the owner out, because lectual.app revokes sessions before the delete (handled in
+--       lectual.app separately).
+--   Q5. If PRE-APPLY CHECK 4 finds platform admins holding membership rows, remove them?
+-- =====================================================================================================================
+
+
+-- ── 1. Schema `private` (not exposed by PostgREST; 0112's form) ────────────────────────────────────────────────────
+create schema if not exists private;
+revoke all on schema private from public;
+revoke all on schema private from anon;
+grant usage on schema private to authenticated;
+grant usage on schema private to service_role;
+do $$
+begin
+  if exists (select 1 from pg_catalog.pg_roles where rolname = 'supabase_auth_admin') then
+    execute 'grant usage on schema private to supabase_auth_admin';
+  end if;
+end
+$$;
+
+
+-- ── 2. The lookups that must see past RLS ──────────────────────────────────────────────────────────────────────────
+-- Answers for the CALLER in their ACTIVE firm only: their real role there (null = no membership row), whether they are Lectual staff,
+-- and the firm's owner count. With p_lock it takes the firm's owner lock first and reads in later statements, so under READ COMMITTED
+-- (PostgREST's level) each read sees everything committed before the lock was granted. The lock is held to the end of the
+-- transaction. Volatile on purpose: each statement takes a fresh snapshot.
+create or replace function private.crm_org_member_caller_facts(
+  p_lock boolean,
+  out caller_role text,
+  out caller_is_platform_admin boolean,
+  out owner_count integer
+)
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_org uuid := public.current_org_id();
+  v_uid uuid := auth.uid();
+begin
+  caller_role := null;
+  caller_is_platform_admin := false;
+  owner_count := 0;
+  if v_org is null or v_uid is null then
+    return;
+  end if;
+
+  if p_lock then
+    perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('crm_org_member_owner:' || v_org::text, 0));
+  end if;
+
+  select m.role::text into caller_role
+    from public.crm_org_member m
+   where m.org_id = v_org and m.user_id = v_uid;
+
+  caller_is_platform_admin := coalesce(public.is_platform_admin(), false);
+
+  select count(*)::integer into owner_count
+    from public.crm_org_member m
+   where m.org_id = v_org and m.role = 'owner';
+end;
+$$;
+
+revoke all on function private.crm_org_member_caller_facts(boolean) from public;
+revoke all on function private.crm_org_member_caller_facts(boolean) from anon;
+grant execute on function private.crm_org_member_caller_facts(boolean) to authenticated;
+
+-- True when the membership row's firm OR its auth user no longer exists: the row is being removed by a cascade.
+create or replace function private.crm_org_member_parent_gone(p_org uuid, p_user uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select not exists (select 1 from public.crm_org o where o.id = p_org)
+      or not exists (select 1 from auth.users u where u.id = p_user);
+$$;
+
+revoke all on function private.crm_org_member_parent_gone(uuid, uuid) from public;
+revoke all on function private.crm_org_member_parent_gone(uuid, uuid) from anon;
+grant execute on function private.crm_org_member_parent_gone(uuid, uuid) to authenticated;
+grant execute on function private.crm_org_member_parent_gone(uuid, uuid) to service_role;
+do $$
+begin
+  if exists (select 1 from pg_catalog.pg_roles where rolname = 'supabase_auth_admin') then
+    execute 'grant execute on function private.crm_org_member_parent_gone(uuid, uuid) to supabase_auth_admin';
+  end if;
+end
+$$;
+
+
+-- ── 3. BEFORE guard: who may write which row ───────────────────────────────────────────────────────────────────────
+-- SECURITY INVOKER (no security definer): current_user must be the caller's own role for the trust test.
+create or replace function public.crm_org_member_owner_guard()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_uid uuid;
+  v_org uuid;
+  v_touches_owner boolean := false;
+  v_facts record;
+begin
+  -- 3a. Referential actions (a crm_org or auth.users delete cascading here) pass, as in 0085 and 0107.
+  if pg_catalog.pg_trigger_depth() > 1 then
+    if tg_op = 'DELETE' then return old; end if;
+    return new;
+  end if;
+
+  -- 3b. Trusted writers: the service role, and the table's owner (SECURITY DEFINER functions such as provision_org, migrations).
+  if current_user = 'service_role'
+     or exists (
+       select 1 from pg_catalog.pg_class c
+        where c.oid = 'public.crm_org_member'::regclass
+          and pg_catalog.pg_has_role(current_user, c.relowner, 'MEMBER')
+     )
+  then
+    if tg_op = 'DELETE' then return old; end if;
+    return new;
+  end if;
+
+  -- 3c. Everyone else must be signed in.
+  v_uid := auth.uid();
+  if v_uid is null then
+    raise exception 'member_owner_guard_no_session: membership changes need a signed-in caller'
+      using errcode = '42501';
+  end if;
+
+  -- 3d. Only the active firm's rows, refused before anything is read (no oracle about another firm).
+  v_org := public.current_org_id();
+  if (tg_op in ('INSERT', 'UPDATE') and new.org_id is distinct from v_org)
+     or (tg_op in ('UPDATE', 'DELETE') and old.org_id is distinct from v_org)
+  then
+    raise exception 'member_owner_guard_wrong_org: membership can only change in your active firm'
+      using errcode = '42501';
+  end if;
+
+  -- 3e. Only the role changes on an update (every other column, today's and any added later).
+  if tg_op = 'UPDATE' and (pg_catalog.to_jsonb(new) - 'role') is distinct from (pg_catalog.to_jsonb(old) - 'role') then
+    raise exception 'member_owner_guard_immutable: only a member''s role can change'
+      using errcode = '42501';
+  end if;
+
+  -- 3f. Never your own row: no self-insert (any role), no self role change (any role).
+  if tg_op = 'INSERT' and new.user_id = v_uid then
+    raise exception 'member_owner_guard_self_insert: you cannot add yourself to a firm'
+      using errcode = '42501';
+  end if;
+  if tg_op = 'UPDATE' and old.user_id = v_uid and new.role is distinct from old.role then
+    raise exception 'member_owner_guard_self_role: you cannot change your own role'
+      using errcode = '42501';
+  end if;
+
+  -- 3g. Does this write create, change or remove an owner row?
+  if tg_op = 'INSERT' then
+    v_touches_owner := new.role = 'owner';
+  elsif tg_op = 'UPDATE' then
+    v_touches_owner := new.role is distinct from old.role and (old.role = 'owner' or new.role = 'owner');
+  else
+    v_touches_owner := old.role = 'owner';
+  end if;
+
+  -- 3h. The caller's REAL standing in this firm (the table, not the claim). The owner lock is taken only when an owner row is touched.
+  select f.caller_role, f.caller_is_platform_admin, f.owner_count into v_facts
+    from private.crm_org_member_caller_facts(v_touches_owner) f;
+
+  if not (coalesce(v_facts.caller_role, '') in ('owner', 'admin', 'senior_admin') or coalesce(v_facts.caller_is_platform_admin, false)) then
+    raise exception 'member_owner_guard_not_admin: only a current owner or admin of this firm can change its members'
+      using errcode = '42501';
+  end if;
+
+  if v_touches_owner and coalesce(v_facts.caller_role, '') <> 'owner' then
+    raise exception 'member_owner_guard_not_owner: only an owner of this firm can add, change or remove an owner'
+      using errcode = '42501';
+  end if;
+
+  if tg_op = 'DELETE' then return old; end if;
+  return new;
+end;
+$$;
+
+
+-- ── 4. AFTER guard: the firm keeps at least one owner ──────────────────────────────────────────────────────────────
+-- AFTER ROW triggers fire once the statement has written every row, so the count includes the whole statement (two owners removed in
+-- one statement) and, after the lock, every transaction committed before it (two owners demoted in two transactions).
+create or replace function public.crm_org_member_last_owner_guard()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_facts record;
+begin
+  -- 4a. A cascade from a deleted firm or auth user: its AFTER events run at depth 1 as the outer role, so test the parents.
+  if tg_op = 'DELETE' and private.crm_org_member_parent_gone(old.org_id, old.user_id) then
+    return null;
+  end if;
+
+  if pg_catalog.pg_trigger_depth() > 1 then
+    return null;
+  end if;
+
+  if current_user = 'service_role'
+     or exists (
+       select 1 from pg_catalog.pg_class c
+        where c.oid = 'public.crm_org_member'::regclass
+          and pg_catalog.pg_has_role(current_user, c.relowner, 'MEMBER')
+     )
+  then
+    return null;
+  end if;
+
+  -- Only a row that WAS an owner and no longer is one can leave the firm without an owner.
+  if old.role is distinct from 'owner' then
+    return null;
+  end if;
+  if tg_op = 'UPDATE' and new.role = 'owner' then
+    return null;
+  end if;
+
+  if old.org_id is distinct from public.current_org_id() then
+    raise exception 'member_owner_guard_wrong_org: membership can only change in your active firm'
+      using errcode = '42501';
+  end if;
+
+  select f.owner_count into v_facts from private.crm_org_member_caller_facts(true) f;
+  if coalesce(v_facts.owner_count, 0) < 1 then
+    raise exception 'member_owner_guard_last_owner: a firm must keep at least one owner'
+      using errcode = '42501';
+  end if;
+
+  return null;
+end;
+$$;
+
+revoke execute on function public.crm_org_member_owner_guard() from public;
+revoke execute on function public.crm_org_member_owner_guard() from anon;
+revoke execute on function public.crm_org_member_owner_guard() from authenticated;
+revoke execute on function public.crm_org_member_last_owner_guard() from public;
+revoke execute on function public.crm_org_member_last_owner_guard() from anon;
+revoke execute on function public.crm_org_member_last_owner_guard() from authenticated;
+
+
+-- ── 5. Triggers ────────────────────────────────────────────────────────────────────────────────────────────────────
+do $$
+begin
+  if not exists (
+    select 1 from pg_trigger
+     where tgrelid = 'public.crm_org_member'::regclass and tgname = 'crm_org_member_owner_guard_trg'
+  ) then
+    create trigger crm_org_member_owner_guard_trg
+      before insert or update or delete on public.crm_org_member
+      for each row execute function public.crm_org_member_owner_guard();
+  end if;
+
+  if not exists (
+    select 1 from pg_trigger
+     where tgrelid = 'public.crm_org_member'::regclass and tgname = 'crm_org_member_last_owner_guard_trg'
+  ) then
+    create trigger crm_org_member_last_owner_guard_trg
+      after update or delete on public.crm_org_member
+      for each row execute function public.crm_org_member_last_owner_guard();
+  end if;
+end
+$$;
+
+
+-- ── 6. Table privileges no API role needs (flagged in the header, Q2) ──────────────────────────────────────────────
+revoke truncate, references, trigger on public.crm_org_member from anon, authenticated;
+-- PostgreSQL 17 adds MAINTAIN; the version guard keeps this file applying on PostgreSQL 16 (0115's form).
+do $$
+begin
+  if pg_catalog.current_setting('server_version_num')::int >= 170000 then
+    execute 'revoke maintain on public.crm_org_member from anon, authenticated';
+  end if;
+end
+$$;
+
+
+-- ── 7. Comments ────────────────────────────────────────────────────────────────────────────────────────────────────
+comment on function private.crm_org_member_caller_facts(boolean) is
+  'For crm_org_member guards (0116): the caller''s real role in current_org_id() (null = no row), whether they are Lectual staff, and the firm''s owner count. With p_lock, takes the firm''s owner advisory lock first. Not exposed by PostgREST.';
+comment on function private.crm_org_member_parent_gone(uuid, uuid) is
+  'For crm_org_member guards (0116): true when the firm or the auth user of a membership row no longer exists, i.e. the row is going by cascade.';
+comment on function public.crm_org_member_owner_guard() is
+  'BEFORE guard on crm_org_member (0116): signed-in callers need a real admin-tier row (or platform admin), cannot add themselves, change their own role or any column but role, or add/change/remove an owner without a real owner row. Service role, the table owner and referential actions pass.';
+comment on function public.crm_org_member_last_owner_guard() is
+  'AFTER guard on crm_org_member (0116): a signed-in caller cannot leave a firm with no owner. Cascades from a deleted firm or auth user, the service role and the table owner pass.';
+
+-- KNOWN LIMITS AND BEHAVIOUR
+--   * Only the owner tier is a database rule. The app's other rank ceilings (hasRole in src/lib/auth/roles.ts: a senior_admin
+--     cannot grant or touch admin, nobody grants above their own rank) stay app-only: a real admin-tier member can still give any
+--     NON-owner role to anyone else through PostgREST, as before 0116 (Q3).
+--   * Platform admins inside a firm they do not belong to can still invite, re-role and remove NON-owner members (rule c lets
+--     is_platform_admin() through; Q1). They can no longer add, change or remove an owner, and cannot join a firm themselves. Making
+--     a firm's owner is done with the service role (scripts/provision-tenant.ts) or by a real owner in the app.
+--   * Stale tokens: the 0002 policies still read the claim, but rule c reads the table, so a demoted or removed admin can no longer
+--     write membership with an old token. Other tables' role-gated policies still read the claim until the token expires.
+--   * A firm that has no owner today (PRE-APPLY CHECK 3) cannot be given one by a signed-in caller after 0116; use the service role.
+--   * Deleting the auth user of a firm's only owner (Supabase auth admin, or the service role) succeeds through the parent_gone test
+--     and leaves the firm with no owner (Taylor's choice). That is an operator action and is not blocked. A signed-in caller deleting
+--     the only owner's ROW is still refused (last_owner).
+--   * The owner lock is per firm and held to the end of the transaction; membership writes that touch an owner in one firm queue
+--     behind each other. They are rare and single-row in the app.
+--   * A transaction run at REPEATABLE READ or SERIALIZABLE would read with its first snapshot; PostgREST runs READ COMMITTED.
+
+-- Cases to add to lectual tests/tenant-isolation.test.ts (NOT written into any lectual file yet). "signed-in" = an authenticated JWT
+-- with active_org_id and org_role claims; "service role" = no session. Firm A has owner O1, admin AD, senior_admin SA, paralegal P;
+-- firm B has owner OB. PA is a platform admin (0050) with no membership row in A, acting inside A (claim org_role = owner).
+--   1. PA inserts (A, PA, 'owner'): 42501 member_owner_guard_self_insert; (A, PA, 'admin') and (A, PA, 'paralegal'): the same. A
+--      token refresh afterwards gives PA no membership in A (count of PA's rows in A is 0).
+--   2. PA inserts (A, newUser, 'owner'): member_owner_guard_not_owner. PA updates O1 to admin, and P to owner: not_owner. PA deletes
+--      O1's row: not_owner (O1's row still there). PA inserts (A, newUser, 'paralegal'), re-roles P to attorney and back, and removes
+--      newUser: all succeed (Lectual staff keep the non-owner flow; Q1).
+--   3. AD updates own row to owner, and to senior_admin: member_owner_guard_self_role. AD updates P to owner: not_owner. AD updates
+--      O1 to admin: not_owner. AD deletes O1: not_owner. AD inserts (A, newUser, 'owner'): not_owner. AD changes P's user_id to AD's,
+--      or created_at: member_owner_guard_immutable.
+--   4. SA: the same refusals as case 3 (self_role, not_owner on promote / demote / delete / insert owner, immutable).
+--   5. AD invites (inserts) (A, newUser, 'paralegal'), re-roles that member paralegal -> attorney -> paralegal, and deletes the row:
+--      all succeed. SA does the same: all succeed.
+--   6. O1 inserts (A, O2, 'owner'): succeeds. O1 changes O2 to admin and back to owner, changes P to attorney: succeed. O1 deletes O2:
+--      succeeds. O1 changes own role: self_role. With O1 the only owner, O1 deletes own row: member_owner_guard_last_owner (row kept);
+--      with O2 present, O1 deleting own row succeeds.
+--   7. Last owner, whole statement: with owners O1, O2 and O3, O1 demotes O2 and O3 in ONE update: succeeds (O1 remains). With owners
+--      O1 and O2 only, O1 deletes BOTH rows in ONE statement (delete ... where role = 'owner'): refused, and BOTH owner rows survive.
+--      Accept any of member_owner_guard_last_owner, member_owner_guard_not_owner or member_owner_guard_not_admin: which row the
+--      statement reaches first decides (on the local PostgreSQL 16 run O1's own row went first, so the second row's check found no
+--      row for O1 and answered not_admin). Then O1 updates O2 to admin (succeeds); O2's token (claim still owner, row now admin)
+--      updating O1 to admin: member_owner_guard_not_owner, O1 unchanged.
+--   8. A demoted owner with a stale `owner` claim (row now admin) inserting (A, newUser, 'owner'): not_owner.
+--   9. OB (firm B's owner, active org B) inserts (A, newUser, 'owner') naming firm A: 42501 member_owner_guard_wrong_org, the same
+--      message for a random org id; OB's update and delete of A's rows affect 0 rows (RLS). OB acting in B cannot touch A at all.
+--  10. Service role: inserts (A, X, 'owner'), self-shaped inserts, changes O1 to admin leaving no owner, deletes the last owner, and
+--      changes user_id: all succeed (the guard does not apply). provision_org_for_owner as service role creates a firm and its owner.
+--  11. provision_org(name, slug) as a signed-in user with no memberships creates the org and their owner row (the SECURITY DEFINER
+--      function runs as the table owner).
+--  12. Cascades through the routes that really run them, NOT the service role writing crm_org_member:
+--      (a) a fixture user U who is the ONLY owner of firm C is deleted with `supabase.auth.admin.deleteUser(U)` (GoTrue, which deletes
+--          as supabase_auth_admin, an untrusted role): the call returns NO error, U's crm_org_member rows are gone, and firm C has no
+--          owner. Assert the returned `error` is null (wipe() does not look at it).
+--      (b) the same for a user who is one of two owners of a firm, and for a user who is a paralegal: no error, rows gone.
+--      (c) deleting firm A in ONE statement removes every crm_org_member row of A, owners included (no last_owner refusal).
+--      (d) contrast: a signed-in O1, the only owner, deleting their own ROW is still member_owner_guard_last_owner.
+--  13. viewer, attorney, intake and paralegal of A: insert, update and delete of membership refused or 0 rows, as before 0116 (RLS).
+--  14. anon: nothing (no_session or RLS). `rpc('crm_org_member_caller_facts')` and `rpc('crm_org_member_parent_gone')` are NOT FOUND
+--      for authenticated and anon (schema `private` is not exposed). proconfig of both helpers is exactly `search_path=""`; public and
+--      anon have no EXECUTE on either.
+--  15. The 0115 money cases (22, 22a, 22b) stay green, and a platform admin can no longer reach them by self-inserting an owner row
+--      (case 1 first, then a money read: 0 rows).
+--  16. Stale tokens (rule c): (a) AD is REMOVED from firm A by O1 while AD's token (claim admin, active org A) is still valid; AD then
+--      inserts (A, newUser, 'paralegal'), re-roles P and deletes P: each member_owner_guard_not_admin, nothing written. (b) AD is
+--      DEMOTED to paralegal by O1; with the old admin token AD tries the same three writes: each not_admin. (c) PA (no membership in A,
+--      is_platform_admin true) re-roles P paralegal -> attorney: succeeds.
+--  17. Grants: has_table_privilege('authenticated' / 'anon', 'public.crm_org_member', 'TRUNCATE' / 'REFERENCES' / 'TRIGGER') are all
+--      false; on PostgreSQL 17 'MAINTAIN' too. SELECT / INSERT / UPDATE / DELETE for authenticated are unchanged (true).
+-- Manual check (not a vitest case): two sessions on lectual-dev, firm with owners O1 and O2; session 1 (O1) demotes O2 and holds the
+-- transaction open, session 2 (O2, still holding an owner row until session 1 commits) demotes O1; session 2 waits on the lock and,
+-- once session 1 commits, fails with member_owner_guard_not_owner or member_owner_guard_last_owner. The firm keeps one owner.
