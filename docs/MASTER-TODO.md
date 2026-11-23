@@ -24,8 +24,16 @@ Visual (private until shared): https://claude.ai/artifact/9CEapkxwyePAdAPDZ2WhS1
 - [ ] Check in the database whether a lead that comes in through a Lectual form ever gets its Lawmatics id stored. If not, the acceptance note,
       signed letter and address can't be filed for that client.
 - [ ] Copy the recap into the Obsidian second brain. This cloud session can't reach the vault.
+- [ ] Lawmatics tab (added to the visual the same day; document section "What the firm could be doing in Lawmatics"): 37 items, 6 quick wins,
+      5 stopgaps, 26 to skip. Decide on the five to do first: Trademark Form reminders (B4), more fields and an upload on the Trademark Form (C8),
+      a pre-filled form link in the welcome email (B3), Rayn told when the form comes back (C8), Dawn's scheduled list of unpaid invoices (C15).
+- [ ] Before switching anything on in Lawmatics, check in the account: which automations are live now, whether any tag Lectual pushes starts an
+      email, and what the firm's plan includes (the unpaid-invoice list needs a plan check).
+- [ ] Tell the team that Lawmatics forms can do dropdowns and conditional questions (its help pages say so; on Aug 28 staff believed they can't).
 
 ### Rebecca (through Taylor)
+- [ ] May a reminder for a form the client was already sent go out by itself (Trademark Form, statement of use)? If yes, approve the wording
+      and the days once.
 - [ ] Package prices, the session fee and whether the $200 credit is standard on every proposal.
 - [ ] Order of payment, letter and signature: sign then pay in one flow (Nov 10), or pay first (intake SOP).
 - [ ] When a lead becomes a matter: at signed LOE and deposit, or at a signed application.

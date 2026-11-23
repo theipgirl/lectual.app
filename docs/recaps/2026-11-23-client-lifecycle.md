@@ -108,3 +108,20 @@ deadlines. Most are Rebecca's or Caitlyn's, through Taylor.
   address for that client.
 - The Obsidian vault could not be reached from this cloud session, so this recap is only in the
   repository.
+
+## Added later the same day: the Lawmatics tab
+
+Taylor asked for a tab showing what the firm could be doing in Lawmatics.
+
+- The visual has a second tab, "What we could be doing in Lawmatics" (same link, version 2). The document has a matching section,
+  "What the firm could be doing in Lawmatics".
+- Two more research reports fed it: what Lawmatics can do, from its own help pages (each claim with its link, checked Nov 23), and what
+  the firm has in use there today (34 things), planned and never built (40), and does by hand next to a feature it already has (18).
+- 37 opportunities, each tied to a step, each with a verdict: 6 quick wins now, 5 stopgaps until Lectual does it, 26 to skip.
+  A reviewer checked every row (26 faults found and applied; none in what it says Lawmatics can do).
+- The five to do first: Trademark Form reminders, more fields and an upload on the Trademark Form, a pre-filled form link in the
+  welcome email, Rayn told when the form comes back, and Dawn's scheduled list of unpaid invoices.
+- The frame on the tab: Taylor's stated direction as of November 23, 2026 is to phase Lawmatics out, so anything set up there now is
+  done again in Lectual later. The tab is a list to decide from, not a plan to build.
+- Not known: what is live in the firm's account, and what its plan includes. Lawmatics' pricing page could not be read in full.
+- One belief to correct: staff said on Aug 28 that Lawmatics forms have no dropdowns or conditional questions; its help pages say they do.
