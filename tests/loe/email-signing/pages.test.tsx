@@ -131,3 +131,18 @@ describe("T22 no client email can come from a staff preview", () => {
     }
   });
 });
+
+describe("the ?sign= render keeps Referrer-Policy: no-referrer and writes nothing on GET", () => {
+  it("the route's layout sets no-referrer for every render of /p/[token], the ?sign= one included", async () => {
+    const { metadata } = await import("@/app/p/[token]/layout");
+    expect(metadata.referrer).toBe("no-referrer");
+    const page = readFileSync("src/app/p/[token]/page.tsx", "utf8");
+    // The ?sign= branch returns before the `viewed` event is recorded, and calls only the read entry.
+    const branch = page.indexOf("if (sign !== undefined) return <SigningLink");
+    expect(branch).toBeGreaterThan(-1);
+    expect(branch).toBeLessThan(page.indexOf("recordProposalViewed(read.handle"));
+    const fn = page.slice(page.indexOf("async function SigningLink"));
+    expect(fn).toMatch(/entryReadLink\(/);
+    expect(fn).not.toMatch(/entryRecordOpened|entryRecordConsent|entrySign\(|\.rpc\(/);
+  });
+});

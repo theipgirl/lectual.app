@@ -307,3 +307,15 @@ describe("T10 / T18 signing", () => {
     expect((await readSigningLink(PUB, SIGN, other.deps)).kind).toBe("unavailable");
   });
 });
+
+describe("a repeat on a link that already signed", () => {
+  it("answers the done screen and makes no rpc and no follow-up", async () => {
+    const signed = { status: "signed", signed_at: "2026-10-20T15:00:01.000Z", signature_id: "sig-1", consent_at: "x", opened_at: "x" };
+    const w = world({ request: signed, proposal: { status: "accepted", accepted_snapshot: { agreement: { signing_request_id: REQ } } } });
+    const notify = vi.fn(async () => {});
+    const r = await signByLink({ publicToken: PUB, signToken: SIGN, typedName: "Sam Client", signature: { kind: "typed", style: "print" } }, { ...w.deps, notify });
+    expect(r).toEqual({ ok: true, signedLine: "Signed October 20, 2026 at 11:00 AM EDT by Sam Client", payUrl: "https://pay.example/x" });
+    expect(w.f.rpcCalls).toEqual([]);
+    expect(notify).not.toHaveBeenCalled();
+  });
+});

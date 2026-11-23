@@ -87,7 +87,12 @@ export async function signByLink(
       if (pair.close) await closeUnusable(deps.db, pair.close, deps.audit);
       return { ok: false, message: LINK_UNAVAILABLE };
     }
-    if (pair.state !== "open") return { ok: false, message: LINK_UNAVAILABLE };
+    if (pair.state === "signed") {
+      // A repeat after this very link signed (a double click, a second tab): the done screen again, and nothing runs.
+      const firm = await readFirm(deps.db, pair.proposal.org_id).catch(() => null);
+      const at = pair.request.signed_at;
+      return { ok: true, signedLine: firm && at ? signedLineText(at, firm.timeZone, pair.request.signer_name) : "", payUrl: safeHttpsUrl(pair.proposal.pay_url) };
+    }
     if (pair.request.consent_at === null) return { ok: false, message: SIGN_LINK_MESSAGES.reload, needConsent: true };
 
     const name = cleanTypedName(input.typedName);

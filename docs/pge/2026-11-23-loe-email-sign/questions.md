@@ -38,6 +38,14 @@ Each is decided conservatively in the contracts until the owner answers. None is
   in DejaVu Sans on the certificate, with the words "Typed signature". 0117 still accepts `script`. Is a script style wanted (it needs
   a bundled font licensed for the PDF and served from `/_next/static/`)?
 
+- **Q9 (Sprint A build, item 9 step 1) What a client sees when the send limiter refuses.** The contract's exact-strings table has
+  no sentence for it. Built conservatively with an existing sentence, `SEND_MESSAGES.send_failed` ("We couldn't send the email. Try
+  again."), and the refusal is never counted (so the bearer link can't trip the fallback). A dedicated sentence ("Too many emails
+  just now...") would need the owner's wording. The switch is off anyway.
+- **Q10 (Sprint A build, item 14) Which signature mode is selected first.** The contract asks for the typed alternative to come
+  first in the focus order; it does not say which mode is selected on load. Built: "Draw" is selected, and the "Type it instead"
+  radio is placed BEFORE the canvas so a keyboard user reaches it first. Confirm, or select "Type" on load.
+
 ## Decisions recorded with the v3 contracts (evaluator's second refusal; none answers an open question)
 - Every failure after a request exists closes it and is counted; every `signing_open` answer is mapped; the database reports
   its own preconditions to readiness (0117 `signing_readiness`) so the app and 0117 cannot disagree (Sprint A D21, D22).
