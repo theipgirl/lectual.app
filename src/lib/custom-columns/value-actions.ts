@@ -34,6 +34,8 @@ export type ValueInsert = { org_id: string; field_id: string; lead_id?: string; 
 export type ValueDeps = {
   /** `resolveCurrentRole` through the scoped client: throws on an RPC error or no role. */
   role: () => Promise<string>;
+  /** Whether the session is Lectual staff acting inside the firm (`resolveFirmSession().actingAsStaff`). A throw counts as staff. */
+  actingAsStaff: () => Promise<boolean>;
   readField: (id: string) => Promise<FieldRow | null>;
   /** `keeperForWrite`: a merged lead's keeper; throws when the pointer can't be read. */
   keeper: (leadId: string) => Promise<string>;
@@ -85,7 +87,16 @@ export async function setCustomValue(deps: ValueDeps, input: ValueInput): Promis
   const options = field.options as string[];
   // 3b. A Money column is owner-only, reads and writes alike (Taylor, Nov 23; 0115's value policies say the same). Refused before
   //     the record, the existing value or anything else is read, so a non-owner learns nothing about a stored amount.
-  if (fieldKind === "money" && !canSeeCustomMoney(role)) return refuse(CUSTOM_MONEY_OWNER_ONLY);
+  //     Lectual staff acting inside the firm are refused too, even with an owner role claim (Taylor, Nov 23).
+  if (fieldKind === "money") {
+    let staff: boolean | null = null;
+    try {
+      staff = await deps.actingAsStaff();
+    } catch {
+      staff = null;
+    }
+    if (!canSeeCustomMoney(role, staff === null ? true : staff)) return refuse(CUSTOM_MONEY_OWNER_ONLY);
+  }
 
   // 4. A merged lead writes to its keeper.
   let recordId = postedId;

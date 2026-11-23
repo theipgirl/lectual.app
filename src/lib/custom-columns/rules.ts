@@ -87,11 +87,14 @@ export const CUSTOM_VALUE_WRITE_ROLES: readonly Role[] = ["owner", "admin", "sen
 export const canWriteCustomValue = (role: string | null | undefined): boolean => !!role && (CUSTOM_VALUE_WRITE_ROLES as readonly string[]).includes(role);
 
 /**
- * Who may see or type a value in a firm's own MONEY column: exactly who sees the built-in fee columns, `canSeeBilling` (the owner, nothing
- * else; unknown or unreadable = no). Taylor, Nov 23. The read (`loadCustomColumns`) never selects an amount for anyone else, the write
- * (`setCustomValue`) refuses, and 0115's value policies hide and refuse money rows for every other role.
+ * Who may see or type a value in a firm's own MONEY column: a REAL owner of the firm (Taylor, Nov 23). The role must pass
+ * `canSeeBilling` (the owner, nothing else; unknown or unreadable = no) AND the session must not be Lectual staff acting inside a firm
+ * (`actingAsStaff`, from `resolveFirmSession`: a platform admin with no membership, whose role claim reads `owner`). Only an explicit
+ * `false` counts as "not staff", so an unknown session fails closed. The built-in fee columns and the Billing card keep `canSeeBilling`.
+ * The read (`loadCustomColumns`) never selects an amount for anyone else, the write (`setCustomValue`) refuses, and 0115's value
+ * policies hide and refuse money rows unless the caller has an owner MEMBERSHIP row.
  */
-export const canSeeCustomMoney = (role: unknown): boolean => canSeeBilling(role);
+export const canSeeCustomMoney = (role: unknown, actingAsStaff: unknown): boolean => canSeeBilling(role) && actingAsStaff === false;
 
 /** The live fields this viewer may have: Money fields only when `canSeeMoney`. */
 export function visibleFields<F extends { kind: CustomKind }>(fields: readonly F[], canSeeMoney: boolean): F[] {

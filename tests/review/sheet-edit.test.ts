@@ -219,7 +219,7 @@ describe("Tab and sizes", () => {
         { id: "00000000-0000-4000-8000-00000000a001", section: "trademarks" as const, label: "Priority", kind: "choice" as const, position: 0 },
         { id: "00000000-0000-4000-8000-00000000a002", section: "both" as const, label: "Signed on", kind: "date" as const, position: 1 },
       ];
-      const withCustom = (sec: SheetSectionId) => columnsFor(sec, { canSeeMoney: true, hasNotes: NOTES_PRESENT, customFields }).map((c) => editColumnOf(c.id));
+      const withCustom = (sec: SheetSectionId) => columnsFor(sec, { canSeeMoney: true, canSeeCustomMoney: true, hasNotes: NOTES_PRESENT, customFields }).map((c) => editColumnOf(c.id));
       expect(withCustom("trademarks")).toContain("cf:00000000-0000-4000-8000-00000000a001");
       const walkCustom = (from: { rowKey: string; col: EditableColumnT }, dir: 1 | -1 = 1) => nextEditableCell(rows, from, OWNER, dir, (r) => withCustom(rows.find((x) => x.key === r.key)!.sec));
       // Changed on purpose (merge with the Notes cell): every drawn column is handed in, so the comparison is with the same columns minus the
@@ -556,7 +556,7 @@ describe("Sprint 3: Tab with custom columns (P2)", () => {
   const perms3 = { ...OWNER, writeCustom: true };
   /** The chooser's order: Priority dragged between Status and Source; Signed on and Matter value at the end. */
   const drawnFor = (hide: string[] = []) => (r: { key: string }) => {
-    const cols = columnsFor(secOf(r.key), { canSeeMoney: true, hasNotes: NOTES_PRESENT, customFields: FIELDS3 }).filter((c) => c.editable && !hide.includes(c.id)).map((c) => editColumnOf(c.id));
+    const cols = columnsFor(secOf(r.key), { canSeeMoney: true, canSeeCustomMoney: true, hasNotes: NOTES_PRESENT, customFields: FIELDS3 }).filter((c) => c.editable && !hide.includes(c.id)).map((c) => editColumnOf(c.id));
     if (secOf(r.key) === "trademarks" && cols.includes(CF_P)) {
       const without = cols.filter((c) => c !== CF_P);
       without.splice(without.indexOf("status") + 1, 0, CF_P);

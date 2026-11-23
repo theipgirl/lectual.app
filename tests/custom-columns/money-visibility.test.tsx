@@ -20,8 +20,10 @@ describe("custom Money columns are owner-only, like the fee columns", () => {
   beforeEach(() => vi.resetModules());
 
   it("the predicate is canSeeBilling: owner only; unknown, null and every other role is no", () => {
-    expect(canSeeCustomMoney("owner")).toBe(true);
-    for (const r of [...NON_OWNERS, null, undefined, "", "Owner"]) expect(canSeeCustomMoney(r), String(r)).toBe(false);
+    expect(canSeeCustomMoney("owner", false)).toBe(true);
+    for (const r of [...NON_OWNERS, null, undefined, "", "Owner"]) expect(canSeeCustomMoney(r, false), String(r)).toBe(false);
+    // Lectual staff acting inside the firm (owner role claim) never; an unknown session fails closed (Nov 23).
+    for (const staff of [true, undefined, null, "false", 0]) expect(canSeeCustomMoney("owner", staff), String(staff)).toBe(false);
   });
 
   it("every non-owner: no money custom column, no amount anywhere in the page, no fee header; the page asks loadReview for no custom money", async () => {
@@ -55,7 +57,7 @@ describe("custom Money columns are owner-only, like the fee columns", () => {
       expect(clean.order).not.toContain(m);
       expect(clean.hidden).not.toContain(m);
     }
-    expect(columnsFor("trademarks", { canSeeMoney: true, hasNotes: NOTES_PRESENT, customFields }).find((c) => c.id === quote)?.money).toBe(true);
+    expect(columnsFor("trademarks", { canSeeMoney: true, canSeeCustomMoney: true, hasNotes: NOTES_PRESENT, customFields }).find((c) => c.id === quote)?.money).toBe(true);
   });
 
   it("withoutMoney drops the Money fields and every amount, and passes the other states through", () => {
@@ -85,5 +87,34 @@ describe("the review's matter input declares the stage's phase (review fix)", ()
   it("ReviewMatterIn's stage type carries phase, so the registered-mark rule can't be dropped silently", async () => {
     const { readFileSync } = await import("node:fs");
     expect(readFileSync("src/lib/review/build.ts", "utf8")).toMatch(/stage: \{ code: string; label: string; is_open: boolean; waiting_on: MatterWaitingOn; order_index\?: number; phase\?: string \| null \} \| null;/);
+  });
+});
+
+describe("Lectual staff acting inside a firm (owner role claim) get no custom money anywhere on the page (Nov 23)", () => {
+  beforeEach(() => vi.resetModules());
+
+  it("the List: loadReview is asked for no custom money; no Money column or amount; the built-in fee columns are unchanged", async () => {
+    mockPage({ load, role: "owner", staff: true });
+    const html = await renderPage({ view: "sheet" });
+    expect(spies.loadReview.mock.calls[0][1]).toMatchObject({ customMoney: false, withFees: true });
+    // The built-in Legal Fee is also $1,250.00 in the fixture, so the custom amount is checked by its column, never by the figure.
+    expect(html).not.toContain("Quoted fee");
+    expect(html).not.toContain(`cf:${CF.quote}`);
+    for (const h of FEE_HEADERS) expect(html, h).toContain(`>${h}</th>`);
+  });
+
+  it("the owner Sheet (role-views): no Money column or amount in what is drawn or handed to the client table", async () => {
+    mockPage({ load, role: "owner", staff: true, roleViews: true });
+    const html = await renderPage({ view: "sheet" });
+    expect(html).not.toContain("Quoted fee");
+    expect(html).not.toContain(`cf:${CF.quote}`);
+    expect(html).not.toContain('"1250.00"');
+  });
+
+  it("columnsFor: the built-in fees follow canSeeMoney, the custom Money field only canSeeCustomMoney === true", () => {
+    const ids = (o: { canSeeMoney: boolean; canSeeCustomMoney?: boolean }) => columnsFor("trademarks", { ...o, hasNotes: NOTES_PRESENT, customFields }).map((c) => c.id);
+    expect(ids({ canSeeMoney: true })).toContain("legalFee");
+    expect(ids({ canSeeMoney: true })).not.toContain(`cf:${CF.quote}`);
+    expect(ids({ canSeeMoney: true, canSeeCustomMoney: true })).toContain(`cf:${CF.quote}`);
   });
 });

@@ -66,6 +66,11 @@ export type ReviewRow = {
   deadline: { dueDate: string; title: string | null } | null;
   /** A filed trademark with no open deadline (PGE Sprint 3). A tag only, never a bucket. False when the deadlines could not be read. */
   noOpenDeadline?: boolean;
+  /**
+   * A registered mark (docket phase maintenance, its stage closed on the docket) admitted ONLY because no Section 8 / Section 9
+   * deadline is open (Taylor, Nov 23). Always On track, off the board's lanes; its `noOpenDeadline` tag says why it is here.
+   */
+  registeredNoDeadline?: true;
   /** Every open deadline of the matter, soonest first (the Deadlines strip). Absent on a lead and when the read failed. */
   openDeadlines?: { id: string; title: string; dueDate: string; confirmed: boolean }[];
   /** A live proposal's expiry, drawn as a tag only. Never moves a row between sections. Absent = none, or the read failed. */
@@ -128,6 +133,8 @@ export function addDays(date: string, days: number): string {
 }
 
 export function bucketOf(row: ReviewRow, today: string): BucketKey {
+  // An admitted registered mark is a safety tag, not a to-do: On track, whatever its step says (Taylor, Nov 23).
+  if (row.registeredNoDeadline) return "track";
   const due = row.nextStep?.dueDate ?? null;
   if (due && due < today) return "overdue";
   if (due && due <= addDays(today, WEEK_DAYS)) return "week";

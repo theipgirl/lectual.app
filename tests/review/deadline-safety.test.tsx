@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { buildReviewRows, type ReviewInput } from "@/lib/review/build";
-import { bucketOf } from "@/lib/review/buckets";
+import { bucketOf, reviewBuckets } from "@/lib/review/buckets";
+import { boardLanes, kpis, offBoard, placeOnBoard } from "@/lib/review/lanes";
 import { rowTags } from "@/lib/review/tags";
 import { deadlinesOut } from "@/lib/review/strips";
 import { DeadlinesStrip } from "@/components/review/ReviewViews";
@@ -67,8 +68,60 @@ describe("registered marks (Taylor, Nov 23): the review's flag rule, and buckets
     expect(row.noOpenDeadline).toBe(false);
   });
 
-  it("membership is unchanged: a registered stage that is closed on the docket (is_open false) is still not a review row", () => {
-    expect(buildReviewRows(base({ matters: [matter({ stage: { ...regStage, is_open: false } })] as never }))).toHaveLength(0);
+});
+
+describe("registered marks become review rows when no Section 8 / 9 is open (Taylor, Nov 23 follow-up; changed on purpose)", () => {
+  // RPB's registered stage: closed on the docket, phase maintenance.
+  const closedReg = { code: "24", label: "Trademark Registered", is_open: false, waiting_on: "uspto", order_index: 24, phase: "maintenance" };
+  const dl = (kind: string) => ({ id: `d-${kind}`, matter_id: "m1", due_date: "2031-06-01", title: null, kind, attorney_confirmed: true });
+  const reg = (over: Record<string, unknown> = {}) => matter({ stage: closedReg, ...over });
+
+  it("admitted with no deadline: one row, tagged, bucket On track, off the board's lanes", () => {
+    const rows = buildReviewRows(base({ matters: [reg()] as never }));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].registeredNoDeadline).toBe(true);
+    expect(rows[0].noOpenDeadline).toBe(true);
+    expect(rowTags(rows[0], TODAY).map((t) => t.text)).toContain("No open deadline");
+    expect(bucketOf(rows[0], TODAY)).toBe("track");
+    // Even with an overdue step or waiting on the client it stays On track and off the lanes.
+    const busy = { ...rows[0], nextStep: { id: "t", title: "x", dueDate: "2026-10-01", assigneeId: "u1" }, waiting: "client" as const };
+    expect(bucketOf(busy, TODAY)).toBe("track");
+    expect(placeOnBoard(busy, "track")).toBeNull();
+  });
+
+  it("admitted with only an office action open", () => {
+    expect(buildReviewRows(base({ matters: [reg()] as never, deadlines: [dl("office_action_response")] }))).toHaveLength(1);
+  });
+
+  it("not admitted with an open Section 8 or an open Section 9 renewal", () => {
+    expect(buildReviewRows(base({ matters: [reg()] as never, deadlines: [dl("section_8_declaration")] }))).toHaveLength(0);
+    expect(buildReviewRows(base({ matters: [reg()] as never, deadlines: [dl("section_9_renewal")] }))).toHaveLength(0);
+  });
+
+  it("not admitted when the deadlines read failed (never a guess)", () => {
+    expect(buildReviewRows(base({ matters: [reg()] as never, sources: { activity: "ok", deadlines: "unavailable" } }))).toHaveLength(0);
+  });
+
+  it("not admitted for a non-TM matter, a closed non-maintenance stage, or a closed / on-hold matter", () => {
+    for (const over of [{ type: "CR" }, { type: "BL" }, { stage: { ...closedReg, phase: "inactive" } }, { stage: { ...closedReg, phase: null } }, { status: "closed" }, { status: "on_hold" }])
+      expect(buildReviewRows(base({ matters: [reg(over)] as never })), JSON.stringify(over)).toHaveLength(0);
+  });
+
+  it("never twice: an open maintenance stage stays a normal row (its own bucket), not a second admitted one", () => {
+    const rows = buildReviewRows(base({ matters: [reg({ stage: { ...closedReg, is_open: true } })] as never }));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].registeredNoDeadline).toBeUndefined();
+  });
+
+  it("counts: the row is counted once, in On track; no KPI (overdue, week, needs, uspto) counts it", () => {
+    const rows = buildReviewRows(base({ matters: [reg(), matter({ id: "m2" })] as never }));
+    const b = reviewBuckets(rows, TODAY);
+    expect(b.total).toBe(2);
+    expect(b.sections.track.map((r) => r.id)).toContain("m1");
+    const k = kpis(b);
+    expect(k.overdue + k.week + k.needs + k.uspto + b.counts.track + b.counts.quiet).toBe(2);
+    expect(offBoard(b).track.map((r) => r.id)).toContain("m1");
+    expect(boardLanes(b, []).flatMap((l) => [...l.our, ...l.client]).map((r) => r.id)).not.toContain("m1");
   });
 });
 

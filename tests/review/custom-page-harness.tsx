@@ -11,7 +11,7 @@ export const spies = {
   cardLoad: vi.fn(),
 };
 
-export function mockPage(opts: { load: unknown; role: string | null; roleViews?: boolean; card?: unknown; cardCustom?: unknown }) {
+export function mockPage(opts: { load: unknown; role: string | null; roleViews?: boolean; card?: unknown; cardCustom?: unknown; staff?: boolean }) {
   spies.loadReview = vi.fn(async () => opts.load);
   spies.cardLoad = vi.fn(async () => opts.card ?? { status: "not-found" });
   spies.cardCustom = vi.fn(async () => opts.cardCustom ?? { status: "ok", fields: [], values: [], mergedInto: {}, leadOfMatter: {} });
@@ -21,7 +21,7 @@ export function mockPage(opts: { load: unknown; role: string | null; roleViews?:
     resolveFirmSession: vi.fn(async () =>
       opts.role === null
         ? { kind: "signed-out", redirectTo: "/" }
-        : { kind: "ok", role: opts.role, user: { id: "u-reb", user_metadata: {} }, org: { id: "o1", modules: opts.roleViews ? ["role-views"] : [] }, actingAsStaff: false },
+        : { kind: "ok", role: opts.role, user: { id: "u-reb", user_metadata: {} }, org: { id: "o1", modules: opts.roleViews ? ["role-views"] : [] }, actingAsStaff: opts.staff === true },
     ),
   }));
   vi.doMock("@/app/dashboard/review/actions", () => ({

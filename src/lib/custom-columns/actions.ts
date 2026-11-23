@@ -47,6 +47,11 @@ function fieldDeps(): FieldDeps {
 function valueDeps(): ValueDeps {
   return {
     role: async () => resolveCurrentRole(await getScopedClient()),
+    actingAsStaff: async () => {
+      const session = await resolveFirmSession();
+      // Anything but a signed-in member session is treated as staff (fail closed): only a real owner types money.
+      return session.kind === "ok" ? session.actingAsStaff !== false : true;
+    },
     readField: async (id) => fieldStore(await store()).readField(id),
     keeper: async (leadId) => keeperForWrite(await getScopedClient(), leadId),
     readRecord: async (kind, id) => valueStore(await store()).readRecord(kind, id),

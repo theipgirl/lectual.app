@@ -53,11 +53,12 @@ function toSheetRow(r: ReviewRow, href: string, today: string, names: ReadonlyMa
  * are worked out and locked. Every edit goes through an existing review action, which re-resolves the role. A role that can't
  * write gets the same table with no editors. On a phone the rows stack and every edit happens in the record panel.
  */
-export function SheetEdit({ rows, today, members, params, perms, initial, canSeeMoney = false, initialPrefs, custom = null, customMembers, adminTier = false, notes = null }: Common & {
+export function SheetEdit({ rows, today, members, params, perms, initial, canSeeMoney = false, canSeeCustomMoney = false, initialPrefs, custom = null, customMembers, adminTier = false, notes = null }: Common & {
   rows: ReviewRow[];
   perms: SheetPerms;
   initial?: SheetEditInitial;
   /** From the page's re-resolved role (`canSeeBilling`). Drops the fee columns when false. */ canSeeMoney?: boolean;
+  /** A REAL owner only (`canSeeCustomMoney(role, actingAsStaff)`): the firm's own Money columns. Never Lectual staff. */ canSeeCustomMoney?: boolean;
   /** Drawing-only starting column choices (a test or preview). */ initialPrefs?: PrefsDocument;
   /** The firm's custom columns as the page read them. Typed in place when `perms.writeCustom` and the state is `ok`. */ custom?: CustomColumnsState | null;
   /** The member directory for person cells; null when it couldn't be read. Defaults to `members`. */ customMembers?: CustomMember[] | null;
@@ -78,7 +79,7 @@ export function SheetEdit({ rows, today, members, params, perms, initial, canSee
     { id: "contracts", title: "Contracts", rows: contracts.map(sheetRow) },
   ];
   const first = (n: string) => n.trim().split(/\s+/)[0] ?? n;
-  const columns = { trademarks: columnsFor("trademarks", { canSeeMoney, hasNotes: NOTES_PRESENT, customFields: fields }), contracts: columnsFor("contracts", { canSeeMoney, hasNotes: NOTES_PRESENT, customFields: fields }) };
+  const columns = { trademarks: columnsFor("trademarks", { canSeeMoney, canSeeCustomMoney, hasNotes: NOTES_PRESENT, customFields: fields }), contracts: columnsFor("contracts", { canSeeMoney, canSeeCustomMoney, hasNotes: NOTES_PRESENT, customFields: fields }) };
   const people: SheetPerson[] = members.map((m) => ({
     userId: m.userId,
     name: m.name,

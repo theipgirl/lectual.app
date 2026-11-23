@@ -117,7 +117,7 @@ describe("0115 proposal: header and prose", () => {
       20: /Merged leads: \(a\)/,
       21: /The existing 0104 \/ 0105 \/ 0107 cases stay green/,
       // Nov 23: custom money is owner only.
-      22: /Money is owner only \(Taylor, Nov 23\)[\s\S]*firm B's owner reads nothing[\s\S]*admin, senior_admin, attorney, intake, paralegal, law_clerk, clerk, social_media and viewer each read 0 money\s+--\s+rows[\s\S]*count=exact[\s\S]*\(admin, senior_admin, attorney, intake, paralegal, law_clerk and clerk\)[\s\S]*No platform-admin assertion here on purpose/,
+      22: /Money is owner only \(Taylor, Nov 23\)[\s\S]*firm B's owner reads nothing[\s\S]*admin, senior_admin, attorney, intake, paralegal, law_clerk, clerk, social_media and viewer each read 0 money\s+--\s+rows[\s\S]*count=exact[\s\S]*\(admin, senior_admin, attorney, intake, paralegal, law_clerk and clerk\)[\s\S]*A platform admin \(0050\) acting inside firm A[\s\S]*refused like any non-owner: 0 money rows read, the `count=exact` money count is 0/,
     };
     for (let n = 1; n <= 22; n++) {
       const start = cases.search(new RegExp(`--\\s+${n}\\. `));
@@ -307,6 +307,12 @@ describe("0115 proposal: functions and triggers", () => {
     expect(flat(body("crm_custom_field_rules"))).toContain("where v.field_id = new.id and v.org_id = new.org_id");
   });
 
+  it("step 5b judges an owner MEMBERSHIP row, never the role claim (Nov 23 follow-up: Lectual staff carry an owner claim, no row)", () => {
+    const value = flat(body("crm_custom_value_rules"));
+    expect(value).toContain("if v_kind = 'money' and auth.uid() is not null and not exists ( select 1 from public.crm_org_member m where m.org_id = new.org_id and m.user_id = auth.uid() and m.role = 'owner' ) then");
+    expect(value).not.toContain("current_org_role()");
+  });
+
   it("the rule steps run in the contract's order", () => {
     const value = body("crm_custom_value_rules");
     // Nov 23: the money owner-only refusal comes right after the field is read, before the record (changed on purpose).
@@ -438,7 +444,9 @@ describe("0115 proposal: grants and RLS", () => {
     const by = (n: string) => policies.find((p) => p.name === n)!.text;
     expect(by("crm_custom_field_select_member")).toBe("for select using (org_id = public.current_org_id())");
     // Nov 23: every value policy carries the money row predicate (owner only); the field select is unchanged.
-    const MONEY = "and (value_cents is null or public.current_org_role() = 'owner')";
+    // Nov 23 follow-up: an OWNER MEMBERSHIP row, never the role claim (Lectual staff inside a firm carry an owner claim, no row).
+    const MONEY = "and (value_cents is null or exists (select 1 from public.crm_org_member m where m.org_id = crm_custom_value.org_id and m.user_id = auth.uid() and m.role = 'owner'))";
+    expect(SQL).not.toContain("current_org_role() = 'owner'");
     expect(by("crm_custom_value_select_member")).toBe(`for select using ( org_id = public.current_org_id() ${MONEY} )`);
     expect(by("crm_custom_value_insert_staff")).toContain(MONEY);
     expect(by("crm_custom_value_update_staff").split(MONEY)).toHaveLength(3);
@@ -533,8 +541,8 @@ describe("0115 proposal: Sprint 3 additions (D8)", () => {
     expect(start).toBeGreaterThan(0);
     without = without.slice(0, start) + without.slice(end);
     // Changed on purpose (Taylor, Nov 23): the owner-only money change is a deliberate edit, so the baseline is now the file with it
-    // (the money header, step 5b, the four policy predicates, a KNOWN LIMITS line and isolation case 22, widened to every role in the review fix). Was 9a366b25be82ef207dcbd410f6daa106 (dbec367).
-    expect(createHash("md5").update(without).digest("hex")).toBe("b47a383d518905f0dad0725e864b3e19");
+    // (the money header, step 5b, the four policy predicates, a KNOWN LIMITS line and isolation case 22, widened to every role in the review fix, and the owner MEMBERSHIP check in the Nov 23 follow-up). Was 9a366b25be82ef207dcbd410f6daa106 (dbec367).
+    expect(createHash("md5").update(without).digest("hex")).toBe("044ee1b47acb4a8a513c135ebfabca73");
   });
 
   it("CO1: the SQL the app's read side mirrors", () => {
