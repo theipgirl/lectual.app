@@ -22,6 +22,9 @@ import { logSignedMismatch } from "./signed-mismatch-log";
 import { addressJson, assembleAgreement, checkSigning, cleanSigningDetails, letterDateText, missingDetails, signedLineText } from "@/lib/loe/signing";
 import { parseInet } from "@/lib/quotes/public";
 import { quoteHasItems } from "./pricing";
+import { emailSigningReadiness, type Readiness } from "@/lib/loe/email-signing/ready";
+import type { SigningDb } from "@/lib/loe/email-signing/db";
+import type { Agreement, SignerDetails } from "@/lib/loe/signing";
 import {
   isWellFormedProposalToken,
   type AcceptedSnapshot,
@@ -111,7 +114,7 @@ export interface PublicProposalsDb {
  * admin client outlives the request that justified it. Throws when the key is
  * absent; callers turn that into `unconfigured` rather than a 500.
  */
-function publicProposalsDb(db?: PublicProposalsDb): PublicProposalsDb {
+export function publicProposalsDb(db?: PublicProposalsDb): PublicProposalsDb {
   return db ?? (getAdminClient() as unknown as PublicProposalsDb);
 }
 
@@ -222,6 +225,12 @@ export type PublicLetterView = {
   clientEmail: string;
   /** The signed letter as VERIFIED against the stored fingerprint (rebuilt, or the stored signed text), or null when it couldn't be. */
   signed: SignedLetterView | null;
+  /**
+   * lectual 0117 (Sprint A): true only when the EMAILED signing link is positively ready for this live proposal (the gate and
+   * per-proposal readiness, `emailSigningReadiness`). Then step 3 offers "Email me a link to sign" in place of in-app signing. A
+   * boolean only: the browser never learns why it is off. Absent or false = today's page, byte for byte.
+   */
+  emailSigning?: boolean;
 };
 
 /** The server-side half of a resolved token. Never passed to a client component. */
@@ -409,6 +418,8 @@ export async function readPublicProposal(
   token: string,
   now: Date,
   db?: PublicProposalsDb,
+  /** `emailSigning: false` skips the emailed-link readiness (its reads and rpcs): the send action checks the client's input first. */
+  opts: { emailSigning?: boolean } = {},
 ): Promise<PublicProposalRead> {
   if (!isWellFormedProposalToken(token)) return { status: "not_found" };
 
@@ -518,6 +529,10 @@ export async function readPublicProposal(
         const email = await readLetterEmail(client, proposalId, orgId);
         if (email === null) return { status: "unavailable" };
         letter = { dateText: letterDateText(now, firm.timeZone), clientEmail: email, signed: null };
+        // The emailed link (0117): set only when positively ready. Every uncertainty, a throw included, is in-app signing as today.
+        if (opts.emailSigning !== false && storedStatus === "sent" && (await emailSigningReadyFor({ proposalId, orgId }, client)).ready) {
+          letter.emailSigning = true;
+        }
       }
     }
 
@@ -663,6 +678,8 @@ export type AcceptRefusal =
   | "letter_unavailable"
   /** Engagement letter: lectual 0106 is not applied (the database function is missing). Nothing was written. */
   | "not_ready"
+  /** Engagement letter (lectual 0117): the emailed signing link is on for this proposal, so it is signed by the link, not here. */
+  | "signing_by_email"
   | "unconfigured"
   | "unavailable";
 
@@ -701,6 +718,7 @@ const REFUSAL_MESSAGE: Record<AcceptRefusal, string> = {
   stale: SIGN_MESSAGES.stale,
   letter_unavailable: SIGN_MESSAGES.letter_unavailable,
   not_ready: SIGN_MESSAGES.not_ready,
+  signing_by_email: SIGN_MESSAGES.signing_by_email,
   unconfigured: "This page isn't available right now. Please try again later.",
   unavailable: "We couldn't record your acceptance. Please try again.",
 };
@@ -823,6 +841,44 @@ function signRefusal(error: NonNullable<PublicDbError>): AcceptRefusal {
 }
 
 /**
+ * The agreement the SERVER builds, the one function both signing paths call (Sprint A D2): the in-app signing (`signAndAccept`)
+ * and the emailed link (`sendSigningLink`, which builds it when the link is sent and stores it as final). From the stored letter,
+ * the cleaned details, the exhibit recomputed from `quoteForAcceptance`'s quote, and THIS server's firm-zone date. Nothing from
+ * the browser. `signerName` merges `{{signer_name}}`.
+ */
+export function buildServerAgreement(input: {
+  read: Extract<PublicProposalRead, { status: "ok" }>;
+  content: ProposalContent;
+  quote: ProposalQuote;
+  details: SignerDetails;
+  signerName: string;
+  now: Date;
+}): { ok: true; agreement: Agreement; dateText: string; sha256: string; canonicalSha256: string } | { ok: false } {
+  const letter = input.read.view.letter;
+  const loe = input.content.loe;
+  if (!letter || !loe || typeof loe.body !== "string") return { ok: false };
+  const dateText = letterDateText(input.now, input.read.view.firm.timeZone);
+  const exhibit = buildExhibit(input.content, input.quote, money);
+  const assembled = assembleAgreement({
+    body: loe.body,
+    inputs: { details: input.details, typedName: input.signerName, dateText, clientEmail: letter.clientEmail },
+    exhibit,
+  });
+  if (!assembled.ok) return { ok: false };
+  const { agreement } = assembled;
+  return { ok: true, agreement, dateText, sha256: agreementTextSha256(agreement.text), canonicalSha256: canonicalFingerprint(agreement.canonical) };
+}
+
+/** Per-proposal readiness of the emailed link over this module's service-role client (never throws; a throw is "not ready"). */
+export async function emailSigningReadyFor(handle: { proposalId: string; orgId: string }, client: PublicProposalsDb): Promise<Readiness> {
+  try {
+    return await emailSigningReadiness(handle, { db: () => client as unknown as SigningDb });
+  } catch {
+    return { ready: false, gate: null, failures: null };
+  }
+}
+
+/**
  * Signing and accepting are one act. Everything is decided from the token's own read and the cleaned submission, and NOTHING
  * is written before the one database call: a stale page, a missing name or tick, an unmergeable letter and a missing function
  * all leave the rows as they were. The agreement text is built HERE from the stored letter, the cleaned details, the
@@ -845,30 +901,29 @@ async function signAndAccept(input: {
   const loe = content.loe;
   if (!letter || !loe || typeof loe.body !== "string") return refuse("letter_unavailable");
 
+  // lectual 0117: while the emailed link is positively ready for this proposal (re-evaluated by THIS request's read: the gate,
+  // readiness, the send-failure fallback and the runtime memo), it is signed by the link and a hand-built POST here is refused,
+  // writing nothing. Whenever the emailed path is off, or can't be read, this function is exactly today's.
+  if (letter.emailSigning === true) return refuse("signing_by_email");
+
   if (input.signing === undefined || input.signing === null) return refuse("signing_required");
   const checked = checkSigning(input.signing);
   if (!checked.ok) return refuse(checked.reason);
 
   // The letter's date: the firm's calendar date NOW, on this server. Never the date the page was opened with.
-  const dateText = letterDateText(now, read.view.firm.timeZone);
-  const exhibit = buildExhibit(content, quote, money);
-  const assembled = assembleAgreement({
-    body: loe.body,
-    inputs: { details: checked.details, typedName: checked.typedName, dateText, clientEmail: letter.clientEmail },
-    exhibit,
-  });
-  if (!assembled.ok) return refuse("letter_unavailable");
-  const { agreement } = assembled;
+  const built = buildServerAgreement({ read, content, quote, details: checked.details, signerName: checked.typedName, now });
+  if (!built.ok) return refuse("letter_unavailable");
+  const { agreement, dateText } = built;
 
   // The fingerprint covers the letter, the details and the exhibit with the DATE fields fixed (`Agreement.canonical`), so a page
   // opened yesterday and signed today still matches. The date stamped into the stored text below is this server's.
   const posted = (input.signing as Record<string, unknown>).fingerprint;
-  const ours = canonicalFingerprint(agreement.canonical);
+  const ours = built.canonicalSha256;
   if (typeof posted !== "string" || posted !== ours) return refuse("stale");
 
   const acceptedAt = now.toISOString();
   // The stored sha256 is over the FINAL text, real dates included: the text the signature row keeps.
-  const sha256 = agreementTextSha256(agreement.text);
+  const sha256 = built.sha256;
   const snapshot = buildAcceptedSnapshot({
     version: read.handle.version,
     content,

@@ -80,6 +80,7 @@ export const SIGN_MESSAGES = {
   not_ready: "Signing isn't available on this page yet. Nothing has been signed. Please contact the firm.",
   signing_required: "This proposal has an engagement letter. Please review and sign it to continue.",
   generic: "We couldn't record your signature. Please try again.",
+  signing_by_email: "Reload this page to get your signing link by email.",
 } as const;
 
 export const PDF_MESSAGES = {
@@ -89,3 +90,41 @@ export const PDF_MESSAGES = {
   details: "Please fill in your full legal name and your full mailing address first: street, city, state, ZIP code and country.",
   not_signed: "There is no signed letter to download.",
 } as const;
+
+/* ── The emailed signing link (lectual 0117, Sprint A) ─────────────────────────────────────────────────────────────────
+ * Step labels and status sentences ONLY. The consent line, the consent text, the line beside Sign, the line under the signature
+ * box and both emails are the firm attorney's own approved words (`client_proposal_signing_words`); none is written here, and
+ * nothing here says what consent, a signature or a letter means. */
+
+export const EMAIL_LINK_LABEL = "Email me a link to sign";
+export const linkSentNote = (masked: string): string => `We emailed a signing link to ${masked}. It works for 7 days.`;
+export const LINK_UNAVAILABLE = "This link is no longer available.";
+export const LINK_CLOSED_NOTE = "Your earlier signing link no longer works. Email yourself a new one on step 3.";
+
+export const SEND_MESSAGES = {
+  unavailable: "Something on this page changed. Reload the page to continue.",
+  send_failed: "We couldn't send the email. Try again.",
+  sign_here_instead: "We couldn't send the email. Reload the page to sign here instead.",
+  uncertain: "We may not have sent the email. Check your inbox. If the link isn't there in a few minutes, press the button again.",
+  superseded: "This proposal changed or a newer link was sent. Reload the page.",
+} as const;
+
+export const SIGN_LINK_MESSAGES = {
+  name_mismatch: "Type your full legal name as it appears on the letter.",
+  retry: "We couldn't record your signature. Please try again.",
+  reload: "Reload this page.",
+  try_again: "Please try again.",
+} as const;
+
+export const CONSENT_STEP_NAME = "Before you sign";
+export const SIGNATURE_STEP_NAME = "Your signature";
+export const CLEAR_LABEL = "Clear";
+export const TYPE_INSTEAD_LABEL = "Type it instead";
+export const DRAW_INSTEAD_LABEL = "Draw it instead";
+export const TYPED_SIGNATURE_LABEL = "Typed signature";
+/** Step and field labels on the `?sign=` page (names of steps and fields only). */
+export const SIGNED_STEP_WORD = "Signed";
+export const BACK_TO_PROPOSAL_LABEL = "Back to the proposal";
+export const SIGNATURE_NAME_LABEL = "Your full legal name";
+export const SIGNATURE_TOO_LARGE = "That drawing is too large. Clear it and draw again, or type it instead.";
+export const SIGNATURE_NEEDED = "Draw your signature, or type it instead.";

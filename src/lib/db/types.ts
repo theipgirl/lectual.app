@@ -4127,6 +4127,163 @@ export type Database = {
           },
         ]
       }
+      // client_proposal_signing_words / _request / _event / _failure: lectual migration 0117 (PROPOSAL ONLY, not applied:
+      // docs/pge/2026-11-23-loe-email-sign/0117-proposed.sql.txt). The emailed signing link. Hand-added until the next codegen
+      // run. Row types list only what this app may read; the words Insert carries only the eight fields and org_id (no
+      // version, status, created_by or approved_*). Requests, events and failures have no Insert or Update for the app: they
+      // are written only through the signing_* functions (service role). Until 0117 is applied every read answers
+      // 42P01 / PGRST205 and every function 42883 / PGRST202 (src/lib/loe/email-signing/codes.ts), and clients sign in-app.
+      client_proposal_signing_words: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          box_note: string
+          consent_line: string
+          consent_text: string
+          copy_body: string
+          copy_subject: string
+          created_at: string
+          created_by: string | null
+          id: string
+          link_body: string
+          link_subject: string
+          org_id: string
+          sign_line: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+          version: number
+        }
+        Insert: {
+          org_id: string
+          consent_line: string
+          consent_text: string
+          sign_line: string
+          box_note: string
+          link_subject: string
+          link_body: string
+          copy_subject: string
+          copy_body: string
+        }
+        Update: {
+          consent_line?: string
+          consent_text?: string
+          sign_line?: string
+          box_note?: string
+          link_subject?: string
+          link_body?: string
+          copy_subject?: string
+          copy_body?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_proposal_signing_words_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_org"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_proposal_signing_request: {
+        Row: {
+          agreement_sha256: string
+          agreement_text: string
+          box_note: string
+          canonical_fingerprint: string
+          closed_reason: string | null
+          consent_at: string | null
+          consent_line: string
+          consent_sha256: string
+          consent_text: string
+          copy_body: string
+          copy_subject: string
+          created_at: string
+          date_text: string
+          details: Json
+          entity_name: string | null
+          expires_at: string
+          family_id: string
+          id: string
+          opened_at: string | null
+          org_id: string
+          proposal_id: string
+          review_pdf_sha256: string | null
+          selection: Json
+          sent_at: string | null
+          sent_to: string
+          sign_line: string
+          signature_id: string | null
+          signed_at: string | null
+          signer_name: string
+          signer_title: string | null
+          snapshot: Json
+          status: string
+          template_version: number | null
+          token_sha256: string
+          updated_at: string
+          version: number
+          words_id: string
+          words_sha256: string
+          words_version: number
+          address: Json | null
+        }
+        Insert: Record<string, never>
+        Update: { review_pdf_sha256?: string }
+        Relationships: [
+          {
+            foreignKeyName: "client_proposal_signing_request_proposal_org_fk"
+            columns: ["proposal_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "client_proposal"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
+      client_proposal_signing_event: {
+        Row: {
+          agreement_sha256: string | null
+          at: string
+          closed_reason: string | null
+          consent_sha256: string | null
+          id: string
+          ip: string | null
+          kind: string
+          org_id: string
+          request_id: string
+          sent_to: string | null
+          signature_kind: string | null
+          signature_png: string | null
+          signature_sha256: string | null
+          typed_name: string | null
+          typed_style: string | null
+          user_agent: string | null
+        }
+        Insert: Record<string, never>
+        Update: Record<string, never>
+        Relationships: [
+          {
+            foreignKeyName: "client_proposal_signing_event_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "client_proposal_signing_request"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_proposal_signing_failure: {
+        Row: {
+          at: string
+          id: string
+          kind: string
+          org_id: string
+          proposal_id: string
+        }
+        Insert: Record<string, never>
+        Update: Record<string, never>
+        Relationships: []
+      }
       user_org_preference: {
         Row: {
           active_org_id: string | null
@@ -4259,6 +4416,57 @@ export type Database = {
     }
     Functions: {
       lawpay_accounts_valid: { Args: { accounts: Json }; Returns: boolean }
+      // lectual 0117 (PROPOSAL ONLY, not applied): the emailed signing link's functions. Service role only. Hand-added until
+      // codegen. A missing function answers 42883 / PGRST202 and the client signs in-app (src/lib/loe/email-signing/).
+      client_proposal_signing_probe: { Args: never; Returns: number }
+      client_proposal_signing_letter_current: { Args: { p_org_id: string; p_content: Json }; Returns: boolean }
+      client_proposal_signing_readiness: { Args: { p_proposal_id: string; p_org_id: string }; Returns: Json }
+      client_proposal_signing_note_failure: { Args: { p_proposal_id: string; p_org_id: string; p_kind: string }; Returns: boolean }
+      client_proposal_signing_open: {
+        Args: {
+          p_proposal_id: string
+          p_org_id: string
+          p_family_id: string
+          p_version: number
+          p_token_sha256: string
+          p_expires_at: string
+          p_signer_name: string
+          p_signer_title: string | null
+          p_entity_name: string | null
+          p_address: Json | null
+          p_details: Json
+          p_template_version: number | null
+          p_agreement_text: string
+          p_agreement_sha256: string
+          p_canonical_fingerprint: string
+          p_selection: Json
+          p_snapshot: Json
+          p_date_text: string
+          p_words_id: string
+          p_words_sha256: string
+        }
+        Returns: string
+      }
+      client_proposal_signing_mark_sent: { Args: { p_request_id: string; p_sent: boolean }; Returns: boolean }
+      client_proposal_signing_opened: { Args: { p_token_sha256: string; p_ip: string | null; p_user_agent: string | null }; Returns: string }
+      client_proposal_signing_consent: {
+        Args: { p_token_sha256: string; p_consent_sha256: string; p_ip: string | null; p_user_agent: string | null }
+        Returns: boolean
+      }
+      client_proposal_signing_close: { Args: { p_request_id: string; p_reason: string }; Returns: boolean }
+      client_proposal_signing_sign: {
+        Args: {
+          p_token_sha256: string
+          p_typed_name: string
+          p_signature_kind: string
+          p_signature_png: string | null
+          p_typed_style: string | null
+          p_signature_sha256: string
+          p_ip: string | null
+          p_user_agent: string | null
+        }
+        Returns: { signature_id: string; signed_now: boolean; proposal_id: string; signed_at: string }[]
+      }
       current_org_id: { Args: never; Returns: string }
       current_org_role: { Args: never; Returns: string }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }

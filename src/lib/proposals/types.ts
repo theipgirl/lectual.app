@@ -503,6 +503,13 @@ export type AcceptedAgreement = {
   signed_at: string;
   sha256: string;
   template_version: number | null;
+  /**
+   * lectual 0117 (Sprint A): written by `client_proposal_signing_sign` when the client signed through the EMAILED link. Absent on
+   * an in-app (0106) signature. Until Sprint B adds the certificate page, no signed PDF is built for `email_link` (signed-pdf.ts).
+   */
+  method?: "email_link";
+  /** lectual 0117: the signing request that signed it (the `?sign=` done screen shows only for this request). */
+  signing_request_id?: string;
 };
 
 export type AcceptedSigning = {

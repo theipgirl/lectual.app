@@ -1,10 +1,13 @@
 import { fetchWithTimeout } from "@/lib/http/timeout";
 
 /**
- * The one place this app talks to Resend for INTERNAL mail (agent failure alerts, "Send feedback") and for the
- * master-class worksheet's two emails (src/lib/worksheet/: the firm's notice, to addresses from an env var, and the
- * attendee's own copy, sent only to the address they typed and only when they ticked the box asking for it).
- * Nothing else here reaches a firm's client, and no record's address is ever used.
+ * THE one Resend caller in this app (a grep test holds it: `api.resend.com` appears only here). It sends:
+ *  - INTERNAL mail (agent failure alerts, "Send feedback");
+ *  - the master-class worksheet's two emails (src/lib/worksheet/: the firm's notice, to addresses from an env var, and the
+ *    attendee's own copy, sent only to the address they typed and only when they ticked the box asking for it);
+ *  - the TWO owner-approved client emails of the emailed engagement-letter link (spec decision 7, lectual 0117): the signing
+ *    link, sent because the client pressed the button, to the proposal's own client email (src/lib/loe/email-signing/), and
+ *    (Sprint B) the signed copy. Nothing else here reaches a firm's client.
  *
  * Never throws and never returns or logs Resend's response body or an exception message: the result is
  * `sent` or `failed` plus the HTTP status (null when no response came back). The caller decides what
@@ -29,12 +32,34 @@ export type InternalMail = {
   label?: string;
   /** Sent as Resend's Idempotency-Key header: a retried send with the same key within 24 h is not delivered twice. */
   idempotencyKey?: string;
+  /** Files to attach (the client emails' PDFs). At most 2, at most 10 MB in total; otherwise nothing is sent (`local: true`). */
+  attachments?: MailAttachment[];
 };
 
-export type InternalMailResult = { status: "sent" } | { status: "failed"; http: number | null };
+export type MailAttachment = { filename: string; content: Uint8Array; contentType: "application/pdf" };
+
+export const MAX_ATTACHMENTS = 2;
+export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+
+/**
+ * `failed` with an HTTP status: Resend answered no. `failed` with `http: null`: no answer came back (timeout, network, abort), so
+ * the mail MAY have been accepted. `local: true`: refused here before any request was made (nothing was sent).
+ */
+export type InternalMailResult = { status: "sent" } | { status: "failed"; http: number | null; local?: true };
+
+function attachmentsBody(list: MailAttachment[] | undefined): Array<{ filename: string; content: string }> | null | undefined {
+  if (!list || list.length === 0) return undefined;
+  if (list.length > MAX_ATTACHMENTS) return null;
+  let total = 0;
+  for (const a of list) total += a.content.byteLength;
+  if (total > MAX_ATTACHMENT_BYTES) return null;
+  return list.map((a) => ({ filename: a.filename, content: Buffer.from(a.content).toString("base64") }));
+}
 
 export async function sendInternalMail(mail: InternalMail): Promise<InternalMailResult> {
   const label = mail.label ?? "internal-mail";
+  const attachments = attachmentsBody(mail.attachments);
+  if (attachments === null) return { status: "failed", http: null, local: true };
   try {
     const post = fetchWithTimeout(mail.fetchImpl ?? fetch, INTERNAL_MAIL_TIMEOUT_MS);
     const res = await post(RESEND_URL, {
@@ -51,6 +76,7 @@ export async function sendInternalMail(mail: InternalMail): Promise<InternalMail
         subject: mail.subject,
         text: mail.text,
         ...(mail.html ? { html: mail.html } : {}),
+        ...(attachments ? { attachments } : {}),
       }),
     });
     if (!res.ok) {

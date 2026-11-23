@@ -55,6 +55,10 @@ const NO_EXHIBIT: Exhibit = { title: "", groups: [], legalDue: { label: "", note
 
 export async function buildVerifiedSignedPdf(input: SignedPdfInput): Promise<SignedPdfBuild> {
   const { snapshot, firm } = input;
+  // lectual 0117, Sprint A (v2 ruling B6): a letter signed through the EMAILED link has no PDF until Sprint B adds its certificate
+  // page. Refused here, before any read, so no caller (the client's download, the staff Download, the Lawmatics filing) can
+  // produce one without it. The filing step records `failed` and is retried later. In-app signatures are untouched.
+  if (snapshot?.agreement?.method === "email_link") return { ok: false, reason: "unavailable" };
   if (!isSignedSnapshot(snapshot) || !snapshot?.agreement) return { ok: false, reason: "unavailable" };
   if (!firm.displayName.trim() || !firm.timeZone.trim()) return { ok: false, reason: "unavailable" };
   const agreement = snapshot.agreement;

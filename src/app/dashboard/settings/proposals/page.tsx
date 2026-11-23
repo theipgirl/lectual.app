@@ -13,7 +13,7 @@ import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 import Link from "next/link";
-import { LETTER_SETTINGS_LINK, LETTER_SETTINGS_LINK_NOTE, PROPOSAL_SETTINGS_NAME } from "@/lib/ui/words";
+import { LETTER_SETTINGS_LINK, LETTER_SETTINGS_LINK_NOTE, PROPOSAL_SETTINGS_NAME, SIGNING_WORDS_LINK_NOTE, SIGNING_WORDS_NAME } from "@/lib/ui/words";
 import { EmptyState, LoadFailedCard, PageHeader } from "@/components/ui";
 
 export const metadata: Metadata = { title: pageTitle(PROPOSAL_SETTINGS_NAME) };
@@ -95,6 +95,17 @@ export default async function ProposalSettingsPage() {
             <p className="lx-note pe-hint" style={{ margin: 0 }}>{LETTER_SETTINGS_LINK_NOTE}</p>
           </div>
           <Link className="lx-btn lx-btn-sec lx-btn-sm" href="/dashboard/settings/proposals/engagement-letter/">
+            Open
+          </Link>
+        </div>
+      </section>
+      <section className="lx-card pe-card">
+        <div className="pe-card-head-row">
+          <div className="pe-card-head">
+            <h2 className="pe-h">{SIGNING_WORDS_NAME}</h2>
+            <p className="lx-note pe-hint" style={{ margin: 0 }}>{SIGNING_WORDS_LINK_NOTE}</p>
+          </div>
+          <Link className="lx-btn lx-btn-sec lx-btn-sm" href="/dashboard/settings/proposals/signing-words/">
             Open
           </Link>
         </div>

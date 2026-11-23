@@ -46,9 +46,11 @@ export type BuildLetterPdfInput = {
   blocks: readonly LetterBlock[];
   exhibit: Exhibit;
   /**
-   * Signed mode only: the STORED signed text (`client_proposal_signature.agreement_text`), drawn verbatim as plain paragraphs
-   * INSTEAD of `blocks` and the exhibit table. Used when today's code no longer rebuilds the text that was signed: the file
-   * then holds exactly the text the stored fingerprint covers.
+   * A STORED text drawn verbatim as plain paragraphs INSTEAD of `blocks` and the exhibit table.
+   *  - signed mode: the stored signed text (`client_proposal_signature.agreement_text`), when today's code no longer rebuilds
+   *    the text that was signed: the file then holds exactly the text the stored fingerprint covers;
+   *  - review mode (lectual 0117, Sprint A): the FINAL agreement text stored on an emailed signing request, so the PDF attached
+   *    to the signing-link email is exactly the text the link signs. The review mark stays on every page.
    */
   storedText?: string;
   details: SignerDetails;
@@ -163,7 +165,8 @@ export async function buildLetterPdf(input: BuildLetterPdfInput): Promise<Uint8A
   // The letterhead line: the firm's display name, first on the first page, before any paragraph of the letter.
   // When the firm's logo was drawn it already names the firm, so the text line is left out. A thin rule follows the letterhead
   // unless the letter draws its own rule under its first lines (a `rule-below` paragraph, as RPB's address line does).
-  const letterDrawsRule = !(input.mode === "signed" && typeof input.storedText === "string") && input.blocks.some((b) => hasStyle(b, "rule-below"));
+  const drawsStored = typeof input.storedText === "string";
+  const letterDrawsRule = !drawsStored && input.blocks.some((b) => hasStyle(b, "rule-below"));
   const letterhead = logoDrawn ? "" : (input.firmName ?? "").replace(/\s+/g, " ").trim();
   if (logoDrawn && !letterDrawsRule) {
     doc.moveTo(left, doc.y).lineTo(left + width, doc.y).strokeColor("#999999").lineWidth(0.5).stroke();
@@ -183,8 +186,8 @@ export async function buildLetterPdf(input: BuildLetterPdfInput): Promise<Uint8A
     doc.font("Regular").fontSize(BODY).fillColor("#000000");
   }
 
-  if (input.mode === "signed" && typeof input.storedText === "string") {
-    // The stored signed text, verbatim: one plain paragraph per blank-line-separated block, line breaks kept. No lead-ins in
+  if (typeof input.storedText === "string") {
+    // The stored text (signed, or the emailed link's final text), verbatim: one plain paragraph per blank-line-separated block, line breaks kept. No lead-ins in
     // bold and no exhibit table are re-derived, because the text itself is what was signed.
     for (const para of input.storedText.split(/\n{2,}/)) {
       if (para.length === 0) continue;

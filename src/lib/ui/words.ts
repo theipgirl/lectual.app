@@ -1605,3 +1605,24 @@ export const STAFF_GUIDE_TOUR_BODY = "Choose Show tips again in this menu for a 
 export const OWNER_ROW_NEEDS_OWNER = "Only an owner of this firm can change or remove an owner.";
 /** Refused when the caller's own membership row couldn't be read: nothing was changed and nobody was signed out. */
 export const OWNER_ROW_CHECK_FAILED = "Couldn't confirm you're an owner of this firm, so nothing was changed. Refresh and try again.";
+
+// Signing words (lectual 0117, Sprint A): the firm attorney's own words for the emailed signing link. These are page labels and
+// status sentences only; the signing words themselves are typed by the firm and never written here.
+export const SIGNING_WORDS_NAME = "Signing words";
+export const SIGNING_WORDS_SUB = "The words your client reads when they sign the engagement letter from an emailed link, and the two emails. Your firm writes them; a named approver approves them.";
+export const SIGNING_WORDS_LINK_NOTE = "The words for signing by an emailed link, with their versions and who approves them.";
+export const SIGNING_WORDS_STATUS_ON = "Clients get a signing link by email. If a check fails, they sign on the proposal page as before.";
+export const SIGNING_WORDS_STATUS_NO_WORDS = "Clients sign on the proposal page until a named approver approves these words.";
+export const SIGNING_WORDS_EMPTY = "No signing words yet. Write a draft, and it can be approved once the words are final.";
+export const SIGNING_WORDS_LOAD_FAILED = "The signing words couldn't be loaded. Refresh to try again.";
+export const SIGNING_WORDS_READ_ONLY = "You can read the signing words. An owner, admin or senior admin writes them.";
+export const SIGNING_WORDS_START = "Start a draft";
+export const SIGNING_WORDS_START_FROM = "Start a new draft from this version";
+export const SIGNING_WORDS_SAVE = "Save draft";
+export const SIGNING_WORDS_APPROVE = "Approve";
+export const SIGNING_WORDS_APPROVED_NOTICE = "Approved. New signing links use these words.";
+export const SIGNING_WORDS_APPROVE_NOTE = "Approving makes these the words new signing links use. Approved words can't be edited; a change is a new draft.";
+export const SIGNING_WORDS_FIELDS_NOTE =
+  "The signing link email body must contain {{signing_link}} exactly once and may use {{client_name}}, {{firm_name}} and {{link_expires}}. The subjects and the signed copy email may use {{client_name}} and {{firm_name}}. The four page fields use none.";
+export const SIGNING_WORDS_FIX_BEFORE_APPROVING = "Fix the problems above before approving.";
+export const SIGNING_WORDS_PROBLEM = { empty: "is empty", too_long: "is too long", two_lines: "must be one line", fields: "uses a merge field it may not use" } as const;
