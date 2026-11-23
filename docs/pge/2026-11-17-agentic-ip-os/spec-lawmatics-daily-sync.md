@@ -128,7 +128,7 @@ No description or notes are kept. **Times:**
 
 **Planner:** new `src/lib/lawmatics/consult-sync-plan.ts` (pure).
 - **Window:** events that start from now − 7 days to now + 60 days. Events outside it are ignored, since Lawmatics may ignore our date filter.
-- **Consult or not (`is_consult`):** the title OR the event-type name matches `isConsultTitle` (`src/lib/calendar/outlook-parse.ts`: strategy session | discovery call | consult | initial call). One regex covers Outlook, Zoom and Lawmatics. Open question 2 asks Taylor and the director to confirm it matches lawmatics-mcp's consult-brief rules (`enumerate.ts`: Strategy Session / Discovery Call).
+- **Consult or not (`is_consult`):** mirror lawmatics-mcp's `isConsult` (`src/consult.ts`, used by `consult-brief/enumerate.ts` with `normalizeEvent`): lower-case the text and match when it includes `strategy session`, `discovery call` or `consult`. Apply it to the event TYPE name (e.g. "Complimentary Consultation") OR the title (real titles look like "30 Minute Consultation - <client>" and "Topic: Discovery Call with <staff> - <client>"). Add it as a Lawmatics-specific predicate beside `isConsultTitle` (which also matches `initial call` for Outlook and Zoom); do not widen either. The rest of `isConsult`'s condition (lawmatics-mcp `src/consult.ts` lines 77-83) is to be copied exactly when building; read it then (confirmed by the director, Nov 23).
 - **Which events are stored:** consults only (open question 2). A non-consult event is not stored. One of this sync's own rows that is no longer a consult is removed like a vanished one.
 - **Lead link (in order),** against the leads re-read after the prospect step:
   1. the event's own prospect id equals a lead's `lawmatics_id`, followed through `merged_into_id` to the keeper;
@@ -299,7 +299,7 @@ No description or notes are kept. **Times:**
 12. Over 50 creates → 50 planned, the rest counted.
 
 **Pure planner, consults** (`tests/lawmatics/consult-sync-plan.test.ts`, `events-normalize.test.ts`):
-13. "Strategy Session", "Discovery Call", "Initial Consult" by title or by event type → consult; "Court hearing" → not stored.
+13. "30 Minute Consultation - X" by title, "Complimentary Consultation" by event type, "Topic: Discovery Call with Y - X" → consult; "Initial call" alone → not a Lawmatics consult (that word is Outlook/Zoom only); "Court hearing" → not stored.
 14. Links:
     - prospect id first; else one lead by attendee email; two or none → null;
     - a merged lead → its keeper (both link paths);
@@ -386,7 +386,7 @@ No description or notes are kept. **Times:**
 
 ## OPEN QUESTIONS for Taylor
 1. **Cutoff date.** Which date should new prospects count from? Suggestion: the day this ships, so the sync never reaches back over people the importer or the spreadsheet already handled. (The hired sync uses Oct 28, 2026.)
-2. **Event type names, and Lost/Won/Nurture matches.** (a) Which Lawmatics event types are consults? We plan to use the Outlook and Zoom words: strategy session, discovery call, consult, initial call. Please confirm with the director that this matches lawmatics-mcp's consult-brief rules (Strategy Session / Discovery Call), and say whether other Lawmatics events should show on the Lectual calendar too. As written, only consults are stored. (b) When a new Lawmatics prospect has the same email as a lead in Lost, Won or Nurture, should the sync link it (no stage change), skip it and show it as "needs a look", or make a new lead? We suggest skip and show.
+2. **Lost/Won/Nurture matches.** (a) Answered (director, Nov 23): consults are matched as lawmatics-mcp's `isConsult` does, by event type name or title; only consults are stored. (b) When a new Lawmatics prospect has the same email as a lead in Lost, Won or Nurture, should the sync link it (no stage change), skip it and show it as "needs a look", or make a new lead? We suggest skip and show.
 3. **A consult for someone outside the window.** If a consult is booked for a Lawmatics prospect created before the cutoff or the 14-day window, and no lead exists, should the sync create the lead (in the new-enquiry stage)? As written it stores the consult unlinked.
 4. **Should a Lawmatics consult move leads?** A Lawmatics booking may be self-booked by the client, so we recommend it only makes a suggestion card for a person to accept, not an automatic move. Or should it move leads like an Outlook consult?
 5. **A prospect with no email.** We recommend skipping them and showing the count ("2 need an email in Lawmatics"), as the importer does. Alternative: create them, matched by Lawmatics id only.
