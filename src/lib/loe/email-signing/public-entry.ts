@@ -6,7 +6,7 @@ import { closeOnChange } from "./close-on-change";
 import type { SigningDb } from "./db";
 import { recordConsent, recordOpened, type ConsentResult } from "./link-actions";
 import { readSigningLink, type SignLinkRead } from "./link-read";
-import { sendSigningLink, type SendResult } from "./send";
+import { sendSigningLink, type SendResult } from "./link-send";
 import { signByLink, type SignResult } from "./sign";
 
 /**

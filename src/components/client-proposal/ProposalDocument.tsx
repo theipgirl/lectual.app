@@ -1247,7 +1247,7 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
                       requestAnimationFrame(() => document.getElementById("cp-letter-preview")?.scrollIntoView({ block: "start" }));
                     }}
                     onDownloadSigned={onDownloadSigned}
-                    {...(emailLink.on ? { emailLink: { pending: emailLink.pending, note: emailLink.note, closedNote: emailLink.closedNote, onSend: () => void emailLink.send() } } : {})}
+                    {...(emailLink.on ? { emailLink: { pending: emailLink.pending, note: emailLink.note, closedNote: emailLink.closedNote, onSend: () => void emailLink.requestLink() } } : {})}
                   />
                 ) : accepted ? (
                   <>

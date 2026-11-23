@@ -15,7 +15,7 @@ import {
   entrySign,
   type RawAudit,
 } from "@/lib/loe/email-signing/public-entry";
-import type { SendResult } from "@/lib/loe/email-signing/send";
+import type { SendResult } from "@/lib/loe/email-signing/link-send";
 import type { SignResult } from "@/lib/loe/email-signing/sign";
 
 /**

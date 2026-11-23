@@ -11,7 +11,7 @@ import { isObject, type SigningDb } from "./db";
 import { emailSigningGate, type GateEnv, type GateResult } from "./gate";
 import { markSigningNotSetUp } from "./not-set-up";
 import { parseReadiness, readyDecision, type ReadinessRpc } from "./ready-rules";
-import { localFailures } from "./send-failures";
+import { localFailures } from "./failure-memo";
 
 /**
  * Per-proposal readiness for the emailed link (Sprint A item 2). The decision is `readyDecision` (`ready-rules.ts`, pure); this

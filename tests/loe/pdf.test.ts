@@ -86,11 +86,22 @@ describe("buildLetterPdf", () => {
     expect(text.startsWith("RPB Law Firm")).toBe(true);
   });
 
-  it("stored-text mode is for a signed copy only: a review copy ignores it", async () => {
+  // Changed on purpose (lectual 0117, Sprint A item 9): the emailed signing link's review PDF is built from the request's STORED
+  // final text, so a review copy now draws `storedText` verbatim (the review mark stays on every page). No caller passed
+  // `storedText` in review mode before, so no existing review copy changes.
+  it("stored-text mode also serves a review copy (the emailed link's final text), with the review mark kept", async () => {
     const bytes = await buildLetterPdf({ blocks: [{ lead: null, text: "The review letter." }], exhibit: exhibitForCallum(), storedText: "Something else entirely.", details: TEST_DETAILS, mode: "review" });
     const text = await readBack(bytes);
+    expect(text).toContain("Something else entirely.");
+    expect(text).not.toContain("The review letter.");
+    expect(text).toContain("Review copy - not yet signed");
+  });
+
+  it("a review copy without storedText is unchanged: the blocks and the exhibit", async () => {
+    const bytes = await buildLetterPdf({ blocks: [{ lead: null, text: "The review letter." }], exhibit: exhibitForCallum(), details: TEST_DETAILS, mode: "review" });
+    const text = await readBack(bytes);
     expect(text).toContain("The review letter.");
-    expect(text).not.toContain("Something else entirely.");
+    expect(text).toContain("Exhibit A");
   });
 
   it("refuses to build a signed copy with no signature record", async () => {

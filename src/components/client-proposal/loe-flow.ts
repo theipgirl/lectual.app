@@ -220,7 +220,7 @@ export function useEmailLink(input: {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- driven by the change key only.
   }, [on, input.changeKey]);
 
-  async function send() {
+  async function requestLink() {
     if (!on || pending || !input.onSend) return;
     setPending(true);
     setError(null);
@@ -244,5 +244,5 @@ export function useEmailLink(input: {
     }
   }
 
-  return { on, pending, note, error, closedNote, send };
+  return { on, pending, note, error, closedNote, requestLink };
 }

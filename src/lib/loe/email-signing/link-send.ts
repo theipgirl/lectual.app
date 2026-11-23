@@ -31,8 +31,8 @@ import { maskEmail } from "./mask";
 import { markSigningNotSetUp } from "./not-set-up";
 import type { Readiness } from "./ready";
 import { parseReadiness, SEND_FAILURE_FALLBACK } from "./ready-rules";
-import { localFailures, noteLocalFailure } from "./send-failures";
-import { signOpenOutcome, type FailureKind } from "./send-outcomes";
+import { localFailures, noteLocalFailure } from "./failure-memo";
+import { signOpenOutcome, type FailureKind } from "./open-outcomes";
 
 /**
  * The client pressed "Email me a link to sign" (Sprint A item 9). Token, ticks, class words and details only: the address the
