@@ -3,7 +3,7 @@ import { isDatabaseUpdateNeeded } from "@/lib/calendar/outlook-errors";
 import { leadRead } from "@/lib/leads/live";
 
 /**
- * A consult that took place is real contact: it moves the lead's last touch forward to the end
+ * A consult that took place (Outlook, or one the Lawmatics daily sync stored) is real contact: it moves the lead's last touch forward to the end
  * of the call, so the Intake list's "last thing that happened" sort sees it.
  *
  * Runs right after the calendar sync for every firm with the mailbox module, whether or not the
@@ -27,18 +27,21 @@ type EventRow = { id: string; lead_id: string | null; starts_at: string; ends_at
 export async function bumpHeldConsults(admin: SupabaseClient, orgId: string, nowMs: number = Date.now()): Promise<HeldConsultResult> {
   try {
     const nowIso = new Date(nowMs).toISOString();
-    const { data, error } = await admin
-      .from("crm_calendar_event")
-      .select("id, lead_id, starts_at, ends_at")
-      .eq("org_id", orgId)
-      .eq("source", "outlook")
-      .eq("is_consult", true)
-      .not("lead_id", "is", null)
-      .gte("starts_at", new Date(nowMs - (LOOKBACK_DAYS + 1) * DAY_MS).toISOString())
-      .lt("starts_at", nowIso)
-      .order("starts_at", { ascending: true })
-      .limit(500);
+    // Outlook's consults, and the Lawmatics daily sync's OWN rows (`lmsync:`); a legacy Lawmatics row is never read.
+    const read = (source: "outlook" | "lawmatics") => {
+      const q = admin.from("crm_calendar_event").select("id, lead_id, starts_at, ends_at").eq("org_id", orgId).eq("source", source);
+      return (source === "lawmatics" ? q.like("external_id", "lmsync:%") : q)
+        .eq("is_consult", true)
+        .not("lead_id", "is", null)
+        .gte("starts_at", new Date(nowMs - (LOOKBACK_DAYS + 1) * DAY_MS).toISOString())
+        .lt("starts_at", nowIso)
+        .order("starts_at", { ascending: true })
+        .limit(500);
+    };
+    const [outlook, lawmatics] = await Promise.all([read("outlook"), read("lawmatics")]);
+    const error = outlook.error ?? lawmatics.error;
     if (error) return { orgId, state: isDatabaseUpdateNeeded(error) ? "database-update-needed" : "error", bumped: 0 };
+    const data = [...(outlook.data ?? []), ...(lawmatics.data ?? [])];
 
     // The newest end per lead, for events that have actually ended.
     const endByLead = new Map<string, number>();

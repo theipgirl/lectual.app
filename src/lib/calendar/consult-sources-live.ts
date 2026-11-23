@@ -6,10 +6,11 @@ import { hasCalendarScope } from "@/lib/mailbox/providers";
 import { ownZoomAccess } from "@/lib/meetings/connection";
 import { listUpcomingZoomMeetings } from "@/lib/meetings/zoom";
 import { loadConsultsForToday } from "./outlook-read";
+import { lawmaticsConsultGate } from "./lawmatics-read";
 import { joinKey, zoomMeetingKey, type ConsultDeps, type LeadRef } from "./consult-sources";
 
 /**
- * The real reads behind Today's Consults card. Scoped client throughout; the only sealed-token read is
+ * The real reads behind Today's Consults card (Outlook, Lawmatics, Zoom). Scoped client throughout; the only sealed-token read is
  * `ownZoomAccess` (the meetings module's own helper). A Zoom meeting is linked to a lead only when an
  * imported `crm_meeting` with a lead matches its meeting id or join link exactly.
  */
@@ -24,6 +25,10 @@ export const liveConsultDeps: ConsultDeps = {
   },
 
   outlook: (now, timeZone) => loadConsultsForToday(now, timeZone),
+
+  // Not behind the Mailboxes feature: the Lawmatics daily sync's own rows, whenever the firm connected Lawmatics.
+  lawmaticsGate: () => lawmaticsConsultGate(),
+  lawmatics: (now, timeZone) => loadConsultsForToday(now, timeZone, "lawmatics"),
 
   async zoomAccess() {
     const access = await ownZoomAccess();

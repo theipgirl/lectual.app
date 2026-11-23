@@ -8,6 +8,8 @@ import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
 import { listCalendarEvents, type CalendarEventRow } from "@/lib/calendar/events";
 import { listOutlookCalendarEvents, type OutlookCalendarEvent, type OutlookRead } from "@/lib/calendar/outlook-read";
 import { joinHref } from "@/lib/calendar/outlook-format";
+import { joinKey } from "@/lib/calendar/consult-sources";
+import { sameLeadSameTime } from "@/lib/calendar/booked-merge";
 import { orgHasModule } from "@/lib/org/modules";
 import {
   isCivilDate,
@@ -29,7 +31,7 @@ import { pageTitle } from "@/lib/ui/page-title";
 import { ViewToggle } from "@/components/ViewToggle";
 import { Icon, Notice, PageHeader } from "@/components/ui";
 import { LoadFailedCard } from "@/components/ui/LoadFailed";
-import { NEXT_STEP, REFRESH_TO_TRY_AGAIN } from "@/lib/ui/words";
+import { LAWMATICS_NAME, NEXT_STEP, REFRESH_TO_TRY_AGAIN } from "@/lib/ui/words";
 import "@/components/calendar/calendar.css";
 import "./calendar.css";
 
@@ -58,20 +60,40 @@ function rowToItem(row: CalendarRow, unconfirmed: Set<string>): CalendarItem {
   };
 }
 
+/** A consult the Lawmatics daily sync stored (its own `lmsync:` rows). */
+function isLawmaticsSync(e: CalendarEventRow): boolean {
+  return e.source === "lawmatics" && typeof e.external_id === "string" && e.external_id.startsWith("lmsync:");
+}
+
 function eventToItem(e: CalendarEventRow, timeZone: string): CalendarItem {
-  const { date, time } = zonedParts(e.starts_at, timeZone);
+  // All-day events are stored at UTC midnight; their date is the UTC date, not a shifted zoned one.
+  const { date, time } = e.all_day && isLawmaticsSync(e) ? { date: e.starts_at.slice(0, 10), time: "" } : zonedParts(e.starts_at, timeZone);
   const who = [e.event_type, e.contact_name].filter(Boolean).join(" · ");
+  const fromLawmatics = isLawmaticsSync(e);
   return {
     key: `e-${e.id}`,
     date,
     time: e.all_day ? null : time,
-    title: e.title?.trim() || e.event_type || "Event",
-    detail: [who, e.location].filter(Boolean).join(" · ") || null,
-    href: e.matter_id ? `/dashboard/matters/${e.matter_id}` : null,
+    title: e.title?.trim() || e.event_type || (fromLawmatics ? "Consult" : "Event"),
+    // Labelled by where it came from; a Lawmatics consult never has a location (none is stored).
+    detail: (fromLawmatics ? [LAWMATICS_NAME, e.event_type] : [who, e.location]).filter(Boolean).join(" · ") || null,
+    href: e.lead_id ? `/dashboard/leads/${e.lead_id}/` : e.matter_id ? `/dashboard/matters/${e.matter_id}` : null,
     kind: "event",
     overdue: false,
     unconfirmed: false,
+    ...(fromLawmatics ? { consult: e.is_consult === true, joinUrl: joinHref(e.join_url ?? null) } : {}),
   };
+}
+
+/** A Lawmatics consult that is the same call as an Outlook event (a shared join link, or the same lead within 15 minutes). */
+function twinOfOutlook(e: CalendarEventRow, outlook: readonly OutlookCalendarEvent[]): boolean {
+  if (!isLawmaticsSync(e)) return false;
+  const key = joinKey(e.join_url ?? null);
+  return outlook.some(
+    (o) =>
+      (key !== null && joinKey(o.join_url) === key) ||
+      sameLeadSameTime({ leadId: e.lead_id ?? null, startsAt: e.starts_at }, { leadId: o.lead_id, startsAt: o.starts_at }),
+  );
 }
 
 /** An Outlook event: linked to its lead when there is one, marked when it is a consult. */
@@ -245,7 +267,8 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const outlookIds = new Set(outlookEvents.map((e) => e.id));
   const items = [
     ...rows.map((r) => rowToItem(r, unconfirmed)),
-    ...(events ?? []).filter((e) => !outlookIds.has(e.id)).map((e) => eventToItem(e, timeZone)),
+    // A Lawmatics consult that is also on Outlook shows once: the Outlook row is kept.
+    ...(events ?? []).filter((e) => !outlookIds.has(e.id) && !twinOfOutlook(e, outlookEvents)).map((e) => eventToItem(e, timeZone)),
     ...outlookEvents.map((e) => outlookToItem(e, timeZone)),
   ];
 

@@ -195,7 +195,8 @@ describe.each(["cron", "run-now"] as const)("F21: the Mailboxes module gate at r
     expect(body).toContain("Not read: Mailboxes isn't switched on for your firm.");
     expect(body).not.toContain("Nothing today.\n\nLeads waiting"); // the consults section is neither empty...
     expect(body).not.toMatch(/Today's consults \(could not be read\)/); // ...nor failed
-    expect(w.log.some((q) => q.table === "crm_calendar_event")).toBe(false);
+    // Only the Lawmatics daily sync's own rows are read (not behind Mailboxes); never an Outlook statement.
+    expect(w.log.some((q) => q.table === "crm_calendar_event" && q.filters.some((f) => f.column === "source" && f.value === "outlook"))).toBe(false);
     expect(body).toContain("Leads waiting on a reply (1)");
     expect(body).toContain("Stalled leads (1)");
     expect(body).toContain("Deadlines in the next 7 days (1)");
@@ -238,7 +239,8 @@ describe.each(["cron", "run-now"] as const)("F21: the Mailboxes module gate at r
     expect(by["consult-prep"].status).toBe("skipped");
     expect(by["consult-prep"].summary).toContain("couldn't check whether Mailboxes is switched on");
     expect(w.requests).toHaveLength(0);
-    expect(w.log.some((q) => q.table === "crm_calendar_event")).toBe(false);
+    // Only the Lawmatics daily sync's own rows are read (not behind Mailboxes); never an Outlook statement.
+    expect(w.log.some((q) => q.table === "crm_calendar_event" && q.filters.some((f) => f.column === "source" && f.value === "outlook"))).toBe(false);
     // The same read that failed also carried the queue key, so the brief cannot be filed: it says why, in the same words.
     expect(by["morning-brief"].status).toBe("skipped");
     expect(by["morning-brief"].summary).toContain("couldn't check whether Mailboxes is switched on");

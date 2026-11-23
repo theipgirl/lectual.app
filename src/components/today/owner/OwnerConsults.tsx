@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { formatEventWhen } from "@/lib/calendar/outlook-format";
-import { sourceNote, type TodayConsultsResult } from "@/lib/calendar/consult-sources";
+import { consultSources, sourceNote, type TodayConsultsResult } from "@/lib/calendar/consult-sources";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Notice } from "@/components/ui/Notice";
 import { civilInZone } from "@/lib/today/outcomes";
 import { OWNER_CONSULTS_SHOWN } from "@/lib/today/owner-rules";
-import { ownerSeeAll, OWNER_CONSULTS_HEADING, OWNER_CONSULTS_NONE_TODAY, ownerConsultJoinLink, OWNER_CONSULT_LEAD_LINK } from "@/lib/ui/words";
+import { LAWMATICS_NAME, ownerSeeAll, OWNER_CONSULTS_HEADING, OWNER_CONSULTS_NONE_TODAY, ownerConsultJoinLink, OWNER_CONSULT_LEAD_LINK } from "@/lib/ui/words";
 
-const SOURCE_LABEL = { outlook: "Outlook", zoom: "Zoom" } as const;
+const SOURCE_LABEL = { outlook: "Outlook", lawmatics: LAWMATICS_NAME, zoom: "Zoom" } as const;
 
 /** "10:00 AM" out of the shared "Tue, Nov 10, 10:00 AM" stamp. */
 function clockOf(stamp: string): string {
@@ -20,10 +20,7 @@ function clockOf(stamp: string): string {
  * "No consults today." only when every source was read; a source that wasn't connected or failed is named with its next step.
  */
 export function OwnerConsults({ result, timeZone, today }: { result: TodayConsultsResult; timeZone: string; today: string }) {
-  const sources = [
-    { source: "outlook" as const, state: result.outlook },
-    { source: "zoom" as const, state: result.zoom },
-  ];
+  const sources = consultSources(result);
   const notes = sources.map((s) => sourceNote(s.source, s.state)).filter((n): n is NonNullable<typeof n> => n !== null);
   const readOk = sources.filter((s) => s.state === "ok").map((s) => SOURCE_LABEL[s.source]);
   const todays = result.consults.filter((c) => civilInZone(new Date(c.startsAt), timeZone) === today);
@@ -68,7 +65,7 @@ export function OwnerConsults({ result, timeZone, today }: { result: TodayConsul
         </Link>
       )}
       {todays.length === 0 && notes.length === 0 && <EmptyState variant="line">{OWNER_CONSULTS_NONE_TODAY}</EmptyState>}
-      {todays.length === 0 && notes.length > 0 && readOk.length > 0 && <EmptyState variant="line">No consults today in {readOk.join(" and ")}.</EmptyState>}
+      {todays.length === 0 && notes.length > 0 && readOk.length > 0 && <EmptyState variant="line">No consults today in {readOk.join(", ").replace(/, ([^,]*)$/, " and $1")}.</EmptyState>}
       {notes.map((n) => (
         <Notice key={n.source} tone="warn" role="status">
           <span>

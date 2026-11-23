@@ -288,7 +288,8 @@ describe("morning-brief: the consults section and the Mailboxes module (F21 iii,
     const body = briefOf(createDraft).draftBody;
     expect(body).toContain("Today's consults (not read)");
     expect(section(body, "Today's consults")).toContain("Not read: Mailboxes isn't switched on for your firm.");
-    expect(log.some((q) => q.table === "crm_calendar_event")).toBe(false);
+    // Only the Lawmatics daily sync's own rows are read (not behind Mailboxes); never an Outlook statement.
+    expect(log.some((q) => q.table === "crm_calendar_event" && q.filters.some((f) => f.column === "source" && f.value === "outlook"))).toBe(false);
     expect(body).toContain("Leads waiting on a reply (1)");
     expect(body).toContain("The queue (1)");
     // three different states, three different strings
@@ -306,7 +307,7 @@ describe("morning-brief: the consults section and the Mailboxes module (F21 iii,
       ctx.orgModules = modules;
       await runMorningBrief(ctx);
       expect(section(briefOf(createDraft).draftBody, "Today's consults")).toContain("Not read: couldn't check whether Mailboxes is switched on.");
-      expect(log.some((q) => q.table === "crm_calendar_event")).toBe(false);
+      expect(log.some((q) => q.table === "crm_calendar_event" && q.filters.some((f) => f.column === "source" && f.value === "outlook"))).toBe(false);
     }
   });
 

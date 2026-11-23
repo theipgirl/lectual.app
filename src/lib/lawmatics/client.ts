@@ -54,7 +54,18 @@ export type FetchLike = (
   statusText: string;
   text: () => Promise<string>;
   json: () => Promise<unknown>;
+  /** Response headers when the fetch exposes them (the real fetch does); read only for `Retry-After`. */
+  headers?: { get(name: string): string | null };
 }>;
+
+/** Every request gets this deadline unless the caller asks for another (daily sync contract: 20 s). */
+export const LAWMATICS_REQUEST_TIMEOUT_MS = 20_000;
+/** A 429 is retried at most this many times per request. */
+export const RATE_LIMIT_RETRIES = 2;
+/** `Retry-After` is honoured up to this long; past it the wait is capped here. */
+export const RETRY_AFTER_CAP_MS = 10_000;
+/** The waits used when a 429 carries no usable `Retry-After`: first retry, second retry. */
+export const RATE_LIMIT_FALLBACK_MS = [2_000, 5_000] as const;
 
 export type LawmaticsClientOptions = {
   token: string;
@@ -62,7 +73,62 @@ export type LawmaticsClientOptions = {
   baseUrl?: string;
   /** Override for tests. Defaults to global `fetch`. */
   fetchImpl?: FetchLike;
+  /** Per-request deadline. Defaults to `LAWMATICS_REQUEST_TIMEOUT_MS`. */
+  timeoutMs?: number;
+  /** The caller's own abort signal (a step's budget). Merged with the per-request deadline; whichever fires first wins. */
+  signal?: AbortSignal;
+  /**
+   * How long the caller still has. A 429 is retried only when the wait fits inside it; absent, a retry is
+   * always allowed (still at most `RATE_LIMIT_RETRIES`).
+   */
+  timeLeftMs?: () => number;
+  /** Override for tests. Defaults to a timer that the caller's signal cancels. */
+  sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
 };
+
+/** The wait before retry number `attempt` (0-based) after a 429: `Retry-After` (seconds or a date), capped, else the fallback. */
+export function retryWaitMs(retryAfter: string | null | undefined, attempt: number, nowMs: number = Date.now()): number {
+  const fallback = RATE_LIMIT_FALLBACK_MS[Math.min(attempt, RATE_LIMIT_FALLBACK_MS.length - 1)];
+  const raw = (retryAfter ?? "").trim();
+  if (!raw) return fallback;
+  if (/^\d+(\.\d+)?$/.test(raw)) return Math.min(Math.max(0, Math.round(Number(raw) * 1000)), RETRY_AFTER_CAP_MS);
+  const at = Date.parse(raw);
+  if (Number.isFinite(at)) return Math.min(Math.max(0, at - nowMs), RETRY_AFTER_CAP_MS);
+  return fallback;
+}
+
+function defaultSleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(signal.reason ?? new Error("aborted"));
+    const t = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(t);
+      reject(signal?.reason ?? new Error("aborted"));
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+/**
+ * The status class of a failed Lawmatics call, for counts. Never the message: `LawmaticsApiError.message`
+ * carries up to 500 characters of the response body and must never be logged, returned or stored.
+ */
+export type LawmaticsFailureClass = "auth" | "rate" | "server" | "timeout" | "shape";
+
+export function lawmaticsFailureClass(err: unknown): LawmaticsFailureClass {
+  if (err instanceof LawmaticsApiError) {
+    if (err.status === 401 || err.status === 403) return "auth";
+    if (err.status === 429) return "rate";
+    if (err.status >= 500) return "server";
+    return "shape";
+  }
+  const name = (err as { name?: unknown } | null)?.name;
+  if (name === "AbortError" || name === "TimeoutError") return "timeout";
+  return "server";
+}
 
 export type LawmaticsClient = {
   get(path: string, params?: Record<string, string>): Promise<unknown>;
@@ -126,22 +192,37 @@ export function createLawmaticsClient(opts: LawmaticsClientOptions): LawmaticsCl
   const base = (opts.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, "");
   const doFetch: FetchLike = opts.fetchImpl ?? (globalThis.fetch as unknown as FetchLike);
   if (!opts.token) throw new Error("Lawmatics token is required");
+  const timeoutMs = typeof opts.timeoutMs === "number" && opts.timeoutMs > 0 ? opts.timeoutMs : LAWMATICS_REQUEST_TIMEOUT_MS;
+  const sleep = opts.sleep ?? defaultSleep;
 
   async function get(path: string, params?: Record<string, string>): Promise<unknown> {
     const url = new URL(`${base}${path}`);
     for (const [k, v] of Object.entries(params ?? {})) url.searchParams.set(k, v);
 
-    const res = await doFetch(url.toString(), {
-      headers: {
-        Authorization: `Bearer ${opts.token}`,
-        Accept: "application/json",
-      },
-    });
-    if (!res.ok) {
+    for (let attempt = 0; ; attempt += 1) {
+      // A fresh deadline per request (a retry is a new request), merged with the caller's own signal.
+      const deadline = AbortSignal.timeout(timeoutMs);
+      const signal = opts.signal ? AbortSignal.any([opts.signal, deadline]) : deadline;
+      const res = await doFetch(url.toString(), {
+        headers: {
+          Authorization: `Bearer ${opts.token}`,
+          Accept: "application/json",
+        },
+        signal,
+      });
+      if (res.ok) return res.json();
+      if (res.status === 429 && attempt < RATE_LIMIT_RETRIES) {
+        const wait = retryWaitMs(res.headers?.get("retry-after"), attempt);
+        // Only when the wait still fits the caller's budget; otherwise the read has failed (counted as `rate`).
+        if (!opts.timeLeftMs || wait < opts.timeLeftMs()) {
+          await res.text().catch(() => "");
+          await sleep(wait, opts.signal);
+          continue;
+        }
+      }
       const body = await res.text().catch(() => "");
       throw new LawmaticsApiError(res.status, path, body.slice(0, 500) || res.statusText);
     }
-    return res.json();
   }
 
   async function listAll(path: string, listOpts: ListOptions = {}): Promise<ListResult> {

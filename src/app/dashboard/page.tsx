@@ -15,6 +15,7 @@ import { hourInZone } from "@/lib/today/priorities";
 import { greetingName, greetingSuffix } from "@/lib/today/greeting-name";
 import { buildNeedsYou } from "@/lib/today/needs-you";
 import { loadConnectionsNeedingReauth, loadDeadlinesClosedSince, loadOpenQuotes, loadUnreviewedSubmissions } from "@/lib/today/load-needs-you";
+import { loadCameBack } from "@/lib/today/came-back";
 import { civilInZone, deadlinesMetThisMonth, mattersOpenedThisMonth, monthQueryFloor, monthStartCivil } from "@/lib/today/outcomes";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { loadAutopilot, type AutopilotLoad } from "@/lib/agents/autopilot";
@@ -93,6 +94,8 @@ export default async function TodayPage() {
   const now = new Date();
   // The Deadlines card (PGE Sprint 3) reads on its own, started now so it runs beside every other read on this page.
   const alertsP = loadDeadlineAlerts(session.user.id, now);
+  // Returning clients (the Lawmatics daily sync's "came back" rows): never throws, three states.
+  const cameBackP = loadCameBack(now);
   const [hasAgents, tz] = await Promise.all([orgHasModule("agents"), getFirmTimeZone()]);
   const monthFloor = monthQueryFloor(now, tz);
 
@@ -128,6 +131,7 @@ export default async function TodayPage() {
     ]);
 
   const alertsData = await alertsP;
+  const cameBack = await cameBackP;
   // loadActiveQueue never throws; a rejection would be a bug, shown as unavailable.
   const queue: QueueLoad = await mineQueue(queueS.status === "fulfilled" ? queueS.value : { status: "unavailable", items: [] }, { userId: session.user.id, role: session.role });
   const leads: Lead[] | null = leadsS.status === "fulfilled" ? leadsS.value : null;
@@ -199,6 +203,7 @@ export default async function TodayPage() {
     submissions,
     hotLeads,
     stalled: docket ? docket.stalled : null,
+    cameBack,
   });
 
   // Outcomes. Each is "—" with why when its source couldn't be read.

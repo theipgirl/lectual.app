@@ -1,6 +1,6 @@
 "use client";
 
-import { IMPORT_PERSON_NOT_SAVED, LAWMATICS_TOKEN_HELP, SAVING, searchPlaceholder, showingOf } from "@/lib/ui/words";
+import { IMPORT_PERSON_NOT_SAVED, LAWMATICS_SYNC_HELP, LAWMATICS_SYNC_NOW, LAWMATICS_SYNC_READING, LAWMATICS_TOKEN_HELP, SAVING, searchPlaceholder, showingOf } from "@/lib/ui/words";
 import { useActionState, useRef, useState, type ReactNode } from "react";
 import { InlineConfirm } from "@/components/ui/InlineConfirm";
 import { Notice } from "@/components/ui/Notice";
@@ -11,8 +11,8 @@ import {
   disconnectLawmaticsAction,
   importAction,
   previewMattersImportAction,
-  syncHiredMattersAction,
-  type HiredSyncState,
+  syncLawmaticsAction,
+  type LawmaticsSyncState,
   type ConnectState,
   type ImportState,
   type MattersImportState,
@@ -444,19 +444,19 @@ export function MattersImport() {
   );
 }
 
-export function HiredMattersSync() {
-  const [state, action, pending] = useActionState<HiredSyncState, FormData>(syncHiredMattersAction, {});
+/** "Sync from Lawmatics now": hired matters, new leads and consults for the caller's own firm. Counts only. */
+export function LawmaticsSyncNow() {
+  const [state, action, pending] = useActionState<LawmaticsSyncState, FormData>(syncLawmaticsAction, {});
   return (
     <form action={action} style={{ display: "grid", gap: 10 }}>
       <p className="lx-note" style={{ margin: 0 }}>
-        People marked Hired in Lawmatics get a matter here automatically every day. This button does it now for your firm. It only reads from
-        Lawmatics, and it never changes a matter that is already linked.
+        {LAWMATICS_SYNC_HELP}
       </p>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <button type="submit" className="lx-btn lx-btn-sec" disabled={pending}>
-          {pending ? "Reading Lawmatics…" : "Sync hired matters now"}
+          {pending ? LAWMATICS_SYNC_READING : LAWMATICS_SYNC_NOW}
         </button>
-        {state.ok && state.notice && (
+        {state.notice && (
           <span className="lx-saved" role="status">
             {state.notice}
           </span>

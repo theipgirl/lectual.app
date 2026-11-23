@@ -603,15 +603,18 @@ ran), intake triage failed on one truncated answer, and Run now could not be cli
 - **`callClaude` checks `stop_reason` before parsing** (`readStructuredResponse`); the SDK's `parse()` parsed first, so a
   max_tokens cut-off surfaced as "Failed to parse structured output". `AiOutputError.kind` is refusal/truncated/shape, and a
   list agent skips the one item (`isUnusableModelAnswer`). Intake triage asks for 16000 tokens.
-- **Cron times (vercel.json, 8 entries, run times in New York all year):** each of the four morning jobs has TWO entries, one UTC hour apart:
+- **Cron times (vercel.json, 12 entries, run times in New York all year):** each of the four morning jobs has TWO entries, one UTC hour apart:
   the winter entry (EST, UTC-5) lawmatics-matters `8 9`, meetings-import `38 9`, mailbox-sync `53 9`, agents `23 10`, and a summer entry
   (EDT, UTC-4) one hour earlier: `8 8`, `38 8`, `53 8`, `23 9`. They run at about 4:08, 4:38, 4:53 and 5:23 AM America/New_York all year
   (the agents finish by about 5:28 AM, before the 7:00 AM deal). Keep that order (hired matters and meetings before the mail sync's Stage
-  Keeper, the mail sync before the agents).
+  Keeper, the mail sync before the agents). The Lawmatics daily sync (the `lawmatics-matters` job) also runs at about 12:08 PM (`8 17` / `8 16`)
+  and 4:08 PM (`8 21` / `8 20`), new prospects and consults only (see "Lawmatics daily sync").
 - **The guard is `shouldRunNow(job, now)`** (`src/lib/cron/ny-hour.ts`, pure, `Intl` with `America/New_York`, no dependency), called in each of
   the four ROUTE HANDLERS (only there, so Run now and the actions that share the underlying functions are unaffected) right after the
-  `CRON_SECRET` check and before any read: it lets the tick through only when the New York HOUR of `now` is the job's (4 for lawmatics-matters,
-  meetings-import and mailbox-sync; 5 for agents). Otherwise the route answers 200 `{ skipped: "not this hour" }` and does nothing (no client, no
+  `CRON_SECRET` check and before any read: it lets the tick through only when the New York HOUR of `now` is one of the job's
+  (`INTENDED_NY_HOUR` is a list per job: [4, 12, 16] for lawmatics-matters, [4] for meetings-import and mailbox-sync, [5] for agents) and returns
+  that hour (null otherwise; compare with `=== null`, never truthiness). A job's hours must be at least 2 apart (a test checks it): adjacent hours
+  would let two pairs through one UTC hour. Otherwise the route answers 200 `{ skipped: "not this hour" }` and does nothing (no client, no
   read). It is the hour, never the minute: on Hobby a cron fires anywhere in its scheduled hour (`23 10` may run at 10:59), a New York hour is one
   whole UTC hour, and the two entries are exactly one UTC hour apart, so exactly one of the pair works each day, jitter included.
   `tests/cron/ny-hour.test.ts` walks every day of 2026 and 2027 (both transition days of each year included) at :00, :59 and the scheduled minute
@@ -1216,8 +1219,10 @@ An ACCEPTED version can go back to "Link live" so the same client link can be ac
 ## Hired-matter sync (Lawmatics -> Lectual)
 A person marked **Hired** in a firm's OWN Lawmatics gets a `crm_matter` here. A separate create path: `matters-import*.ts` stays update-only and is unchanged. No schema.
 - **Pieces:** `src/lib/lawmatics/hired-sync-plan.ts` (pure planner), `hired-sync-normalize.ts` (prospect -> sanitized candidate), `hired-sync.ts` (runner, `server-only`),
-  `GET /api/cron/lawmatics-matters/` (daily `18 11 * * *`, `CRON_SECRET`, counts only), and a "Sync hired matters now" button on Settings -> Integrations -> Lawmatics
-  (`syncHiredMattersAction`: admin tier re-resolved inside the action, runs for the SESSION's org only).
+  `GET /api/cron/lawmatics-matters/` (now the Lawmatics daily sync's route: the hired step runs on its 4 AM tick only, `CRON_SECRET`, counts only), and the
+  "Sync from Lawmatics now" button on Settings -> Integrations -> Lawmatics (`syncLawmaticsAction`, which replaced "Sync hired matters now": admin tier
+  re-resolved inside the action, runs for the SESSION's org only). `syncFirm` takes the daily sync's shared `/prospects` read (`SharedProspectRead`;
+  `null` = that read failed, so nothing is written) and reports a failed Lawmatics call's status class only (`failure`); its rules are unchanged.
 - **Which records:** Lawmatics `status` = hired (case-insensitive) AND `converted_date` on/after `HIRED_SYNC_CUTOFF` (`2026-10-28`). Older hired people were reconciled by hand or came from the
   sheet, and Lawmatics re-stamped `converted_date` on ~20 old clients on 2026-09-21, so an older cutoff would duplicate them. A hired record with no `converted_date` is skipped ("needs a look").
 - **Decisions, in order:** Lawmatics id already on a matter -> skip. No usable title (no `case_title`, no "Name of Trademark") and the owner already has any matter -> skip, needs a look
@@ -1250,6 +1255,59 @@ A person marked **Hired** in a firm's OWN Lawmatics gets a `crm_matter` here. A 
   returns one, is only the fallback) and on update only FILLS a blank source: one a person already set is never replaced, even with "overwrite edited fields". The hired sync stamps a created
   matter's `referral_source` as "Source (detail)" or "Source". `REFERRAL_SOURCES` gained "Social media", "Search engine", "Website", "Other" (appended).
 - **NOT verified against a live Lawmatics:** the attribute names `status`, `converted_date`, `case_title`, `case_number` and the shape of `custom_fields` come from the public API reference. Check the first run's counts. Also unverified: how tags appear on a prospect (relationship ids, inline names, `tag_ids` are all tried) and `custom_field_values[<id>].formatted_value`.
+
+## Lawmatics daily sync: new prospects and booked consults (proposed lectual 0118, works without it)
+Contract: `docs/pge/2026-11-17-agentic-ip-os/spec-lawmatics-daily-sync.md` (Taylor, Nov 23). Three times a day a firm's OWN Lawmatics is read: a new
+prospect becomes a lead, a booked consult becomes a calendar row. Nothing is sent, nothing is written to Lawmatics (read calls only: `listAll`, `get`;
+a grep test holds the new files to that), no automation rule fires, no matter handoff runs, no lead's stage is moved, and no `won` stage is ever used.
+- **Pieces:** `src/lib/lawmatics/prospect-sync-plan.ts` and `consult-sync-plan.ts` (pure planners), `events-normalize.ts` (pure), `daily-sync.ts` (the runner,
+  service role, its own writes), the route `src/app/api/cron/lawmatics-matters/route.ts`, `syncLawmaticsAction` + `LawmaticsSyncNow`. Readers: `src/lib/calendar/
+  lawmatics-read.ts`, `booked-merge.ts` (pure), `src/lib/today/came-back.ts` + `came-back-rules.ts` (pure).
+- **Schedule:** `INTENDED_NY_HOUR["lawmatics-matters"] = [4, 12, 16]`; 6 vercel.json entries (`8 9`/`8 8`, `8 17`/`8 16`, `8 21`/`8 20`). The 4 AM tick
+  (`LAWMATICS_FULL_RUN_HOUR`) is the full run: hired matters (`syncFirm`, unchanged), new prospects, consults. 12 PM and 4 PM: new prospects and consults only.
+  The job id and path keep their old name.
+- **Tenant fence:** per ACTIVE `lawmatics_connection`, token from `firmToken(admin, orgId)` (never a deployment token). Every read filtered on, every
+  insert / update / upsert / delete stamped or fenced with, the connection row's `org_id`. The button resolves the admin tier inside the action
+  (`requireImportAdmin`) and passes the SESSION's org; the dashboard reads use the scoped client.
+- **Reads:** ONE `/prospects` request (`include=stage,practice_area,contact` AND `fields=all`, shared by the hired and prospect steps), `/contacts`, the origin
+  lookups, `/events` (`include=event_type`), and for a consult whose prospect no lead holds, `GET /prospects/<id>` (the answer must name that id, else
+  discarded). Fail closed per step and per firm: a truncated, failed or unrecognised read writes nothing for that step; `includeDropped` on `/prospects`
+  or a cut-short / failed `/contacts` writes no leads for that firm; the consult step still runs. Lawmatics' error text is never logged, returned or stored:
+  only the status class (`lawmaticsFailureClass`: auth / rate / server / timeout / shape).
+- **Client:** every request has a 20 s deadline merged with the step's `AbortSignal`; a 429 waits for `Retry-After` (capped at 10 s, else 2 s then 5 s), at
+  most 2 retries, only when the wait fits the step's time left. A 401/403 sets the connection `invalid` (fenced on id, org and `active`) with the fixed
+  `LAWMATICS_SYNC_KEY_REFUSED` and stops that firm; the cron then skips it until someone reconnects (`reauthNeeded`).
+- **Budget:** wall 270 s (button 240 s; the settings page exports `maxDuration = 300`), per firm 150 s, hired 60 s, prospects 45 s, consults 45 s; a firm is not
+  started with under 60 s left, a step whose slice is under 10 s is skipped, a step out of time writes nothing more and doesn't move the cutoff.
+- **Prospects:** cutoff = 2026-11-01 on the first run, before 0118, or when the stored value can't be read; else max(Nov 1, `last_sync_at` - 2 days).
+  Hired prospects (status, `converted_date`, hired stage name) are left to the hired sync. "Came back" (exactly one keeper with the email, in a lost / won /
+  nurture stage, names not contradicting) is set aside first; the rest go through the importer's own `planImport` (filter off) and only `creates` (new-enquiry
+  stage) and email LINKS (`lawmatics_id` only, fenced `is null` and live) are kept. Caps: 50 creates (targeted reads included), 50 links. A created lead:
+  `created_at` / `last_activity_at` = the Lawmatics created date, `stage_entered_at` = the run, `lawmatics_synced_at` left null (so "0d in stage"), one
+  `lead_created` row `{ source: "lawmatics-daily-sync", lawmatics_id }` with no stage flags. `last_sync_at` moves (to the run's START) only for a complete
+  step with nobody over the cap and no failed write.
+- **Came back:** one `ai_insight` row per lead and Lawmatics id (`payload { source: "lawmatics-daily-sync", kind: "came_back", lawmatics_id, stage_category }`,
+  ids only), checked first (an unreadable check writes nothing). The lead's stage is never touched; `lawmatics_id` is written only when it had none. Today
+  shows it in Needs you (and its own card on the owner's Today) for 14 days or until a later `stage_changed`, newest first, at most 10; a failed read
+  says `CAME_BACK_UNAVAILABLE`. Every other `ai_insight` reader keys on its own source and ignores it (tested).
+- **Consults:** window now - 7 to now + 60 days; consult = `isConsultTitle` (the same words as lawmatics-mcp's `isConsult`) on the event TYPE name or the title.
+  Stored: title, times, all-day, event type, an allowlisted https join URL (zoom.us, teams.microsoft.com, teams.live.com, meet.google.com) taken from the
+  description, `lead_id`, `matter_id` (exactly one matter with that prospect id), `is_consult`. NEVER location, description, attendees, organizer or contact
+  name (attendee addresses are used in memory to find the lead, then dropped). A start or end with no UTC offset is refused; all-day = UTC midnight of the
+  date. Upsert on `org_id,source,external_id` with `external_id = 'lmsync:' + id`; an unchanged row is not written; a 23505 (an older row holds the Lawmatics
+  id) is counted and that row left alone. Removal only after a complete read, only `lmsync:` rows in the window, in chunks: a `source = 'lawmatics'` row
+  without the prefix is never updated or removed. Caps: 500 writes, 200 removals.
+- **Readers widened (three states kept):** Today's Consults card (both layouts) has a third source, `lawmatics` (`ConsultDeps.lawmaticsGate` / `.lawmatics`,
+  optional; one row per call: a shared join key or the same lead within 15 minutes, kept in the order Outlook, Lawmatics, Zoom); the lead page's "Consult
+  booked" and `lead-step/load.ts` read Lawmatics NOT behind Mailboxes and show the earliest (`mergeBookedConsults`); the calendar page labels the sync's rows
+  "Lawmatics · <type>" and hides a twin of an Outlook event; the Stage Keeper reads the sync's own rows as a SUGGESTION only (`why: "lawmatics-consult"`),
+  nothing for a lead outside an open stage, an Outlook twin acts instead; the held-consult bump and the morning brief read them too (the brief's Lawmatics
+  half isn't behind Mailboxes). Consult prep is unchanged (Outlook only). The Leads Working set already read every source.
+- **Before 0118:** reads and writes of `last_sync_at` answer 42703 / PGRST204 = not set up: the cutoff stays 2026-11-01 and Settings says
+  `LAWMATICS_LAST_SYNC_NOT_READY`. `last_sync_at` is hand-added in `src/lib/db/types.ts` until codegen. The proposal is `docs/pge/2026-11-17-agentic-ip-os/0118-proposed.sql.txt`.
+- **NOT verified against a live Lawmatics (Blocker 1):** the `/events` shape (title, start/end names, all-day, cancelled, event type, prospect and invitee
+  relationships, where the description sits), whether `fields=all` and `include` work together on `/prospects`, `GET /prospects/<id>` with `include`, and
+  whether a 429 carries `Retry-After`. The pre-build database checks of the contract are not done here either. Run the first sync by hand at a quiet hour.
 
 ## A package per brand name on the client proposal page (Spec 6, 2026-10-29, no schema)
 Taylor, for Renata Ostrowski: one section per brand name, each with "Select your package" (Essential, Enhanced or Concierge), then the classes as

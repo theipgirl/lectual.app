@@ -44,6 +44,7 @@ class Query implements PromiseLike<Result> {
   lte(column: string, value: unknown) { this.rec.filters.push({ op: "lte", column, value }); return this; }
   neq(column: string, value: unknown) { this.rec.filters.push({ op: "neq", column, value }); return this; }
   lt(column: string, value: unknown) { this.rec.filters.push({ op: "lt", column, value }); return this; }
+  like(column: string, value: unknown) { this.rec.filters.push({ op: "like", column, value }); return this; }
   upsert(values: unknown, opts?: { onConflict?: string }) {
     this.rec.action = "insert";
     this.rec.values = values;

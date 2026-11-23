@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Notice } from "@/components/ui/Notice";
 import { Pill } from "@/components/ui/Pill";
 import { NEEDS_YOU_SHOWN, emptyNeedsYouNote, type NeedsYou, type NeedsYouItem } from "@/lib/today/needs-you";
+import { CAME_BACK_UNAVAILABLE } from "@/lib/ui/words";
 import "./today.css";
 
 function Row({ n }: { n: NeedsYouItem }) {
@@ -47,6 +48,11 @@ export function NeedsYouSection({ needs, queue }: { needs: NeedsYou; queue: "ok"
         <Notice tone="warn">
           {needs.unavailable.join(", ")}{" "}couldn&apos;t be read, so this list may be missing items.
         </Notice>
+      )}
+      {needs.cameBackUnavailable && (
+        <p className="lx-note" role="status">
+          {CAME_BACK_UNAVAILABLE}
+        </p>
       )}
       {needs.items.length === 0 ? (
         <p className="lx-note lx-state-line">{emptyNeedsYouNote(needs, queue)}</p>

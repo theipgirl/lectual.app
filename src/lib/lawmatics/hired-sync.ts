@@ -6,7 +6,7 @@ import { getAdminClient } from "@/lib/db/admin";
 import type { Database, Json } from "@/lib/db/types";
 import { firmToken } from "@/lib/intake-forms/lawmatics-sync";
 
-import { createLawmaticsClient, type FetchLike, type LawmaticsClient } from "./client";
+import { createLawmaticsClient, lawmaticsFailureClass, type FetchLike, type LawmaticsClient, type LawmaticsFailureClass, type ListResult } from "./client";
 import { normalizeHiredProspect } from "./hired-sync-normalize";
 import {
   LEAD_MOVE_REASON,
@@ -19,7 +19,7 @@ import {
   type PlanStage,
 } from "./hired-sync-plan";
 import { field, idOf } from "./jsonapi";
-import { readOriginLookups } from "./lead-origin-read";
+import { readOriginLookups, type OriginLookups } from "./lead-origin-read";
 import { leadRead } from "@/lib/leads/live";
 
 /**
@@ -48,6 +48,8 @@ export type FirmResult = {
   leadsMoved: number;
   /** Lead moves that errored. The matter is untouched and the run goes on. */
   leadMovesFailed: number;
+  /** When a Lawmatics call threw: its status class only (never the message). */
+  failure?: LawmaticsFailureClass;
 };
 
 export type HiredSyncSummary = {
@@ -85,7 +87,15 @@ async function pageAll<T>(read: (from: number, to: number) => PromiseLike<{ data
   return null; // more than `max` rows: not a complete read
 }
 
-async function readProspects(client: LawmaticsClient): Promise<HiredProspect[] | null> {
+/**
+ * The `/prospects` read the Lawmatics daily sync shares between its steps (one request for the hired step and
+ * the prospect step), with the origin lookups. `null` means that read failed: the hired step then writes nothing.
+ * Its rules are unchanged: a truncated or unrecognised list is not a read the hired step trusts.
+ */
+export type SharedProspectRead = { prospects: ListResult; lookups: OriginLookups } | null;
+
+async function readProspects(client: LawmaticsClient, shared?: SharedProspectRead): Promise<HiredProspect[] | null> {
+  if (shared === null) return null;
   const areas = await client.listAll("/practice_areas", { params: { fields: "all" } });
   if (areas.truncated || areas.unrecognisedShape) return null;
   const names = new Map<string, string>();
@@ -94,10 +104,10 @@ async function readProspects(client: LawmaticsClient): Promise<HiredProspect[] |
     const name = field(a, "name", "title", "label");
     if (id && name) names.set(id, name);
   }
-  const pulled = await client.listAll("/prospects", { params: { fields: "all" } });
+  const pulled = shared ? shared.prospects : await client.listAll("/prospects", { params: { fields: "all" } });
   if (pulled.truncated || pulled.unrecognisedShape) return null;
   // Optional: tag and custom-field names for the lead origin. A failed read only skips those rules.
-  const lookups = await readOriginLookups(client);
+  const lookups = shared ? shared.lookups : await readOriginLookups(client);
   const out: HiredProspect[] = [];
   for (const raw of pulled.records) {
     const n = normalizeHiredProspect(raw, names, lookups);
@@ -106,9 +116,9 @@ async function readProspects(client: LawmaticsClient): Promise<HiredProspect[] |
   return out;
 }
 
-export async function syncFirm(admin: Admin, orgId: string, client: LawmaticsClient, now: Date): Promise<FirmResult> {
+export async function syncFirm(admin: Admin, orgId: string, client: LawmaticsClient, now: Date, shared?: SharedProspectRead): Promise<FirmResult> {
   try {
-    const prospects = await readProspects(client);
+    const prospects = await readProspects(client, shared);
     if (!prospects) return { ...FAILED };
 
     const [matters, leads, stages, leadStageRows] = await Promise.all([
@@ -206,8 +216,8 @@ export async function syncFirm(admin: Admin, orgId: string, client: LawmaticsCli
     }
 
     return { ok: true, created, linked, skipped: plan.skipped.length, failedWrites, leadsMoved, leadMovesFailed };
-  } catch {
-    return { ...FAILED };
+  } catch (err) {
+    return { ...FAILED, failure: lawmaticsFailureClass(err) };
   }
 }
 

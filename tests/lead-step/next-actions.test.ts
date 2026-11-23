@@ -12,10 +12,10 @@ describe("the schedule comes from the cron code", () => {
   it("the assistants' window is the New York hour INTENDED_NY_HOUR names, in winter and in summer", () => {
     const winter = nextRunWindow("agents", new Date(NOW));
     expect(winter?.start).toBe("2026-11-18T10:00:00.000Z");
-    expect(newYorkHour(new Date(winter!.start))).toBe(INTENDED_NY_HOUR.agents);
+    expect(newYorkHour(new Date(winter!.start))).toBe(INTENDED_NY_HOUR.agents[0]);
     const summer = nextRunWindow("agents", new Date("2026-07-01T12:00:00.000Z"));
     expect(summer?.start).toBe("2026-07-02T09:00:00.000Z");
-    expect(newYorkHour(new Date(summer!.start))).toBe(INTENDED_NY_HOUR.agents);
+    expect(newYorkHour(new Date(summer!.start))).toBe(INTENDED_NY_HOUR.agents[0]);
   });
 
   it("a window is the whole hour (the minute moves), and reads in the firm's zone", () => {

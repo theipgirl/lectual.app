@@ -1,14 +1,14 @@
-import { LAWMATICS_NAME, integrationErrorLine } from "@/lib/ui/words";
+import { LAWMATICS_LAST_SYNC_NOT_READY, LAWMATICS_NAME, LAWMATICS_SYNC_NOW, cantShow, integrationErrorLine, lawmaticsLastSync } from "@/lib/ui/words";
 import { LoadFailedCard, Notice, PageHeader, Pill } from "@/components/ui";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { notFound } from "next/navigation";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { hasRole } from "@/lib/auth/roles";
-import { getLawmaticsConnection } from "@/lib/lawmatics/connection";
+import { getLawmaticsConnection, getLawmaticsLastSync } from "@/lib/lawmatics/connection";
 import { relativeTime } from "@/lib/relative-time";
 import { orgHasModule } from "@/lib/org/modules";
 import { loadLawmaticsCustomFields, loadLoeFieldsConfig } from "@/lib/proposals/loe-fields-load";
-import { ClientsImport, ConnectLawmatics, DisconnectLawmatics, MattersImport, HiredMattersSync } from "@/components/lawmatics/LawmaticsImport";
+import { ClientsImport, ConnectLawmatics, DisconnectLawmatics, MattersImport, LawmaticsSyncNow } from "@/components/lawmatics/LawmaticsImport";
 import { LoeFieldsForm } from "@/components/lawmatics/LoeFieldsForm";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
@@ -17,6 +17,8 @@ import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 export const metadata: Metadata = { title: pageTitle(LAWMATICS_NAME) };
 
 export const dynamic = "force-dynamic";
+/** "Sync from Lawmatics now" runs every step of the daily sync for the firm; the action gives it a 240 s budget. */
+export const maxDuration = 300;
 
 /**
  * Import from Lawmatics, using the firm's OWN token (lectual 0077). No module
@@ -32,6 +34,16 @@ export default async function LawmaticsPage() {
   const tz = await getFirmTimeZone();
   const conn = read.ok ? read.connection : null;
   const active = conn?.status === "active";
+  // "Last complete daily sync": three states, and before lectual 0118 it says it isn't switched on yet.
+  const lastSync = active ? await getLawmaticsLastSync() : null;
+  const lastSyncLine =
+    lastSync === null
+      ? null
+      : lastSync.status === "ok"
+        ? lawmaticsLastSync(lastSync.value ? relativeTime(lastSync.value, undefined, tz) : null)
+        : lastSync.status === "not-set-up"
+          ? LAWMATICS_LAST_SYNC_NOT_READY
+          : cantShow("the last daily sync");
 
   // "LOE fields" belongs to the proposals module and to the admin tier; for anyone else the section is not drawn.
   const showLoeFields = canManage && (await orgHasModule("proposals"));
@@ -109,9 +121,14 @@ export default async function LawmaticsPage() {
           </section>
           <section className="lx-card lx-pad" style={{ display: "grid", gap: 12 }}>
             <h2 className="lx-h2">
-              Hired matters
+              {LAWMATICS_SYNC_NOW}
             </h2>
-            <HiredMattersSync />
+            {lastSyncLine && (
+              <p className="lx-note" role="status" style={{ margin: 0 }}>
+                {lastSyncLine}
+              </p>
+            )}
+            <LawmaticsSyncNow />
           </section>
         </>
       )}

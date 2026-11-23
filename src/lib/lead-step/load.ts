@@ -27,6 +27,8 @@ import { loadAuditContext } from "@/lib/queue/audit-context";
 import { gateLinkedProposal, loadLinkedPanel } from "@/lib/consult-proposal/link";
 import { listTasks } from "@/lib/matters/tasks";
 import { loadBookedConsult } from "@/lib/calendar/outlook-read";
+import { loadBookedLawmaticsConsult } from "@/lib/calendar/lawmatics-read";
+import { mergeBookedConsults } from "@/lib/calendar/booked-merge";
 import { meetingsFor } from "@/lib/meetings/read";
 import { listMeetingConnections } from "@/lib/meetings/connection";
 import { getProposalSettings, listProposalOpens, listProposalStepEvents, listProposals } from "@/lib/proposals/store";
@@ -206,13 +208,20 @@ async function readTasks(leadId: string): Promise<Read<OpenTask[]>> {
 }
 
 async function readConsult(leadId: string, modules: string[] | null): Promise<Read<BookedConsult | null>> {
-  if (modules === null) return unavailable();
-  if (!modules.includes("mailbox")) return notSetUp("mailbox-off");
-  const read = await loadBookedConsult(leadId);
-  if (read.status === "database-update-needed") return notSetUp("calendar-not-ready");
-  if (read.status !== "ok") return unavailable();
-  const e = read.event;
-  return ok(e ? { eventId: e.id, title: e.title, startsAt: e.starts_at, endsAt: e.ends_at, joinUrl: e.join_url } : null);
+  // Lawmatics consults first: not behind the Mailboxes feature (null = Lawmatics isn't connected, nothing read).
+  const lawmatics = await loadBookedLawmaticsConsult(leadId).catch(() => ({ status: "unavailable" as const }));
+  const fact = (e: { id: string; title: string | null; starts_at: string; ends_at: string | null; join_url: string | null }) =>
+    ok({ eventId: e.id, title: e.title, startsAt: e.starts_at, endsAt: e.ends_at, joinUrl: e.join_url });
+  // The Mailboxes gate applies to the Outlook half only.
+  const mailbox = modules === null ? "unknown" : modules.includes("mailbox") ? "on" : "off";
+  const outlook = mailbox === "on" ? await loadBookedConsult(leadId) : null;
+  const read = mergeBookedConsults([lawmatics, outlook]);
+  if (read?.status === "ok" && read.event) return fact(read.event);
+  if (mailbox === "unknown") return unavailable();
+  if (read?.status === "unavailable") return unavailable();
+  if (read?.status === "database-update-needed") return notSetUp("calendar-not-ready");
+  if (mailbox === "off") return notSetUp("mailbox-off");
+  return ok(null);
 }
 
 async function readMeetings(leadId: string): Promise<Read<MeetingFact[]>> {

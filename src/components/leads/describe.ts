@@ -6,7 +6,8 @@
 import { STOP_REASON_LABEL, isStopReason } from "@/lib/campaigns/stops";
 import { CONSULT_OUTCOME_LABEL, isConsultOutcome } from "@/lib/pipeline/consult-outcome-labels";
 import { formatFileSize } from "@/lib/files/rules";
-import { AUTOMATIC_STAGE_MOVES, FIRST_READ, FROM_THEIR_EMAILS } from "@/lib/ui/words";
+import { AUTOMATIC_STAGE_MOVES, CAME_BACK_TIMELINE, FIRST_READ, FROM_THEIR_EMAILS, LAWMATICS_NAME } from "@/lib/ui/words";
+import { CAME_BACK_SOURCE, isCameBackRow } from "@/lib/today/came-back-rules";
 import { reasonText } from "@/lib/stage-keeper/format";
 import { AGENT_ACTOR, REVIEW_SOURCE, SUGGESTION_SOURCE, WHY_TEXT, parseAgentMove, parseSuggestion } from "@/lib/stage-keeper/moves";
 
@@ -199,7 +200,8 @@ export function describeActivity(row: Row & { id?: string }, options: DescribeOp
       };
     }
     case "lead_created":
-      return { title: "Lead created", detail: str(p.source), tone: "system", link: null };
+      // The Lawmatics daily sync stamps its own source id; the timeline names Lawmatics instead.
+      return { title: "Lead created", detail: p.source === CAME_BACK_SOURCE ? LAWMATICS_NAME : str(p.source), tone: "system", link: null };
     case "lead_assigned":
       return { title: "Lead assigned", detail: null, tone: "system", link: null };
     case "lead_merged":
@@ -252,6 +254,8 @@ export function describeActivity(row: Row & { id?: string }, options: DescribeOp
       return { title: "Draft queued for approval", detail: str(p.subject), tone: "ai", link: null };
     case "ai_insight": {
       const source = str(p.source) ?? "";
+      // The Lawmatics daily sync's "came back" flag: ids and the category only, so the words come from the glossary.
+      if (isCameBackRow({ payload: p })) return { title: CAME_BACK_TIMELINE, detail: null, tone: "system", link: null };
       if (source === "intake-triage") {
         return { title: `First read: ${String(p.lane ?? "").toUpperCase() || "scored"}`, detail: str(p.reason), tone: "ai", link: null };
       }

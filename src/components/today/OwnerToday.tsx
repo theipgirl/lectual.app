@@ -24,6 +24,8 @@ import type { PillTone } from "@/lib/ui/tones";
 import { AddNameLink } from "@/components/account/AddNameLink";
 import { OwnerNeedsReview } from "@/components/today/owner/OwnerNeedsReview";
 import { OwnerConsults } from "@/components/today/owner/OwnerConsults";
+import { OwnerCameBack } from "@/components/today/owner/OwnerCameBack";
+import { loadCameBack } from "@/lib/today/came-back";
 import { WeekStrip } from "@/components/today/owner/WeekStrip";
 import { CopilotBox } from "@/components/today/owner/CopilotBox";
 import { DeadlineAlertsCard, loadDeadlineAlerts } from "@/components/today/DeadlineAlertsCard";
@@ -86,6 +88,8 @@ export async function OwnerToday({
 }) {
   // The Deadlines card (PGE Sprint 3) reads on its own, started now so it runs beside every other read on this page.
   const alertsP = loadDeadlineAlerts(userId, now);
+  // Returning clients (the Lawmatics daily sync's "came back" rows): never throws, three states.
+  const cameBackP = loadCameBack(now);
   const [hasProposals, tz] = await Promise.all([orgHasModule("proposals").catch(() => false), getFirmTimeZone()]);
   const dealTimes = parseDealTimes(metadata);
   const [deckS, consultsS, deadlinesS, reviewS, proposalsS, membersS] = await Promise.allSettled([
@@ -98,6 +102,7 @@ export async function OwnerToday({
   ]);
 
   const alertsData = await alertsP;
+  const cameBack = await cameBackP;
   // loadDeckSummary never throws; a rejection would be a bug, shown as unavailable.
   const deck: DeckSummary = deckS.status === "fulfilled" ? deckS.value : { status: "unavailable" };
   const consults: TodayConsultsResult | null = consultsS.status === "fulfilled" ? consultsS.value : null;
@@ -208,6 +213,7 @@ export async function OwnerToday({
               </Notice>
             </section>
           )}
+          <OwnerCameBack read={cameBack} />
         </div>
 
         {proposals !== null && (

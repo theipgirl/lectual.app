@@ -2,7 +2,17 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 /** Each cron route: a tick outside its New York hour answers 200 { skipped } and touches nothing; a tick inside works. */
 const admin = vi.fn(() => ({}));
-const runHiredSync = vi.fn(async () => ({ connections: 0, created: 0, linked: 0, skipped: 0, failedFirms: 0, leadsMoved: 0, leadMovesFailed: 0 }));
+const runLawmaticsDailySync = vi.fn(async (o: { mode: string }) => ({
+  mode: o.mode,
+  connections: 0,
+  failedFirms: 0,
+  reauthNeeded: 0,
+  outOfTime: 0,
+  failures: {},
+  hired: { created: 0, linked: 0, skipped: 0, leadsMoved: 0, leadMovesFailed: 0 },
+  prospects: {},
+  consults: {},
+}));
 const runMeetingImports = vi.fn(async () => ({ connections: 0, ok: 0, failed: 0, inserted: 0 }));
 const runMailboxSync = vi.fn(async () => ({ orgs: 0, connections: 0, ok: 0, failed: 0, outcomes: [] }));
 const runAfterSync = vi.fn(async () => undefined);
@@ -12,7 +22,7 @@ const rootKey = vi.fn(() => "root");
 
 vi.mock("@/lib/env", () => ({ env: { CRON_SECRET: "s3cret" } }));
 vi.mock("@/lib/db/admin", () => ({ getAdminClient: admin }));
-vi.mock("@/lib/lawmatics/hired-sync", () => ({ runHiredSync }));
+vi.mock("@/lib/lawmatics/daily-sync", () => ({ runLawmaticsDailySync, WALL_BUDGET_MS: 270_000 }));
 vi.mock("@/lib/meetings/import", () => ({ runMeetingImports }));
 vi.mock("@/lib/meetings/config", () => ({ zoomClientCredentials: () => null }));
 vi.mock("@/lib/mailbox/config", () => ({ rootKeyOrNull: rootKey, providerCredentials: {} }));
@@ -23,7 +33,7 @@ vi.mock("@/lib/agents/runner", () => ({ runAllAgents }));
 vi.mock("@/lib/ai/claude", () => ({ aiConfigured: () => true }));
 
 const ROUTES = [
-  { job: "lawmatics-matters", intended: "2026-07-15T08:08:00Z", work: runHiredSync },
+  { job: "lawmatics-matters", intended: "2026-07-15T08:08:00Z", work: runLawmaticsDailySync },
   { job: "meetings-import", intended: "2026-07-15T08:38:00Z", work: runMeetingImports },
   { job: "mailbox-sync", intended: "2026-07-15T08:53:00Z", work: runMailboxSync },
   { job: "agents", intended: "2026-07-15T09:23:00Z", work: runAllAgents },
@@ -55,7 +65,7 @@ describe("cron routes and the New York hour guard", () => {
       const res = await call(r.job);
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual({ skipped: "not this hour" });
-      for (const fn of [admin, deps, rootKey, runHiredSync, runMeetingImports, runMailboxSync, runAfterSync, runAllAgents]) expect(fn).not.toHaveBeenCalled();
+      for (const fn of [admin, deps, rootKey, runLawmaticsDailySync, runMeetingImports, runMailboxSync, runAfterSync, runAllAgents]) expect(fn).not.toHaveBeenCalled();
     });
 
     it(`${r.job}: a tick in its hour (even at :59) goes on to work`, async () => {
@@ -74,4 +84,34 @@ describe("cron routes and the New York hour guard", () => {
       expect(res.status).toBe(401);
     });
   }
+
+  describe("lawmatics-matters: the hour decides the mode", () => {
+    const at = async (iso: string) => {
+      vi.setSystemTime(new Date(iso));
+      return call("lawmatics-matters");
+    };
+    it("the 4 AM tick (winter `8 9`) is the full run: hired, prospects, consults", async () => {
+      await at("2026-12-01T09:08:00Z");
+      expect(runLawmaticsDailySync).toHaveBeenCalledWith(expect.objectContaining({ mode: "full" }));
+    });
+    it("the 12 PM and 4 PM ticks (summer `8 16`, `8 20`) are daytime runs: no hired step", async () => {
+      await at("2026-07-15T16:08:00Z");
+      expect(runLawmaticsDailySync).toHaveBeenLastCalledWith(expect.objectContaining({ mode: "daytime" }));
+      await at("2026-07-15T20:59:00Z");
+      expect(runLawmaticsDailySync).toHaveBeenLastCalledWith(expect.objectContaining({ mode: "daytime" }));
+    });
+    it("any other hour is 200 { skipped } with nothing read", async () => {
+      const res = await at("2026-07-15T14:08:00Z"); // 10 AM EDT
+      expect(await res.json()).toEqual({ skipped: "not this hour" });
+      expect(runLawmaticsDailySync).not.toHaveBeenCalled();
+      expect(admin).not.toHaveBeenCalled();
+    });
+    it("without CRON_SECRET it is 401", async () => {
+      vi.setSystemTime(new Date("2026-12-01T09:08:00Z"));
+      const { GET } = await LOAD["lawmatics-matters"]();
+      const res = await GET(new Request("https://x/", {}) as never);
+      expect(res.status).toBe(401);
+      expect(runLawmaticsDailySync).not.toHaveBeenCalled();
+    });
+  });
 });

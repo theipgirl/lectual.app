@@ -94,26 +94,32 @@ export async function readLeadNames(admin: SupabaseClient, orgId: string, ids: r
 export type ConsultItem = { eventId: string; leadId: string | null; startsAt: string; joinUrl: string | null };
 
 /**
- * Outlook consults that start on the firm's calendar day (not the UTC day). The database window is
- * deliberately wider than any zone's day; the exact day is decided here, in the firm's zone.
+ * Consults that start on the firm's calendar day (not the UTC day): Outlook's (only with `outlook`, i.e. the Mailboxes
+ * module on) and the Lawmatics daily sync's OWN rows (`lmsync:`), which are not behind Mailboxes. The database window
+ * is deliberately wider than any zone's day; the exact day is decided here, in the firm's zone.
  */
-export async function readTodaysConsults(admin: SupabaseClient, orgId: string, nowMs: number, tz: string): Promise<Section<ConsultItem>> {
+export async function readTodaysConsults(
+  admin: SupabaseClient,
+  orgId: string,
+  nowMs: number,
+  tz: string,
+  sources: { outlook: boolean } = { outlook: true },
+): Promise<Section<ConsultItem>> {
   try {
     const today = civilDay(nowMs, tz);
     const lo = new Date(`${addCivilDays(today, -1)}T00:00:00Z`).toISOString();
     const hi = new Date(`${addCivilDays(today, 2)}T00:00:00Z`).toISOString();
-    const { data, error } = await admin
-      .from("crm_calendar_event")
-      .select("id, lead_id, starts_at, join_url, all_day")
-      .eq("org_id", orgId)
-      .eq("source", "outlook")
-      .eq("is_consult", true)
-      .gte("starts_at", lo)
-      .lt("starts_at", hi)
-      .order("starts_at", { ascending: true });
+    const read = (source: "outlook" | "lawmatics") => {
+      const q = admin.from("crm_calendar_event").select("id, lead_id, starts_at, join_url, all_day").eq("org_id", orgId).eq("source", source);
+      return (source === "lawmatics" ? q.like("external_id", "lmsync:%") : q).eq("is_consult", true).gte("starts_at", lo).lt("starts_at", hi).order("starts_at", { ascending: true });
+    };
+    const reads = await Promise.all([...(sources.outlook ? [read("outlook")] : []), read("lawmatics")]);
+    const error = reads.find((r) => r.error)?.error;
     if (error) return isDatabaseUpdateNeeded(error) ? { state: "database-update-needed" } : { state: "unavailable", reason: "the calendar did not answer" };
-    const items = ((data ?? []) as Array<{ id: string; lead_id: string | null; starts_at: string; join_url: string | null; all_day: boolean | null }>)
+    const items = reads
+      .flatMap((r) => (r.data ?? []) as Array<{ id: string; lead_id: string | null; starts_at: string; join_url: string | null; all_day: boolean | null }>)
       .filter((e) => !e.all_day && civilDay(new Date(e.starts_at), tz) === today)
+      .sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at))
       .map((e) => ({ eventId: e.id, leadId: e.lead_id ?? null, startsAt: e.starts_at, joinUrl: joinHref(e.join_url) }));
     return { state: "ok", items };
   } catch {

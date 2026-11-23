@@ -3646,6 +3646,8 @@ export type Database = {
           id: string
           last_error: string | null
           last_import_at: string | null
+          /** lectual 0118 (PROPOSED, hand-added until codegen): start of the last complete daily-sync prospect step. */
+          last_sync_at: string | null
           last_verified_at: string | null
           org_id: string
           status: string
@@ -3659,6 +3661,7 @@ export type Database = {
           id?: string
           last_error?: string | null
           last_import_at?: string | null
+          last_sync_at?: string | null
           last_verified_at?: string | null
           org_id: string
           status?: string
@@ -3672,6 +3675,7 @@ export type Database = {
           id?: string
           last_error?: string | null
           last_import_at?: string | null
+          last_sync_at?: string | null
           last_verified_at?: string | null
           org_id?: string
           status?: string

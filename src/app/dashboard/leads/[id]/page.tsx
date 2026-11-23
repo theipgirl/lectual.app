@@ -60,6 +60,8 @@ import { AUTOMATIC_STAGE_MOVES, BLANK, FIRST_READ, LAST_CONTACT, FROM_THEIR_EMAI
 import { mergedSetFor, resolveLeadId } from "@/lib/leads/live";
 import { mergeNotice, mergedFromRedirect } from "@/lib/leads/merge-links";
 import { loadBookedConsult } from "@/lib/calendar/outlook-read";
+import { loadBookedLawmaticsConsult } from "@/lib/calendar/lawmatics-read";
+import { mergeBookedConsults } from "@/lib/calendar/booked-merge";
 import { SequencesCard, type SequenceRow } from "@/components/leads/SequencesCard";
 import { laneView, nextStepForLane } from "@/lib/leads/lane";
 import { getFirmTimeZone, getLaneLinks } from "@/lib/org/profile";
@@ -185,8 +187,9 @@ export default async function LeadPage({
     loadLeadAnswers(lead.id),
     // Files stored on this lead. Never throws: a failed read is named on the card, not an empty list.
     loadDocumentsRead({ kind: "lead", id: lead.id, mergedIds }, { includeLetters: false }),
-    // Outlook consults exist only for a firm with the mailbox module: without it, no read. Never throws (three states).
-    hasMailbox ? loadBookedConsult(lead.id) : Promise.resolve(null),
+    // Two reads, the earliest booking shown: Outlook only with the mailbox module, Lawmatics whenever it is connected
+    // (not behind Mailboxes). Never throws (three states each; null = not read).
+    Promise.all([hasMailbox ? loadBookedConsult(lead.id) : Promise.resolve(null), loadBookedLawmaticsConsult(lead.id).catch(() => ({ status: "unavailable" as const }))]).then(mergeBookedConsults),
     // The address the client gave when they signed their letter: staff roles only (null = not asked). Never throws (three states).
     loadSignedAddress(session.role, { leadId: lead.id }),
   ]);
