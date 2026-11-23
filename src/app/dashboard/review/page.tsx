@@ -28,7 +28,7 @@ import { canSeeBilling } from "@/lib/billing/can-see";
 import { ColumnChooser, type ChooserSection } from "@/components/review/ColumnChooser";
 import { NOTES_PRESENT, columnsFor } from "@/lib/review/sheet-columns";
 import { loadCardCustomColumns } from "@/lib/custom-columns/card-load";
-import { canWriteCustomValue, firmColumnsBlock, type FirmColumnsBlock } from "@/lib/custom-columns/rules";
+import { canSeeCustomMoney, canWriteCustomValue, firmColumnsBlock, withoutMoney, type FirmColumnsBlock } from "@/lib/custom-columns/rules";
 import { canSeeSetup } from "@/lib/setup/roles";
 import { reviewBuckets, reviewSubline } from "@/lib/review/buckets";
 import { boardLanes, kpis, meetingPosition, offBoard } from "@/lib/review/lanes";
@@ -66,7 +66,9 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   // So is the Notes column: each row's newest plain note is read with the review's other reads, only for the List (three-state).
   const withCustom = params.view === "sheet";
   const notes = params.view === "sheet";
-  const load = await loadReview(new Date(), { withFees, withCustom, notes });
+  // The firm's own Money columns follow the fee rule (Taylor, Nov 23): an amount is read only for the owner.
+  const customMoney = canSeeCustomMoney(role);
+  const load = await loadReview(new Date(), { withFees, withCustom, notes, customMoney });
   const userId = session.kind === "ok" ? session.user.id : null;
   const canWrite = !!role && MATTER_WRITE_ROLES.includes(role);
   const canMove = canWrite && CAN_MOVE_STAGE.includes(role);
@@ -102,7 +104,8 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   }) === "owner";
   const common = { owner, today: load.today, members: load.members, canWrite, params };
   // Custom columns: the state the List drew from (null when not read), and the directory for person cells (null = it couldn't be read).
-  const custom = load.custom ?? null;
+  // Cleaned again here (the loader never read an amount for a non-owner): no Money field or amount reaches any table, card or chooser.
+  const custom = load.custom ? (customMoney ? load.custom : withoutMoney(load.custom)) : null;
   const customFields = custom?.status === "ok" ? custom.fields : [];
   const customMembers = load.failed.includes("team names") ? null : load.members;
   // The owner's Sheet edits in place. Each permission comes from the role re-resolved above; the stage lists are read only for a role that can move one.
@@ -174,9 +177,11 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
     const state =
       custom && cardRow
         ? custom
-        : await loadCardCustomColumns(cardLoad.kind === "lead" ? { kind: "lead", id: cardLoad.lead.id } : { kind: "matter", id: cardLoad.matter.id, leadId: cardLoad.matter.lead_id ?? null });
+        : await loadCardCustomColumns(cardLoad.kind === "lead" ? { kind: "lead", id: cardLoad.lead.id } : { kind: "matter", id: cardLoad.matter.id, leadId: cardLoad.matter.lead_id ?? null }, {
+            canSeeMoney: customMoney && canSeeCustomMoney(cardLoad.role),
+          });
     // A staff role types in the card (the card's own re-resolved role); viewer and social media see the values only.
-    firmColumns = firmColumnsBlock(state, custom && cardRow ? cardRow : record, customMembers, load.today, canWriteCustomValue(cardLoad.role));
+    firmColumns = firmColumnsBlock(customMoney && canSeeCustomMoney(cardLoad.role) ? state : withoutMoney(state), custom && cardRow ? cardRow : record, customMembers, load.today, canWriteCustomValue(cardLoad.role));
   }
   // Close (and Back) land on the same review view: every other review param is kept, only `open` goes.
   const cardBase = reviewHref({ ...params, open: null });

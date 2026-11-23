@@ -28,6 +28,7 @@ import {
   CUSTOM_VALUE_SAVE_FAILED,
   CUSTOM_WRONG_KIND,
   CUSTOM_WRONG_SECTION,
+  CUSTOM_MONEY_OWNER_ONLY,
   RECORD_CARD_GONE,
 } from "@/lib/ui/words";
 
@@ -40,7 +41,7 @@ import {
 
 export type ErrorContext = "field" | "value";
 
-/** 0115's 14 distinct trigger prefixes. */
+/** 0115's 15 distinct trigger prefixes (the 15th, money owner-only, Taylor Nov 23). */
 export const PREFIX_WORDS: Readonly<Record<string, string>> = {
   custom_field_immutable: CUSTOM_FIELD_IMMUTABLE,
   custom_field_limit: CUSTOM_LIMIT,
@@ -56,6 +57,7 @@ export const PREFIX_WORDS: Readonly<Record<string, string>> = {
   custom_value_empty: CUSTOM_VALUE_EMPTY,
   custom_value_wrong_kind: CUSTOM_WRONG_KIND,
   custom_value_bad_choice: CUSTOM_CHOICE_BAD,
+  custom_value_money_owner_only: CUSTOM_MONEY_OWNER_ONLY,
 };
 
 /** 0115's 11 CHECKs, its 2 mapped unique keys and its 4 named foreign keys. */

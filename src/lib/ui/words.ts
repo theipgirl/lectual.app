@@ -1336,6 +1336,13 @@ export const CHANGED_BY_AUTOMATION = "an automation";
 export const CHANGED_BY_ASSISTANT = "an assistant";
 export const UPDATED_AUTOMATICALLY = "Updated automatically";
 export const CAME_IN_THROUGH_A_FORM = "Came in through a form";
+/**
+ * Weekly review's last-changed line when the form's staff name could be read (Taylor, Nov 23): "Came in through the UGW 2026 form".
+ * A name that already ends in "form" (a word or part of one, "Webform") is not given a second one. Any other case (failed read, no form, empty name) is CAME_IN_THROUGH_A_FORM.
+ */
+export function cameInThroughForm(name: string): string {
+  return /form$/i.test(name) ? `Came in through the ${name}` : `Came in through the ${name} form`;
+}
 export const OPENED_WHEN_CLIENT_SIGNED = "Opened when the client signed";
 /** The Stage Keeper is never named to a firm (the glossary bans it): its move reads as an automatic one. */
 export const changedAutomaticallyLine = (when: string) => `Changed automatically · ${when}`;
@@ -1387,9 +1394,11 @@ export const REVIEW_LOG_PLACEHOLDER = "A short note for the timeline";
 /** The tag on a filed trademark with no open docket entry (matter page, Matters list, Weekly review). Never moves a row. */
 export const NO_OPEN_DEADLINE = "No open deadline";
 export const NO_OPEN_DEADLINE_HINT = "This trademark is filed and nothing is open on its docket. Add the next USPTO deadline, or close the matter if the work is done.";
+/** The same flag on a REGISTERED mark (Taylor, Nov 23): no Section 8 or renewal deadline open. */
+export const NO_MAINTENANCE_DEADLINE_HINT = "This trademark is registered and no Section 8 or renewal deadline is open on its docket. Add the next maintenance deadline, or close the matter if the work is done.";
 /** A failed deadlines read: nothing is flagged, and this is said instead. */
 export const DEADLINES_COULDNT_LOAD = "Deadlines couldn't load. Refresh to try again.";
-export const DEADLINE_FLAGS_UNCHECKED = "Deadlines couldn't load, so filed matters weren't checked for a missing deadline. Refresh to try again.";
+export const DEADLINE_FLAGS_UNCHECKED = "Deadlines couldn't load, so filed and registered matters weren't checked for a missing deadline. Refresh to try again.";
 /** The Today "Deadlines" card, drawn for the members chosen in Settings. */
 export const DEADLINE_CARD_HEADING = "Deadlines";
 export const DEADLINE_CARD_OVERDUE = "Overdue";
@@ -1546,6 +1555,10 @@ export const CUSTOM_MONEY_TOO_BIG = "That amount is too large.";
 export const CUSTOM_PERSON_NOT_MEMBER = "Choose someone on your firm's team.";
 export const CUSTOM_VALUE_CHANGED = "This cell was changed by someone else just now. Refresh and try again.";
 export const CUSTOM_VALUE_NOT_ALLOWED = "Your role can't change this value. Ask an attorney or an admin.";
+/** A firm's own Money column is owner-only, like the fee columns (Taylor, Nov 23): the refusal for anyone else's write. */
+export const CUSTOM_MONEY_OWNER_ONLY = "Only the firm's owner can see or change money in the firm's own columns.";
+/** Settings -> Columns, under the kind select. */
+export const COLUMNS_KIND_MONEY_HINT = "Money columns are shown only to the firm's owner, like the fee columns.";
 export const CUSTOM_BUSY = "Someone else was changing this column at the same moment. Try again.";
 export const CUSTOM_SAVE_FAILED = "The column couldn't be saved. Try again.";
 export const CUSTOM_VALUE_SAVE_FAILED = "The value couldn't be saved. Try again.";

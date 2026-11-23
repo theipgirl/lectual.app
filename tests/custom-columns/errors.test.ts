@@ -54,10 +54,11 @@ const tableOf = (name: string) => (name.startsWith("crm_custom_value") ? "crm_cu
 
 describe("F12: the counts in the proposal file", () => {
   const raises = [...sql.matchAll(/raise exception '([a-z_]+):([^']*(?:''[^']*)*)'\s*using errcode = '(\w+)'/g)];
-  it("16 raise lines, 14 distinct prefixes, each mapped", () => {
-    expect(raises).toHaveLength(16);
+  // Nov 23: +1 raise and +1 prefix, custom_value_money_owner_only (custom Money is owner-only; changed on purpose).
+  it("17 raise lines, 15 distinct prefixes, each mapped", () => {
+    expect(raises).toHaveLength(17);
     const prefixes = [...new Set(raises.map((m) => m[1]))];
-    expect(prefixes).toHaveLength(14);
+    expect(prefixes).toHaveLength(15);
     expect(prefixes.sort()).toEqual(Object.keys(PREFIX_WORDS).sort());
   });
   it("11 CHECKs, 4 named FKs, 4 unique constraints and 1 unique index; each mapped or on the allow-list", () => {
@@ -83,7 +84,7 @@ describe("F12: the counts in the proposal file", () => {
 
 describe("F12: the real message shapes map to their words, never echoing the input", () => {
   const raises = [...sql.matchAll(/raise exception '(([a-z_]+):[^']*(?:''[^']*)*)'\s*using errcode = '(\w+)'/g)];
-  it("each of the 16 trigger messages, verbatim, in both contexts", () => {
+  it("each of the 17 trigger messages, verbatim, in both contexts", () => {
     for (const m of raises) {
       const message = m[1].replace(/''/g, "'");
       const input = { code: m[3], message };

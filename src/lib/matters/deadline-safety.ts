@@ -5,6 +5,9 @@
  *  1. "Filed with no open deadline": an open TM matter with a serial number or a filing date, and no open
  *     docket entry. A tag only: it never changes a bucket, a sort or a count. When the deadlines could not
  *     be read the answer is "unknown" and NOTHING is flagged (a failed read is never "no deadline").
+ *     Registered marks too (Taylor, Nov 23, answering Rebecca's question): an open TM matter on a docket stage of
+ *     phase `maintenance` with no OPEN Section 8 or Section 9 renewal deadline (`MAINTENANCE_DEADLINE_KINDS`) gets
+ *     the same flag. Its other open deadlines (an office action, say) do not satisfy it.
  *  2. The close guard: closing a matter that holds an open deadline of a USPTO kind is refused, unless an
  *     attorney overrides it with a written reason. Until Rebecca says which kinds count (questions.md R1),
  *     EVERY open deadline on a TM matter counts; on any other matter the trademark kinds below count.
@@ -24,7 +27,22 @@ export const USPTO_DEADLINE_KINDS: readonly DeadlineKind[] = [
   "priority_filing",
 ];
 
-export type FiledMatterInput = Pick<DocketMatterInput, "status" | "stage"> & {
+/**
+ * The registration-maintenance kinds a registered mark must have one of open (Taylor, Nov 23): the Section 8 declaration
+ * and the Section 9 renewal. Section 15 (incontestability) is optional and does not count; nor does any other kind.
+ */
+export const MAINTENANCE_DEADLINE_KINDS: readonly DeadlineKind[] = ["section_8_declaration", "section_9_renewal"];
+
+export function isMaintenanceDeadlineKind(kind: string): boolean {
+  return (MAINTENANCE_DEADLINE_KINDS as readonly string[]).includes(kind);
+}
+
+/** The docket phase of a registered mark's stage (crm_matter_stage.phase). */
+export const REGISTERED_PHASE = "maintenance";
+
+export type FiledMatterInput = Pick<DocketMatterInput, "status"> & {
+  /** The docket stage; `phase` is crm_matter_stage.phase when the caller has it (null or absent = no phase). */
+  stage: (NonNullable<DocketMatterInput["stage"]> & { phase?: string | null }) | null;
   type?: string | null;
   serial_number?: string | null;
   filing_date?: string | null;
@@ -41,12 +59,53 @@ export function isFiledTrademark(m: FiledMatterInput): boolean {
 }
 
 /**
- * The flag. `openDeadlineMatterIds` is the set of matter ids holding at least one `open` docket entry, or
- * null when that read failed: then nothing is flagged.
+ * A registered trademark (Taylor, Nov 23): lifecycle `open`, type TM (no type reads as TM), on a docket stage whose phase is
+ * `maintenance`. Separate from `isFiledTrademark` on purpose: a registered stage is usually `is_open = false`, which
+ * `isOpenMatter` reads as closed, and a registered matter still has maintenance clocks. Never reads a stage name or code.
  */
-export function noOpenDeadline(m: FiledMatterInput & { id: string }, openDeadlineMatterIds: ReadonlySet<string> | null): boolean {
-  if (openDeadlineMatterIds === null) return false;
-  return isFiledTrademark(m) && !openDeadlineMatterIds.has(m.id);
+export function isRegisteredTrademark(m: FiledMatterInput): boolean {
+  if (m.status !== "open") return false;
+  if ((m.type ?? "TM") !== "TM") return false;
+  return m.stage?.phase === REGISTERED_PHASE;
+}
+
+/** The matters whose open deadlines the flag needs to know: filed or registered trademarks. */
+export function needsDeadlineCheck(m: FiledMatterInput): boolean {
+  return isRegisteredTrademark(m) || isFiledTrademark(m);
+}
+
+/**
+ * Which matters hold an open docket entry: `any` kind, and a `maintenance` kind (Section 8 / Section 9). Built from the
+ * rows a deadline read returned (rows of another status are ignored).
+ */
+export type OpenDeadlineIndex = { any: ReadonlySet<string>; maintenance: ReadonlySet<string> };
+
+export function openDeadlineIndex(rows: readonly { matter_id: string; kind: string; status?: string | null }[]): OpenDeadlineIndex {
+  const any = new Set<string>();
+  const maintenance = new Set<string>();
+  for (const r of rows) {
+    if (r.status !== undefined && r.status !== null && r.status !== "open") continue;
+    any.add(r.matter_id);
+    if (isMaintenanceDeadlineKind(r.kind)) maintenance.add(r.matter_id);
+  }
+  return { any, maintenance };
+}
+
+/**
+ * The flag. `open` says which matters hold an open docket entry (any kind, and a maintenance kind), or is null when that
+ * read failed: then nothing is flagged. A registered mark needs an open Section 8 / Section 9 deadline; a filed one, any
+ * open deadline. The registered rule is asked first, so a firm whose maintenance stage is `is_open` still needs a
+ * maintenance deadline there.
+ */
+export function noOpenDeadline(m: FiledMatterInput & { id: string }, open: OpenDeadlineIndex | null): boolean {
+  if (open === null) return false;
+  if (isRegisteredTrademark(m)) return !open.maintenance.has(m.id);
+  return isFiledTrademark(m) && !open.any.has(m.id);
+}
+
+/** The flag's explanation for this matter: the registered wording for a registered mark, else the filed one. */
+export function noOpenDeadlineHint(m: FiledMatterInput, words: { filed: string; registered: string }): string {
+  return isRegisteredTrademark(m) ? words.registered : words.filed;
 }
 
 // ── the close guard ─────────────────────────────────────────────────────────

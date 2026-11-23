@@ -16,7 +16,7 @@ import type { ReviewRow } from "./buckets";
 import { CONTACT_TYPES } from "./contact";
 import { firmSendersFrom, NO_FIRM_SENDERS, type FirmSenders } from "@/lib/mailbox/firm-sender";
 import { proposalExpiryTag, type ProposalExpiryIn } from "./proposal-expiry";
-import { CHANGE_SELECT, CHANGE_TYPES, changeWindowStart, lastChangeFor, pickLastChanges, withoutPeople, type ChangeRowIn } from "./last-changed";
+import { CHANGE_SELECT, CHANGE_TYPES, changeWindowStart, lastChangeFor, pickLastChanges, withFormNames, withoutPeople, type ChangeRowIn } from "./last-changed";
 import { DEFAULT_FEE_READS, type FeeReads } from "./fees-load";
 import { loadCustomColumns } from "@/lib/custom-columns/load";
 import type { CustomColumnsState } from "@/lib/custom-columns/rules";
@@ -185,6 +185,39 @@ export async function readChangeRows(db: ScopedClient, matterIds: readonly strin
   return [...m, ...l];
 }
 
+/**
+ * lead id -> the staff name of the intake form the lead came in through (Taylor, Nov 23), for the "Came in through the <name> form" line.
+ * Two batched reads through the scoped client: the leads' intake submissions (lead_id, form_id, started_at; no answers, no contact), then
+ * the forms' `name` (never the slug). A lead with several submissions takes its FIRST (oldest `started_at`, then id): that one filed it.
+ * A form that can't be found (archived ones are still rows; a missing one), or an empty name, leaves the lead out (the generic sentence).
+ * Any failed read rejects; the caller then keeps the generic sentence for every row (never a guess).
+ */
+export async function readIntakeFormNames(db: ScopedClient, leadIds: readonly string[]): Promise<Map<string, string>> {
+  type Sub = { id: string; lead_id: string | null; form_id: string | null; started_at: string | null };
+  const raw = db as unknown as { from(t: string): { select(c: string): { in(c: string, v: string[]): { order(c: string): { range(a: number, b: number): PromiseLike<{ data: unknown[] | null; error: unknown }> } } } } };
+  const subs = await inChunks(leadIds, (chunk) =>
+    readAllPages<Sub>((from, to) => raw.from("crm_intake_submission").select("id, lead_id, form_id, started_at").in("lead_id", chunk).order("id").range(from, to) as PromiseLike<{ data: Sub[] | null; error: unknown }>),
+  );
+  const first = new Map<string, Sub>();
+  for (const s of subs) {
+    if (!s.lead_id || !s.form_id) continue;
+    const cur = first.get(s.lead_id);
+    const k = (x: Sub) => `${x.started_at ?? "9999"}|${x.id}`;
+    if (!cur || k(s) < k(cur)) first.set(s.lead_id, s);
+  }
+  const formIds = [...new Set([...first.values()].map((s) => s.form_id as string))];
+  const forms = await inChunks(formIds, (chunk) =>
+    readAllPages<{ id: string; name: string | null }>((from, to) => raw.from("crm_intake_form").select("id, name").in("id", chunk).order("id").range(from, to) as PromiseLike<{ data: { id: string; name: string | null }[] | null; error: unknown }>),
+  );
+  const nameOf = new Map(forms.filter((f) => typeof f.name === "string" && f.name.trim() !== "").map((f) => [f.id, f.name as string]));
+  const out = new Map<string, string>();
+  for (const [leadId, s] of first) {
+    const name = nameOf.get(s.form_id as string);
+    if (name) out.set(leadId, name);
+  }
+  return out;
+}
+
 export async function readLastStageChange(db: ScopedClient, leadIds: readonly string[]): Promise<Map<string, string>> {
   const rows = await inChunks(leadIds, (chunk) =>
     readAllPages<{ lead_id: string | null; created_at: string }>((from, to) =>
@@ -270,6 +303,8 @@ export type ReviewReads = FeeReads & { customColumns: typeof loadCustomColumns }
 export type ReviewLoadOptions = {
   withFees?: boolean;
   withCustom?: boolean;
+  /** The firm's own Money columns: only when the page's re-resolved role may see money (`canSeeCustomMoney`). Defaults to no. */
+  customMoney?: boolean;
   /** Read each row's newest note (the List's Notes column). */
   notes?: boolean;
   reads?: Partial<ReviewReads>;
@@ -308,7 +343,7 @@ export async function loadReview(now: Date = new Date(), opts: ReviewLoadOptions
   const dependsOnRecords = failedCritical.length === 0;
   const proposalLeadIds = [...new Set([...leadIds, ...matters.filter((m) => m.status === "open" || m.status === "on_hold").map((m) => m.lead_id).filter((x): x is string => !!x)])];
   const noteRows = [...matterIds.map((id) => ({ kind: "matter" as const, id })), ...leadIds.map((id) => ({ kind: "lead" as const, id }))];
-  const [tasksS, activityS, deadlinesS, changesS, proposalsS, countsS, sendersS, changeRowsS, feeProposalsS, feeTrackerS, customS, notesS] = dependsOnRecords
+  const [tasksS, activityS, deadlinesS, changesS, proposalsS, countsS, sendersS, changeRowsS, feeProposalsS, feeTrackerS, customS, notesS, formNamesS] = dependsOnRecords
     ? await Promise.allSettled([
         readOpenTasks(db, matterIds, leadIds),
         // A matter shows its lead's mail too (the emails were filed on the lead before it signed), so the lead ids behind matters are read as well.
@@ -323,11 +358,14 @@ export async function loadReview(now: Date = new Date(), opts: ReviewLoadOptions
         withFees ? feeReads.acceptedProposalFees(db, matterIds, proposalLeadIds) : Promise.resolve([] as Awaited<ReturnType<FeeReads["acceptedProposalFees"]>>),
         withFees ? feeReads.trackerFees(db, matterIds) : Promise.resolve([] as Awaited<ReturnType<FeeReads["trackerFees"]>>),
         // The firm's custom columns (the List only), in the same batch. A matter shows its lead's value, so the leads behind matters are read too.
-        withCustom ? customRead(db, matterIds, proposalLeadIds, readMergedChildren) : Promise.resolve(null),
+        withCustom ? customRead(db, matterIds, proposalLeadIds, readMergedChildren, { canSeeMoney: opts.customMoney === true }) : Promise.resolve(null),
         // In parallel with the rest, one bounded query per record (sheet-notes-load.ts); never throws, failure is `unavailable`.
         opts.notes ? readSheetNotes(db as unknown as NotesDb, noteRows, timeZone) : Promise.resolve(null),
+        // The intake form a lead came in through, by its staff name (the last-changed line). A matter shows its lead's line, so the
+        // leads behind matters are read too. A failure keeps the generic "Came in through a form" (no note: the line still says something true).
+        readIntakeFormNames(db, proposalLeadIds),
       ])
-    : ([null, null, null, null, null, null, null, null, null, null, null, null] as const);
+    : ([null, null, null, null, null, null, null, null, null, null, null, null, null] as const);
   if (dependsOnRecords && tasksS && tasksS.status === "rejected") failedCritical.push("tasks");
   if (failedCritical.length > 0) return { status: "unavailable", failed: failedCritical };
 
@@ -345,7 +383,8 @@ export async function loadReview(now: Date = new Date(), opts: ReviewLoadOptions
   const proposals = proposalsS?.status === "fulfilled" ? proposalsS.value : null;
   if (!proposals) failed.push("proposals");
 
-  const lastChanges = changeRowsS?.status === "fulfilled" ? pickLastChanges(changeRowsS.value, timeZone, now) : null;
+  const formNames = formNamesS?.status === "fulfilled" ? formNamesS.value : null;
+  const lastChanges = changeRowsS?.status === "fulfilled" ? withFormNames(pickLastChanges(changeRowsS.value, timeZone, now), formNames) : null;
   if (!lastChanges) failed.push("last change");
 
   const docCounts = countsS?.status === "fulfilled" ? countsS.value : null;

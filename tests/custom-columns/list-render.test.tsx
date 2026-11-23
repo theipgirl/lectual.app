@@ -6,6 +6,8 @@ import { CF, cellOf, customFields, customFixture, renderOwnerSheet, renderReadOn
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }), usePathname: () => "/dashboard/review/", useSearchParams: () => new URLSearchParams() }));
 
 const TM_CUSTOM = ["Priority", "Review cycle", "Quoted fee", "Brand note", "Reviewer"];
+/** Nov 23: the Money field ("Quoted fee") is owner-only, like the fee columns; without canSeeMoney it is no column at all. */
+const tmCustom = (canSeeMoney: boolean) => (canSeeMoney ? TM_CUSTOM : TM_CUSTOM.filter((h) => h !== "Quoted fee"));
 const CT_CUSTOM = ["Signed on", "Review cycle"];
 const builtin = (section: "trademarks" | "contracts", canSeeMoney: boolean) => columnsFor(section, { canSeeMoney, hasNotes: NOTES_PRESENT }).map((c) => c.header);
 
@@ -21,7 +23,8 @@ describe.each(tables)("custom columns in %s", (_name, render) => {
   it("each section draws its own fields after the spreadsheet columns, in position order; a both field in both", async () => {
     for (const money of [true, false]) {
       const [tm, ct] = tableHeaders(await render(money));
-      expect(tm).toEqual([...builtin("trademarks", money), ...TM_CUSTOM]);
+      expect(tm).toEqual([...builtin("trademarks", money), ...tmCustom(money)]);
+      if (!money) expect(tm).not.toContain("Quoted fee");
       expect(ct).toEqual([...builtin("contracts", money), ...CT_CUSTOM]);
     }
   });
@@ -109,12 +112,13 @@ describe("F3 / F8: the List follows the one column order", () => {
   it("F3: a new Trademarks column (last position) comes after the spreadsheet columns, last", async () => {
     const added = { id: "00000000-0000-4000-8000-00000000c0aa", section: "trademarks" as const, label: "Urgency", kind: "choice" as const, position: 99, options: ["High", "Low"] };
     const [tm] = tableHeaders(await renderReadOnly({ canSeeMoney: false, custom: withFields([...customFields, added]) }));
-    expect(tm.slice(-6)).toEqual([...TM_CUSTOM, "Urgency"]);
+    expect(tm.slice(-5)).toEqual([...tmCustom(false), "Urgency"]);
     expect(tm.slice(0, builtin("trademarks", false).length)).toEqual(builtin("trademarks", false));
   });
   it("R1: after a Move puts Trademarks 'Quoted fee' (position 4) above Both 'Review cycle' (position 3), it is drawn before it", async () => {
     const moved = customFields.map((f) => (f.id === CF.quote ? { ...f, position: 3 } : f.id === CF.review ? { ...f, position: 4 } : f));
-    const [tm, ct] = tableHeaders(await renderReadOnly({ canSeeMoney: false, custom: withFields(moved) }));
+    // The owner's List: the Money field is drawn only for canSeeMoney (Nov 23).
+    const [tm, ct] = tableHeaders(await renderReadOnly({ canSeeMoney: true, custom: withFields(moved) }));
     expect(tm.slice(-5)).toEqual(["Priority", "Quoted fee", "Review cycle", "Brand note", "Reviewer"]);
     expect(ct.slice(-2)).toEqual(["Signed on", "Review cycle"]);
   });

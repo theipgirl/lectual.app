@@ -45,10 +45,12 @@ describe("0115 proposal: header and prose", () => {
     expect(raw).toMatch(/Depends on: 0001 \(crm_org, crm_org_member unique \(org_id, user_id\)\), 0002 \(current_org_id \/ current_org_role\),\s*--\s*0104 \(crm_lead_id_org_uniq, crm_matter_id_org_uniq\), 0107 \(crm_lead\.merged_into_id\)/);
   });
 
-  it("carries the custom-money open question", () => {
-    expect(raw).toContain("OPEN QUESTION FOR THE FIRM (custom money visibility)");
-    expect(raw).toMatch(/NOT under the app's owner-only fee rule/);
-    expect(raw).toMatch(/every member who can\s+--\s+read the table sees it/);
+  // Changed on purpose (Taylor, Nov 23): the open question is answered, owner only.
+  it("states that custom money is owner only, and why RLS enforces it", () => {
+    expect(raw).not.toContain("OPEN QUESTION FOR THE FIRM (custom money visibility)");
+    expect(raw).toContain("CUSTOM MONEY IS OWNER ONLY (Taylor, Nov 23; this replaces the earlier open question)");
+    expect(raw).toMatch(/`value_cents is not null` is true for\s+--\s+exactly the money rows/);
+    expect(raw).toMatch(/Not chosen: a column grant on value_cents/);
   });
 
   it("records the trigger rename from the spec", () => {
@@ -90,7 +92,7 @@ describe("0115 proposal: header and prose", () => {
     expect(sql).not.toMatch(/insert\s+into\s+public\.crm_custom_/i);
   });
 
-  it("lists the 21 isolation cases, each with a key phrase, plus the manual check", () => {
+  it("lists the 22 isolation cases, each with a key phrase, plus the manual check", () => {
     const cases = raw.slice(raw.indexOf("-- Cases to add to lectual tests/tenant-isolation.test.ts"));
     const phrases: Record<number, RegExp> = {
       1: /Firm B reads 0 of firm A's fields and 0 of its values/,
@@ -114,11 +116,13 @@ describe("0115 proposal: header and prose", () => {
       19: /Deleting an auth user who created a field and last updated a value on an ARCHIVED field succeeds/,
       20: /Merged leads: \(a\)/,
       21: /The existing 0104 \/ 0105 \/ 0107 cases stay green/,
+      // Nov 23: custom money is owner only.
+      22: /Money is owner only \(Taylor, Nov 23\)[\s\S]*firm B's owner reads nothing[\s\S]*admin, senior_admin, attorney, intake, paralegal, law_clerk, clerk, social_media and viewer each read 0 money\s+--\s+rows[\s\S]*count=exact[\s\S]*\(admin, senior_admin, attorney, intake, paralegal, law_clerk and clerk\)[\s\S]*No platform-admin assertion here on purpose/,
     };
-    for (let n = 1; n <= 21; n++) {
+    for (let n = 1; n <= 22; n++) {
       const start = cases.search(new RegExp(`--\\s+${n}\\. `));
       expect(start, `case ${n}`).toBeGreaterThanOrEqual(0);
-      const next = n < 21 ? cases.search(new RegExp(`--\\s+${n + 1}\\. `)) : cases.indexOf("Manual check");
+      const next = n < 22 ? cases.search(new RegExp(`--\\s+${n + 1}\\. `)) : cases.indexOf("Manual check");
       expect(cases.slice(start, next), `case ${n}`).toMatch(phrases[n]);
     }
     expect(cases).toContain("Manual check (not a vitest case): two sessions on lectual-dev");
@@ -305,7 +309,8 @@ describe("0115 proposal: functions and triggers", () => {
 
   it("the rule steps run in the contract's order", () => {
     const value = body("crm_custom_value_rules");
-    const order = ["custom_value_immutable", "custom_value_one_record", "pg_advisory_xact_lock_shared", "custom_value_no_field", "custom_value_no_record", "custom_value_merged_lead", "custom_value_field_archived", "custom_value_wrong_section", "custom_value_empty", "custom_value_wrong_kind", "custom_value_bad_choice", "new.updated_by := auth.uid()"];
+    // Nov 23: the money owner-only refusal comes right after the field is read, before the record (changed on purpose).
+    const order = ["custom_value_immutable", "custom_value_one_record", "pg_advisory_xact_lock_shared", "custom_value_no_field", "custom_value_money_owner_only", "custom_value_no_record", "custom_value_merged_lead", "custom_value_field_archived", "custom_value_wrong_section", "custom_value_empty", "custom_value_wrong_kind", "custom_value_bad_choice", "new.updated_by := auth.uid()"];
     for (let i = 1; i < order.length; i++) expect(value.indexOf(order[i - 1]), `${order[i - 1]} < ${order[i]}`).toBeLessThan(value.indexOf(order[i]));
     const field = body("crm_custom_field_rules");
     const forder = ["custom_field_immutable", "pg_advisory_xact_lock(", "custom_field_limit", "custom_field_label_taken", "custom_field_options_in_use", "new.created_at := now()"];
@@ -326,7 +331,7 @@ describe("0115 proposal: functions and triggers", () => {
     expect(fCols).toEqual(["id", "org_id", "kind", "section", "created_by", "created_at"]);
   });
 
-  it("each of the 14 prefixes is the start of a raise exception message, with its errcode on that raise (R2-4)", () => {
+  it("each of the 15 prefixes is the start of a raise exception message, with its errcode on that raise (R2-4)", () => {
     const codes: Record<string, string> = {
       custom_field_limit: "23514",
       custom_field_immutable: "23514",
@@ -342,9 +347,10 @@ describe("0115 proposal: functions and triggers", () => {
       custom_value_empty: "23514",
       custom_value_wrong_kind: "23514",
       custom_value_bad_choice: "23514",
+      custom_value_money_owner_only: "42501",
     };
     const raises = [...sql.matchAll(/raise exception '([a-z_]+):(?:[^']|'')*'\s+using errcode = '(\d{5})';/g)].map((m) => [m[1], m[2]] as const);
-    expect(Object.keys(codes)).toHaveLength(14);
+    expect(Object.keys(codes)).toHaveLength(15);
     for (const [prefix, code] of Object.entries(codes)) {
       const mine = raises.filter(([p]) => p === prefix);
       expect(mine.length, prefix).toBeGreaterThanOrEqual(1);
@@ -431,7 +437,12 @@ describe("0115 proposal: grants and RLS", () => {
     const STAFF = "('owner', 'admin', 'senior_admin', 'attorney', 'intake', 'paralegal', 'law_clerk', 'clerk')";
     const by = (n: string) => policies.find((p) => p.name === n)!.text;
     expect(by("crm_custom_field_select_member")).toBe("for select using (org_id = public.current_org_id())");
-    expect(by("crm_custom_value_select_member")).toBe("for select using (org_id = public.current_org_id())");
+    // Nov 23: every value policy carries the money row predicate (owner only); the field select is unchanged.
+    const MONEY = "and (value_cents is null or public.current_org_role() = 'owner')";
+    expect(by("crm_custom_value_select_member")).toBe(`for select using ( org_id = public.current_org_id() ${MONEY} )`);
+    expect(by("crm_custom_value_insert_staff")).toContain(MONEY);
+    expect(by("crm_custom_value_update_staff").split(MONEY)).toHaveLength(3);
+    expect(by("crm_custom_value_delete_staff")).toContain(MONEY);
     expect(by("crm_custom_field_insert_admin")).toContain(`public.current_org_role() in ${ADMIN}`);
     expect(by("crm_custom_field_update_admin").split(ADMIN)).toHaveLength(3);
     expect(by("crm_custom_value_insert_staff")).toContain(`public.current_org_role() in ${STAFF}`);
@@ -447,9 +458,9 @@ describe("0115 proposal: grants and RLS", () => {
 });
 
 describe("0115 proposal: the app maps its prefixes in ONE place (Sprint 3)", () => {
-  it("only src/lib/custom-columns/errors.ts names one of the 14 prefixes", () => {
+  it("only src/lib/custom-columns/errors.ts names one of the 15 prefixes", () => {
     const prefixes = [...new Set([...sql.matchAll(/raise exception '([a-z_]+):/g)].map((m) => m[1]))];
-    expect(prefixes).toHaveLength(14);
+    expect(prefixes).toHaveLength(15);
     const re = new RegExp(`\\b(${prefixes.join("|")})\\b`);
     const hits: string[] = [];
     const walk = (dir: string) => {
@@ -521,8 +532,9 @@ describe("0115 proposal: Sprint 3 additions (D8)", () => {
     const end = without.indexOf("end\n$$;\n", start) + "end\n$$;\n".length;
     expect(start).toBeGreaterThan(0);
     without = without.slice(0, start) + without.slice(end);
-    // md5 of docs/pge/2026-11-17-agentic-ip-os/0115-proposed.sql.txt at dbec367 (the end of Sprint 2).
-    expect(createHash("md5").update(without).digest("hex")).toBe("9a366b25be82ef207dcbd410f6daa106");
+    // Changed on purpose (Taylor, Nov 23): the owner-only money change is a deliberate edit, so the baseline is now the file with it
+    // (the money header, step 5b, the four policy predicates, a KNOWN LIMITS line and isolation case 22, widened to every role in the review fix). Was 9a366b25be82ef207dcbd410f6daa106 (dbec367).
+    expect(createHash("md5").update(without).digest("hex")).toBe("b47a383d518905f0dad0725e864b3e19");
   });
 
   it("CO1: the SQL the app's read side mirrors", () => {

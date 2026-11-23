@@ -19,14 +19,14 @@ import {
 } from "@/lib/matters";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { formatCivilDate, formatInternationalClasses, FILING_BASIS_LABEL } from "@/lib/matters/ip-fields";
-import { canOverrideClose, guardedDeadlines, guardedNames, noOpenDeadline } from "@/lib/matters/deadline-safety";
+import { canOverrideClose, guardedDeadlines, guardedNames, noOpenDeadline, noOpenDeadlineHint, openDeadlineIndex } from "@/lib/matters/deadline-safety";
 import { CloseOverrideForm } from "@/components/matters/CloseOverrideForm";
 import { CALCULATED_DEADLINE_NOTICE, daysUntil, deadlineKindLabel, deadlineSourceLabel } from "@/lib/matters/deadline-rules";
 import { matterLabel } from "@/lib/matters/docket-summary";
 import { matterStatusLabel } from "@/lib/matters/status";
 import { BAND_COPY, bandOf, stageAge } from "@/lib/matters/worklist";
 import { LoadFailedLine, Notice, PageHeader, Pill } from "@/components/ui";
-import { A_TEAMMATE, BLANK, DEADLINES_COULDNT_LOAD, MATTERS_NAME, NEXT_STEPS, NO_OPEN_DEADLINE, NO_OPEN_DEADLINE_HINT, OWNER_COLUMN, TEAMMATE, UNASSIGNED } from "@/lib/ui/words";
+import { A_TEAMMATE, BLANK, DEADLINES_COULDNT_LOAD, MATTERS_NAME, NEXT_STEPS, NO_MAINTENANCE_DEADLINE_HINT, NO_OPEN_DEADLINE, NO_OPEN_DEADLINE_HINT, OWNER_COLUMN, TEAMMATE, UNASSIGNED } from "@/lib/ui/words";
 import { Timeline } from "@/components/timeline/Timeline";
 import { meetingsFor } from "@/lib/meetings/read";
 import { LinkedMeetings } from "@/components/meetings/LinkedMeetings";
@@ -177,7 +177,8 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
   const closedDeadlines = (deadlines ?? []).filter((d) => d.status !== "open");
   // Deadline safety (PGE Sprint 3): the flag needs a deadlines read that worked; the override form needs an override role,
   // a matter that isn't closed, and an open deadline the close guard counts.
-  const flagNoDeadline = noOpenDeadline(matter, deadlines === null ? null : new Set(openDeadlines.map((d) => d.matter_id)));
+  // A registered mark (docket phase maintenance) needs an open Section 8 / renewal deadline (Taylor, Nov 23).
+  const flagNoDeadline = noOpenDeadline(matter, deadlines === null ? null : openDeadlineIndex(openDeadlines));
   const guarded = deadlines === null ? [] : guardedDeadlines(matter.type, openDeadlines);
   const showCloseOverride = canOverrideClose(session.role) && matter.status !== "closed" && guarded.length > 0;
   const age = stageAge(matter);
@@ -275,7 +276,7 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
             {flagNoDeadline && (
               <p className="mx-row" data-flag="no-open-deadline">
                 <Pill tone="risk">{NO_OPEN_DEADLINE}</Pill>
-                <span className="lx-note">{NO_OPEN_DEADLINE_HINT}</span>
+                <span className="lx-note">{noOpenDeadlineHint(matter, { filed: NO_OPEN_DEADLINE_HINT, registered: NO_MAINTENANCE_DEADLINE_HINT })}</span>
               </p>
             )}
             {deadlines === null ? (
