@@ -11,7 +11,7 @@
 -- Spec: docs/pge/2026-11-23-loe-email-sign/spec.md (owner, Nov 23). Contracts: sprint-a.md (this file is Sprint A's), sprint-b.md.
 -- Reused ideas (not code) from the paused Adobe design (git show db58275:docs/pge/2026-11-17-agentic-ip-os/0113-proposed.sql.txt):
 -- the open function that locks the proposal, the one partial unique index per version, SECURITY INVOKER for the function that
--- accepts, the lock order (request first, then proposal), and the isolation-case layout.
+-- accepts, and the isolation-case layout. (The lock order is NOT 0113's: see "Lock order" below, v2.)
 --
 -- WHAT THIS ADDS
 --   1. client_proposal_signing_words      the attorney's own signing words, versioned per firm, approved by a named approver
@@ -24,6 +24,11 @@
 --      and THE one signing function client_proposal_signing_sign (SECURITY INVOKER, like 0106's sign_and_accept).
 --   5. A trigger on client_proposal: when a version leaves `sent` any way other than through signing_sign (withdrawn,
 --      superseded by a new version, accepted in-app), its open request is closed.
+--   6. client_proposal_signing_letter_current(org, content): is the letter copy on the proposal still the firm's CURRENT
+--      approved letter (the database twin of the app's letterLiveCheck)? signing_open and signing_sign refuse when it is not
+--      (`signing_letter_replaced`), so a link never signs a letter the firm has since replaced (spec decision 2, v2 ruling B3).
+--   7. client_proposal_signing_probe(): created LAST in this file. The app's gate calls it; a missing function (42883 /
+--      PGRST202) means 0117 is not fully applied and the client signs in-app as today (v2 ruling B1).
 --
 -- WHAT THIS DOES NOT DO
 --   * 0106's tables, triggers, grants and client_proposal_sign_and_accept are NOT amended. The in-app path keeps working byte
@@ -42,11 +47,23 @@
 --   * Confirm 0106 grants INSERT on client_proposal_signature to service_role (sign_and_accept is INVOKER, so it must).
 --   * Confirm public.current_org_id() / public.current_org_role() and the 0089 unique key client_proposal(id, org_id)
 --     (`client_proposal_id_org_uniq`) exist as 0113 assumed.
+--   * Confirm 0106's client_proposal_loe_template has the columns section 4b reads (id, org_id, status, version, kind, title,
+--     body) under those names, and that `kind` holds 'trademark' / 'general' as content.loe.kind does.
+--   * Apply this file in ONE transaction. client_proposal_signing_probe() is the last statement on purpose: a partial apply
+--     leaves it missing and every firm signs in-app.
 --
 -- Every function: `set search_path = ''`, schema-qualified names, REVOKE from public, anon, authenticated. Service-role-only
--- functions GRANT EXECUTE to service_role. Lock order everywhere: a function that locks both takes the REQUEST row first, then
--- the PROPOSAL (`for update`). Raised messages start with a stable prefix the app maps to fixed sentences; the text after the
--- prefix is never shown.
+-- functions GRANT EXECUTE to service_role. Raised messages start with a stable prefix the app maps to fixed sentences; the text
+-- after the prefix is never shown.
+--
+-- LOCK ORDER (v2, evaluator N1): everywhere that locks both, the PROPOSAL row is locked FIRST, then its request rows.
+--   * signing_open: the proposal `for update`, then the in-flight requests (through close_internal) and the insert.
+--   * the section 7 trigger: runs inside the staff UPDATE of the proposal (proposal already locked), then closes requests.
+--   * signing_sign: reads the request WITHOUT a lock only to learn its proposal id, locks the proposal, THEN locks the request
+--     and re-checks everything on the locked row.
+--   * signing_mark_sent, signing_opened, signing_consent, signing_close lock only the request (never the proposal).
+-- So no two of these can wait on each other in opposite orders. If Postgres still reports a deadlock (40P01, e.g. with a
+-- 0106 path this session could not read), the transaction is rolled back whole and the app answers a fixed "try again" sentence.
 -- =====================================================================================================================
 
 -- ── 1. client_proposal_signing_words: the attorney's own words ───────────────────────────────────────────────────────
@@ -250,6 +267,9 @@ do $$
 begin
   if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'client_proposal_signing_words'
       and policyname = 'client_proposal_signing_words_select') then
+    -- INTENDED (evaluator N12): every member of the firm, viewer and social_media included, reads the firm's own words (the
+    -- spec: "Every member ... reads"), like 0106's letter templates. The request and event policies below are narrower on
+    -- purpose (they hold client evidence); the words hold none.
     create policy client_proposal_signing_words_select on public.client_proposal_signing_words
       for select using (org_id = public.current_org_id());
   end if;
@@ -580,6 +600,31 @@ end
 $$;
 revoke all on function public.client_proposal_signing_close_internal(uuid, text) from public, anon, authenticated;
 
+-- ── 4b. Is the proposal's letter copy still the firm's current approved letter? (v2, ruling B3) ──────────────────────
+-- The database twin of src/lib/loe/live-guard.ts letterLiveCheck / loeIsCurrent: the copy's template id, version, kind,
+-- title and body all equal the firm's APPROVED template row. A retired template, another firm's, or any difference = false.
+-- STABLE, no writes. Called by signing_open and signing_sign (and so also run as the service role inside the INVOKER sign).
+create or replace function public.client_proposal_signing_letter_current(p_org_id uuid, p_content jsonb)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1 from public.client_proposal_loe_template t
+     where t.org_id = p_org_id
+       and t.status = 'approved'
+       and t.id::text = (p_content -> 'loe' ->> 'template_id')
+       and t.version::text = (p_content -> 'loe' ->> 'template_version')
+       and t.kind = (p_content -> 'loe' ->> 'kind')
+       and t.title = (p_content -> 'loe' ->> 'title')
+       and t.body = (p_content -> 'loe' ->> 'body')
+  )
+$$;
+revoke all on function public.client_proposal_signing_letter_current(uuid, jsonb) from public, anon, authenticated;
+grant execute on function public.client_proposal_signing_letter_current(uuid, jsonb) to service_role;
+
 -- ── 5. client_proposal_signing_open (service role) ───────────────────────────────────────────────────────────────────
 -- Locks the proposal, checks it is the same live version with a letter, checks the words are the firm's APPROVED version and
 -- that the snapshotted words and text hash to what is passed, closes any request already in flight for this version
@@ -631,6 +676,9 @@ begin
   if v_row.client_email is null or btrim(v_row.client_email) !~ '^[^@\s]+@[^@\s]+$' then
     raise exception 'signing_no_email: the proposal has no client email on file' using errcode = '23514';
   end if;
+  if not public.client_proposal_signing_letter_current(v_row.org_id, v_row.content) then
+    raise exception 'signing_letter_replaced: the firm has replaced this letter since the proposal went out' using errcode = '23514';
+  end if;
 
   select * into v_words from public.client_proposal_signing_words w where w.id = p_words_id;
   if not found or v_words.org_id is distinct from v_row.org_id or v_words.status is distinct from 'approved' then
@@ -649,13 +697,22 @@ begin
      or pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(p_agreement_text, 'UTF8')), 'hex') is distinct from p_agreement_sha256 then
     raise exception 'signing_invalid: the agreement text does not match its fingerprint' using errcode = '23514';
   end if;
+  -- The app passes (its now + 7 days - 5 minutes), clamped to the proposal's own last day (v2, N2), so a clock skew of up to
+  -- 5 minutes between the app and the database never refuses a send.
   if p_expires_at is null or p_expires_at <= now() or p_expires_at > now() + interval '7 days' then
     raise exception 'signing_invalid: a link lasts at most 7 days' using errcode = '23514';
   end if;
 
-  -- Pressing the button again sends a fresh link and closes the old one.
+  -- Pressing the button again sends a fresh link and closes the old one. A request already past its expiry is closed as
+  -- `expired`, not `resent`, so the evidence says why it closed (v2, N5). Proposal locked above, requests now (lock order).
   for v_old in select r.id from public.client_proposal_signing_request r
-                where r.proposal_id = v_row.id and r.status in ('sending', 'open') loop
+                where r.proposal_id = v_row.id and r.status in ('sending', 'open') and r.expires_at <= now()
+                order by r.id for update loop
+    perform public.client_proposal_signing_close_internal(v_old, 'expired');
+  end loop;
+  for v_old in select r.id from public.client_proposal_signing_request r
+                where r.proposal_id = v_row.id and r.status in ('sending', 'open')
+                order by r.id for update loop
     perform public.client_proposal_signing_close_internal(v_old, 'resent');
   end loop;
 
@@ -814,9 +871,14 @@ begin
     when 'accepted'   then 'accepted_elsewhere'
     else 'proposal_changed'
   end;
+  -- The proposal row is already locked by the UPDATE that fired this trigger; the requests are locked second (lock order).
   for v_id in select r.id from public.client_proposal_signing_request r
-               where r.proposal_id = new.id and r.status in ('sending', 'open') loop
-    perform public.client_proposal_signing_close_internal(v_id, v_reason);
+               where r.proposal_id = new.id and r.status in ('sending', 'open')
+               order by r.id for update loop
+    perform public.client_proposal_signing_close_internal(
+      v_id,
+      case when (select r2.expires_at from public.client_proposal_signing_request r2 where r2.id = v_id) <= now()
+           then 'expired' else v_reason end);
   end loop;
   return null;
 end
@@ -835,9 +897,9 @@ end
 $$;
 
 -- ── 8. client_proposal_signing_sign: THE one signing function (service role) ─────────────────────────────────────────
--- Locks the request (by token sha256), checks it is open, unexpired, opened and consented, checks the typed name is the
--- frozen signer name (case and spaces folded), checks the signature payload, locks the proposal and checks it is still the
--- same live version, writes 0106's signature row from the request's FROZEN text, appends the `signature` and `signed`
+-- Locks the proposal, then the request (by token sha256; v2 lock order), checks the request is open, unexpired, opened and
+-- consented, checks the typed name is the frozen signer name (ASCII case and spaces folded), checks the signature payload,
+-- checks the proposal is still the same live version with the firm's CURRENT letter, writes 0106's signature row from the request's FROZEN text, appends the `signature` and `signed`
 -- evidence, marks the request `signed`, and accepts the proposal with the request's frozen selection and snapshot, all in
 -- this one transaction. A second call for a signed request returns (signature_id, false) and changes nothing.
 -- SECURITY INVOKER, service_role only: 0106's lifecycle accepts a letter proposal only from the service role with no session
@@ -869,10 +931,17 @@ declare
   v_signed_at    timestamptz;
   v_fold_typed   text;
   v_fold_frozen  text;
+  v_proposal_id  uuid;
 begin
-  -- Lock order: the request first, then the proposal.
-  select * into v_req from public.client_proposal_signing_request r where r.token_sha256 = p_token_sha256 for update;
+  -- Lock order (v2, N1): the PROPOSAL first, then the request. Learn the proposal id without a lock, lock the proposal, then
+  -- lock the request and re-check everything below on the LOCKED row.
+  select r.proposal_id into v_proposal_id from public.client_proposal_signing_request r where r.token_sha256 = p_token_sha256;
   if not found then
+    raise exception 'signing_link_closed: no such link' using errcode = '23514';
+  end if;
+  select * into v_row from public.client_proposal p where p.id = v_proposal_id for update;
+  select * into v_req from public.client_proposal_signing_request r where r.token_sha256 = p_token_sha256 for update;
+  if not found or v_req.proposal_id is distinct from v_proposal_id then
     raise exception 'signing_link_closed: no such link' using errcode = '23514';
   end if;
   if v_req.status = 'signed' then
@@ -886,8 +955,13 @@ begin
     raise exception 'signing_no_consent: consent comes before signing' using errcode = '23514';
   end if;
 
-  v_fold_typed  := lower(regexp_replace(btrim(coalesce(p_typed_name, '')), '\s+', ' ', 'g'));
-  v_fold_frozen := lower(regexp_replace(btrim(v_req.signer_name), '\s+', ' ', 'g'));
+  -- Name folding (v2, N3): trim, runs of whitespace to one space, and ASCII A-Z to a-z ONLY (translate, not lower(), whose
+  -- result depends on the database collation). Non-ASCII letters compare exactly. The app folds by the same rule
+  -- (src/lib/loe/email-signing/name-fold.ts), and passes p_typed_name already cleaned by cleanTypedName.
+  v_fold_typed  := pg_catalog.translate(pg_catalog.regexp_replace(pg_catalog.btrim(coalesce(p_typed_name, '')), '\s+', ' ', 'g'),
+                     'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz');
+  v_fold_frozen := pg_catalog.translate(pg_catalog.regexp_replace(pg_catalog.btrim(v_req.signer_name), '\s+', ' ', 'g'),
+                     'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz');
   if char_length(v_fold_typed) < 2 or v_fold_typed <> v_fold_frozen then
     raise exception 'signing_name_mismatch: the typed name is not the name on the letter' using errcode = '23514';
   end if;
@@ -902,15 +976,17 @@ begin
     end if;
   elsif p_signature_kind = 'typed' then
     if p_signature_png is not null or p_typed_style not in ('script', 'print')
-       or pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(p_typed_style || chr(31) || btrim(p_typed_name), 'UTF8')), 'hex') <> p_signature_sha256 then
+       -- p_typed_name is the app's cleanTypedName output (v2, N3), so btrim() is the identity here and both sides hash the
+       -- same string: sha256(style || U+001F || cleaned name). Sprint A offers only 'print' (ruling N9); 'script' is reserved.
+       or pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(p_typed_style || chr(31) || pg_catalog.btrim(p_typed_name), 'UTF8')), 'hex') <> p_signature_sha256 then
       raise exception 'signing_bad_signature: the typed signature does not match its hash' using errcode = '23514';
     end if;
   else
     raise exception 'signing_bad_signature: drawn or typed' using errcode = '23514';
   end if;
 
-  select * into v_row from public.client_proposal p where p.id = v_req.proposal_id for update;
-  if not found
+  -- v_row was locked at the top (lock order); checked here, after the request's own checks.
+  if v_row.id is null
      or v_row.org_id is distinct from v_req.org_id
      or v_row.family_id is distinct from v_req.family_id
      or v_row.version is distinct from v_req.version
@@ -918,6 +994,11 @@ begin
      or (v_row.expires_on is not null and v_row.expires_on < (now() at time zone 'Etc/GMT+12')::date)
      or (jsonb_typeof(v_row.content -> 'loe') = 'object') is not true then
     raise exception 'signing_changed: the proposal changed after the link was sent' using errcode = '23514';
+  end if;
+  -- A link never signs a letter the firm has replaced since (v2, ruling B3). The app closes the link (`proposal_changed`)
+  -- when it sees this; here it is only refused, because a refusal inside this function rolls back the whole transaction.
+  if not public.client_proposal_signing_letter_current(v_row.org_id, v_row.content) then
+    raise exception 'signing_letter_replaced: the firm has replaced this letter since the link was sent' using errcode = '23514';
   end if;
   if pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(v_req.agreement_text, 'UTF8')), 'hex') is distinct from v_req.agreement_sha256 then
     raise exception 'signing_text_mismatch: the stored text does not hash to its fingerprint' using errcode = '23514';
@@ -991,6 +1072,18 @@ $$;
 revoke all on function public.client_proposal_signing_sign(text, text, text, bytea, text, text, inet, text) from public, anon, authenticated;
 grant execute on function public.client_proposal_signing_sign(text, text, text, bytea, text, text, inet, text) to service_role;
 
+-- ── 9. client_proposal_signing_probe: LAST statement on purpose (v2, ruling B1) ──────────────────────────────────────
+-- The app's gate calls it as the service role. Missing (42883 / PGRST202) = 0117 is not (fully) applied = every firm signs
+-- in-app as today. Returns this file's number so a later amendment can be told apart.
+create or replace function public.client_proposal_signing_probe()
+returns integer
+language sql
+immutable
+set search_path = ''
+as $$ select 117 $$;
+revoke all on function public.client_proposal_signing_probe() from public, anon, authenticated;
+grant execute on function public.client_proposal_signing_probe() to service_role;
+
 -- =====================================================================================================================
 -- ISOLATION CASES for lectual's tests/tenant-isolation.test.ts (copy in the same PR as this migration; NOT run in
 -- lectual.app). Same helpers as the 0106 block there: seedOrg, clientFor, admin, anonClient, addMember, seedSentProposal,
@@ -1029,3 +1122,12 @@ grant execute on function public.client_proposal_signing_sign(text, text, text, 
 -- 21. Evidence: an UPDATE or DELETE of an event by the service role is refused (signing_event_append_only); the owner's family
 --     delete (0102) removes the proposal, its requests and their events by cascade.
 -- 22. sign() after the proposal's expires_on has passed (backstop day) is refused (signing_changed) and nothing is written.
+-- 23. (v2, B3) A's admin approves a NEW letter template version while a request is open: sign() is refused
+--     (signing_letter_replaced) and nothing is written; signing_open for that proposal is refused the same way.
+-- 24. (v2, N5) signing_open while an earlier request is past its expires_at: that request closes with `expired` (not
+--     `resent`); a second, unexpired one closes with `resent`.
+-- 25. (v2, B1) client_proposal_signing_probe() answers 117 for the service role and is refused for anon and authenticated.
+-- 26. (v2, N1) A withdrawal (staff UPDATE of status) and sign() on the same proposal in two concurrent sessions: one wins,
+--     the other is refused or waits; neither raises 40P01 (both lock the proposal first).
+-- 27. (v2, N3) sign() folds only ASCII case: "  sam   CLIENT " matches "Sam Client"; "ZOË" does NOT match "Zoë" (the app
+--     refuses the same pair, pinned by src tests).
