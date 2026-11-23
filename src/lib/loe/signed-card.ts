@@ -1,7 +1,7 @@
 import { stepStates, STEP_SUCCESS, type StepEventInput } from "@/lib/proposals/paid";
 import { stepText, type Tone } from "@/lib/proposals/paid-view";
 import type { AcceptedSnapshot } from "@/lib/proposals/types";
-import { SIGNED_ADDRESS_NOT_YET, SIGNED_CARD_UNAVAILABLE, SIGNED_FILING_NOT_YET, signedSummaryLine } from "@/lib/ui/words";
+import { SIGNED_ADDRESS_NOT_YET, SIGNED_CARD_UNAVAILABLE, SIGNED_COPY_NOT_YET, SIGNED_FILING_NOT_YET, signedSummaryLine } from "@/lib/ui/words";
 import type { SignatureRead } from "./signature-read";
 import { rebuiltTextMatches } from "./signed-text-check";
 import { signedAtText } from "./signing";
@@ -46,6 +46,12 @@ export type SignedCardView =
       filing: FilingView;
       /** Whether the signer's mailing address was added to the Lawmatics matter (`address_to_lawmatics`), same states as `filing`. */
       address: FilingView;
+      /**
+       * Sprint B: only for a version signed through the EMAILED link (the two steps never run for an in-app signature, so there is
+       * nothing to show): whether the signed copy was filed in Lectual, and whether it was emailed to the client. Same states.
+       */
+      file: FilingView | null;
+      copy: FilingView | null;
     }
   /** A role that may not read the signature record: who signed and when, from the snapshot. Nothing else. */
   | { kind: "summary"; text: string }
@@ -89,6 +95,8 @@ export function buildSignedCard(input: {
     fromStoredText: !rebuiltTextMatches(input.snapshot),
     filing: filingView(input.events, input.proposalId, input.canRetry),
     address: addressView(input.events, input.proposalId, input.canRetry),
+    file: input.snapshot.agreement?.method === "email_link" ? lectualFileView(input.events, input.proposalId, input.canRetry) : null,
+    copy: input.snapshot.agreement?.method === "email_link" ? emailCopyView(input.events, input.proposalId, input.canRetry) : null,
   };
 }
 
@@ -110,3 +118,20 @@ export function addressView(events: readonly StepEventInput[] | null, proposalId
   const state = s.outcome === "failed" ? "failed" : s.outcome === "skipped" ? "skipped" : "blocked";
   return { state, text: stepText(s), tone: state === "skipped" ? "mute" : "warn", retry: canRetry };
 }
+
+function stepView(step: "signed_loe_file" | "signed_copy_email", notYet: string, events: readonly StepEventInput[] | null, proposalId: string, canRetry: boolean): FilingView {
+  if (events === null) return { state: "unreadable", text: FILING_UNREADABLE, tone: "warn", retry: false };
+  const s = stepStates(events, proposalId)[step];
+  if (!s) return { state: "not_yet", text: notYet, tone: "mute", retry: false };
+  if (s.outcome === STEP_SUCCESS[step]) return { state: "done", text: stepText(s), tone: "ok", retry: false };
+  const state = s.outcome === "failed" ? "failed" : s.outcome === "skipped" ? "skipped" : "blocked";
+  return { state, text: stepText(s), tone: state === "skipped" ? "mute" : "warn", retry: canRetry };
+}
+
+/** Whether the signed copy was filed in Lectual (Documents & files), `signed_loe_file`. */
+export const lectualFileView = (events: readonly StepEventInput[] | null, proposalId: string, canRetry: boolean): FilingView =>
+  stepView("signed_loe_file", SIGNED_FILING_NOT_YET, events, proposalId, canRetry);
+
+/** Whether the signed copy was emailed to the address the link went to, `signed_copy_email`. */
+export const emailCopyView = (events: readonly StepEventInput[] | null, proposalId: string, canRetry: boolean): FilingView =>
+  stepView("signed_copy_email", SIGNED_COPY_NOT_YET, events, proposalId, canRetry);

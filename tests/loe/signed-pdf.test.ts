@@ -21,7 +21,7 @@ const FIRM = { displayName: "RPB Law Firm", timeZone: "America/New_York" };
 /** Builds through the ONE signed-PDF builder; `readStored` is a spy that must not be called unless the test says so. */
 async function build(snapshot: AcceptedSnapshot, over: Partial<SignedPdfInput> = {}) {
   const readStored = vi.fn(async () => null as { text: string; sha256: string } | null);
-  const result = await buildVerifiedSignedPdf({ snapshot, firm: FIRM, readStored, ...over });
+  const result = await buildVerifiedSignedPdf({ snapshot, firm: FIRM, readStored, readEvidence: async () => "unavailable", ...over });
   return { result, readStored: (over.readStored as typeof readStored | undefined) ?? readStored };
 }
 

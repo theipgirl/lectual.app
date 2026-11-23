@@ -124,6 +124,7 @@ export async function signedLetterPdf(token: string, now: Date, opts: { db?: Pub
       // `readPublicProposal` answers `unavailable` for a letter proposal whose firm profile couldn't be read, so these are real.
       firm: { displayName: read.view.firm.displayName, timeZone: read.view.firm.timeZone, logo: letterLogoForSlug(read.view.firm.slug) },
       readStored: source.readStored,
+      readEvidence: source.readEvidence,
     });
     if (!built.ok) {
       // The client gets the same generic sentence either way; a stored text that does not match its fingerprint is logged (id and step only).

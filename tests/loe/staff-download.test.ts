@@ -19,6 +19,7 @@ function deps(over: Partial<StaffDownloadDeps> = {}): StaffDownloadDeps {
     getProposal: async () => acceptedProposalRow(signedTrademark()),
     firmFacts: async () => FACTS,
     readStored: async () => null,
+    readEvidence: async () => "unavailable" as const,
     ...over,
   };
 }
@@ -37,7 +38,7 @@ describe("the staff Download of a signed letter", () => {
     expect(Buffer.from(bytes.slice(0, 4)).toString()).toBe("%PDF");
     expect(r.filename).toBe("Callum-Ferreira-engagement-letter-signed-2026-11-12.pdf");
     // The same builder as the client's own signed download and the Lawmatics filing: the same text read back.
-    const clientSide = await buildVerifiedSignedPdf({ snapshot: signedTrademark(), firm: { displayName: "RPB Law Firm", timeZone: "America/New_York" }, readStored: async () => null });
+    const clientSide = await buildVerifiedSignedPdf({ snapshot: signedTrademark(), firm: { displayName: "RPB Law Firm", timeZone: "America/New_York" }, readStored: async () => null, readEvidence: async () => "unavailable" });
     if (!clientSide.ok) throw new Error("no file");
     expect(await text(bytes)).toBe(await text(clientSide.bytes));
     // Rebuilt and matched: no flag, and the stored text was never asked for.

@@ -128,3 +128,22 @@ export const BACK_TO_PROPOSAL_LABEL = "Back to the proposal";
 export const SIGNATURE_NAME_LABEL = "Your full legal name";
 export const SIGNATURE_TOO_LARGE = "That drawing is too large. Clear it and draw again, or type it instead.";
 export const SIGNATURE_NEEDED = "Draw your signature, or type it instead.";
+
+/** The certificate page on a LINK-signed letter (Sprint B): a heading and the names of the recorded facts. Labels only. */
+export const CERTIFICATE_HEADING = "Signing record";
+export const CERTIFICATE_NOT_RECORDED = "Not recorded";
+export const CERTIFICATE_LABELS = {
+  sentTo: "Sent to",
+  sentAt: "Sent at",
+  openedAt: "Opened at",
+  consentAt: "Consent accepted at",
+  consentSha: "Consent text fingerprint (sha256)",
+  wordsVersion: "Signing words version",
+  signedAt: "Signed at",
+  signedAtUtc: "Signed at (UTC)",
+  ip: "IP address",
+  browser: "Browser",
+  letterFingerprint: "Letter fingerprint (sha256)",
+  typedName: "Typed legal name",
+  signature: "Signature",
+} as const;

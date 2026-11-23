@@ -3,7 +3,8 @@ import "server-only";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import PDFDocument from "pdfkit";
-import { REVIEW_COPY_MARK } from "./client-words";
+import { CERTIFICATE_HEADING, CERTIFICATE_LABELS, REVIEW_COPY_MARK, TYPED_SIGNATURE_LABEL } from "./client-words";
+import type { SigningCertificate } from "./email-signing/certificate";
 import type { LetterLogo } from "./letter-logo";
 import type { Exhibit } from "./exhibit";
 import { hasStyle, splitFirstLine } from "./letter-styles";
@@ -57,6 +58,11 @@ export type BuildLetterPdfInput = {
   mode: PdfMode;
   /** Required for `signed`. */
   signature?: PdfSignature;
+  /**
+   * The certificate page of a letter signed through the EMAILED link (Sprint B): one extra page after the signature record, built only from
+   * recorded evidence (`certificateFrom`). `signed` mode only; a review copy with a certificate is refused.
+   */
+  certificate?: SigningCertificate;
   firmName?: string;
   /**
    * The firm's own logo (RPB only today, `letterLogoForSlug`), drawn centred at the top of page 1 before the letterhead. A logo whose
@@ -104,6 +110,7 @@ export const INDENT_PT = 2.25 * 72;
 
 export async function buildLetterPdf(input: BuildLetterPdfInput): Promise<Uint8Array> {
   if (input.mode === "signed" && !input.signature) throw new Error("A signed letter needs its signature record.");
+  if (input.certificate && input.mode !== "signed") throw new Error("Only a signed letter has a certificate page.");
   const { regular, bold } = loadFonts();
   const doc = new PDFDocument({
     size: "LETTER",
@@ -203,6 +210,7 @@ export async function buildLetterPdf(input: BuildLetterPdfInput): Promise<Uint8A
   }
 
   if (input.mode === "signed" && input.signature) writeSignature(doc, input.signature, input.details, left, width);
+  if (input.mode === "signed" && input.certificate) writeCertificate(doc, input.certificate, left, width);
 
   // Page numbers (bufferPages): written below the bottom margin, so the margin is lifted while drawing them.
   const range = doc.bufferedPageRange();
@@ -343,4 +351,50 @@ function writeSignature(doc: PDFKit.PDFDocument, sig: PdfSignature, details: Sig
   if (details.title) line("Title", details.title);
   line("Fingerprint (sha256)", sig.fingerprint);
   doc.x = left;
+}
+
+/**
+ * The certificate page (Sprint B): ONE added page, label: value in a fixed order, the recorded signature last. Only labels and the
+ * recorded values; no sentence of its own. The drawn signature is the stored PNG itself; a typed one is the typed name in the page's
+ * regular face (no oblique is bundled) beside the words "Typed signature".
+ */
+function writeCertificate(doc: PDFKit.PDFDocument, c: SigningCertificate, left: number, width: number) {
+  doc.addPage();
+  doc.x = left;
+  doc.font("Bold").fontSize(12).text(CERTIFICATE_HEADING, left, doc.y, { width });
+  doc.moveDown(0.8);
+  const line = (label: string, value: string) => {
+    ensureRoom(doc, 36);
+    doc.font("Bold").fontSize(BODY).text(`${label}: `, left, doc.y, { width, continued: true });
+    doc.font("Regular").text(value, { width });
+    doc.moveDown(0.2);
+  };
+  const L = CERTIFICATE_LABELS;
+  line(L.sentTo, c.sentTo);
+  line(L.sentAt, c.sentAt);
+  line(L.openedAt, c.openedAt);
+  line(L.consentAt, c.consentAt);
+  line(L.consentSha, c.consentSha256);
+  line(L.wordsVersion, c.wordsVersion);
+  line(L.signedAt, c.signedAt);
+  line(L.signedAtUtc, c.signedAtUtc);
+  line(L.ip, c.ip);
+  line(L.browser, c.browser);
+  line(L.letterFingerprint, c.letterFingerprint);
+  line(L.typedName, c.typedName);
+
+  ensureRoom(doc, 120);
+  doc.font("Bold").fontSize(BODY).text(`${L.signature}:`, left, doc.y, { width });
+  doc.moveDown(0.3);
+  if (c.signature.kind === "drawn") {
+    // A PNG that cannot be decoded throws: a link-signed letter is never printed without its signature.
+    const top = doc.y;
+    doc.image(Buffer.from(c.signature.png), left, top, { fit: [220, 90] });
+    doc.y = top + 96;
+  } else {
+    doc.font("Regular").fontSize(18).text(c.signature.name, left, doc.y, { width });
+    doc.font("Regular").fontSize(BODY).text(c.signature.style === "print" ? TYPED_SIGNATURE_LABEL : `${TYPED_SIGNATURE_LABEL} (${c.signature.style})`, left, doc.y, { width });
+  }
+  doc.x = left;
+  doc.font("Regular").fontSize(BODY);
 }

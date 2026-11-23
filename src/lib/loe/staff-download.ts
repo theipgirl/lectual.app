@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { LetterPdfResult } from "./pdf-result";
+import type { EvidenceRead } from "./email-signing/evidence";
 import { buildVerifiedSignedPdf, signedLetterFileName, type StoredAgreement } from "./signed-pdf";
 import type { StaffFirmFacts } from "./staff-firm";
 import { isSignedSnapshot } from "@/lib/proposals/signed-state";
@@ -30,6 +31,11 @@ export type StaffDownloadDeps = {
   firmFacts: () => Promise<StaffFirmFacts>;
   /** The stored signed text of this version (scoped client, fenced on the row's own org). Only called when the rebuilt text no longer matches. */
   readStored: (proposal: ProposalRow) => Promise<StoredAgreement | null>;
+  /**
+   * The signing evidence of an emailed-link signature (`readSigningEvidence` on the caller's SCOPED client; 0117 grants the staff roles
+   * these columns). Called only for a link signature, after the text is verified (`buildVerifiedSignedPdf`).
+   */
+  readEvidence: (proposal: ProposalRow) => Promise<EvidenceRead>;
   /** Called once when the stored signed text does not match its recorded fingerprint: the caller writes the one log line (id and step only). */
   onMismatch?: (proposalId: string) => void;
 };
@@ -52,6 +58,7 @@ export async function runStaffDownload(deps: StaffDownloadDeps, proposalId: unkn
       snapshot,
       firm: { displayName: facts.displayName, timeZone: facts.timeZone, logo: facts.logo ?? null },
       readStored: () => deps.readStored(proposal),
+      readEvidence: () => deps.readEvidence(proposal),
     });
     if (!built.ok) {
       if (built.reason === "mismatch") {

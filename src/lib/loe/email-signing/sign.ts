@@ -9,6 +9,7 @@ import { isObject, type SigningDb } from "./db";
 import type { Audit } from "./link-actions";
 import { readFirm } from "./link-read";
 import { namesMatch } from "./name-fold";
+import { MAX_SIGNATURE_PNG_BYTES } from "./sign-limits";
 import { markSigningNotSetUp } from "./not-set-up";
 import { closeUnusable, verifyLinkPair, type VerifyDeps } from "./verify";
 
@@ -21,7 +22,7 @@ import { closeUnusable, verifyLinkPair, type VerifyDeps } from "./verify";
  * Nothing here logs the name, the signature, the token or the address.
  */
 
-export const MAX_SIGNATURE_PNG_BYTES = 102_400;
+export { MAX_SIGNATURE_PNG_BYTES };
 export const TYPED_STYLE = "print";
 const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const DATA_URL = /^data:image\/png;base64,([A-Za-z0-9+/]+={0,2})$/;

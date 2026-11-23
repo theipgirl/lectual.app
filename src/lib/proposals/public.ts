@@ -1,3 +1,5 @@
+import { readSigningEvidence, type EvidenceDb } from "@/lib/loe/email-signing/evidence-read";
+import type { EvidenceRead } from "@/lib/loe/email-signing/evidence";
 import "server-only";
 
 import { after } from "next/server";
@@ -988,7 +990,7 @@ async function signAndAccept(input: {
 export async function readSignedSource(
   handle: PublicProposalHandle,
   db?: PublicProposalsDb,
-): Promise<{ snapshot: AcceptedSnapshot; readStored: () => Promise<{ text: string; sha256: string } | null> } | null> {
+): Promise<{ snapshot: AcceptedSnapshot; readStored: () => Promise<{ text: string; sha256: string } | null>; readEvidence: () => Promise<EvidenceRead> } | null> {
   try {
     const client = publicProposalsDb(db);
     const { data, error } = await client.from("client_proposal").select("accepted_snapshot").eq("id", handle.proposalId).eq("org_id", handle.orgId).maybeSingle();
@@ -998,6 +1000,8 @@ export async function readSignedSource(
       snapshot,
       readStored: () =>
         readStoredAgreement(client as unknown as StoredAgreementDb, { proposalId: handle.proposalId, orgId: handle.orgId, signatureId: snapshot.agreement?.signature_id }),
+      // The emailed link's evidence, by the request the snapshot names; fenced on the handle's own org and proposal.
+      readEvidence: () => readSigningEvidence(client as unknown as EvidenceDb, { proposalId: handle.proposalId, orgId: handle.orgId, requestId: snapshot.agreement?.signing_request_id }),
     };
   } catch {
     return null;

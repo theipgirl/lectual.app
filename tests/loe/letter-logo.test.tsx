@@ -167,8 +167,8 @@ describe("the PDF", () => {
 
   it("buildVerifiedSignedPdf passes the firm's logo through, and none when the firm has none", async () => {
     const snapshot = signedTrademark();
-    const withLogo = await buildVerifiedSignedPdf({ snapshot, firm: { displayName: "RPB Law Firm", timeZone: "America/New_York", logo: RPB_LETTER_LOGO }, readStored: async () => null });
-    const without = await buildVerifiedSignedPdf({ snapshot, firm: { displayName: "Other Firm", timeZone: "America/New_York", logo: letterLogoForSlug("hartwell-ip") }, readStored: async () => null });
+    const withLogo = await buildVerifiedSignedPdf({ snapshot, firm: { displayName: "RPB Law Firm", timeZone: "America/New_York", logo: RPB_LETTER_LOGO }, readStored: async () => null, readEvidence: async () => "unavailable" });
+    const without = await buildVerifiedSignedPdf({ snapshot, firm: { displayName: "Other Firm", timeZone: "America/New_York", logo: letterLogoForSlug("hartwell-ip") }, readStored: async () => null, readEvidence: async () => "unavailable" });
     expect(withLogo.ok && hasImage(withLogo.bytes)).toBe(true);
     expect(without.ok && hasImage(without.bytes)).toBe(false);
   });

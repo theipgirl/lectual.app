@@ -6,6 +6,8 @@ import type { AcceptedSnapshot } from "@/lib/proposals/types";
 import type { Exhibit } from "./exhibit";
 import type { LetterLogo } from "./letter-logo";
 import { buildLetterPdf } from "./pdf";
+import { checkCertificate, type SigningCertificate } from "./email-signing/certificate";
+import type { EvidenceRead } from "./email-signing/evidence";
 import { cleanSigningDetails, signedAtText, signedAtUtcIso } from "./signing";
 
 import { verifySignedCopy, type StoredAgreement } from "./signed-text-check";
@@ -29,6 +31,13 @@ export { rebuiltTextMatches } from "./signed-text-check";
  *
  * The firm's name and zone are required: a failed read of either is the caller's to report, never a letter with no letterhead
  * or a time in a guessed zone.
+ *
+ * ── A LINK-SIGNED LETTER IS NEVER PRINTED WITHOUT ITS CERTIFICATE (lectual 0117, Sprint B) ───────────────────────────────
+ * A snapshot signed through the EMAILED link (`agreement.method === "email_link"`) gets one more page, the signing record, built
+ * from recorded evidence (`checkCertificate`). `readEvidence` is REQUIRED (no caller can leave it out), is asked only AFTER the
+ * text is verified, and is never called for an in-app (0106) signature, whose bytes are exactly what they were before. Evidence
+ * that is unavailable, not set up or incomplete: NO file (`unavailable`, try again). A `signed` event whose sha256 differs from
+ * the verified text's, or a drawn signature that does not hash to what was recorded: NO file (`mismatch`).
  */
 
 export type { StoredAgreement };
@@ -48,6 +57,11 @@ export type SignedPdfInput = {
   firm: { displayName: string; timeZone: string; /** The firm's own letter logo (`letterLogoForSlug`), if it has one. */ logo?: LetterLogo | null };
   /** Reads the stored signed text. Called ONLY when the rebuilt text does not match the stored fingerprint. */
   readStored: () => Promise<StoredAgreement | null>;
+  /**
+   * REQUIRED. The signing evidence of an emailed-link signature (`readSigningEvidence`, bound by the caller to the client it holds,
+   * fenced on the proposal row's org). Called only for an `email_link` snapshot, only after the text is verified.
+   */
+  readEvidence: () => Promise<EvidenceRead>;
 };
 
 /** Never drawn: the stored-text copy has no exhibit table (its exhibit lines are part of the stored text). */
@@ -55,10 +69,6 @@ const NO_EXHIBIT: Exhibit = { title: "", groups: [], legalDue: { label: "", note
 
 export async function buildVerifiedSignedPdf(input: SignedPdfInput): Promise<SignedPdfBuild> {
   const { snapshot, firm } = input;
-  // lectual 0117, Sprint A (v2 ruling B6): a letter signed through the EMAILED link has no PDF until Sprint B adds its certificate
-  // page. Refused here, before any read, so no caller (the client's download, the staff Download, the Lawmatics filing) can
-  // produce one without it. The filing step records `failed` and is retried later. In-app signatures are untouched.
-  if (snapshot?.agreement?.method === "email_link") return { ok: false, reason: "unavailable" };
   if (!isSignedSnapshot(snapshot) || !snapshot?.agreement) return { ok: false, reason: "unavailable" };
   if (!firm.displayName.trim() || !firm.timeZone.trim()) return { ok: false, reason: "unavailable" };
   const agreement = snapshot.agreement;
@@ -69,6 +79,22 @@ export async function buildVerifiedSignedPdf(input: SignedPdfInput): Promise<Sig
   const copy = await verifySignedCopy(snapshot, firm.timeZone, input.readStored);
   if (copy.kind === "mismatch") return { ok: false, reason: "mismatch" };
   if (copy.kind === "unavailable") return { ok: false, reason: "unavailable" };
+
+  // A letter signed through the emailed link: the certificate page, from verified evidence only, or no file at all.
+  let certificate: SigningCertificate | undefined;
+  if (agreement.method === "email_link") {
+    let read: EvidenceRead;
+    try {
+      read = await input.readEvidence();
+    } catch {
+      read = "unavailable";
+    }
+    if (read === "not_set_up" || read === "unavailable") return { ok: false, reason: "unavailable" };
+    const checked = checkCertificate({ request: read.request, events: read.events, snapshot, verifiedSha256: agreement.sha256, tz: firm.timeZone });
+    if (checked.kind === "mismatch") return { ok: false, reason: "mismatch" };
+    if (checked.kind !== "ok") return { ok: false, reason: "unavailable" };
+    certificate = checked.certificate;
+  }
 
   if (copy.kind === "rebuilt") {
     const letter = copy.letter;
@@ -81,6 +107,7 @@ export async function buildVerifiedSignedPdf(input: SignedPdfInput): Promise<Sig
       firmName: firm.displayName,
       logo: firm.logo ?? null,
       title,
+      ...(certificate ? { certificate } : {}),
     });
     return done(bytes, false);
   }
@@ -102,6 +129,7 @@ export async function buildVerifiedSignedPdf(input: SignedPdfInput): Promise<Sig
     firmName: firm.displayName,
     logo: firm.logo ?? null,
     title,
+    ...(certificate ? { certificate } : {}),
   });
   return done(bytes, true);
 }

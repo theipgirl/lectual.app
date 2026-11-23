@@ -4,6 +4,7 @@ import type { LetterPdfResult } from "@/lib/loe/pdf-result";
 import { runStaffDownload } from "@/lib/loe/staff-download";
 import { loadStaffFirmFacts } from "@/lib/loe/staff-firm";
 import { getScopedClient } from "@/lib/db/scoped-client";
+import { readSigningEvidence, type EvidenceDb } from "@/lib/loe/email-signing/evidence-read";
 import { readStoredAgreement, type StoredAgreementDb } from "@/lib/loe/stored-agreement";
 import { logSignedMismatch } from "@/lib/proposals/signed-mismatch-log";
 import { getProposalRow } from "@/lib/proposals/store";
@@ -27,6 +28,12 @@ export async function downloadSignedLetterStaffAction(proposalId: string): Promi
           proposalId: proposal.id,
           orgId: proposal.org_id,
           signatureId: proposal.accepted_snapshot?.agreement?.signature_id,
+        }),
+      readEvidence: async (proposal) =>
+        readSigningEvidence((await getScopedClient()) as unknown as EvidenceDb, {
+          proposalId: proposal.id,
+          orgId: proposal.org_id,
+          requestId: proposal.accepted_snapshot?.agreement?.signing_request_id,
         }),
       onMismatch: (id) => logSignedMismatch(id, "staff_download"),
     },
