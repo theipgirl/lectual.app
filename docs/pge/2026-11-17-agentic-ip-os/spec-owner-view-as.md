@@ -1,6 +1,6 @@
 # Contract: Owner "View as" a teammate (read-only preview)
 
-**Status:** DRAFT for Taylor's approval, revised after the strict security review (Nov 23). Nothing is built.
+**Status:** DRAFT, revised after the strict security review and with Taylor's answers folded in (Nov 23). Nothing is built. The questions she didn't answer use the defaults in "Defaults chosen (Taylor may override)".
 
 **Size:** large. Every write path gets one wrapper, and every render path switches from "my role" to "the viewer's role".
 
@@ -41,12 +41,16 @@ It does not guard against a hostile owner. Any write that slipped through would 
 - An admin or senior admin can promote their own `crm_org_member` row to owner.
 - A Lectual platform admin (claim `owner`, no row) can insert an owner row for themselves. After that they hold a real row, so `actingAsStaff` turns false and the app sees an ordinary owner.
 
-So 0117 is applied only after 0116. `owner_view_as_start` also refuses (`view_as_needs_member_guard`) when 0116's guard trigger is not on `crm_org_member` (Q15).
+So 0117 is applied only after 0116. `owner_view_as_start` also refuses (`view_as_needs_member_guard`) when 0116's guard trigger is not on `crm_org_member` (default D14).
 
-**Never Lectual staff acting inside a firm** (`session.actingAsStaff`).
-- Their `owner` claim does not count, and they have no row.
-- They keep their existing draw-only preview (`user_metadata.lectual_view_preview`), unchanged.
-- One platform admin in prod is ALSO a real owner. Whether they may use View as is Q11. Default: allowed, because they hold a real owner row.
+**Lectual staff (Taylor, Nov 23).** The rule rests ONLY on a real `crm_org_member` owner row in THAT firm. Being a platform admin neither grants it nor takes it away.
+- **Refused:** a platform admin with no owner row in the firm. That covers:
+  - staff standing in a firm they don't belong to (`actingAsStaff`, claim `owner`, no row);
+  - a platform admin who holds a row there with any role other than owner.
+- **Allowed:** a platform admin who IS a real owner member of that firm (the demo-firm case in prod), in that firm only. In every other firm they are staff, and refused.
+- **The app check** is `session.member?.role === "owner"`, read from the active firm's row that `resolveFirmSession` already loads. It is never `session.role`, and never `!actingAsStaff` on its own.
+- **The database check** is the same table lookup (Data, shared check 3).
+- Staff keep their existing draw-only preview (`user_metadata.lectual_view_preview`), unchanged.
 
 **Never any other role.** That includes admins and senior admins: admins get the owner shell, but not this.
 
@@ -54,7 +58,7 @@ So 0117 is applied only after 0116. `owner_view_as_start` also refuses (`view_as
 - Not yourself.
 - Not anyone outside the firm.
 - Not a removed member. The target must have a row in the same firm when the preview starts AND on every request while it lasts. If they leave the firm, the next request shows Taylor's own view again.
-- Any member otherwise, other owners and admins included (Q8).
+- Anyone else in the firm: **other owners included** (Taylor, Nov 23), and admins.
 
 ## Scope
 
@@ -76,7 +80,7 @@ These are route handlers, not server actions. A server action reaches the proxy 
 Each handler re-reads the session, checks the origin (same-site POST) and returns a redirect.
 
 **Enter:**
-1. Refuses unless the caller is a real owner and not staff.
+1. Refuses unless the caller has a real owner row in this firm.
 2. Checks the target is a current member who is not the caller.
 3. Calls `owner_view_as_start`, which re-checks all of it in the database and writes the rows.
 4. Sets the hint cookie.
@@ -89,7 +93,12 @@ Entering while a preview is open switches teammate. The function closes the old 
 2. Clears the hint cookie.
 3. Redirects to Settings → Team.
 
-If the call fails, Exit still clears the cookie, which ends the preview in this browser (see "Where the preview state lives"). It then shows `VIEW_AS_EXIT_UNRECORDED`. The next call closes the open row (item 5).
+If the call fails, the preview is NOT over, because the database is the sole authority and its row is still open. Exit then:
+- keeps the cookie;
+- stays read-only;
+- shows `VIEW_AS_EXIT_FAILED` ("try again, or sign out").
+
+Signing out ends it. The row's session is gone, so the next state call closes it as `session_ended` (item 5).
 
 **Sign-out:**
 1. Calls `owner_view_as_end('sign_out')` first. This is best effort: a failure never blocks signing out.
@@ -112,15 +121,12 @@ If the call fails, Exit still clears the cookie, which ends the preview in this 
 | Sign-out | `exit/sign_out` |
 | Switching teammate | `exit/switch` |
 | Time-out | `exit/timeout`, with `created_at` = start + 2 hours |
+| Session gone without Exit (signed out elsewhere, session expired) | `exit/session_ended` |
+| Owner row lost, or target left the firm | `exit/access_ended` |
 
-A time-out is closed on the next request:
-1. While the hint cookie is present, the proxy asks `owner_view_as_current`.
-2. If that says the preview is over, the proxy calls `owner_view_as_close_expired()`, which writes `exit/timeout`.
-3. The proxy deletes the cookie.
+**When the closing happens.** `owner_view_as_state()` runs on every dashboard request by a real owner (see "Where the preview state lives"). Before answering, it closes every open row of that owner, in any session, that has timed out, whose session no longer exists, or whose owner or target lost access. `owner_view_as_start` and `owner_view_as_end` close the same way first.
 
-`owner_view_as_start` and `owner_view_as_end` also close any open entry the same way first.
-
-If the browser never comes back, one row stays open. Every reader of the log counts it as ended at start + 2 hours.
+A row can stay open only while its owner makes no request at all. The owner's next request closes it, and until then every reader of the log counts it as ended at start + 2 hours. No open row is ever left behind unnoticed.
 
 **6. The teammate's view, computed through one seam** (below). It covers the rail, phone bar, Today, Approvals (list, deck, item page), Weekly review, Settings tabs, and every page's drawn role checks.
 
@@ -136,9 +142,9 @@ If the browser never comes back, one row stays open. Every reader of the log cou
 
 ### Out
 - Acting as the teammate: approving, moving, sending, noting or uploading "as" them. Any write at all.
-- Seeing the teammate's personal mail, personal Outlook, Copilot chats or bell (open questions).
-- A screen for viewing the log (Q6).
-- Telling the teammate they were viewed (Q5).
+- Seeing the teammate's personal mail, personal Outlook, Copilot chats or bell (defaults D2–D4).
+- A screen for viewing the log (D7).
+- Telling the teammate they were viewed (Taylor, Nov 23: no notice; the 0117 log is enough).
 - Any change to RLS on existing tables.
 - Any change to the staff draw-only preview.
 - Changes to `pricing.ts`, `canApproveItem` or the routing rules. They are called with the teammate's id and role, not changed.
@@ -200,7 +206,7 @@ Role reads in the code today:
 | Role → view | `viewFor({ role, preview, firmHasRoleViews, actingAsStaff })` | `viewFor({ role: viewer.role, preview: NO_PREVIEW, firmHasRoleViews, actingAsStaff: false })` | Yes |
 | Rail, phone bar, More sheet, tour slugs | `drawnNav(visibleNav(modules, role), view)` | `drawnNav(visibleNav(modules, viewer.role), view)`, `shellFor(view)` | Yes |
 | Rail Approvals badge | `mineQueue(allQueue, { userId, role })` | Same, with `viewer` | Yes |
-| Owner-shell deal-ready dot | `loadDealNudge(..., parseDealTimes(user.user_metadata), parseDeckSeen(...))` | Viewer id; firm default deal times (`DEFAULT_DEAL_TIMES`); no deck-seen stamp, because the teammate's own account metadata is not readable | Partly (Q10) |
+| Owner-shell deal-ready dot | `loadDealNudge(..., parseDealTimes(user.user_metadata), parseDeckSeen(...))` | Viewer id; firm default deal times (`DEFAULT_DEAL_TIMES`); no deck-seen stamp, because the teammate's own account metadata is not readable | Partly (D10) |
 | Today (technician) | `loadDeadlineAlerts(userId)`, `mineQueue`, `greetingName`, setup and Getting started cards | Viewer id and role; greeting from the directory name; Getting started card hidden, because its progress lives on the teammate's own account | Mostly |
 | Today (owner view, for an owner or admin target) | `OwnerToday({ userId, role, metadata })`, `loadDeckSummary` | Viewer id and role; no metadata, so firm default deal times | Mostly |
 | Today Consults | Outlook stored events, plus source notes from the CALLER's visible Microsoft connections (Taylor's personal one included); live Zoom | Events as stored: they are org-wide, so the teammate sees the same rows. Source notes from **firm (shared) connections only**, never Taylor's personal connection state. The teammate's own Outlook shows `VIEW_AS_PRIVATE_OUTLOOK`. Zoom is not read (token refresh, see Layer d) and shows `VIEW_AS_ZOOM` | Partly |
@@ -211,10 +217,10 @@ Role reads in the code today:
 | Weekly review | `userId = session.user.id`; `isApprover`; `?who=mine`; Cards `chosenPerson(people, params.person, userId)`; "Waiting on you" | Viewer id and role everywhere. An approver target reads "Waiting on you", as they would | Yes |
 | Lanes, Board, Sheet | Firm-wide rows | Unchanged | Yes |
 | Running timer chip | `crm_time_entry`, readable firm-wide (0056) | The viewer's running timer | Yes |
-| My Mail | The caller's visible connections: own personal plus firm | **Firm (shared) mailboxes only**, from stored rows. The live Inbox tab and reading pane are not fetched. Personal mailboxes show a sentence | Partly (Q1) |
-| Bell | `crm_notification` (RLS `user_id = auth.uid()`) | Muted bell with the sentence; neither person's items | No (Q4) |
-| Copilot | Page, drawer, `POST /api/matters-chat`, history (author-only RLS) | Page shows the sentence; launcher hidden; the route refuses | No (Q2) |
-| Own-Outlook pieces (drafter's Outlook, "Send from Outlook now") | `myOwnOutlookRow()` via `auth.getUser()` | The sentence; never Taylor's Outlook in their place | No (Q1) |
+| My Mail | The caller's visible connections: own personal plus firm | **Firm (shared) mailboxes only**, from stored rows. The live Inbox tab and reading pane are not fetched. Personal mailboxes show a sentence | Partly (D2) |
+| Bell | `crm_notification` (RLS `user_id = auth.uid()`) | Muted bell with the sentence; neither person's items | No (D4) |
+| Copilot | Page, drawer, `POST /api/matters-chat`, history (author-only RLS) | Page shows the sentence; launcher hidden; the route refuses | No (D3) |
+| Own-Outlook pieces (drafter's Outlook, "Send from Outlook now") | `myOwnOutlookRow()` via `auth.getUser()` | The sentence; never Taylor's Outlook in their place | No (D2) |
 | Settings | Per-tab gates | Drawn by `viewerRole()`; every save refused | Yes |
 
 ### Wider than they'd see (handled in code, not left to RLS)
@@ -245,7 +251,7 @@ A test pins the classified list.
 | `VIEW_AS_BANNER(name)` | "Viewing as {name} (read-only)" |
 | `VIEW_AS_EXIT` | "Exit" |
 | `VIEW_AS_READ_ONLY` | "This is a read-only preview. Nothing was changed." |
-| `VIEW_AS_EXIT_UNRECORDED` | "You've left the preview, but leaving couldn't be recorded. Sign out to end the preview fully." |
+| `VIEW_AS_EXIT_FAILED` | "Couldn't leave the preview. Try again, or sign out to end it." |
 | `VIEW_AS_PRIVATE_MAIL(name)` | "{name}'s own mailbox is private to them and isn't shown in a preview." |
 | `VIEW_AS_LIVE_MAIL` | "Live mail isn't read in a preview. Stored messages are shown." |
 | `VIEW_AS_PRIVATE_OUTLOOK(name)` | "{name}'s own Outlook isn't checked in a preview." |
@@ -262,38 +268,52 @@ A test pins the classified list.
 The no-build-words gate applies to all of these: no "impersonate", "session", "RLS" or "migration".
 
 ## Where the preview state lives
-**The state lives in the database (0117), keyed on the auth session id. It is switched on in a browser only while the hint cookie is present.**
+**The database (0117) is the sole authority** (Taylor, Nov 23). A preview is on exactly when `owner_view_as_state()` returns an open row for this owner, this auth session and this firm. The cookie never decides anything.
 
-| Hint cookie | Database read | Result |
-|---|---|---|
-| Absent | None made | OFF |
-| Present | `owner_view_as_current()` returns an open entry | ON |
-| Present | No open entry | OFF (the proxy closes the row and deletes the cookie, Scope item 5) |
-| Present | The read fails | `previewState: "unknown"`: banner shows `VIEW_AS_UNCHECKED` with Exit; writes refused |
+**When it is read: on every dashboard request by a real owner.** That means every page render, every server action and every route handler.
+- "Real owner" is already known for free: `resolveFirmSession` reads the member row on every request anyway.
+- The read is memoized per request, so it happens at most once.
+- **Non-owners make no read at all.** A 0117 outage never touches them.
+- The other option (read only when the hint cookie is present, plus a cheap check) was rejected. It cannot see a row whose cookie was lost, which is exactly the "open row left behind unnoticed" this rule forbids.
 
-- **The hint cookie** is `lx_view_as`: httpOnly, Secure, SameSite=Lax, path `/`, lasting 2 hours.
-- **An open entry** is one for this user, this session and this firm that is:
-  - less than 2 hours old;
-  - held by a caller who is still a real owner;
-  - for a target who is still a member.
-- **No cookie means no read.** A non-owner, or an owner who isn't previewing, pays nothing, and a 0117 outage never blocks anyone who isn't previewing.
-- **The session id** comes from the JWT's `session_id` claim, read in the database (`auth.jwt()`). The browser never sends it.
+**Cost for owners.** One small RPC per dashboard request: an indexed lookup on `(org_id, actor_id, auth_session_id, created_at desc)`.
+- It writes only when it closes a stale row, which is rare.
+- A firm has one to three owners, so the extra load is negligible.
 
-**Why the database, not a signed httpOnly cookie alone.** A cookie holding `{owner, target, session, expiry}`, signed with a server secret, would also work and would save a read per request. The database was chosen because:
+**What `owner_view_as_state()` does.**
+1. Closes this owner's stale open rows (Scope item 5).
+2. Returns the open preview for this session, if any: target user id and start time.
+
+It is a POST RPC, because closing stale rows is a write to the view-as log. The database net allows exactly this function and `owner_view_as_end` (Layer b).
+
+**What each answer means:**
+
+| `owner_view_as_state()` answers | Result |
+|---|---|
+| An open row | ON |
+| No open row | OFF |
+| The read fails (for a real owner) | `previewState: "unknown"`. The banner shows `VIEW_AS_UNCHECKED` and writes are refused. Taylor's own writes would mostly fail in a database outage anyway. |
+| 0117 missing (42P01, PGRST205, 42883, PGRST202), or 0116's guard missing | Not offered; OFF |
+
+**A preview whose cookie is gone is still honoured.** The preview stays on, with the banner and the write block.
+- The cookie `lx_view_as` (httpOnly, Secure, SameSite=Lax, path `/`, 2 hours) is set by Enter and cleared by Exit and sign-out.
+- It only lets the proxy refuse non-GET requests early (Layer c).
+- Clearing it by hand therefore never ends a preview silently and never leaves a row behind. It only drops that early refusal until the next Enter.
+- Forging it without an open row changes nothing except early 409s for that browser.
+
+**The session id** comes from the JWT's `session_id` claim, read in the database (`auth.jwt()`). The browser never sends it.
+
+**Why the database, not a signed httpOnly cookie.** A cookie holding `{owner, target, session, expiry}`, signed with a server secret, would also work and would save the read. The database was chosen because:
 - the in/out log is required anyway, and the log IS the state, so the two can't disagree;
-- the 2-hour limit uses the database clock, not the app server's;
-- owner-only and target membership are re-checked in the database on every read, so a demoted owner or a removed teammate ends the preview at once (a signed cookie would stay valid until it expired);
-- there is no new deployment secret to manage and rotate.
-
-The cookie is kept only as the on-switch in a browser. Deleting it ends the preview there. Forging it without an open row changes nothing.
+- the 2-hour limit runs on the database clock;
+- the owner row and the target's membership are re-checked on every read, so a demoted owner or a removed teammate ends the preview at once (a signed cookie would stay valid until it expired);
+- there is no new deployment secret.
 
 **Why not reuse `user_metadata.lectual_view_preview`:**
 - **The user can edit it** (`auth.updateUser` with the anon key). That is fine for the staff flag, which only decides what is drawn. Here the flag also gates writes and is logged.
 - **It follows the account, not the session.** A preview on the laptop would also lock the phone.
 - **Leaving would itself be a write** (`updateUser`).
 - **It has no server clock and no log.**
-
-**Before 0117 is applied, or when 0116's guard is missing:** the feature is not offered and nobody is previewing. A missing table or function is recognised by its error code (42P01, PGRST205, 42883 or PGRST202).
 
 ## The write block
 
@@ -341,7 +361,7 @@ All of these are reached only from actions and route handlers, or from the rende
 - **What "write nothing" means:** no database write, no queue or provider call, and **no token refresh**.
 - **How each entry is checked:** listed with its reason, and covered by a test that runs it under a preview with a fetch spy and expects only GET reads.
 - **`previewReconcileAction` stays refused,** because it refreshes mailbox tokens (the reconcile mail search).
-- **Whether read-only actions should work at all in a preview is Q12.** Default: they work, because a picker that only answers "read-only" makes the preview hard to look round.
+- **Read-only search and pickers work in a preview** (Taylor, Nov 23). Anything that writes, or refreshes a token, stays refused.
 - **The only other exceptions** are the three view-as / sign-out handlers, listed by path.
 
 ### Layer b: the database net inside `getScopedClient()`
@@ -351,15 +371,14 @@ All of these are reached only from actions and route handlers, or from the rende
 
 **What still passes:**
 - `POST /storage/v1/object/sign/...`, because minting a download link is a read;
-- `POST /rest/v1/rpc/owner_view_as_end` and `owner_view_as_close_expired`, which write only the log;
+- `POST /rest/v1/rpc/owner_view_as_state` and `owner_view_as_end`, which write only the view-as log;
 - auth's token refresh and logout.
 
 **There is no other RPC allowlist.** Read-only RPCs are called as GET, `rpc(fn, args, { get: true })`, which supabase-js supports for STABLE and IMMUTABLE functions. The build switches every read RPC call to that form:
 - `current_org_id` and `current_org_role` (28 calls);
 - `is_platform_admin` and `platform_admin_orgs`;
 - `org_member_directory` (`src/lib/members/directory.ts:46`, via `callMemberRpc` in `src/lib/members/rpc.ts:35`). `loadApprovalRouting` (`src/lib/queue/routing-load.ts:26`) and the preview itself depend on it;
-- the proposed 0108 `mailbox_connections_for_owner`;
-- `owner_view_as_current`.
+- the proposed 0108 `mailbox_connections_for_owner`.
 
 Each must be STABLE in the database for GET to be accepted; the build checks this. A read RPC left as POST simply fails in a preview with "couldn't be read", so the net fails closed.
 
@@ -371,8 +390,6 @@ Each must be STABLE in the database for GET to be accepted; the build checks thi
 - the OAuth connect / callback GETs.
 
 **What it lets through:** three exact paths, `/dashboard/view-as/enter/`, `/dashboard/view-as/exit/` and `/auth/sign-out/`. Paths, because a server action arrives only as an opaque action id.
-
-**It also does the time-out housekeeping** (Scope item 5).
 
 **It is not the authority.** Layers a and b are the guarantee, because:
 - the matcher skips `.png` / `.svg` / font paths and `_next/static`;
@@ -393,7 +410,7 @@ If the provider rotated the token but Layer b refused the save, the connection w
 
 ### Stale tabs
 - A tab drawn before the preview started has no banner. If it posts, the server refuses with the sentence. That is the safe direction.
-- Every tab in this browser shares the cookie and the session.
+- Every tab in this browser shares the session, and so the preview.
 - Another device or another sign-in is not affected.
 
 ### Rejected designs, and why
@@ -447,7 +464,7 @@ If the provider rotated the token but Layer b refused the save, the connection w
 ## Data: proposed lectual 0117 (a proposal file only)
 **Where it goes.** At build time this is written as `docs/pge/2026-11-17-agentic-ip-os/0117-proposed.sql.txt`, for the `lectual` repo. This repo has no migrations.
 
-**Number.** 0117 is the next after the 0108–0116 proposals in this folder. The sibling `spec-lawmatics-daily-sync.md` needs no migration. Re-check `lectual/supabase/migrations` and this folder before copying, because numbering is first-merged-wins.
+**Number.** 0117 is the next after the 0108–0116 proposals in this folder. The sibling `spec-lawmatics-daily-sync.md` proposes 0118 (`lawmatics_connection.last_sync_at`). Re-check `lectual/supabase/migrations` and this folder before copying, because numbering is first-merged-wins.
 
 **Order.**
 1. 0116 is applied and verified on a project.
@@ -470,7 +487,7 @@ The state needs a server clock, owner re-checks and a log. One small append-only
 - `actor_id`: uuid NOT NULL.
 - `target_user_id`: uuid NOT NULL.
 - `kind`: text NOT NULL, CHECK in (`enter`, `exit`).
-- `exit_reason`: text, CHECK in (`exit`, `sign_out`, `switch`, `timeout`). Required on `exit`, null on `enter`.
+- `exit_reason`: text, CHECK in (`exit`, `sign_out`, `switch`, `timeout`, `session_ended`, `access_ended`). Required on `exit`, null on `enter`.
 - `auth_session_id`: uuid NOT NULL.
 - `created_at`: timestamptz NOT NULL.
 
@@ -499,7 +516,7 @@ using (
 )
 ```
 - It is a table lookup, never `current_org_role()`, so a staff `owner` claim does not count.
-- Whether owners see each other's rows is Q13. This policy says yes.
+- Every real owner of the firm sees every row, so one owner can see when another previewed them (default D8).
 
 **Append-only:**
 - A BEFORE UPDATE trigger refuses every update, the service role included (`view_as_append_only`).
@@ -517,50 +534,48 @@ All are SECURITY DEFINER with `search_path = ''`, and executable by `authenticat
 1. Runs checks 1–3.
 2. Refuses the caller as their own target (`view_as_self`, 23514).
 3. Refuses a target with no row in the same firm (`view_as_target_not_member`, 23514).
-4. Closes any open entry in this session: an expired one as `timeout` (at start + 2 hours), a live one as `switch`.
+4. Applies the close rule (below), then closes this session's live entry, if any, as `switch`.
 5. Writes `enter` and returns its time.
 
 **`owner_view_as_end(p_reason text) returns void`:**
 1. Runs checks 1–3. Check 3 is skipped when the caller has an open entry, so a just-demoted owner can still close their own row.
 2. Accepts `p_reason` in (`exit`, `sign_out`) only.
-3. Writes the exit when this session has an open entry, otherwise nothing.
+3. Applies the close rule, then writes the exit when this session has an open entry, otherwise nothing.
 
-**`owner_view_as_close_expired() returns void`:**
-1. Runs check 1.
-2. Writes `exit/timeout` (at start + 2 hours) for this session's open entry when the entry is over 2 hours old, or when its target is no longer a member or its actor no longer an owner. Otherwise nothing.
+**The close rule.** Every function applies it before anything else. It writes an exit for each open `enter` of the caller (in this firm, in ANY session):
+- `timeout` (at start + 2 hours) when the entry is over 2 hours old;
+- `session_ended` when its `auth_session_id` is no longer a row in `auth.sessions`;
+- `access_ended` when the caller no longer has an owner row, or the target is no longer a member.
 
-**`owner_view_as_current() returns table (target_user_id uuid, started_at timestamptz)`:**
-- STABLE, called with GET. Runs checks 1–2.
-- Returns the newest event for (`auth.uid()`, session, `current_org_id()`) when all of these hold:
-  - it is an `enter`;
-  - it is younger than 2 hours;
-  - the caller is still a real owner;
-  - the target is still a member.
-- Otherwise it returns no row.
+**`owner_view_as_state() returns table (target_user_id uuid, started_at timestamptz)`:**
+- VOLATILE (it may write closes), called once per dashboard request by a real owner.
+- Runs checks 1–2, then the close rule. Check 3 is not an error here: a caller who is no longer an owner gets their rows closed as `access_ended` and no row back.
+- Returns this session's open `enter`, if any, otherwise no row.
 
 **Error prefixes:** `view_as_no_session`, `view_as_needs_member_guard`, `view_as_not_owner`, `view_as_self`, `view_as_target_not_member`, `view_as_append_only`, `view_as_no_delete`.
 
 ### Isolation cases (lectual `tests/tenant-isolation.test.ts`)
-- **An owner of firm B reads 0 rows of firm A's events**, directly and through `owner_view_as_current`.
+- **An owner of firm B reads 0 rows of firm A's events**, directly and through `owner_view_as_state`.
 - Firm B's owner cannot start a preview of firm A's member.
 - Admin, senior_admin, attorney and viewer are refused.
 - A platform admin inside the firm with only the claim is refused.
 - Self is refused, and so is a member of another firm as the target.
 - Direct INSERT, UPDATE and DELETE are refused for `authenticated`; UPDATE and DELETE are refused for the service role.
 - The start function refuses when 0116's trigger is absent.
-- `owner_view_as_current` returns nothing after 2 hours, and nothing under a new session id.
-- `owner_view_as_close_expired` writes exactly one `timeout`.
+- `owner_view_as_state` returns nothing after 2 hours, and nothing under a new session id.
+- `owner_view_as_state` writes exactly one `timeout`; one `session_ended` for a row whose session was deleted; one `access_ended` after the target's row is removed. A second call writes nothing.
+- A platform admin who has a real owner row in the firm may start; the same person in a firm where they have no row, or only an admin row, is refused.
 - The firm delete cascades.
 
 ## States
 | Read | ok | not set up | couldn't be read |
 |---|---|---|---|
-| Preview state (`owner_view_as_current`) | On (banner) / off | Before 0117, or without 0116: not offered, nobody previewing | Cookie present: "unknown", banner with `VIEW_AS_UNCHECKED`, writes refused. No cookie: not read, off |
+| Preview state (`owner_view_as_state`, real owners only) | On (banner) / off | Before 0117, or without 0116: not offered, nobody previewing | "unknown": banner with `VIEW_AS_UNCHECKED`, writes refused (cookie or not) |
 | Target in the member directory | Name, role | (n/a) | No preview drawn; Taylor's own view; "Couldn't load your team. Refresh to try again." |
 | Approval routing (for Mine) | Teammate's Mine | (n/a) | Today's fallback: every pending item counted, never 0 |
 | Card events (Handed to you) | Teammate's handed cards | Before 0103: nothing drawn | Nothing drawn, never "none handed" |
 | Queue | As today | Unconfigured | Unavailable (three states untouched) |
-| Exit's log write | Logged, redirect | (n/a) | Cookie cleared, preview over in this browser, `VIEW_AS_EXIT_UNRECORDED`; the next call closes the row |
+| Exit's log write | Logged, cookie cleared, redirect | (n/a) | Preview stays on, cookie kept, `VIEW_AS_EXIT_FAILED`; signing out ends it (`session_ended` on the next owner request) |
 | Every other read | As today | As today | As today |
 | Private places | The sentence | The sentence | The sentence |
 
@@ -568,7 +583,9 @@ All are SECURITY DEFINER with `search_path = ''`, and executable by `authenticat
 
 ### lectual.app
 1. **`tests/views/view-as-rules.test.ts`**
-   - Who may start: all 10 roles × member / staff / self / other firm / removed member. Only a real owner row passes, never the claim.
+   - Who may start: all 10 roles × member / self / other firm / removed member. Only a real owner row passes, never the claim.
+   - Platform admins: one with an owner row in the firm passes; one with no row (`actingAsStaff`) or a non-owner row is refused; the same person passes in their own firm and is refused in another.
+   - An owner may preview another owner.
    - `resolveViewer` swaps only "whose view".
    - role-views on and off give the teammate's `viewFor` / `drawnNav(visibleNav(...))`.
 2. **`tests/views/view-as-actions-guarded.test.ts`** (AST)
@@ -582,7 +599,7 @@ All are SECURITY DEFINER with `search_path = ''`, and executable by `authenticat
    - With the flag on, none of these reaches the fetch spy from a scoped client: insert, update, upsert, delete, volatile RPC, storage upload, `updateUser`.
    - GET reads, GET RPCs (`{ get: true }`), signed-URL minting and the two log functions pass.
    - With the flag off, everything passes.
-5. **`tests/views/view-as-read-rpcs.test.ts`**: every read RPC call uses `{ get: true }`: `current_org_id`, `current_org_role`, `is_platform_admin`, `platform_admin_orgs`, `org_member_directory`, `mailbox_connections_for_owner`, `owner_view_as_current`. A grep of `.rpc(` against a classified list.
+5. **`tests/views/view-as-read-rpcs.test.ts`**: every read RPC call uses `{ get: true }`: `current_org_id`, `current_org_role`, `is_platform_admin`, `platform_admin_orgs`, `org_member_directory`, `mailbox_connections_for_owner`. A grep of `.rpc(` against a classified list.
 6. **`tests/views/view-as-read-only-allowlist.test.ts`**
    - Each allowlisted action, run in a preview with a fetch spy, makes only GET requests and no token refresh.
    - `previewReconcileAction` is refused.
@@ -614,13 +631,17 @@ All are SECURITY DEFINER with `search_path = ''`, and executable by `authenticat
     - Enter refuses each of these with its fixed sentence: staff, non-owners, self, a non-member, a missing 0117, a missing 0116 guard.
     - Enter switches teammate, writing one `switch` exit.
     - Exit writes `exit/exit` and clears the cookie.
-    - Exit with the database down still clears the cookie and shows `VIEW_AS_EXIT_UNRECORDED`.
+    - Exit with the database down keeps the preview on and the cookie set, and shows `VIEW_AS_EXIT_FAILED`.
     - Sign-out calls `owner_view_as_end('sign_out')` first, and signs out even when that fails.
 15. **`tests/views/view-as-proxy.test.ts`**
     - With the cookie, non-GET on signed-in paths gets 409 plus the sentence.
     - The three fixed paths pass; so do cron, webhooks, worksheet and the public token pages.
-    - An expired preview triggers `owner_view_as_close_expired` once, and the cookie is deleted.
-16. **`tests/ui/words.test.ts` and the no-build-words gate** cover the new strings.
+    - The proxy reads no preview state (it is not the authority).
+16. **`tests/views/view-as-state.test.ts`**
+    - Every dashboard page render, action and route by a real owner calls `owner_view_as_state` exactly once (memoized); a non-owner makes no call.
+    - Cookie cleared by hand with an open row: the preview stays on (banner, writes refused).
+    - A failed state read for an owner: "unknown", writes refused.
+16a. **`tests/ui/words.test.ts` and the no-build-words gate** cover the new strings.
 17. **Existing suites stay green:** the queue three-state tests, `tests/queue/fold-trust.test.ts`, the views tests (the staff preview is unchanged), and the Weekly review tests.
 
 ### lectual
@@ -629,7 +650,7 @@ All are SECURITY DEFINER with `search_path = ''`, and executable by `authenticat
     - no FK on the user columns;
     - `authenticated` has SELECT and **no INSERT, UPDATE or DELETE grant**;
     - the SELECT policy qualifies `owner_view_as_event.org_id` on both sides and checks `current_org_id()`;
-    - every read function is STABLE;
+    - `owner_view_as_state` applies the close rule and the 0116 check;
     - the 0116-trigger check is present.
 
     Plus the isolation cases above.
@@ -649,11 +670,12 @@ All are SECURITY DEFINER with `search_path = ''`, and executable by `authenticat
 - The service role added to dashboard code.
 - Taylor's own private items shown inside the teammate's view, or the teammate's private items shown at all.
 - A preview started:
-  - by Lectual staff through their claim;
+  - by a platform admin with no owner row in that firm;
   - by a non-owner;
   - of yourself, or of someone outside the firm;
   - on a database without 0116's member guard.
 - One firm reading another firm's view-as log.
+- An open view-as row left behind unnoticed, or a preview silently ended by clearing a cookie.
 - A provider token refreshed (and so rotated) during a preview.
 - A failed read shown as empty or zero.
 
@@ -663,32 +685,29 @@ All are SECURITY DEFINER with `search_path = ''`, and executable by `authenticat
 - **R3. External reads that use POST** (for example a provider search). In a preview they are refused and show "couldn't be read". That fails closed, but a preview page can end up emptier than the real one. List them during the build.
 - **R4. The AST test must see through every way an action is exported** in this codebase. If a pattern can't be checked, it is rewritten to one that can, rather than allowlisted.
 
-## OPEN QUESTIONS (for Taylor)
-1. **Their personal mail and Outlook.** This can't be done safely. A personal mailbox is visible only to its owner by design (0075), and opening it to the firm owner would expose privileged client mail and the person's own mail. Shared mailboxes (intake@, trademark@) do show. Is that enough?
-2. **Their Copilot chats.** These are private to the author (0099), and there is no owner policy, on purpose. Recommend leaving them private. Agree?
-3. **"Act as" them** (approve, move or send as the teammate). Not offered. Every record would say the teammate did something they didn't, which breaks:
-   - the audit trail;
-   - lane and approval attribution (0085, the approval receipts);
-   - the attorney-only approval rule.
+## Taylor's answers (Nov 23)
+- **Owners can preview other owners.**
+- **Read-only search and pickers work in a preview,** through the named read-only allowlist. Anything that writes, or refreshes a token, stays refused.
+- **The teammate is not notified.** The 0117 log of every preview is enough.
+- **"Never staff" means:** any platform admin who isn't a real owner member of the firm is refused. A platform admin who IS a real owner member of that firm (the demo-firm case) is allowed there. The rule rests on the owner row, not on `actingAsStaff`.
+- **The database is the sole authority for preview state.** See "Where the preview state lives".
 
-   Taylor does any fix as herself, after Exit. Agree?
-4. **Their bell.** `crm_notification` is readable only by its recipient (0056). Showing it would need a new policy letting an owner read teammates' notification headlines. Recommend no. Want it anyway?
-5. **Should the teammate be told** they were viewed (a bell line, or a line on their Team row)? Default: no notice; the log is for owners.
-6. **Where to show the log.** Default: stored only, no screen. Option: a "Recent previews" list on Team settings for owners.
-7. **Time limit.** Default 2 hours. Shorter or longer?
-8. **Previewing another owner or an admin.** Default: allowed (read-only, and only firm data Taylor already sees). Restrict to non-owners?
-9. **Admins** get the owner shell but NOT View as, per "owner only". Confirm.
-10. **Their own settings** (deal times, tips and Getting started progress) live on their account and can't be read. The preview uses the firm's default deal times and hides Getting started. OK?
-11. **"Never Lectual staff."** Does that mean only staff acting in a firm they don't belong to (`actingAsStaff`), or any `platform_admin`? One platform admin is also a real owner in prod. Default: only `actingAsStaff` is refused, so that person may use it as an owner.
-12. **Read-only actions in a preview** (pickers, search, compare, previews, downloads). Should they work, or show the read-only sentence? Default: they work.
-13. **Owners and the log.** Should owners see each other's View as rows? (The default policy says yes.) And may one owner preview another owner without that owner seeing it?
-14. **Live reads skipped.** Zoom consults on Today, and the live Inbox and reading pane in My Mail, are not read in a preview: reading them refreshes a token, which is a write. OK?
-15. **View as waits for 0116.** It can't ship until the member guard (0116) is on both databases, because until then an admin can make themselves an owner. OK to hold it?
-16. **Exit when the database is unreachable.** Proposed:
-    - Exit still ends the preview in this browser (the cookie is cleared);
-    - it says leaving couldn't be recorded, and to sign out to end it fully;
-    - the open row is closed by the next call, or counted as ended at 2 hours.
+## Defaults chosen (Taylor may override)
+- **D1. Time limit:** 2 hours from Enter, then the preview ends by itself (`timeout`).
+- **D2. Personal mail and Outlook:** never shown. Personal mailboxes are private by design (0075); shared mailboxes show from stored rows.
+- **D3. Copilot chats:** never shown. They are private to the author (0099).
+- **D4. Bell:** neither person's notifications; a muted bell with the sentence. No new policy on `crm_notification`.
+- **D5. No "act as":** nothing is done as the teammate. Fixes are made by Taylor as herself, after Exit.
+- **D6. Admins** get the owner shell but not View as (owner only).
+- **D7. The log:** stored only, no screen for it in this sprint.
+- **D8. Owners see all of the firm's view-as rows,** so an owner can see when another owner previewed them.
+- **D9. Admins can be previewed** as well as owners.
+- **D10. The teammate's own settings** (deal times, tips, Getting started) can't be read. The preview uses the firm's default deal times and hides Getting started.
+- **D11. Live reads that refresh a token are skipped** (Zoom on Today; My Mail's live Inbox and reading pane), each with a sentence.
+- **D12. Exit when the database can't be reached:** the preview stays on, with "try again, or sign out". Signing out always ends it.
+- **D13. Two tabs:** a preview covers every tab of that sign-in; other devices are not affected.
+- **D14. View as waits for 0116** to be on both databases, and is not offered until then.
+- **D15. AGENTS.md's "firm members have no view switch" line** is updated when this is built: View as is a read-only look at a teammate, not a switch of one's own view.
 
-    Acceptable, or should Exit refuse until it can be recorded?
-17. **Two tabs.** A preview covers every tab in that browser sign-in; other devices are not affected. OK?
-18. **AGENTS.md** says firm members have no view switch (Nov 10). This is a different thing, a read-only look at a teammate, but that line should be updated when this is built. Agree?
+## OPEN QUESTIONS
+None. Every question is answered above or covered by a default.
