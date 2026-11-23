@@ -8,7 +8,7 @@
 **What it is not.** It is not a new SOP, not legal guidance, and not a decision. Nothing was changed in any system to write it.
 **Where it is thin.** No recording of the post-filing walkthrough was found, and parts of the intake SOP could not be read. Those places are marked.
 
-**Source labels.** (SOP intake), (SOP pre-filing), (SOP post-filing), (SOP agents) for "Client Intake - SOP for Agents (Lectual)", v1.0, Oct 2, 2026, a draft never approved; (templates) for the email handbook; (Lawmatics Implementation Guide, plan) for a build plan written for the Lawmatics rep, which records nothing as built; (meeting, date) for a recorded meeting; (SOPs compared, Nov 17) for the page "SOPs Compared With Lectual", which checked every SOP step against Lectual as it was on Nov 17; (Lectual) for the app's code and notes as of Nov 23. Where the two disagree about what Lectual does, the Nov 23 read is taken as current and the Nov 17 page is quoted after it. "Not stated" means the sources are silent.
+**Source labels.** (SOP intake), (SOP pre-filing), (SOP post-filing), (SOP agents) for "Client Intake - SOP for Agents (Lectual)", v1.0, Oct 2, 2026, a draft never approved; (templates) for the email handbook; (Lawmatics Implementation Guide, plan) for a build plan written for the Lawmatics rep, which records nothing as built; (meeting, date) for a recorded meeting; (SOPs compared, Nov 17) for the page "SOPs Compared With Lectual", which checked every SOP step against Lectual as it was on Nov 17; (Lectual) for the app's code and notes as of Nov 23; (Taylor, Nov 23) for Taylor's stated direction on Lawmatics, which was not made in a meeting. Where the two disagree about what Lectual does, the Nov 23 read is taken as current and the Nov 17 page is quoted after it. "Not stated" means the sources are silent.
 
 **Words used.** PNC means prospective new client (SOP intake). LOE means letter of engagement (templates). Lawmatics calls each matter a "prospect" (Lectual). The SOPs' "Co-Pilot" is a planned drafting feature (SOP pre-filing); it is not the same thing as Lectual's Copilot, which answers questions and drafts proposals today (Lectual).
 
@@ -16,15 +16,15 @@
 - **No written procedure**: the step happens, but no document says how.
 - **Not in Lectual yet**: the step relies on Lawmatics, a spreadsheet or someone's memory, and Lectual does not do it ("partly" where it partly does).
 - **Sources disagree**: documents or people say different things.
-- **Done differently in Lectual**: the step is done in Lectual, but not the way the SOP says (the comparison's "Different" items, B1 to B21).
+- **Done differently in Lectual**: the step is done in Lectual, but not the way the SOP says (the comparison's rows marked "Different", 23 in all, and its list B1 to B21).
 - **Not on record**: something the research could not see. This is not a gap in the firm's process.
 
-**About Lawmatics.** Taylor decided on November 23, 2026 that Lawmatics is to be phased out. The team has not been told. No meeting decided it, and the last working split on record still gives Lawmatics the automatic follow-ups, payment links and reminders (Taylor, Nov 23; meeting, Nov 6).
+**About Lawmatics.** Taylor's stated direction as of November 23, 2026 is to phase Lawmatics out. No meeting on record decided it, and whether the rest of the team has been told is not on record. The last working split on record still gives Lawmatics the automatic follow-ups, payment links and reminders (Taylor, Nov 23; meeting, Nov 6).
 
 ### Two numbering traps
 
 - **"Phase 8" means two different things.** The intake SOP calls long-term nurture "Phase 8" (SOP intake). The pre-filing SOP uses "8. Questionnaire Complete" (SOP pre-filing). Caitlyn noted the clash herself (meeting, Nov 12), and the pre-filing SOP asks to rename intake nurture (SOP pre-filing, D7). In this document, nurture is called "long-term nurture" and phase 8 means Questionnaire Complete.
-- **There is no phase 17.** The first pre-filing draft ran stages 8 to 17; version 0.4 merged search and opinion letter into one stage and renumbered the rest. Read together, the revision history suggests the old 17 became today's "16. Application Filed"; the SOP does not say so outright (SOP pre-filing, revision history). Its file name still says "8-17" (templates). On Nov 12 Taylor's board still showed 8 through 17 (meeting, Nov 12). The post-filing SOP starts at 18 (SOP post-filing). Separately, a note in Lectual's code assumes Lectual's own stage number for "Application Filed" is 17 (Lectual). The Nov 17 comparison, reading the firm's stage set-up script, found the same: Lectual's matter stages still split search and opinion letter, so its numbers 9 to 17 are one higher than the SOP's and "Application Filed" is 17 (SOPs compared, Nov 17). Neither read the live stage list, so it is still to check (Lectual; SOPs compared, Nov 17).
+- **There is no phase 17.** The first pre-filing draft ran stages 8 to 17; version 0.4 merged search and opinion letter into one stage and renumbered the rest. Read together, the revision history suggests the old 17 became today's "16. Application Filed"; the SOP does not say so outright (SOP pre-filing, revision history). Its file name still says "8-17" (SOP pre-filing, file name; SOPs compared, Nov 17, D1). On Nov 12 Taylor's board still showed 8 through 17 (meeting, Nov 12). The post-filing SOP starts at 18 (SOP post-filing). Separately, a note in Lectual's code assumes Lectual's own stage number for "Application Filed" is 17 (Lectual). The Nov 17 comparison, reading the firm's stage set-up script, found the same: Lectual still has search and opinion letter as two separate stages, so from stage 9 on, every Lectual stage number is one more than the SOP's; Application Filed is 17 in Lectual and 16 in the SOP (SOPs compared, Nov 17). Neither read the live stage list, so it is still to check (Lectual; SOPs compared, Nov 17).
 
 ---
 
@@ -40,7 +40,7 @@
 | A6 | Proposal and follow-up [done differently in Lectual] | Taylor drafts; Rebecca approves (SOP intake) | Lectual proposals; Outlook; Lawmatics templates (meeting, Sep 22, Oct 30) | Proposal, a text, follow-up emails days 4, 6, 7 (SOP intake; templates) | Proposal sits; client goes quiet (meeting, Nov 2, Nov 9) |
 | A7 | Payment [done differently in Lectual] | Client pays; Dawn verifies (SOP intake) | Lawmatics pay link, LawPay, QuickBooks (SOP intake; meeting, Aug 28, Nov 9) | Pay link (SOP intake) | Payment not cleared; unpaid invoice (meeting, Aug 19, Nov 9) |
 | A8 | Long-term nurture [done differently in Lectual] | Amor (SOP intake) | Lawmatics; the SOP's sequence is not built, but a nurture sequence runs (SOP intake; meeting, Nov 2, Nov 9) | Check-ins, monthly emails (SOP intake) | No visible flag when a sequence ends (meeting, Sep 17) |
-| B1 | Engagement letter prepared and signed [done differently in Lectual] | Dawn prepares; Rebecca approves (SOP intake; SOP agents) | Word plus Lawmatics (meeting, Aug 28); signing on the Lectual proposal page is built, no meeting on record shows it in use yet (Lectual) | Letter to sign (SOP intake) | Letter not signed (meeting, Aug 31, Nov 9) |
+| B1 | Engagement letter prepared and signed [done differently in Lectual] | Dawn prepares; Rebecca approves (SOP intake; SOP agents) | Word plus Lawmatics (meeting, Aug 28); signing on the Lectual proposal page is built; no meeting on record shows it in use yet (Lectual) | Letter to sign (SOP intake) | Letter not signed (meeting, Aug 31, Nov 9) |
 | B2 | Matter opened, folder, Rayn told | Dawn creates matter numbers; Taylor hands to Rayn (SOP intake, footnote 3; SOP pre-filing) | Lawmatics Hired status, then Lectual's daily automatic check, or by hand (Lectual) | Nothing (not stated) | Not stated |
 | B3 | Welcome and Trademark Form sent [done differently in Lectual] | Dawn, Rayn or Rebecca (sources disagree) | Lawmatics form 79368 (SOP pre-filing) | "Engagement Confirmed" and "Welcome" emails with the form (templates) | Not stated |
 | B4 | Form reminders and return | Rayn (SOP pre-filing) | Lawmatics (SOP pre-filing) | Form reminders 1 to 3 (templates) | Client takes a month or more (meeting, Aug 31) |
@@ -105,16 +105,16 @@ Its headline findings: the biggest single gap is after filing, where nothing rea
 
 | Topic | Lectual on Nov 23 | The Nov 17 comparison said |
 |---|---|---|
-| Engagement letter signed on the proposal page | Built for trademark proposals; filing the signed letter in Lawmatics never checked against the live account (Lectual) | On the test database only, not in use (SOPs compared, Nov 17) |
-| Deadlines on Today | A Deadlines card for named people: overdue, next 7 days, 8 to 30 days, with bell notices (Lectual) | Today showed deadlines only within 14 days; no alert to anyone (SOPs compared, Nov 17) |
+| Engagement letter signed on the proposal page | Built in Lectual; the project's notes say the database update for it is on the live system (Nov 17) and the firm's letter was approved on Nov 12; filing the signed letter in Lawmatics never checked against the live account; no meeting on record shows a client signing this way yet (Lectual) | On the test database only, not in use (SOPs compared, Nov 17) |
+| Deadlines on Today | A Deadlines card for named people: overdue, next 7 days, 8 to 30 days, with bell notices raised when that person opens Today, not overnight; no email or text (Lectual) | Today showed deadlines only within 14 days; no alert to anyone (SOPs compared, Nov 17) |
 | A filed matter with no deadline | A trademark matter with a serial number or filing date and no open deadline is flagged (Lectual) | No such flag; listed as something to build (SOPs compared, Nov 17) |
 | Registered marks | A registered mark with no maintenance deadline is flagged and appears on the Weekly review (Lectual) | Registration closes the matter, so maintenance deadlines drop out of the working lists (SOPs compared, Nov 17) |
 | Closing a matter with an open deadline | Refused unless an attorney overrides with a written reason (Lectual) | A check before moving to 25 or 26 was listed as something to build (SOPs compared, Nov 17) |
 | Deadline list on the Weekly review | A Deadlines strip on the Weekly review (Lectual) | No full deadline list (SOPs compared, Nov 17) |
-| Monthly filing update | A four-month sequence with a 9-month estimate (Lectual) | Up to month 5; month 1 says about 8 months to first review (SOPs compared, Nov 17) |
+| Monthly filing update | Drafts monthly updates from a 9-month estimate, so month 1 says about 8 months (Lectual) | The same estimate; the button offers up to month 5, where the firm's template stops at month 4 (SOPs compared, Nov 17) |
 | Approval kinds a law clerk may clear | Routine kinds such as the filing receipt exist and can be routed to a law clerk, but nothing drafts them yet (Lectual) | Only welcome emails and stalled-lead follow-ups could be routed; filing emails were attorney-only (SOPs compared, Nov 17) |
-| Where an approved email becomes a draft | The approver's own Outlook, or a named drafter's own Outlook, which depends on a change not yet released (Lectual) | The approver's own Outlook, or the queue service's mailbox, Rebecca's by default; no Cc (SOPs compared, Nov 17) |
-| Merging duplicate leads | Not described; the lead import only skips a lead already merged into another (Lectual) | The merge function was on the test database, its screen being built; the page also says the database part is live, and does not reconcile the two (SOPs compared, Nov 17) |
+| Where an approved email becomes a draft | The approved email appears as a draft in the approver's Outlook. Sending drafts to a chosen colleague's Outlook is planned but not working yet (Lectual) | The approver's own Outlook, or the queue service's mailbox, Rebecca's by default; no Cc (SOPs compared, Nov 17) |
+| Merging duplicate leads | Built; whether it is switched on for the firm is to check (Lectual) | The merge function was on the test database, its screen being built; the page also says the database part is live, and does not reconcile the two (SOPs compared, Nov 17) |
 
 Where the two agree (no USPTO notice reading, no invoices, Mark paid by hand, forms pushing tags to Lawmatics, the owner-only Billing card never checked live, no booking, no texts, the Stage Keeper moving leads on its own), both are cited in the step sections (Lectual; SOPs compared, Nov 17).
 
@@ -136,7 +136,7 @@ Where the two agree (no USPTO notice reading, no invoices, Mark paid by hand, fo
 - **Time:** 1 business day to enter a manual lead (SOP intake).
 - **Can stall or exit:** leads are sent to Dawn and Amor outside any system (meeting, Sep 11); an activation lead who never replies goes to nurture (SOP intake).
 - **In Lectual today:** does it. Intake forms, scored event assessments and a source tag and campaign codes in the link on every lead (Lectual); sources were visible in Lectual by Oct 16 (meeting, Oct 16).
-- **Gap:** Open question: whether the "Social Media" answer applies a tag (SOP intake, Q8). Not in Lectual yet, partly: website forms still post to Lawmatics, and those leads reach Lectual only by import (SOP intake; SOPs compared, Nov 17). Done differently in Lectual: Lectual forms send each person to Lawmatics with tags that start the firm's thank-you and nurture automations, with no approval, where the agents draft forbids such a tag without approval (B3); an event QR code points to a Lectual form, not the website form (SOPs compared, Nov 17; Lectual).
+- **Gap:** Open question: whether the "Social Media" answer applies a tag (SOP intake, Q8). Not in Lectual yet, partly: website forms still post to Lawmatics, and those leads reach Lectual only by import (SOP intake; SOPs compared, Nov 17). Done differently in Lectual: when someone fills in a Lectual form, Lectual adds them to Lawmatics with labels that make Lawmatics email them automatically. No one approves those emails, although the agents draft says a person must (B3); an event QR code points to a Lectual form, not the website form (SOPs compared, Nov 17; Lectual).
 
 ### A2. Lead capture and record (SOP phase 2)
 - **Starts when:** a form is submitted or a manual lead arrives (SOP intake).
@@ -146,7 +146,7 @@ Where the two agree (no USPTO notice reading, no invoices, Mark paid by hand, fo
 - **The client receives:** nothing named (SOP intake).
 - **Time:** stalled after 2 business days (SOP intake).
 - **Can stall or exit:** duplicate found: merge into the older record, owner Dawn (SOP intake).
-- **In Lectual today:** does it for its own forms; a Leads page with sets such as Working, Nurture and Lost (Lectual). On Nov 17 there was also a possible-duplicate flag (same email or full name, open leads only, not phone) (SOPs compared, Nov 17); the Nov 23 read does not describe it (Lectual).
+- **In Lectual today:** does it for its own forms; a Leads page with sets such as Working, Nurture and Lost (Lectual). On Nov 17 there was also a possible-duplicate flag (same email or full name, open leads only, not phone) (SOPs compared, Nov 17). Merging two duplicate leads is built; whether it is switched on for the firm is to check (Lectual).
 - **Gap:** Sources disagree: the SOP forbids a second record, but Lawmatics makes one per inquiry (SOP intake; meeting, Oct 16). Done differently in Lectual: the Intake list shows only trademark or blank practice areas, so other leads appear only on Pipeline (B15); a lead added by hand in Lectual is not sent to Lawmatics, where the SOP enters it in Lawmatics (B21) (SOPs compared, Nov 17). Not in Lectual yet, partly: website leads arrive only by import, and duplicates are not checked by phone (SOPs compared, Nov 17, T12).
 
 ### A3. First contact and booking the Legal Strategy Session (SOP phase 3)
@@ -158,7 +158,7 @@ Where the two agree (no USPTO notice reading, no invoices, Mark paid by hand, fo
 - **Time:** stalled after 3 business days without a booking (SOP intake).
 - **Can stall or exit:** no booking by day 10 goes to long-term nurture; urgent matters go to Rebecca the same day (SOP intake).
 - **In Lectual today:** booking is not built: no booking page, no consult fee, no texts. First contact is partly there: Lectual reads matched mail and a booked consult from the Outlook calendar (Lectual; SOPs compared, Nov 17).
-- **Gap:** Not in Lectual yet: booking and texts are Lawmatics only (Lectual). No template for the day 3 and day 7 follow-ups, though the SOP describes them (templates; SOP intake). Sources disagree on the session price and credit (see table). Done differently in Lectual: the Stage Keeper moves a lead to Consultation Scheduled from a linked Outlook calendar event, not the Lawmatics scheduler, and moves leads on its own, where the agents draft lets agents only propose a stage change (B2) (Lectual; SOPs compared, Nov 17).
+- **Gap:** Not in Lectual yet: booking and texts are Lawmatics only (Lectual). No template for the day 3 and day 7 follow-ups, though the SOP describes them (templates; SOP intake). Sources disagree on the session price and credit (see table). Done differently in Lectual: Lectual's automatic stage mover (the Stage Keeper) moves a lead to Consultation Scheduled when it sees the consult in Outlook, not from the Lawmatics scheduler, and it does this without asking anyone (its default setting; a firm can set it to suggest only), where the agents draft lets agents only propose a stage change (B2) (Lectual; SOPs compared, Nov 17).
 
 ### A4. Consult prep and the mark summary (SOP phase 4)
 - **Starts when:** the session is booked (SOP intake).
@@ -168,7 +168,7 @@ Where the two agree (no USPTO notice reading, no invoices, Mark paid by hand, fo
 - **The client receives:** the client-prep email (SOP intake).
 - **Time:** brief due the business day before (SOP intake).
 - **Can stall or exit:** the booking form does not require a mark name (meeting, Oct 27); prep drafts landed where Rebecca did not see them (meeting, Oct 16).
-- **In Lectual today:** does it, as drafts: Prep a consult and a consult-prep agent write an internal heads-up and a client email into the approval queue (Lectual).
+- **In Lectual today:** partly, as drafts: Prep a consult and a consult-prep agent write an internal heads-up and a client email into the approval queue (Lectual). On Nov 17 the heads-up was facts only, with no mark summary and no risk level, and it was prepared the morning of the call, not the business day before (SOPs compared, Nov 17).
 - **Gap:** No written procedure: the SOP links to "Lectual SOP 6" and "SOP 7", which are placeholders (SOP intake). The client-prep email has no template (templates).
 
 ### A5. The Legal Strategy Session (SOP phase 5)
@@ -180,7 +180,7 @@ Where the two agree (no USPTO notice reading, no invoices, Mark paid by hand, fo
 - **Time:** stalled the same day (SOP intake).
 - **Can stall or exit:** no-show: wait 10 minutes, then email and text; second no-show goes to Rebecca (SOP intake). Not a fit, referred out (SOP intake).
 - **In Lectual today:** does it for the record: Fathom and Zoom recordings import daily, and Taylor pulls the transcript into Lectual (Lectual; meeting, Sep 22). Consult details per mark are drafted for a person to review (Lectual). Mark no-show is built in Lectual; no meeting on record shows it in use yet (Lectual).
-- **Gap:** No written procedure for "Not a fit" and "Referred out" after the log entry (SOP intake). Staff could not open a recording (meeting, Nov 2). Sources disagree on the recording source: recent consults came through Fathom, but the agents read Zoom (SOP agents, known issue). Done differently in Lectual: there is no "No Show / Reschedule" stage, so a no-show lead stays in Consultation Scheduled and looks healthy; none of the SOP's three outcomes is recorded, and there are no day 2, 5 and 10 follow-ups (SOPs compared, Nov 17; Lectual). Not in Lectual yet: the no-show stage, its follow-up timers and the second-no-show alert (SOPs compared, Nov 17, T11).
+- **Gap:** No written procedure for "Not a fit" and "Referred out" after the log entry (SOP intake). Staff could not open a recording (meeting, Nov 2). Sources disagree on the recording source: recent consults came through Fathom, but the agents read Zoom (SOP agents, known issue). Sources disagree on who follows up no-shows and moves them to nurture (see table). Done differently in Lectual: there is no "No Show / Reschedule" stage, so a no-show lead stays in Consultation Scheduled and looks healthy; none of the SOP's three outcomes is recorded, and there are no day 2, 5 and 10 follow-ups (SOPs compared, Nov 17; Lectual). Not in Lectual yet: the no-show stage, its follow-up timers and the second-no-show alert (SOPs compared, Nov 17, T11).
 
 ### A6. Proposal and follow-up (SOP phase 6)
 - **Starts when:** the session ends with "Proposal to send" (SOP intake).
@@ -213,7 +213,7 @@ Where the two agree (no USPTO notice reading, no invoices, Mark paid by hand, fo
 - **Time:** 12 months of silence ends in "Closed - Inactive" (SOP intake).
 - **Can stall or exit:** books or pays: back to the same matter; unsubscribes: "Opted out" (SOP intake).
 - **In Lectual today:** partly. A Long-Term Nurture stage and a Nurture set exist; a move to nurture is only suggested; drip emails are drafts (Lectual).
-- **Gap:** Sources disagree on how nurture runs and on "never Lost" (see table). Not in Lectual yet: the nurture sequence runs in Lawmatics, and Lectual has no nurture content (meeting, Nov 2; SOPs compared, Nov 17). Done differently in Lectual: the Weekly review's close form offers Lost as well as Nurture, where the SOP says never Lost for silence or a decline (B20) (SOPs compared, Nov 17; Lectual).
+- **Gap:** Sources disagree on how nurture runs, on "never Lost", and on who moves non-bookers (see table). Not in Lectual yet: the nurture sequence runs in Lawmatics, and Lectual has no nurture content (meeting, Nov 2; SOPs compared, Nov 17). Done differently in Lectual: the Weekly review's close form offers Lost as well as Nurture, where the SOP says never Lost for silence or a decline (B20) (SOPs compared, Nov 17; Lectual).
 
 ---
 
@@ -233,7 +233,7 @@ Where the two agree (no USPTO notice reading, no invoices, Mark paid by hand, fo
 - **The client receives:** the letter to sign (SOP intake); no template for sending the letter, a reminder or a receipt (templates).
 - **Time:** stalled after 3 days (SOP intake, Current Practice v1.0, Oct 2); not stated in the current SOP.
 - **Can stall or exit:** letters drafted and never signed (meeting, Aug 28); a letter sent a month earlier with marks still to add (meeting, Aug 31).
-- **In Lectual today:** built for trademark proposals: the client types their details and name and signs on the proposal page, and Lectual then sends the signed PDF to the client's Lawmatics record. The sending is built; never checked against the live account, and no meeting on record shows a client signing this way yet (Lectual; meeting record). The flat-fee letter text is still awaited (Lectual). (The Nov 17 comparison said: on the test database only (SOPs compared, Nov 17).)
+- **In Lectual today:** for trademark proposals the client types their details and name and signs on the proposal page, and Lectual then sends the signed PDF to the client's Lawmatics record. Signing is built in Lectual; the project's notes say the database update for it is on the live system (Nov 17) and the firm's letter was approved on Nov 12 (Lectual); the Nov 17 comparison had it on the test database only (SOPs compared, Nov 17); no meeting on record shows a client signing this way yet (meeting record). Sending the PDF to Lawmatics is built; never checked against the live account (Lectual). The flat-fee letter text is still awaited (Lectual).
 - **Gap:** No written procedure (only an unapproved draft). Sources disagree on order and tool (see table). Whether a typed name is an acceptable signature is open (Lectual). Not in Lectual yet, partly: filing the signed letter in Lawmatics is unchecked (Lectual). Done differently in Lectual: the client signs at acceptance, before paying, where the SOP says payment first (B8) (SOPs compared, Nov 17); the Nov 10 meeting chose sign then pay, and the SOP has not been changed (meeting, Nov 10; SOP intake).
 
 ### B2. Matter opened, folder, Rayn told
@@ -267,7 +267,7 @@ Where the two agree (no USPTO notice reading, no invoices, Mark paid by hand, fo
 - **Time:** send days are not in the handbook (templates).
 - **Can stall or exit:** form never returned (SOP pre-filing).
 - **In Lectual today:** not built (Lectual).
-- **Gap:** Open: whether the reminders are automatic (SOP pre-filing, D1). The handbook marks no automation (templates); on Oct 27 they were to send automatically (meeting, Oct 27). Not in Lectual yet.
+- **Gap:** No written procedure (no approved onboarding SOP) (SOP intake; templates). Open: whether the reminders are automatic (SOP pre-filing, D1). The handbook marks no automation (templates); on Oct 27 they were to send automatically (meeting, Oct 27). Not in Lectual yet.
 
 ---
 
@@ -311,7 +311,7 @@ Caitlyn walked this SOP through with Rayn on Nov 6, and Rayn corrected it; Rebec
 - **Time:** stalled after 9 days (proposed) (SOP pre-filing, D3).
 - **Can stall or exit:** client changes the mark or classes: back to phase 9 (meeting, Nov 6); client stops: Rebecca decides any refund and closes (SOP pre-filing).
 - **In Lectual today:** partly. Approve, then a person sends; stage changes by hand (Lectual).
-- **Gap:** Sources disagree on the 7-day proceed rule (SOP pre-filing; templates; meeting, Nov 6). Done differently in Lectual: the approved email becomes a draft in the approver's own Outlook with no copies, not in trademarks@ copying Rebecca (B4) (SOPs compared, Nov 17; Lectual).
+- **Gap:** Sources disagree on the 7-day proceed rule (SOP pre-filing; templates; meeting, Nov 6). No written procedure for a client who stalls (meeting, Nov 6). Done differently in Lectual: the approved email becomes a draft in the approver's own Outlook with no copies, not in trademarks@ copying Rebecca (B4) (SOPs compared, Nov 17; Lectual).
 
 ### C11. Application Preparation, and Rebecca's review
 - **Starts when:** the client says go (meeting, Nov 6); or day 7 passes (SOP pre-filing).
@@ -355,7 +355,7 @@ Caitlyn walked this SOP through with Rayn on Nov 6, and Rayn corrected it; Rebec
 - **Time:** stalled after 2 business days (proposed) (SOP pre-filing, D3).
 - **Can stall or exit:** class count differs: Rebecca approves the new figure (SOP pre-filing).
 - **In Lectual today:** not built (Lectual).
-- **Gap:** Sources disagree on what "remaining balance" means (SOP pre-filing, D2; meeting, Nov 6). Not in Lectual yet (Lectual). Done differently in Lectual: Lectual marks "Send Invoice for Remaining Balance" as waiting on the client, where the SOP has it as the firm's turn, with the wait in 15 (B14) (SOPs compared, Nov 17).
+- **Gap:** Sources disagree on what "remaining balance" means (SOP pre-filing, D2; meeting, Nov 6). Not in Lectual yet (Lectual). Done differently in Lectual: (set-up script values; live settings not checked) Lectual marks "Send Invoice for Remaining Balance" as waiting on the client, where the SOP has it as the firm's turn, with the wait in 15 (B14) (SOPs compared, Nov 17).
 
 ### C15. Full Balance Received
 - **Starts when:** the invoice is sent (SOP pre-filing).
@@ -398,7 +398,7 @@ Caitlyn walked this SOP through with Rayn on Nov 6, and Rayn corrected it; Rebec
 - **The client receives:** "Trademark Application Filed" follow-ups 1 to 4 (templates).
 - **Time:** months since filing; the receipt says 8 to 10 months to first examination (SOP post-filing).
 - **Can stall or exit:** to office action, publication or abandonment; suspension stays in 18, tagged (SOP post-filing).
-- **In Lectual today:** does it as drafts: Filing follow-up drafts the next monthly update, a four-month sequence with a 9-month estimate (Lectual) (the Nov 17 comparison said: up to month 5, with month 1 saying about 8 months to first review (SOPs compared, Nov 17)). USPTO mail is filed on the matter, but Lectual cannot yet read a USPTO notice or look up a mark's status by itself, so no deadline is created from it (Lectual; SOPs compared, Nov 17).
+- **In Lectual today:** does it as drafts: Filing follow-up drafts the next monthly update from a 9-month estimate (Lectual) (the Nov 17 comparison adds that the button offers up to month 5, and month 1 says about 8 months (SOPs compared, Nov 17)). USPTO mail is filed on the matter, but Lectual cannot yet read a USPTO notice or look up a mark's status by itself, so no deadline is created from it (Lectual; SOPs compared, Nov 17).
 - **Gap:** Sources disagree on follow-up months (see table). Not in Lectual yet: reading USPTO notices (Lectual; SOPs compared, Nov 17). Done differently in Lectual: a person clicks for each month and only an attorney approves, where the SOP has Rayn send it (B10, B17); it does not stop on a client reply; the wording differs from the firm's template (B10) (Lectual; SOPs compared, Nov 17).
 
 ### D19. Office action track (19A to 19I)
@@ -410,7 +410,7 @@ Caitlyn walked this SOP through with Rayn on Nov 6, and Rayn corrected it; Rebec
 - **Time:** 3 months, 6 with extension (SOP post-filing; templates).
 - **Can stall or exit:** client silent 14 days: Rebecca calls; unpaid near the deadline: Rebecca decides; missed deadline: abandoned (SOP post-filing).
 - **In Lectual today:** partly. Deadline kinds and alerts, an "OA Issued" stage; no drafting and no invoice (Lectual).
-- **Gap:** Sources disagree on deadline dates between TMTKO and the receipt (meeting, Oct 12). Not in Lectual yet: invoices, reading notices (Lectual). No office action extension email exists (SOP post-filing). Done differently in Lectual: the Weekly review files 19D "Invoice for OA Response Sent" under waiting on the USPTO, so an unpaid office-action invoice drops out of "Needs a next step" while a USPTO deadline runs; no matter was in that stage on Nov 17 (B1); the office action email becomes a draft in the approver's Outlook, not trademarks@ (B4) (SOPs compared, Nov 17).
+- **Gap:** Sources disagree on deadline dates between TMTKO and the receipt (meeting, Oct 12). Not in Lectual yet: invoices, reading notices (Lectual). No office action extension email exists (SOP post-filing). No written procedure for settling a deadline the sources disagree on (meeting, Oct 12). Done differently in Lectual: the Weekly review wrongly treats a matter waiting for the client to pay an office-action invoice ("Invoice for OA Response Sent", 19D) as waiting on the USPTO, so it does not show up as needing action, even though a USPTO deadline is running; no matter was in that stage on Nov 17 (B1); the office action email becomes a draft in the approver's Outlook, not trademarks@ (B4) (SOPs compared, Nov 17).
 
 ### D22. Publication for Opposition
 - **Starts when:** the USPTO publishes the mark (SOP post-filing).
@@ -432,7 +432,7 @@ Caitlyn walked this SOP through with Rayn on Nov 6, and Rayn corrected it; Rebec
 - **Time:** 6 months per window (SOP post-filing).
 - **Can stall or exit:** fifth extension used: the next filing must be the statement of use (SOP post-filing).
 - **In Lectual today:** partly. Deadline kinds exist; the form, reminders and invoice are not in Lectual (Lectual).
-- **Gap:** Not in Lectual yet (Lectual). The specimen guidance should also be on the Trademark Form (meeting, Nov 6). Done differently in Lectual: 21E counts as the firm's turn by default, where the SOP says it waits on the client (B14) (SOPs compared, Nov 17).
+- **Gap:** Not in Lectual yet (Lectual). The specimen guidance should also be on the Trademark Form (meeting, Nov 6). Done differently in Lectual: (set-up script values; live settings not checked) 21E counts as the firm's turn by default, where the SOP says it waits on the client (B14) (SOPs compared, Nov 17).
 
 ### D20. Statement of Use
 - **Starts when:** the client chooses to file (SOP post-filing).
@@ -443,7 +443,7 @@ Caitlyn walked this SOP through with Rayn on Nov 6, and Rayn corrected it; Rebec
 - **Time:** the statement of use due date (SOP post-filing).
 - **Can stall or exit:** a specimen refusal is treated as an office action (SOP post-filing).
 - **In Lectual today:** partly. Deadline kinds only (Lectual).
-- **Gap:** Sources disagree on whether a legal fee is charged (see table). Not in Lectual yet (Lectual). Done differently in Lectual: 20D, after the statement of use is filed, counts as the firm's turn and is flagged stale after 30 days, where the SOP says it waits on the USPTO (B14) (SOPs compared, Nov 17).
+- **Gap:** Sources disagree on whether a legal fee is charged (see table). Not in Lectual yet (Lectual). Done differently in Lectual: (set-up script values; live settings not checked) 20D, after the statement of use is filed, counts as the firm's turn and is flagged stale after 30 days, where the SOP says it waits on the USPTO (B14) (SOPs compared, Nov 17).
 
 ### D23. Trademark Abandoned, and revival (as written only, apart from mentions of revivals)
 - **Starts when:** a notice of abandonment arrives (SOP post-filing).
@@ -647,10 +647,10 @@ Lectual's Weekly review page shows open matters and leads by person, with overdu
 | Consent to file | Signing request from Lectual; e-signature system open | SOP pre-filing (Q7) |
 | | Sent from USPTO Trademark Center | meeting, Nov 6 |
 | Remaining balance | Legal fee balance plus government fee, or only scope changes, open | SOP pre-filing (D2) |
+| | The government fee link; sometimes the other 50% of the legal fee | meeting, Nov 6 |
 | Which stage the remaining-balance wait sits in | 14 is the firm's turn and the wait is in 15, though the name of 14 reads as the waiting stage | SOP pre-filing (D4); SOPs compared, Nov 17 (D14) |
 | Government fee arithmetic | $350 per class | SOP intake, phase 7 |
 | | $350 per class per mark, which differs when a word mark and a design mark are both filed | SOPs compared, Nov 17 (D13) |
-| | The government fee link; sometimes the other 50% of the legal fee | meeting, Nov 6 |
 | Filing before payment | Never acceptable | SOP pre-filing |
 | | Two filings made without payment | meeting, Nov 9 |
 | Stall times, phases 13 and 15 | 2 versus 3 business days; 7 versus 14 days | SOP pre-filing (two pages) |
@@ -669,7 +669,7 @@ Lectual's Weekly review page shows open matters and leads by person, with overdu
 | | "trademark@" and "trademarks@" both used | SOP agents (known issue) |
 | Lawmatics' future | Keep Lawmatics for intake and CRM | meeting, Aug 28 |
 | | Lawmatics keeps the automatic follow-ups, payment links and reminders | meeting, Nov 6 |
-| | Taylor decided on November 23, 2026 that Lawmatics is to be phased out; the team has not been told | Taylor, Nov 23 |
+| | Taylor's stated direction as of Nov 23 is to phase Lawmatics out; no meeting on record decided it, and whether the rest of the team has been told is not on record | Taylor, Nov 23 |
 | Phase 8 | Long-term nurture | SOP intake |
 | | Questionnaire Complete | SOP pre-filing |
 | Phase or stage 17 | Old pre-filing number, probably now 16; the file name still says "Phases 8-17" | SOP pre-filing; SOPs compared, Nov 17 (D1) |
@@ -685,6 +685,8 @@ Lectual's Weekly review page shows open matters and leads by person, with overdu
 ---
 
 ## Gaps
+
+**Counts.** Of the 30 step sections (A1 to D27, with D25 and D26 as one section), 12 carry a "No written procedure" gap, 26 "Not in Lectual yet", 18 "Sources disagree" and 21 "Done differently in Lectual". The 21 are the steps marked "[done differently in Lectual]" in the one-page table. Each step's own "Gap" line is the record; the tables below group them.
 
 ### No written procedure
 
@@ -714,10 +716,10 @@ Lectual's Weekly review page shows open matters and leads by person, with overdu
 | A7, C14, C15, D19 to D27 | Invoices and payments; Mark paid is a stopgap; no firm-wide unpaid list, and Dawn cannot see invoices unless she holds the owner role (Lectual; SOPs compared, Nov 17, T7) | Money stays in Lawmatics, and filing waits on a payment check made outside Lectual |
 | A1, A2 | Partly: website leads reach Lectual only by import; a duplicate check does not cover phone numbers or nurture and lost leads (SOPs compared, Nov 17, T12) | A returning contact or a contracts lead can be missed or entered twice |
 | A1 to A8 | A conversion dashboard (sessions booked, fees, conversion by source), planned in the SOP and not built; Lectual's reports show new leads, hires and who is waiting (SOP intake, Q16; SOPs compared, Nov 17, T14) | The weekly meeting cannot run from Lectual alone |
-| B1 | Partly: signing is built, but filing the signed letter in Lawmatics was never checked against the live account (Lectual) | The first real signing needs checking |
+| B1 | Partly: signing is built, and no meeting on record shows it in use yet; filing the signed letter in Lawmatics was never checked against the live account (Lectual) | The first real signing needs checking |
 | B2 | Partly: a signed proposal opens no matter (Lectual) | The matter waits for Lawmatics or a person |
 | B3, B4, C8, C12, D20 | What the client does: the Trademark Form with file uploads, form reminders, consent, the statement of use form (Lectual; SOPs compared, Nov 17, T6) | Staff move answers and documents across by hand, and Lectual cannot tell when the client has done their part |
-| C8 to D27 | Per-stage time targets and stall colours (the SOPs' planned "shot clock"); Lectual has one number for leads and one for matters, in calendar days (SOP pre-filing; SOPs compared, Nov 17, T2) | A same-day stage can sit for weeks unflagged |
+| C8 to D27 | A time limit for each stage, with a colour that changes when a matter sits too long (the SOPs call this the "shot clock", planned); Lectual has one number for leads and one for matters, in calendar days (SOP pre-filing; SOPs compared, Nov 17, T2) | A same-day stage can sit for weeks unflagged |
 | B3 to D27 | A drafter for about 30 named email and document templates (filing receipt, office action issued, publication, registered, revival, maintenance and others); Lectual drafts the proposal email, client-prep email, welcome pointer, monthly update and three letters (SOPs compared, Nov 17, T10; Lectual) | Each one is copied from Lawmatics by hand |
 | C9 | Partly: no search; the letter tool is little used (Lectual; meeting, Nov 10) | TMTKO and a manual letter remain |
 | C11, C12 | Application drafting, review screen, consent to file (Lectual; SOPs compared, Nov 17) | Done in USPTO Trademark Center and on Zoom |
@@ -742,6 +744,9 @@ Lectual's Weekly review page shows open matters and leads by person, with overdu
 | C10 | 7-day proceed rule | Rayn's practice and the client email say different things |
 | C11, C12 | Where review and consent happen | The SOP describes a flow nobody follows |
 | C14 | What "remaining balance" is | The invoice amount is unclear |
+| C13 | Stall time, 2 or 3 business days (SOP pre-filing) | The checkpoint's clock is unclear |
+| D19 | Deadline dates from TMTKO, the receipt and the call (meeting, Oct 12) | A wrong date can abandon an application (SOP post-filing) |
+| A5 | Recording source, Fathom or Zoom (SOP agents) | The agents may read the wrong recordings |
 | C16 | Filing before payment | A rule that "never bends" was broken |
 | D18 | Follow-up months; first examination timing | Clients get mixed timelines |
 | D20 | Legal fee for a statement of use | Billing differs from the SOP |
@@ -749,12 +754,12 @@ Lectual's Weekly review page shows open matters and leads by person, with overdu
 
 ### Done differently in Lectual
 
-The comparison's 21 items where Lectual does the step, but not as the SOP says. "Who decides" is the page's own; none of these is marked decided on the page (SOPs compared, Nov 17).
+The comparison's 21 items where Lectual does the step, but not as the SOP says. As found on Nov 17; not re-checked against the Nov 23 read except where a row says "since then". "Who decides" is the page's own; none of these is marked decided on the page (SOPs compared, Nov 17).
 
 | # | Step | What the SOP says | What Lectual does | Decided? |
 |---|---|---|---|---|
 | B1 | D19 (19D) | The invoice stage waits on the client to pay (SOP post-filing) | The Weekly review files "Invoice for OA Response Sent" under waiting on the USPTO, so it drops out of "Needs a next step" (SOPs compared, Nov 17) | Not decided; to fix as a bug (Taylor) (SOPs compared, Nov 17) |
-| B2 | A3 | Agents only propose a stage change (SOP agents) | The Stage Keeper moves leads forward on its own, logged and undoable (Lectual; SOPs compared, Nov 17) | Not decided (Caitlyn, Taylor) (SOPs compared, Nov 17) |
+| B2 | A3 | Agents only propose a stage change (SOP agents) | The Stage Keeper moves leads forward on its own, logged and undoable (its default setting; a firm can set it to suggest only) (Lectual; SOPs compared, Nov 17) | Not decided (Caitlyn, Taylor) (SOPs compared, Nov 17) |
 | B3 | A1 | No tag that could start a client email without approval (SOP agents) | Every Lectual intake sends the person to Lawmatics with tags that start the firm's thank-you and nurture automations (Lectual; SOPs compared, Nov 17) | Not decided (Caitlyn, Rebecca) (SOPs compared, Nov 17) |
 | B4 | A6, C10, C16, D19 | Send from info@ or trademarks@, with copies (SOP intake; SOP pre-filing; SOP post-filing) | The approved email becomes a draft in a personal Outlook, with no copies (Lectual; SOPs compared, Nov 17) | Not decided (Caitlyn, Taylor) (SOPs compared, Nov 17) |
 | B5 | A6 | A client reply pauses the sequence until the firm answers (SOP intake) | A reply stops the sequence for good; staff enrol the client again (SOPs compared, Nov 17) | Not decided (Caitlyn, Taylor) (SOPs compared, Nov 17) |
@@ -766,11 +771,11 @@ The comparison's 21 items where Lectual does the step, but not as the SOP says. 
 | B11 | B3 | From trademarks@ with Rebecca copied (SOP pre-filing) | The draft reads from Rebecca, copying trademarks@ (SOPs compared, Nov 17) | Not decided (Caitlyn) (SOPs compared, Nov 17) |
 | B12 | C8, C9 | One stage "9. Search & Opinion Letter", then 10 to 16 (SOP pre-filing) | Two stages, so 9 to 17 are one higher; "Application Filed" is 17 (SOPs compared, Nov 17; Lectual) | Not decided (Caitlyn, Taylor) (SOPs compared, Nov 17) |
 | B13 | D23, D24, D27 | 24 passes on to 27 Maintenance; 23 stays open for revival (SOP post-filing) | 23 and 24 are closed stages; no 27 (SOPs compared, Nov 17); since then registered marks with no maintenance deadline are flagged (Lectual) | Not decided (Caitlyn) (SOPs compared, Nov 17) |
-| B14 | C14, D20, D21 | Who each stage waits on, per the SOP tables (SOP pre-filing; SOP post-filing) | Lectual's stage settings differ for 14, 20D and 21E (SOPs compared, Nov 17) | Not decided (Caitlyn) (SOPs compared, Nov 17) |
+| B14 | C14, D20, D21 | Who each stage waits on, per the SOP tables (SOP pre-filing; SOP post-filing) | Lectual's starting stage settings (from its set-up script; the live settings were not read) differ for 14, 20D and 21E (SOPs compared, Nov 17) | Not decided (Caitlyn) (SOPs compared, Nov 17) |
 | B15 | A2 | Trademark and other-practice leads are both working lists (SOP intake) | The Intake list shows only trademark or blank practice areas (SOPs compared, Nov 17) | Not decided (Caitlyn, Taylor) (SOPs compared, Nov 17) |
 | B16 | C9 | Rebecca approves on the card; a PDF is saved; the stage moves (SOP pre-filing) | Approval in the queue makes a Word file; the stage does not move (SOPs compared, Nov 17) | Not decided (Rebecca, Caitlyn) (SOPs compared, Nov 17) |
 | B17 | C16, D18 | Rayn sends routine filing emails (SOP pre-filing; SOP post-filing) | On Nov 17 a law clerk could not approve them (SOPs compared, Nov 17); since then routine kinds that can go to a law clerk exist, but nothing drafts them (Lectual) | Not decided (Rebecca, Taylor) (SOPs compared, Nov 17) |
-| B18 | All stages | Each stage has its own target and stall time in business days (SOP intake; SOP pre-filing; SOP post-filing) | One number: 30 days for matters (120 when waiting on the USPTO), 14 days quiet on the Weekly review, one limit per lead stage, calendar days (SOPs compared, Nov 17) | Not decided (Caitlyn, Taylor) (SOPs compared, Nov 17) |
+| B18 | All stages | Each stage has its own target and stall time in business days (SOP intake; SOP pre-filing; SOP post-filing) | Lectual uses one time limit for all matters (30 days, or 120 when waiting on the USPTO), counts weekends, and flags a lead or matter after 14 quiet days on the Weekly review; lead stages have one limit each (SOPs compared, Nov 17) | Not decided (Caitlyn, Taylor) (SOPs compared, Nov 17) |
 | B19 | Weekly meeting | Wednesday in most places (SOP intake; SOP pre-filing; SOP post-filing) | The Weekly review is described as Monday's walk-through (SOPs compared, Nov 17) | Not decided (Caitlyn) (SOPs compared, Nov 17) |
 | B20 | A8 | Never Lost for silence or a decline (SOP intake) | The close form offers Lost as well as Nurture (SOPs compared, Nov 17; Lectual) | Not decided (Caitlyn) (SOPs compared, Nov 17) |
 | B21 | A1, A2 | Manual leads go into Lawmatics within 1 business day (SOP intake) | Add a lead records in Lectual only (SOPs compared, Nov 17) | Not decided (Caitlyn, Taylor) (SOPs compared, Nov 17) |
@@ -807,7 +812,7 @@ Counted as distinct mentions in the six Monday meetings read (Aug 19, Aug 31, Se
 
 ## Lawmatics while it is still here
 
-Taylor decided on November 23, 2026 that Lawmatics is to be phased out. The team has not been told. No meeting decided it: on Aug 28 Rebecca wanted to keep Lawmatics for intake (meeting, Aug 28), and the last working split on record still gives Lawmatics the automatic follow-ups, payment links and reminders, while Lectual keeps the cards, stage moves and drafts (meeting, Nov 6). Until Lawmatics goes, Lectual reads from it and writes to it in the places below. Lectual connects with the firm's own Lawmatics key, never a shared one (Lectual).
+Taylor's stated direction as of November 23, 2026 is to phase Lawmatics out. No meeting on record decided it, and whether the rest of the team has been told is not on record. On Aug 28 Rebecca wanted to keep Lawmatics for intake (meeting, Aug 28), and the last working split on record still gives Lawmatics the automatic follow-ups, payment links and reminders, while Lectual keeps the cards, stage moves and drafts (meeting, Nov 6). Until Lawmatics goes, Lectual reads from it and writes to it in the places below. Lectual connects with the firm's own Lawmatics key, never a shared one (Lectual).
 
 ### What Lectual depends on, and what goes wrong without it
 
@@ -815,11 +820,11 @@ Taylor decided on November 23, 2026 that Lawmatics is to be phased out. The team
 |---|---|---|---|
 | L1 | An active connection (the firm's key) | Every read and write below (Lectual) | All Lawmatics steps are skipped or blocked; the owner's Billing card says it is not connected (Lectual) |
 | L2 | An email and a name on each prospect | Lead import; matching a lead to its Lawmatics record (Lectual) | The person is skipped on import; Reconcile cannot match them (Lectual) |
-| L3 | One record per person | Import, Reconcile and filing things back after signing (Lectual) | Two records with one email: neither is matched; the acceptance note, signed letter and address are not filed (Lectual). Lawmatics makes one matter per inquiry (meeting, Oct 16) |
+| L3 | One record per person | Import, Reconcile and filing things back after signing (Lectual) | If one person has two Lawmatics records with the same email, Lectual cannot tell which is right, so it files nothing back to Lawmatics for them (Lectual). Lawmatics makes one matter per inquiry (meeting, Oct 16) |
 | L4 | Status Hired with a converted date on or after Oct 28, 2026 | The daily automatic check that opens matters in Lectual (Lectual) | No hired date: skipped. A hired client with no date or an older date gets no matter (Lectual). The field names were never checked against the live account (Lectual) |
 | L5 | Case title, or the Name of Trademark field | The new matter's title and duplicate check (Lectual) | No title and the client already has a matter: skipped for a person to look at (Lectual) |
 | L6 | Practice area, or the Practice Area field | The matter type: trademark or business law (Lectual) | Missing: filed as business law unless a trademark name is present (Lectual) |
-| L7 | Event tags with a year, and the fields Lectual reads by the names How did you hear about us?, Referred By and Specify Source | Where a lead came from (Lectual) | Source stays unknown (Lectual). The intake SOP calls the field "Where did you hear about us?" (SOP intake), so the name may not match: to check in the account |
+| L7 | The event labels (which must include the year) and three Lawmatics fields Lectual looks up by their exact names: How did you hear about us?, Referred By and Specify Source | Where a lead came from (Lectual) | Source stays unknown (Lectual). The intake SOP calls the field "Where did you hear about us?" (SOP intake), so the name may not match: to check in the account |
 | L8 | The Lawmatics id on the Lectual lead or matter | Where the acceptance note, signed letter, accepted proposal and mailing address are filed (Lectual) | No write; the step says no Lawmatics record was found (Lectual). To check: a lead that came in through a Lectual form may not carry the id the form created until an import links it by email (Lectual) |
 | L9 | Exactly one matter per lead with a Lawmatics id | Filing the signed letter and accepted proposal in the Engagement folder (Lectual) | Two matters, or a matter with no id: refused (Lectual) |
 | L10 | Invoices linked to the right matter | The owner's read-only Billing card (Lectual) | An invoice on another record is not shown (Lectual) |
@@ -843,14 +848,13 @@ Cheap fixes that remove a failure Lectual has today.
 7. **Check the owner's Billing card against Lawmatics on one matter** (L10). The invoice read was never checked against the live account, and the comparison makes that check the first step of any billing view for Dawn (Lectual; SOPs compared, Nov 17, build item 9).
 8. **Use a pay link made for the client's own record, not a shared form** (L13), so the client does not retype the address. Lectual does not read payment from it; staff still press Mark paid (Lectual).
 
-### Worth doing before the move
-Tidy-ups that mainly make the eventual export out of Lawmatics clean, and help Lectual meanwhile.
+### Worth doing before Lawmatics is left
+No source describes how the firm's records will be moved out of Lawmatics, so this tier assumes they will have to be (Lectual; Taylor, Nov 23). These tidy-ups also help Lectual meanwhile.
 1. **Give every live prospect an email and a name** (L2). Only people still in play, not the archive (Lectual).
 2. **For each person still in play with two or more PNC matters, close the extras** (L3). Lawmatics will keep making one per inquiry, so this does not stay fixed; it matters while a lead import or Reconcile is still used, and for a clean export (Lectual; meeting, Oct 16).
-3. **Label matters that have no practice area or mark name** (L5, L6), so the export and the automatic matter check both know what each one is (Lectual).
-4. **List every Lawmatics automation that sends to a client**, by stage move or tag, so each one is replaced or deliberately dropped at the move (SOP agents; Lectual).
-5. **Keep invoices on the client's main matter** (L10). Low value for Lectual: only the owner's read-only Billing card uses it (Lectual).
-6. **Find out whether Lawmatics can give out the client's form answers and uploaded files** (the Trademark Form and the statement of use form). Lectual does not read them (Lectual), and the comparison suggested checking whether the Lawmatics connection exposes them (SOPs compared, Nov 17, T6). They hold the specimens and first-use dates a matter needs after the move.
+3. **List every Lawmatics automation that sends to a client**, by stage move or tag, so each one is replaced or deliberately dropped at the move (SOP agents; Lectual).
+4. **Keep invoices on the client's main matter** (L10). Low value for Lectual: only the owner's read-only Billing card uses it (Lectual).
+5. **Find out whether Lawmatics can give out the client's form answers and uploaded files** (the Trademark Form and the statement of use form). Lectual does not read them (Lectual), and the comparison suggested checking whether the Lawmatics connection exposes them (SOPs compared, Nov 17, T6). They hold the specimens and first-use dates a matter needs after the move.
 
 ### Not worth doing
 - **Reorganising stages, or renaming them to 8-16 or 8-27** (SOP pre-filing, Q12). Lectual never reads a Lawmatics stage to place a lead or matter (Lectual). Renaming needs every automation re-pointed (SOP pre-filing, Q12), so it risks breaking client emails, and it is thrown away at the phase-out. The comparison recommended renaming Lectual's stages together with the Lawmatics rename (SOPs compared, Nov 17, T1); with the phase-out only the Lectual side is worth doing.
@@ -872,7 +876,7 @@ Still needed in Lawmatics until Lectual replaces them, so not throw-away: the Tr
 Gathered from every source, with the comparison's 36 questions (cited by number) and 10 build items merged in. Near-duplicates are joined. "Who" is the person the source names; the comparison's questions are addressed to Caitlyn unless it names others. "On record" marks an answer already given somewhere since, which the SOPs have not yet taken in.
 
 ### Lawmatics and which system is the record
-1. When and how to tell the team that Lawmatics will be phased out, and in what order its jobs move to Lectual. Taylor (Taylor, Nov 23).
+1. Whether and when Lawmatics is phased out, whether and how the team is told, and in what order its jobs move to Lectual. The direction is Taylor's; who decides is not stated (Taylor, Nov 23).
 2. Which system holds the true stage for leads and matters when they disagree. Caitlyn, Taylor (SOPs compared, Nov 17, question 1, T1).
 3. Where a lead taken by hand (a card, a referral, a call) is entered: Lectual or Lawmatics. Caitlyn, Taylor (SOPs compared, Nov 17, question 14, B21).
 4. Whether specimens the client uploads in Lawmatics are copied to the Lectual matter, and by whom. Taylor, Rayn (SOP pre-filing, Q4; SOPs compared, Nov 17, question 27).
@@ -907,7 +911,19 @@ Gathered from every source, with the comparison's 36 questions (cited by number)
 
 ### Emails and reminders
 25. Whether Lectual may ever send a client email by itself, and which client emails Lectual drafts while which reminders stay as Lawmatics automations. Taylor, Caitlyn, Rebecca (SOP pre-filing, Q1; SOPs compared, Nov 17, question 2, T4; Lectual). On Aug 25 automated emails were to stay drafts until the system is stable (meeting, Aug 25). The comparison recommended leaving routine reminders as Lawmatics automations (SOPs compared, Nov 17); that sits uneasily with the phase-out (Taylor, Nov 23).
-   The comparison's 12 steps that Lectual will not do because of a rule (SOPs compared, Nov 17). Four would change if this decision allowed Lectual to send: sending a marketing campaign from Rebecca's account to an audience; the automatic stalled-matter update on day 7; the automatic 7-day proceed notice; sending the office action email from trademarks@ within 3 business days. The other eight are legal acts that stay with a person whatever is decided: Rebecca contacting a client when she advises not to proceed; answering a client's legal questions; Rebecca filing an office action response, a statement of use and an extension; checking specimens against each class; Rebecca speaking to a client first when the firm missed a deadline; and the Section 15 decision at maintenance (SOPs compared, Nov 17).
+   The comparison lists 12 steps that Lectual will not do because of a rule (SOPs compared, Nov 17).
+   Would change if Lectual were allowed to send:
+   - sending a marketing campaign from Rebecca's account to an audience;
+   - the automatic stalled-matter update on day 7;
+   - the automatic 7-day proceed notice;
+   - sending the office action email from trademarks@ within 3 business days.
+   Stay with a person whatever is decided:
+   - Rebecca contacting a client when she advises not to proceed;
+   - answering a client's legal questions;
+   - Rebecca filing an office action response, a statement of use and an extension (three steps);
+   - checking specimens against each class;
+   - Rebecca speaking to a client first when the firm missed a deadline;
+   - the Section 15 decision at maintenance.
 26. Which mailbox an approved email comes from (info@ or trademarks@, with Rebecca copied) or whether the approver's own mailbox is acceptable. Caitlyn, Taylor (SOPs compared, Nov 17, question 3, B4, build item 6).
 27. Whether a client reply pauses a sequence or stops it so staff enrol the client again; whether the proposal follow-ups are the manual days 1 to 7 or the automatic 48 and 96 hours. Caitlyn, Taylor (SOPs compared, Nov 17, questions 9, 11).
 28. Whether the proposal email repeats the fee total and the last day. Rebecca (SOPs compared, Nov 17, question 15).
@@ -942,7 +958,7 @@ Gathered from every source, with the comparison's 36 questions (cited by number)
 
 **Meetings** (RPB team meetings and working sessions): Aug 19, Aug 25, Aug 28, Aug 31, Sep 11, Sep 14, Sep 17, Sep 22, Oct 2, Oct 12, Oct 16, Oct 27, Oct 30, Nov 2, Nov 3, Nov 6, Nov 9, Nov 10, Nov 11, Nov 12, Nov 13, Nov 17. Many were read from notes plus parts of the transcript only.
 
-**Decisions not made in a meeting**: Taylor's decision of Nov 23, 2026 to phase out Lawmatics (Taylor, Nov 23).
+**Not from a meeting**: Taylor's stated direction as of Nov 23, 2026 to phase Lawmatics out (Taylor, Nov 23).
 
 **Lectual**: a read of the app's code and notes as of Nov 23, which shows what the app does but not the firm's live data.
 
