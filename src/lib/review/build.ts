@@ -9,7 +9,7 @@ import type { ReviewRow, ReviewNextStep } from "./buckets";
 import { summarizeContact, type ContactActivity } from "./contact";
 import type { FirmSenders } from "@/lib/mailbox/firm-sender";
 import { stageIsWithUspto, waitingOn } from "./waiting";
-import { noOpenDeadline, openDeadlineIndex } from "@/lib/matters/deadline-safety";
+import { isRegisteredTrademark, noOpenDeadline, openDeadlineIndex } from "@/lib/matters/deadline-safety";
 import { MATTER_TYPE_LABELS } from "@/lib/matters/matter-types";
 import { deadlineKindLabel, type DeadlineKind } from "@/lib/matters/deadline-rules";
 
@@ -220,7 +220,16 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
   const rows: ReviewRow[] = [];
 
   const openMatters = input.matters.filter((m) => isOpenMatter(m) && (m.status === "open" || m.status === "on_hold"));
-  for (const m of openMatters) {
+  // Registered marks with no open Section 8 / Section 9 deadline (Taylor, Nov 23) become rows too, in On track with the tag. Only when
+  // the deadlines were read (a failed read admits none: never a guess), and never twice (a firm whose maintenance stage is open on the
+  // docket already has the matter in `openMatters`).
+  const openIds = new Set(openMatters.map((m) => m.id));
+  const admitted = new Set(
+    input.sources.deadlines === "ok"
+      ? input.matters.filter((m) => !openIds.has(m.id) && isRegisteredTrademark(m) && noOpenDeadline(m, openSet)).map((m) => m.id)
+      : [],
+  );
+  for (const m of [...openMatters, ...input.matters.filter((x) => admitted.has(x.id))]) {
     const age = stageAgeDisplay({
       stageEnteredAt: m.stage_entered_at,
       createdAt: m.created_at,
@@ -257,7 +266,8 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
       lastOutboundType,
       source: m.referral_source?.trim() || null,
       waiting: waitingOn({
-        withUspto: stageIsWithUspto(m.stage),
+        // An admitted registered mark is never "waiting on the USPTO" (Taylor, Nov 23): its stage's waiting_on is not a to-do here.
+        withUspto: admitted.has(m.id) ? false : stageIsWithUspto(m.stage),
         pendingApproval: input.pendingMatterIds?.has(m.id) ?? false,
         lastDirection: direction,
       }),
@@ -269,6 +279,7 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
       serialNumber: m.serial_number?.trim() || null,
       startDate: civilDateIn(m.opened_at || m.created_at, timeZone),
       practiceArea: m.type && m.type in MATTER_TYPE_LABELS ? MATTER_TYPE_LABELS[m.type as keyof typeof MATTER_TYPE_LABELS] : null,
+      ...(admitted.has(m.id) ? { registeredNoDeadline: true as const } : {}),
     });
   }
 

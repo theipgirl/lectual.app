@@ -22,7 +22,7 @@ const fields: CustomColumnField[] = [
   { id: C, section: "both", label: "Quoted fee", kind: "money", position: 0 },
 ];
 // The owner's view: the Money field is a column (Nov 23: custom Money is owner-only, like the fee columns).
-const opts = (customFields: CustomColumnField[] = fields) => ({ canSeeMoney: true, hasNotes: NOTES_PRESENT, customFields });
+const opts = (customFields: CustomColumnField[] = fields) => ({ canSeeMoney: true, canSeeCustomMoney: true, hasNotes: NOTES_PRESENT, customFields });
 const ids = (section: "trademarks" | "contracts", f?: CustomColumnField[]) => columnsFor(section, opts(f)).map((c) => c.id);
 
 describe("columnsFor with the firm's fields", () => {

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { buildReviewRows, type ReviewInput } from "@/lib/review/build";
-import { bucketOf } from "@/lib/review/buckets";
+import { bucketOf, reviewBuckets, reviewSubline } from "@/lib/review/buckets";
+import { boardLanes, kpis } from "@/lib/review/lanes";
+import { waitingCell } from "@/lib/review/sheet";
 import { rowTags } from "@/lib/review/tags";
 import { deadlinesOut } from "@/lib/review/strips";
 import { DeadlinesStrip } from "@/components/review/ReviewViews";
@@ -67,8 +69,87 @@ describe("registered marks (Taylor, Nov 23): the review's flag rule, and buckets
     expect(row.noOpenDeadline).toBe(false);
   });
 
-  it("membership is unchanged: a registered stage that is closed on the docket (is_open false) is still not a review row", () => {
-    expect(buildReviewRows(base({ matters: [matter({ stage: { ...regStage, is_open: false } })] as never }))).toHaveLength(0);
+});
+
+describe("registered marks become review rows when no Section 8 / 9 is open (Taylor, Nov 23 follow-up; changed on purpose)", () => {
+  // RPB's registered stage: closed on the docket, phase maintenance, waiting on the USPTO on the docket.
+  const closedReg = { code: "24", label: "Trademark Registered", is_open: false, waiting_on: "uspto", order_index: 24, phase: "maintenance" };
+  const dl = (kind: string) => ({ id: `d-${kind}`, matter_id: "m1", due_date: "2031-06-01", title: null, kind, attorney_confirmed: true });
+  const reg = (over: Record<string, unknown> = {}) => matter({ stage: closedReg, ...over });
+  const task = (due: string | null) => ({ id: "t1", matter_id: "m1", lead_id: null, title: "Docket the Section 8", due_at: due ? `${due}T15:00:00Z` : null, assignee_id: "u1" });
+
+  it("admitted with no deadline: one row, tagged, never waiting on the USPTO (no USPTO tag, ordinary waiting)", () => {
+    const rows = buildReviewRows(base({ matters: [reg()] as never }));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].registeredNoDeadline).toBe(true);
+    expect(rows[0].noOpenDeadline).toBe(true);
+    expect(rows[0].waiting).not.toBe("uspto");
+    const tags = rowTags(rows[0], TODAY).map((t) => t.text);
+    expect(tags).toContain("No open deadline");
+    expect(tags.some((t) => /USPTO/.test(t))).toBe(false);
+    // The Sheet's Waiting column shows the ordinary value, never "USPTO": with no mail and no approval that is the plain dash, the
+    // same as an open filed matter whose stage isn't with the USPTO; an approval reads Approval.
+    expect(rows[0].waiting).toBeNull();
+    expect(waitingCell(rows[0], (d) => d)).not.toBe("USPTO");
+    const [withApproval] = buildReviewRows(base({ matters: [reg()] as never, pendingMatterIds: new Set(["m1"]) }));
+    expect(withApproval.waiting).toBe("approval");
+  });
+
+  it("normal bucket rules (changed on purpose: no longer forced to On track)", () => {
+    const at = (t: ReturnType<typeof task> | null) => {
+      const [r] = buildReviewRows(base({ matters: [reg()] as never, ...(t ? { tasks: [t] as never } : {}) }));
+      return r;
+    };
+    // no next step -> Needs a next step (not the USPTO list, which the stage would have given it)
+    expect(bucketOf(at(null), TODAY)).toBe("needs");
+    // an overdue step -> Overdue, in a lane, counted by the KPI
+    const overdue = at(task("2026-10-01"));
+    expect(bucketOf(overdue, TODAY)).toBe("overdue");
+    const b = reviewBuckets([overdue], TODAY);
+    expect(kpis(b).overdue).toBe(1);
+    expect(boardLanes(b, []).flatMap((l) => [...l.our, ...l.client]).map((r) => r.id)).toContain("m1");
+    // due this week -> Due this week
+    expect(bucketOf(at(task("2026-11-04")), TODAY)).toBe("week");
+    // a dated step later, recent contact -> On track; never "uspto"
+    const later = { ...at(task("2026-12-20")), contactKnown: true, lastContact: { date: "2026-11-01", type: "email_sent" as never } };
+    expect(bucketOf(later, TODAY)).toBe("track");
+    // the same, but quiet for 14+ days -> Quiet
+    expect(bucketOf({ ...later, lastContact: { date: "2026-10-01", type: "email_sent" as never } }, TODAY)).toBe("quiet");
+    for (const r of [at(null), overdue, later]) expect(kpis(reviewBuckets([r], TODAY)).uspto).toBe(0);
+  });
+
+  it("admitted with only an office action open", () => {
+    expect(buildReviewRows(base({ matters: [reg()] as never, deadlines: [dl("office_action_response")] }))).toHaveLength(1);
+  });
+
+  it("not admitted with an open Section 8 or an open Section 9 renewal", () => {
+    expect(buildReviewRows(base({ matters: [reg()] as never, deadlines: [dl("section_8_declaration")] }))).toHaveLength(0);
+    expect(buildReviewRows(base({ matters: [reg()] as never, deadlines: [dl("section_9_renewal")] }))).toHaveLength(0);
+  });
+
+  it("not admitted when the deadlines read failed (never a guess)", () => {
+    expect(buildReviewRows(base({ matters: [reg()] as never, sources: { activity: "ok", deadlines: "unavailable" } }))).toHaveLength(0);
+  });
+
+  it("not admitted for a non-TM matter, a closed non-maintenance stage, or a closed / on-hold matter", () => {
+    for (const over of [{ type: "CR" }, { type: "BL" }, { stage: { ...closedReg, phase: "inactive" } }, { stage: { ...closedReg, phase: null } }, { status: "closed" }, { status: "on_hold" }])
+      expect(buildReviewRows(base({ matters: [reg(over)] as never })), JSON.stringify(over)).toHaveLength(0);
+  });
+
+  it("never twice: an open maintenance stage stays an ordinary row (its stage's USPTO waiting kept), not a second admitted one", () => {
+    const rows = buildReviewRows(base({ matters: [reg({ stage: { ...closedReg, is_open: true } })] as never }));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].registeredNoDeadline).toBeUndefined();
+    expect(rows[0].waiting).toBe("uspto");
+  });
+
+  it("the sub-line counts them apart: 'N open · M registered', M only when > 0", () => {
+    const rows = buildReviewRows(base({ matters: [reg(), matter({ id: "m2" })] as never }));
+    const b = reviewBuckets(rows, TODAY);
+    expect(b.total).toBe(2);
+    expect(reviewSubline(b)).toMatch(/^1 open · 1 registered · /);
+    expect(reviewSubline(reviewBuckets(buildReviewRows(base()), TODAY))).toMatch(/^1 open · /);
+    expect(reviewSubline(reviewBuckets(buildReviewRows(base()), TODAY))).not.toContain("registered");
   });
 });
 

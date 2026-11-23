@@ -67,7 +67,9 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const withCustom = params.view === "sheet";
   const notes = params.view === "sheet";
   // The firm's own Money columns follow the fee rule (Taylor, Nov 23): an amount is read only for the owner.
-  const customMoney = canSeeCustomMoney(role);
+  // Lectual staff acting inside the firm never see them, even with an owner role claim (Taylor, Nov 23).
+  const actingAsStaff = session.kind === "ok" ? session.actingAsStaff : true;
+  const customMoney = canSeeCustomMoney(role, actingAsStaff);
   const load = await loadReview(new Date(), { withFees, withCustom, notes, customMoney });
   const userId = session.kind === "ok" ? session.user.id : null;
   const canWrite = !!role && MATTER_WRITE_ROLES.includes(role);
@@ -121,8 +123,8 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
     params.view === "sheet" ? (
       <ColumnChooser
         sections={[
-          { id: "trademarks", title: "Trademarks", columns: columnsFor("trademarks", { canSeeMoney, hasNotes: NOTES_PRESENT, customFields }) },
-          { id: "contracts", title: "Contracts", columns: columnsFor("contracts", { canSeeMoney, hasNotes: NOTES_PRESENT, customFields }) },
+          { id: "trademarks", title: "Trademarks", columns: columnsFor("trademarks", { canSeeMoney, canSeeCustomMoney: customMoney, hasNotes: NOTES_PRESENT, customFields }) },
+          { id: "contracts", title: "Contracts", columns: columnsFor("contracts", { canSeeMoney, canSeeCustomMoney: customMoney, hasNotes: NOTES_PRESENT, customFields }) },
         ] satisfies ChooserSection[]}
       />
     ) : null;
@@ -178,10 +180,10 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
       custom && cardRow
         ? custom
         : await loadCardCustomColumns(cardLoad.kind === "lead" ? { kind: "lead", id: cardLoad.lead.id } : { kind: "matter", id: cardLoad.matter.id, leadId: cardLoad.matter.lead_id ?? null }, {
-            canSeeMoney: customMoney && canSeeCustomMoney(cardLoad.role),
+            canSeeMoney: customMoney && canSeeCustomMoney(cardLoad.role, actingAsStaff),
           });
     // A staff role types in the card (the card's own re-resolved role); viewer and social media see the values only.
-    firmColumns = firmColumnsBlock(customMoney && canSeeCustomMoney(cardLoad.role) ? state : withoutMoney(state), custom && cardRow ? cardRow : record, customMembers, load.today, canWriteCustomValue(cardLoad.role));
+    firmColumns = firmColumnsBlock(customMoney && canSeeCustomMoney(cardLoad.role, actingAsStaff) ? state : withoutMoney(state), custom && cardRow ? cardRow : record, customMembers, load.today, canWriteCustomValue(cardLoad.role));
   }
   // Close (and Back) land on the same review view: every other review param is kept, only `open` goes.
   const cardBase = reviewHref({ ...params, open: null });
@@ -337,7 +339,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
       ) : params.view === "sheet" ? (
         <>
           {strips}
-          <SheetView rows={shown} canSeeMoney={canSeeMoney} custom={custom} customMembers={customMembers} adminTier={adminTier} notes={sheetNotes} {...common} {...(sheetPerms ? { sheetEdit: { perms: sheetPerms } } : {})} />
+          <SheetView rows={shown} canSeeMoney={canSeeMoney} canSeeCustomMoney={customMoney} custom={custom} customMembers={customMembers} adminTier={adminTier} notes={sheetNotes} {...common} {...(sheetPerms ? { sheetEdit: { perms: sheetPerms } } : {})} />
         </>
       ) : (
         <>

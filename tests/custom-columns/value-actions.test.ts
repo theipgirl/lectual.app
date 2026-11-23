@@ -15,10 +15,12 @@ const PERSON = "00000000-0000-4000-8000-0000000000c1";
 
 const fieldRow = (over: Partial<FieldRow> = {}): FieldRow => ({ id: F, section: "trademarks", kind: "choice", label: "Priority", options: ["High", "Low"], position: 1, archived: false, updated_at: "2026-11-20T10:00:00+00:00", ...over });
 
-export function valueStore(opts: { field?: FieldRow | null; role?: () => Promise<string>; records?: Record<string, { id: string; org_id: string; type?: string | null }>; existing?: { id: string } | null; members?: string[] } = {}) {
+export function valueStore(opts: { field?: FieldRow | null; role?: () => Promise<string>; staff?: () => Promise<boolean>; records?: Record<string, { id: string; org_id: string; type?: string | null }>; existing?: { id: string } | null; members?: string[] } = {}) {
   const records = opts.records ?? { [LEAD]: { id: LEAD, org_id: VORG }, [MATTER]: { id: MATTER, org_id: VORG, type: "TM" } };
   const deps = {
     role: vi.fn(opts.role ?? (async () => "attorney")),
+    // A real member session unless a test says otherwise (Lectual staff inside a firm never type money, Nov 23).
+    actingAsStaff: vi.fn(opts.staff ?? (async () => false)),
     readField: vi.fn(async (id: string) => (opts.field === undefined ? fieldRow() : opts.field && opts.field.id === id ? opts.field : null)),
     keeper: vi.fn(async (id: string) => id),
     // The real store reads crm_lead for a lead and crm_matter for a matter: a matter carries `type`, a lead never does.
@@ -232,5 +234,25 @@ describe("Money columns are owner-only (Taylor, Nov 23)", () => {
     expect(await post(owner.deps, { value: "1250" })).toEqual({ saved: true });
     expect(owner.deps.insertValue.mock.calls[0][0]).toMatchObject({ value_cents: 125000 });
     expect(await post(valueStore({ role: async () => "paralegal" }).deps)).toEqual({ saved: true });
+  });
+});
+
+describe("Lectual staff acting inside a firm never write custom money, even with an owner role claim (Nov 23)", () => {
+  const money = () => fieldRow({ kind: "money", options: [] });
+  it("owner role + actingAsStaff true: refused, nothing read past the field, nothing written", async () => {
+    const s = valueStore({ field: money(), role: async () => "owner", staff: async () => true });
+    expect(await post(s.deps, { value: "1250" })).toEqual({ error: W.CUSTOM_MONEY_OWNER_ONLY });
+    expect(s.deps.readRecord).not.toHaveBeenCalled();
+    expect(s.writes()).toBe(0);
+  });
+  it("a staff check that throws counts as staff (fail closed)", async () => {
+    const s = valueStore({ field: money(), role: async () => "owner", staff: async () => Promise.reject(new Error("no session")) });
+    expect(await post(s.deps, { value: "1250" })).toEqual({ error: W.CUSTOM_MONEY_OWNER_ONLY });
+    expect(s.writes()).toBe(0);
+  });
+  it("staff still write a non-money column as before (the staff check is asked only for money)", async () => {
+    const s = valueStore({ role: async () => "owner", staff: async () => true });
+    expect(await post(s.deps)).toEqual({ saved: true });
+    expect(s.deps.actingAsStaff).not.toHaveBeenCalled();
   });
 });

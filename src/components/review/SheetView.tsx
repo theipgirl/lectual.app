@@ -6,7 +6,7 @@ import { laneOf } from "@/lib/review/lanes";
 import { sheetSections, waitingCell } from "@/lib/review/sheet";
 import { FACT_COLUMN_IDS, NOTES_PRESENT, columnsFor, type ColumnId, type CustomStateLike, type SheetColumn, type SheetSectionId } from "@/lib/review/sheet-columns";
 import { factCells, type FactCell } from "@/lib/review/sheet-cells";
-import { customCells, noteStateOf, type CustomColumnsState, type CustomMember } from "@/lib/custom-columns/rules";
+import { customCells, noteStateOf, withoutMoney, type CustomColumnsState, type CustomMember } from "@/lib/custom-columns/rules";
 import type { PrefsDocument } from "@/lib/review/column-prefs-storage";
 import { LastChanged, openHref, type Common } from "./shared";
 import { SheetEdit } from "./SheetEdit";
@@ -88,22 +88,25 @@ function SheetSection({ id, title, rows, today, members, params, canWrite, colum
 }
 
 /** The Excel tracker as one table: Trademarks, then Contracts, in pipeline order. Edits happen in the record card the Client link opens. */
-export function SheetView({ rows, owner, sheetEdit, canSeeMoney = false, initialPrefs, custom = null, customMembers, adminTier = false, notes = null, ...common }: Common & {
+export function SheetView({ rows, owner, sheetEdit, canSeeMoney = false, canSeeCustomMoney = false, initialPrefs, custom: customIn = null, customMembers, adminTier = false, notes = null, ...common }: Common & {
   rows: ReviewRow[];
   /** The owner view's editable sheet (owner view only). */ sheetEdit?: { perms: SheetPerms };
   /** From the page's re-resolved role (`canSeeBilling`), never from the browser. */ canSeeMoney?: boolean;
+  /** A REAL owner only (`canSeeCustomMoney(role, actingAsStaff)`): the firm's own Money columns. Never Lectual staff. */ canSeeCustomMoney?: boolean;
   /** Drawing-only starting column choices (a test or preview). */ initialPrefs?: PrefsDocument;
   /** The firm's custom columns as the page read them (null: not read). Only `ok` adds columns. */ custom?: CustomColumnsState | null;
   /** The member directory for person cells; null when it couldn't be read (a person cell then says so). Defaults to `members`. */ customMembers?: CustomMember[] | null;
   /** The admin tier (`canSeeSetup` of the page's re-resolved role): the section note's "not switched on" line and "Add a column" link are theirs only. */ adminTier?: boolean;
   /** The Notes column's reads (sheet-notes.ts). */ notes?: SheetNotes | null;
 }) {
-  if (owner && sheetEdit) return <SheetEdit rows={rows} perms={sheetEdit.perms} owner canSeeMoney={canSeeMoney} initialPrefs={initialPrefs} custom={custom} customMembers={customMembers} adminTier={adminTier} notes={notes} {...common} />;
+  // The component enforces its own prop: without canSeeCustomMoney no Money field or amount goes further, whatever a caller handed in.
+  const custom = canSeeCustomMoney ? customIn : customIn && withoutMoney(customIn);
+  if (owner && sheetEdit) return <SheetEdit rows={rows} perms={sheetEdit.perms} owner canSeeMoney={canSeeMoney} canSeeCustomMoney={canSeeCustomMoney} initialPrefs={initialPrefs} custom={custom} customMembers={customMembers} adminTier={adminTier} notes={notes} {...common} />;
   const { trademarks, contracts } = sheetSections(rows);
   const fields = custom?.status === "ok" ? custom.fields : [];
   const cells = custom?.status === "ok" ? customCells(rows, fields, custom, customMembers === undefined ? common.members : customMembers, common.today) : {};
   const noteState = noteStateOf(custom);
-  const columns = { trademarks: columnsFor("trademarks", { canSeeMoney, hasNotes: NOTES_PRESENT, customFields: fields }), contracts: columnsFor("contracts", { canSeeMoney, hasNotes: NOTES_PRESENT, customFields: fields }) };
+  const columns = { trademarks: columnsFor("trademarks", { canSeeMoney, canSeeCustomMoney, hasNotes: NOTES_PRESENT, customFields: fields }), contracts: columnsFor("contracts", { canSeeMoney, canSeeCustomMoney, hasNotes: NOTES_PRESENT, customFields: fields }) };
   return (
     <div className="rv-sheets">
       <SheetSection id="trademarks" title="Trademarks" rows={trademarks} columns={columns.trademarks} initialPrefs={initialPrefs} custom={cells} noteState={noteState} adminTier={adminTier} notes={notes} {...common} />

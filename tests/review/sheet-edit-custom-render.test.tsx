@@ -28,7 +28,7 @@ async function render(opts: { open: { rowKey: string; col: string }[]; custom?: 
   return decode(
     renderToStaticMarkup(
       <div className="rv-owner">
-        <SheetEdit rows={rows} perms={opts.perms ?? PERMS} owner today={TODAY} members={members} canWrite params={params} canSeeMoney custom={opts.custom ?? customFixture} initial={{ open: opts.open as never }} />
+        <SheetEdit rows={rows} perms={opts.perms ?? PERMS} owner today={TODAY} members={members} canWrite params={params} canSeeMoney canSeeCustomMoney custom={opts.custom ?? customFixture} initial={{ open: opts.open as never }} />
       </div>,
     ),
   );

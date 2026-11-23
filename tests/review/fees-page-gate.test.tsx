@@ -120,7 +120,9 @@ describe("page.tsx source", () => {
     // Merge with the Notes cell: the List's Notes column is asked for in the same call (`notes`, the view alone, no role).
     // Nov 23: custom Money columns are owner-only too, from the same re-resolved role (changed on purpose).
     expect(src).toMatch(/loadReview\(new Date\(\), \{ withFees, withCustom, notes, customMoney \}\)/);
-    expect(src).toMatch(/const customMoney = canSeeCustomMoney\(role\)/);
+    // Nov 23 follow-up: a REAL owner only, so Lectual staff acting inside the firm (owner role claim) are excluded (changed on purpose).
+    expect(src).toMatch(/const actingAsStaff = session\.kind === "ok" \? session\.actingAsStaff : true;/);
+    expect(src).toMatch(/const customMoney = canSeeCustomMoney\(role, actingAsStaff\)/);
     expect(src).toMatch(/const withCustom = params\.view === "sheet"/);
     expect(src.indexOf("await resolveFirmSession()")).toBeGreaterThan(-1);
     expect(src.indexOf("await resolveFirmSession()")).toBeLessThan(src.indexOf("await loadReview("));
@@ -130,6 +132,8 @@ describe("page.tsx source", () => {
   });
   it("passes that same canSeeMoney to the chooser and to SheetView", () => {
     expect(src).toMatch(/<SheetView rows=\{shown\} canSeeMoney=\{canSeeMoney\}/);
-    expect(src.match(/canSeeMoney, hasNotes: NOTES_PRESENT/g)?.length).toBe(2);
+    // Nov 23 follow-up: the chooser also gets the real-owner custom money flag (changed on purpose).
+    expect(src.match(/canSeeMoney, canSeeCustomMoney: customMoney, hasNotes: NOTES_PRESENT/g)?.length).toBe(2);
+    expect(src).toMatch(/canSeeCustomMoney=\{customMoney\}/);
   });
 });

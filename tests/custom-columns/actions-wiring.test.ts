@@ -43,13 +43,16 @@ const h = vi.hoisted(() => ({
   inserts: [] as unknown[],
   valueInserts: [] as unknown[],
   valueUpdates: [] as unknown[][],
+  /** The value action's role and session (Nov 23 follow-up: the actingAsStaff wiring). Undefined = the defaults below. */
+  role: undefined as string | undefined,
+  session: undefined as unknown,
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/db/scoped-client", () => ({ getScopedClient: async () => ({}) }));
 vi.mock("@/lib/auth/current-role", () => ({ currentRole: async () => "owner" }));
-vi.mock("@/lib/pipeline/leads", () => ({ resolveCurrentRole: async () => "attorney" }));
-vi.mock("@/lib/firm/session", () => ({ resolveFirmSession: async () => ({ kind: "ok", role: "owner", org: { id: "00000000-0000-4000-8000-0000000000aa" } }) }));
+vi.mock("@/lib/pipeline/leads", () => ({ resolveCurrentRole: async () => h.role ?? "attorney" }));
+vi.mock("@/lib/firm/session", () => ({ resolveFirmSession: async () => h.session ?? { kind: "ok", role: "owner", org: { id: "00000000-0000-4000-8000-0000000000aa" } } }));
 vi.mock("@/lib/leads/live", () => ({ keeperForWrite: async (_db: unknown, id: string) => id }));
 vi.mock("@/lib/members/directory", () => ({ listMemberDirectory: async () => [] }));
 vi.mock("@/lib/custom-columns/store", () => ({
@@ -105,6 +108,8 @@ beforeEach(() => {
   h.inserts = [];
   h.valueInserts = [];
   h.valueUpdates = [];
+  h.role = undefined;
+  h.session = undefined;
 });
 
 describe("F3 / F7 / F8 / F13: forged fields change no payload", () => {
@@ -139,5 +144,42 @@ describe("F3 / F7 / F8 / F13: forged fields change no payload", () => {
     const wrongKind = form({ fieldId: F1, kind: "matter", id: LEAD, value: "High" }, false);
     expect(await setCustomValueAction({}, wrongKind)).toEqual({ error: "That record couldn't be found. It may have been removed." });
     expect(h.valueInserts).toHaveLength(1);
+  });
+});
+
+/* ── Nov 23 follow-up: valueDeps().actingAsStaff, through the real wrapper, on a Money field typed by an owner role ── */
+
+describe("the value action's actingAsStaff wiring (a Money field, owner role)", () => {
+  const MONEY = "00000000-0000-4000-8000-00000000f009";
+  const post = async () => {
+    const { setCustomValueAction } = await import("@/lib/custom-columns/actions");
+    return setCustomValueAction({}, form({ fieldId: MONEY, kind: "lead", id: LEAD, value: "1250" }, false));
+  };
+  beforeEach(() => {
+    h.fields.push({ id: MONEY, section: "trademarks", kind: "money", label: "Quoted fee", options: [], position: 3, archived: false, updated_at: STAMP });
+    h.role = "owner";
+  });
+
+  it("a session that isn't ok reads as staff (true): refused, nothing written", async () => {
+    h.session = { kind: "signed-out", redirectTo: "/" };
+    expect(await post()).toEqual({ error: "Only the firm's owner can see or change money in the firm's own columns." });
+    expect(h.valueInserts).toEqual([]);
+  });
+
+  it("actingAsStaff: true reads as staff (true): refused, nothing written", async () => {
+    h.session = { kind: "ok", role: "owner", org: { id: ORG }, actingAsStaff: true };
+    expect(await post()).toEqual({ error: "Only the firm's owner can see or change money in the firm's own columns." });
+    expect(h.valueInserts).toEqual([]);
+  });
+
+  it("a real member (actingAsStaff: false) reads as not staff (false): the owner's amount is written", async () => {
+    h.session = { kind: "ok", role: "owner", org: { id: ORG }, actingAsStaff: false };
+    expect(await post()).toEqual({ saved: true });
+    expect(h.valueInserts).toEqual([{ org_id: ORG, field_id: MONEY, lead_id: LEAD, value_cents: 125000 }]);
+  });
+
+  it("a session with no actingAsStaff flag at all fails closed (staff)", async () => {
+    h.session = { kind: "ok", role: "owner", org: { id: ORG } };
+    expect(await post()).toEqual({ error: "Only the firm's owner can see or change money in the firm's own columns." });
   });
 });

@@ -2295,9 +2295,15 @@ deadline or changes `attorney_confirmed`. Rules are pure in `src/lib/matters/dea
   it carries the same "No open deadline" tag with its own hint (`NO_MAINTENANCE_DEADLINE_HINT`, `noOpenDeadlineHint`). The registered rule is
   asked first. The flag takes `openDeadlineIndex` (`{ any, maintenance }` matter id sets), never a bare set; `loadOpenDeadlineMatterIds` now
   selects `matter_id, kind` for the filed AND registered ids (`needsDeadlineCheck`). Drawn on the matter page, the Matters list and board
-  (a registered stage is `is_open = false`, so those matters sit under the Closed chip there), and by the Weekly review's rule. **The Weekly
-  review's membership is unchanged:** it lists open docket stages only, so a registered matter on an `is_open = false` stage is not a review
-  row and shows no review tag; a firm whose maintenance stage is open on the docket gets the tag there. A tag only: never a bucket.
+  (a registered stage is `is_open = false`, so those matters sit under the Closed chip there, and only there: the default chip is unchanged),
+  and on the Weekly review. **Registered marks become Weekly review rows (Taylor, Nov 23 follow-up):** `buildReviewRows` admits a matter that is
+  NOT already an open row, `isRegisteredTrademark`, and `noOpenDeadline` (no open Section 8 / 9), only when the deadlines read worked (a failed
+  read admits none; the existing "Some details couldn't load (deadlines)" note covers it). Such a row carries `registeredNoDeadline: true`
+  and takes the ORDINARY bucket rules (Taylor, Nov 23, second answer): overdue, due this week, needs a next step, quiet 14+ days, else On
+  track, so an overdue step on a registered mark is in Overdue, its lane and the KPIs. It is never "waiting on the USPTO": `build.ts` sets
+  its waiting from mail and approvals only (`withUspto: false`), so no USPTO tag, no USPTO list or KPI, and the Sheet's Waiting column shows
+  Our turn / Client / Approval. The sub-line counts these rows apart, "N open · M registered" (`reviewOpenCounts`, words.ts; M only when
+  > 0). A matter whose maintenance stage is open on the docket stays an ordinary row (no second copy, its stage's waiting kept).
 - **Alerts** (Taylor C8): recipients are the firm note `crm_firm_brain_entry` (category `other`, key `deadline_alert_recipients`,
   `data.user_ids`), set by the admin tier in Settings -> Team ("Deadline alerts", `saveDeadlineAlertRecipientsAction`: role and every id
   re-checked against the member directory). Hidden from the Firm notes page. No names in code. A removed member's id is dropped on read.
@@ -2534,8 +2540,13 @@ and its words are the same.
   editor, so it is not `editable` in the registry; its header pencil follows `canNote`.
 
 ## Firm-defined Money columns are owner-only (Taylor, Nov 23; lectual 0115 proposal updated, still NOT applied; no schema here)
-A firm's own List column of kind `money` follows the built-in fee columns' rule: `canSeeCustomMoney(role)` = `canSeeBilling(role)` (`owner`, exactly;
-unknown or unreadable = no). Nothing is hidden only in the browser: the server never reads an amount for anyone else.
+A firm's own List column of kind `money` is a REAL owner's only: `canSeeCustomMoney(role, actingAsStaff)` = `canSeeBilling(role)` AND
+`actingAsStaff === false` (from `resolveFirmSession`; an unknown session fails closed). **Lectual staff acting inside a firm never see or type
+custom money** (Nov 23 follow-up), even though their role reads `owner`; the built-in fee columns and the Billing card still follow
+`canSeeBilling` alone. The review page derives `customMoney` once (`actingAsStaff` from the session, `true` when it isn't ok) and passes it to
+`loadReview`, the card read, `withoutMoney`, `columnsFor`'s `canSeeCustomMoney` (a custom Money column needs it EXACTLY true; `canSeeMoney` no
+longer admits one) and `SheetView` / `SheetEdit` (`canSeeCustomMoney` prop, default false; each component also runs `withoutMoney` on its own `custom` when the prop is false, so no Money field, amount, editor or field meta reaches the client table whatever a caller passes; `tests/review/sheet-money-self-enforce.test.tsx`). `setCustomValue` asks `deps.actingAsStaff()` for a
+Money field only (a throw counts as staff). Nothing is hidden only in the browser: the server never reads an amount for anyone else.
 - **Reads closed:** `loadCustomColumns(db, matterIds, leadIds, readMerged, access)` takes a REQUIRED `{ canSeeMoney }` (missing = no). Without it Money
   fields are not returned (`visibleFields`), the value select is `VALUE_SELECT_NO_MONEY` (no `value_cents`) with `.is("value_cents", null)`, and a
   value that still carried an amount is dropped. Callers: the Weekly review List (`loadReview({ customMoney })`, from the page's re-resolved role) and the
@@ -2547,7 +2558,9 @@ unknown or unreadable = no). Nothing is hidden only in the browser: the server n
   is read (decision: owner-only writes too, clears included). Field DEFINITIONS are still the admin tier's (Settings -> Columns says
   `COLUMNS_KIND_MONEY_HINT` under the kind), and a non-owner still sees a Money column's name in Settings -> Columns.
 - **0115 (proposal):** the money rows are a row-level set because a value row holds exactly one typed column, the field kind's, so every value policy adds
-  `(value_cents is null or current_org_role() = 'owner')`, and the rules trigger refuses a signed-in non-owner's money write
+  `(value_cents is null or (select exists (select 1 from public.crm_org_member m where m.org_id = public.current_org_id() and m.user_id = auth.uid() and m.role = 'owner')))`
+  (a scalar sub-select, run once per statement; trigger step 5b keeps its per-row check on `new.org_id`)
+  (an owner MEMBERSHIP row, never the role claim, so a 0050 platform admin inside a firm is refused), and the rules trigger refuses any other signed-in caller's money write
   (`custom_value_money_owner_only`, 42501, mapped in `errors.ts`) right after the field read. Isolation case 22. Header explains why not a column grant,
   a separate table or a view. Tests: `tests/custom-columns/money-visibility.test.tsx`, `load.test.ts`, `value-actions.test.ts`, `registry.test.ts`,
   `tests/review/record-card-review-custom.test.tsx`. Not verified against any database (0115 is unapplied).

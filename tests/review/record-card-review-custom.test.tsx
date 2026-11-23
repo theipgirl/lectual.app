@@ -164,3 +164,15 @@ describe("the card's own custom read carries the viewer's money access; a non-ow
       }
     });
 });
+
+describe("the opened card: Lectual staff with an owner role claim get no custom money (Nov 23)", () => {
+  beforeEach(() => vi.resetModules());
+  const tmId = customFixture.status === "ok" ? customFixture.values.find((v) => v.cents !== null)!.matterId! : "";
+  it("canSeeMoney false on the card read, and nothing of the amount is drawn", async () => {
+    mockPage({ load: load(null), role: "owner", staff: true, card: matterCard(tmId, "TM", null, "owner"), cardCustom: customFixture });
+    const html = decode(await renderPage({ view: "board", open: `matter:${tmId}` }));
+    expect(spies.cardCustom.mock.calls[0][1]).toEqual({ canSeeMoney: false });
+    expect(html).not.toContain("Quoted fee");
+    expect(html).not.toContain("1250.00");
+  });
+});

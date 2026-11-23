@@ -176,14 +176,15 @@ export function sheetColumn(id: BuiltinColumnId, section: SheetSectionId): Sheet
  * The columns this viewer may have, in default order. `canSeeMoney` comes from the page's re-resolved role
  * (`canSeeBilling`), never from a browser value; `hasNotes` is whether the Notes cell exists. `customFields` are the firm's live
  * fields (read through the scoped client): that section's come after the spreadsheet columns, in position order. A custom Money
- * column follows the fee columns' rule (Taylor, Nov 23): dropped unless `canSeeMoney`, so a non-owner's chooser never lists it and a
- * stored pref naming it is dropped by `parseColumnPrefs`.
+ * column is a REAL owner's only (Taylor, Nov 23): dropped unless `canSeeCustomMoney` is exactly true (`canSeeCustomMoney(role,
+ * actingAsStaff)`; Lectual staff inside a firm never get it, while `canSeeMoney` keeps the built-in fee columns as they were), so
+ * nobody else's chooser lists it and a stored pref naming it is dropped by `parseColumnPrefs`.
  */
-export function columnsFor(section: SheetSectionId, opts: { canSeeMoney: boolean; hasNotes: boolean; customFields?: readonly CustomColumnField[] }): SheetColumn[] {
+export function columnsFor(section: SheetSectionId, opts: { canSeeMoney: boolean; canSeeCustomMoney?: boolean; hasNotes: boolean; customFields?: readonly CustomColumnField[] }): SheetColumn[] {
   const builtin = SHEET_SECTION_COLUMNS[section]
     .filter((id) => (opts.canSeeMoney || !MONEY_COLUMNS.includes(id)) && (opts.hasNotes || id !== "notes"))
     .map((id) => sheetColumn(id, section));
-  return [...builtin, ...fieldsForSection(opts.customFields ?? [], section).filter((f) => opts.canSeeMoney || f.kind !== "money").map(customColumn)];
+  return [...builtin, ...fieldsForSection(opts.customFields ?? [], section).filter((f) => opts.canSeeCustomMoney === true || f.kind !== "money").map(customColumn)];
 }
 
 /** The "No home" spreadsheet columns, named once in the note above each section. */
