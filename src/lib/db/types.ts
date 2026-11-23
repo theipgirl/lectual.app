@@ -4095,108 +4095,6 @@ export type Database = {
           },
         ]
       }
-      // lectual 0113 (Sprint 5a; a PROPOSAL file, docs/pge/2026-11-17-agentic-ip-os/0113-proposed.sql.txt, applied nowhere):
-      // a firm's own Adobe Acrobat Sign connection and its signing requests. Hand-added until the next codegen run. Until 0113 is
-      // applied every read answers 42P01 / PGRST205 and the e-sign code reads that as "not set up" (in-app signing).
-      // `access_token_enc` / `refresh_token_enc` have NO select grant for authenticated: never named in a scoped select.
-      adobe_sign_connection: {
-        Row: {
-          access_expires_at: string | null
-          access_token_enc: string | null
-          account_email: string | null
-          api_access_point: string
-          connected_by: string | null
-          created_at: string
-          id: string
-          last_error: string | null
-          last_refreshed_at: string | null
-          last_verified_at: string | null
-          org_id: string
-          refresh_token_enc: string | null
-          scopes: string[]
-          status: string
-          updated_at: string
-          web_access_point: string | null
-        }
-        Insert: {
-          access_expires_at?: string | null
-          access_token_enc?: string | null
-          account_email?: string | null
-          api_access_point: string
-          last_refreshed_at?: string | null
-          last_verified_at?: string | null
-          org_id: string
-          refresh_token_enc?: string | null
-          scopes?: string[]
-          status?: string
-          web_access_point?: string | null
-        }
-        Update: {
-          access_expires_at?: string | null
-          access_token_enc?: string | null
-          account_email?: string | null
-          api_access_point?: string
-          last_error?: string | null
-          last_refreshed_at?: string | null
-          last_verified_at?: string | null
-          refresh_token_enc?: string | null
-          scopes?: string[]
-          status?: string
-          updated_at?: string
-          web_access_point?: string | null
-        }
-        Relationships: []
-      }
-      // Written only by the service role (client_proposal_esign_open, the app's fenced status changes, the completion function).
-      client_proposal_esign_request: {
-        Row: {
-          address: Json | null
-          adobe_agreement_id: string | null
-          agreement_sha256: string
-          agreement_text: string
-          audit_file_id: string | null
-          audit_sha256: string | null
-          cancel_failed: boolean
-          canonical_fingerprint: string
-          completed_at: string | null
-          connection_id: string | null
-          created_at: string
-          details: Json | null
-          entity_name: string | null
-          family_id: string
-          id: string
-          last_checked_at: string | null
-          last_error: string | null
-          org_id: string
-          proposal_id: string
-          provider: string
-          selection: Json
-          sent_pdf_sha256: string
-          signature_id: string | null
-          signed_pdf_file_id: string | null
-          signed_pdf_sha256: string | null
-          signer_email: string | null
-          signer_name: string
-          signer_title: string | null
-          snapshot: Json
-          status: string
-          template_version: number | null
-          version: number
-        }
-        Insert: Record<string, never>
-        Update: {
-          adobe_agreement_id?: string | null
-          audit_file_id?: string | null
-          audit_sha256?: string | null
-          cancel_failed?: boolean
-          last_checked_at?: string | null
-          last_error?: string | null
-          signed_pdf_file_id?: string | null
-          signed_pdf_sha256?: string | null
-          status?: string
-        }
-        Relationships: []
-      }
       client_proposal_signature: {
         Row: {
           address: Json | null
@@ -4216,12 +4114,6 @@ export type Database = {
           template_version: number | null
           user_agent: string | null
           version: number
-          // lectual 0113 (proposal, not applied): which provider signed. Read in a SEPARATE query (the 0106 COLUMNS read is unchanged).
-          provider?: string | null
-          adobe_agreement_id?: string | null
-          esign_request_id?: string | null
-          // Adobe's own completion time (signed_at stays the server clock, as 0106 stamps it). Null for an in-app signature.
-          provider_signed_at?: string | null
         }
         Insert: Record<string, never>
         Update: Record<string, never>

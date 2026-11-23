@@ -53,11 +53,9 @@ import { letterLogoForBrand } from "@/lib/loe/letter-logo";
 import { LoeLetterPanel } from "./LoeLetterPanel";
 import { DownloadPdfButton, LoeSignedLetter } from "./LoeReceipt";
 import { LoeSideAction } from "./LoeSideAction";
-import { LoeSignSlot } from "./LoeSignSlot";
-import { adobeSideProps, useAdobeSigning } from "./adobe-flow";
+import { LoeSignPanel } from "./LoeSignPanel";
 import { LoeStepBar } from "./LoeStepBar";
 import { saveDetailsInBackground, showsSavedNote, useLoeFlow, type LoeLetterData, type LoeStep } from "./loe-flow";
-import type { AdobeSigningPath, AdobeStart } from "./adobe-flow";
 import { RPB_FONT_VARS } from "./fonts";
 import {
   brandForSlug,
@@ -144,14 +142,6 @@ export type ProposalDocumentProps = {
   signedLine?: string | null;
   /** Starting step and typed values: for tests and the staff preview, never set by the public page. */
   initialLoe?: { step?: LoeStep; details?: SignerDetails; typedName?: string; agree?: boolean };
-  /**
-   * Sprint 5a: how step 3 signs, chosen by the server (`signingPathFor`). Absent = the in-app signature (0106), drawn exactly as
-   * before. `adobe` / `resume` = Adobe Acrobat Sign (the firm's own account); `paused` = an open Adobe letter while the firm's
-   * connection needs attention.
-   */
-  signingPath?: AdobeSigningPath;
-  /** Sprint 5a: starts (or resumes) signing with Adobe. Token-only, bound server-side. */
-  onStartAdobe?: AdobeStart;
   /** The state right after a successful accept or signing (what `onAccept` returned): for tests only, never set by the public page. */
   initialDone?: { payUrl: string | null; opened?: boolean; signedLine?: string | null; letterDate?: string | null; letterVerified?: boolean };
 };
@@ -379,8 +369,6 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
   });
   const loeOn = loeFlow.enabled;
   const stepOne = !loeOn || accepted || loeFlow.step === 1;
-  // Sprint 5a: the signing path the server chose (absent = in-app, drawn exactly as before).
-  const adobe = useAdobeSigning({ path: mode === "live" ? props.signingPath : undefined, onStart: props.onStartAdobe, loeFlow, selection, clientClasses: { entries, added } });
   // The letter shown as SIGNED: the server's verified copy on a receipt; on the just-signed page the page's own letter, and only
   // when its text hashed to the sha256 the server stored (`letterVerified`). Otherwise nothing is shown under that label.
   const signedView = letter?.signed ?? (done?.letterVerified ? loeFlow.agreement : null);
@@ -627,7 +615,12 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
                   label={DOWNLOAD_REVIEW_LABEL}
                   onDownload={onDownloadReview ? () => onDownloadReview(selection, { entries, added }, loeFlow.cleaned) : undefined}
                 />
-                <LoeSignSlot adobe={adobe} loeFlow={loeFlow} />
+                <LoeSignPanel
+                  typedName={loeFlow.typedName}
+                  onName={loeFlow.setTypedName}
+                  agree={loeFlow.agree}
+                  onAgree={loeFlow.setAgree}
+                />
               </section>
             ) : null}
             {stepOne ? (
@@ -1238,7 +1231,6 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
                       requestAnimationFrame(() => document.getElementById("cp-letter-preview")?.scrollIntoView({ block: "start" }));
                     }}
                     onDownloadSigned={onDownloadSigned}
-                    {...adobeSideProps(adobe)}
                   />
                 ) : accepted ? (
                   <>

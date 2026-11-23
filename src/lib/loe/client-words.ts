@@ -80,8 +80,6 @@ export const SIGN_MESSAGES = {
   not_ready: "Signing isn't available on this page yet. Nothing has been signed. Please contact the firm.",
   signing_required: "This proposal has an engagement letter. Please review and sign it to continue.",
   generic: "We couldn't record your signature. Please try again.",
-  // Sprint 5a: the version is out for signature in Adobe Acrobat Sign, so it isn't signed here as well.
-  esign_open: "Your engagement letter is open for signing with Adobe Acrobat Sign. Please finish signing there, or come back later. Nothing has been signed here.",
 } as const;
 
 export const PDF_MESSAGES = {
@@ -91,26 +89,3 @@ export const PDF_MESSAGES = {
   details: "Please fill in your full legal name and your full mailing address first: street, city, state, ZIP code and country.",
   not_signed: "There is no signed letter to download.",
 } as const;
-
-/**
- * Sprint 5a: signing with Adobe Acrobat Sign, when the firm has connected its own Adobe account and Lectual has switched the path
- * on. Step words only (a label, what the page does); nothing about what a signature means.
- */
-export const ADOBE_SIGN_LABEL = "Continue to Adobe to sign";
-export const ADOBE_SIGN_PENDING = "Opening Adobe…";
-/** Under the typed name on the Adobe path: what happens next. */
-export const ADOBE_SIGN_NOTE = "You'll sign on Adobe Acrobat Sign's page, then come back here to pay.";
-/** Beside the disabled Adobe button. */
-export const ADOBE_SIGN_REQUIRED_NOTE = "Type your full legal name to continue.";
-/** Creation failed on this visit (D1): the in-app form is shown instead, with what the client typed kept. */
-export const ADOBE_FALLBACK_SENTENCE = "Adobe Acrobat Sign didn't answer, so you can sign here instead.";
-/** Adobe isn't available for this proposal right now (switched off, not connected): the in-app form instead. */
-export const ADOBE_SIGN_HERE_INSTEAD = "You can sign here instead.";
-/** An open request while the firm's Adobe connection needs attention (D6): no in-app form and no Adobe call. */
-export const ESIGN_PAUSED_SENTENCE = "Signing is paused for a moment. Please come back later.";
-/** Adobe says the letter is already signed: the page waits for Lectual to record it (never in-app, never a second agreement). */
-export const ESIGN_SIGNED_WAITING_SENTENCE = "Your signature is being recorded. This page will update shortly.";
-/** Too many presses of the Adobe button for one proposal in an hour (a courtesy limit). */
-export const ESIGN_LIMIT_SENTENCE = "Too many tries just now. Please wait a few minutes and try again.";
-/** A request is being created right now (a second press within moments). */
-export const ESIGN_BUSY_SENTENCE = "Your letter is being prepared for signing. Please wait a moment and try again.";

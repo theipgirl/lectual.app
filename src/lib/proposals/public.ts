@@ -19,7 +19,7 @@ import { readStoredAgreement, type StoredAgreementDb } from "@/lib/loe/stored-ag
 import { storedSignedLetterView, type SignedLetterView } from "@/lib/loe/signed-letter";
 import { verifySignedCopy } from "@/lib/loe/signed-text-check";
 import { logSignedMismatch } from "./signed-mismatch-log";
-import { addressJson, assembleAgreement, checkSigning, cleanSigningDetails, letterDateText, missingDetails, signedLineText, type Agreement, type SignerDetails } from "@/lib/loe/signing";
+import { addressJson, assembleAgreement, checkSigning, cleanSigningDetails, letterDateText, missingDetails, signedLineText } from "@/lib/loe/signing";
 import { parseInet } from "@/lib/quotes/public";
 import { quoteHasItems } from "./pricing";
 import {
@@ -663,8 +663,6 @@ export type AcceptRefusal =
   | "letter_unavailable"
   /** Engagement letter: lectual 0106 is not applied (the database function is missing). Nothing was written. */
   | "not_ready"
-  /** Engagement letter: a signing request for this version is open in Adobe Acrobat Sign (lectual 0113). Nothing was written. */
-  | "esign_open"
   | "unconfigured"
   | "unavailable";
 
@@ -703,50 +701,12 @@ const REFUSAL_MESSAGE: Record<AcceptRefusal, string> = {
   stale: SIGN_MESSAGES.stale,
   letter_unavailable: SIGN_MESSAGES.letter_unavailable,
   not_ready: SIGN_MESSAGES.not_ready,
-  esign_open: SIGN_MESSAGES.esign_open,
   unconfigured: "This page isn't available right now. Please try again later.",
   unavailable: "We couldn't record your acceptance. Please try again.",
 };
 
-/** The fixed sentence for a refusal (never raw error text). Shared with the Adobe Acrobat Sign path. */
-export function acceptRefusalMessage(reason: AcceptRefusal): string {
-  return REFUSAL_MESSAGE[reason];
-}
-
 function refuse(reason: AcceptRefusal): AcceptResult {
   return { ok: false, reason, message: REFUSAL_MESSAGE[reason] };
-}
-
-/**
- * The token's read and the server's own price, shared by every way a client accepts (the plain accept, the in-app signature and
- * the Adobe Acrobat Sign path, `src/lib/esign/start.ts`). Factored out of `acceptPublicProposal`, not copied: the refusals and
- * their order are exactly what that function always did.
- */
-export type PreparedAcceptance =
-  | { ok: true; read: Extract<PublicProposalRead, { status: "ok" }>; content: ProposalContent; selection: Selection; quote: ProposalQuote }
-  | { ok: false; reason: AcceptRefusal };
-
-export async function prepareAcceptance(token: string, selection: unknown, now: Date, db: PublicProposalsDb | undefined, clientClasses?: unknown): Promise<PreparedAcceptance> {
-  const read = await readPublicProposal(token, now, db);
-  if (read.status === "unconfigured") return { ok: false, reason: "unconfigured" };
-  if (read.status === "unavailable") return { ok: false, reason: "unavailable" };
-  if (read.status === "not_found") return { ok: false, reason: "not_found" };
-  if (read.status === "closed") return { ok: false, reason: "closed" };
-  if (read.handle.storedStatus !== "sent") return { ok: false, reason: "already_resolved" };
-
-  // The ticks are normalised. Unknown ids, entries for classes that are not open, adds past a brand name's max (or
-  // for a brand name without one) are dropped; every description is cleaned.
-  // One price path: the stored content plus the ticks plus what the client wrote, through the
-  // helper the page uses. The result is the EFFECTIVE content (open classes carry the client's
-  // words, added classes have server-made ids), and that is what is quoted and stored. A mark
-  // ticked with no class is repaired to its first class; one with no class to fall back on is refused.
-  // `quoteForAcceptance` is the one function for this, called by the page's letter steps too (so their fingerprint
-  // is over the same cleaned words).
-  const priced = quoteForAcceptance(read.view.content, selection, clientClasses);
-  if (!priced.ok) return { ok: false, reason: "nothing_selected" };
-  if (priced.missing.length > 0) return { ok: false, reason: "missing_description" };
-  if (!quoteHasItems(priced.quote)) return { ok: false, reason: "nothing_selected" };
-  return { ok: true, read, content: priced.content, selection: priced.selection, quote: priced.quote };
 }
 
 /**
@@ -779,9 +739,26 @@ export async function acceptPublicProposal(
   /** The request's network address and browser, read the way the quote engine reads them (`parseInet`, 400 characters). */
   audit?: AcceptAudit,
 ): Promise<AcceptResult> {
-  const prepared = await prepareAcceptance(token, selection, now, db, clientClasses);
-  if (!prepared.ok) return refuse(prepared.reason);
-  const { read, content, selection: finalSelection, quote } = prepared;
+  const read = await readPublicProposal(token, now, db);
+  if (read.status === "unconfigured") return refuse("unconfigured");
+  if (read.status === "unavailable") return refuse("unavailable");
+  if (read.status === "not_found") return refuse("not_found");
+  if (read.status === "closed") return refuse("closed");
+  if (read.handle.storedStatus !== "sent") return refuse("already_resolved");
+
+  // The ticks are normalised. Unknown ids, entries for classes that are not open, adds past a brand name's max (or
+  // for a brand name without one) are dropped; every description is cleaned.
+  // One price path: the stored content plus the ticks plus what the client wrote, through the
+  // helper the page uses. The result is the EFFECTIVE content (open classes carry the client's
+  // words, added classes have server-made ids), and that is what is quoted and stored. A mark
+  // ticked with no class is repaired to its first class; one with no class to fall back on is refused.
+  // `quoteForAcceptance` is the one function for this, called by the page's letter steps too (so their fingerprint
+  // is over the same cleaned words).
+  const priced = quoteForAcceptance(read.view.content, selection, clientClasses);
+  if (!priced.ok) return refuse("nothing_selected");
+  const { content, selection: finalSelection, quote } = priced;
+  if (priced.missing.length > 0) return refuse("missing_description");
+  if (!quoteHasItems(quote)) return refuse("nothing_selected");
 
   const acceptedAt = now.toISOString();
 
@@ -840,108 +817,9 @@ function signRefusal(error: NonNullable<PublicDbError>): AcceptRefusal {
   const message = error.message ?? "";
   // The function is not there (lectual 0106 not applied): PostgreSQL 42883, or PostgREST's schema-cache miss PGRST202.
   if (code === "42883" || code === "PGRST202") return "not_ready";
-  // lectual 0113: a signing request is open in Adobe Acrobat Sign for this version, so it can't also be signed here.
-  if (message.startsWith("loe_sign_esign_open")) return "esign_open";
   if (message.startsWith("loe_sign_not_sent")) return "already_resolved";
   if (message.startsWith("loe_sign_expired")) return "closed";
   return "unavailable";
-}
-
-/**
- * THE agreement half of a signing, shared by the in-app signature (`signAndAccept`, lectual 0106) and the Adobe Acrobat Sign path
- * (`src/lib/esign/start.ts`, Sprint 5a): factored out of `signAndAccept`, never copied (D10). From the token's read, the
- * recomputed quote and the signer's CLEANED typed name and details (`checkSignerFields`), it builds the exhibit and the agreement
- * with `letterDateText(now, firm zone)` in both date fields (exactly as `letterValues` fills them), compares the canonical
- * fingerprint with the browser's, and returns the final text, its sha256, the accepted snapshot and the database arguments, each
- * computed exactly as 0106's `client_proposal_sign_and_accept` takes them. Nothing is written here.
- */
-export type SigningArgs = {
-  p_signer_name: string;
-  p_signer_title: string | null;
-  p_entity_name: string | null;
-  p_address: Record<string, string>;
-  p_agreement_text: string;
-  p_agreement_sha256: string;
-  p_selection: Selection;
-  p_snapshot: AcceptedSnapshot;
-};
-
-export type SigningHalf =
-  | {
-      ok: true;
-      agreement: Agreement;
-      dateText: string;
-      sha256: string;
-      acceptedAt: string;
-      clientEmail: string;
-      args: SigningArgs;
-    }
-  | { ok: false; reason: "letter_unavailable" | "stale" };
-
-export function buildSigningAgreement(input: {
-  read: Extract<PublicProposalRead, { status: "ok" }>;
-  content: ProposalContent;
-  selection: Selection;
-  quote: ProposalQuote;
-  now: Date;
-  typedName: string;
-  details: SignerDetails;
-  fingerprint: unknown;
-}): SigningHalf {
-  const { read, content, selection, quote, now } = input;
-  const letter = read.view.letter;
-  const loe = content.loe;
-  if (!letter || !loe || typeof loe.body !== "string") return { ok: false, reason: "letter_unavailable" };
-
-  // The letter's date: the firm's calendar date NOW, on this server. Never the date the page was opened with.
-  const dateText = letterDateText(now, read.view.firm.timeZone);
-  const exhibit = buildExhibit(content, quote, money);
-  const assembled = assembleAgreement({
-    body: loe.body,
-    inputs: { details: input.details, typedName: input.typedName, dateText, clientEmail: letter.clientEmail },
-    exhibit,
-  });
-  if (!assembled.ok) return { ok: false, reason: "letter_unavailable" };
-  const { agreement } = assembled;
-
-  // The fingerprint covers the letter, the details and the exhibit with the DATE fields fixed (`Agreement.canonical`), so a page
-  // opened yesterday and signed today still matches. The date stamped into the stored text below is this server's.
-  const ours = canonicalFingerprint(agreement.canonical);
-  if (typeof input.fingerprint !== "string" || input.fingerprint !== ours) return { ok: false, reason: "stale" };
-
-  const acceptedAt = now.toISOString();
-  // The stored sha256 is over the FINAL text, real dates included: the text the signature row keeps.
-  const sha256 = agreementTextSha256(agreement.text);
-  const snapshot = buildAcceptedSnapshot({
-    version: read.handle.version,
-    content,
-    selection,
-    quote,
-    acceptedAt,
-    signed: {
-      // The database fills `signature_id`, `signed_at` and the final `agreement` block itself; these are the same values it will write.
-      agreement: { signature_id: null, signer_name: input.typedName, signed_at: acceptedAt, sha256, template_version: null },
-      signing: { details: { ...input.details }, date_text: dateText, client_email: letter.clientEmail },
-    },
-  });
-  return {
-    ok: true,
-    agreement,
-    dateText,
-    sha256,
-    acceptedAt,
-    clientEmail: letter.clientEmail,
-    args: {
-      p_signer_name: input.typedName,
-      p_signer_title: input.details.title || null,
-      p_entity_name: input.details.entity_name || null,
-      p_address: addressJson(input.details),
-      p_agreement_text: agreement.text,
-      p_agreement_sha256: sha256,
-      p_selection: selection,
-      p_snapshot: snapshot,
-    },
-  };
 }
 
 /**
@@ -966,24 +844,43 @@ async function signAndAccept(input: {
   const letter = read.view.letter;
   const loe = content.loe;
   if (!letter || !loe || typeof loe.body !== "string") return refuse("letter_unavailable");
-  // Only the agreement half below is shared with the Adobe Acrobat Sign path; the tick (`checkSigning`) is the in-app path's own.
 
   if (input.signing === undefined || input.signing === null) return refuse("signing_required");
   const checked = checkSigning(input.signing);
   if (!checked.ok) return refuse(checked.reason);
 
-  const half = buildSigningAgreement({
-    read,
+  // The letter's date: the firm's calendar date NOW, on this server. Never the date the page was opened with.
+  const dateText = letterDateText(now, read.view.firm.timeZone);
+  const exhibit = buildExhibit(content, quote, money);
+  const assembled = assembleAgreement({
+    body: loe.body,
+    inputs: { details: checked.details, typedName: checked.typedName, dateText, clientEmail: letter.clientEmail },
+    exhibit,
+  });
+  if (!assembled.ok) return refuse("letter_unavailable");
+  const { agreement } = assembled;
+
+  // The fingerprint covers the letter, the details and the exhibit with the DATE fields fixed (`Agreement.canonical`), so a page
+  // opened yesterday and signed today still matches. The date stamped into the stored text below is this server's.
+  const posted = (input.signing as Record<string, unknown>).fingerprint;
+  const ours = canonicalFingerprint(agreement.canonical);
+  if (typeof posted !== "string" || posted !== ours) return refuse("stale");
+
+  const acceptedAt = now.toISOString();
+  // The stored sha256 is over the FINAL text, real dates included: the text the signature row keeps.
+  const sha256 = agreementTextSha256(agreement.text);
+  const snapshot = buildAcceptedSnapshot({
+    version: read.handle.version,
     content,
     selection,
     quote,
-    now,
-    typedName: checked.typedName,
-    details: checked.details,
-    fingerprint: (input.signing as Record<string, unknown>).fingerprint,
+    acceptedAt,
+    signed: {
+      // The database fills `signature_id`, `signed_at` and the final `agreement` block itself; these are the same values it will write.
+      agreement: { signature_id: null, signer_name: checked.typedName, signed_at: acceptedAt, sha256, template_version: null },
+      signing: { details: { ...checked.details }, date_text: dateText, client_email: letter.clientEmail },
+    },
   });
-  if (!half.ok) return refuse(half.reason);
-  const { dateText, sha256, acceptedAt } = half;
 
   try {
     const client = publicProposalsDb(input.db);
@@ -992,16 +889,16 @@ async function signAndAccept(input: {
     const { data, error } = await client.rpc("client_proposal_sign_and_accept", {
       p_proposal_id: proposalId,
       p_org_id: orgId,
-      p_signer_name: half.args.p_signer_name,
-      p_signer_title: half.args.p_signer_title,
-      p_entity_name: half.args.p_entity_name,
-      p_address: half.args.p_address,
+      p_signer_name: checked.typedName,
+      p_signer_title: checked.details.title || null,
+      p_entity_name: checked.details.entity_name || null,
+      p_address: addressJson(checked.details),
       p_ip: parseInet(input.audit?.ip),
       p_user_agent: truncateUserAgent(input.audit?.userAgent),
-      p_agreement_text: half.args.p_agreement_text,
-      p_agreement_sha256: half.args.p_agreement_sha256,
-      p_selection: half.args.p_selection,
-      p_snapshot: half.args.p_snapshot,
+      p_agreement_text: agreement.text,
+      p_agreement_sha256: sha256,
+      p_selection: selection,
+      p_snapshot: snapshot,
     });
     if (error) return refuse(signRefusal(error));
     if (typeof data !== "string" || data.length === 0) return refuse("unavailable");

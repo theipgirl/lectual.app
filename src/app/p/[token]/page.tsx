@@ -4,8 +4,7 @@ import { ProposalDocument } from "@/components/client-proposal/ProposalDocument"
 import { ProposalNotice } from "@/components/client-proposal/ProposalNotice";
 import { readPublicProposal, recordProposalViewed } from "@/lib/proposals/public";
 import { isSignedInFirmMember } from "@/lib/proposals/staff-view";
-import { acceptProposalAction, saveDetailsAction, downloadReviewLetterAction, downloadSignedLetterAction, startAdobeSigningAction } from "./actions";
-import { signingPathFor } from "@/lib/esign/path";
+import { acceptProposalAction, saveDetailsAction, downloadReviewLetterAction, downloadSignedLetterAction } from "./actions";
 
 /**
  * `/p/<token>` — the client's proposal. No login; the token is the credential.
@@ -90,14 +89,8 @@ export default async function PublicProposalPage({ params }: { params: Promise<{
     );
   }
 
-  // Sprint 5a: which way step 3 signs (in-app unless the firm's own Adobe connection is active AND Lectual has switched the path
-  // on, or a request is already open). Read only for a live proposal that carries a letter; in-app passes nothing, so the page
-  // is drawn exactly as before.
-  const path = view.letter ? await signingPathFor({ proposalId: read.handle.proposalId, orgId: read.handle.orgId }, now) : "in_app";
-
   return (
     <ProposalDocument
-      {...(path !== "in_app" ? { signingPath: path, onStartAdobe: startAdobeSigningAction.bind(null, token) } : {})}
       mode="live"
       content={view.content}
       title={view.title}

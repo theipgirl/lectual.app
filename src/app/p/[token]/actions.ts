@@ -5,13 +5,7 @@ import { acceptPublicProposal, savePublicDetailsAddress } from "@/lib/proposals/
 import { reviewLetterPdf, signedLetterPdf, type LetterPdfResult } from "@/lib/proposals/public-letter";
 import type { ProposalAcceptResult } from "@/components/client-proposal/ProposalDocument";
 import { safeHttpsUrl } from "@/components/client-proposal/format";
-import { ESIGN_LIMIT_SENTENCE, PDF_MESSAGES, SIGN_MESSAGES } from "@/lib/loe/client-words";
-import { createHash } from "node:crypto";
-import { adobeStartTokenLimiter } from "@/lib/esign/start-limit";
-import { startAdobeSigning } from "@/lib/esign/start";
-import { inAppBlockedByOpenRequest } from "@/lib/esign/path";
-import { readPublicProposal } from "@/lib/proposals/public";
-import type { AdobeStartResult } from "@/components/client-proposal/adobe-flow";
+import { PDF_MESSAGES } from "@/lib/loe/client-words";
 
 /**
  * The server actions an ANONYMOUS visitor may invoke on a proposal: accept (and, when the proposal carries an engagement
@@ -45,9 +39,6 @@ import type { AdobeStartResult } from "@/components/client-proposal/adobe-flow";
  */
 export async function acceptProposalAction(token: string, selection: unknown, clientClasses?: unknown, signing?: unknown): Promise<ProposalAcceptResult> {
   try {
-    // Sprint 5a: while a signing request for this version is open in Adobe Acrobat Sign, the in-app signature is refused here as
-    // well as by lectual 0113's amended `client_proposal_sign_and_accept`. Only a read that worked and found one refuses.
-    if (signing !== undefined && signing !== null && (await inAppRefused(String(token ?? "")))) return { ok: false, message: SIGN_MESSAGES.esign_open };
     const h = await headers();
     // The caller's address and browser, read as the quote engine reads them (`parseInet` and a 400-character cap, applied inside).
     const audit = { ip: h.get("x-forwarded-for") ?? h.get("x-real-ip"), userAgent: h.get("user-agent") };
@@ -98,43 +89,5 @@ export async function saveDetailsAction(token: string, details: unknown): Promis
     await savePublicDetailsAddress(String(token ?? ""), details, new Date(), undefined, { ip: h.get("x-forwarded-for") ?? h.get("x-real-ip") });
   } catch {
     // Silent by design.
-  }
-}
-
-/** Is an Adobe signing request open for this token's live letter proposal? Token only; false on any doubt (the database decides). */
-async function inAppRefused(token: string): Promise<boolean> {
-  try {
-    const read = await readPublicProposal(token, new Date());
-    if (read.status !== "ok" || read.handle.storedStatus !== "sent" || !read.view.content.loe) return false;
-    return await inAppBlockedByOpenRequest({ proposalId: read.handle.proposalId, orgId: read.handle.orgId });
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Sprint 5a: "Continue to Adobe to sign". Token-only, like Accept: the proposal, its firm and every price are re-resolved from the
- * token inside `startAdobeSigning`; the browser sends only the ticks, its class words, the typed name, the details and the
- * fingerprint of the letter it showed. Answers the Adobe signing URL for a TOP-LEVEL navigation (never stored, never logged),
- * or `fallback: "in_app"` with a fixed sentence, or a fixed refusal.
- */
-export async function startAdobeSigningAction(
-  token: string,
-  selection: unknown,
-  clientClasses: unknown,
-  details: unknown,
-  typedName: unknown,
-  fingerprint: unknown,
-): Promise<AdobeStartResult> {
-  try {
-    // A courtesy limit per token, before anything is read.
-    const key = `t:${createHash("sha256").update(String(token ?? "")).digest("hex")}`;
-    if (!adobeStartTokenLimiter.allowed(key)) return { ok: false, message: ESIGN_LIMIT_SENTENCE };
-    adobeStartTokenLimiter.record(key);
-    const r = await startAdobeSigning({ token: String(token ?? ""), selection, clientClasses, details, typedName, fingerprint });
-    if (r.ok) return { ok: true, url: r.url };
-    return "fallback" in r ? { ok: false, fallback: "in_app", message: r.message } : { ok: false, message: r.message };
-  } catch {
-    return { ok: false, fallback: "in_app", message: SIGN_MESSAGES.generic };
   }
 }

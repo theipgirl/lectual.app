@@ -25,7 +25,7 @@ describe("F14: one row design", () => {
   });
 
   it("every card on the page is an IntegrationRow", () => {
-    expect(page.match(/<IntegrationRow\b/g)?.length).toBe(5); // Lawmatics, LawPay, Adobe Acrobat Sign (Sprint 5a), Meetings, and the provider row
+    expect(page.match(/<IntegrationRow\b/g)?.length).toBe(4); // Lawmatics, LawPay, Meetings, and the provider row
     expect(page).not.toContain("<IntegrationHeader");
     expect(page).not.toContain('className="lx-int-import"');
   });

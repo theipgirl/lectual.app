@@ -63,5 +63,4 @@ export const ROW_ICON = {
   lawmatics: "M4 6h16M4 12h16M4 18h10",
   lawpay: "M3 7h18v10H3zM3 10h18M7 15h3",
   meetings: "M15 10l5-3v10l-5-3zM3 7h12v10H3z",
-  esign: "M4 20h4L19 9l-4-4L4 16v4zM13 7l4 4M4 20h16",
 } as const;
