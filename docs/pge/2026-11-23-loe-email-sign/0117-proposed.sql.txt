@@ -1,0 +1,1031 @@
+-- =====================================================================================================================
+-- PROPOSAL ONLY. NOT A MIGRATION OF THIS REPO. NOT APPLIED ANYWHERE (not lectual-dev, not lectual-prod).
+--
+-- This file is a draft for the `lectual` repo (theipgirl/lectual), where migrations live (AGENTS.md: "No migrations in this
+-- repo"). To use it: copy it to `lectual/supabase/migrations/0117_loe_email_sign.sql` (first-merged-wins numbering: re-check
+-- the number against lectual/supabase/migrations first; 0108, 0110-0113, 0115 and 0116 are spoken for), review it there
+-- against 0106's own text (see "BEFORE APPLYING" below), COPY THE ISOLATION CASES AT THE END INTO lectual's
+-- `tests/tenant-isolation.test.ts` IN THE SAME PR, apply to lectual-dev, run them, and apply to lectual-prod only with the
+-- owner's OK. The deployment switch `LOE_EMAIL_SIGNING` stays unset until those cases pass on lectual-dev.
+--
+-- Spec: docs/pge/2026-11-23-loe-email-sign/spec.md (owner, Nov 23). Contracts: sprint-a.md (this file is Sprint A's), sprint-b.md.
+-- Reused ideas (not code) from the paused Adobe design (git show db58275:docs/pge/2026-11-17-agentic-ip-os/0113-proposed.sql.txt):
+-- the open function that locks the proposal, the one partial unique index per version, SECURITY INVOKER for the function that
+-- accepts, the lock order (request first, then proposal), and the isolation-case layout.
+--
+-- WHAT THIS ADDS
+--   1. client_proposal_signing_words      the attorney's own signing words, versioned per firm, approved by a named approver
+--                                         (modelled on 0106's client_proposal_loe_template).
+--   2. client_proposal_signing_request    one emailed signing link for one proposal version: the FINAL agreement text, the token's
+--                                         sha256 (never the token), the frozen selection/snapshot/details, and a snapshot of the
+--                                         approved signing words (text + sha256).
+--   3. client_proposal_signing_event      append-only evidence: sent, opened, consent, signature, signed, closed.
+--   4. Functions (service role only): signing_open, signing_mark_sent, signing_opened, signing_consent, signing_close,
+--      and THE one signing function client_proposal_signing_sign (SECURITY INVOKER, like 0106's sign_and_accept).
+--   5. A trigger on client_proposal: when a version leaves `sent` any way other than through signing_sign (withdrawn,
+--      superseded by a new version, accepted in-app), its open request is closed.
+--
+-- WHAT THIS DOES NOT DO
+--   * 0106's tables, triggers, grants and client_proposal_sign_and_accept are NOT amended. The in-app path keeps working byte
+--     for byte. No double signing is possible without an amendment: whichever path signs first moves the proposal to
+--     `accepted`; the other is refused by its own `status = 'sent'` fence (0106 `loe_sign_not_sent`, here `signing_changed`).
+--   * client_proposal_signature gets NO new column (its 0106 guard would have to change). The request row points at the
+--     signature (`signature_id`), not the other way round.
+--   * No deployment-wide sender, key or credential is stored. The firm's from-address lives in the app's env, by org id.
+--
+-- BEFORE APPLYING (things this session could not read; it has no checkout of lectual):
+--   * Diff section 6's signature insert and accepted_snapshot update against 0106's client_proposal_sign_and_accept body
+--     (0106 lines ~584-716). The copy used here is the one quoted, "copied exactly", in the 0113 proposal; confirm it.
+--   * Confirm 0106's lifecycle (lines ~726-1004) accepts a letter proposal when current_user = 'service_role', auth.uid() is
+--     null, `lectual.loe_signing` names the proposal, and a client_proposal_signature row inserted by this transaction exists,
+--     and that it does not rewrite `accepted_snapshot.agreement` (0113's header asked the same).
+--   * Confirm 0106 grants INSERT on client_proposal_signature to service_role (sign_and_accept is INVOKER, so it must).
+--   * Confirm public.current_org_id() / public.current_org_role() and the 0089 unique key client_proposal(id, org_id)
+--     (`client_proposal_id_org_uniq`) exist as 0113 assumed.
+--
+-- Every function: `set search_path = ''`, schema-qualified names, REVOKE from public, anon, authenticated. Service-role-only
+-- functions GRANT EXECUTE to service_role. Lock order everywhere: a function that locks both takes the REQUEST row first, then
+-- the PROPOSAL (`for update`). Raised messages start with a stable prefix the app maps to fixed sentences; the text after the
+-- prefix is never shown.
+-- =====================================================================================================================
+
+-- ── 1. client_proposal_signing_words: the attorney's own words ───────────────────────────────────────────────────────
+-- One row per version per firm. status: draft -> approved -> retired. At most one draft and one approved per firm.
+-- Edits (draft only) by the admin tier; approval by a named approver (client_proposal_setting.approver_user_ids) whose role can
+-- write proposals. Approving retires the previous approved version. An approved or retired row is frozen.
+-- Merge fields: link_body must contain {{signing_link}} exactly once; the four email fields may use {{client_name}},
+-- {{firm_name}} and {{link_expires}} (link email only); the four page fields use none. Nothing else in double braces.
+create table if not exists public.client_proposal_signing_words (
+  id             uuid        primary key default gen_random_uuid(),
+  org_id         uuid        not null references public.crm_org(id) on delete cascade,
+  version        integer     not null,
+  status         text        not null default 'draft',
+  -- Page words (client-facing, the attorney's): the line on the consent button, the full consent text, the line beside Sign,
+  -- the line under the signature box.
+  consent_line   text        not null,
+  consent_text   text        not null,
+  sign_line      text        not null,
+  box_note       text        not null,
+  -- Email words: the signing-link email and the signed-copy email (Sprint B sends the second).
+  link_subject   text        not null,
+  link_body      text        not null,
+  copy_subject   text        not null,
+  copy_body      text        not null,
+  created_by     uuid        null default auth.uid() references auth.users(id) on delete set null,
+  updated_by     uuid        null references auth.users(id) on delete set null,
+  approved_by    uuid        null references auth.users(id) on delete set null,
+  approved_at    timestamptz null,
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now(),
+  constraint client_proposal_signing_words_status check (status in ('draft', 'approved', 'retired')),
+  constraint client_proposal_signing_words_version_pos check (version >= 1),
+  constraint client_proposal_signing_words_org_version unique (org_id, version),
+  constraint client_proposal_signing_words_lens check (
+        char_length(btrim(consent_line)) between 1 and 300
+    and char_length(btrim(consent_text)) between 1 and 8000
+    and char_length(btrim(sign_line))    between 1 and 600
+    and char_length(btrim(box_note))     between 1 and 600
+    and char_length(btrim(link_subject)) between 1 and 200
+    and char_length(btrim(link_body))    between 1 and 8000
+    and char_length(btrim(copy_subject)) between 1 and 200
+    and char_length(btrim(copy_body))    between 1 and 8000
+  ),
+  -- Subjects are one line.
+  constraint client_proposal_signing_words_subject_line check (link_subject !~ '[\r\n]' and copy_subject !~ '[\r\n]'),
+  constraint client_proposal_signing_words_approved_stamp check (status = 'draft' or (approved_by is not null and approved_at is not null))
+);
+
+create unique index if not exists client_proposal_signing_words_one_draft
+  on public.client_proposal_signing_words (org_id) where status = 'draft';
+create unique index if not exists client_proposal_signing_words_one_approved
+  on public.client_proposal_signing_words (org_id) where status = 'approved';
+
+comment on table public.client_proposal_signing_words is
+  'The firm attorney''s own words for the emailed signing link (0117): consent line and text, the line beside Sign, the line under the signature box, and both emails. Versioned; approved by a named approver; approved rows frozen. Lectual writes none of these words.';
+
+-- The merge-field rule, shared by the approve check below and mirrored by src/lib/loe/signing-words.ts.
+create or replace function public.client_proposal_signing_words_fields_ok(
+  p_text text, p_allowed text[], p_required text
+) returns boolean
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v_field text;
+  v_count integer := 0;
+begin
+  if p_text is null then return false; end if;
+  -- An unclosed "{{" or a stray "}}" outside a field.
+  if pg_catalog.regexp_replace(p_text, '\{\{[a-z_]+\}\}', '', 'g') ~ '(\{\{|\}\})' then return false; end if;
+  for v_field in select (pg_catalog.regexp_matches(p_text, '\{\{([a-z_]+)\}\}', 'g'))[1] loop
+    if not (v_field = any (p_allowed)) then return false; end if;
+    if p_required is not null and v_field = p_required then v_count := v_count + 1; end if;
+  end loop;
+  return p_required is null or v_count = 1;
+end
+$$;
+revoke all on function public.client_proposal_signing_words_fields_ok(text, text[], text) from public, anon, authenticated;
+
+create or replace function public.client_proposal_signing_words_rules()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_role     text := public.current_org_role();
+  v_uid      uuid := auth.uid();
+  v_approver boolean;
+begin
+  -- The service role (no session) is never a writer of the firm's words.
+  if v_uid is null then
+    raise exception 'signing_words_not_allowed: the firm''s signing words are written by its own staff' using errcode = '42501';
+  end if;
+
+  if tg_op = 'INSERT' then
+    if v_role is null or v_role not in ('owner', 'admin', 'senior_admin') then
+      raise exception 'signing_words_edit_admin_only: only the admin tier starts a draft' using errcode = '42501';
+    end if;
+    new.status := 'draft';
+    new.created_by := v_uid;
+    new.updated_by := v_uid;
+    new.approved_by := null;
+    new.approved_at := null;
+    new.created_at := now();
+    new.updated_at := now();
+    -- Serialise version numbers per firm.
+    perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('client_proposal_signing_words:' || new.org_id::text));
+    select coalesce(max(w.version), 0) + 1 into new.version
+      from public.client_proposal_signing_words w where w.org_id = new.org_id;
+    return new;
+  end if;
+
+  -- UPDATE
+  if new.org_id is distinct from old.org_id or new.version is distinct from old.version
+     or new.created_by is distinct from old.created_by or new.created_at is distinct from old.created_at then
+    raise exception 'signing_words_frozen: those columns never change' using errcode = '23514';
+  end if;
+
+  if old.status = 'draft' and new.status = 'draft' then
+    if v_role is null or v_role not in ('owner', 'admin', 'senior_admin') then
+      raise exception 'signing_words_edit_admin_only: only the admin tier edits a draft' using errcode = '42501';
+    end if;
+    new.updated_by := v_uid;
+    new.updated_at := now();
+    new.approved_by := null;
+    new.approved_at := null;
+    return new;
+  end if;
+
+  if old.status = 'draft' and new.status = 'approved' then
+    -- Approve is its own act: no word may change in the same statement.
+    if (to_jsonb(new) - array['status','approved_by','approved_at','updated_at','updated_by'])
+       is distinct from (to_jsonb(old) - array['status','approved_by','approved_at','updated_at','updated_by']) then
+      raise exception 'signing_words_bad_transition: save the words first, then approve them on their own' using errcode = '23514';
+    end if;
+    select (v_uid = any (s.approver_user_ids)) into v_approver
+      from public.client_proposal_setting s where s.org_id = old.org_id;
+    if v_approver is not true
+       or v_role is null
+       or v_role not in ('owner','admin','senior_admin','intake','paralegal','law_clerk','attorney','clerk') then
+      raise exception 'signing_words_not_approver: only a named approver approves the signing words' using errcode = '42501';
+    end if;
+    if not public.client_proposal_signing_words_fields_ok(new.link_body, array['signing_link','client_name','firm_name','link_expires'], 'signing_link')
+       or not public.client_proposal_signing_words_fields_ok(new.link_subject, array['client_name','firm_name'], null)
+       or not public.client_proposal_signing_words_fields_ok(new.copy_subject, array['client_name','firm_name'], null)
+       or not public.client_proposal_signing_words_fields_ok(new.copy_body, array['client_name','firm_name'], null)
+       or not public.client_proposal_signing_words_fields_ok(new.consent_line, array[]::text[], null)
+       or not public.client_proposal_signing_words_fields_ok(new.consent_text, array[]::text[], null)
+       or not public.client_proposal_signing_words_fields_ok(new.sign_line, array[]::text[], null)
+       or not public.client_proposal_signing_words_fields_ok(new.box_note, array[]::text[], null) then
+      raise exception 'signing_words_fields_invalid: a merge field is unknown, unclosed, or the link field is missing' using errcode = '23514';
+    end if;
+    -- Retire the version it replaces (the partial unique index allows one approved per firm).
+    update public.client_proposal_signing_words w
+       set status = 'retired', updated_at = now()
+     where w.org_id = old.org_id and w.status = 'approved' and w.id <> old.id;
+    new.approved_by := v_uid;
+    new.approved_at := now();
+    new.updated_by := v_uid;
+    new.updated_at := now();
+    return new;
+  end if;
+
+  -- The one other transition: approved -> retired, done above by the approve of a newer version (depth > 1).
+  if old.status = 'approved' and new.status = 'retired' and pg_catalog.pg_trigger_depth() > 1
+     and (to_jsonb(new) - array['status','updated_at']) = (to_jsonb(old) - array['status','updated_at']) then
+    new.updated_at := now();
+    return new;
+  end if;
+
+  raise exception 'signing_words_frozen: approved and retired signing words never change' using errcode = '23514';
+end
+$$;
+revoke all on function public.client_proposal_signing_words_rules() from public, anon, authenticated;
+
+do $$
+begin
+  if not exists (select 1 from pg_trigger where tgname = 'client_proposal_signing_words_rules_trg'
+      and tgrelid = 'public.client_proposal_signing_words'::regclass) then
+    create trigger client_proposal_signing_words_rules_trg
+      before insert or update on public.client_proposal_signing_words
+      for each row execute function public.client_proposal_signing_words_rules();
+  end if;
+end
+$$;
+
+alter table public.client_proposal_signing_words enable row level security;
+revoke all on public.client_proposal_signing_words from anon;
+revoke all on public.client_proposal_signing_words from authenticated;
+grant select on public.client_proposal_signing_words to authenticated;
+grant insert (org_id, consent_line, consent_text, sign_line, box_note, link_subject, link_body, copy_subject, copy_body)
+  on public.client_proposal_signing_words to authenticated;
+grant update (status, consent_line, consent_text, sign_line, box_note, link_subject, link_body, copy_subject, copy_body)
+  on public.client_proposal_signing_words to authenticated;
+-- No delete for anyone but the cascade. The service role only reads (the public path reads the approved version).
+grant select on public.client_proposal_signing_words to service_role;
+
+do $$
+begin
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'client_proposal_signing_words'
+      and policyname = 'client_proposal_signing_words_select') then
+    create policy client_proposal_signing_words_select on public.client_proposal_signing_words
+      for select using (org_id = public.current_org_id());
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'client_proposal_signing_words'
+      and policyname = 'client_proposal_signing_words_insert') then
+    create policy client_proposal_signing_words_insert on public.client_proposal_signing_words
+      for insert with check (
+        org_id = public.current_org_id()
+        and public.current_org_role() in ('owner', 'admin', 'senior_admin')
+      );
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'client_proposal_signing_words'
+      and policyname = 'client_proposal_signing_words_update') then
+    -- The admin tier (edit) or a named approver (approve); the trigger decides which act each may do.
+    create policy client_proposal_signing_words_update on public.client_proposal_signing_words
+      for update using (
+        org_id = public.current_org_id()
+        and (
+          public.current_org_role() in ('owner', 'admin', 'senior_admin')
+          or exists (select 1 from public.client_proposal_setting s
+                      where s.org_id = public.current_org_id() and auth.uid() = any (s.approver_user_ids))
+        )
+      )
+      with check (org_id = public.current_org_id());
+  end if;
+end
+$$;
+
+-- ── 2. client_proposal_signing_request: one emailed link for one proposal version ───────────────────────────────────
+create table if not exists public.client_proposal_signing_request (
+  id                    uuid        primary key default gen_random_uuid(),
+  org_id                uuid        not null references public.crm_org(id) on delete cascade,
+  proposal_id           uuid        not null,
+  family_id             uuid        not null,
+  version               integer     not null,
+  -- sha256 (hex) of the url-safe token (>= 32 random bytes). The token itself is never stored.
+  token_sha256          text        not null unique,
+  status                text        not null default 'sending',
+  closed_reason         text        null,
+  -- Where the link went: the PROPOSAL ROW's client_email at opening (never an address from the browser).
+  sent_to               text        not null,
+  sent_at               timestamptz null,
+  expires_at            timestamptz not null,
+  -- Frozen at opening. The letter is final here: the emailed PDF, the signing page and the signed PDF come from THIS text.
+  signer_name           text        not null,
+  signer_title          text        null,
+  entity_name           text        null,
+  address               jsonb       null,
+  details               jsonb       not null,
+  template_version      integer     null,
+  agreement_text        text        not null,
+  agreement_sha256      text        not null,
+  canonical_fingerprint text        not null,
+  review_pdf_sha256     text        null,
+  selection             jsonb       not null,
+  snapshot              jsonb       not null,
+  date_text             text        not null,
+  -- The approved signing words this request uses, snapshotted (text + sha256), so a later approval never changes an open link.
+  -- No FK: words rows are never deleted except with the whole firm, and the snapshot below is what counts.
+  words_id              uuid        not null,
+  words_version         integer     not null,
+  consent_line          text        not null,
+  consent_text          text        not null,
+  consent_sha256        text        not null,
+  sign_line             text        not null,
+  box_note              text        not null,
+  copy_subject          text        not null,
+  copy_body             text        not null,
+  words_sha256          text        not null,
+  opened_at             timestamptz null,
+  consent_at            timestamptz null,
+  signed_at             timestamptz null,
+  -- ON DELETE CASCADE, not SET NULL: a signature row is removed only by the owner's family delete (0102), which removes this
+  -- request too; a SET NULL would be an update the guard refuses and would break the `signed` check.
+  signature_id          uuid        null references public.client_proposal_signature(id) on delete cascade,
+  created_at            timestamptz not null default now(),
+  updated_at            timestamptz not null default now(),
+  constraint client_proposal_signing_request_proposal_org_fk foreign key (proposal_id, org_id)
+    references public.client_proposal (id, org_id) on delete cascade,
+  constraint client_proposal_signing_request_status check (status in ('sending', 'open', 'signed', 'closed')),
+  constraint client_proposal_signing_request_closed_reason check (
+    (status = 'closed') = (closed_reason is not null)
+    and (closed_reason is null or closed_reason in (
+      'resent', 'send_failed', 'expired', 'withdrawn', 'superseded', 'accepted_elsewhere', 'proposal_changed', 'reset'
+    ))
+  ),
+  constraint client_proposal_signing_request_sha check (
+        token_sha256 ~ '^[0-9a-f]{64}$' and agreement_sha256 ~ '^[0-9a-f]{64}$' and canonical_fingerprint ~ '^[0-9a-f]{64}$'
+    and consent_sha256 ~ '^[0-9a-f]{64}$' and words_sha256 ~ '^[0-9a-f]{64}$'
+    and (review_pdf_sha256 is null or review_pdf_sha256 ~ '^[0-9a-f]{64}$')
+  ),
+  constraint client_proposal_signing_request_text_len check (char_length(agreement_text) between 1 and 204800),
+  constraint client_proposal_signing_request_name_len check (char_length(btrim(signer_name)) between 2 and 200),
+  constraint client_proposal_signing_request_email check (char_length(sent_to) between 3 and 320 and sent_to ~ '^[^@\s]+@[^@\s]+$'),
+  constraint client_proposal_signing_request_expiry check (expires_at > created_at and expires_at <= created_at + interval '7 days 1 minute'),
+  constraint client_proposal_signing_request_signed check ((status = 'signed') = (signature_id is not null and signed_at is not null)),
+  constraint client_proposal_signing_request_shapes check (
+    jsonb_typeof(details) = 'object' and pg_column_size(details) <= 8192
+    and (address is null or (jsonb_typeof(address) = 'object' and pg_column_size(address) <= 4096))
+    and jsonb_typeof(snapshot) = 'object'
+  )
+);
+
+-- One request in flight per proposal version (sending or open).
+create unique index if not exists client_proposal_signing_request_one_open
+  on public.client_proposal_signing_request (proposal_id) where status in ('sending', 'open');
+create index if not exists client_proposal_signing_request_org_idx
+  on public.client_proposal_signing_request (org_id, proposal_id, created_at desc);
+
+comment on table public.client_proposal_signing_request is
+  'One emailed signing link for one proposal version (0117). Written only by the service role through the signing_* functions. Staff read status, timestamps and ids; the token hash, the letter text, the address, the details, the email, the snapshot and the words are withheld. Privileged client content: never logged.';
+
+-- Status changes and evidence columns move only through the functions below; a direct service-role update is limited to
+-- review_pdf_sha256 (set once, by the send action, before the email goes out).
+create or replace function public.client_proposal_signing_request_guard()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if tg_op = 'UPDATE' then
+    if coalesce(current_setting('lectual.signing_fn', true), '') <> new.id::text then
+      if (to_jsonb(new) - array['review_pdf_sha256','updated_at']) is distinct from (to_jsonb(old) - array['review_pdf_sha256','updated_at'])
+         or old.review_pdf_sha256 is not null or old.status <> 'sending' then
+        raise exception 'signing_request_guarded: a signing request changes only through its functions' using errcode = '42501';
+      end if;
+    end if;
+    new.updated_at := now();
+    return new;
+  end if;
+  -- INSERT only through signing_open.
+  if coalesce(current_setting('lectual.signing_fn', true), '') <> 'open' then
+    raise exception 'signing_request_guarded: a signing request is opened only through client_proposal_signing_open' using errcode = '42501';
+  end if;
+  new.created_at := now();
+  new.updated_at := now();
+  return new;
+end
+$$;
+revoke all on function public.client_proposal_signing_request_guard() from public, anon, authenticated;
+
+do $$
+begin
+  if not exists (select 1 from pg_trigger where tgname = 'client_proposal_signing_request_guard_trg'
+      and tgrelid = 'public.client_proposal_signing_request'::regclass) then
+    create trigger client_proposal_signing_request_guard_trg
+      before insert or update on public.client_proposal_signing_request
+      for each row execute function public.client_proposal_signing_request_guard();
+  end if;
+end
+$$;
+
+alter table public.client_proposal_signing_request enable row level security;
+revoke all on public.client_proposal_signing_request from anon;
+revoke all on public.client_proposal_signing_request from authenticated;
+grant select (
+  id, org_id, proposal_id, family_id, version, status, closed_reason, sent_at, expires_at, opened_at, consent_at, signed_at,
+  signature_id, words_version, copy_subject, copy_body, created_at, updated_at
+) on public.client_proposal_signing_request to authenticated;
+-- copy_subject / copy_body (the firm's own approved words, readable by every member in the words table anyway) are granted so a
+-- staff Try again of the signed-copy email (Sprint B) runs on the scoped client. The address is read from the `sent` event.
+-- NO grant on token_sha256, sent_to, signer_*, entity_name, address, details, agreement_*, canonical_fingerprint, selection,
+-- snapshot, date_text, the page words, consent_sha256, words_sha256, review_pdf_sha256. No insert, update or delete for authenticated.
+grant select, insert, update on public.client_proposal_signing_request to service_role;
+
+do $$
+begin
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'client_proposal_signing_request'
+      and policyname = 'client_proposal_signing_request_select_staff') then
+    -- SIGNATURE_READ_ROLES (src/lib/loe/signature-roles.ts), 0106's list. Viewer, social_media and anon read nothing.
+    create policy client_proposal_signing_request_select_staff on public.client_proposal_signing_request
+      for select using (
+        org_id = public.current_org_id()
+        and public.current_org_role() in ('owner','admin','senior_admin','attorney','intake','paralegal','law_clerk','clerk')
+      );
+  end if;
+end
+$$;
+
+-- ── 3. client_proposal_signing_event: append-only evidence ───────────────────────────────────────────────────────────
+create table if not exists public.client_proposal_signing_event (
+  id                uuid        primary key default gen_random_uuid(),
+  org_id            uuid        not null references public.crm_org(id) on delete cascade,
+  request_id        uuid        not null references public.client_proposal_signing_request(id) on delete cascade,
+  kind              text        not null,
+  at                timestamptz not null default now(),
+  ip                inet        null,
+  user_agent        text        null,
+  -- sent
+  sent_to           text        null,
+  -- consent
+  consent_sha256    text        null,
+  -- signature
+  signature_kind    text        null,
+  signature_png     bytea       null,
+  typed_style       text        null,
+  signature_sha256  text        null,
+  typed_name        text        null,
+  -- signed
+  agreement_sha256  text        null,
+  -- closed
+  closed_reason     text        null,
+  constraint client_proposal_signing_event_kind check (kind in ('sent', 'opened', 'consent', 'signature', 'signed', 'closed')),
+  constraint client_proposal_signing_event_ua_len check (user_agent is null or char_length(user_agent) <= 400),
+  constraint client_proposal_signing_event_shape check (
+    case kind
+      when 'sent'      then sent_to is not null
+      when 'opened'    then true
+      when 'consent'   then consent_sha256 ~ '^[0-9a-f]{64}$'
+      when 'signature' then typed_name is not null and char_length(btrim(typed_name)) between 2 and 200
+                            and signature_sha256 ~ '^[0-9a-f]{64}$'
+                            and (
+                              (signature_kind = 'drawn' and signature_png is not null and typed_style is null
+                                and octet_length(signature_png) between 8 and 102400
+                                and substring(signature_png from 1 for 8) = '\x89504e470d0a1a0a'::bytea)
+                              or (signature_kind = 'typed' and signature_png is null and typed_style in ('script', 'print'))
+                            )
+      when 'signed'    then agreement_sha256 ~ '^[0-9a-f]{64}$'
+      when 'closed'    then closed_reason is not null
+    end
+  )
+);
+create index if not exists client_proposal_signing_event_request_idx on public.client_proposal_signing_event (request_id, at);
+
+comment on table public.client_proposal_signing_event is
+  'Append-only evidence for an emailed signing link (0117): sent (to whom), opened, consent (which text, by sha256), signature (drawn PNG <= 100 KB or typed style, its sha256, the typed legal name), signed (agreement sha256), closed. Written only inside the signing_* functions; the time is the database clock.';
+
+create or replace function public.client_proposal_signing_event_guard()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if tg_op <> 'INSERT' then
+    raise exception 'signing_event_append_only: evidence is never changed or removed' using errcode = '42501';
+  end if;
+  if coalesce(current_setting('lectual.signing_fn', true), '') = '' then
+    raise exception 'signing_event_append_only: evidence is written only by the signing functions' using errcode = '42501';
+  end if;
+  new.at := now();
+  return new;
+end
+$$;
+revoke all on function public.client_proposal_signing_event_guard() from public, anon, authenticated;
+
+do $$
+begin
+  if not exists (select 1 from pg_trigger where tgname = 'client_proposal_signing_event_guard_trg'
+      and tgrelid = 'public.client_proposal_signing_event'::regclass) then
+    -- INSERT only from the signing functions; UPDATE never. DELETE is the next trigger.
+    create trigger client_proposal_signing_event_guard_trg
+      before insert or update on public.client_proposal_signing_event
+      for each row execute function public.client_proposal_signing_event_guard();
+  end if;
+end
+$$;
+
+create or replace function public.client_proposal_signing_event_no_delete()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  -- Only the cascade of the request's own delete (0102's owner family delete) removes evidence.
+  if pg_catalog.pg_trigger_depth() > 1 then return old; end if;
+  raise exception 'signing_event_append_only: evidence is never removed' using errcode = '42501';
+end
+$$;
+revoke all on function public.client_proposal_signing_event_no_delete() from public, anon, authenticated;
+
+do $$
+begin
+  if not exists (select 1 from pg_trigger where tgname = 'client_proposal_signing_event_no_delete_trg'
+      and tgrelid = 'public.client_proposal_signing_event'::regclass) then
+    create trigger client_proposal_signing_event_no_delete_trg
+      before delete on public.client_proposal_signing_event
+      for each row execute function public.client_proposal_signing_event_no_delete();
+  end if;
+end
+$$;
+
+alter table public.client_proposal_signing_event enable row level security;
+revoke all on public.client_proposal_signing_event from anon;
+revoke all on public.client_proposal_signing_event from authenticated;
+-- Staff read the evidence the way 0106 lets them read the signature row (ip and user_agent included): the certificate on a
+-- staff download is built from it. No insert, update or delete for authenticated.
+grant select on public.client_proposal_signing_event to authenticated;
+grant select, insert on public.client_proposal_signing_event to service_role;
+
+do $$
+begin
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'client_proposal_signing_event'
+      and policyname = 'client_proposal_signing_event_select_staff') then
+    create policy client_proposal_signing_event_select_staff on public.client_proposal_signing_event
+      for select using (
+        org_id = public.current_org_id()
+        and public.current_org_role() in ('owner','admin','senior_admin','attorney','intake','paralegal','law_clerk','clerk')
+      );
+  end if;
+end
+$$;
+
+-- ── 4. Small helpers (service role) ──────────────────────────────────────────────────────────────────────────────────
+-- Close one request (fenced on status) and append its `closed` evidence. Internal; also called by the trigger in section 7.
+create or replace function public.client_proposal_signing_close_internal(p_request_id uuid, p_reason text)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_org uuid;
+begin
+  perform set_config('lectual.signing_fn', p_request_id::text, true);
+  update public.client_proposal_signing_request r
+     set status = 'closed', closed_reason = p_reason
+   where r.id = p_request_id and r.status in ('sending', 'open')
+  returning r.org_id into v_org;
+  if not found then
+    perform set_config('lectual.signing_fn', '', true);
+    return false;
+  end if;
+  insert into public.client_proposal_signing_event (org_id, request_id, kind, closed_reason)
+  values (v_org, p_request_id, 'closed', p_reason);
+  perform set_config('lectual.signing_fn', '', true);
+  return true;
+end
+$$;
+revoke all on function public.client_proposal_signing_close_internal(uuid, text) from public, anon, authenticated;
+
+-- ── 5. client_proposal_signing_open (service role) ───────────────────────────────────────────────────────────────────
+-- Locks the proposal, checks it is the same live version with a letter, checks the words are the firm's APPROVED version and
+-- that the snapshotted words and text hash to what is passed, closes any request already in flight for this version
+-- (reason `resent`), and inserts the new one as `sending`. org_id, family_id, version and sent_to come from the proposal row.
+-- Returns the new request id. SECURITY DEFINER: it never changes the proposal.
+create or replace function public.client_proposal_signing_open(
+  p_proposal_id           uuid,
+  p_org_id                uuid,
+  p_family_id             uuid,
+  p_version               integer,
+  p_token_sha256          text,
+  p_expires_at            timestamptz,
+  p_signer_name           text,
+  p_signer_title          text,
+  p_entity_name           text,
+  p_address               jsonb,
+  p_details               jsonb,
+  p_template_version      integer,
+  p_agreement_text        text,
+  p_agreement_sha256      text,
+  p_canonical_fingerprint text,
+  p_selection             jsonb,
+  p_snapshot              jsonb,
+  p_date_text             text,
+  p_words_id              uuid,
+  p_words_sha256          text
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_row   public.client_proposal%rowtype;
+  v_words public.client_proposal_signing_words%rowtype;
+  v_old   uuid;
+  v_id    uuid;
+begin
+  select * into v_row from public.client_proposal p where p.id = p_proposal_id for update;
+  if not found
+     or v_row.org_id is distinct from p_org_id
+     or v_row.family_id is distinct from p_family_id
+     or v_row.version is distinct from p_version
+     or v_row.status is distinct from 'sent'
+     or (v_row.expires_on is not null and v_row.expires_on < (now() at time zone 'Etc/GMT+12')::date)
+     or (jsonb_typeof(v_row.content -> 'loe') = 'object') is not true then
+    raise exception 'signing_changed: the proposal is not the live version with a letter' using errcode = '23514';
+  end if;
+  if v_row.client_email is null or btrim(v_row.client_email) !~ '^[^@\s]+@[^@\s]+$' then
+    raise exception 'signing_no_email: the proposal has no client email on file' using errcode = '23514';
+  end if;
+
+  select * into v_words from public.client_proposal_signing_words w where w.id = p_words_id;
+  if not found or v_words.org_id is distinct from v_row.org_id or v_words.status is distinct from 'approved' then
+    raise exception 'signing_words_changed: those are not the firm''s approved signing words' using errcode = '23514';
+  end if;
+  -- The words hash: sha256 of the eight fields joined by U+001F, in this order (src/lib/loe/signing-words.ts wordsSha256).
+  if pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+       v_words.consent_line || chr(31) || v_words.consent_text || chr(31) || v_words.sign_line || chr(31) || v_words.box_note
+       || chr(31) || v_words.link_subject || chr(31) || v_words.link_body || chr(31) || v_words.copy_subject || chr(31) || v_words.copy_body,
+       'UTF8')), 'hex') is distinct from p_words_sha256 then
+    raise exception 'signing_words_changed: the words changed while the link was being made' using errcode = '23514';
+  end if;
+
+  if p_token_sha256 is null or p_token_sha256 !~ '^[0-9a-f]{64}$'
+     or p_agreement_text is null or p_agreement_sha256 is null
+     or pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(p_agreement_text, 'UTF8')), 'hex') is distinct from p_agreement_sha256 then
+    raise exception 'signing_invalid: the agreement text does not match its fingerprint' using errcode = '23514';
+  end if;
+  if p_expires_at is null or p_expires_at <= now() or p_expires_at > now() + interval '7 days' then
+    raise exception 'signing_invalid: a link lasts at most 7 days' using errcode = '23514';
+  end if;
+
+  -- Pressing the button again sends a fresh link and closes the old one.
+  for v_old in select r.id from public.client_proposal_signing_request r
+                where r.proposal_id = v_row.id and r.status in ('sending', 'open') loop
+    perform public.client_proposal_signing_close_internal(v_old, 'resent');
+  end loop;
+
+  perform set_config('lectual.signing_fn', 'open', true);
+  insert into public.client_proposal_signing_request (
+    org_id, proposal_id, family_id, version, token_sha256, status, sent_to, expires_at,
+    signer_name, signer_title, entity_name, address, details, template_version,
+    agreement_text, agreement_sha256, canonical_fingerprint, selection, snapshot, date_text,
+    words_id, words_version, consent_line, consent_text, consent_sha256, sign_line, box_note, copy_subject, copy_body, words_sha256
+  ) values (
+    v_row.org_id, v_row.id, v_row.family_id, v_row.version, p_token_sha256, 'sending', btrim(v_row.client_email), p_expires_at,
+    btrim(p_signer_name), nullif(btrim(coalesce(p_signer_title, '')), ''), nullif(btrim(coalesce(p_entity_name, '')), ''),
+    p_address, p_details, p_template_version,
+    p_agreement_text, p_agreement_sha256, p_canonical_fingerprint, p_selection, p_snapshot, p_date_text,
+    v_words.id, v_words.version, v_words.consent_line, v_words.consent_text,
+    pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(v_words.consent_text, 'UTF8')), 'hex'),
+    v_words.sign_line, v_words.box_note, v_words.copy_subject, v_words.copy_body, p_words_sha256
+  )
+  returning id into v_id;
+  perform set_config('lectual.signing_fn', '', true);
+  return v_id;
+end
+$$;
+revoke all on function public.client_proposal_signing_open(
+  uuid, uuid, uuid, integer, text, timestamptz, text, text, text, jsonb, jsonb, integer, text, text, text, jsonb, jsonb, text, uuid, text)
+  from public, anon, authenticated;
+grant execute on function public.client_proposal_signing_open(
+  uuid, uuid, uuid, integer, text, timestamptz, text, text, text, jsonb, jsonb, integer, text, text, text, jsonb, jsonb, text, uuid, text)
+  to service_role;
+
+-- ── 6. Sent, opened, consent, close (service role) ───────────────────────────────────────────────────────────────────
+-- After the email: p_sent true -> `open` + a `sent` event; false -> `closed` (send_failed): a failed send leaves no open request.
+create or replace function public.client_proposal_signing_mark_sent(p_request_id uuid, p_sent boolean)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_req public.client_proposal_signing_request%rowtype;
+begin
+  select * into v_req from public.client_proposal_signing_request r where r.id = p_request_id for update;
+  if not found or v_req.status <> 'sending' then return false; end if;
+  if not p_sent then
+    return public.client_proposal_signing_close_internal(p_request_id, 'send_failed');
+  end if;
+  perform set_config('lectual.signing_fn', p_request_id::text, true);
+  update public.client_proposal_signing_request r set status = 'open', sent_at = now() where r.id = p_request_id;
+  insert into public.client_proposal_signing_event (org_id, request_id, kind, sent_to) values (v_req.org_id, v_req.id, 'sent', v_req.sent_to);
+  perform set_config('lectual.signing_fn', '', true);
+  return true;
+end
+$$;
+revoke all on function public.client_proposal_signing_mark_sent(uuid, boolean) from public, anon, authenticated;
+grant execute on function public.client_proposal_signing_mark_sent(uuid, boolean) to service_role;
+
+-- The link is opened. The FIRST open is recorded (opened_at + one `opened` event with ip and browser). Returns the request's
+-- state for the page: 'open' / 'signed' / 'closed' / 'expired' / 'unknown'. An open request past expires_at is closed here
+-- (reason `expired`). Looked up by token sha256 only (the app hashes the token; the hash is never compared in app code with ==).
+create or replace function public.client_proposal_signing_opened(p_token_sha256 text, p_ip inet, p_user_agent text)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_req public.client_proposal_signing_request%rowtype;
+begin
+  if p_token_sha256 is null or p_token_sha256 !~ '^[0-9a-f]{64}$' then return 'unknown'; end if;
+  select * into v_req from public.client_proposal_signing_request r where r.token_sha256 = p_token_sha256 for update;
+  if not found then return 'unknown'; end if;
+  if v_req.status = 'signed' then return 'signed'; end if;
+  if v_req.status <> 'open' then return 'closed'; end if;
+  if v_req.expires_at <= now() then
+    perform public.client_proposal_signing_close_internal(v_req.id, 'expired');
+    return 'expired';
+  end if;
+  if v_req.opened_at is null then
+    perform set_config('lectual.signing_fn', v_req.id::text, true);
+    update public.client_proposal_signing_request r set opened_at = now() where r.id = v_req.id;
+    insert into public.client_proposal_signing_event (org_id, request_id, kind, ip, user_agent)
+    values (v_req.org_id, v_req.id, 'opened', p_ip, left(p_user_agent, 400));
+    perform set_config('lectual.signing_fn', '', true);
+  end if;
+  return 'open';
+end
+$$;
+revoke all on function public.client_proposal_signing_opened(text, inet, text) from public, anon, authenticated;
+grant execute on function public.client_proposal_signing_opened(text, inet, text) to service_role;
+
+-- The first click: consent to sign electronically. Must name the consent text this request snapshotted (by sha256).
+-- Recorded once; a second call returns true and writes nothing.
+create or replace function public.client_proposal_signing_consent(p_token_sha256 text, p_consent_sha256 text, p_ip inet, p_user_agent text)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_req public.client_proposal_signing_request%rowtype;
+begin
+  select * into v_req from public.client_proposal_signing_request r where r.token_sha256 = p_token_sha256 for update;
+  if not found or v_req.status <> 'open' or v_req.expires_at <= now() or v_req.opened_at is null then
+    raise exception 'signing_link_closed: no open link' using errcode = '23514';
+  end if;
+  if p_consent_sha256 is distinct from v_req.consent_sha256 then
+    raise exception 'signing_consent_mismatch: that is not the consent text this link shows' using errcode = '23514';
+  end if;
+  if v_req.consent_at is not null then return true; end if;
+  perform set_config('lectual.signing_fn', v_req.id::text, true);
+  update public.client_proposal_signing_request r set consent_at = now() where r.id = v_req.id;
+  insert into public.client_proposal_signing_event (org_id, request_id, kind, ip, user_agent, consent_sha256)
+  values (v_req.org_id, v_req.id, 'consent', p_ip, left(p_user_agent, 400), v_req.consent_sha256);
+  perform set_config('lectual.signing_fn', '', true);
+  return true;
+end
+$$;
+revoke all on function public.client_proposal_signing_consent(text, text, inet, text) from public, anon, authenticated;
+grant execute on function public.client_proposal_signing_consent(text, text, inet, text) to service_role;
+
+-- App-side close (new choices sent, a reset seen, an expiry). Fenced on the request being in flight. Returns whether it closed.
+create or replace function public.client_proposal_signing_close(p_request_id uuid, p_reason text)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if p_reason is null or p_reason not in ('resent', 'send_failed', 'expired', 'proposal_changed', 'reset') then
+    raise exception 'signing_invalid: not a reason the app may close a link for' using errcode = '23514';
+  end if;
+  return public.client_proposal_signing_close_internal(p_request_id, p_reason);
+end
+$$;
+revoke all on function public.client_proposal_signing_close(uuid, text) from public, anon, authenticated;
+grant execute on function public.client_proposal_signing_close(uuid, text) to service_role;
+
+-- ── 7. Closing a link when the version leaves `sent` (withdrawn, superseded, accepted in-app, reset) ─────────────────
+-- AFTER UPDATE OF status on client_proposal. client_proposal_signing_sign marks its request `signed` BEFORE it updates the
+-- proposal, so its own acceptance finds nothing to close. A reset (accepted -> sent) closes nothing that is still open (a
+-- signed request is not in flight); any request still in flight on a status change is closed with a reason for that change.
+create or replace function public.client_proposal_signing_on_status()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_id uuid;
+  v_reason text;
+begin
+  if new.status is not distinct from old.status then return null; end if;
+  v_reason := case new.status
+    when 'withdrawn'  then 'withdrawn'
+    when 'superseded' then 'superseded'
+    when 'accepted'   then 'accepted_elsewhere'
+    else 'proposal_changed'
+  end;
+  for v_id in select r.id from public.client_proposal_signing_request r
+               where r.proposal_id = new.id and r.status in ('sending', 'open') loop
+    perform public.client_proposal_signing_close_internal(v_id, v_reason);
+  end loop;
+  return null;
+end
+$$;
+revoke all on function public.client_proposal_signing_on_status() from public, anon, authenticated;
+
+do $$
+begin
+  if not exists (select 1 from pg_trigger where tgname = 'client_proposal_signing_on_status_trg'
+      and tgrelid = 'public.client_proposal'::regclass) then
+    create trigger client_proposal_signing_on_status_trg
+      after update of status on public.client_proposal
+      for each row execute function public.client_proposal_signing_on_status();
+  end if;
+end
+$$;
+
+-- ── 8. client_proposal_signing_sign: THE one signing function (service role) ─────────────────────────────────────────
+-- Locks the request (by token sha256), checks it is open, unexpired, opened and consented, checks the typed name is the
+-- frozen signer name (case and spaces folded), checks the signature payload, locks the proposal and checks it is still the
+-- same live version, writes 0106's signature row from the request's FROZEN text, appends the `signature` and `signed`
+-- evidence, marks the request `signed`, and accepts the proposal with the request's frozen selection and snapshot, all in
+-- this one transaction. A second call for a signed request returns (signature_id, false) and changes nothing.
+-- SECURITY INVOKER, service_role only: 0106's lifecycle accepts a letter proposal only from the service role with no session
+-- and a signature row from this very transaction (the reason 0106's sign_and_accept and 0113's adobe_complete are INVOKER).
+-- NO EXCEPTION BLOCK, NO SAVEPOINT (the lifecycle looks for a signature row with this transaction's own xid).
+create or replace function public.client_proposal_signing_sign(
+  p_token_sha256     text,
+  p_typed_name       text,
+  p_signature_kind   text,
+  p_signature_png    bytea,
+  p_typed_style      text,
+  p_signature_sha256 text,
+  p_ip               inet,
+  p_user_agent       text
+)
+returns table (signature_id uuid, signed_now boolean, proposal_id uuid, signed_at timestamptz)
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_req          public.client_proposal_signing_request%rowtype;
+  v_row          public.client_proposal%rowtype;
+  v_signature_id uuid := gen_random_uuid();
+  v_template_id  uuid;
+  v_template_ver integer;
+  v_linked_ver   integer;
+  v_loe          jsonb;
+  v_signed_at    timestamptz;
+  v_fold_typed   text;
+  v_fold_frozen  text;
+begin
+  -- Lock order: the request first, then the proposal.
+  select * into v_req from public.client_proposal_signing_request r where r.token_sha256 = p_token_sha256 for update;
+  if not found then
+    raise exception 'signing_link_closed: no such link' using errcode = '23514';
+  end if;
+  if v_req.status = 'signed' then
+    return query select v_req.signature_id, false, v_req.proposal_id, v_req.signed_at;
+    return;
+  end if;
+  if v_req.status <> 'open' or v_req.expires_at <= now() then
+    raise exception 'signing_link_closed: this link is no longer open' using errcode = '23514';
+  end if;
+  if v_req.opened_at is null or v_req.consent_at is null then
+    raise exception 'signing_no_consent: consent comes before signing' using errcode = '23514';
+  end if;
+
+  v_fold_typed  := lower(regexp_replace(btrim(coalesce(p_typed_name, '')), '\s+', ' ', 'g'));
+  v_fold_frozen := lower(regexp_replace(btrim(v_req.signer_name), '\s+', ' ', 'g'));
+  if char_length(v_fold_typed) < 2 or v_fold_typed <> v_fold_frozen then
+    raise exception 'signing_name_mismatch: the typed name is not the name on the letter' using errcode = '23514';
+  end if;
+  if p_signature_sha256 is null or p_signature_sha256 !~ '^[0-9a-f]{64}$' then
+    raise exception 'signing_bad_signature: no signature' using errcode = '23514';
+  end if;
+  if p_signature_kind = 'drawn' then
+    if p_signature_png is null or octet_length(p_signature_png) > 102400
+       or substring(p_signature_png from 1 for 8) <> '\x89504e470d0a1a0a'::bytea
+       or pg_catalog.encode(pg_catalog.sha256(p_signature_png), 'hex') <> p_signature_sha256 then
+      raise exception 'signing_bad_signature: the drawn signature is not a PNG of at most 100 KB, or its hash differs' using errcode = '23514';
+    end if;
+  elsif p_signature_kind = 'typed' then
+    if p_signature_png is not null or p_typed_style not in ('script', 'print')
+       or pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(p_typed_style || chr(31) || btrim(p_typed_name), 'UTF8')), 'hex') <> p_signature_sha256 then
+      raise exception 'signing_bad_signature: the typed signature does not match its hash' using errcode = '23514';
+    end if;
+  else
+    raise exception 'signing_bad_signature: drawn or typed' using errcode = '23514';
+  end if;
+
+  select * into v_row from public.client_proposal p where p.id = v_req.proposal_id for update;
+  if not found
+     or v_row.org_id is distinct from v_req.org_id
+     or v_row.family_id is distinct from v_req.family_id
+     or v_row.version is distinct from v_req.version
+     or v_row.status is distinct from 'sent'
+     or (v_row.expires_on is not null and v_row.expires_on < (now() at time zone 'Etc/GMT+12')::date)
+     or (jsonb_typeof(v_row.content -> 'loe') = 'object') is not true then
+    raise exception 'signing_changed: the proposal changed after the link was sent' using errcode = '23514';
+  end if;
+  if pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(v_req.agreement_text, 'UTF8')), 'hex') is distinct from v_req.agreement_sha256 then
+    raise exception 'signing_text_mismatch: the stored text does not hash to its fingerprint' using errcode = '23514';
+  end if;
+
+  -- 0106's template link rule, copied: only the proposal's firm's approved (or since retired) version the content names.
+  v_loe := v_row.content -> 'loe';
+  if (v_loe ->> 'template_id') ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' then
+    v_template_id := (v_loe ->> 'template_id')::uuid;
+  end if;
+  if (v_loe ->> 'template_version') ~ '^[0-9]{1,9}$' then
+    v_template_ver := (v_loe ->> 'template_version')::integer;
+  end if;
+  if v_template_id is not null then
+    select t.version into v_linked_ver from public.client_proposal_loe_template t
+     where t.id = v_template_id and t.org_id = v_row.org_id and t.status in ('approved', 'retired') and t.version = v_template_ver;
+    if found then v_template_ver := v_linked_ver; else v_template_id := null; end if;
+  end if;
+
+  -- 0106's signature row, from the request's FROZEN columns. signed_at is 0106's guard's own clock.
+  insert into public.client_proposal_signature (
+    id, org_id, proposal_id, family_id, version, signer_name, signer_title, entity_name,
+    address, signer_email, ip, user_agent, agreement_text, agreement_sha256, template_id, template_version
+  ) values (
+    v_signature_id, v_row.org_id, v_row.id, v_row.family_id, v_row.version, v_req.signer_name, v_req.signer_title,
+    v_req.entity_name, v_req.address, v_req.sent_to, p_ip, left(p_user_agent, 400), v_req.agreement_text,
+    v_req.agreement_sha256, v_template_id, v_template_ver
+  )
+  returning signed_at into v_signed_at;
+
+  -- Evidence, then the request is marked signed BEFORE the proposal moves (so section 7's trigger finds nothing to close).
+  perform set_config('lectual.signing_fn', v_req.id::text, true);
+  insert into public.client_proposal_signing_event (org_id, request_id, kind, ip, user_agent, signature_kind, signature_png, typed_style, signature_sha256, typed_name)
+  values (v_req.org_id, v_req.id, 'signature', p_ip, left(p_user_agent, 400), p_signature_kind, p_signature_png,
+          case when p_signature_kind = 'typed' then p_typed_style end, p_signature_sha256, btrim(p_typed_name));
+  insert into public.client_proposal_signing_event (org_id, request_id, kind, ip, user_agent, agreement_sha256)
+  values (v_req.org_id, v_req.id, 'signed', p_ip, left(p_user_agent, 400), v_req.agreement_sha256);
+  update public.client_proposal_signing_request r
+     set status = 'signed', signature_id = v_signature_id, signed_at = v_signed_at
+   where r.id = v_req.id and r.status = 'open';
+  perform set_config('lectual.signing_fn', '', true);
+
+  -- 0106's marker and the one conditional update fenced on `status = 'sent'`.
+  perform set_config('lectual.loe_signing', v_row.id::text, true);
+  update public.client_proposal p
+     set status = 'accepted',
+         accepted_selection = v_req.selection,
+         accepted_snapshot = v_req.snapshot || jsonb_build_object(
+           'schema', 2,
+           -- The snapshot was built at send time; the acceptance instant is the signing's (0106's clock).
+           'accepted_at', v_signed_at,
+           'agreement', jsonb_build_object(
+             'signature_id', v_signature_id,
+             'signer_name', v_req.signer_name,
+             'signed_at', v_signed_at,
+             'sha256', v_req.agreement_sha256,
+             'template_version', v_template_ver,
+             'method', 'email_link',
+             'signing_request_id', v_req.id
+           )
+         )
+   where p.id = v_row.id and p.org_id = v_row.org_id and p.status = 'sent';
+  if not found then
+    raise exception 'signing_changed: only a live proposal can be signed' using errcode = '23514';
+  end if;
+  perform set_config('lectual.loe_signing', '', true);
+
+  return query select v_signature_id, true, v_row.id, v_signed_at;
+end
+$$;
+revoke all on function public.client_proposal_signing_sign(text, text, text, bytea, text, text, inet, text) from public, anon, authenticated;
+grant execute on function public.client_proposal_signing_sign(text, text, text, bytea, text, text, inet, text) to service_role;
+
+-- =====================================================================================================================
+-- ISOLATION CASES for lectual's tests/tenant-isolation.test.ts (copy in the same PR as this migration; NOT run in
+-- lectual.app). Same helpers as the 0106 block there: seedOrg, clientFor, admin, anonClient, addMember, seedSentProposal,
+-- CONTENT_WITH_LOE. Each case is listed; the generator in lectual writes them out in that block's style.
+-- =====================================================================================================================
+--  1. Firm B's member reads 0 rows of firm A's client_proposal_signing_words.
+--  2. A's paralegal cannot insert signing words (42501); A's admin can; A's admin cannot insert with org_id = B.
+--  3. A's admin who is NOT a named approver cannot approve (signing_words_not_approver); A's named approver (attorney) can;
+--     A's named approver who is a viewer cannot.
+--  4. Approving with a changed word in the same statement is refused (signing_words_bad_transition).
+--  5. Approve refuses a link_body without {{signing_link}}, with it twice, with {{unknown}}, and with an unclosed "{{".
+--  6. An approved row cannot be edited (signing_words_frozen); approving a newer draft retires it; there is still one approved row.
+--  7. B's admin updates A's draft: 0 rows. Nobody (authenticated) can delete a words row.
+--  8. Requests: B reads 0 of A's. A's attorney reads the granted columns; selecting token_sha256, sent_to, agreement_text,
+--     snapshot, selection, details, address, consent_text, consent_sha256 is an error for every authenticated role (A's owner
+--     included); copy_subject and copy_body ARE readable by A's attorney.
+--  9. A's viewer and social_media read 0 requests and 0 events.
+-- 10. Authenticated (A's owner) cannot insert, update or delete a request or an event (no grant).
+-- 11. The service role cannot insert a request directly (signing_request_guarded) nor change a request's status directly; it
+--     CAN set review_pdf_sha256 once on a `sending` row, and not a second time.
+-- 12. Every signing_* function is refused for anon and for authenticated (A's owner).
+-- 13. signing_open: another org's p_org_id, a wrong version, a withdrawn proposal, a proposal without a letter, B's words, a
+--     draft words id, a words hash that does not match, a text whose sha256 differs, an expiry over 7 days: each refused, 0 rows.
+-- 14. signing_open twice for one proposal: the first request is `closed` (resent) with a `closed` event; one in-flight row.
+-- 15. mark_sent(false) closes with send_failed (no open request left); mark_sent(true) opens and writes one `sent` event.
+-- 16. opened(): an unknown hash returns 'unknown'; the first open stamps opened_at and one `opened` event; a second open writes
+--     nothing; an open past expires_at closes with `expired`.
+-- 17. consent(): refused before open; refused with another sha256; recorded once.
+-- 18. sign(): refused without consent; refused with a typed name that differs from the frozen name ("Sam Client" vs "Sam
+--     Clients"), accepted with "  sam   CLIENT "; refused with a PNG over 100 KB, a non-PNG, a hash that does not match.
+-- 19. sign() succeeds once: one client_proposal_signature row (org_id = the proposal's), the proposal `accepted` with
+--     accepted_snapshot.agreement.method = 'email_link', the request `signed`, two events (signature, signed); a second call
+--     returns signed_now = false and changes nothing (row counts equal).
+-- 20. Withdrawing the proposal (staff path) closes the open request (`withdrawn`); a new version (supersede) closes it
+--     (`superseded`); an in-app 0106 signing of the same version closes it (`accepted_elsewhere`) and sign() then refuses.
+-- 21. Evidence: an UPDATE or DELETE of an event by the service role is refused (signing_event_append_only); the owner's family
+--     delete (0102) removes the proposal, its requests and their events by cascade.
+-- 22. sign() after the proposal's expires_on has passed (backstop day) is refused (signing_changed) and nothing is written.
