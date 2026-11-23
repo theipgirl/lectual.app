@@ -1617,6 +1617,7 @@ export const LAWMATICS_SYNC_REAUTH = "Lawmatics no longer accepts your firm's ke
 export const LAWMATICS_SYNC_OUT_OF_TIME = "Lawmatics took too long. Try again shortly.";
 export const LAWMATICS_SYNC_NOT_CONNECTED = "Lawmatics isn't connected for your firm.";
 export const LAWMATICS_SYNC_FAILED = "We couldn't sync from Lawmatics just now. Try again shortly.";
+export const LAWMATICS_SYNC_KEY_UNREADABLE = "We couldn't open your firm's Lawmatics key, so nothing was synced. Reconnect it above, or try again shortly.";
 /** A step that couldn't read Lawmatics: named by what it does, never with raw text. */
 export const LAWMATICS_SYNC_STEP_NAMES = { hired: "hired matters", prospects: "new leads", consults: "consults" } as const;
 export const lawmaticsSyncStepsFailed = (steps: readonly string[]) =>
@@ -1662,8 +1663,7 @@ export const CAME_BACK_OPEN = "Open lead";
 /** Consults from Lawmatics on Today, the lead page and the calendar. */
 export const LAWMATICS_CONSULTS_NOT_CONNECTED = "Consults from Lawmatics aren't shown: Lawmatics isn't connected.";
 export const LAWMATICS_CONSULTS_UNAVAILABLE = "Lawmatics consults couldn't be read just now.";
-export const LAWMATICS_CONSULTS_RECONNECT = "Lawmatics no longer accepts your firm's key, so its consults aren't shown.";
+export const LAWMATICS_CONSULTS_RECONNECT = "Lawmatics no longer accepts your firm's key, so new consults won't come over until you reconnect.";
 export const LAWMATICS_CONSULTS_NOT_READY = notReadyYet("Consults from Lawmatics");
-export const LAWMATICS_CALENDAR_UNAVAILABLE = "We couldn't load the consults from Lawmatics. Docket dates and tasks are shown.";
 /** Stage suggestion reason for a consult booked in Lawmatics (it may have been booked by the client). */
 export const WHY_LAWMATICS_CONSULT = "This consult was booked in Lawmatics, possibly by the client, so a person decides.";

@@ -91,6 +91,10 @@ describe("Sync from Lawmatics now (35, 36)", () => {
     const failed = await syncLawmaticsAction({}, new FormData());
     expect(failed.error).toBe("We couldn't read Lawmatics for consults, so nothing was changed there. Try again shortly.");
     expect(failed.notice).toMatch(/^Added 3 leads/);
+    state.result = summary((s) => void ((s.tokenUnreadable = 1), (s.failedFirms = 1)));
+    const key = await syncLawmaticsAction({}, new FormData());
+    expect(key.ok).toBeUndefined();
+    expect(key.error).toBe("We couldn't open your firm's Lawmatics key, so nothing was synced. Reconnect it above, or try again shortly.");
     state.result = summary((s) => void (s.connections = 0));
     expect((await syncLawmaticsAction({}, new FormData())).error).toBe("Lawmatics isn't connected for your firm.");
     state.throws = true;

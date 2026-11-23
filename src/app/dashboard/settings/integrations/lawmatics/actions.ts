@@ -33,6 +33,7 @@ import {
 import { BUTTON_BUDGET_MS, runLawmaticsDailySync } from "@/lib/lawmatics/daily-sync";
 import {
   LAWMATICS_SYNC_FAILED,
+  LAWMATICS_SYNC_KEY_UNREADABLE,
   LAWMATICS_SYNC_NOT_ALLOWED,
   LAWMATICS_SYNC_NOT_CONNECTED,
   LAWMATICS_SYNC_OUT_OF_TIME,
@@ -499,6 +500,8 @@ export async function syncLawmaticsAction(_prev: LawmaticsSyncState, _formData: 
     if (s.connections === 0) return { error: LAWMATICS_SYNC_NOT_CONNECTED };
     for (const path of ["/dashboard/intake/", "/dashboard/calendar/", "/dashboard/", "/dashboard/matters/", PAGE]) revalidatePath(path);
     if (s.reauthNeeded > 0) return { error: LAWMATICS_SYNC_REAUTH };
+    // The firm's key couldn't be opened: nothing ran, so never "ok" with all-zero counts.
+    if (s.tokenUnreadable > 0) return { error: LAWMATICS_SYNC_KEY_UNREADABLE };
     const notice = lawmaticsSyncResult({
       leadsAdded: s.prospects.created,
       leadsLinked: s.prospects.linked,

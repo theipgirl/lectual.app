@@ -306,7 +306,7 @@ describe("consults through the runner (19, 20, 15)", () => {
     await run(w, lawmatics({ events: list([consult("e1", { start_time: day(3), end_time: day(3.02) }, { prospect: { data: { type: "prospect", id: "p1" } } })]) }));
     expect(w.db.tables.crm_calendar_event).toHaveLength(1);
     expect(w.db.tables.crm_calendar_event[0].starts_at).toBe(day(3));
-    await run(w, lawmatics({ events: list([consult("e1", { status: "cancelled", start_time: day(3) })]) }));
+    await run(w, lawmatics({ events: list([consult("e1", { status: "cancelled", start_time: day(3), end_time: day(3.02) })]) }));
     expect(w.db.tables.crm_calendar_event).toHaveLength(0);
   });
 
@@ -335,17 +335,20 @@ describe("consults through the runner (19, 20, 15)", () => {
     const w = world();
     const lm = lawmatics({
       events: list([consult("e1", {}, { prospect: { data: { type: "prospect", id: "p9" } } })]),
-      one: (id) => ({ data: prospect(id, { created_at: "2025-01-01T00:00:00Z" }) }),
+      one: (id) => ({ data: prospect(id, { created_at: "2025-01-01T00:00:00Z", status: "open" }) }),
     });
     const s = await run(w, lm);
-    expect(lm.calls.filter((c) => c.method === "get").map((c) => c.path)).toEqual(["/prospects/p9"]);
+    const gets = lm.calls.filter((c) => c.method === "get");
+    expect(gets.map((c) => c.path)).toEqual(["/prospects/p9"]);
+    // (Q2) fields=all with the same include, so status and converted_date are there.
+    expect(gets[0].opts).toEqual({ include: "stage,practice_area,contact", fields: "all" });
     expect(s.prospects.created).toBe(1);
     expect(w.db.tables.crm_calendar_event[0].lead_id).toBe(w.db.tables.crm_lead[0].id);
   });
 
   it("a targeted read that names another id is discarded: the consult stays unlinked and is counted", async () => {
     const w = world();
-    const s = await run(w, lawmatics({ events: list([consult("e1", {}, { prospect: { data: { type: "prospect", id: "p9" } } })]), one: () => ({ data: prospect("someone-else") }) }));
+    const s = await run(w, lawmatics({ events: list([consult("e1", {}, { prospect: { data: { type: "prospect", id: "p9" } } })]), one: () => ({ data: prospect("someone-else", { status: "open" }) }) }));
     expect(s.consults.prospectReadsFailed).toBe(1);
     expect(w.db.tables.crm_lead).toHaveLength(0);
     expect(w.db.tables.crm_calendar_event[0].lead_id).toBeNull();
@@ -501,5 +504,130 @@ describe("last successful run", () => {
     expect(s.prospects.created).toBe(50);
     expect(s.prospects.overCap).toBe(5);
     expect(w.db.tables.lawmatics_connection[0].last_sync_at).toBeNull();
+  });
+});
+
+describe("evaluation fixes", () => {
+  const withProspect = (id: string, attrs: Row = {}) => consult(id, attrs, { prospect: { data: { type: "prospect", id: `p-${id}` } } });
+
+  it("(1) an unreadable event means no removal that run: the stored row for it survives, and it is counted", async () => {
+    const w = world({ crm_calendar_event: [{ id: "keep-me", org_id: ORG, source: "lawmatics", external_id: "lmsync:e2", lawmatics_id: "e2", starts_at: day(1), is_consult: true, title: "Consultation" }] });
+    const s = await run(w, lawmatics({ events: list([consult("e1"), consult("e2", { start_time: "2026-11-25T14:00:00" })]) }));
+    expect(s.consults.unusable).toBe(1);
+    expect(s.consults.removalsHeld).toBe(1);
+    expect(w.db.tables.crm_calendar_event.map((r) => r.id)).toContain("keep-me");
+    expect(w.db.tables.crm_calendar_event.some((r) => r.external_id === "lmsync:e1")).toBe(true);
+  });
+
+  it("(2) two targeted prospects with the same email make ONE lead", async () => {
+    const w = world();
+    const lm = lawmatics({
+      events: list([withProspect("a"), withProspect("b")]),
+      one: (id) => ({ data: prospect(id, { email: "same@example.test", first_name: "Wren", last_name: "Tester", created_at: "2025-01-01T00:00:00Z", status: "open" }) }),
+    });
+    const s = await run(w, lm);
+    expect(w.db.tables.crm_lead).toHaveLength(1);
+    expect(s.prospects.created).toBe(1);
+  });
+
+  it("(3) the hired step reads what it read before: /contacts is read after it, by the prospect step", async () => {
+    const lm = lawmatics();
+    await run(world(), lm, { mode: "full" });
+    const paths = lm.calls.map((c) => c.path);
+    expect(paths.indexOf("/contacts")).toBeGreaterThan(paths.lastIndexOf("/practice_areas"));
+  });
+
+  it("(4) every firm's hired step runs before any prospect step; the prospect order rotates by the hour", async () => {
+    let t = 0;
+    const firms = ["f1", "f2", "f3"].map((o, i) => ({ id: `c${i}`, org_id: o, status: "active" }));
+    const w = world({ lawmatics_connection: firms });
+    const order: string[] = [];
+    const slow = (org: string): LawmaticsClient => ({
+      async listAll(path) {
+        order.push(`${org}${path}`);
+        if (path === "/contacts") t += 100_000; // a slow prospect step
+        return list([]);
+      },
+      async get() {
+        return {};
+      },
+    });
+    let current = "";
+    const s = await runLawmaticsDailySync({
+      admin: w.admin,
+      client: () => slow(current),
+      getToken: async (_a, org) => ((current = org), "tok"),
+      now: () => NOW,
+      clock: () => t,
+      mode: "full",
+    });
+    expect(s.hired.ran).toBe(3);
+    const firstContacts = order.findIndex((x) => x.endsWith("/contacts"));
+    expect(order.filter((x) => x.endsWith("/practice_areas"))).toHaveLength(3);
+    expect(order.slice(0, firstContacts).filter((x) => x.endsWith("/practice_areas"))).toHaveLength(3);
+    expect(s.outOfTime).toBeGreaterThan(0); // the slow firms used up the wall budget, said so
+    const { fairOrder } = await import("@/lib/lawmatics/daily-sync");
+    expect(fairOrder(["a", "b", "c"], 0)).toEqual(["a", "b", "c"]);
+    expect(fairOrder(["a", "b", "c"], 3_600_000)).toEqual(["b", "c", "a"]);
+    expect(fairOrder(["a", "b", "c"], 2 * 3_600_000)).toEqual(["c", "a", "b"]);
+  });
+
+  it("(5) a key that can't be opened is counted (tokenUnreadable), and nothing runs for that firm", async () => {
+    const lm = lawmatics();
+    const s = await runLawmaticsDailySync({ admin: world().admin, client: () => lm.client, getToken: async () => null, now: () => NOW, mode: "full" });
+    expect(s.tokenUnreadable).toBe(1);
+    expect(s.failedFirms).toBe(1);
+    expect(lm.calls).toHaveLength(0);
+  });
+
+  it("(7) a came-back link that fails writes no flag, so the next run retries both", async () => {
+    const lost = { id: "L1", org_id: ORG, email: "wren1@example.test", first_name: "Wren", last_name: "Tester1", current_stage_id: "s-lost", lawmatics_id: null };
+    const w = world({ crm_lead: [{ ...lost }] }, (q) => (q.table === "crm_lead" && q.action === "update" ? { code: "XX" } : undefined));
+    const lm = lawmatics({ prospects: list([prospect("1")]) });
+    const s = await run(w, lm);
+    expect(s.prospects.failedWrites).toBe(1);
+    expect(w.db.tables.crm_activity.filter((a) => (a.payload as Row)?.kind === "came_back")).toHaveLength(0);
+    w.db.refuse = undefined;
+    const s2 = await run(w, lm);
+    expect(s2.prospects.cameBack).toBe(1);
+    expect(w.db.tables.crm_lead[0].lawmatics_id).toBe("1");
+  });
+
+  it("(8) a failed lead_created row is counted; the lead stands", async () => {
+    const w = world({}, (q) => (q.table === "crm_activity" && q.action === "insert" ? { code: "XX" } : undefined));
+    const s = await run(w, lawmatics({ prospects: list([prospect("1")]) }));
+    expect(s.prospects.created).toBe(1);
+    expect(s.prospects.timelineNotWritten).toBe(1);
+  });
+
+  it("(10) no targeted read once the create cap is used; they are counted as waiting", async () => {
+    const w = world();
+    const lm = lawmatics({
+      prospects: list(Array.from({ length: 50 }, (_, i) => prospect(String(i)))),
+      events: list([withProspect("x")]),
+      one: () => ({ data: prospect("p-x", { status: "open" }) }),
+    });
+    const s = await run(w, lm);
+    expect(s.prospects.created).toBe(50);
+    expect(lm.calls.filter((c) => c.method === "get")).toHaveLength(0);
+    expect(s.prospects.overCap).toBeGreaterThanOrEqual(1);
+  });
+
+  it("(13) a targeted read with no status is unusable: no lead, counted", async () => {
+    const w = world();
+    const s = await run(w, lawmatics({ events: list([withProspect("y")]), one: (id) => ({ data: prospect(id) }) }));
+    expect(w.db.tables.crm_lead).toHaveLength(0);
+    expect(s.consults.prospectReadsFailed).toBe(1);
+  });
+
+  it("(13) a targeted read of a hired prospect never becomes a new-enquiry lead", async () => {
+    const w = world();
+    const s = await run(w, lawmatics({ events: list([withProspect("z")]), one: (id) => ({ data: prospect(id, { status: "Hired" }) }) }));
+    expect(w.db.tables.crm_lead).toHaveLength(0);
+    expect(s.prospects.leftForHired).toBe(1);
+  });
+
+  it("(12) the runner's own admin client has a deadline", () => {
+    expect(fs.readFileSync("src/lib/lawmatics/daily-sync.ts", "utf8")).toMatch(/getAdminClient\(\{ timeoutMs: DB_FETCH_TIMEOUT_MS \}\)/);
   });
 });

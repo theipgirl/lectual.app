@@ -62,4 +62,29 @@ describe("Stage Keeper and Lawmatics consults (41)", () => {
     const r = await bumpHeldConsults(client as unknown as SupabaseClient, ORG, NOW);
     expect(r.bumped).toBe(1);
   });
+
+  it("(11) sources are independent: a failed Lawmatics read keeps the Outlook consult acting, and the reverse", async () => {
+    const isSource = (src: string) => (q: { table: string; filters: Array<{ column: string; value: unknown }> }) =>
+      q.table === "crm_calendar_event" && q.filters.some((f) => f.column === "source" && f.value === src) ? { message: "down" } : undefined;
+    const a = keeperWorld({ leads: [lead(L.amara, S.newPnc)], events: [event(L.amara)], refuse: isSource("lawmatics") as never });
+    const ra = await runStageKeeper(a.ctx("act").ctx);
+    expect(agentRows(a.rows("crm_activity"))).toHaveLength(1);
+    expect(ra.summary).toContain("Lawmatics consults couldn't be read this run.");
+    const b = keeperWorld({ leads: [lead(L.amara, S.newPnc)], events: [lmEvent(L.amara)], refuse: isSource("outlook") as never });
+    await runStageKeeper(b.ctx("act").ctx);
+    expect(suggestionRows(b.rows("crm_activity"))).toHaveLength(1);
+  });
+
+  it("(11) the held-consult bump uses Outlook when the Lawmatics read fails, and says which half failed", async () => {
+    const { fakeAdmin } = await import("../mailbox/fake-db");
+    const { keeperHandler } = await import("./db");
+    const db = {
+      tables: { crm_lead: [lead(L.amara, S.newPnc, { last_activity_at: daysAgo(6) })], crm_calendar_event: [event(L.amara, { starts_at: daysAgo(1.05), ends_at: daysAgo(1) })] },
+      refuse: (q: { table: string; filters: Array<{ column: string; value: unknown }> }) =>
+        q.table === "crm_calendar_event" && q.filters.some((f) => f.column === "source" && f.value === "lawmatics") ? { message: "down" } : undefined,
+    };
+    const { client } = fakeAdmin(keeperHandler(db as never));
+    const r = await bumpHeldConsults(client as unknown as SupabaseClient, ORG, NOW);
+    expect(r).toMatchObject({ state: "ok", bumped: 1, partial: "lawmatics" });
+  });
 });

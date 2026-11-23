@@ -158,15 +158,17 @@ async function readMail(admin: SupabaseClient, orgId: string, sinceIso: string, 
   return { signals, truncated: rows.length >= MAIL_CAP };
 }
 
-type CalendarRead = { state: CalendarState; signals: Map<string, KeeperSignal[]> };
+/** `state` is the Outlook half, `lawmatics` the Lawmatics daily sync's half: each read on its own, a failed one never drops the other. */
+type CalendarRead = { state: CalendarState; lawmatics: CalendarState; signals: Map<string, KeeperSignal[]> };
 
-/** Future Outlook consults linked to a lead. A refused or failed read skips only this half of the input. */
 /**
  * Booked future consults linked to a lead: Outlook's, and the Lawmatics daily sync's OWN rows (`lmsync:`; a legacy
  * `source = 'lawmatics'` row gives nothing). A Lawmatics consult is marked, so it only ever becomes a suggestion card.
  */
 async function readConsults(admin: SupabaseClient, orgId: string, nowIso: string): Promise<CalendarRead> {
-  const none = (state: CalendarState): CalendarRead => ({ state, signals: new Map() });
+  const none = (state: CalendarState): CalendarRead => ({ state, lawmatics: state, signals: new Map() });
+  const stateOf = (error: { code?: string; message?: string } | null): CalendarState =>
+    !error ? "ok" : isDatabaseUpdateNeeded(error) ? "database-update-needed" : "unavailable";
   try {
     const read = (source: "outlook" | "lawmatics") => {
       const q = admin.from("crm_calendar_event").select("id, lead_id, title, starts_at").eq("org_id", orgId).eq("source", source);
@@ -178,8 +180,6 @@ async function readConsults(admin: SupabaseClient, orgId: string, nowIso: string
         .limit(EVENT_CAP);
     };
     const [outlook, lawmatics] = await Promise.all([read("outlook"), read("lawmatics")]);
-    const error = outlook.error ?? lawmatics.error;
-    if (error) return none(isDatabaseUpdateNeeded(error) ? "database-update-needed" : "unavailable");
     const signals = new Map<string, KeeperSignal[]>();
     const add = (rows: unknown[] | null, fromLawmatics: boolean) => {
       for (const row of (rows ?? []) as Array<{ id: string; lead_id: string | null; title: string | null; starts_at: string }>) {
@@ -195,9 +195,9 @@ async function readConsults(admin: SupabaseClient, orgId: string, nowIso: string
         signals.set(row.lead_id, [...(signals.get(row.lead_id) ?? []), signal]);
       }
     };
-    add(outlook.data, false);
-    add(lawmatics.data, true);
-    return { state: "ok", signals };
+    if (!outlook.error) add(outlook.data, false);
+    if (!lawmatics.error) add(lawmatics.data, true);
+    return { state: stateOf(outlook.error), lawmatics: stateOf(lawmatics.error), signals };
   } catch {
     return none("unavailable");
   }
@@ -525,6 +525,7 @@ export async function runStageKeeper(ctx: AgentContext): Promise<AgentResult> {
   // The calendar half is optional: before lectual 0098 its columns do not exist.
   const calendar = await readConsults(admin, orgId, nowIso);
   if (calendar.state !== "ok") notes.push(CALENDAR_NOTE[calendar.state]);
+  if (calendar.lawmatics !== "ok" && calendar.state === "ok") notes.push("Lawmatics consults couldn't be read this run.");
   // Held meetings, live proposals and approved post-consult emails are optional halves too: each failure is said, never "none".
   const meetings = await readMeetings(admin, orgId, sinceIso, nowIso);
   if (!meetings.ok) notes.push("Linked meetings couldn't be read this run.");

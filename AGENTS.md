@@ -1269,16 +1269,21 @@ a grep test holds the new files to that), no automation rule fires, no matter ha
 - **Tenant fence:** per ACTIVE `lawmatics_connection`, token from `firmToken(admin, orgId)` (never a deployment token). Every read filtered on, every
   insert / update / upsert / delete stamped or fenced with, the connection row's `org_id`. The button resolves the admin tier inside the action
   (`requireImportAdmin`) and passes the SESSION's org; the dashboard reads use the scoped client.
-- **Reads:** ONE `/prospects` request (`include=stage,practice_area,contact` AND `fields=all`, shared by the hired and prospect steps), `/contacts`, the origin
-  lookups, `/events` (`include=event_type`), and for a consult whose prospect no lead holds, `GET /prospects/<id>` (the answer must name that id, else
-  discarded). Fail closed per step and per firm: a truncated, failed or unrecognised read writes nothing for that step; `includeDropped` on `/prospects`
+- **Reads:** ONE `/prospects` request (`include=stage,practice_area,contact` AND `fields=all`) plus the origin lookups, shared by the hired and prospect
+  steps (what the hired step read before; `/contacts` is read by the prospect step only, inside its own slice), `/events` (`include=event_type`), and for a
+  consult whose prospect no lead holds, `GET /prospects/<id>` with the same include and `fields=all` (the answer must name that id and carry `status`, else
+  it is unusable and counted). The targeted reads stop once the 50-create cap is used; all the candidates are planned in ONE `planProspectSync` call, so
+  two with one email make one lead. Fail closed per step and per firm: a truncated, failed or unrecognised read writes nothing for that step; `includeDropped` on `/prospects`
   or a cut-short / failed `/contacts` writes no leads for that firm; the consult step still runs. Lawmatics' error text is never logged, returned or stored:
   only the status class (`lawmaticsFailureClass`: auth / rate / server / timeout / shape).
 - **Client:** every request has a 20 s deadline merged with the step's `AbortSignal`; a 429 waits for `Retry-After` (capped at 10 s, else 2 s then 5 s), at
   most 2 retries, only when the wait fits the step's time left. A 401/403 sets the connection `invalid` (fenced on id, org and `active`) with the fixed
   `LAWMATICS_SYNC_KEY_REFUSED` and stops that firm; the cron then skips it until someone reconnects (`reauthNeeded`).
-- **Budget:** wall 270 s (button 240 s; the settings page exports `maxDuration = 300`), per firm 150 s, hired 60 s, prospects 45 s, consults 45 s; a firm is not
-  started with under 60 s left, a step whose slice is under 10 s is skipped, a step out of time writes nothing more and doesn't move the cutoff.
+- **Budget and order:** wall 270 s (button 240 s; the settings page exports `maxDuration = 300`). Two passes: on the full run, the hired step (60 s) for EVERY
+  firm first; then prospects (45 s) and consults (45 s) firm by firm in `fairOrder` (rotated by the hour, so a slow firm can't starve the same one every run),
+  at most 150 s a firm, none started with under 60 s left. A step whose slice is under 10 s is skipped, a step out of time writes nothing more and doesn't
+  move the cutoff. The runner's own admin client has `DB_FETCH_TIMEOUT_MS` per statement. A firm whose key can't be opened is `tokenUnreadable`; the
+  button then says so (never "ok").
 - **Prospects:** cutoff = 2026-11-01 on the first run, before 0118, or when the stored value can't be read; else max(Nov 1, `last_sync_at` - 2 days).
   Hired prospects (status, `converted_date`, hired stage name) are left to the hired sync. "Came back" (exactly one keeper with the email, in a lost / won /
   nurture stage, names not contradicting) is set aside first; the rest go through the importer's own `planImport` (filter off) and only `creates` (new-enquiry
@@ -1287,7 +1292,9 @@ a grep test holds the new files to that), no automation rule fires, no matter ha
   `lead_created` row `{ source: "lawmatics-daily-sync", lawmatics_id }` with no stage flags. `last_sync_at` moves (to the run's START) only for a complete
   step with nobody over the cap and no failed write.
 - **Came back:** one `ai_insight` row per lead and Lawmatics id (`payload { source: "lawmatics-daily-sync", kind: "came_back", lawmatics_id, stage_category }`,
-  ids only), checked first (an unreadable check writes nothing). The lead's stage is never touched; `lawmatics_id` is written only when it had none. Today
+  ids only), checked first (an unreadable check writes nothing). The lead's stage is never touched; `lawmatics_id` is written only when it had none, and
+  the flag is written only once that link landed (a failed link writes no flag, so the next run retries both). A failed `lead_created` row is counted
+  (`timelineNotWritten`); the lead stands. Today
   shows it in Needs you (and its own card on the owner's Today) for 14 days or until a later `stage_changed`, newest first, at most 10; a failed read
   says `CAME_BACK_UNAVAILABLE`. Every other `ai_insight` reader keys on its own source and ignores it (tested).
 - **Consults:** window now - 7 to now + 60 days; consult = `isConsultTitle` (the same words as lawmatics-mcp's `isConsult`) on the event TYPE name or the title.
@@ -1295,16 +1302,19 @@ a grep test holds the new files to that), no automation rule fires, no matter ha
   description, `lead_id`, `matter_id` (exactly one matter with that prospect id), `is_consult`. NEVER location, description, attendees, organizer or contact
   name (attendee addresses are used in memory to find the lead, then dropped). A start or end with no UTC offset is refused; all-day = UTC midnight of the
   date. Upsert on `org_id,source,external_id` with `external_id = 'lmsync:' + id`; an unchanged row is not written; a 23505 (an older row holds the Lawmatics
-  id) is counted and that row left alone. Removal only after a complete read, only `lmsync:` rows in the window, in chunks: a `source = 'lawmatics'` row
+  id) is counted and that row left alone. Removal only after a complete read (and none at all in a run where any event record couldn't be read:
+  it could be any stored consult; `removalsHeld`), only `lmsync:` rows in the window, in chunks: a `source = 'lawmatics'` row
   without the prefix is never updated or removed. Caps: 500 writes, 200 removals.
 - **Readers widened (three states kept):** Today's Consults card (both layouts) has a third source, `lawmatics` (`ConsultDeps.lawmaticsGate` / `.lawmatics`,
   optional; one row per call: a shared join key or the same lead within 15 minutes, kept in the order Outlook, Lawmatics, Zoom); the lead page's "Consult
   booked" and `lead-step/load.ts` read Lawmatics NOT behind Mailboxes and show the earliest (`mergeBookedConsults`); the calendar page labels the sync's rows
   "Lawmatics · <type>" and hides a twin of an Outlook event; the Stage Keeper reads the sync's own rows as a SUGGESTION only (`why: "lawmatics-consult"`),
   nothing for a lead outside an open stage, an Outlook twin acts instead; the held-consult bump and the morning brief read them too (the brief's Lawmatics
-  half isn't behind Mailboxes). Consult prep is unchanged (Outlook only). The Leads Working set already read every source.
+  half isn't behind Mailboxes). In the brief, the Stage Keeper and the held-consult bump the two sources are read on their own: one failing keeps the
+  other's consults and the failed half is named (a brief `note`, a run-summary sentence, `HeldConsultResult.partial`). Consult prep is unchanged (Outlook only). The Leads Working set already read every source.
 - **Before 0118:** reads and writes of `last_sync_at` answer 42703 / PGRST204 = not set up: the cutoff stays 2026-11-01 and Settings says
-  `LAWMATICS_LAST_SYNC_NOT_READY`. `last_sync_at` is hand-added in `src/lib/db/types.ts` until codegen. The proposal is `docs/pge/2026-11-17-agentic-ip-os/0118-proposed.sql.txt`.
+  `LAWMATICS_LAST_SYNC_NOT_READY`. 0118 guards the column with a BEFORE INSERT/UPDATE trigger (0077 grants UPDATE at table level, which a column revoke
+  can't narrow): only the service role, the table owner or a cascade may set or change it. `last_sync_at` is hand-added in `src/lib/db/types.ts` until codegen. The proposal is `docs/pge/2026-11-17-agentic-ip-os/0118-proposed.sql.txt`.
 - **NOT verified against a live Lawmatics (Blocker 1):** the `/events` shape (title, start/end names, all-day, cancelled, event type, prospect and invitee
   relationships, where the description sits), whether `fields=all` and `include` work together on `/prospects`, `GET /prospects/<id>` with `include`, and
   whether a 429 carries `Retry-After`. The pre-build database checks of the contract are not done here either. Run the first sync by hand at a quiet hour.

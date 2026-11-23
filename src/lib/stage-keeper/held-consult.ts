@@ -15,7 +15,13 @@ import { leadRead } from "@/lib/leads/live";
  * `database-update-needed`, not as "no consults held".
  */
 
-export type HeldConsultResult = { orgId: string; state: "ok" | "database-update-needed" | "error"; bumped: number };
+export type HeldConsultResult = {
+  orgId: string;
+  state: "ok" | "database-update-needed" | "error";
+  bumped: number;
+  /** Set when one of the two sources (Outlook, Lawmatics) couldn't be read; the other was still used. */
+  partial?: "outlook" | "lawmatics";
+};
 
 const DAY_MS = 86_400_000;
 /** The calendar sync keeps seven days of the past, so that is as far back as this looks. */
@@ -39,9 +45,13 @@ export async function bumpHeldConsults(admin: SupabaseClient, orgId: string, now
         .limit(500);
     };
     const [outlook, lawmatics] = await Promise.all([read("outlook"), read("lawmatics")]);
-    const error = outlook.error ?? lawmatics.error;
-    if (error) return { orgId, state: isDatabaseUpdateNeeded(error) ? "database-update-needed" : "error", bumped: 0 };
-    const data = [...(outlook.data ?? []), ...(lawmatics.data ?? [])];
+    // Each source on its own: a failed Lawmatics read never drops Outlook's held consults, nor the other way round.
+    // Both failing is the old answer; one failing still bumps from the other and reports the failure.
+    if (outlook.error && lawmatics.error) {
+      return { orgId, state: isDatabaseUpdateNeeded(outlook.error) ? "database-update-needed" : "error", bumped: 0 };
+    }
+    const partial: Pick<HeldConsultResult, "partial"> = outlook.error ? { partial: "outlook" } : lawmatics.error ? { partial: "lawmatics" } : {};
+    const data = [...(outlook.error ? [] : (outlook.data ?? [])), ...(lawmatics.error ? [] : (lawmatics.data ?? []))];
 
     // The newest end per lead, for events that have actually ended.
     const endByLead = new Map<string, number>();
@@ -51,7 +61,7 @@ export async function bumpHeldConsults(admin: SupabaseClient, orgId: string, now
       if (!Number.isFinite(end) || end > nowMs) continue;
       if (end > (endByLead.get(row.lead_id) ?? Number.NEGATIVE_INFINITY)) endByLead.set(row.lead_id, end);
     }
-    if (endByLead.size === 0) return { orgId, state: "ok", bumped: 0 };
+    if (endByLead.size === 0) return { orgId, state: "ok", bumped: 0, ...partial };
 
     const ids = [...endByLead.keys()];
     const touched = new Map<string, number | null>();
@@ -82,7 +92,7 @@ export async function bumpHeldConsults(admin: SupabaseClient, orgId: string, now
       if (upErr) return { orgId, state: "error", bumped };
       bumped += 1;
     }
-    return { orgId, state: "ok", bumped };
+    return { orgId, state: "ok", bumped, ...partial };
   } catch {
     return { orgId, state: "error", bumped: 0 };
   }

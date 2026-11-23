@@ -311,6 +311,16 @@ describe("morning-brief: the consults section and the Mailboxes module (F21 iii,
     }
   });
 
+  it("the two consult sources are independent: a failed Lawmatics read keeps Outlook's consult and names the failed half", async () => {
+    const isLawmatics = (q: Recorded) => q.table === "crm_calendar_event" && q.filters.some((f) => f.column === "source" && f.value === "lawmatics");
+    const { ctx, createDraft } = setup({ tables: consultTables(), modules: ["mailbox"], failures: (q) => (isLawmatics(q) ? { message: "x" } : undefined) });
+    const result = await runMorningBrief(ctx);
+    const sec = section(briefOf(createDraft).draftBody, "Today's consults");
+    expect(sec).toContain("Today's consults (1)");
+    expect(sec).toContain("Lawmatics consults couldn't be read.");
+    expect(result.summary).toMatch(/Not read: consults/);
+  });
+
   it("module on: today's consult is read and listed", async () => {
     const { ctx, createDraft } = setup({ tables: consultTables(), modules: ["mailbox"] });
     await runMorningBrief(ctx);

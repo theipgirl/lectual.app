@@ -175,7 +175,8 @@ export async function runMorningBrief(ctx: AgentContext): Promise<AgentResult> {
   const consultsDeliberatelyOff = gate === "off";
   const unread = [
     // An unreadable module list left the Outlook half unread even when Lawmatics consults were listed.
-    (consults.state !== "ok" && !consultsDeliberatelyOff) || gate === "unreadable" ? "consults" : null,
+    // One consult source of two unreadable (`note`) is a read that failed too.
+    (consults.state !== "ok" && !consultsDeliberatelyOff) || gate === "unreadable" || (consults.state === "ok" && consults.note) ? "consults" : null,
     waiting.state !== "ok" ? "waiting" : null,
     suggestions.state !== "ok" ? "suggestions" : null,
     stalled.state !== "ok" ? "stalled" : null,
