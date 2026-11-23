@@ -1626,3 +1626,27 @@ export const SIGNING_WORDS_FIELDS_NOTE =
   "The signing link email body must contain {{signing_link}} exactly once and may use {{client_name}}, {{firm_name}} and {{link_expires}}. The subjects and the signed copy email may use {{client_name}} and {{firm_name}}. The four page fields use none.";
 export const SIGNING_WORDS_FIX_BEFORE_APPROVING = "Fix the problems above before approving.";
 export const SIGNING_WORDS_PROBLEM = { empty: "is empty", too_long: "is too long", two_lines: "must be one line", fields: "uses a merge field it may not use" } as const;
+// Emailed signing link, staff side (lectual 0117, Sprint B): the link's state on the proposal page, and the two steps after a link signature.
+export const SIGNING_LINK_HEADING = "Signing link";
+export const SIGNING_LINK_UNREADABLE = "Signing link status couldn't be loaded.";
+export const SIGNING_LINK_STATE = {
+  sending: "Link being sent",
+  sent: (when: string) => `Link sent ${when}`,
+  opened: (when: string) => `Opened ${when}`,
+  consent: (when: string) => `Consent given ${when}`,
+  signed: (when: string) => `Signed ${when}`,
+  expired: (day: string) => `Link expired ${day}`,
+  closed: {
+    resent: "Link closed (a newer link was sent)",
+    send_failed: "Link closed (the email couldn't be sent)",
+    withdrawn: "Link closed (the proposal was withdrawn)",
+    superseded: "Link closed (a new version replaced this one)",
+    accepted_elsewhere: "Link closed (the letter was signed another way)",
+    proposal_changed: "Link closed (the proposal changed)",
+    reset: "Link closed (the acceptance was reset)",
+    other: "Link closed",
+  },
+} as const;
+export const SIGNED_FILE_HEADING = "Filed in Lectual";
+export const SIGNED_COPY_HEADING = "Signed copy emailed to the client";
+export const SIGNED_COPY_NOT_YET = "Not emailed yet.";

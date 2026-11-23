@@ -5,7 +5,7 @@ import { downloadSignedLetterStaffAction } from "@/app/dashboard/proposals/[id]/
 import { retryUploadAction } from "@/app/dashboard/proposals/[id]/paid-actions";
 import { saveBase64Pdf } from "@/components/client-proposal/download-pdf";
 import type { SignedCardView } from "@/lib/loe/signed-card";
-import { SIGNED_CARD_HEADING, SIGNED_DOWNLOAD, SIGNED_DOWNLOADING, SIGNED_ADDRESS_HEADING, SIGNED_FILING_HEADING, SIGNED_FINGERPRINT_LABEL, SIGNED_FROM_STORED_TEXT, SIGNED_TRY_AGAIN, SAVING } from "@/lib/ui/words";
+import { SIGNED_CARD_HEADING, SIGNED_DOWNLOAD, SIGNED_DOWNLOADING, SIGNED_ADDRESS_HEADING, SIGNED_COPY_HEADING, SIGNED_FILE_HEADING, SIGNED_FILING_HEADING, SIGNED_FINGERPRINT_LABEL, SIGNED_FROM_STORED_TEXT, SIGNED_TRY_AGAIN, SAVING } from "@/lib/ui/words";
 import { ActionForm, Outcome } from "./ActionForm";
 import { Pill } from "@/components/ui/Pill";
 
@@ -76,6 +76,8 @@ function SignedBody({ proposalId, view }: { proposalId: string; view: Extract<Si
           </ActionForm>
         ) : null}
       </div>
+      {view.file ? <StepRow label={SIGNED_FILE_HEADING} view={view.file} step="signed_loe_file" proposalId={proposalId} done="Filed" failed="Not filed" /> : null}
+      {view.copy ? <StepRow label={SIGNED_COPY_HEADING} view={view.copy} step="signed_copy_email" proposalId={proposalId} done="Sent" failed="Not sent" /> : null}
       <div className="pe-signed-filing pe-signed-address" data-address={view.address.state}>
         <span className="lx-label">{SIGNED_ADDRESS_HEADING}</span>
         <span className="pe-signed-actions">
@@ -98,6 +100,32 @@ function SignedBody({ proposalId, view }: { proposalId: string; view: Extract<Si
         ) : null}
       </div>
     </>
+  );
+}
+
+function StepRow({ label, view, step, proposalId, done, failed }: { label: string; view: NonNullable<Extract<SignedCardView, { kind: "signed" }>["file"]>; step: string; proposalId: string; done: string; failed: string }) {
+  return (
+    <div className="pe-signed-filing" data-step={step} data-state={view.state}>
+      <span className="lx-label">{label}</span>
+      <span className="pe-signed-actions">
+        <Pill tone={view.tone}>{filingPill(view.state, done, failed)}</Pill>
+        <span className="pe-step-text">{view.text}</span>
+      </span>
+      {view.retry ? (
+        <ActionForm action={retryUploadAction} className="pe-signed-actions">
+          {({ state, pending }) => (
+            <>
+              <input type="hidden" name="proposalId" value={proposalId} />
+              <input type="hidden" name="step" value={step} />
+              <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
+                {pending ? SAVING : SIGNED_TRY_AGAIN}
+              </button>
+              <Outcome state={state} pending={pending} />
+            </>
+          )}
+        </ActionForm>
+      ) : null}
+    </div>
   );
 }
 

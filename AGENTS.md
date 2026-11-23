@@ -149,7 +149,8 @@ only: nothing is shared with a client and there is no portal.
   it is empty or odd for .msg, .eml and .heic, so it neither widens nor narrows what is accepted. The mapped MIME is
   what is stored and what the upload must send as its content type.
 - **No service role and no module gate** for the files part: org-scoped table and storage policies, no global
-  credential. Downloads are a 60-second signed URL minted through the scoped client
+  credential. (One documented exception: the signed engagement letter of a client who signed by the EMAILED link is filed here by the
+  public follow-up run with the service-role client it is handed, fenced on the proposal row's org; see "Engagement letter by emailed link".) Downloads are a 60-second signed URL minted through the scoped client
   (`/dashboard/files/[id]/download`; any member, a viewer included). Delete is the admin tier only
   (owner/admin/senior_admin) and removes the object first, then the row; an object that is already gone counts as removed.
 - **Reads are not-set-up / unavailable aware.** Files report `ok` / `not-set-up` (table missing, judged on the error
@@ -2598,10 +2599,9 @@ Settings -> Client proposals -> Signing words.
   uncertain mail answer and a refusal that is not a precondition are counted too; client-caused refusals never are). In-app signing is
   refused (`signing_by_email`) ONLY while the email path is positively ready for that proposal.
 - **`LOE_EMAIL_SIGNING` stays off** until 0117's isolation cases pass on lectual-dev, Sprint B ships (a link signature must never print
-  without its certificate: until then every signed PDF of an `email_link` snapshot answers `unavailable`), and the owner answers Q1, Q2,
-  Q4, Q6 and Q7 in `questions.md`.
+  without its certificate: Sprint B built it), and the owner answers Q1, Q2, Q4, Q6 and Q7 in `questions.md`.
 - **Owner-approved exception (spec decision 7): Lectual now emails a client by itself**, exactly two emails and nothing else: the signing
-  link (sent because the client pressed "Email me a link to sign") and, in Sprint B, the signed copy (sent because the client signed).
+  link (sent because the client pressed "Email me a link to sign") and the signed copy (sent because the client signed by that link).
   Both go through the one mailer `src/lib/mail/internal-mail.ts` (the only Resend caller; attachments added there), to the PROPOSAL ROW's
   own client email, never an address from the browser. Tests never send. Idempotency keys come from the request id.
 - **The attorney's words.** The consent line and text, the line beside Sign, the line under the signature box and both emails are the
@@ -2620,3 +2620,53 @@ Settings -> Client proposals -> Signing words.
   and runs no follow-up. New choices or details close an open link (`closeSigningLinkAction`, armed by `close-arming.ts`). Rate limits are
   in-memory courtesy limits. `pricing.ts` is untouched; snapshots are never re-priced.
 - Words for decisions D3/D4 (the name and the dates in the letter) are the builder's defaults, NOT the owner's answer (Q1, Q2).
+
+### Sprint B: after signing (certificate, signed copy, Lectual file, staff card; no schema, same 0117 as written for Sprint A)
+Contract `sprint-b.md`. Nothing here is switched on until the conditions above hold: 0117's isolation cases pass on lectual-dev, and the
+owner has answered Q1, Q2, Q4, Q6 and Q7. The in-app (0106) path is untouched: its signed PDF has no certificate page and neither new step runs for it.
+- **The certificate page** (`pdf.ts` `writeCertificate`, built only by `certificateFrom` / `checkCertificate`, `email-signing/certificate.ts`, pure): ONE
+  extra page after the signature record, signed copy only ("Signing record", labels in `client-words.ts`): sent to, sent at, opened at, consent accepted
+  at, consent text fingerprint, signing words version, signed at (firm zone, named, plus UTC ISO 8601), IP, browser, the letter's fingerprint, the typed
+  legal name, and the signature (the stored PNG itself, or the typed name in DejaVu Sans with the words "Typed signature"). A value not recorded prints
+  "Not recorded", never a guess. It reads ONLY the columns 0117 grants to `authenticated`, so the service-role and the dashboard paths read the same
+  set (`evidence-read.ts` `readSigningEvidence`, ONE reader, three-state by error CODE; never `token_sha256`, `agreement_text`, `agreement_sha256`,
+  `consent_sha256` or the request's `sent_to`). It is built only when the chain holds: the request is `signed`, is the one the snapshot names with the
+  signature row it names, exactly one `sent` / `consent` / `signature` / `signed` event exists, the `signed` event's sha256 equals the snapshot's AND the
+  sha256 the printed text was verified against, and a drawn PNG is a PNG of at most 100 KB that hashes to its recorded `signature_sha256`. A broken
+  link in the chain is `missing` (no file, try again); a sha256 that disagrees or bytes that don't hash is `mismatch` (the existing blocked step, one
+  `logSignedMismatch` line).
+- **A link-signed letter is never printed without its certificate.** `buildVerifiedSignedPdf` takes a REQUIRED `readEvidence`, asked only AFTER the text is
+  verified (`verifySignedCopy` is unchanged) and never for an in-app snapshot. Every caller passes it, each with the client it already holds: the client's
+  download (`public-letter.ts` through `readSignedSource`) and `accept-followups.ts` use the service-role client fenced on the proposal row's org;
+  `paid-flow.ts` and `staff-download.ts` the SCOPED client. A grep test fails on any call without it. Sprint A recorded `signed_loe_upload` as `failed`
+  for a link signature, so the next run or Try again files the letter WITH its certificate in Lawmatics.
+- **`signed_copy_email`** (success word `sent`, `signed-copy-email.ts`, pure core, deps injected): runs in `runAcceptanceFollowups` after
+  `signed_loe_upload` and the Lectual file, ONLY for `agreement.method === "email_link"`. ONE email to the `sent` event's address (never the proposal's
+  current `client_email`), from the firm's `FIRM_CLIENT_MAIL_FROM` entry, with the request's SNAPSHOTTED `copy_subject` / `copy_body` merged with
+  `client_name` and `firm_name`, the verified signed PDF with its certificate attached, idempotency key `signed-copy:<request id>:<round>` (a reset
+  starts a new round). `skipped` (the switch isn't `on`, or no mail entry / key) is NOT the success word, so the next run and Try again run it again;
+  `blocked` (no address on the record, no words, the PDF doesn't verify); `failed` (the mailer: `HTTP <status>` or "no response", or the evidence or
+  firm facts couldn't be read). Step payloads carry the outcome and a fixed sentence or status only: never the address, the words, the PDF or the token.
+  **A staff Try again of `signed_copy_email` is a RETRY of that same owner-approved email** (the same words, the same signed PDF, the same address, the
+  same key for the round) on the caller's SCOPED client; it cannot change the address, the words or the attachment and is never a new kind of client
+  email. Nothing else is emailed to a client (owner decision 7).
+- **`signed_loe_file`** (success word `filed`, `signed-loe-file.ts`): the signed PDF (with its certificate) is written to the private `client-files` bucket
+  at `buildStoragePath` from the proposal row's org, then ONE `crm_file` row (never `uploaded_by` or `contact_id`) and ONE `file_uploaded` activity
+  (`actor_type system`, payload `file_id` and `source: "signed_letter"` only), under the proposal's `matter_id`, else its `lead_id` followed to its
+  keeper (`signed-file-target.ts`, `keeperForWrite`); no lead or matter is `blocked` ("No lead or matter to file the signed letter under yet."). An
+  object written but a row refused: the object is removed and the step is `failed`. A missing table or bucket is `skipped` (retried later). **Service
+  role on the public path, a documented exception to "Documents & files has no service role":** the follow-up run (no session) writes the object, the
+  row and the activity with the service-role client it is handed, fenced on the proposal row's org; the file imports no admin client. Staff Try again
+  runs the same core on the SCOPED client. Q5 (filing the IN-APP signed copy too) is open, so only link signatures run it.
+- **Order of the steps** (`accept_notice`, `lawmatics_note`, `signed_loe_upload`, `signed_loe_file`, `signed_copy_email`, `address_to_lawmatics`): each
+  independent, none waits on another's success. Both new steps are in `RETRYABLE_STEPS` and need no paid mark to retry.
+- **Staff side:** the Engagement letter card shows, for a signed link version, "Filed in Lectual" and "Signed copy emailed to the client" with their states
+  and Try again (`lectualFileView`, `emailCopyView`), and a LIVE version with a letter gets one line from the newest request (`SigningLinkCard`,
+  `request-status.ts`: sent / opened / consent given / signed / expired / closed, from granted columns through the scoped client; a failed read says
+  "Signing link status couldn't be loaded.", never "not sent"; 0117 missing draws nothing; not attempted outside `SIGNATURE_READ_ROLES`). Reset's confirm
+  adds "The signing link can be sent again." and the owner's delete confirm adds "The signing link's record is removed too."
+- **NOT verified:** real email delivery and Resend attachments (including the 10 MB / 2 file limits in practice); the firm's verified sending domain; a
+  real database with 0117 (every read here is judged by code and tested with fakes); Storage writes to `client-files` by the service role in production
+  and the `crm_activity` insert with `actor_type system` and no `actor_id` under the dashboard's RLS (staff Try again); the certificate page in a real PDF
+  viewer; the harness screens at 375px in a real browser (no browser here: the screens render as static markup only and no overflow was measured); a
+  drawn signature, the name-mismatch sentence and the "link sent" note in a browser.

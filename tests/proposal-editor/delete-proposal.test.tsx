@@ -152,7 +152,7 @@ describe("who may delete, and the More menu", () => {
     const { DeleteConfirm } = await import("@/components/proposal-editor/Lifecycle");
     const html = renderToStaticMarkup(createElement(DeleteConfirm, { proposalId: "p1", onCancel: () => {} }));
     expect(DELETE_CONFIRM).toBe(
-      "Delete this proposal and all its versions? The client link stops working and its history is removed, and the signed letter's record is removed too. This can't be undone.",
+      "Delete this proposal and all its versions? The client link stops working and its history is removed, and the signed letter's record is removed too. The signing link's record is removed too. This can't be undone.",
     );
     expect(html).toContain("all its versions");
     expect(html).toContain("can&#x27;t be undone");

@@ -24,7 +24,7 @@ import { SAVING, notReadyYet } from "@/lib/ui/words";
 
 export const RESET_LABEL = "Reset acceptance";
 export const RESET_CONFIRM =
-  "Reset this acceptance? The client link opens again and they can accept again. The Lawmatics note and alerts already sent stay as they are. Earlier signature records are kept.";
+  "Reset this acceptance? The client link opens again and they can accept again. The Lawmatics note and alerts already sent stay as they are. Earlier signature records are kept. The signing link can be sent again.";
 export const RESET_CONFIRM_BUTTON = "Yes, reset";
 export const RESET_PENDING = SAVING;
 export const RESET_DONE = "Acceptance reset. The client link is live again, and the client can accept again.";

@@ -7,8 +7,10 @@ import { generateTrademarkLoe } from "@/lib/documents/generate";
 import { listDraftsForProposal } from "@/lib/documents/store";
 import { renderAcceptedProposalDocx, DOCX_MIME } from "@/lib/documents/accepted-proposal-docx";
 import { setProspectCustomFields, uploadMatterFile } from "@/lib/lawmatics/writes";
+import { readSigningEvidence, type EvidenceDb } from "@/lib/loe/email-signing/evidence-read";
 import { readStoredAgreement, type StoredAgreementDb } from "@/lib/loe/stored-agreement";
 import { buildVerifiedSignedPdf, signedLetterFileName } from "@/lib/loe/signed-pdf";
+import { cleanSigningDetails } from "@/lib/loe/signing";
 import { loadStaffFirmFacts } from "@/lib/loe/staff-firm";
 import { orgHasModule } from "@/lib/org/modules";
 import { firmCivilDate } from "@/lib/quotes/firm-time";
@@ -20,11 +22,16 @@ import { retryLoeFileUpload } from "./loe-upload";
 import { lastAddressWrite, signedAddressDone } from "./address-events";
 import { runAddressToLawmatics } from "./address-to-lawmatics";
 import { SignedUploadBlocked, runSignedLoeUpload } from "./loe-signed-upload";
+import { sendInternalMail } from "@/lib/mail/internal-mail";
+import { copyMailGate, deploymentMailEnv, runSignedCopyEmail } from "./signed-copy-email";
+import { filingStoreFor, runSignedLoeFile, type FilingClient } from "./signed-loe-file";
+import { resolveFilingTarget } from "./signed-file-target";
 import { logSignedMismatch } from "./signed-mismatch-log";
 import { isSignedSnapshot } from "./signed-state";
 import { normalisePackages } from "./package-list";
 import {
   draftsInRound,
+  roundNumber,
   paidStateFromEvents,
   roundStartedAt,
   stepPayload,
@@ -303,6 +310,8 @@ async function signedUploadRetryStep(supabase: ScopedClient, proposal: ProposalR
         snapshot,
         firm: { displayName: facts.displayName, timeZone: facts.timeZone, logo: facts.logo ?? null },
         readStored: () => readStoredAgreement(supabase as unknown as StoredAgreementDb, { proposalId: proposal.id, orgId: proposal.org_id, signatureId: snapshot!.agreement?.signature_id }),
+        // The scoped client: 0117 grants the staff roles the request's granted columns and the events.
+        readEvidence: () => readSigningEvidence(supabase as unknown as EvidenceDb, { proposalId: proposal.id, orgId: proposal.org_id, requestId: snapshot!.agreement?.signing_request_id }),
       });
       if (!built.ok) {
         if (built.reason === "mismatch") {
@@ -317,6 +326,86 @@ async function signedUploadRetryStep(supabase: ScopedClient, proposal: ProposalR
     fileName: signedLetterFileName(snapshot!.agreement?.signer_name ?? "", snapshot!.agreement?.signed_at ?? "", facts.timeZone),
   });
   return report(proposal, "signed_loe_upload", result.outcome, result.reason ?? null);
+}
+
+/**
+ * Files the signed letter (with its certificate) in Lectual again (Try again on the proposal page). A LINK signature only. The caller's
+ * SCOPED client: the `client-files` storage policies and `crm_file` RLS are org-scoped, as the dashboard upload already uses them.
+ */
+async function signedFileRetryStep(supabase: ScopedClient, proposal: ProposalRow, events: ProposalStepEvent[]): Promise<FlowReport | { note: string } | null> {
+  if (stepSucceeded(events, proposal.id, "signed_loe_file")) return { note: STEP_TEXT.fileAlready };
+  const snapshot = proposal.accepted_snapshot;
+  if (!isSignedSnapshot(snapshot) || snapshot?.agreement?.method !== "email_link") return { note: STEP_TEXT.fileNotLink };
+  const facts = await loadStaffFirmFacts();
+  if (facts.status !== "ok") return report(proposal, "signed_loe_file", "failed", STEP_TEXT.signedFirmUnreadable);
+  const agreement = snapshot.agreement!;
+  const result = await runSignedLoeFile({
+    orgId: proposal.org_id,
+    target: () => resolveFilingTarget(supabase, { orgId: proposal.org_id, matterId: proposal.matter_id, leadId: proposal.lead_id }),
+    buildPdf: async () => {
+      const built = await buildVerifiedSignedPdf({
+        snapshot,
+        firm: { displayName: facts.displayName, timeZone: facts.timeZone, logo: facts.logo ?? null },
+        readStored: () => readStoredAgreement(supabase as unknown as StoredAgreementDb, { proposalId: proposal.id, orgId: proposal.org_id, signatureId: agreement.signature_id }),
+        readEvidence: () => readSigningEvidence(supabase as unknown as EvidenceDb, { proposalId: proposal.id, orgId: proposal.org_id, requestId: agreement.signing_request_id }),
+      });
+      if (!built.ok) {
+        if (built.reason === "mismatch") {
+          logSignedMismatch(proposal.id, "signed_loe_file");
+          throw new SignedUploadBlocked();
+        }
+        throw new Error("not built");
+      }
+      return built.bytes;
+    },
+    store: filingStoreFor(supabase as unknown as FilingClient),
+    fileName: signedLetterFileName(agreement.signer_name, agreement.signed_at, facts.timeZone),
+    newId: () => crypto.randomUUID(),
+  });
+  return report(proposal, "signed_loe_file", result.outcome, result.reason ?? null, result.extra ?? {});
+}
+
+/**
+ * Emails the signed copy again (Try again on the proposal page). A RETRY of the owner-approved signed copy only (N10): the same email
+ * (the request's snapshotted words, the same signed PDF), to the same `sent_to`, under the same idempotency key for the round. It cannot
+ * change the address, the words or the attachment, and it is never a new kind of client email. The caller's SCOPED client reads the
+ * request's granted columns and the events (0117 grants the staff roles these); no service role is used on the dashboard path.
+ */
+async function signedCopyRetryStep(supabase: ScopedClient, proposal: ProposalRow, events: ProposalStepEvent[]): Promise<FlowReport | { note: string } | null> {
+  if (stepSucceeded(events, proposal.id, "signed_copy_email")) return { note: STEP_TEXT.copyAlready };
+  const snapshot = proposal.accepted_snapshot;
+  const linkSigned = isSignedSnapshot(snapshot) && snapshot?.agreement?.method === "email_link";
+  if (!linkSigned) return { note: STEP_TEXT.copyNotLink };
+  const facts = await loadStaffFirmFacts();
+  if (facts.status !== "ok") return report(proposal, "signed_copy_email", "failed", STEP_TEXT.signedFirmUnreadable);
+  const agreement = snapshot!.agreement!;
+  const result = await runSignedCopyEmail({
+    linkSigned,
+    gate: () => copyMailGate(proposal.org_id, deploymentMailEnv()),
+    readEvidence: () => readSigningEvidence(supabase as unknown as EvidenceDb, { proposalId: proposal.id, orgId: proposal.org_id, requestId: agreement.signing_request_id }),
+    buildPdf: async (evidence) => {
+      const built = await buildVerifiedSignedPdf({
+        snapshot,
+        firm: { displayName: facts.displayName, timeZone: facts.timeZone, logo: facts.logo ?? null },
+        readStored: () => readStoredAgreement(supabase as unknown as StoredAgreementDb, { proposalId: proposal.id, orgId: proposal.org_id, signatureId: agreement.signature_id }),
+        readEvidence: async () => evidence,
+      });
+      if (!built.ok) {
+        if (built.reason === "mismatch") {
+          logSignedMismatch(proposal.id, "signed_copy_email");
+          throw new SignedUploadBlocked();
+        }
+        throw new Error("not built");
+      }
+      return built.bytes;
+    },
+    deliver: sendInternalMail,
+    clientName: cleanSigningDetails(snapshot!.signing?.details).client_name || agreement.signer_name || proposal.client_name,
+    firmName: facts.displayName,
+    fileName: signedLetterFileName(agreement.signer_name, agreement.signed_at, facts.timeZone),
+    round: roundNumber(events, proposal.id),
+  });
+  return report(proposal, "signed_copy_email", result.outcome, result.reason ?? null);
 }
 
 function split(results: Array<FlowReport | { note: string } | null>): { reports: FlowReport[]; notes: string[] } {
@@ -383,7 +472,7 @@ export async function retryProposalStep(id: string, step: RetryableStep): Promis
   if (!loaded.ok) return loaded;
   const { proposal, events } = loaded;
   // The signed letter is filed when the client signs, before any payment, so its retry does not need the paid mark.
-  if (step !== "signed_loe_upload" && step !== "address_to_lawmatics" && paidStateFromEvents(events).state !== "paid") return { ok: false, error: "Mark the proposal paid first." };
+  if (step !== "signed_loe_upload" && step !== "signed_loe_file" && step !== "signed_copy_email" && step !== "address_to_lawmatics" && paidStateFromEvents(events).state !== "paid") return { ok: false, error: "Mark the proposal paid first." };
 
   const supabase = await getScopedClient();
   const run = async (): Promise<FlowReport | { note: string } | null> => {
@@ -398,6 +487,10 @@ export async function retryProposalStep(id: string, step: RetryableStep): Promis
         return noteStep(supabase, proposal, events);
       case "signed_loe_upload":
         return signedUploadRetryStep(supabase, proposal, events);
+      case "signed_loe_file":
+        return signedFileRetryStep(supabase, proposal, events);
+      case "signed_copy_email":
+        return signedCopyRetryStep(supabase, proposal, events);
       case "address_to_lawmatics":
         return addressRetryStep(supabase, proposal, events);
       case "loe_file_upload": {

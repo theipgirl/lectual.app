@@ -49,6 +49,8 @@ export const STEP_LABEL: Record<ProposalStep, string> = {
   loe_file_upload: "Engagement letter file",
   custom_fields: "LOE fields",
   signed_loe_upload: "Signed engagement letter",
+  signed_loe_file: "Signed letter in Lectual",
+  signed_copy_email: "Signed copy emailed",
   address_to_lawmatics: "Mailing address",
 };
 
@@ -60,6 +62,8 @@ const SUCCESS_TEXT: Partial<Record<ProposalStep, string>> = {
   loe_file_upload: "LOE file uploaded to Lawmatics.",
   custom_fields: "LOE fields written to Lawmatics.",
   signed_loe_upload: "Signed engagement letter filed in Lawmatics.",
+  signed_loe_file: "Signed engagement letter filed in Documents & files.",
+  signed_copy_email: "Signed engagement letter emailed to the client.",
   address_to_lawmatics: "Mailing address added to Lawmatics.",
 };
 
@@ -77,6 +81,11 @@ export function stepText(state: Pick<StepState, "step" | "outcome" | "reason"> &
     case "signed_loe_upload":
       // A request that went out and was refused carries the unverified-shape caution; "not connected" and "not linked" do not.
       return outcome === "failed" ? notUploadedText(reason ?? "the request failed") : (reason ?? "Not uploaded to Lawmatics.");
+    case "signed_loe_file":
+      return reason ?? "The signed letter was not filed in Lectual.";
+    case "signed_copy_email":
+      // A mailer failure carries only its HTTP status (or "no response"); it is dressed here, never the provider's own text.
+      return outcome === "failed" && reason && /^(HTTP \d{3}|no response)$/.test(reason) ? `The signed copy couldn't be emailed (${reason}). Try again.` : (reason ?? "The signed letter was not emailed.");
     case "address_to_lawmatics":
       return outcome === "failed" ? notAddedText(reason ?? "the request failed") : (reason ?? "The mailing address was not added to Lawmatics.");
     case "custom_fields":

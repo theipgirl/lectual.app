@@ -24,6 +24,8 @@ import { hasPendingLetterCheck, pendingLetterCheck } from "@/lib/proposals/lette
 import { buildSignedCard } from "@/lib/loe/signed-card";
 import { getApprovedLetter } from "@/lib/loe/templates-store";
 import { isSignedSnapshot } from "@/lib/proposals/signed-state";
+import { SigningLinkCard } from "@/components/proposal-editor/SigningLinkCard";
+import { readLatestRequest, requestStatusLine, type RequestStatusRead } from "@/lib/loe/email-signing/request-status";
 import { EngagementLetterCard } from "@/components/proposal-editor/EngagementLetterCard";
 import { moneyInput } from "@/lib/proposal-editor/form";
 import { addedClassesPhrase, clientAddedClasses, clientDescribedClasses } from "@/lib/proposals/added-view";
@@ -134,7 +136,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
   const { proposal, versions, events } = detail;
   const content = proposal.content;
 
-  const [tz, members, settings, isApprover, origin, consult, stepRead, leadLink, leadOptions, opensRead, letterRead, signatureRead] = await Promise.all([
+  const [tz, members, settings, isApprover, origin, consult, stepRead, leadLink, leadOptions, opensRead, letterRead, signatureRead, linkRead] = await Promise.all([
     getFirmTimeZone(),
     listMemberDirectory().catch((): MemberIdentity[] => []),
     getProposalSettings().catch(() => null),
@@ -169,7 +171,16 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
           (): SignatureRead => ({ status: "unavailable" }),
         )
       : Promise.resolve(null),
+    // Sprint B (lectual 0117): a LIVE version's emailed signing link, newest request, granted columns, three-state. Only a role that may read
+    // signature records is asked (the database hides the rows from everyone else; an empty answer would read as "no link").
+    proposal.status === "sent" && content.loe && mayReadSignature
+      ? getScopedClient().then(
+          (db) => readLatestRequest(db, proposal.id),
+          (): RequestStatusRead => ({ status: "unavailable" }),
+        )
+      : Promise.resolve(null),
   ]);
+  const linkLine = requestStatusLine(linkRead, tz, new Date());
   const letterState = editorLetterState({ read: letterRead, attached: content.loe, pending: hasPendingLetterCheck(content) });
   const signedCard =
     proposal.status === "accepted" && content.loe
@@ -423,6 +434,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
       )}
 
       {signedCard && <EngagementLetterCard proposalId={proposal.id} view={signedCard} />}
+      {linkLine && <SigningLinkCard line={linkLine} />}
 
       {paidView && <PaidPanel proposalId={proposal.id} view={paidView} />}
 

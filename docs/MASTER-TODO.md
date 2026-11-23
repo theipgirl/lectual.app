@@ -3,6 +3,19 @@
 One list across sessions. Each session adds its action items here and checks them against Omi.
 Newest section first. Tick an item when it is done; don't delete it.
 
+## 2026-11-23: engagement letter by emailed link (Sprint A + B built on `claude/loe-email-sign`, not merged, nothing applied)
+
+### Taylor
+- [ ] Apply lectual 0117 (`docs/pge/2026-11-23-loe-email-sign/0117-proposed.sql.txt`, re-check the number against `lectual/supabase/migrations`) to
+      lectual-dev, run its isolation cases, then prod with your OK.
+- [ ] Set `FIRM_CLIENT_MAIL_FROM` (JSON `{ "<org id>": "Firm Name <signing@firm-domain>" }`) and verify the firm's sending domain on the `RESEND_API_KEY` account.
+- [ ] The firm's approver approves the signing words (Settings -> Client proposals -> Signing words): consent line and text, the lines beside Sign and under
+      the box, and the two emails. Nothing is written for the firm by the app.
+- [ ] Answer Q1, Q2, Q4, Q6 and Q7 in `docs/pge/2026-11-23-loe-email-sign/questions.md` BEFORE `LOE_EMAIL_SIGNING=on` (Q3, Q5 and Q8 can wait).
+- [ ] Set `LOE_EMAIL_SIGNING=on` on the deployment (only after the three items above and 0117's isolation cases).
+- [ ] Walk the whole flow once in a real browser on desktop and on a phone: email the link, open it, consent, draw and type a signature, sign, pay; then check
+      the signed copy email, the file in Documents & files, the Lawmatics filing and the certificate page.
+
 ## 2026-11-12 (night): merged #29, #30, #31; letter version 2 waiting for approval
 
 ### Taylor

@@ -1,6 +1,12 @@
 import "server-only";
 
 import { firmToken } from "@/lib/intake-forms/lawmatics-sync";
+import { readSigningEvidence, type EvidenceDb } from "@/lib/loe/email-signing/evidence-read";
+import { sendInternalMail, type InternalMail, type InternalMailResult } from "@/lib/mail/internal-mail";
+import { cleanSigningDetails } from "@/lib/loe/signing";
+import { copyMailGate, deploymentMailEnv, runSignedCopyEmail } from "./signed-copy-email";
+import { filingStoreFor, runSignedLoeFile, type FilingClient } from "./signed-loe-file";
+import { resolveFilingTarget } from "./signed-file-target";
 import { readStoredAgreement, type StoredAgreementDb } from "@/lib/loe/stored-agreement";
 import { letterLogoForSlug, type LetterLogo } from "@/lib/loe/letter-logo";
 import { buildVerifiedSignedPdf, signedLetterFileName } from "@/lib/loe/signed-pdf";
@@ -17,7 +23,7 @@ import { STEP_TEXT } from "./step-text";
 import { formatDollars } from "@/lib/proposal-editor/events";
 import { addedClassCount } from "./client-classes";
 import { chosenPackagesText, packageLineTitle } from "./name-package";
-import { RESET_EVENT_TYPE, stepPayload, stepSucceeded, type ProposalStep, type StepEventInput, type StepPayload } from "./paid";
+import { RESET_EVENT_TYPE, roundNumber, stepPayload, stepSucceeded, type ProposalStep, type StepEventInput, type StepPayload } from "./paid";
 import { MARK_KIND_LABEL, isGeneralContent, type AcceptedSnapshot } from "./types";
 import { leadRead } from "@/lib/leads/live";
 
@@ -271,6 +277,12 @@ export type FollowupDeps = {
   uploadFetch?: MultipartFetchLike;
   /** The GET that reads which contact a matter belongs to, for the mailing address (tests only; the default is `fetch`). */
   getFetch?: GetFetchLike;
+  /** The deployment's mail settings for the signed copy (tests only; the default is `process.env`). */
+  copyEnv?: Parameters<typeof copyMailGate>[1];
+  /** Delivers the signed copy (tests only; the default is the one mailer, `sendInternalMail`). */
+  deliverMail?: (mail: InternalMail) => Promise<InternalMailResult>;
+  /** A new file id for the Lectual filing (tests only). */
+  newFileId?: () => string;
 };
 
 const PROPOSAL_COLUMNS = "id, org_id, family_id, status, client_name, client_email, lead_id, matter_id, accepted_snapshot";
@@ -306,7 +318,7 @@ export async function readEarlierSteps(db: FollowupDb, row: { id: string; orgId:
       .select("proposal_id, created_at, payload")
       .eq("proposal_id", row.id)
       .eq("org_id", row.orgId)
-      .in("payload->>step", ["accept_notice", "lawmatics_note", "signed_loe_upload", "address_to_lawmatics"])
+      .in("payload->>step", ["accept_notice", "lawmatics_note", "signed_loe_upload", "signed_loe_file", "signed_copy_email", "address_to_lawmatics"])
       // Newest first: the address step's "Your details" trigger can add a few events before signing, and the newest are the ones read.
       .order("created_at", { ascending: false })
       .limit(100),
@@ -504,6 +516,8 @@ async function signedUploadStep(db: FollowupDb, row: Row, deps: FollowupDeps): P
           firm: { displayName: facts.displayName, timeZone: facts.timeZone, logo: facts.logo },
           // Only read when today's code no longer rebuilds the signed text; fenced on the proposal's own org.
           readStored: () => readStoredAgreement(db as unknown as StoredAgreementDb, { proposalId: row.id, orgId: row.orgId, signatureId: row.snapshot.agreement?.signature_id }),
+          // An emailed-link signature gets its certificate page from the evidence; fenced on the proposal's own org.
+          readEvidence: () => readSigningEvidence(db as unknown as EvidenceDb, { proposalId: row.id, orgId: row.orgId, requestId: row.snapshot.agreement?.signing_request_id }),
         });
         if (!built.ok) {
           if (built.reason === "mismatch") {
@@ -520,6 +534,83 @@ async function signedUploadStep(db: FollowupDb, row: Row, deps: FollowupDeps): P
     });
   } catch {
     return { outcome: "failed", reason: "unexpected error" };
+  }
+}
+
+/**
+ * Files the signed letter (with its certificate) in Lectual under the proposal's lead or matter. A LINK signature only (Sprint B).
+ * Service role fenced on the proposal row's own org: the documented exception to "Documents & files has no service role".
+ */
+async function signedFileStep(db: FollowupDb, row: Row, deps: FollowupDeps): Promise<StepResult> {
+  try {
+    const facts = await firmLetterFacts(db, row.orgId);
+    if (facts.status !== "ok") return { outcome: "failed", reason: STEP_TEXT.signedFirmUnreadable };
+    const agreement = row.snapshot.agreement;
+    return await runSignedLoeFile({
+      orgId: row.orgId,
+      target: () => resolveFilingTarget(db, row),
+      buildPdf: async () => {
+        const built = await buildVerifiedSignedPdf({
+          snapshot: row.snapshot,
+          firm: { displayName: facts.displayName, timeZone: facts.timeZone, logo: facts.logo },
+          readStored: () => readStoredAgreement(db as unknown as StoredAgreementDb, { proposalId: row.id, orgId: row.orgId, signatureId: agreement?.signature_id }),
+          readEvidence: () => readSigningEvidence(db as unknown as EvidenceDb, { proposalId: row.id, orgId: row.orgId, requestId: agreement?.signing_request_id }),
+        });
+        if (!built.ok) {
+          if (built.reason === "mismatch") {
+            logSignedMismatch(row.id, "signed_loe_file");
+            throw new SignedUploadBlocked();
+          }
+          throw new Error("not built");
+        }
+        return built.bytes;
+      },
+      store: filingStoreFor(db as unknown as FilingClient),
+      fileName: signedLetterFileName(agreement?.signer_name ?? "", agreement?.signed_at ?? "", facts.timeZone),
+      newId: deps.newFileId ?? (() => crypto.randomUUID()),
+    });
+  } catch {
+    return { outcome: "failed", reason: STEP_TEXT.fileFailed };
+  }
+}
+
+/**
+ * Emails the signed copy to the address the signing link went to (owner decision 7). A LINK signature only. The attorney's snapshotted
+ * words, the verified PDF with its certificate, an idempotency key per request and round.
+ */
+async function signedCopyStep(db: FollowupDb, row: Row, deps: FollowupDeps, earlier: StepEventInput[] | null): Promise<StepResult> {
+  try {
+    const facts = await firmLetterFacts(db, row.orgId);
+    if (facts.status !== "ok") return { outcome: "failed", reason: STEP_TEXT.signedFirmUnreadable };
+    const agreement = row.snapshot.agreement;
+    return await runSignedCopyEmail({
+      linkSigned: agreement?.method === "email_link",
+      gate: () => copyMailGate(row.orgId, deps.copyEnv ?? deploymentMailEnv()),
+      readEvidence: () => readSigningEvidence(db as unknown as EvidenceDb, { proposalId: row.id, orgId: row.orgId, requestId: agreement?.signing_request_id }),
+      buildPdf: async (evidence) => {
+        const built = await buildVerifiedSignedPdf({
+          snapshot: row.snapshot,
+          firm: { displayName: facts.displayName, timeZone: facts.timeZone, logo: facts.logo },
+          readStored: () => readStoredAgreement(db as unknown as StoredAgreementDb, { proposalId: row.id, orgId: row.orgId, signatureId: agreement?.signature_id }),
+          readEvidence: async () => evidence,
+        });
+        if (!built.ok) {
+          if (built.reason === "mismatch") {
+            logSignedMismatch(row.id, "signed_copy_email");
+            throw new SignedUploadBlocked();
+          }
+          throw new Error("not built");
+        }
+        return built.bytes;
+      },
+      deliver: deps.deliverMail ?? sendInternalMail,
+      clientName: cleanSigningDetails(row.snapshot.signing?.details).client_name || agreement?.signer_name || row.clientName,
+      firmName: facts.displayName,
+      fileName: signedLetterFileName(agreement?.signer_name ?? "", agreement?.signed_at ?? "", facts.timeZone),
+      round: earlier ? roundNumber(earlier, row.id) : 0,
+    });
+  } catch {
+    return { outcome: "failed", reason: STEP_TEXT.copyMailFailed };
   }
 }
 
@@ -555,6 +646,12 @@ export async function runAcceptanceFollowups(db: FollowupDb, input: FollowupInpu
     await runStep(db, row, "lawmatics_note", earlier, () => noteStep(db, row, deps), true);
     // Sprint 6: a signed (schema 2) acceptance also files the signed letter. Earlier acceptances never run this step.
     if (isSignedSnapshot(row.snapshot)) await runStep(db, row, "signed_loe_upload", earlier, () => signedUploadStep(db, row, deps), true);
+    // Sprint B (lectual 0117): a LINK signature is also filed in Lectual and its signed copy emailed to the address the link went to. Each is
+    // independent (none waits on another's success). `skipped` is not the success word, so the next run and Try again run it again.
+    if (isSignedSnapshot(row.snapshot) && row.snapshot.agreement?.method === "email_link") {
+      await runStep(db, row, "signed_loe_file", earlier, () => signedFileStep(db, row, deps), true);
+      await runStep(db, row, "signed_copy_email", earlier, () => signedCopyStep(db, row, deps, earlier), true);
+    }
     // The signer's mailing address goes to the same Lawmatics matter. Independent of the steps above: none waits on it or is changed by it.
     // A success of the "Your details" trigger does not end it: the signed address is still compared with what was written.
     if (isSignedSnapshot(row.snapshot))

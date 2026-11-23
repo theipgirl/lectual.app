@@ -82,8 +82,10 @@ describe("paidStateFromEvents", () => {
 });
 
 describe("step vocabulary", () => {
-  it("has ten steps (Sprint 6 added signed_loe_upload, then address_to_lawmatics), one success word each, and stepPayload builds the payload", () => {
-    expect(PROPOSAL_STEPS).toHaveLength(10);
+  it("has twelve steps (Sprint 6 added signed_loe_upload, then address_to_lawmatics; Sprint B of the emailed link added signed_loe_file and signed_copy_email), one success word each, and stepPayload builds the payload", () => {
+    expect(PROPOSAL_STEPS).toHaveLength(12);
+    expect(STEP_SUCCESS.signed_loe_file).toBe("filed");
+    expect(STEP_SUCCESS.signed_copy_email).toBe("sent");
     expect(STEP_SUCCESS.address_to_lawmatics).toBe("added");
     expect(STEP_SUCCESS.signed_loe_upload).toBe("uploaded");
     for (const s of PROPOSAL_STEPS) expect(typeof STEP_SUCCESS[s]).toBe("string");
@@ -98,8 +100,8 @@ describe("step vocabulary", () => {
     for (const bad of [null, undefined, 3, "s", [], {}, { step: "loe_draft" }, { step: "x", outcome: "y" }, { step: "loe_draft", outcome: "" }]) expect(readStep(bad)).toBeNull();
   });
 
-  it("isRetryableStep names the seven steps the page can run again (Sprint 6 added signed_loe_upload, then address_to_lawmatics)", () => {
-    for (const s of ["loe_draft", "accepted_file_upload", "custom_fields", "lawmatics_note", "loe_file_upload", "signed_loe_upload", "address_to_lawmatics"]) expect(isRetryableStep(s)).toBe(true);
+  it("isRetryableStep names the nine steps the page can run again (Sprint 6 added signed_loe_upload, then address_to_lawmatics)", () => {
+    for (const s of ["loe_draft", "accepted_file_upload", "custom_fields", "lawmatics_note", "loe_file_upload", "signed_loe_upload", "signed_loe_file", "signed_copy_email", "address_to_lawmatics"]) expect(isRetryableStep(s)).toBe(true);
     for (const s of ["paid_marked", "paid_undone", "accept_notice", "x", null]) expect(isRetryableStep(s)).toBe(false);
   });
 
