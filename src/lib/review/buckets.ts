@@ -74,7 +74,24 @@ export type ReviewRow = {
   documentCount?: number | null;
   /** The newest change of the record (who, when). `undefined` = the read failed (no line is drawn); `null` = read, and no change row. */
   lastChange?: LastChange | null;
+  /** `crm_matter.serial_number` (matters only; null = none recorded). Absent on a lead. */
+  serialNumber?: string | null;
+  /** YYYY-MM-DD on the firm's day of `opened_at` (matter) or `created_at` (lead). */
+  startDate?: string | null;
+  /** The `MATTER_TYPE_LABELS` label of a matter's type. Absent on a lead and when the type is unknown. */
+  practiceArea?: string | null;
+  /**
+   * The earliest OPEN `office_action_response` deadline of a matter. `null` = none open. Absent = the deadlines read failed
+   * (the cell says so) or the row is a lead (the cell is a plain dash).
+   */
+  officeActionDue?: { dueDate: string; confirmed: boolean } | null;
+  /** Owner-only fee facts, present only when the page asked for fees and the reads worked. Absent = not asked, or a read failed. */
+  fees?: ReviewFees;
 };
+
+/** A fee cell: proposal money is formatted by `formatCents`, the spreadsheet ledger's is verbatim. `null` = nothing recorded. */
+export type FeeCell = { text: string; from: "proposal" | "spreadsheet" } | null;
+export type ReviewFees = { legal: FeeCell; legalDue: string | null; gov: FeeCell; govDue: string | null };
 
 export const BUCKET_KEYS = ["overdue", "week", "needs", "quiet", "uspto", "track"] as const;
 export type BucketKey = (typeof BUCKET_KEYS)[number];

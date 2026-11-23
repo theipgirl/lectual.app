@@ -3905,6 +3905,107 @@ export type Database = {
           },
         ]
       }
+      // crm_custom_field and crm_custom_value: lectual 0115, proposed; replace on the next codegen run. NOT applied anywhere yet
+      // (docs/pge/2026-11-17-agentic-ip-os/0115-proposed.sql.txt). Until it is, reads answer 42P01 / PGRST205 and the List says the
+      // custom columns aren't switched on (src/lib/custom-columns/load.ts). `created_by`, `updated_by`, `created_at` and `updated_at` are
+      // stamped by the database's triggers; a signed-in caller may insert and update only the columns listed in Insert / Update.
+      crm_custom_field: {
+        Row: {
+          archived: boolean
+          created_at: string
+          created_by: string | null
+          id: string
+          kind: string
+          label: string
+          options: Json
+          org_id: string
+          position: number
+          section: string
+          updated_at: string
+        }
+        Insert: {
+          kind: string
+          label: string
+          options?: Json
+          org_id: string
+          position?: number
+          section: string
+        }
+        Update: {
+          archived?: boolean
+          label?: string
+          options?: Json
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_custom_field_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_org"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      // lectual 0115, proposed; replace on the next codegen run. One value per field and record (exactly one of lead_id / matter_id, exactly
+      // one typed column, the field kind's).
+      crm_custom_value: {
+        Row: {
+          field_id: string
+          id: string
+          lead_id: string | null
+          matter_id: string | null
+          org_id: string
+          updated_at: string
+          updated_by: string | null
+          value_cents: number | null
+          value_choice: string | null
+          value_date: string | null
+          value_text: string | null
+          value_user_id: string | null
+        }
+        Insert: {
+          field_id: string
+          lead_id?: string | null
+          matter_id?: string | null
+          org_id: string
+          value_cents?: number | null
+          value_choice?: string | null
+          value_date?: string | null
+          value_text?: string | null
+          value_user_id?: string | null
+        }
+        Update: {
+          value_cents?: number | null
+          value_choice?: string | null
+          value_date?: string | null
+          value_text?: string | null
+          value_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_custom_value_field_org_fk"
+            columns: ["field_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_custom_field"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "crm_custom_value_lead_org_fk"
+            columns: ["lead_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_lead"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "crm_custom_value_matter_org_fk"
+            columns: ["matter_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "crm_matter"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
       // queue_card_event: lectual migration 0103 (append-only card events for the approval deck: hand-off, later,
       // returned). Hand-added until the next codegen run, like crm_file. `actor_id` is forced to auth.uid() and `created_at` set by a trigger in the
       // database: signed-in users may insert only the six Insert columns below (anything else is permission denied). Until 0103 is applied, reads answer 42P01 / PGRST205 (src/lib/queue/card-state.ts).

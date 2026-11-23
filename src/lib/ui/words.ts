@@ -514,9 +514,11 @@ export const DECK_FOR = "for";
 
 /* ── Owner view: the weekly review's editable Sheet ── */
 export const SHEET_YOU_TYPE = "You type these";
-export const SHEET_YOU_TYPE_BODY = `Status (moves the stage), Next step (text and due date), ${OWNER_COLUMN} (a person), Source. Each change saves on its own and is logged on the record.`;
+export const SHEET_YOU_TYPE_BODY = `Status (moves the stage), Next step (text and due date), ${OWNER_COLUMN} (a person), Source, Notes (a new note on the timeline). Each change saves on its own and is logged on the record.`;
 export const SHEET_WORKED_OUT = "Lectual works these out";
-export const SHEET_WORKED_OUT_BODY = "Waiting on and Last contact come from next steps, mail and calls. They can't be edited here; log what happened with + Note instead.";
+export const SHEET_WORKED_OUT_BODY = "Waiting on and Last contact come from next steps, mail and calls. Serial No., Start Date, Practice Area and Office Action Due Date come from the record itself. None of these can be edited here; type what happened in Notes instead.";
+/** Added to the legend for the viewer who may see fees (the owner) and nobody else. */
+export const SHEET_WORKED_OUT_FEES = "The fee columns come from the accepted proposal, else from the spreadsheet import.";
 export const SHEET_LEGEND_LABEL = "Which columns you can edit";
 export const SHEET_KEYS_EDIT = "or click to edit";
 export const SHEET_KEYS_NEXT = "next cell";
@@ -528,11 +530,6 @@ export const SHEET_NO_ONE_FOUND = "No one matches.";
 export const SHEET_NEXT_STEP = NEXT_STEP;
 export const SHEET_DUE = "Due";
 export const SHEET_ENTER_ESC = "Enter to save · Esc to cancel";
-export const SHEET_NOTE_BUTTON = "+ Note";
-export const sheetNoteFor = (client: string) => `Add a note for ${client}`;
-export const SHEET_WHAT_HAPPENED = "What happened?";
-export const sheetNoteHint = (firstName: string) => `Goes on ${firstName}'s timeline as a note and counts as last contact.`;
-export const SHEET_ADD_NOTE = ADD_TO_TIMELINE;
 export const SHEET_CANCEL = CANCEL;
 export const SHEET_NO_SOURCE = "No source";
 export const SHEET_SOURCE_LABEL = "Source";
@@ -544,12 +541,21 @@ export const SHEET_PUT_BACK = "The earlier value is back.";
 export const SHEET_NOTE_NOT_SAVED = "The note wasn't saved.";
 export const SHEET_TRY_AFTER_REFRESH = "Couldn't save this yet. Refresh the page and try again.";
 export const SHEET_ENTER_TITLE = "Enter what happens next.";
-export const SHEET_WRITE_NOTE = "Write what happened.";
 export const SHEET_STAGES_UNREADABLE = "The stage list couldn't load, so Status can't be changed here right now. Refresh to try again.";
 export const sheetResizeColumn = (name: string) => `Resize ${name} column`;
 export const SHEET_RESIZE_ROW = "Resize row";
 export const SHEET_EMPTY_SECTION = noneYet("records in this view");
 export const SHEET_SAVE_FAILED = "Couldn't save this change.";
+/** The Sheet's Notes column: the newest plain note, typed in place (Enter or leaving the cell saves, Esc cancels). */
+export const SHEET_NOTES_COLUMN = "Notes";
+export const SHEET_NOTE_CANT_LOAD = DECK_COULDNT_LOAD;
+export const SHEET_NOTE_ADD = "Add a note";
+export const SHEET_NOTE_SAVING = "Saving…";
+export const SHEET_NOTE_SAVED = "Saved";
+export const SHEET_NOTE_SAVE_FAILED = "Couldn't save";
+export const SHEET_NOTE_KEYS = "Enter to save · Shift+Enter for a new line · Esc to cancel";
+export const SHEET_NOTE_NOT_SAVED_YET = "Not saved yet. Press Enter to save.";
+export const sheetNoteCellLabel = (client: string) => `Note for ${client}`;
 
 /* Needs review (Today, both views): old hand-entered dates nobody confirmed. */
 export const NEEDS_REVIEW_HEADING = "Needs review";
@@ -1419,3 +1425,162 @@ export const CLOSE_OVERRIDE_BUTTON = "Close the matter";
 export const CLOSE_OVERRIDE_DONE = "Closed. The reason is on the timeline.";
 /** The pre-0110 override closed the matter, could not write its reason, and could not put the status back either. */
 export const CLOSE_OVERRIDE_UNRECORDED = "The matter was closed, but the reason couldn't be recorded. Tell Lectual.";
+
+/* ── The List's spreadsheet columns (Sprint 1): one registry, `src/lib/review/sheet-columns.ts` ── */
+export const COL_TRADEMARK_OWNER = "Trademark Owner";
+export const COL_TRADEMARK_NAME = "Trademark Name";
+export const COL_SERIAL = "Serial No.";
+export const COL_STATUS = "Status";
+export const COL_SOURCE = "Source";
+export const COL_NOTES = "Notes";
+export const COL_START = "Start Date";
+export const COL_LEGAL_FEE = "Legal Fee";
+export const COL_LEGAL_FEE_DUE = "Legal Fee Due Date";
+export const COL_GOV_FEE = "Government Filing fee";
+export const COL_GOV_FEE_DUE = "Government Filing Fee Due Date";
+export const COL_OA_DUE = "Office Action Due Date";
+export const COL_WAITING = "Waiting on";
+export const COL_CLIENT_NAME = "Client Name";
+export const COL_PRACTICE_AREA = "Practice Area";
+export const COL_CONTRACT_TYPE = "Contract Type";
+/** Header titles (hover text): where Lectual's word and the spreadsheet's word differ, or the value needs a sentence. */
+export const COL_OWNER_TITLE = "Assigned To in your spreadsheet: the next step's person, else the record's";
+export const COL_NEXT_TITLE = "Task in your spreadsheet";
+export const COL_START_TITLE = "The day it was opened in Lectual. Records brought in from the spreadsheet or Lawmatics show the day they were brought in.";
+export const COL_CONTRACT_TYPE_TITLE = "The matter's title in Lectual.";
+/** "Not tracked" names, one per spreadsheet column Lectual has no home for. */
+export const NT_PRIORITY = "Priority";
+export const NT_OPINION_LETTER_DUE = "Opinion Letter Due Date";
+export const NT_COMPLETION_DATE = "Completion Date";
+export const NT_OFFICE_ACTION_FEE = "Office Action Fee";
+export const notTrackedNote = (names: readonly string[]) => `Not tracked in Lectual yet: ${names.join(", ")}.`;
+/** Said only where a Notes column is drawn; without one it would point at nothing. */
+export const NOT_TRACKED_NOTES_SENTENCE = "Description and Notes are one column in Lectual: Notes.";
+export const COL_COULDNT_LOAD = "Couldn't load";
+export const COL_UNCONFIRMED_SUFFIX = " · unconfirmed";
+export const proposalsCount = (n: number) => `${n} proposals`;
+export const FEE_FROM_PROPOSAL = "From the accepted proposal";
+export const FEE_FROM_SPREADSHEET = "From the spreadsheet import";
+/** The column chooser (draw-only, kept in this browser). */
+export const COLUMNS_BUTTON = "Columns";
+export const COLUMNS_MENU_LABEL = "Choose columns";
+export const COLUMNS_RESET = "Reset to the spreadsheet's order";
+export const COLUMNS_MOVE_UP = "Move up";
+export const COLUMNS_MOVE_DOWN = "Move down";
+export const COLUMNS_ALWAYS_SHOWN = "Always shown";
+export const COLUMNS_KEPT_HERE = "Kept in this browser only. It changes what you see, not what you may see.";
+export const columnsShow = (header: string) => `Show ${header}`;
+export const columnsMoveUp = (header: string) => `${COLUMNS_MOVE_UP}: ${header}`;
+export const columnsMoveDown = (header: string) => `${COLUMNS_MOVE_DOWN}: ${header}`;
+export const columnsSectionLabel = (section: string) => `${section} columns`;
+/** Firm-defined custom columns (lectual 0115, proposed). Read only until Settings -> Columns exists. */
+export const CUSTOM_COLUMNS_NOT_ON = "Custom columns aren't switched on for your firm yet.";
+export const CUSTOM_FROM_LEAD = "From the lead";
+export const CUSTOM_FROM_MERGED = "From a merged duplicate";
+export const CUSTOM_NO_LONGER_ON_TEAM = "Someone no longer on the team";
+export const FIRM_COLUMNS_HEADING = "Firm columns";
+/** The five kinds of custom column, as the chooser and a header's hover text name them. */
+export const CUSTOM_KIND_TEXT = "Text";
+export const CUSTOM_KIND_DATE = "Date";
+export const CUSTOM_KIND_MONEY = "Money";
+export const CUSTOM_KIND_CHOICE = "Choice";
+export const CUSTOM_KIND_PERSON = "Person";
+
+/* ── Settings -> Columns and the custom-column writes (Sprint 3; lectual 0115, proposed) ── */
+export const COLUMNS_SETTINGS_NAME = "Columns";
+export const COLUMNS_SETTINGS_SUB =
+  "Your firm's own columns on the Weekly review List. Everyone in the firm sees them, money columns included. A column's kind and section can't change after it's added. Archiving a column keeps its values.";
+export const columnsCount = (n: number) => `${n} of 40 columns`;
+export const COLUMNS_ADD = "Add a column";
+export const COLUMNS_NAME_LABEL = "Name";
+export const COLUMNS_SECTION_LABEL = "Section";
+export const COLUMNS_KIND_LABEL = "Kind";
+export const COLUMNS_CHOICES_LABEL = "Choices (one per line)";
+export const COLUMNS_CHOICES_HINT = "Only for a Choice column";
+/** The List's two sections, and a column that shows in both. */
+export const CUSTOM_SECTION_WORDS = { trademarks: "Trademarks", contracts: "Contracts", both: "Both" } as const;
+export const archiveQuestion = (label: string) => `Archive ${label}? It leaves the List; its values are kept.`;
+export const archivedHeading = (n: number) => `Archived columns (${n})`;
+/** Settings -> Columns lists the first `n` archived columns; there are more (never an error page). */
+export const archivedShownNote = (n: number) => `Showing the first ${n} archived columns.`;
+export const COLUMNS_ARCHIVE = "Archive";
+export const COLUMNS_RESTORE = "Restore";
+export const COLUMNS_RENAME = "Rename";
+export const COLUMNS_EDIT_CHOICES = "Edit choices";
+export const COLUMNS_SAVE_NAME = "Save name";
+export const COLUMNS_SAVE_CHOICES = "Save choices";
+export const columnsRenameLabel = (label: string) => `New name for ${label}`;
+export const columnsChoicesFor = (label: string) => `Choices for ${label}, one per line`;
+export const columnsRestoreLabel = (label: string) => `Restore ${label}`;
+export const columnsArchiveLabel = (label: string) => `Archive ${label}`;
+export const COLUMNS_AT_LIMIT = "Your firm has 40 columns, the most it can have. Archive one to add another.";
+export const COLUMNS_NONE = "No columns yet. Add one below.";
+export const choiceUse = (option: string, n: number) => `${option}: used on ${n} ${n === 1 ? "record" : "records"}`;
+export const COLUMNS_USE_UNCOUNTED = "Couldn't count which choices are in use. Saving still checks.";
+/** The field actions' role gate (the admin tier). It starts with the phrase, as everywhere else in the app. */
+export const COLUMNS_NO_PERMISSION = `${ADMIN_TIER_PHRASE} can change the firm's columns.`;
+
+/** The fixed sentences the custom-column actions and the error mapper answer with. Never any part of a database message. */
+export const CUSTOM_COLUMNS_NOT_READY = `${CUSTOM_COLUMNS_NOT_ON} Lectual will turn it on.`;
+export const CUSTOM_FIELD_IMMUTABLE = "A column's kind and where it shows can't be changed after it's added.";
+export const CUSTOM_LIMIT = "Your firm is at its limit of 40. Archive a column first.";
+export const CUSTOM_LABEL_TAKEN = "That name is in use by one of your firm's columns. Pick a different name.";
+export const CUSTOM_OPTIONS_IN_USE = "One of the choices you took out is still used on a record. Keep it, or change those records first.";
+export const CUSTOM_VALUE_IMMUTABLE = "A saved value stays with the column and the lead or matter it was saved on. Clear it, then type the new one.";
+export const CUSTOM_VALUE_ONE_RECORD = "Each saved value is for a single record.";
+export const CUSTOM_FIELD_GONE = "That column couldn't be found. It may have been archived or removed.";
+export const CUSTOM_VALUE_MERGED = "That lead is now part of another lead. Change the value there.";
+export const CUSTOM_COLUMN_ARCHIVED = `Archived columns can't be changed. ${ADMIN_TIER_PHRASE} can bring it back in Settings.`;
+export const CUSTOM_WRONG_SECTION = "Wrong part of the List for that column.";
+export const CUSTOM_VALUE_EMPTY = "Clear the cell to remove a value.";
+export const CUSTOM_WRONG_KIND = "That entry isn't the right type for this column.";
+export const CUSTOM_CHOICE_BAD = "Pick a choice from the list.";
+export const CUSTOM_LABEL_TOO_LONG = "Names can be up to 60 characters.";
+export const CUSTOM_LABEL_SPACES = "Take the spaces off the start and end of the name.";
+export const CUSTOM_CHOICES_INVALID = "Choices need 1 to 30 different entries of up to 40 characters each.";
+export const CUSTOM_BAD_SECTION = "Choose Trademarks, Contracts or Both.";
+export const CUSTOM_BAD_KIND = "Choose Text, Date, Money, Choice or Person.";
+export const CUSTOM_MOVE_FAILED = "The order couldn't be saved. Refresh and try again.";
+export const CUSTOM_TEXT_TOO_LONG = "Text can be up to 500 characters.";
+export const CUSTOM_MONEY_TOO_BIG = "That amount is too large.";
+export const CUSTOM_PERSON_NOT_MEMBER = "Choose someone on your firm's team.";
+export const CUSTOM_VALUE_CHANGED = "This cell was changed by someone else just now. Refresh and try again.";
+export const CUSTOM_VALUE_NOT_ALLOWED = "Your role can't change this value. Ask an attorney or an admin.";
+export const CUSTOM_BUSY = "Someone else was changing this column at the same moment. Try again.";
+export const CUSTOM_SAVE_FAILED = "The column couldn't be saved. Try again.";
+export const CUSTOM_VALUE_SAVE_FAILED = "The value couldn't be saved. Try again.";
+export const CUSTOM_FIELD_CHANGED = "This column was changed by someone else just now. Refresh and try again.";
+export const CUSTOM_ORDER_CHANGED = "The order changed while you were looking. Refresh and try again.";
+export const CUSTOM_SAVE_FAILED_READ = "Couldn't check the firm's columns just now, so nothing was saved. Try again.";
+export const CUSTOM_LABEL_EMPTY = "Give the column a name.";
+export const CUSTOM_CHOICES_COUNT = "A Choice column needs 1 to 30 choices.";
+export const CUSTOM_CHOICE_TOO_LONG = "Choices can be up to 40 characters.";
+export const choiceRepeated = (choice: string) => `${choice} is listed twice. Each choice must be different.`;
+export const labelIsBuiltin = (label: string) => `${label} is already a column on the List. Choose another name.`;
+export const labelTaken = (label: string) => `${label} is already one of your firm's columns. Choose another name.`;
+export const optionInUse = (option: string, n: number) => `${option} is still used on ${n} ${n === 1 ? "record" : "records"}.`;
+export const CUSTOM_DATE_BAD = "Choose a date.";
+export const CUSTOM_MONEY_BAD = "Enter an amount like 1,250 or 1250.00.";
+export const CUSTOM_TEAM_UNREADABLE = "Couldn't check the team list right now, so nothing was saved. Try again.";
+
+/** The custom-cell editors (owner Sheet and the opened card). */
+export const fromLeadHint = (text: string) => `${CUSTOM_FROM_LEAD}: ${text}`;
+export const fromMergedHint = (text: string) => `${CUSTOM_FROM_MERGED}: ${text}`;
+export const noLongerAChoice = (value: string) => `${value} (no longer a choice)`;
+export const CUSTOM_NO_ONE = "No one";
+export const CUSTOM_FROM_LEAD_KEPT = "Cleared. The lead's value still shows here.";
+export const CUSTOM_FROM_MERGED_KEPT = "Cleared. The merged duplicate's value still shows here.";
+export const customCellLabel = (label: string, value: string) => `${label}: ${value}`;
+/* Getting started: the short guide for staff roles (every role outside the admin tier). */
+export const STAFF_GUIDE_TRACK = "Your first steps";
+export const STAFF_GUIDE_TRACK_SUMMARY = "Your name, your own mailbox and a short tour.";
+export const STAFF_GUIDE_NAME_TITLE = "Add your name";
+export const STAFF_GUIDE_NAME_SUMMARY = "So your team sees who you are.";
+export const STAFF_GUIDE_NAME_STEP = "Your name";
+export const STAFF_GUIDE_NAME_BODY = "Open this menu and choose Your name. It's how your team sees you in Lectual.";
+export const STAFF_GUIDE_MAILBOX_TITLE = "Connect your Outlook";
+export const STAFF_GUIDE_MAILBOX_SUMMARY = "Your own mailbox, so your mail shows on your leads and matters.";
+export const STAFF_GUIDE_MAILBOX_BODY = "Choose Connect Outlook at the top of this page to connect your own mailbox. A personal mailbox is yours: colleagues don't see it here.";
+export const STAFF_GUIDE_TOUR_TITLE = "Take the tour";
+export const STAFF_GUIDE_TOUR_SUMMARY = "A quick look at the main screens.";
+export const STAFF_GUIDE_TOUR_BODY = "Choose Show tips again in this menu for a short tour of the main screens. You can take it as often as you like.";

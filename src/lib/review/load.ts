@@ -17,8 +17,14 @@ import { CONTACT_TYPES } from "./contact";
 import { firmSendersFrom, NO_FIRM_SENDERS, type FirmSenders } from "@/lib/mailbox/firm-sender";
 import { proposalExpiryTag, type ProposalExpiryIn } from "./proposal-expiry";
 import { CHANGE_SELECT, CHANGE_TYPES, changeWindowStart, lastChangeFor, pickLastChanges, withoutPeople, type ChangeRowIn } from "./last-changed";
+import { DEFAULT_FEE_READS, type FeeReads } from "./fees-load";
+import { loadCustomColumns } from "@/lib/custom-columns/load";
+import type { CustomColumnsState } from "@/lib/custom-columns/rules";
+import { feesFor } from "./fees-cells";
 import { closeStagesOf, type CloseStage } from "./close-stage";
 import { OPTIONAL_SOURCES, type CriticalSource, type OptionalSource } from "./notes";
+import { readSheetNotes, type NotesDb } from "./sheet-notes-load";
+import type { SheetNotes } from "./sheet-notes";
 
 type ScopedClient = Awaited<ReturnType<typeof getScopedClient>>;
 type ActivityType = Database["public"]["Tables"]["crm_activity"]["Row"]["type"];
@@ -40,6 +46,10 @@ export type ReviewLoad =
       failed: OptionalSource[];
       /** The firm's lost / nurture stages, for the Lost / Nurture button. Empty hides the button. */
       closeStages: CloseStage[];
+      /** The firm's custom columns, when the page asked for them (the List): ok, not switched on, or couldn't load. Null when not asked. */
+      custom?: CustomColumnsState | null;
+      /** The Sheet's Notes column (only when asked for): the newest plain note per row, or `unavailable`. */
+      notes?: SheetNotes;
     }
   | { status: "unavailable"; failed: CriticalSource[] };
 
@@ -191,7 +201,7 @@ export async function readLastStageChange(db: ScopedClient, leadIds: readonly st
  * helper (before 0107 there is no pointer and nothing is merged). Any failure, or a read that may have hit PostgREST's
  * 1000-row cap, rejects: a keeper's count must never be too low, so the caller draws no tag and names "documents".
  */
-async function readMergedChildren(db: ScopedClient, leadIds: readonly string[]): Promise<Map<string, string>> {
+export async function readMergedChildren(db: ScopedClient, leadIds: readonly string[]): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   await Promise.all(
     chunks(leadIds).map(async (chunk) => {
@@ -255,7 +265,21 @@ function proposalsFor(row: ReviewRow, all: readonly ProposalExpiryRead[], matter
  * tasks are CRITICAL: if any fails there are no sections (a failed task read must not put everyone
  * under "Needs a next step"). The rest only enrich a row and are named when they fail.
  */
-export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
+/** The optional reads `loadReview` can be handed (tests inject them; the page uses the defaults). */
+export type ReviewReads = FeeReads & { customColumns: typeof loadCustomColumns };
+export type ReviewLoadOptions = {
+  withFees?: boolean;
+  withCustom?: boolean;
+  /** Read each row's newest note (the List's Notes column). */
+  notes?: boolean;
+  reads?: Partial<ReviewReads>;
+};
+
+export async function loadReview(now: Date = new Date(), opts: ReviewLoadOptions = {}): Promise<ReviewLoad> {
+  const withFees = opts.withFees === true;
+  const withCustom = opts.withCustom === true;
+  const feeReads: FeeReads = { ...DEFAULT_FEE_READS, ...opts.reads };
+  const customRead = opts.reads?.customColumns ?? loadCustomColumns;
   const db = await getScopedClient();
   const [mattersS, leadsS, stagesS, membersS, tzS, queueS] = await Promise.allSettled([
     listMatters(),
@@ -283,7 +307,8 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
 
   const dependsOnRecords = failedCritical.length === 0;
   const proposalLeadIds = [...new Set([...leadIds, ...matters.filter((m) => m.status === "open" || m.status === "on_hold").map((m) => m.lead_id).filter((x): x is string => !!x)])];
-  const [tasksS, activityS, deadlinesS, changesS, proposalsS, countsS, sendersS, changeRowsS] = dependsOnRecords
+  const noteRows = [...matterIds.map((id) => ({ kind: "matter" as const, id })), ...leadIds.map((id) => ({ kind: "lead" as const, id }))];
+  const [tasksS, activityS, deadlinesS, changesS, proposalsS, countsS, sendersS, changeRowsS, feeProposalsS, feeTrackerS, customS, notesS] = dependsOnRecords
     ? await Promise.allSettled([
         readOpenTasks(db, matterIds, leadIds),
         // A matter shows its lead's mail too (the emails were filed on the lead before it signed), so the lead ids behind matters are read as well.
@@ -294,10 +319,20 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
         readDocumentCounts(db, matterIds, leadIds),
         readFirmSenders(db),
         readChangeRows(db, matterIds, proposalLeadIds, now),
+        // Owner-only money, in the same parallel batch (each read's failure stays its own). Asked for only when the page's re-resolved role may see it.
+        withFees ? feeReads.acceptedProposalFees(db, matterIds, proposalLeadIds) : Promise.resolve([] as Awaited<ReturnType<FeeReads["acceptedProposalFees"]>>),
+        withFees ? feeReads.trackerFees(db, matterIds) : Promise.resolve([] as Awaited<ReturnType<FeeReads["trackerFees"]>>),
+        // The firm's custom columns (the List only), in the same batch. A matter shows its lead's value, so the leads behind matters are read too.
+        withCustom ? customRead(db, matterIds, proposalLeadIds, readMergedChildren) : Promise.resolve(null),
+        // In parallel with the rest, one bounded query per record (sheet-notes-load.ts); never throws, failure is `unavailable`.
+        opts.notes ? readSheetNotes(db as unknown as NotesDb, noteRows, timeZone) : Promise.resolve(null),
       ])
-    : ([null, null, null, null, null, null, null, null] as const);
+    : ([null, null, null, null, null, null, null, null, null, null, null, null] as const);
   if (dependsOnRecords && tasksS && tasksS.status === "rejected") failedCritical.push("tasks");
   if (failedCritical.length > 0) return { status: "unavailable", failed: failedCritical };
+
+  // One source, `fees`: either read failing (or being cut short) leaves the fee fields absent on every row.
+  const feesS = withFees && feeProposalsS && feeTrackerS ? ([feeProposalsS, feeTrackerS] as const) : null;
 
   const failed: OptionalSource[] = [];
   const activityOk = activityS?.status === "fulfilled";
@@ -365,6 +400,9 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
   // A matter also takes the changes filed on its lead. With the member directory unreadable a person's change draws no line (never "a teammate").
   const leadOfMatter = new Map(matters.map((m) => [m.id, m.lead_id]));
   const namesKnown = membersS.status === "fulfilled";
+  const feeData = feesS && feesS[0].status === "fulfilled" && feesS[1].status === "fulfilled" ? { proposals: feesS[0].value, tracker: feesS[1].value } : null;
+  if (feesS && !feeData) failed.push("fees");
+
   const changed = lastChanges
     ? counted.map((r) => {
         const c = lastChangeFor(lastChanges, r.kind, r.id, r.kind === "matter" ? leadOfMatter.get(r.id) : null);
@@ -372,13 +410,34 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
       })
     : counted;
 
+  // Custom columns: "not switched on" is not a failure; anything else that isn't ok is named "custom columns".
+  let custom: CustomColumnsState | null = null;
+  if (withCustom) {
+    const read = customS?.status === "fulfilled" ? customS.value : null;
+    if (read && read.status === "ok") {
+      const open = new Set(matterIds);
+      const leadOf: Record<string, string> = {};
+      for (const m of matters) if (m.lead_id && open.has(m.id)) leadOf[m.id] = m.lead_id;
+      custom = { ...read, leadOfMatter: leadOf };
+    } else if (read && read.status === "not-set-up") {
+      custom = read;
+    } else {
+      custom = { status: "unavailable" };
+      failed.push("custom columns");
+    }
+  }
+
+  const withMoney = feeData ? changed.map((r) => ({ ...r, fees: feesFor(r, r.kind === "matter" ? leadOfMatter.get(r.id) ?? null : null, feeData.proposals, feeData.tracker) })) : changed;
+
   return {
     status: "ok",
-    rows: changed,
+    rows: withMoney,
     closeStages: closeStagesOf(leadStages),
+    ...(opts.notes ? { notes: notesS?.status === "fulfilled" && notesS.value ? notesS.value : ({ status: "unavailable" } as const) } : {}),
     today,
     timeZone,
     members: memberList.map((m) => ({ userId: m.userId, name: m.displayName || m.email || "Teammate", role: m.role })),
     failed: OPTIONAL_SOURCES.filter((s) => failed.includes(s)),
+    custom,
   };
 }

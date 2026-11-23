@@ -146,10 +146,14 @@ describe("the arrows, the temperature words and the copy button", () => {
 });
 
 describe("empty states", () => {
+  // Changed on purpose: the intake-form link is drawn only for a role shown Forms (canSeeFormsAndProposals, passed as showFormsLink).
   it("no leads: the plain sentence, an Add lead button and a link to the intake form", () => {
-    const html = render([]);
+    const html = render([], {}, { showFormsLink: true } as Reads);
     expect(html).toContain(NO_LEADS_YET);
     expect(html).toMatch(/data-empty="none"[\s\S]*Add a lead[\s\S]*href="\/dashboard\/forms\/?"[^>]*>Open your intake form/);
+    const without = render([]);
+    expect(without).toContain("Add a lead");
+    expect(without).not.toContain("Open your intake form");
   });
 
   it("filtered to nothing: the sentence and a Clear filters button", () => {

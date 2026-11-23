@@ -28,13 +28,14 @@ import {
 } from "@/lib/onboarding/hub";
 
 const ALL = ["mailbox", "proposals", "agents", "agent-toolkit", "litigation", "inbox", "document-center", "lawmatics-import"];
-const ctx = (role: string, modules: string[] | null = ALL, aiConfigured = true): HubContext => ({ role, modules, aiConfigured });
+const ctx = (role: string, modules: string[] | null = ALL, aiConfigured = true, outlookConnectable = true): HubContext => ({ role, modules, aiConfigured, outlookConnectable });
 const flowIds = (c: HubContext) => visibleFlows(c).map((f) => f.id);
 const trackIds = (c: HubContext) => hubTracks(c).map((t) => t.id);
 
 describe("catalog shape", () => {
-  it("has the five tracks in order", () => {
-    expect(HUB_TRACKS.map((t) => t.id)).toEqual(["intake", "consults", "matters", "approvals", "admin"]);
+  it("has the staff guide's track then the five tracks, in order", () => {
+    // Changed on purpose: the staff guide's track ("start") comes first; the admin tier never sees it.
+    expect(HUB_TRACKS.map((t) => t.id)).toEqual(["start", "intake", "consults", "matters", "approvals", "admin"]);
     expect(trackIds(ctx("owner"))).toEqual(["intake", "consults", "matters", "approvals", "admin"]);
   });
 
@@ -87,9 +88,13 @@ describe("role x module matrix", () => {
     expect(flowIds(ctx(role)).includes("intake-reconcile")).toBe(tier);
   });
 
-  it.each(ROLES)("%s: the Intake track is for staff roles only", (role) => {
-    const staff = role !== "viewer" && role !== "social_media";
-    expect(trackIds(ctx(role)).includes("intake")).toBe(staff);
+  // Changed on purpose: outside the admin tier the hub is the short staff guide only.
+  // Changed on purpose (Taylor, Nov 2026): an approver outside the admin tier (attorney) also keeps the Consults and Approvals walkthroughs.
+  it.each(ROLES)("%s: the Intake track is for the admin tier; approvers add Consults and Approvals; everyone else the staff guide only", (role) => {
+    const tier = ["owner", "admin", "senior_admin"].includes(role);
+    expect(trackIds(ctx(role)).includes("intake")).toBe(tier);
+    const expected = tier ? ["intake", "consults", "matters", "approvals", "admin"] : canApproveQueue(role) ? ["start", "consults", "approvals"] : ["start"];
+    expect(trackIds(ctx(role))).toEqual(expected);
   });
 
   it("without proposals the proposal flows go", () => {
@@ -129,8 +134,9 @@ describe("role x module matrix", () => {
     expect(flowIds(ctx("owner", ["nonsense"]))).toEqual(flowIds(ctx("owner", [])));
   });
 
-  it.each(["", "root", "OWNER", "superadmin"])("the unknown role %j sees no flow at all", (role) => {
-    expect(hubTracks(ctx(role))).toEqual([]);
+  // Changed on purpose: an unknown role fails closed to the staff guide, without the mailbox flow (it sees no rail section).
+  it.each(["", "root", "OWNER", "superadmin"])("the unknown role %j gets the staff guide's name and tour flows only", (role) => {
+    expect(flowIds(ctx(role))).toEqual(["staff-name", "staff-tour"]);
   });
 
   it("drops a track with no flow left rather than showing 0 of 0", () => {
@@ -145,10 +151,9 @@ describe("role x module matrix", () => {
 describe("read-only wording", () => {
   const queueBody = (role: string) => visibleFlows(ctx(role)).find((f) => f.id === "approvals-queue")!.steps.find((s) => s.id === "queue")!.body;
 
-  it.each(ROLES.filter((r) => !canApproveQueue(r)))("%s is not told they can approve", (role) => {
-    const body = queueBody(role);
-    expect(body).toMatch(/Nothing goes to a client until someone approves it/);
-    expect(body).not.toMatch(/you can approve|then approve|approve or reject|review each draft/i);
+  // Changed on purpose: no role that cannot approve sees the queue flow any more (they get the staff guide), so no approve wording reaches them.
+  it.each(ROLES.filter((r) => !canApproveQueue(r)))("%s has no queue flow, so is not told they can approve", (role) => {
+    expect(flowIds(ctx(role))).not.toContain("approvals-queue");
   });
 
   it("an unknown role has no queue flow at all, so no approve wording can reach it", () => {
@@ -254,9 +259,9 @@ describe("progress", () => {
 
   it("counts only flows the person can see", () => {
     const tracks = hubTracks(ctx("attorney"));
-    const counts = trackCounts(tracks, ["intake-leads", "admin-setup", "intake-reconcile"]);
-    expect(counts.find((c) => c.id === "intake")!.done).toBe(1);
-    expect(overallCount(tracks, ["admin-setup"]).done).toBe(0);
+    const counts = trackCounts(tracks, ["intake-leads", "admin-setup", "staff-name"]);
+    expect(counts.find((c) => c.id === "start")!.done).toBe(1);
+    expect(overallCount(tracks, ["admin-setup", "intake-leads"]).done).toBe(0);
     const owner = hubTracks(ctx("owner"));
     expect(overallCount(owner, ["admin-setup"]).done).toBe(1);
     expect(overallCount(owner, []).total).toBe(owner.flatMap((t) => t.flows).length);
@@ -291,5 +296,85 @@ describe("record picking", () => {
     expect(pickFirstRecord({ ok: true, rows: [{ id: "a" }, { id: "b" }] })).toEqual({ status: "ok", id: "a" });
     expect(pickFirstRecord({ ok: true, rows: [] })).toEqual({ status: "none" });
     expect(pickFirstRecord({ ok: false })).toEqual({ status: "unavailable" });
+  });
+});
+
+describe("the staff guide (roles outside the admin tier)", () => {
+  // Non-approver staff: the short guide only (an approver outside the admin tier is covered below).
+  const STAFF = ROLES.filter((r) => !["owner", "admin", "senior_admin"].includes(r) && !canApproveQueue(r));
+
+  it("an attorney (a queue approver) gets the staff guide plus the Consults and Approvals walkthroughs, with approver wording", () => {
+    const ids = flowIds(ctx("attorney"));
+    expect(ids.slice(0, 3)).toEqual(["staff-name", "staff-mailbox", "staff-tour"]);
+    expect(ids).toContain("approvals-queue");
+    expect(ids).toContain("consults-calendar");
+    expect(ids.every((id) => /^(staff|consults|approvals)-/.test(id))).toBe(true);
+    // The proposal walkthroughs need the Proposals row, which an attorney is not shown.
+    expect(ids).not.toContain("consults-proposal");
+    expect(ids.filter((id) => /^(intake|matters|admin)-/.test(id))).toEqual([]);
+    const queue = visibleFlows(ctx("attorney")).find((f) => f.id === "approvals-queue")!.steps.find((st) => st.id === "queue")!.body;
+    expect(queue).toMatch(/then approve or reject it/);
+  });
+
+  it.each(STAFF)("%s: name, own mailbox and the tour, nothing else", (role) => {
+    expect(flowIds(ctx(role))).toEqual(["staff-name", "staff-mailbox", "staff-tour"]);
+  });
+
+  it.each(STAFF)("%s: no mailbox guide without the Mailboxes feature, or with the feature list unreadable", (role) => {
+    expect(flowIds(ctx(role, ALL.filter((m) => m !== "mailbox")))).toEqual(["staff-name", "staff-tour"]);
+    expect(flowIds(ctx(role, null))).toEqual(["staff-name", "staff-tour"]);
+  });
+
+  it.each(STAFF)("%s: no mailbox guide when this deployment can't connect Outlook (or it isn't said)", (role) => {
+    expect(flowIds(ctx(role, ALL, true, false))).toEqual(["staff-name", "staff-tour"]);
+    expect(flowIds({ role, modules: ALL, aiConfigured: true })).toEqual(["staff-name", "staff-tour"]);
+  });
+
+  it("the admin tier's hub doesn't depend on Outlook being connectable", () => {
+    expect(flowIds(ctx("owner", ALL, true, false))).toEqual(flowIds(ctx("owner")));
+  });
+
+  it("the guide's words point at what is really on the page, and say nothing about signing drafts", async () => {
+    const steps = visibleFlows(ctx("paralegal")).flatMap((f) => f.steps);
+    const mailbox = steps.find((s) => s.id === "mailbox")!.body;
+    expect(mailbox).toMatch(/Connect Outlook at the top of this page/);
+    expect(mailbox).not.toMatch(/Under Mailboxes/);
+    for (const s of steps) expect(s.body).not.toMatch(/sign(ed|s)? /i);
+    const page = readFileSync("src/app/dashboard/settings/integrations/page.tsx", "utf8");
+    expect(page).toContain("Connect {PROVIDER_LABEL[p]}");
+  });
+
+  it("points at the account menu (Your name, Show tips again) and the Integrations page", () => {
+    const steps = visibleFlows(ctx("paralegal")).flatMap((f) => f.steps.map((s) => [f.id, s.path, s.target]));
+    expect(steps).toEqual([
+      ["staff-name", "/dashboard/", "account"],
+      ["staff-mailbox", "/dashboard/settings/integrations/", "integrations-head"],
+      ["staff-tour", "/dashboard/", "account"],
+    ]);
+  });
+
+  it("the admin tier's hub is unchanged: the same flows, in the same order, as before the staff guide", () => {
+    const BEFORE = [
+      "intake-leads", "intake-board", "intake-lead", "intake-forms", "intake-reconcile",
+      "consults-calendar", "consults-prep", "consults-proposal", "consults-accepted", "consults-meetings",
+      "matters-list", "matters-page", "matters-files", "matters-updates",
+      "approvals-queue", "approvals-agents", "approvals-copilot", "approvals-bell",
+      "admin-setup", "admin-integrations", "admin-team", "admin-modules", "admin-firm",
+    ];
+    for (const role of ["owner", "admin", "senior_admin"]) expect(flowIds(ctx(role))).toEqual(BEFORE);
+    expect(trackIds(ctx("owner"))).toEqual(["intake", "consults", "matters", "approvals", "admin"]);
+  });
+
+  it("old progress flags keep working and the new ids are recognised", () => {
+    const meta = { lectual_hub: { version: HUB_VERSION, done: ["intake-leads", "staff-name", "nope", "staff-name"] } };
+    expect(parseHubProgress(meta).done).toEqual(["intake-leads", "staff-name"]);
+    expect(isHubFlowId("staff-tour")).toBe(true);
+    expect(isHubFlowId("staff-anything")).toBe(false);
+  });
+
+  it("the Today card shows the staff guide's count and hides once all three are done", () => {
+    const tracks = hubTracks(ctx("clerk"));
+    expect(overallCount(tracks, []).total).toBe(3);
+    expect(shouldShowHubCard(tracks, { done: ["staff-name", "staff-mailbox", "staff-tour"], hiddenCard: false })).toBe(false);
   });
 });

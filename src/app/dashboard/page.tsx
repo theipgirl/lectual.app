@@ -1,3 +1,4 @@
+import { canSeeFormsAndProposals } from "@/lib/auth/forms-proposals";
 import Link from "next/link";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { getScopedClient } from "@/lib/db/scoped-client";
@@ -159,6 +160,7 @@ export default async function TodayPage() {
 
   const needs = buildNeedsYou({
     userId: session.user.id,
+    canOpenForms: canSeeFormsAndProposals(session.role),
     now,
     deadlines:
       deadlines?.filter((d) => !deadlineNeedsReview(d, civilDate(now))).map((d) => ({

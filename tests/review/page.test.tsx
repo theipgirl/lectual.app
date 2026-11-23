@@ -189,16 +189,19 @@ describe("Weekly review page", () => {
     }
   });
 
-  it("Sheet view: Trademarks then Contracts, the eight columns, Client links to the panel, filters respected", async () => {
+  it("Sheet view: Trademarks then Contracts, the spreadsheet columns, Client links to the panel, filters respected", async () => {
     const contract = row({ key: "k", client: "Contract Co", matterType: "BL", stageLabel: "Drafting", stageOrder: 100_001, waiting: "client", lastOutbound: "2026-10-28", source: "Referral" });
-    mock(ok({ rows: [...rows, contract] }));
+    // Contracts has no Source column in the spreadsheet's order (Sprint 1), so the Source cell is checked on a trademark row.
+    const withSource = row({ key: "s", client: "Source Co", source: "Referral" });
+    mock(ok({ rows: [...rows, contract, withSource] }));
     const html = await render({ view: "sheet" });
     expect(html).toMatch(/aria-current="page" href="[^"]*">List/);
     expect(html.indexOf("Trademarks")).toBeGreaterThan(-1);
     expect(html.indexOf("Trademarks")).toBeLessThan(html.indexOf("Contracts"));
     expect(html.indexOf("Lapsed Co")).toBeLessThan(html.indexOf("Contracts"));
     expect(html.indexOf("Contract Co")).toBeGreaterThan(html.indexOf("Contracts"));
-    for (const c of ["Client", "Mark", "Status", "Next step", "Owner", "Waiting on", "Source", "Last contact"]) expect(html).toContain(`<th>${c}</th>`);
+    // Header renamed by Sprint 1: Client -> Trademark Owner / Client Name, Mark -> Trademark Name / Contract Type (plus the new read-only columns).
+    for (const c of ["Trademark Owner", "Trademark Name", "Serial No.", "Status", "Source", "Owner", "Start Date", "Office Action Due Date", "Next step", "Waiting on", "Last contact", "Client Name", "Practice Area", "Contract Type"]) expect(html).toMatch(new RegExp(`<th[^>]*>${c.replace(".", "\\.")}</th>`));
     expect(html).toContain("Client · followed up Oct 28");
     expect(html).toContain("Referral");
     expect(html).toMatch(/class="lx-rowlink" href="[^"]*view=sheet[^"]*open=matter%3A/);

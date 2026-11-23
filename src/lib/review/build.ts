@@ -10,6 +10,7 @@ import { summarizeContact, type ContactActivity } from "./contact";
 import type { FirmSenders } from "@/lib/mailbox/firm-sender";
 import { stageIsWithUspto, waitingOn } from "./waiting";
 import { noOpenDeadline } from "@/lib/matters/deadline-safety";
+import { MATTER_TYPE_LABELS } from "@/lib/matters/matter-types";
 import { deadlineKindLabel, type DeadlineKind } from "@/lib/matters/deadline-rules";
 
 /**
@@ -27,6 +28,8 @@ export type ReviewMatterIn = {
   type?: string | null;
   /** "Filed" (PGE Sprint 3) is a TM matter with a serial number or a filing date. */
   serial_number?: string | null;
+  /** The day the matter was opened in Lectual (Start Date); the row's `created_at` stands in when absent. */
+  opened_at?: string | null;
   filing_date?: string | null;
   referral_source?: string | null;
   stage_id?: string | null;
@@ -179,6 +182,12 @@ function openDeadlinesOf(list: readonly ReviewDeadlineIn[] | undefined): NonNull
     }));
 }
 
+/** The earliest open `office_action_response` deadline (an open statement of use is another deadline and is ignored). */
+export function earliestOfficeAction(list: readonly ReviewDeadlineIn[] | undefined): { dueDate: string; confirmed: boolean } | null {
+  const oa = (list ?? []).filter((d) => d.kind === "office_action_response").sort((a, b) => a.due_date.localeCompare(b.due_date) || (a.id ?? "").localeCompare(b.id ?? ""));
+  return oa.length === 0 ? null : { dueDate: oa[0].due_date.slice(0, 10), confirmed: oa[0].attorney_confirmed === true };
+}
+
 function nearestDeadline(list: readonly ReviewDeadlineIn[] | undefined): ReviewRow["deadline"] {
   if (!list || list.length === 0) return null;
   const first = [...list].sort((a, b) => a.due_date.localeCompare(b.due_date))[0];
@@ -254,7 +263,10 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
       deadline: input.sources.deadlines === "ok" ? nearestDeadline(deadlinesByMatter.get(m.id)) : null,
       // A tag only (never a bucket). Unknown when the deadlines could not be read: nothing is flagged then.
       noOpenDeadline: noOpenDeadline(m, input.sources.deadlines === "ok" ? openSet : null),
-      ...(input.sources.deadlines === "ok" ? { openDeadlines: openDeadlinesOf(deadlinesByMatter.get(m.id)) } : {}),
+      ...(input.sources.deadlines === "ok" ? { openDeadlines: openDeadlinesOf(deadlinesByMatter.get(m.id)), officeActionDue: earliestOfficeAction(deadlinesByMatter.get(m.id)) } : {}),
+      serialNumber: m.serial_number?.trim() || null,
+      startDate: civilDateIn(m.opened_at || m.created_at, timeZone),
+      practiceArea: m.type && m.type in MATTER_TYPE_LABELS ? MATTER_TYPE_LABELS[m.type as keyof typeof MATTER_TYPE_LABELS] : null,
     });
   }
 
@@ -305,6 +317,7 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
       }),
       nextStep: leadTasks.get(l.id) ?? null,
       deadline: null,
+      startDate: civilDateIn(l.created_at, timeZone),
     });
   }
   return rows;

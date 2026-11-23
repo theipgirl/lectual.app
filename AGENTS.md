@@ -1719,10 +1719,10 @@ The edit page for a draft is five sections in ONE form with ONE Save. Nothing se
 - Words: `EDITOR_WORDS` / `checkTheseHeading` in `vocabulary.ts` ("Selected to start", "Let the client describe this"); the menu beside the lifecycle buttons is named for what it holds (`moreMenuLabel`: Withdraw, Reset or delete, ...).
   New proposal still uses `BuilderLayout` and its "More options"; only the editor changed.
 
-## Engagement letter: database and firm template (Letter track, Sprint 2; needs lectual 0106: on dev since 2026-11-12, NOT on prod)
+## Engagement letter: database and firm template (Letter track, Sprint 2; needs lectual 0106: on dev since 2026-11-12, on prod: verified by the director, Nov 17)
 Design: `docs/specs/2026-11-12-proposal-loe-and-builder-design.md` (4.1, 4.2, 4.5). This sprint is the firm's letter and the rules around it; the
 client page, signing and the staff side come in later sprints. Nothing here sends, moves a stage or touches a price (`pricing.ts` has no diff).
-- **Migration 0106 is in `lectual`. It was applied to lectual-dev on 2026-11-12 and verified there; it is NOT applied to lectual-prod (needs the owner's OK).** Two tables: `client_proposal_loe_template` (versions per firm and kind) and
+- **Migration 0106 is in `lectual`. It was applied to lectual-dev on 2026-11-12 and verified there; it is also on lectual-prod (verified by the director, Nov 17).** Two tables: `client_proposal_loe_template` (versions per firm and kind) and
   `client_proposal_signature` (written only by the service role's `client_proposal_sign_and_accept`). Hand-added types are in `src/lib/db/types.ts`.
   Until 0106 is applied every read answers 42P01 / PGRST205 and the page says the letter "isn't switched on for your firm yet" with no form.
 - **The pure library is `src/lib/loe/`** (no `server-only`, no HTML): `fields.ts` (the seven fields `date`, `client_name`, `entity_name`,
@@ -1785,7 +1785,7 @@ New proposal is one step, and every way of starting a proposal goes through ONE 
 - **"New proposals offer"** (Settings, Proposals; `src/lib/proposals/new-offer.ts`, `NewOfferSection` inside the ONE settings form): `pricing.new_offer = { mode: "one" | "choice", per: "brand" | "mark", options (1..3 package names), start }`, NAMES only. `parseNewOffer` drops names not on the firm's list and keeps at most 3; `readNewOffer` reads it; the form's `newOffer.present` marker means a post without the control leaves the key alone; `withNewOffer` refuses (fixed sentence) a serialised pricing over 64 KB and otherwise touches only its own key, so approvers, `approval_routing`, `lawmatics_loe_fields`, package rows and includes stay as they were (`withPackages` and `parseSettingsPricing` already spread the rest). The action checks names against the list AS IT WILL BE after the same save, so a package renamed in that post can't be offered. Admin tier only (the existing `gateAdminAction`). All doors use it as the starting point; none set = one package, the firm's first.
 - **Not verified in a real browser:** the start screen and settings control are tested with `renderToStaticMarkup` and Playwright screenshots of a static render only; Copilot actually opening with the request typed in is not exercised.
 
-## Sprint 4 (Letter track): Client page: details, letter, sign (needs lectual 0106 for signing: on dev since 2026-11-12, NOT on prod)
+## Sprint 4 (Letter track): Client page: details, letter, sign (needs lectual 0106 for signing: on dev since 2026-11-12, on prod: verified by the director, Nov 17)
 A proposal whose content carries `loe` (Sprint 2) adds four steps to the client page: Choose, Your details, Engagement letter, Pay. Content with no
 `loe` renders byte for byte as before (`tests/client-proposal/loe-baseline.test.tsx` against `__baseline__/`, rendered from 29f6329). Nothing here sends
 anything; `pricing.ts` has no diff; one dependency was added (`pdfkit`, exact-pinned 0.20.2).
@@ -1944,7 +1944,7 @@ No migration, no dependency, `pricing.ts` untouched. Nothing here approves, make
   now comes back as `needs_changes` from the builder instead of a built draft with `blocking`).
 - Not verified: the real model (no key here), a database, a real browser. `tests/proposals/sprint5-hygiene.test.ts` greps the new code for approve/link/queue/mail/service-role paths and price fields.
 
-## Sprint 6 (Letter track): Signed letter on the staff side, and the flat-fee letter (needs lectual 0106: on dev since 2026-11-12, NOT on prod)
+## Sprint 6 (Letter track): Signed letter on the staff side, and the flat-fee letter (needs lectual 0106: on dev since 2026-11-12, on prod: verified by the director, Nov 17)
 Nothing here sends, moves a stage, opens a matter or calls a model. No migration, no dependency. Pricing is untouched.
 - **The editor's Engagement letter section** (`EngagementLetterSlot`, rules in `src/lib/loe/editor-state.ts`, pure) draws one of five states from the firm's
   approved letter, read through the scoped client (`getApprovedLetter`): `none` (no approved letter of this kind, or the table isn't there: the set-up line
@@ -2455,3 +2455,70 @@ their own click). Contract: `docs/pge/2026-11-17-agentic-ip-os/sprint-4.md`. App
   - **If lawmatics-mcp ever normalises `final_body`** (trims, re-wraps, changes line endings), the stored text stops hashing to the `draft_to` /
     receipt hash and EVERY Make-draft is refused ("changed after it was approved"): it fails closed, never drafts other text (pinned by a test).
 
+
+## Rail: Forms and Proposals for the admin tier only (no schema)
+**Superseded (Taylor, Nov 2026):** intake is shown them too, through one predicate; see "Forms and Proposals: shown to the admin tier and intake" below.
+The Forms, Proposals and older Quotes rows carry `minRole: ADMIN_TIER_MIN_ROLE` (`senior_admin`, ranked, so owner / admin / senior_admin) in
+`NAV` (`src/lib/nav.ts`), the existing role filter inside `navItemAllowed` / `visibleNav`. So the rail, the phone bar's More sheet, the tour and the
+Getting started hub (whose flows need those rows) drop them for every other role, and an unknown role never sees them. Navigation only: the pages and
+actions keep their own role and feature gates (a staff member with the link still reaches what those gates allow). The Intake report stays (Leads is
+still visible). Tests: `tests/nav/admin-tier-rows.test.ts`.
+
+## Getting started: the short staff guide (no schema)
+**Updated (Taylor, Nov 2026):** a queue approver outside the admin tier (attorney) also keeps the Consults and Approvals walkthroughs; see "Getting started: approvers keep their walkthroughs" below.
+Outside the admin tier (`canSeeSetup` false, which also covers an unknown or unreadable role: fails closed) the Getting started hub and the Today
+`GettingStartedCard` offer ONLY the staff guide, track `start` ("Your first steps", words in `words.ts` `STAFF_GUIDE_*`): `staff-name` (the account
+menu's "Your name"), `staff-mailbox` (the "Connect Outlook" button at the top of Integrations; needs the Mail rail section, i.e. the Mailboxes feature, AND
+`connectableProviders().microsoft` on the deployment, passed in as `HubContext.outlookConnectable`; an unreadable feature list or an absent flag hides it) and `staff-tour` (the account menu's "Show tips again"). The rule is one line in `flowVisible` (`requires.staffGuide`); the admin
+tier never sees those three and its hub is exactly what it was (pinned in `tests/onboarding/hub.test.ts`). Progress flags are unchanged: old ids still parse,
+the three new ids are known, unknown ids are dropped. "Your setup" (Outlook status) above the guides is unchanged.
+
+## Weekly review: an editable Notes cell in the Sheet (no schema)
+**Updated (Taylor, Nov 2026):** a note saves on Enter ONLY; leaving the cell never posts. See "Sheet notes save on Enter only" below; where this section says leaving the cell saves, that rule wins.
+Both Sheets (`?view=sheet`: the plain `SheetView` and the owner's `SheetEditTable`) end with a Notes column. Logic in `src/lib/review/sheet-notes.ts`
+(pure), the read in `sheet-notes-load.ts`, the cell in `src/components/review/NotesCell.tsx`; `sheet.ts` / `SheetView.tsx` only add the column and the call.
+- **Read:** only for the Sheet (`loadReview(now, { notes: true })`, inside the review's one parallel read), for the review's records: ONE bounded query
+  per record (`crm_activity` type `note`, its `matter_id` / `lead_id`, newest first, `limit(1)`; PostgREST has no newest-per-group), 12 at a time,
+  the scoped client; selects the ids, date and `payload->>note|body|text` only (a matter's own notes, like the Cards note). Shows the newest note's first line (80
+  characters) and its firm-calendar date. Three states: a failed or cut-short read is "Couldn't load" in every cell, never blank; none is an empty cell.
+- **Write:** writers (`canWrite` = MATTER_WRITE_ROLES = CAN_WRITE_LEAD; the owner table: `canNote`, not on phones) click in and type; Enter (no Shift) or
+  leaving the cell saves ONE plain note through the existing `logWhatHappenedAction` (role and record re-checked, revalidates the review); Esc cancels;
+  empty saves nothing. `noteCommitter` is the one-save-per-edit rule (Enter then blur posts once). A failed save keeps the text and says "Couldn't save";
+  after a failure only Enter retries (leaving the cell never re-posts: the "failure" may have been a timeout that landed). Text typed while a save is in
+  flight is kept (`afterNoteSaved`) and the editor stays open for it.
+  Other roles read the note with no editor. Note text is React text only.
+- The owner table's "+ Note" popover column is gone (one way to add a note); the Notes column is a resizable column (150px; four defaults and Next step's
+  minimum shrank so the defaults still fit 1440 with the rail open, 1,106px). The plain Sheet's floor is 940px (Notes a fixed 150px), under the 954px
+  a 1280 window leaves with the rail pinned. A header's pencil shows only on a column someone here can type in. Not verified in a real browser.
+
+## Forms and Proposals: shown to the admin tier and intake (no schema)
+ONE rule, `canSeeFormsAndProposals(role)` (`src/lib/auth/forms-proposals.ts`: owner, admin, senior_admin, intake; fails closed on anything else),
+decides every way in that is DRAWN (Taylor, Nov 2026): the Forms, Proposals and older Quotes rail rows (`roleRule: "forms-proposals"` on the `NAV` rows,
+applied in `navItemAllowed`; this replaced their `minRole: senior_admin`), so the phone More sheet, the tour and the Getting started hub follow; Today's
+"Needs you" submissions item (`canOpenForms`: the item stays, linking to Forms only when shown, else to the Leads list, where every submission is already
+a lead); the Intake report's "Intake forms" and Proposals tiles (`intakeReportLinks`); the Leads page's "Open your intake form" (`showFormsLink`).
+Navigation only: the pages and actions keep their own role and feature gates. Tests: `tests/nav/forms-proposals-roles.test.ts` (every role, and a grep
+that each place uses the one predicate).
+
+## Getting started: approvers keep their walkthroughs (no schema)
+Outside the admin tier, a queue approver (`QUEUE_APPROVE_ROLES`: attorney) gets the short staff guide AND the Consults and Approvals walkthroughs
+(`STAFF_APPROVER_TRACKS` in `hub.ts`, with the queue step's approver wording; a walkthrough whose rail section the person isn't shown still drops, e.g.
+the proposal ones). Every other non-admin role gets only the staff guide. The admin tier's hub is unchanged (still pinned in `tests/onboarding/hub.test.ts`).
+
+## Sheet notes save on Enter only (no schema)
+In both Sheets a note saves on Enter (no Shift) ONLY. Leaving the cell never posts (`noteBlurOutcome`): with text the editor stays open, keeps the text and
+says "Not saved yet. Press Enter to save." (`SHEET_NOTE_NOT_SAVED_YET`; a failed save keeps its own "Couldn't save"); with nothing typed it closes. Esc
+cancels. `noteCommitter` keeps one post per Enter (a second Enter while saving is ignored); after a failure the next Enter retries.
+
+## Weekly review List: the Notes cell sits in the column registry's slot (merge of the Notes cell into the columns work, no schema)
+The List's columns come from ONE registry (`src/lib/review/sheet-columns.ts`; `columnsFor`, the per-person chooser) and `NOTES_PRESENT` is now
+`true`: both tables (the read-only `SheetView` and the owner's `SheetEditTable`) draw the merged `NotesCell` at the registry's `notes` slot,
+Trademarks after Source, Contracts after Next step, not last. The chooser hides or moves Notes like any other column. The Trademarks section note
+says "Description and Notes are one column in Lectual: Notes." again. Nothing about the cell changed: it saves on Enter only, leaving it never posts,
+and its words are the same.
+- **Read:** `loadReview(now, { withFees, withCustom, notes })`, the three asked together for the List only, in the one parallel read.
+- **Tab:** `nextEditableCell` treats `notes` as a stop where it is DRAWN and `canNote` says the row's note can be typed; the owner table's Notes
+  `<td>` carries `data-rse-cell="<row>|notes"` only then, and `focusCell` focuses the cell's own button inside it. Native Tab follows the drawn
+  order anyway (the cell is a button). The old "+ Note" popover column is gone; `sheetMinWidth(sizes, columns)` sums only the columns drawn.
+- `registry.editable` stays the four typed pickers (Status, Next step, Owner, Source) plus the firm's columns: Notes is typed in place by its own
+  editor, so it is not `editable` in the registry; its header pencil follows `canNote`.

@@ -1,5 +1,5 @@
 import type { ReviewRow } from "./buckets";
-import { LAST_CONTACT, OUR_TURN, OWNER_COLUMN } from "@/lib/ui/words";
+import { OUR_TURN } from "@/lib/ui/words";
 
 /**
  * The Sheet view: the Excel tracker as one table, in two sections. Pure.
@@ -27,8 +27,6 @@ export function sheetSections(rows: readonly ReviewRow[]): SheetSections {
   for (const r of rows) (isTrademarkRow(r) ? trademarks : contracts).push(r);
   return { trademarks: trademarks.sort(compare), contracts: contracts.sort(compare) };
 }
-
-export const SHEET_COLUMNS = ["Client", "Mark", "Status", "Next step", OWNER_COLUMN, "Waiting on", "Source", LAST_CONTACT] as const;
 
 /** "Our turn", "Client · followed up Nov 4", "USPTO", "Approval" or "—". Pure; `shortDate` is passed in. */
 export function waitingCell(row: Pick<ReviewRow, "waiting" | "contactKnown" | "lastOutbound">, fmt: (date: string) => string): string {

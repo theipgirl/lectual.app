@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { COLUMN_IDS, NOTES_PRESENT, columnsFor, type SheetSectionId } from "@/lib/review/sheet-columns";
 import {
   growHeight,
   normalizeNextStepTitle,
@@ -13,9 +14,9 @@ import {
   NEXT_MIN_WIDTH,
   colWidth,
   sheetMinWidth,
+  editColumnOf,
   courtOf,
   nextEditableCell,
-  notePost,
   parseSizes,
   postFor,
   sheetLeadStages,
@@ -102,32 +103,32 @@ describe("each editable cell posts to an existing review action", () => {
     expect(courtOf(sheetRow())).toBe(U1);
   });
 
-  it("Source -> setSource; + Note -> logWhatHappened", () => {
+  // Changed on purpose: notePost is gone (the Notes cell posts through logWhatHappenedAction itself; see tests/review/sheet-notes.test.tsx).
+  it("Source -> setSource", () => {
     expect(postFor(sheetRow({ kind: "lead" }), { col: "source", source: "Referral" })).toEqual({ action: "setSource", fields: { kind: "lead", id: ID, source: "Referral" } });
     expect(postFor(sheetRow(), { col: "source", source: null })?.fields.source).toBe("");
-    expect(notePost(sheetRow(), "Called")).toEqual({ action: "logWhatHappened", fields: { kind: "matter", id: ID, body: "Called" } });
   });
 });
 
 describe("who may edit what", () => {
   it("locked columns, the client link and the mark never get an editor", () => {
     for (const col of [...LOCKED_COLUMNS, "client", "mark"] as const) {
-      expect(cellEditable(col, "matter", OWNER)).toBe(false);
-      expect(cellEditable(col, "lead", OWNER)).toBe(false);
+      expect(cellEditable(col, { key: "m", kind: "matter" }, OWNER)).toBe(false);
+      expect(cellEditable(col, { key: "l", kind: "lead" }, OWNER)).toBe(false);
     }
-    expect(SHEET_EDIT_COLUMNS.filter((c) => cellEditable(c, "matter", OWNER))).toEqual([...EDITABLE_COLUMNS]);
+    expect(SHEET_EDIT_COLUMNS.filter((c) => cellEditable(c, { key: "m", kind: "matter" }, OWNER))).toEqual([...EDITABLE_COLUMNS]);
   });
 
   it("read-only roles get no editors at all", () => {
-    for (const col of SHEET_EDIT_COLUMNS) for (const kind of ["matter", "lead"] as const) expect(cellEditable(col, kind, READ_ONLY_PERMS)).toBe(false);
+    for (const col of SHEET_EDIT_COLUMNS) for (const kind of ["matter", "lead"] as const) expect(cellEditable(col, { key: "r", kind }, READ_ONLY_PERMS)).toBe(false);
   });
 
   it("a lead's Status needs the move-stage role; an unreadable stage list gives no Status editor", () => {
     const noMove = { ...OWNER, moveLead: false };
-    expect(cellEditable("status", "lead", noMove)).toBe(false);
-    expect(cellEditable("next", "lead", noMove)).toBe(true);
-    expect(cellEditable("status", "matter", { ...OWNER, matterStages: null })).toBe(false);
-    expect(cellEditable("status", "matter", { ...OWNER, matterStages: [] })).toBe(false);
+    expect(cellEditable("status", { key: "l", kind: "lead" }, noMove)).toBe(false);
+    expect(cellEditable("next", { key: "l", kind: "lead" }, noMove)).toBe(true);
+    expect(cellEditable("status", { key: "m", kind: "matter" }, { ...OWNER, matterStages: null })).toBe(false);
+    expect(cellEditable("status", { key: "m", kind: "matter" }, { ...OWNER, matterStages: [] })).toBe(false);
   });
 });
 
@@ -186,6 +187,91 @@ describe("Tab and sizes", () => {
     expect(nextEditableCell(rows, { rowKey: "b", col: "source" }, perms)).toBeNull();
   });
 
+  describe("Tab follows the DRAWN editable cells (each section's columns, after the chooser)", () => {
+    const drawn = (sec: SheetSectionId, hide: string[] = []) =>
+      columnsFor(sec, { canSeeMoney: true, hasNotes: NOTES_PRESENT }).filter((c) => c.editable && !hide.includes(c.id)).map((c) => editColumnOf(c.id));
+    const rows = [
+      { key: "t1", kind: "matter" as const, sec: "trademarks" as const },
+      { key: "t2", kind: "matter" as const, sec: "trademarks" as const },
+      { key: "c1", kind: "matter" as const, sec: "contracts" as const },
+      { key: "c2", kind: "matter" as const, sec: "contracts" as const },
+    ];
+    const walk = (from: { rowKey: string; col: EditableColumnT }, dir: 1 | -1 = 1, hide: Record<string, string[]> = {}) =>
+      nextEditableCell(rows, from, OWNER, dir, (r) => {
+        const sec = rows.find((x) => x.key === r.key)!.sec;
+        return drawn(sec, hide[sec]);
+      });
+    type EditableColumnT = (typeof EDITABLE_COLUMNS)[number];
+
+    it("Contracts: Tab from court goes to the next row's status; Shift+Tab from status goes to the previous row's court", () => {
+      expect(drawn("contracts")).toEqual(["status", "next", "court"]);
+      expect(walk({ rowKey: "c1", col: "court" })).toEqual({ rowKey: "c2", col: "status" });
+      expect(walk({ rowKey: "c2", col: "status" }, -1)).toEqual({ rowKey: "c1", col: "court" });
+    });
+    it("Trademarks: Tab goes status, source, court, next (the drawn order)", () => {
+      expect(walk({ rowKey: "t1", col: "status" })).toEqual({ rowKey: "t1", col: "source" });
+      expect(walk({ rowKey: "t1", col: "source" })).toEqual({ rowKey: "t1", col: "court" });
+      expect(walk({ rowKey: "t1", col: "court" })).toEqual({ rowKey: "t1", col: "next" });
+      expect(walk({ rowKey: "t1", col: "next" })).toEqual({ rowKey: "t2", col: "status" });
+    });
+    it("custom columns (read only) are never a stop: with firm columns drawn, Tab visits the same cells as before", () => {
+      const customFields = [
+        { id: "00000000-0000-4000-8000-00000000a001", section: "trademarks" as const, label: "Priority", kind: "choice" as const, position: 0 },
+        { id: "00000000-0000-4000-8000-00000000a002", section: "both" as const, label: "Signed on", kind: "date" as const, position: 1 },
+      ];
+      const withCustom = (sec: SheetSectionId) => columnsFor(sec, { canSeeMoney: true, hasNotes: NOTES_PRESENT, customFields }).map((c) => editColumnOf(c.id));
+      expect(withCustom("trademarks")).toContain("cf:00000000-0000-4000-8000-00000000a001");
+      const walkCustom = (from: { rowKey: string; col: EditableColumnT }, dir: 1 | -1 = 1) => nextEditableCell(rows, from, OWNER, dir, (r) => withCustom(rows.find((x) => x.key === r.key)!.sec));
+      // Changed on purpose (merge with the Notes cell): every drawn column is handed in, so the comparison is with the same columns minus the
+      // firm's (Notes included on both sides: it is a stop where it can be typed in, see below).
+      const plain = (sec: SheetSectionId) => columnsFor(sec, { canSeeMoney: true, hasNotes: NOTES_PRESENT }).map((c) => editColumnOf(c.id));
+      const walkPlain = (from: { rowKey: string; col: EditableColumnT }, dir: 1 | -1 = 1) => nextEditableCell(rows, from, OWNER, dir, (r) => plain(rows.find((x) => x.key === r.key)!.sec));
+      const starts: { rowKey: string; col: EditableColumnT }[] = rows.flatMap((r) => (["status", "next", "court", "source"] as const).map((col) => ({ rowKey: r.key, col })));
+      for (const from of starts) for (const dir of [1, -1] as const) expect(walkCustom(from, dir), `${from.rowKey}|${from.col}|${dir}`).toEqual(walkPlain(from, dir));
+    });
+    // Merge with the Notes cell (488dd3d): Tab follows the drawn cells and lands on Notes where it can be typed in.
+    describe("the Notes cell is a Tab stop in its drawn place", () => {
+      const withNotes = (sec: SheetSectionId, hide: string[] = []) =>
+        columnsFor(sec, { canSeeMoney: true, hasNotes: NOTES_PRESENT }).filter((c) => (c.editable || c.id === "notes") && !hide.includes(c.id)).map((c) => editColumnOf(c.id));
+      const walkN = (from: { rowKey: string; col: EditableColumnT | "notes" }, dir: 1 | -1 = 1, perms = OWNER, hide: Record<string, string[]> = {}, rs: readonly { key: string; kind: "matter" | "lead"; sec: SheetSectionId }[] = rows) =>
+        nextEditableCell(rs, from, perms, dir, (r) => withNotes(rs.find((x) => x.key === r.key)!.sec, hide[rs.find((x) => x.key === r.key)!.sec]));
+      it("Trademarks: status, source, Notes, court, next (Notes after Source)", () => {
+        expect(withNotes("trademarks")).toEqual(["status", "source", "notes", "court", "next"]);
+        expect(walkN({ rowKey: "t1", col: "source" })).toEqual({ rowKey: "t1", col: "notes" });
+        expect(walkN({ rowKey: "t1", col: "notes" })).toEqual({ rowKey: "t1", col: "court" });
+        expect(walkN({ rowKey: "t1", col: "court" }, -1)).toEqual({ rowKey: "t1", col: "notes" });
+      });
+      it("Contracts: status, next, Notes, court (Notes after Next step)", () => {
+        expect(withNotes("contracts")).toEqual(["status", "next", "notes", "court"]);
+        expect(walkN({ rowKey: "c1", col: "next" })).toEqual({ rowKey: "c1", col: "notes" });
+        expect(walkN({ rowKey: "c1", col: "notes" })).toEqual({ rowKey: "c1", col: "court" });
+      });
+      it("moved or hidden by the chooser, Notes follows: hidden is skipped", () => {
+        expect(walkN({ rowKey: "t1", col: "source" }, 1, OWNER, { trademarks: ["notes"] })).toEqual({ rowKey: "t1", col: "court" });
+      });
+      it("not a stop on a row whose note can't be typed (the note write roles)", () => {
+        const mixed = [
+          { key: "m1", kind: "matter" as const, sec: "trademarks" as const },
+          { key: "l1", kind: "lead" as const, sec: "trademarks" as const },
+        ];
+        const matterOnly = { ...OWNER, writeLead: false, moveLead: false };
+        expect(walkN({ rowKey: "m1", col: "source" }, 1, matterOnly, {}, mixed)).toEqual({ rowKey: "m1", col: "notes" });
+        // the lead row has no typed cell at all for this role: from the matter's last stop, Tab ends
+        expect(walkN({ rowKey: "m1", col: "next" }, 1, matterOnly, {}, mixed)).toBeNull();
+      });
+    });
+    it("a hidden status is skipped", () => {
+      expect(walk({ rowKey: "t1", col: "next" }, 1, { trademarks: ["status"] })).toEqual({ rowKey: "t2", col: "source" });
+      expect(walk({ rowKey: "c1", col: "court" }, 1, { contracts: ["status"] })).toEqual({ rowKey: "c2", col: "next" });
+    });
+    it("crossing from the last Trademarks row to the first Contracts row lands on a drawn cell, and back", () => {
+      const to = walk({ rowKey: "t2", col: "next" });
+      expect(to).toEqual({ rowKey: "c1", col: "status" });
+      expect(drawn("contracts")).toContain(to!.col);
+      expect(walk({ rowKey: "c1", col: "status" }, -1)).toEqual({ rowKey: "t2", col: "next" });
+    });
+  });
+
   it("stored widths are read defensively and clamped", () => {
     expect(parseSizes(null)).toEqual({ cols: {}, rows: {} });
     expect(parseSizes("{not json")).toEqual({ cols: {}, rows: {} });
@@ -195,7 +281,9 @@ describe("Tab and sizes", () => {
 
 describe("default column widths", () => {
   it("are the director's defaults, with Next step flexible", () => {
-    expect(DEFAULT_COL_WIDTHS).toEqual({ client: 140, mark: 130, status: 130, next: null, court: 110, waiting: 140, source: 100, contact: 84 });
+    // The original eight are unchanged; Sprint 1 adds the new columns' widths (a test below checks every id is covered). Notes is the
+    // merged Notes cell's own 150px (it replaced the "+ Note" column).
+    expect(DEFAULT_COL_WIDTHS).toMatchObject({ client: 140, mark: 130, status: 130, next: null, court: 110, waiting: 140, source: 100, contact: 84, notes: 150 });
     expect(NEXT_MIN_WIDTH).toBe(200);
   });
   it("a stored width overrides the default; nothing stored reads the default", () => {
@@ -206,9 +294,19 @@ describe("default column widths", () => {
     expect(colWidth(stored, "next")).toBe(400);
     expect(colWidth(stored, "mark")).toBe(130);
   });
-  it("the table's minimum is the sum, Next step counted at 200 and the note column only while editing", () => {
-    expect(sheetMinWidth(parseSizes(null), false)).toBe(140 + 130 + 130 + 200 + 110 + 140 + 100 + 84);
-    expect(sheetMinWidth(parseSizes(null), true)).toBe(1034 + 76);
+  it("the table's minimum is the sum of the columns drawn, Next step counted at 200 (no separate note column any more)", () => {
+    const eight = ["client", "mark", "status", "next", "court", "waiting", "source", "contact"] as const;
+    expect(sheetMinWidth(parseSizes(null), eight)).toBe(140 + 130 + 130 + 200 + 110 + 140 + 100 + 84);
+    expect(sheetMinWidth(parseSizes(null), [...eight, "notes"])).toBe(1034 + 150);
+  });
+  it("widths cover every column id, and the minimum sums only the columns drawn", () => {
+    for (const id of COLUMN_IDS) expect(DEFAULT_COL_WIDTHS, id).toHaveProperty(editColumnOf(id));
+    const some = ["client", "serial", "oaDue"] as const;
+    expect(sheetMinWidth(parseSizes(null), some)).toBe(140 + 100 + 130);
+    expect(sheetMinWidth(parseSizes(JSON.stringify({ cols: { serial: 200 } })), some)).toBe(140 + 200 + 130);
+  });
+  it("stored widths for unknown ids are dropped; the new ids are kept and clamped", () => {
+    expect(parseSizes(JSON.stringify({ cols: { oaDue: 9999, serial: 20, legalFee: 150, owner: 300, notAColumn: 100 } })).cols).toEqual({ oaDue: 640, serial: 72, legalFee: 150 });
   });
 });
 
@@ -357,5 +455,168 @@ describe("next step title field", () => {
     expect(growHeight(10, 21, 18)).toBe(60);
     expect(growHeight(70, 21, 18)).toBe(70);
     expect(growHeight(400, 21, 18)).toBe(102);
+  });
+});
+
+/* ── Sprint 3: the firm's own columns ── */
+
+import { fieldWord, isEditableColumn, keptNote, rowHolds, applyValue, type CellValue, type CustomFit } from "@/lib/review/sheet-edit";
+import { CUSTOM_FROM_LEAD, CUSTOM_FROM_LEAD_KEPT, CUSTOM_FROM_MERGED, CUSTOM_FROM_MERGED_KEPT } from "@/lib/ui/words";
+
+const CF_P = "cf:00000000-0000-4000-8000-00000000a001" as const; // Trademarks "Priority"
+const CF_S = "cf:00000000-0000-4000-8000-00000000a002" as const; // Both "Signed on"
+const CF_C = "cf:00000000-0000-4000-8000-00000000a003" as const; // Contracts "Matter value"
+const FIELDS3 = [
+  { id: CF_P.slice(3), section: "trademarks" as const, label: "Priority", kind: "choice" as const, position: 0 },
+  { id: CF_S.slice(3), section: "both" as const, label: "Signed on", kind: "date" as const, position: 1 },
+  { id: CF_C.slice(3), section: "contracts" as const, label: "Matter value", kind: "money" as const, position: 2 },
+];
+
+describe("Sprint 3: custom cells", () => {
+  const lead = sheetRow({
+    key: "lead:1",
+    kind: "lead",
+    customOwn: { [CF_P]: "High", [CF_S]: null },
+    customInherited: { [CF_P]: { from: "merged", cell: { text: "Low", tone: "value", title: CUSTOM_FROM_MERGED } } },
+    custom: { [CF_P]: { text: "High", tone: "value" } },
+  });
+  const matter = sheetRow({
+    customOwn: { [CF_P]: null },
+    customInherited: { [CF_P]: { from: "lead", cell: { text: "High", tone: "value", title: CUSTOM_FROM_LEAD } } },
+    custom: { [CF_P]: { text: "High", tone: "value", title: CUSTOM_FROM_LEAD } },
+  });
+
+  it("a cf: column is an editable column id; postFor posts the value action with the field, the RECORD kind and id, the raw value", () => {
+    expect(isEditableColumn(CF_P)).toBe(true);
+    expect(isEditableColumn("cf:not-a-uuid")).toBe(false);
+    expect(postFor(lead, { col: CF_P, raw: "Low" })).toEqual({ action: "setCustomValue", fields: { fieldId: CF_P.slice(3), kind: "lead", id: ID, value: "Low" } });
+    expect(postFor(matter, { col: CF_P, raw: "" })).toEqual({ action: "setCustomValue", fields: { fieldId: CF_P.slice(3), kind: "matter", id: ID, value: "" } });
+  });
+
+  it("rowHolds compares with the OWN value only: an inherited value never holds", () => {
+    expect(rowHolds(lead, { col: CF_P, raw: "High" })).toBe(true);
+    expect(rowHolds(matter, { col: CF_P, raw: "High" })).toBe(false);
+    expect(rowHolds(matter, { col: CF_P, raw: "" })).toBe(true);
+  });
+
+  it("R10: a blank raw draws the inherited cell with its title, never a dash; a value draws as the server would", () => {
+    const cleared = applyValue(lead, { col: CF_P, raw: "" });
+    expect(cleared.custom?.[CF_P]).toEqual({ text: "Low", tone: "value", title: CUSTOM_FROM_MERGED });
+    expect(cleared.customOwn?.[CF_P]).toBeNull();
+    const typed = applyValue(matter, { col: CF_P, raw: "Low", shown: { text: "Low", tone: "value" } });
+    expect(typed.custom?.[CF_P]).toEqual({ text: "Low", tone: "value" });
+    const noInherit = applyValue(sheetRow({ customOwn: { [CF_S]: "2026-11-02" } }), { col: CF_S, raw: "" });
+    expect(noInherit.custom?.[CF_S]).toEqual({ text: "—", tone: "none" });
+  });
+
+  it("the kept sentence: only for a clear of an own value with an inherited value present", () => {
+    expect(keptNote(lead, { col: CF_P, raw: "" })).toBe(CUSTOM_FROM_MERGED_KEPT);
+    const leadInherited = { ...lead, customInherited: { [CF_P]: { from: "lead" as const, cell: { text: "x", tone: "value" as const } } } };
+    expect(keptNote(leadInherited, { col: CF_P, raw: "" })).toBe(CUSTOM_FROM_LEAD_KEPT);
+    expect(keptNote(sheetRow({ customOwn: { [CF_S]: "2026-11-02" } }), { col: CF_S, raw: "" })).toBeUndefined(); // nothing inherited
+    expect(keptNote(lead, { col: CF_P, raw: "Low" })).toBeUndefined(); // not a clear
+    expect(keptNote(matter, { col: CF_P, raw: "" })).toBeUndefined(); // there was no own value
+  });
+
+  it("sheetReducer for cf: keys: start, saved only with a matching seq (with its note), failed reverts, an older seq ignored, refreshed keeps saving", () => {
+    const cell = cellKey(lead.key, CF_P);
+    const v: CellValue = { col: CF_P, raw: "" };
+    let st = sheetReducer(EMPTY_SHEET_STATE, { type: "start", cell, seq: 1, value: v, client: "Acme", field: CF_P, label: "Priority" });
+    expect(st.status).toEqual({ tone: "saving", client: "Acme", field: CF_P, label: "Priority" });
+    expect(shownRow(lead, st).custom?.[CF_P]?.text).toBe("Low");
+    st = sheetReducer(st, { type: "start", cell, seq: 2, value: { col: CF_P, raw: "High" }, client: "Acme", field: CF_P, label: "Priority" });
+    expect(sheetReducer(st, { type: "saved", cell, seq: 1, client: "Acme", field: CF_P })).toBe(st);
+    const refreshed = sheetReducer(st, { type: "refreshed" });
+    expect(refreshed.overrides[cell]).toEqual({ col: CF_P, raw: "High" });
+    const saved = sheetReducer(st, { type: "saved", cell, seq: 2, client: "Acme", field: CF_P, label: "Priority", note: CUSTOM_FROM_LEAD_KEPT });
+    expect(saved.status).toEqual({ tone: "saved", client: "Acme", field: CF_P, label: "Priority", note: CUSTOM_FROM_LEAD_KEPT });
+    const failed = sheetReducer(st, { type: "failed", cell, seq: 2, client: "Acme", field: CF_P, message: "No.", label: "Priority" });
+    expect(failed.overrides[cell]).toBeUndefined();
+    expect(shownRow(lead, failed).custom?.[CF_P]?.text).toBe("High");
+    expect(failed.status?.message).toBe("No.");
+  });
+
+  it("fieldWord: the built-in word or the custom label", () => {
+    expect(fieldWord("next", {})).toBe("next step");
+    expect(fieldWord(CF_P, { [CF_P]: "Priority" })).toBe("Priority");
+  });
+});
+
+describe("Sprint 3: Tab with custom columns (P2)", () => {
+  const rows3 = [
+    { key: "t1", kind: "matter" as const, sec: "trademarks" as const },
+    { key: "t2", kind: "lead" as const, sec: "trademarks" as const },
+    { key: "c1", kind: "matter" as const, sec: "contracts" as const },
+  ];
+  const secOf = (k: string) => rows3.find((r) => r.key === k)!.sec;
+  const fit: CustomFit = (col, r) => {
+    const f = FIELDS3.find((x) => `cf:${x.id}` === col);
+    return !!f && (f.section === "both" || f.section === secOf(r.key));
+  };
+  const perms3 = { ...OWNER, writeCustom: true };
+  /** The chooser's order: Priority dragged between Status and Source; Signed on and Matter value at the end. */
+  const drawnFor = (hide: string[] = []) => (r: { key: string }) => {
+    const cols = columnsFor(secOf(r.key), { canSeeMoney: true, hasNotes: NOTES_PRESENT, customFields: FIELDS3 }).filter((c) => c.editable && !hide.includes(c.id)).map((c) => editColumnOf(c.id));
+    if (secOf(r.key) === "trademarks" && cols.includes(CF_P)) {
+      const without = cols.filter((c) => c !== CF_P);
+      without.splice(without.indexOf("status") + 1, 0, CF_P);
+      return without;
+    }
+    return cols;
+  };
+  const walk = (from: { rowKey: string; col: string }, dir: 1 | -1 = 1, perms: SheetPerms = perms3, f: CustomFit | undefined = fit, hide: string[] = []) =>
+    nextEditableCell(rows3, from as never, perms, dir, drawnFor(hide), f);
+
+  it("the drawn order, a custom column between two built-ins", () => {
+    expect(walk({ rowKey: "t1", col: "status" })).toEqual({ rowKey: "t1", col: CF_P });
+    expect(walk({ rowKey: "t1", col: CF_P })).toEqual({ rowKey: "t1", col: "source" });
+    expect(walk({ rowKey: "t1", col: "next" })).toEqual({ rowKey: "t1", col: CF_S });
+    expect(walk({ rowKey: "t1", col: CF_S })).toEqual({ rowKey: "t2", col: "status" });
+  });
+  it("Shift+Tab walks the reverse order", () => {
+    expect(walk({ rowKey: "t1", col: "source" }, -1)).toEqual({ rowKey: "t1", col: CF_P });
+    expect(walk({ rowKey: "t2", col: "status" }, -1)).toEqual({ rowKey: "t1", col: CF_S });
+  });
+  it("a custom column hidden in the chooser is skipped", () => {
+    expect(walk({ rowKey: "t1", col: "status" }, 1, perms3, fit, [CF_P])).toEqual({ rowKey: "t1", col: "source" });
+  });
+  it("a Contracts-only field is not a stop on a Trademarks row, and is on a Contracts row", () => {
+    const tm = [...Array(20)].reduce<{ rowKey: string; col: string } | null>((at) => (at && at.rowKey !== "c1" ? walk(at) : at), { rowKey: "t1", col: "status" });
+    expect(tm?.rowKey).toBe("c1");
+    const stopsOnT: string[] = [];
+    let at: { rowKey: string; col: string } | null = { rowKey: "t1", col: "status" };
+    while (at && at.rowKey !== "c1") {
+      stopsOnT.push(at.col);
+      at = walk(at);
+    }
+    expect(stopsOnT).not.toContain(CF_C);
+    const onC: string[] = [];
+    while (at) {
+      onC.push(at.col);
+      at = walk(at);
+    }
+    expect(onC).toContain(CF_C);
+  });
+  it("writeCustom absent, false, READ_ONLY_PERMS, or no fit: no custom stop", () => {
+    for (const [perms, f] of [
+      [OWNER, fit],
+      [{ ...OWNER, writeCustom: false }, fit],
+      [READ_ONLY_PERMS, fit],
+      [perms3, undefined],
+    ] as const) {
+      const stops: string[] = [];
+      let at = nextEditableCell(rows3, { rowKey: "zz", col: "status" } as never, perms, 1, drawnFor(), f);
+      for (let i = 0; at && i < 50; i++) {
+        stops.push(at.col);
+        at = nextEditableCell(rows3, at, perms, 1, drawnFor(), f);
+      }
+      expect(stops.filter((c) => c.startsWith("cf:"))).toEqual([]);
+    }
+  });
+  it("cellEditable is the one predicate: a cf: column needs writeCustom AND a fit that says yes", () => {
+    expect(cellEditable(CF_P, { key: "t1", kind: "matter" }, perms3, fit)).toBe(true);
+    expect(cellEditable(CF_P, { key: "c1", kind: "matter" }, perms3, fit)).toBe(false);
+    expect(cellEditable(CF_P, { key: "t1", kind: "matter" }, perms3)).toBe(false);
+    expect(cellEditable(CF_P, { key: "t1", kind: "matter" }, OWNER, fit)).toBe(false);
   });
 });

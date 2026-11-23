@@ -24,6 +24,12 @@ import { NO_PREVIEW, previewFor, viewFor } from "@/lib/views";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import { CAN_MOVE_STAGE, CAN_WRITE_LEAD } from "@/lib/pipeline/leads";
 import { loadReview } from "@/lib/review/load";
+import { canSeeBilling } from "@/lib/billing/can-see";
+import { ColumnChooser, type ChooserSection } from "@/components/review/ColumnChooser";
+import { NOTES_PRESENT, columnsFor } from "@/lib/review/sheet-columns";
+import { loadCardCustomColumns } from "@/lib/custom-columns/card-load";
+import { canWriteCustomValue, firmColumnsBlock, type FirmColumnsBlock } from "@/lib/custom-columns/rules";
+import { canSeeSetup } from "@/lib/setup/roles";
 import { reviewBuckets, reviewSubline } from "@/lib/review/buckets";
 import { boardLanes, kpis, meetingPosition, offBoard } from "@/lib/review/lanes";
 import { deadlinesOut, reviewPerson, waitingOnPerson } from "@/lib/review/strips";
@@ -50,11 +56,24 @@ type SearchParams = { since?: string | string[]; who?: string | string[]; kind?:
 export default async function ReviewPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;
   const params = parseReviewParams(sp);
-  const [load, session] = await Promise.all([loadReview(), resolveFirmSession()]);
+  // The session comes FIRST: whether this viewer may see fees is decided here from the re-resolved role, before anything is read, so
+  // the money reads are never made for anyone else. Fees are the List's columns, so no other view pays for them.
+  const session = await resolveFirmSession();
   const role = session.kind === "ok" ? session.role : null;
+  const canSeeMoney = canSeeBilling(role);
+  const withFees = canSeeMoney && params.view === "sheet";
+  // The firm's own columns are the List's too: only the List reads them (the opened card reads its own record when needed).
+  // So is the Notes column: each row's newest plain note is read with the review's other reads, only for the List (three-state).
+  const withCustom = params.view === "sheet";
+  const notes = params.view === "sheet";
+  const load = await loadReview(new Date(), { withFees, withCustom, notes });
   const userId = session.kind === "ok" ? session.user.id : null;
   const canWrite = !!role && MATTER_WRITE_ROLES.includes(role);
   const canMove = canWrite && CAN_MOVE_STAGE.includes(role);
+  // The admin tier (the setup roles) alone hears that custom columns aren't switched on yet, and gets "Add a column" (CO4, R11).
+  const adminTier = canSeeSetup(role);
+  // Typing in the firm's own columns: 0115's value policy list, from the role re-resolved above.
+  const writeCustom = canWriteCustomValue(role);
 
   if (load.status === "unavailable") {
     return (
@@ -82,14 +101,30 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
     actingAsStaff: session.actingAsStaff,
   }) === "owner";
   const common = { owner, today: load.today, members: load.members, canWrite, params };
+  // Custom columns: the state the List drew from (null when not read), and the directory for person cells (null = it couldn't be read).
+  const custom = load.custom ?? null;
+  const customFields = custom?.status === "ok" ? custom.fields : [];
+  const customMembers = load.failed.includes("team names") ? null : load.members;
   // The owner's Sheet edits in place. Each permission comes from the role re-resolved above; the stage lists are read only for a role that can move one.
   let sheetPerms: SheetPerms | null = null;
   if (owner && params.view === "sheet") {
     const writeLead = !!role && CAN_WRITE_LEAD.includes(role);
     const moveLead = writeLead && !!role && CAN_MOVE_STAGE.includes(role);
     const stages = canWrite || moveLead ? await loadSheetStages() : { matter: null, lead: null };
-    sheetPerms = canWrite || writeLead ? { writeMatter: canWrite, writeLead, moveLead, matterStages: canWrite ? stages.matter : null, leadStages: moveLead ? stages.lead : null } : READ_ONLY_PERMS;
+    sheetPerms = canWrite || writeLead ? { writeMatter: canWrite, writeLead, moveLead, matterStages: canWrite ? stages.matter : null, leadStages: moveLead ? stages.lead : null, writeCustom } : READ_ONLY_PERMS;
   }
+  // "Columns" (draw-only, kept in this browser): offered on the List only, over exactly the columns this viewer may have.
+  const chooser =
+    params.view === "sheet" ? (
+      <ColumnChooser
+        sections={[
+          { id: "trademarks", title: "Trademarks", columns: columnsFor("trademarks", { canSeeMoney, hasNotes: NOTES_PRESENT, customFields }) },
+          { id: "contracts", title: "Contracts", columns: columnsFor("contracts", { canSeeMoney, hasNotes: NOTES_PRESENT, customFields }) },
+        ] satisfies ChooserSection[]}
+      />
+    ) : null;
+  // The Notes column: read with the review's other reads, only for the List (three-state; a failed read says so in the cells).
+  const sheetNotes = load.notes ?? null;
   const approvalsKnown = !load.failed.includes("approvals");
   // An approver sees the strip about THEM ("Waiting on you"); anyone else sees it about the review person, as before.
   const isApprover = !!role && !!userId && QUEUE_APPROVE_ROLES.includes(role);
@@ -128,6 +163,21 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const cardLoad = params.open ? await loadRecordCard(params.open) : null;
   const cardShownId = cardLoad?.status === "ok" ? (cardLoad.kind === "lead" ? cardLoad.lead.id : cardLoad.matter.id) : null;
   const cardRow = params.open && cardShownId ? (load.rows.find((r) => r.kind === params.open!.kind && r.id === cardShownId) ?? null) : null;
+  // "Firm columns" on the opened card: from the List's own read when the record is a row of it; otherwise ONE scoped read for the record the
+  // card shows (a merged lead opened by URL is its keeper). No card (not found, couldn't load) means no read at all.
+  let firmColumns: FirmColumnsBlock | null = null;
+  if (cardLoad?.status === "ok") {
+    const record =
+      cardLoad.kind === "lead"
+        ? { kind: "lead" as const, id: cardLoad.lead.id, matterType: null }
+        : { kind: "matter" as const, id: cardLoad.matter.id, matterType: cardLoad.matter.type ?? null };
+    const state =
+      custom && cardRow
+        ? custom
+        : await loadCardCustomColumns(cardLoad.kind === "lead" ? { kind: "lead", id: cardLoad.lead.id } : { kind: "matter", id: cardLoad.matter.id, leadId: cardLoad.matter.lead_id ?? null });
+    // A staff role types in the card (the card's own re-resolved role); viewer and social media see the values only.
+    firmColumns = firmColumnsBlock(state, custom && cardRow ? cardRow : record, customMembers, load.today, canWriteCustomValue(cardLoad.role));
+  }
   // Close (and Back) land on the same review view: every other review param is kept, only `open` goes.
   const cardBase = reviewHref({ ...params, open: null });
   const cardParams = new URLSearchParams(cardBase.includes("?") ? cardBase.slice(cardBase.indexOf("?") + 1) : "");
@@ -150,6 +200,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
                 stagesFailed={cardLoad.status === "ok" && cardLoad.stages.status !== "ok" && cardEdits({ role: cardLoad.role, kind: cardLoad.kind }).stage}
                 closeStages={canMove ? load.closeStages : []}
                 deadlinesFailed={load.failed.includes("deadlines")}
+                firmColumns={firmColumns}
               />
             ),
           },
@@ -172,6 +223,12 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           sheetPerms && sheetPerms !== READ_ONLY_PERMS ? (
             <div className="rse-head-right">
               <SheetSaveStatus />
+              {chooser}
+              <ViewSwitch params={params} />
+            </div>
+          ) : chooser ? (
+            <div className="rse-head-right">
+              {chooser}
               <ViewSwitch params={params} />
             </div>
           ) : (
@@ -222,6 +279,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           clearHref: link({ q: "", i: 1 }),
         }}
         toggle={<ViewSwitch params={params} />}
+        more={chooser}
       />
 
       <KpiStrip kpis={kpis(buckets)} />
@@ -274,7 +332,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
       ) : params.view === "sheet" ? (
         <>
           {strips}
-          <SheetView rows={shown} {...common} {...(sheetPerms ? { sheetEdit: { perms: sheetPerms } } : {})} />
+          <SheetView rows={shown} canSeeMoney={canSeeMoney} custom={custom} customMembers={customMembers} adminTier={adminTier} notes={sheetNotes} {...common} {...(sheetPerms ? { sheetEdit: { perms: sheetPerms } } : {})} />
         </>
       ) : (
         <>
