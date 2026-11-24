@@ -439,7 +439,10 @@ describe("consult-prep: the three internal emails", () => {
     expect(sendPayloads(db)[1].scheduled_for).toBe(hours(26));
     expect(result.summary).toMatch(/1 email sent, 2 reminders scheduled/);
     // ids and times only
-    for (const row of sendRows(db)) expect(Object.keys(row.payload as object).sort()).toEqual(["kind", "prep_key", "resend_id", "scheduled_for", "source", "status"]);
+    // (plus the sha256 of the To+Cc list, so a later change of recipients can be seen: a hash, never an address)
+    for (const row of sendRows(db)) expect(Object.keys(row.payload as object).sort()).toEqual(["kind", "prep_key", "recipients_sha256", "resend_id", "scheduled_for", "source", "status"]);
+    for (const row of sendRows(db)) expect((row.payload as { recipients_sha256: string }).recipients_sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(JSON.stringify(sendRows(db))).not.toContain("@firm.example");
   });
 
   it("the email never goes to the lead, and the guard runs on every send", async () => {
@@ -905,5 +908,287 @@ describe("consult-prep: the Overnight digest never reports a failed or held-back
     await first.run();
     const second = setup({ tables: { crm_activity: first.db.tables.crm_activity } });
     expect(digestFor(await second.run())).toMatchObject({ text: "found no consults to prep", tone: "quiet" });
+  });
+});
+
+// ── review fixes (F1 to F9, N1, N3, N4) ─────────────────────────────────────
+
+const kindOf = (m: InternalMail) => m.idempotencyKey?.split(":").find((p) => p === "booked" || p === "24h" || p === "1h");
+const FIFTY_H = (over: Row = {}): Tables => ({ crm_calendar_event: [event("e1", { starts_at: hours(50), ...over })] });
+const plusMin = (iso: string, min: number) => new Date(Date.parse(iso) + min * 60_000).toISOString();
+
+describe("F1: one call booked twice is one prep", () => {
+  it("the Lawmatics row and the Outlook row of one call (10 minutes apart) are prepped ONCE, with one set of emails", async () => {
+    const tables: Tables = { crm_calendar_event: [event("e1", { starts_at: hours(50) }), event("o1", { source: "outlook", external_id: "AAMk1", starts_at: plusMin(hours(50), 10) })] };
+    const { run, sent, createDraft, db } = setup({ tables });
+    const result = await run();
+    expect(result.itemsIn).toBe(1);
+    expect(briefs(createDraft)).toHaveLength(1);
+    expect(sent.map(kindOf)).toEqual(["booked", "24h", "1h"]);
+    expect([...new Set(markers(db).map((r) => (r.payload as { event_id: string }).event_id))]).toEqual(["e1"]); // the Lawmatics row
+    expect(result.summary).toMatch(/booked twice/);
+  });
+
+  it("the twin that already has a prep is the one kept: a Lawmatics twin arriving later makes nothing new", async () => {
+    const first = setup({ tables: { crm_calendar_event: [event("o1", { source: "outlook", external_id: "AAMk1", starts_at: hours(50) })] } });
+    await first.run();
+    const again = setup({
+      tables: { crm_calendar_event: [event("o1", { source: "outlook", external_id: "AAMk1", starts_at: hours(50) }), event("e1", { starts_at: plusMin(hours(50), 5) })], crm_activity: first.db.tables.crm_activity },
+    });
+    await again.run();
+    expect(again.createDraft).not.toHaveBeenCalled();
+    expect(again.sent).toHaveLength(0);
+    expect(again.cancelled).toHaveLength(0);
+    expect(markers(again.db).length).toBe(markers(first.db).length);
+  });
+
+  it("a lead that already has a prep marker within the same-call window is not prepped again under another event id, and its reminders are NOT cancelled while the twin stands", async () => {
+    const first = setup({ tables: FIFTY_H() });
+    await first.run();
+    const again = setup({ tables: { crm_calendar_event: [event("e2", { starts_at: plusMin(hours(50), 5) })], crm_activity: first.db.tables.crm_activity } });
+    const result = await again.run();
+    expect(again.createDraft).not.toHaveBeenCalled();
+    expect(again.sent).toHaveLength(0);
+    expect(again.cancelled).toHaveLength(0);
+    expect(result.summary).toMatch(/booked twice/);
+  });
+
+  it("with no twin, a vanished event still cancels (the same call 3 hours away is a different call)", async () => {
+    const first = setup({ tables: FIFTY_H() });
+    await first.run();
+    const again = setup({ tables: { crm_calendar_event: [event("e2", { starts_at: plusMin(hours(50), 180) })], crm_activity: first.db.tables.crm_activity } });
+    await again.run();
+    expect(again.cancelled.map((c) => c.id).sort()).toEqual(["re_2", "re_3"]);
+  });
+});
+
+describe("F2: idempotency and races", () => {
+  it("the emailed text and html carry no 'Prepared' time, and the same facts at another time are the same payload; the queue copy still shows it", async () => {
+    const a = setup({ tables: FIFTY_H() });
+    await a.run();
+    const b = setup({ tables: FIFTY_H(), now: NOW + 3_600_000 });
+    await b.run();
+    for (const m of a.sent) {
+      expect(m.text).not.toMatch(/Prepared:/);
+      expect(m.html).not.toMatch(/Prepared:/);
+    }
+    expect(b.sent[0].text).toBe(a.sent[0].text);
+    expect(b.sent[0].html).toBe(a.sent[0].html);
+    expect(briefs(a.createDraft)[0].draftBody as string).toContain("Prepared:");
+  });
+
+  it("an HTTP 409 from Resend is 'already handled': recorded as duplicate, never failed, and not tried again", async () => {
+    const first = setup({ tables: FIFTY_H(), deps: { mailOut: async () => ({ status: "failed", http: 409 }) } });
+    const result = await first.run();
+    expect(sendPayloads(first.db).map((p) => p.status)).toEqual(["duplicate", "duplicate", "duplicate"]);
+    expect(sendPayloads(first.db).some((p) => p.status === "failed")).toBe(false);
+    expect(result.summary).toMatch(/already been handled by another run/);
+    expect(result.summary).not.toMatch(/could not be sent/);
+    const again = setup({ tables: { ...FIFTY_H(), crm_activity: first.db.tables.crm_activity } });
+    await again.run();
+    expect(again.sent).toHaveLength(0);
+  });
+
+  it("the booked email is attempted BEFORE the prep marker is written", async () => {
+    let markersAtFirstSend = -1;
+    const holder: { db?: { tables: Tables } } = {};
+    const s = setup({
+      tables: FIFTY_H(),
+      deps: {
+        mailOut: async () => {
+          if (markersAtFirstSend < 0) markersAtFirstSend = markers(holder.db as { tables: Tables }).length;
+          return { status: "sent", id: "re_x" };
+        },
+      },
+    });
+    holder.db = s.db;
+    await s.run();
+    expect(markersAtFirstSend).toBe(0);
+    expect(markers(s.db).length).toBeGreaterThan(0);
+  });
+
+  it("the markers are looked at again right before the BRIEFING is queued: a prep another run just made is not made twice", async () => {
+    const holder: { db?: { tables: Tables } } = {};
+    const key = `lead-1:e1:${hours(5)}`;
+    const s = setup({
+      tables: { crm_lead: [leadRow("lead-1", { lawmatics_id: "9" })] },
+      deps: {
+        prospects: {
+          client: async () => {
+            // another run finishes its prep while this one is gathering
+            holder.db?.tables.crm_activity.push({ id: "m-other", org_id: ORG, lead_id: "lead-1", type: "queue_drafted", created_at: new Date(NOW).toISOString(), payload: { source: "consult-prep", agent: "consult-prep", kind: "brief", event_id: "e1", prep_key: key, start_at: hours(5) } });
+            return null;
+          },
+        },
+      },
+    });
+    holder.db = s.db;
+    const result = await s.run();
+    expect(s.createDraft).not.toHaveBeenCalled();
+    expect(result.itemsIn).toBe(0);
+    expect(result.summary).toMatch(/just been prepared by another run/);
+  });
+});
+
+describe("F3: a re-run sends only a booked email", () => {
+  it("plans no 24h or 1h under the re-run key, even when the base key never scheduled them; the base key still owns the reminders", async () => {
+    const tables: Tables = FIFTY_H();
+    const first = setup({ tables, deps: { mail: { apiKey: null, from: null } } }); // prepped with email off: no send records at all
+    await first.run();
+    expect(sendRows(first.db)).toHaveLength(0);
+    const rerun = setup({ tables: { ...tables, crm_activity: first.db.tables.crm_activity }, scope: { leadIds: ["lead-1"], reason: "rerun" } });
+    await rerun.run();
+    expect(rerun.sent.map(kindOf)).toEqual(["booked"]);
+    expect(rerun.sent[0].idempotencyKey).toMatch(/:rerun:\d+:booked$/);
+    const sweep = setup({ tables: { ...tables, crm_activity: rerun.db.tables.crm_activity } });
+    await sweep.run();
+    expect(sweep.sent.map(kindOf)).toEqual(["24h", "1h"]);
+    expect(sweep.sent.every((m) => !m.idempotencyKey?.includes(":rerun:"))).toBe(true);
+  });
+});
+
+describe("F6: a change of who gets the email cancels reminders that are still scheduled", () => {
+  it("cancels both, plans them again with the current list under a new key, and records a hash of the list, never an address", async () => {
+    const first = setup({ tables: FIFTY_H() });
+    await first.run();
+    const again = setup({ tables: { ...FIFTY_H(), crm_activity: first.db.tables.crm_activity }, deps: { memberAddresses: async () => ["partner@firm.example"] } });
+    const result = await again.run();
+    expect(again.cancelled.map((c) => c.id).sort()).toEqual(["re_2", "re_3"]);
+    expect(again.sent.map(kindOf)).toEqual(["24h", "1h"]);
+    expect(again.sent.every((m) => m.to.join() === "partner@firm.example")).toBe(true);
+    expect(again.sent.map((m) => m.idempotencyKey?.split(":").slice(-2).join(":"))).toEqual(["24h:g1", "1h:g1"]);
+    expect(result.summary).toMatch(/who gets consult prep changed/);
+    expect(JSON.stringify(sendRows(again.db))).not.toContain("partner@firm.example");
+  });
+
+  it("an unchanged list cancels nothing", async () => {
+    const first = setup({ tables: FIFTY_H() });
+    await first.run();
+    const again = setup({ tables: { ...FIFTY_H(), crm_activity: first.db.tables.crm_activity } });
+    await again.run();
+    expect(again.cancelled).toHaveLength(0);
+    expect(again.sent).toHaveLength(0);
+  });
+
+  it("a recipient read that is unavailable cancels nothing", async () => {
+    const first = setup({ tables: FIFTY_H() });
+    await first.run();
+    const again = setup({ tables: { ...FIFTY_H(), crm_activity: first.db.tables.crm_activity }, deps: { memberAddresses: async () => null } });
+    await again.run();
+    expect(again.cancelled).toHaveLength(0);
+  });
+});
+
+describe("F7: a scoped run does only its leads' work", () => {
+  it("its send-history read is for its leads only, small, and no firm-wide read is made", async () => {
+    const first = setup({ tables: FIFTY_H() });
+    await first.run();
+    const again = setup({ tables: { ...FIFTY_H(), crm_activity: first.db.tables.crm_activity }, scope: { leadIds: ["lead-1"], reason: "stage" } });
+    await again.run();
+    const reads = again.log.filter((q) => q.table === "crm_activity" && q.action === "select" && q.filters.some((f) => f.column === "payload->>source" && f.value === "consult-prep-send"));
+    expect(reads.length).toBeGreaterThan(0);
+    for (const q of reads) {
+      expect(q.filters.some((f) => f.column === "lead_id" && f.op === "in")).toBe(true);
+      expect(q.limit).toBeLessThanOrEqual(500);
+    }
+  });
+
+  it("another lead's scheduled sends are not even looked at by a run for one lead", async () => {
+    const tables: Tables = { crm_calendar_event: [event("e1", { starts_at: hours(50) }), event("e2", { lead_id: "lead-2", starts_at: hours(50) })], crm_lead: [leadRow(), leadRow("lead-2", { email: "two@client.example" })] };
+    const first = setup({ tables });
+    await first.run();
+    const gone: Tables = { crm_calendar_event: [], crm_lead: tables.crm_lead, crm_activity: first.db.tables.crm_activity };
+    const again = setup({ tables: gone, scope: { leadIds: ["lead-1"], reason: "stage" } });
+    await again.run();
+    // lead-1's event is gone, lead-2's too, but this run was for lead-1 only
+    expect(again.cancelled).toHaveLength(2);
+  });
+});
+
+describe("F8: a lead that leaves cancels its reminders", () => {
+  const stages = [
+    { id: "s-open", org_id: ORG, name: "Discovery", category: "open", order_index: 1 },
+    { id: "s-consult", org_id: ORG, name: "Consultation Scheduled", category: "open", order_index: 2 },
+    { id: "s-lost", org_id: ORG, name: "Lost", category: "lost", order_index: 9 },
+    { id: "s-nurt", org_id: ORG, name: "Long-term nurture", category: "nurture", order_index: 10 },
+  ];
+  it.each([
+    ["lost, a scoped run (the hook)", "s-lost", { leadIds: ["lead-1"], reason: "stage" as const }],
+    ["nurture, a scoped run (the hook)", "s-nurt", { leadIds: ["lead-1"], reason: "stage" as const }],
+    ["lost, the sweep", "s-lost", undefined],
+  ])("%s", async (_n, stageId, scope) => {
+    const first = setup({ tables: FIFTY_H() });
+    await first.run();
+    const again = setup({ tables: { ...FIFTY_H(), crm_stage: stages, crm_lead: [leadRow("lead-1", { current_stage_id: stageId })], crm_activity: first.db.tables.crm_activity }, scope });
+    const result = await again.run();
+    expect(again.cancelled.map((c) => c.id).sort()).toEqual(["re_2", "re_3"]);
+    expect(again.sent).toHaveLength(0); // and they are not planned again
+    expect(again.createDraft).not.toHaveBeenCalled();
+    expect(result.summary).toMatch(/left the pipeline/);
+  });
+
+  it("a merged lead's reminders are cancelled", async () => {
+    const first = setup({ tables: FIFTY_H() });
+    await first.run();
+    const again = setup({ tables: { ...FIFTY_H(), crm_lead: [leadRow("lead-1", { merged_into_id: "lead-9" }), leadRow("lead-9", { email: "keeper@client.example" })], crm_activity: first.db.tables.crm_activity } });
+    await again.run();
+    expect(again.cancelled.map((c) => c.id).sort()).toEqual(["re_2", "re_3"]);
+  });
+
+  it("a lead still in an open stage keeps them", async () => {
+    const first = setup({ tables: FIFTY_H() });
+    await first.run();
+    const again = setup({ tables: { ...FIFTY_H(), crm_stage: stages, crm_activity: first.db.tables.crm_activity } });
+    await again.run();
+    expect(again.cancelled).toHaveLength(0);
+  });
+});
+
+describe("F9: a cut-short read fails closed", () => {
+  it("send records that fill the read limit fail the run, with nothing sent", async () => {
+    const rows: Row[] = Array.from({ length: 2000 }, (_, i) => ({ id: `r${i}`, org_id: ORG, lead_id: `l${i}`, type: "ai_insight", created_at: new Date(NOW).toISOString(), payload: { source: "consult-prep-send", prep_key: `l${i}:x:y`, kind: "booked", status: "sent", resend_id: `re${i}`, scheduled_for: null } }));
+    const s = setup({ tables: { crm_activity: rows } });
+    await expect(s.run()).rejects.toThrow(/cut short/);
+    expect(s.sent).toHaveLength(0);
+    expect(s.createDraft).not.toHaveBeenCalled();
+  });
+
+  it("calendar events that fill the read limit fail the run", async () => {
+    const rows: Row[] = Array.from({ length: 300 }, (_, i) => event(`x${i}`, { lead_id: `l${i}`, starts_at: hours(5) }));
+    const s = setup({ tables: { crm_calendar_event: rows } });
+    await expect(s.run()).rejects.toThrow(/cut short/);
+  });
+
+  it("stage leads that fill the read limit are not used (no partial list is treated as the whole), and it is said", async () => {
+    const leads: Row[] = Array.from({ length: 200 }, (_, i) => leadRow(`s${i}`, { current_stage_id: "s-consult", email: `p${i}@client.example`, stage_entered_at: hours(-1) }));
+    const s = setup({ tables: { crm_calendar_event: [], crm_lead: leads } });
+    const result = await s.run();
+    expect(s.createDraft).not.toHaveBeenCalled();
+    expect(result.itemsIn).toBe(0);
+    expect(result.summary).toMatch(/consult stage could not be read/);
+  });
+});
+
+describe("N1, N4: the client's addresses, and a future consult beyond the window", () => {
+  it("never mails the old email of a merged lead, or any email-shaped text in the client's own answers", async () => {
+    const tables: Tables = {
+      crm_lead: [leadRow(), leadRow("lead-m", { merged_into_id: "lead-1", email: "old@client.example" })],
+      crm_intake_submission: [
+        { id: "sub-1", org_id: ORG, lead_id: "lead-1", form_id: "f1", mode: "intake", answers: [{ question: "Best way to reach you?", answer: "Write to dana.work@client.example" }], started_at: ago(3), submitted_at: ago(3), score: null, band: null, temperature: null },
+      ],
+    };
+    const { run, sent } = setup({ tables, deps: { memberAddresses: async () => ["attorney@firm.example", "old@client.example", "dana.work@client.example"] } });
+    await run();
+    expect(sent.length).toBeGreaterThan(0);
+    for (const m of sent) expect(m.to).toEqual(["attorney@firm.example"]);
+  });
+
+  it("a lead in the consult stage that has a consult booked 30 days out is not prepped by its stage", async () => {
+    const tables: Tables = { crm_calendar_event: [event("far", { starts_at: hours(24 * 30) })], crm_lead: [leadRow("lead-1", { current_stage_id: "s-consult", stage_entered_at: hours(-1) })] };
+    const { run, createDraft, db } = setup({ tables });
+    const result = await run();
+    expect(createDraft).not.toHaveBeenCalled();
+    expect(markers(db)).toHaveLength(0);
+    expect(result.itemsIn).toBe(0);
   });
 });

@@ -25,6 +25,7 @@ import { briefOwnWording, renderConsultBrief, type BriefFacts } from "./brief";
 import { PREP_BRIEF_KIND, PREP_SEND_SOURCE, eventPrepKey, markerEventId, normalizedStart, parsePrepKey, rerunKey, stagePrepKey } from "./keys";
 import { readLawmaticsIntake, type LawmaticsRead, type ProspectReader } from "./lawmatics-intake";
 import { CONSULT_PREP_KEY, guardRecipients, parseRecipientSetting } from "./recipients";
+import type { GuardResult } from "./recipients";
 import {
   HOUR_MS,
   foldSendRecords,
@@ -40,6 +41,9 @@ import {
   type SendStatus,
 } from "./sends";
 import { consultScheduledStage } from "./stage";
+import { recipientsSha256 } from "./recipient-hash";
+import { collapseTwins, hasTwinMarker } from "./twins";
+import { sameLeadSameTime } from "@/lib/calendar/booked-merge";
 
 /**
  * Automatic consult prep (S1): the run behind the `consult-prep` assistant.
@@ -70,6 +74,12 @@ export const STAGE_WINDOW_MS = 3 * 24 * HOUR_MS;
 /** Send records are read this far back: a scheduled send is at most 72 hours ahead, and the booked rule looks back 7 days. */
 const SEND_LOOKBACK_MS = 8 * 24 * HOUR_MS;
 const EVENT_ROWS = 300;
+const STAGE_LEAD_ROWS = 200;
+const SEND_ROWS = 2000;
+const SCOPED_SEND_ROWS = 500;
+const MARKER_ROWS = 1000;
+/** A read that came back exactly as long as its limit may have been cut short: the run fails rather than treat part as all. */
+const CUT_SHORT = "A read was cut short, so no consults were prepped.";
 const NO_NEW_ITEM_RESERVE_MS = 20_000;
 
 export type PrepDeps = {
@@ -113,6 +123,12 @@ type Counts = {
   sendFailed: number;
   nothingToDeliver: number;
   mergedSkipped: number;
+  duplicate: number;
+  leftSkipped: number;
+  twins: number;
+  alreadyPrepped: number;
+  leftCancelled: number;
+  recipientsChanged: number;
   over: number;
   deferred: number;
   unreadSections: Record<string, number>;
@@ -120,7 +136,7 @@ type Counts = {
 
 const emptyCounts = (): Counts => ({
   prepped: 0, drafts: 0, noAddress: 0, noTemplate: 0, refused: 0, failed: 0, partial: 0, unrecorded: 0, sent: 0, scheduled: 0, cancelled: 0,
-  cancelUnchecked: 0, noRecipients: 0, emailOff: 0, recipientsUnread: 0, sendFailed: 0, nothingToDeliver: 0, mergedSkipped: 0, over: 0, deferred: 0,
+  cancelUnchecked: 0, noRecipients: 0, emailOff: 0, recipientsUnread: 0, sendFailed: 0, nothingToDeliver: 0, mergedSkipped: 0, duplicate: 0, leftSkipped: 0, twins: 0, alreadyPrepped: 0, leftCancelled: 0, recipientsChanged: 0, over: 0, deferred: 0,
   unreadSections: { answers: 0, mail: 0, meetings: 0, files: 0, lawmatics: 0 },
 });
 
@@ -146,11 +162,13 @@ async function readCalendar(admin: SupabaseClient, orgId: string, nowMs: number,
     if (leadIds) q = q.in("lead_id", [...leadIds]);
     return q.order("starts_at", { ascending: true }).limit(EVENT_ROWS);
   };
+  const cutShort = (res: { data: unknown[] | null }) => (res.data ?? []).length >= EVENT_ROWS;
   const lawmatics = await one("lawmatics");
   if (lawmatics.error) {
     if (isDatabaseUpdateNeeded(lawmatics.error)) throw new DatabaseNotReady();
     throw new Error("The calendar could not be read, so no consults were prepped.");
   }
+  if (cutShort(lawmatics)) throw new Error(CUT_SHORT);
   let outlookRows: EventRow[] = [];
   let outlookNotReady = false;
   if (outlook) {
@@ -158,7 +176,10 @@ async function readCalendar(admin: SupabaseClient, orgId: string, nowMs: number,
     if (res.error) {
       if (isDatabaseUpdateNeeded(res.error)) outlookNotReady = true;
       else throw new Error("The calendar could not be read, so no consults were prepped.");
-    } else outlookRows = (res.data ?? []) as EventRow[];
+    } else {
+      if (cutShort(res)) throw new Error(CUT_SHORT);
+      outlookRows = (res.data ?? []) as EventRow[];
+    }
   }
   const rows = [...((lawmatics.data ?? []) as EventRow[]), ...outlookRows].filter((e) => {
     const at = Date.parse(e.starts_at);
@@ -201,9 +222,10 @@ async function readStageLeads(admin: SupabaseClient, orgId: string, stageId: str
     let q = live(admin.from("crm_lead").select("id, stage_entered_at")).eq("org_id", orgId).eq("current_stage_id", stageId);
     if (sinceMs !== null) q = q.gte("stage_entered_at", new Date(sinceMs).toISOString());
     if (leadIds) q = q.in("id", [...leadIds]);
-    return q.limit(200);
+    return q.limit(STAGE_LEAD_ROWS);
   });
   if (res.error) throw new Error("The leads could not be read, so no consults were prepped.");
+  if ((res.data ?? []).length >= STAGE_LEAD_ROWS) throw new Error(CUT_SHORT);
   return ((res.data ?? []) as Array<{ id: string; stage_entered_at: string | null }>).map((r) => ({ id: r.id, stageEnteredAt: r.stage_entered_at }));
 }
 
@@ -234,8 +256,10 @@ async function readMarkers(admin: SupabaseClient, orgId: string, eventIds: reado
       .eq("org_id", orgId)
       .eq("type", "queue_drafted")
       .eq("payload->>source", PREP_SOURCE)
-      .in("payload->>event_id", batch);
+      .in("payload->>event_id", batch)
+      .limit(MARKER_ROWS);
     if (res.error) throw new Error("The prep history could not be read, so no consults were prepped.");
+    if ((res.data ?? []).length >= MARKER_ROWS) throw new Error(CUT_SHORT);
     for (const row of (res.data ?? []) as Array<{ created_at: string; payload: Record<string, unknown> | null }>) {
       const key = row.payload?.prep_key;
       if (typeof key === "string") {
@@ -247,18 +271,63 @@ async function readMarkers(admin: SupabaseClient, orgId: string, eventIds: reado
   return out;
 }
 
-async function readSendRecords(admin: SupabaseClient, orgId: string, nowMs: number): Promise<SendRecord[]> {
-  const { data, error } = await admin
+/** Send records, oldest first. A scoped run reads only its leads' rows. A read that fills its limit fails the run: part of the history is not the history. */
+async function readSendRecords(admin: SupabaseClient, orgId: string, nowMs: number, leadIds?: readonly string[]): Promise<SendRecord[]> {
+  const limit = leadIds ? SCOPED_SEND_ROWS : SEND_ROWS;
+  let q = admin
     .from("crm_activity")
     .select("lead_id, created_at, payload")
     .eq("org_id", orgId)
     .eq("type", "ai_insight")
     .eq("payload->>source", PREP_SEND_SOURCE)
-    .gte("created_at", new Date(nowMs - SEND_LOOKBACK_MS).toISOString())
-    .order("created_at", { ascending: true })
-    .limit(2000);
+    .gte("created_at", new Date(nowMs - SEND_LOOKBACK_MS).toISOString());
+  if (leadIds) q = q.in("lead_id", [...leadIds]);
+  const { data, error } = await q.order("created_at", { ascending: true }).limit(limit);
   if (error) throw new Error("The send history could not be read, so no consults were prepped.");
+  if ((data ?? []).length >= limit) throw new Error(CUT_SHORT);
   return ((data ?? []) as Array<{ lead_id: string | null; created_at: string; payload: unknown }>).map(parseSendRecord).filter((r): r is SendRecord => r !== null);
+}
+
+/** Prep markers on these leads whose consult had a start: what a twin of the same call is judged against. */
+type LeadMarker = { leadId: string; startAt: string; eventId: string | null };
+
+async function readLeadMarkers(admin: SupabaseClient, orgId: string, leadIds: readonly string[]): Promise<LeadMarker[]> {
+  const out: LeadMarker[] = [];
+  for (const batch of chunk([...new Set(leadIds)], IN_CHUNK)) {
+    const res = await admin
+      .from("crm_activity")
+      .select("lead_id, payload")
+      .eq("org_id", orgId)
+      .eq("type", "queue_drafted")
+      .eq("payload->>source", PREP_SOURCE)
+      .in("lead_id", batch)
+      .limit(MARKER_ROWS);
+    if (res.error) throw new Error("The prep history could not be read, so no consults were prepped.");
+    if ((res.data ?? []).length >= MARKER_ROWS) throw new Error(CUT_SHORT);
+    for (const row of (res.data ?? []) as Array<{ lead_id: string | null; payload: Record<string, unknown> | null }>) {
+      const startAt = row.payload?.start_at;
+      if (row.lead_id && typeof startAt === "string") out.push({ leadId: row.lead_id, startAt, eventId: typeof row.payload?.event_id === "string" ? row.payload.event_id : null });
+    }
+  }
+  return out;
+}
+
+/** The leads among these that have ANY future consult event, whatever the source and however far off. A failed read throws. */
+async function leadsWithFutureConsult(admin: SupabaseClient, orgId: string, leadIds: readonly string[], nowMs: number): Promise<Set<string>> {
+  const out = new Set<string>();
+  for (const batch of chunk([...new Set(leadIds)], IN_CHUNK)) {
+    const res = await admin
+      .from("crm_calendar_event")
+      .select("lead_id")
+      .eq("org_id", orgId)
+      .eq("is_consult", true)
+      .in("lead_id", batch)
+      .gt("starts_at", new Date(nowMs).toISOString())
+      .limit(MARKER_ROWS);
+    if (res.error) throw new Error("The calendar could not be read for the stage check.");
+    for (const r of (res.data ?? []) as Array<{ lead_id: string | null }>) if (r.lead_id) out.add(r.lead_id);
+  }
+  return out;
 }
 
 type RecipientsRead = { state: "ok"; to: string[]; cc: string[] } | { state: "none" } | { state: "unreadable" };
@@ -283,23 +352,28 @@ async function readRecipients(admin: SupabaseClient, orgId: string, deps: PrepDe
 // ── one prep ─────────────────────────────────────────────────────────────────
 
 /** The leads merged INTO this one (lectual 0107), whose files stay on them. A failed read is null: the lead's own files are listed and it is said. */
-async function readMergedIds(admin: SupabaseClient, orgId: string, leadId: string): Promise<string[] | null> {
+async function readMergedLeads(admin: SupabaseClient, orgId: string, leadId: string): Promise<Array<{ id: string; email: string | null }> | null> {
   try {
     // live-guard: reads the leads merged INTO this one (a merged row is exactly what is wanted) to list their files
-    const { data, error } = await admin.from("crm_lead").select("id, merged_into_id").eq("org_id", orgId).eq("merged_into_id", leadId);
+    const { data, error } = await admin.from("crm_lead").select("id, email, merged_into_id").eq("org_id", orgId).eq("merged_into_id", leadId);
     if (error) return (error as { code?: string }).code === "42703" || (error as { code?: string }).code === "PGRST204" ? [] : null;
-    return ((data ?? []) as Array<{ id: string }>).map((r) => r.id);
+    return ((data ?? []) as Array<{ id: string; email?: string | null }>).map((r) => ({ id: r.id, email: r.email ?? null }));
   } catch {
     return null;
   }
 }
+
+const EMAIL_SHAPED = /[A-Za-z0-9._%+'-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+/g;
+/** Every email-shaped string in a text (the guard re-validates each). */
+export const emailsIn = (text: string | null | undefined): string[] => (typeof text === "string" ? (text.match(EMAIL_SHAPED) ?? []) : []);
 
 type Gathered = { lead: LeadFacts; facts: BriefFacts; clientAddresses: string[] };
 
 async function gather(admin: SupabaseClient, orgId: string, c: Candidate, nowMs: number, tz: string, deps: PrepDeps, counts: Counts | null): Promise<Gathered | null> {
   const lead = await readLeadFacts(admin, orgId, c.leadId);
   if (!lead) return null;
-  const mergedIds = await readMergedIds(admin, orgId, lead.id);
+  const mergedLeads = await readMergedLeads(admin, orgId, lead.id);
+  const mergedIds = mergedLeads ? mergedLeads.map((m) => m.id) : null;
   const [answers, mail, meetings, files, lawmatics] = await Promise.all([
     readLeadAnswers(admin, orgId, lead.id),
     readMailSummary(admin, orgId, lead.id),
@@ -327,12 +401,30 @@ async function gather(admin: SupabaseClient, orgId: string, c: Candidate, nowMs:
     mail,
     meetings,
   };
-  const clientAddresses = [lead.email, lawmatics.state === "ok" ? lawmatics.contactEmail : null].filter((a): a is string => !!a);
+  // Every address that is the client's: the lead's own, the Lawmatics contact's, the old emails of leads merged into this one, and any
+  // email-shaped text in the intake answers or the Lawmatics fields (a client who types a colleague's or their own second address).
+  const texts: string[] = [];
+  if (answers.state === "ok") for (const b of answers.blocks) for (const p of b.pairs) texts.push(p.question, p.answer);
+  if (lawmatics.state === "ok") {
+    texts.push(JSON.stringify(lawmatics.intake));
+    for (const p of lawmatics.other) texts.push(p.label, p.value);
+  }
+  const clientAddresses = [
+    lead.email,
+    lawmatics.state === "ok" ? lawmatics.contactEmail : null,
+    ...(mergedLeads ?? []).map((m) => m.email),
+    ...texts.flatMap(emailsIn),
+  ].filter((a): a is string => !!a);
   return { lead, facts, clientAddresses };
 }
 
 /** Writes one send record (append-only). Returns false when the row could not be written. */
-async function writeSendRecord(admin: SupabaseClient, orgId: string, leadId: string, r: Omit<SendRecord, "at" | "leadId">): Promise<boolean> {
+async function writeSendRecord(
+  admin: SupabaseClient,
+  orgId: string,
+  leadId: string,
+  r: Omit<SendRecord, "at" | "leadId">,
+): Promise<boolean> {
   const { error } = await admin.from("crm_activity").insert({ org_id: orgId, lead_id: leadId, type: "ai_insight", actor_id: null, actor_type: "ai", payload: sendRecordPayload(r) });
   return !error;
 }
@@ -341,12 +433,30 @@ type Mailer = {
   recipients: () => Promise<RecipientsRead>;
 };
 
+/** What a run knows about the sends: the folded records, how many times each slot was cancelled, and the leads a scoped run is limited to. */
+type RunState = {
+  folded: Map<string, SendRecord>;
+  /** Cancelled rows per slot. A send planned again after a cancel carries `:g<n>` in its idempotency key, so Resend never answers with the cancelled email. */
+  gens: Map<string, number>;
+  scopedIds: readonly string[] | undefined;
+  tz: string;
+};
+
+const generationsOf = (records: readonly SendRecord[]): Map<string, number> => {
+  const out = new Map<string, number>();
+  for (const r of records) if (r.status === "cancelled") out.set(recordSlot(r.prepKey, r.kind), (out.get(recordSlot(r.prepKey, r.kind)) ?? 0) + 1);
+  return out;
+};
+
+const sha = (g: Pick<GuardResult, "to" | "cc">): string | null => (g.to.length === 0 ? null : recipientsSha256(g.to, g.cc));
+
 /** Sends (or schedules) what a plan says, each recorded. Every skip is counted. */
 async function deliver(
   ctx: AgentContext,
   deps: PrepDeps,
   mailer: Mailer,
   counts: Counts,
+  state: RunState,
   g: Gathered,
   c: Candidate,
   actions: readonly SendAction[],
@@ -372,9 +482,12 @@ async function deliver(
     counts.noRecipients += actions.length;
     return;
   }
+  const listHash = recipientsSha256(guarded.to, guarded.cc);
   for (const action of actions) {
-    const brief = renderConsultBrief({ ...g.facts, send: action.kind });
+    // The emailed copy is a pure function of the facts (no "Prepared" time), so a re-posted send under the same key carries the same payload.
+    const brief = renderConsultBrief({ ...g.facts, send: action.kind }, { prepared: false });
     const scheduledFor = action.mode === "schedule" ? action.at : null;
+    const gen = state.gens.get(recordSlot(c.key, action.kind)) ?? 0;
     const result = await deps.mailOut({
       apiKey,
       from,
@@ -383,30 +496,68 @@ async function deliver(
       subject: brief.subject,
       text: brief.text,
       html: brief.html,
-      idempotencyKey: `consult-prep:${ctx.orgId}:${c.key}:${action.kind}`,
+      idempotencyKey: `consult-prep:${ctx.orgId}:${c.key}:${action.kind}${gen > 0 ? `:g${gen}` : ""}`,
       ...(scheduledFor ? { scheduledAt: scheduledFor } : {}),
       label: "consult-prep",
     });
-    const status: SendStatus = result.status === "sent" ? (action.mode === "schedule" ? "scheduled" : "sent") : "failed";
+    // HTTP 409 from Resend = this key is already handled (another run got there first): done, never a failure.
+    const duplicate = result.status === "failed" && result.http === 409;
+    const status: SendStatus = result.status === "sent" ? (action.mode === "schedule" ? "scheduled" : "sent") : duplicate ? "duplicate" : "failed";
     if (result.status === "sent") {
       if (status === "scheduled") counts.scheduled += 1;
       else counts.sent += 1;
-    } else counts.sendFailed += 1;
+    } else if (duplicate) counts.duplicate += 1;
+    else counts.sendFailed += 1;
     const written = await writeSendRecord(ctx.admin, ctx.orgId, g.lead.id, {
       prepKey: c.key,
       kind: action.kind,
       resendId: result.status === "sent" ? (result.id ?? null) : null,
       scheduledFor,
       status,
+      recipientsSha256: listHash,
     });
     if (!written) counts.unrecorded += 1;
   }
 }
 
-// ── cancel on change ─────────────────────────────────────────────────────────
+// ── cancel ───────────────────────────────────────────────────────────────────
 
-async function cancelChanged(ctx: AgentContext, deps: PrepDeps, counts: Counts, folded: Map<string, SendRecord>, nowMs: number): Promise<void> {
-  const scheduled = [...folded.values()].filter((r) => r.status === "scheduled" && (!r.scheduledFor || Date.parse(r.scheduledFor) > nowMs));
+/** The scheduled sends (still in the future) a run may touch: a scoped run touches only its own leads'. */
+function scheduledIn(state: RunState, nowMs: number): SendRecord[] {
+  return [...state.folded.values()].filter(
+    (r) => r.status === "scheduled" && (!r.scheduledFor || Date.parse(r.scheduledFor) > nowMs) && (!state.scopedIds || (r.leadId !== null && state.scopedIds.includes(r.leadId))),
+  );
+}
+
+const leadOfRecord = (r: SendRecord): string | null => r.leadId ?? parsePrepKey(r.prepKey)?.leadId ?? null;
+
+/** Cancels one scheduled send with Resend, then records it. True when it was cancelled. */
+async function cancelOne(ctx: AgentContext, deps: PrepDeps, counts: Counts, state: RunState, record: SendRecord, nowMs: number): Promise<boolean> {
+  if (!record.resendId || !deps.mail.apiKey) {
+    counts.cancelUnchecked += 1;
+    return false;
+  }
+  const res = await deps.mailCancel({ apiKey: deps.mail.apiKey, id: record.resendId, label: "consult-prep" });
+  if (res.status !== "cancelled") {
+    counts.sendFailed += 1;
+    return false;
+  }
+  counts.cancelled += 1;
+  // The slot is no longer done: a later plan in this run sees it as cancelled, and a new send for it gets a new idempotency key.
+  const slot = recordSlot(record.prepKey, record.kind);
+  state.folded.set(slot, { ...record, status: "cancelled", at: new Date(nowMs).toISOString() });
+  state.gens.set(slot, (state.gens.get(slot) ?? 0) + 1);
+  const leadId = leadOfRecord(record);
+  const ok = leadId
+    ? await writeSendRecord(ctx.admin, ctx.orgId, leadId, { prepKey: record.prepKey, kind: record.kind, resendId: record.resendId, scheduledFor: record.scheduledFor, status: "cancelled", recipientsSha256: record.recipientsSha256 })
+    : false;
+  if (!ok) counts.unrecorded += 1;
+  return true;
+}
+
+/** The event a scheduled send was made for changed or went (unless the same call is still on the calendar under another id). */
+async function cancelChanged(ctx: AgentContext, deps: PrepDeps, counts: Counts, state: RunState, nowMs: number): Promise<void> {
+  const scheduled = scheduledIn(state, nowMs);
   if (scheduled.length === 0) return;
   const eventIds = [...new Set(scheduled.map((r) => parsePrepKey(r.prepKey)).flatMap((p) => (p && p.kind === "event" ? [p.eventId] : [])))];
   const now = new Map<string, EventNow>();
@@ -421,29 +572,124 @@ async function cancelChanged(ctx: AgentContext, deps: PrepDeps, counts: Counts, 
       now.set(row.id, { startsAt: row.starts_at, leadId: row.lead_id, isConsult: row.is_consult });
     }
   }
+  // A send whose event id vanished may still be right: the same call booked in Lawmatics AND on Outlook is two rows. Look for a twin.
+  const missing = scheduled.filter((r) => {
+    const p = parsePrepKey(r.prepKey);
+    return p && p.kind === "event" && !now.get(p.eventId);
+  });
+  const twins: Array<{ id: string; lead_id: string | null; starts_at: string }> = [];
+  let twinsUnread = false;
+  if (missing.length > 0) {
+    const starts = missing.map((r) => Date.parse((parsePrepKey(r.prepKey) as { startsAt: string }).startsAt)).filter(Number.isFinite);
+    const leads = [...new Set(missing.map((r) => leadOfRecord(r)).filter((x): x is string => !!x))];
+    const margin = 60 * 60_000;
+    for (const batch of chunk(leads, IN_CHUNK)) {
+      const res = await ctx.admin
+        .from("crm_calendar_event")
+        .select("id, lead_id, starts_at")
+        .eq("org_id", ctx.orgId)
+        .eq("is_consult", true)
+        .in("lead_id", batch)
+        .gte("starts_at", new Date(Math.min(...starts) - margin).toISOString())
+        .lte("starts_at", new Date(Math.max(...starts) + margin).toISOString())
+        .limit(MARKER_ROWS);
+      if (res.error || (res.data ?? []).length >= MARKER_ROWS) {
+        twinsUnread = true;
+        break;
+      }
+      twins.push(...((res.data ?? []) as Array<{ id: string; lead_id: string | null; starts_at: string }>));
+    }
+  }
   for (const record of scheduled) {
     const parsed = parsePrepKey(record.prepKey);
     if (!parsed || parsed.kind !== "event") continue;
-    if (!shouldCancel(record, now.get(parsed.eventId) ?? null)) continue;
-    if (!record.resendId || !deps.mail.apiKey) {
+    const event = now.get(parsed.eventId) ?? null;
+    if (!event && twinsUnread) {
       counts.cancelUnchecked += 1;
       continue;
     }
-    const res = await deps.mailCancel({ apiKey: deps.mail.apiKey, id: record.resendId, label: "consult-prep" });
-    if (res.status !== "cancelled") {
-      counts.sendFailed += 1;
-      continue;
+    const twinExists = !event && twins.some((t) => t.id !== parsed.eventId && sameLeadSameTime({ leadId: t.lead_id, startsAt: t.starts_at }, { leadId: parsed.leadId, startsAt: parsed.startsAt }));
+    if (!shouldCancel(record, event, { twinExists })) continue;
+    await cancelOne(ctx, deps, counts, state, record, nowMs);
+  }
+}
+
+/** A lead that moved into a lost or nurture stage, or was merged, no longer wants its reminders. */
+async function cancelLeftLeads(ctx: AgentContext, deps: PrepDeps, counts: Counts, state: RunState, nowMs: number): Promise<void> {
+  const scheduled = scheduledIn(state, nowMs);
+  if (scheduled.length === 0) return;
+  let stages: StageOpt[];
+  try {
+    stages = await readStages(ctx.admin, ctx.orgId);
+  } catch {
+    counts.cancelUnchecked += scheduled.length;
+    return;
+  }
+  const category = new Map(stages.map((s) => [s.id, s.category]));
+  const leadIds = [...new Set(scheduled.map(leadOfRecord).filter((x): x is string => !!x))];
+  const stageOfLive = new Map<string, string | null>();
+  for (const batch of chunk(leadIds, IN_CHUNK)) {
+    const res = await leadRead(({ live }) => live(ctx.admin.from("crm_lead").select("id, current_stage_id")).eq("org_id", ctx.orgId).in("id", batch));
+    if (res.error) {
+      counts.cancelUnchecked += scheduled.length;
+      return;
     }
-    counts.cancelled += 1;
-    // The slot is no longer done: a later plan in this run sees it as cancelled.
-    folded.set(recordSlot(record.prepKey, record.kind), { ...record, status: "cancelled", at: new Date(nowMs).toISOString() });
-    const leadId = record.leadId ?? parsed.leadId;
-    const ok = await writeSendRecord(ctx.admin, ctx.orgId, leadId, { prepKey: record.prepKey, kind: record.kind, resendId: record.resendId, scheduledFor: record.scheduledFor, status: "cancelled" });
-    if (!ok) counts.unrecorded += 1;
+    for (const r of (res.data ?? []) as Array<{ id: string; current_stage_id: string | null }>) stageOfLive.set(r.id, r.current_stage_id);
+  }
+  for (const record of scheduled) {
+    const leadId = leadOfRecord(record);
+    if (!leadId) continue;
+    const gone = !stageOfLive.has(leadId); // merged into another lead (or no longer there)
+    const cat = category.get(stageOfLive.get(leadId) ?? "");
+    if (!gone && cat !== "lost" && cat !== "nurture") continue;
+    if (await cancelOne(ctx, deps, counts, state, record, nowMs)) counts.leftCancelled += 1;
+  }
+}
+
+/**
+ * A scheduled send carries the hash of the list it was made for. When who gets consult prep changes, a still-scheduled send is
+ * cancelled (the candidate loop then plans it again with the current list). An unreadable recipient list cancels nothing.
+ */
+async function cancelStaleRecipients(ctx: AgentContext, deps: PrepDeps, counts: Counts, state: RunState, mailer: Mailer, nowMs: number): Promise<void> {
+  const scheduled = scheduledIn(state, nowMs).filter((r) => r.recipientsSha256 && r.resendId);
+  if (scheduled.length === 0) return;
+  const recipients = await mailer.recipients();
+  if (recipients.state === "unreadable") return;
+  const emails = new Map<string, string | null>();
+  if (recipients.state === "ok") {
+    const leadIds = [...new Set(scheduled.map(leadOfRecord).filter((x): x is string => !!x))];
+    for (const batch of chunk(leadIds, IN_CHUNK)) {
+      const res = await leadRead(({ live }) => live(ctx.admin.from("crm_lead").select("id, email")).eq("org_id", ctx.orgId).in("id", batch));
+      if (res.error) {
+        counts.cancelUnchecked += scheduled.length;
+        return;
+      }
+      for (const r of (res.data ?? []) as Array<{ id: string; email: string | null }>) emails.set(r.id, r.email);
+    }
+  }
+  const full = new Map<string, Promise<Gathered | null>>();
+  for (const record of scheduled) {
+    const leadId = leadOfRecord(record);
+    if (!leadId) continue;
+    if (recipients.state === "ok") {
+      // Cheap check with the lead's own address; only a difference is confirmed with everything the guard knows about the client.
+      const cheap = sha(guardRecipients({ to: recipients.to, cc: recipients.cc, clientAddresses: [emails.get(leadId)] }));
+      if (cheap === record.recipientsSha256) continue;
+      if (!full.has(leadId)) full.set(leadId, gather(ctx.admin, ctx.orgId, { key: record.prepKey, baseKey: record.prepKey, leadId, event: null, rerun: false }, nowMs, state.tz, deps, null).catch(() => null));
+      const g = await full.get(leadId)!;
+      if (!g) {
+        counts.cancelUnchecked += 1;
+        continue;
+      }
+      if (sha(guardRecipients({ to: recipients.to, cc: recipients.cc, clientAddresses: g.clientAddresses })) === record.recipientsSha256) continue;
+    }
+    if (await cancelOne(ctx, deps, counts, state, record, nowMs)) counts.recipientsChanged += 1;
   }
 }
 
 // ── the run ──────────────────────────────────────────────────────────────────
+
+type Ev = EventRow & { leadId: string; startsAt: string };
 
 export async function runPrep(ctx: AgentContext, deps: PrepDeps, generate: DraftTextGenerator): Promise<AgentResult> {
   const { admin, orgId, autonomy } = ctx;
@@ -451,6 +697,7 @@ export async function runPrep(ctx: AgentContext, deps: PrepDeps, generate: Draft
   const scope = ctx.scope;
   const scopedIds = scope?.leadIds && scope.leadIds.length > 0 ? scope.leadIds : undefined;
   if (scope?.leadIds && scope.leadIds.length === 0) return skipped("Skipped: no lead was named for this prep.");
+  const rerunRun = scope?.reason === "rerun";
   const outlook = mailboxModuleState(ctx) === "on";
   const counts = emptyCounts();
 
@@ -464,45 +711,82 @@ export async function runPrep(ctx: AgentContext, deps: PrepDeps, generate: Draft
   }
   const live = await liveLeadIds(admin, orgId, calendar.rows.map((e) => e.lead_id as string));
   counts.mergedSkipped += calendar.rows.filter((e) => !live.has(e.lead_id as string)).length;
-  const events = calendar.rows.filter((e) => live.has(e.lead_id as string));
-  const withConsult = new Set(events.map((e) => e.lead_id as string));
+  const liveEvents: Ev[] = calendar.rows.filter((e) => live.has(e.lead_id as string)).map((e) => ({ ...e, leadId: e.lead_id as string, startsAt: e.starts_at }));
+
+  // What is already done: prep markers. Unreadable ends the run (a guess could prep twice).
+  const markers = await readMarkers(admin, orgId, liveEvents.map((e) => e.id));
+  // One call booked twice (Lawmatics and Outlook) is ONE candidate: the twin that already has a marker, else the Lawmatics row.
+  const collapsed = collapseTwins(liveEvents, (e) => markers.byKey.has(eventPrepKey(e.leadId, e.id, e.starts_at)) || markers.legacyEvents.has(e.id));
+  counts.twins += collapsed.dropped;
+  const events = collapsed.kept;
+  const withConsult = new Set(events.map((e) => e.leadId));
+  const leadMarkers = await readLeadMarkers(admin, orgId, [...withConsult]);
 
   const candidates: Candidate[] = events.map((e) => {
-    const base = eventPrepKey(e.lead_id as string, e.id, e.starts_at);
-    const rerun = scope?.reason === "rerun";
-    return { key: rerun ? rerunKey(base, nowMs) : base, baseKey: base, leadId: e.lead_id as string, event: { id: e.id, startsAt: normalizedStart(e.starts_at) ?? e.starts_at, joinUrl: e.join_url }, rerun };
+    const base = eventPrepKey(e.leadId, e.id, e.starts_at);
+    return { key: rerunRun ? rerunKey(base, nowMs) : base, baseKey: base, leadId: e.leadId, event: { id: e.id, startsAt: normalizedStart(e.starts_at) ?? e.starts_at, joinUrl: e.join_url }, rerun: rerunRun };
   });
 
   let stageUnread = false;
+  let stageList: StageOpt[] | null = null;
   try {
     const [stages, mapping] = await Promise.all([readStages(admin, orgId), readMapping(admin, orgId)]);
+    stageList = stages;
     const stage = consultScheduledStage(stages, mapping);
     if (stage) {
-      const rerun = scope?.reason === "rerun";
-      const leads = await readStageLeads(admin, orgId, stage.id, rerun ? null : nowMs - STAGE_WINDOW_MS, scopedIds);
+      const leads = await readStageLeads(admin, orgId, stage.id, rerunRun ? null : nowMs - STAGE_WINDOW_MS, scopedIds);
+      // A lead with ANY future consult event (not only one inside the 14-day window) is prepped by that consult, never by its stage.
+      const future = await leadsWithFutureConsult(admin, orgId, leads.map((l) => l.id).filter((id) => !withConsult.has(id)), nowMs);
+      const found: Candidate[] = [];
       for (const lead of leads) {
-        if (withConsult.has(lead.id)) continue;
+        if (withConsult.has(lead.id) || future.has(lead.id)) continue;
         const rowId = (await newestStageRow(admin, orgId, lead.id, stage.id)) ?? lead.stageEnteredAt;
         if (!rowId) continue;
         const base = stagePrepKey(lead.id, rowId);
-        candidates.push({ key: rerun ? rerunKey(base, nowMs) : base, baseKey: base, leadId: lead.id, event: null, rerun });
+        found.push({ key: rerunRun ? rerunKey(base, nowMs) : base, baseKey: base, leadId: lead.id, event: null, rerun: rerunRun });
       }
+      const stageMarkers = await readMarkers(admin, orgId, found.map((c) => markerEventId(c.baseKey)).filter((x): x is string => !!x));
+      for (const [k, v] of stageMarkers.byKey) markers.byKey.set(k, v);
+      for (const id of stageMarkers.legacyEvents) markers.legacyEvents.add(id);
+      candidates.push(...found);
     }
   } catch {
     stageUnread = true;
   }
-  // What is already done: prep markers and send records. Either unreadable ends the run (a guess could prep or send twice).
-  const markers = await readMarkers(admin, orgId, candidates.map((c) => markerEventId(c.baseKey)).filter((x): x is string => !!x));
-  const records = await readSendRecords(admin, orgId, nowMs);
-  const folded = foldSendRecords(records);
 
+  // Send records (unreadable or cut short ends the run: a guess could send twice).
+  const records = await readSendRecords(admin, orgId, nowMs, scopedIds);
+  const state: RunState = { folded: foldSendRecords(records), gens: generationsOf(records), scopedIds, tz: "UTC" };
   const style = await readFirmStyle(admin, orgId);
+  state.tz = style.timeZone;
 
-  // Cancel what a change made wrong, before anything new is scheduled.
-  await cancelChanged(ctx, deps, counts, folded, nowMs);
-  if (candidates.length === 0) {
+  let recipientsCache: Promise<RecipientsRead> | null = null;
+  const mailer: Mailer = { recipients: () => (recipientsCache ??= readRecipients(admin, orgId, deps)) };
+
+  // Cancel what a change made wrong, before anything new is scheduled: the consult moved or went, the lead left, who gets the email changed.
+  await cancelChanged(ctx, deps, counts, state, nowMs);
+  await cancelLeftLeads(ctx, deps, counts, state, nowMs);
+  await cancelStaleRecipients(ctx, deps, counts, state, mailer, nowMs);
+  const folded = state.folded;
+
+  // A lead in a lost or nurture stage is not prepped and gets no reminders planned again.
+  const leftIds = new Set<string>();
+  if (stageList) {
+    const cat = new Map(stageList.map((s) => [s.id, s.category]));
+    const stageOf = await leadStages(admin, orgId, [...new Set(candidates.map((c) => c.leadId))]);
+    for (const [id, stageId] of stageOf) {
+      const k = cat.get(stageId ?? "");
+      if (k === "lost" || k === "nurture") leftIds.add(id);
+    }
+  }
+  const standing = candidates.filter((c) => !leftIds.has(c.leadId));
+  counts.leftSkipped += candidates.length - standing.length;
+
+  if (standing.length === 0) {
     const parts = ["No consults need prep."];
     if (counts.cancelled > 0) parts.push(`${plural(counts.cancelled, "reminder", "reminders")} cancelled.`);
+    if (counts.leftCancelled > 0) parts.push(`${plural(counts.leftCancelled, "reminder", "reminders")} cancelled because the lead left the pipeline.`);
+    if (counts.recipientsChanged > 0) parts.push(`${plural(counts.recipientsChanged, "reminder", "reminders")} cancelled because who gets consult prep changed.`);
     if (counts.cancelUnchecked > 0) parts.push(`${plural(counts.cancelUnchecked, "scheduled email", "scheduled emails")} could not be checked against the calendar.`);
     if (counts.sendFailed > 0) parts.push(`${plural(counts.sendFailed, "email", "emails")} could not be sent or cancelled and will be tried again.`);
     if (stageUnread) parts.push("The consult stage could not be read, so leads were not checked by stage.");
@@ -511,23 +795,15 @@ export async function runPrep(ctx: AgentContext, deps: PrepDeps, generate: Draft
     return { itemsIn: 0, draftsOut: 0, summary: parts.join(" ") };
   }
 
-  let recipientsCache: Promise<RecipientsRead> | null = null;
-  const mailer: Mailer = { recipients: () => (recipientsCache ??= readRecipients(admin, orgId, deps)) };
-
   const templateOn = agentToolkitModuleState(ctx) === "on";
   let newPreps = 0;
   let reminders = 0;
-  for (const c of candidates) {
+  for (const c of standing) {
     if (budgetNearlySpent(ctx, NO_NEW_ITEM_RESERVE_MS)) {
       counts.deferred += 1;
       continue;
     }
     const existing = new Map(folded);
-    // A re-run's reminders are not duplicated: the earlier prep of this consult keeps its own.
-    if (c.rerun) for (const kind of ["24h", "1h"] as const) {
-      const earlier = folded.get(recordSlot(c.baseKey, kind));
-      if (earlier) existing.set(recordSlot(c.key, kind), earlier);
-    }
     const preppedAt = c.rerun ? undefined : markers.byKey.get(c.key);
     const legacy = !c.rerun && c.event !== null && markers.legacyEvents.has(c.event.id);
     const startMs = c.event ? Date.parse(c.event.startsAt) : null;
@@ -556,10 +832,15 @@ export async function runPrep(ctx: AgentContext, deps: PrepDeps, generate: Draft
           counts.failed += 1;
           continue;
         }
-        await deliver(ctx, deps, mailer, counts, g, c, actions);
+        await deliver(ctx, deps, mailer, counts, state, g, c, actions);
         continue;
       }
 
+      // The same call already prepped under another event id (a twin that has since gone, or one this run did not keep): not prepped again.
+      if (!c.rerun && c.event && hasTwinMarker(leadMarkers.filter((m) => m.eventId !== c.event?.id), c.leadId, c.event.startsAt)) {
+        counts.twins += 1;
+        continue;
+      }
       if (newPreps >= PREP_BATCH) {
         counts.over += 1;
         continue;
@@ -605,6 +886,16 @@ export async function runPrep(ctx: AgentContext, deps: PrepDeps, generate: Draft
             if (err instanceof JudgmentBoundaryError) throw err;
             counts.partial += 1;
           }
+        }
+      }
+
+      // Another run (another instance) may have made this very prep while this one was gathering: look again, right before the queue.
+      // This narrows the race, it does not close it (two runs can still read "none" in the same instant; see AGENTS.md).
+      if (!c.rerun) {
+        const again = await readMarkers(admin, orgId, [markerEventId(c.baseKey)].filter((x): x is string => !!x));
+        if (again.byKey.has(c.key)) {
+          counts.alreadyPrepped += 1;
+          continue;
         }
       }
 
@@ -660,6 +951,13 @@ export async function runPrep(ctx: AgentContext, deps: PrepDeps, generate: Draft
       counts.prepped += 1;
       newPreps += 1;
       counts.drafts += queued.filter((q) => q.id).length;
+
+      // The emails go BEFORE the marker is written: a crash between the two just posts the same keys with the same payload again
+      // (Resend dedupes), where a marker with no email would never send the booked email.
+      const bookedHeld = !!c.event && stageBookedRecently(records, lead.id, nowMs);
+      const plan = planSends({ prepKey: c.key, startsAtMs: startMs, nowMs, preppedAtMs: nowMs, madeNow: true, suppressBooked: bookedHeld, bookedOnly: c.rerun, existing });
+      await deliver(ctx, deps, mailer, counts, state, g, c, plan.actions);
+
       const { error: recordError } = await admin.from("crm_activity").insert(
         queued.map((q) => ({
           org_id: orgId,
@@ -679,10 +977,6 @@ export async function runPrep(ctx: AgentContext, deps: PrepDeps, generate: Draft
         })),
       );
       if (recordError) counts.unrecorded += 1;
-
-      const bookedHeld = !!c.event && stageBookedRecently(records, lead.id, nowMs);
-      const plan = planSends({ prepKey: c.key, startsAtMs: startMs, nowMs, preppedAtMs: nowMs, madeNow: true, suppressBooked: bookedHeld, existing });
-      await deliver(ctx, deps, mailer, counts, g, c, plan.actions);
     } catch (err) {
       if (err instanceof JudgmentBoundaryError) counts.refused += 1;
       else counts.failed += 1;
@@ -690,6 +984,17 @@ export async function runPrep(ctx: AgentContext, deps: PrepDeps, generate: Draft
   }
 
   return { itemsIn: counts.prepped, draftsOut: counts.drafts, summary: summaryOf(counts, stageUnread, calendar.outlookNotReady, mailboxModuleState(ctx)) };
+}
+
+/** The current stage of each live lead among these (a merged lead is absent). A failed read throws: the run fails rather than prep a lead it could not check. */
+async function leadStages(admin: SupabaseClient, orgId: string, ids: readonly string[]): Promise<Map<string, string | null>> {
+  const out = new Map<string, string | null>();
+  for (const batch of chunk([...ids], IN_CHUNK)) {
+    const res = await leadRead(({ live }) => live(admin.from("crm_lead").select("id, current_stage_id")).eq("org_id", orgId).in("id", batch));
+    if (res.error) throw new Error("The leads could not be read, so no consults were prepped.");
+    for (const r of (res.data ?? []) as Array<{ id: string; current_stage_id: string | null }>) out.set(r.id, r.current_stage_id);
+  }
+  return out;
 }
 
 function summaryOf(c: Counts, stageUnread: boolean, outlookNotReady: boolean, outlookGate: "on" | "off" | "unreadable"): string {
@@ -713,6 +1018,12 @@ function summaryOf(c: Counts, stageUnread: boolean, outlookNotReady: boolean, ou
   if (c.unrecorded > 0) parts.push(`${plural(c.unrecorded, "prep", "preps")} could not be recorded on the lead, so they may be drafted again.`);
   const missing = Object.entries(c.unreadSections).filter(([, n]) => n > 0).map(([k]) => k);
   if (missing.length > 0) parts.push(`Some card sections could not be read: ${missing.join(", ")}.`);
+  if (c.duplicate > 0) parts.push(`${plural(c.duplicate, "email", "emails")} had already been handled by another run.`);
+  if (c.twins > 0) parts.push(`${plural(c.twins, "consult", "consults")} skipped: the same call is booked twice and is prepared once.`);
+  if (c.alreadyPrepped > 0) parts.push(`${plural(c.alreadyPrepped, "consult", "consults")} had just been prepared by another run.`);
+  if (c.leftCancelled > 0) parts.push(`${plural(c.leftCancelled, "reminder", "reminders")} cancelled because the lead left the pipeline.`);
+  if (c.recipientsChanged > 0) parts.push(`${plural(c.recipientsChanged, "reminder", "reminders")} cancelled because who gets consult prep changed.`);
+  if (c.leftSkipped > 0) parts.push(`${plural(c.leftSkipped, "consult", "consults")} skipped: the lead is in a lost or nurture stage.`);
   if (c.mergedSkipped > 0) parts.push(`${plural(c.mergedSkipped, "consult", "consults")} skipped: the lead was merged into another.`);
   if (stageUnread) parts.push("The consult stage could not be read, so leads were not checked by stage.");
   if (outlookNotReady) parts.push("The Outlook calendar isn't switched on for your firm yet.");
