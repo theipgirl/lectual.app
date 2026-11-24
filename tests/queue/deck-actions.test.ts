@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { qitem, U } from "./routing-fixtures";
+import { REJECT_NOTE_IS_DONE_MARKER } from "@/lib/ui/words";
 
 /**
  * The approval deck's actions (src/app/dashboard/queue/deck/actions.ts): behind `role-views` (notFound), the caller
@@ -20,6 +21,11 @@ const state = vi.hoisted(() => ({
   routed: { status: "ok", routing: {}, members: [], dropped: 0, settingsExist: true } as unknown,
   sendAccess: "ready" as string,
   send: vi.fn(),
+  notify: vi.fn(),
+  meta: {} as Record<string, unknown>,
+}));
+vi.mock("@/lib/db/scoped-client", () => ({
+  getScopedClient: vi.fn(async () => ({ auth: { getUser: vi.fn(async () => ({ data: { user: { user_metadata: state.meta } }, error: null })) } })),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -44,6 +50,7 @@ vi.mock("@/lib/members/directory", () => ({
     return state.members;
   }),
 }));
+vi.mock("@/lib/notifications/core", () => ({ notify: (...a: unknown[]) => state.notify(...a) }));
 vi.mock("@/lib/org/profile", () => ({ getFirmTimeZone: vi.fn(async () => "America/New_York") }));
 vi.mock("@/lib/mailbox/my-mailbox", () => ({
   mySendAccess: vi.fn(async () => state.sendAccess),
@@ -74,18 +81,23 @@ beforeEach(() => {
   state.cardState = { status: "ok", events: [] };
   state.record.mockReset().mockResolvedValue({ ok: true });
   state.members = MEMBERS;
+  state.routed = { status: "ok", routing: {}, members: MEMBERS, dropped: 0, settingsExist: true };
   state.membersFail = false;
   state.sendAccess = "ready";
   state.send.mockReset().mockResolvedValue({ ok: true });
+  state.notify.mockReset().mockResolvedValue(undefined);
+  state.meta = {};
 });
 
+const SHA = "a".repeat(64);
 const NOT_SWITCHED_ON = "This isn't switched on for your firm yet. Lectual will turn it on.";
 
 describe("the role-views gate", () => {
   it.each([
-    ["approve", () => A.approveCardAction("q1")],
+    ["approve", () => A.approveCardAction("q1", SHA)],
     ["mark read", () => A.markReadCardAction("q1")],
     ["reject", () => A.rejectCardAction("q1", "no")],
+    ["done", () => A.doneCardAction("q1")],
     ["hand off", () => A.handOffCardAction("q1", U.caitlyn, "")],
     ["later", () => A.laterCardAction("q1")],
     ["send back", () => A.returnCardAction("q1", "")],
@@ -110,7 +122,7 @@ describe("every action re-checks the caller", () => {
     ["a viewer", sessionFor(U.viewer, "viewer")],
   ])("%s gets nothing done", async (_n, session) => {
     state.session = session;
-    for (const r of [await A.approveCardAction("q1"), await A.rejectCardAction("q1", "x"), await A.handOffCardAction("q1", U.caitlyn, ""), await A.laterCardAction("q1"), await A.sendDraftNowAction("q1", "AAMk1")]) {
+    for (const r of [await A.approveCardAction("q1", SHA), await A.rejectCardAction("q1", "x"), await A.doneCardAction("q1"), await A.handOffCardAction("q1", U.caitlyn, ""), await A.laterCardAction("q1"), await A.sendDraftNowAction("q1", "AAMk1")]) {
       expect(r.ok).toBe(false);
     }
     expect(state.core).not.toHaveBeenCalled();
@@ -119,25 +131,32 @@ describe("every action re-checks the caller", () => {
   });
 
   it("Yes runs the shared core with a receipt and returns where the draft is", async () => {
-    const r = await A.approveCardAction("q1");
-    expect(state.core).toHaveBeenCalledWith({ id: "q1", intent: "approve", withReceipt: true });
+    const r = await A.approveCardAction("q1", SHA);
+    expect(state.core).toHaveBeenCalledWith({ id: "q1", intent: "approve", withReceipt: true, requireShown: true, shownSha256: SHA });
     expect(r).toMatchObject({ ok: true, draft: { provider: "microsoft", webLink: "https://outlook/d", draftId: "AAMk1", canSend: true } });
   });
 
   it("a second Yes on a decided card (another tab, a replayed POST) is refused by the core and drafts nothing", async () => {
     state.core.mockResolvedValue({ kind: "error", error: "This card was already decided." });
-    expect(await A.approveCardAction("q1")).toEqual({ ok: false, error: "This card was already decided." });
+    expect(await A.approveCardAction("q1", SHA)).toEqual({ ok: false, error: "This card was already decided." });
     expect(await A.markReadCardAction("q1")).toMatchObject({ ok: false });
   });
 
   it("the core's refusal comes back as it is (routing, gates, stale)", async () => {
     state.core.mockResolvedValue({ kind: "error", error: "Only an attorney can approve this kind of message." });
-    expect(await A.approveCardAction("q1")).toEqual({ ok: false, error: "Only an attorney can approve this kind of message." });
+    expect(await A.approveCardAction("q1", SHA)).toEqual({ ok: false, error: "Only an attorney can approve this kind of message." });
+  });
+
+  it("Yes without the hash of the text shown (or a malformed one) is refused and the core is never called", async () => {
+    for (const bad of [undefined, null, "", "abc", "A".repeat(64), 42]) {
+      expect(await A.approveCardAction("q1", bad)).toEqual({ ok: false, error: "The draft changed. Refresh to see it." });
+    }
+    expect(state.core).not.toHaveBeenCalled();
   });
 
   it("an id that isn't a queue id is refused before anything", async () => {
-    expect((await A.approveCardAction("../../x")).ok).toBe(false);
-    expect((await A.approveCardAction(42)).ok).toBe(false);
+    expect((await A.approveCardAction("../../x", SHA)).ok).toBe(false);
+    expect((await A.approveCardAction(42, SHA)).ok).toBe(false);
     expect(state.core).not.toHaveBeenCalled();
   });
 
@@ -157,10 +176,54 @@ describe("every action re-checks the caller", () => {
 
   it("Send is not offered when the permission isn't there, with the reconnect line", async () => {
     state.sendAccess = "needs-permission";
-    const r = await A.approveCardAction("q1");
+    const r = await A.approveCardAction("q1", SHA);
     expect(r).toMatchObject({ ok: true, draft: { canSend: false, sendNote: expect.stringMatching(/reconnect your Outlook/) } });
     state.sendAccess = "switched-off";
-    expect(await A.approveCardAction("q1")).toMatchObject({ ok: true, draft: { canSend: false, sendNote: expect.stringMatching(/isn't switched on/) } });
+    expect(await A.approveCardAction("q1", SHA)).toMatchObject({ ok: true, draft: { canSend: false, sendNote: expect.stringMatching(/isn't switched on/) } });
+  });
+});
+
+describe("Lectual staff viewing as the firm (no membership: the fold would drop their events)", () => {
+  const PREVIEW_ONLY = "Preview only: hand-offs aren't saved while you're viewing as the firm.";
+  it("hand off and send back refuse with the preview sentence and write nothing", async () => {
+    state.session = { ...sessionFor(U.rebecca, "attorney"), actingAsStaff: true };
+    state.cardState = { status: "ok", events: [{ queueItemId: "q1", kind: "handoff", actorId: U.rebecca, targetUserId: U.caitlyn, until: null, note: null, createdAt: "2026-11-10T13:00:00Z" }] };
+    expect(await A.handOffCardAction("q1", U.caitlyn, "")).toEqual({ ok: false, error: PREVIEW_ONLY });
+    expect(await A.returnCardAction("q1", "")).toEqual({ ok: false, error: PREVIEW_ONLY });
+    expect(state.record).not.toHaveBeenCalled();
+    expect(state.notify).not.toHaveBeenCalled();
+  });
+});
+
+describe("a typed Reject note can't be the Done marker", () => {
+  it("refuses the marker (and with a receipt line) without calling the core; a doneCardAction still sends it", async () => {
+    for (const note of ["Done: handled without approving", "  Done: handled without approving \n", "Done: handled without approving\nReceipt: sha256 0123456789ab"]) {
+      state.core.mockClear();
+      expect(await A.rejectCardAction("q1", note)).toEqual({ ok: false, error: REJECT_NOTE_IS_DONE_MARKER });
+      expect(state.core).not.toHaveBeenCalled();
+    }
+    state.core.mockResolvedValue({ kind: "resolved", intent: "reject" });
+    expect((await A.doneCardAction("q1")).ok).toBe(true);
+    expect(state.core).toHaveBeenCalledWith({ id: "q1", intent: "reject", note: "Done: handled without approving" });
+  });
+});
+
+describe("Done", () => {
+  it("resolves through the reject path with exactly the marker note, never approve", async () => {
+    state.core.mockResolvedValue({ kind: "resolved", intent: "reject" });
+    expect(await A.doneCardAction("q1")).toMatchObject({ ok: true });
+    expect(state.core).toHaveBeenCalledTimes(1);
+    expect(state.core).toHaveBeenCalledWith({ id: "q1", intent: "reject", note: "Done: handled without approving" });
+    expect(state.send).not.toHaveBeenCalled();
+  });
+  it("returns the core's refusal (routing is re-resolved there)", async () => {
+    state.core.mockResolvedValue({ kind: "error", error: "Only an attorney can approve this kind of message." });
+    expect(await A.doneCardAction("q1")).toEqual({ ok: false, error: "Only an attorney can approve this kind of message." });
+  });
+  it("Lectual staff previewing a firm are refused before anything runs", async () => {
+    state.session = { ...sessionFor(U.rebecca, "attorney"), actingAsStaff: true };
+    expect(await A.doneCardAction("q1")).toEqual({ ok: false, error: "Preview only: hand-offs aren't saved while you're viewing as the firm." });
+    expect(state.core).not.toHaveBeenCalled();
   });
 });
 
@@ -171,6 +234,18 @@ describe("hand off", () => {
     expect(state.record).toHaveBeenCalledWith({ orgId: "org-1", queueItemId: "q1", kind: "handoff", targetUserId: U.caitlyn, note: "tidy" });
     // The actor is never passed: the database default is auth.uid().
     expect(Object.keys(state.record.mock.calls[0][0])).not.toContain("actorId");
+  });
+
+  it("a Hand off note over the limit is refused, never cut, and nothing is written", async () => {
+    expect(await A.handOffCardAction("q1", U.caitlyn, "x".repeat(501))).toEqual({ ok: false, error: "That note is too long. Keep it to 500 characters." });
+    expect(state.record).not.toHaveBeenCalled();
+    expect(state.notify).not.toHaveBeenCalled();
+  });
+
+  it("a Hand off note of exactly 500 characters is accepted whole", async () => {
+    const note = "y".repeat(500);
+    expect((await A.handOffCardAction("q1", U.caitlyn, note)).ok).toBe(true);
+    expect(state.record).toHaveBeenCalledWith(expect.objectContaining({ kind: "handoff", note }));
   });
 
   it.each([
@@ -228,12 +303,39 @@ describe("later and send back", () => {
     expect(until - Date.now()).toBeLessThanOrEqual(25 * 3600_000);
   });
 
+  it("Later's until is the next deal of the actor's STORED times, and nothing posted changes it", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-10T14:30:00Z")); // 9:30 AM New York (EST)
+    try {
+      state.meta = { lectual_deal_times: { v: 1, times: ["10:00", "16:30"] } };
+      expect((await laterWithExtras()).ok).toBe(true);
+      expect(state.record.mock.calls[0][0].until).toBe("2026-11-10T15:00:00.000Z"); // 10:00 AM EST
+      state.record.mockClear();
+      state.meta = { lectual_deal_times: { v: 1, times: ["08:00", "16:30"] } };
+      await A.laterCardAction("q1");
+      expect(state.record.mock.calls[0][0].until).toBe("2026-11-10T21:30:00.000Z"); // 4:30 PM EST
+      state.record.mockClear();
+      state.meta = {}; // no stored times: the defaults, 2:00 PM
+      await A.laterCardAction("q1");
+      expect(state.record.mock.calls[0][0].until).toBe("2026-11-10T19:00:00.000Z");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("Send back is for the holder (or whoever handed it)", async () => {
     expect((await A.returnCardAction("q1", "")).ok).toBe(false);
     state.cardState = { status: "ok", events: [{ queueItemId: "q1", kind: "handoff", actorId: U.rebecca, targetUserId: U.caitlyn, until: null, note: null, createdAt: "2026-11-10T13:00:00Z" }] };
     state.session = sessionFor(U.caitlyn, "paralegal", "caitlyn@example.com");
     expect((await A.returnCardAction("q1", "done")).ok).toBe(true);
     expect(state.record).toHaveBeenCalledWith(expect.objectContaining({ kind: "returned", queueItemId: "q1" }));
+  });
+
+  it("a Send back note over the limit is refused, never cut, and nothing is written", async () => {
+    state.cardState = { status: "ok", events: [{ queueItemId: "q1", kind: "handoff", actorId: U.rebecca, targetUserId: U.caitlyn, until: null, note: null, createdAt: "2026-11-10T13:00:00Z" }] };
+    state.session = sessionFor(U.caitlyn, "paralegal", "caitlyn@example.com");
+    expect(await A.returnCardAction("q1", "x".repeat(501))).toEqual({ ok: false, error: "That note is too long. Keep it to 500 characters." });
+    expect(state.record).not.toHaveBeenCalled();
   });
 });
 
@@ -273,3 +375,37 @@ describe("Send from Outlook now", () => {
     expect(!r.ok && r.error).toMatch(re);
   });
 });
+
+describe("bell notices for hand-offs (Phase 2 item 2)", () => {
+  it("handing a card off tells the person it was handed to, with ids and the headline only", async () => {
+    state.item = qitem({ id: "q1", headline: "Post-consult follow-up — Ana", draft_body: "SECRET BODY", recipient: "ana@example.com", subject: "SECRET SUBJECT" });
+    expect((await A.handOffCardAction("q1", U.caitlyn, "a private note")).ok).toBe(true);
+    expect(state.notify).toHaveBeenCalledTimes(1);
+    const arg = state.notify.mock.calls[0][0];
+    expect(arg).toMatchObject({ userId: U.caitlyn, kind: "approval_needed", actorId: U.rebecca });
+    expect(arg.payload).toEqual({ source: "card_handoff", queue_id: "q1", headline: "Post-consult follow-up — Ana" });
+    const text = JSON.stringify(arg);
+    for (const leak of ["SECRET BODY", "SECRET SUBJECT", "a private note", "ana@example.com"]) expect(text).not.toContain(leak);
+  });
+
+  it("a hand-off that is refused or fails to save raises no notice", async () => {
+    expect((await A.handOffCardAction("q1", U.ghost, "")).ok).toBe(false);
+    state.record.mockResolvedValue({ ok: false, reason: "failed" });
+    expect((await A.handOffCardAction("q1", U.caitlyn, "")).ok).toBe(false);
+    expect(state.notify).not.toHaveBeenCalled();
+  });
+
+  it("sending a card back tells the person who handed it", async () => {
+    state.cardState = { status: "ok", events: [{ queueItemId: "q1", kind: "handoff", actorId: U.rebecca, targetUserId: U.caitlyn, until: null, note: "my note", createdAt: "2026-11-10T13:00:00Z" }] };
+    state.session = sessionFor(U.caitlyn, "paralegal", "caitlyn@example.com");
+    expect((await A.returnCardAction("q1", "back to you")).ok).toBe(true);
+    const arg = state.notify.mock.calls[0][0];
+    expect(arg).toMatchObject({ userId: U.rebecca, kind: "approval_needed", actorId: U.caitlyn });
+    expect(arg.payload).toEqual({ source: "card_returned", queue_id: "q1", headline: "Post-consult follow-up — Ana" });
+    expect(JSON.stringify(arg)).not.toContain("back to you");
+  });
+});
+/** Calls Later with extra arguments a forged client might add (an "until", times): the action ignores them. */
+function laterWithExtras() {
+  return (A.laterCardAction as unknown as (...a: unknown[]) => Promise<{ ok: boolean }>)("q1", { until: "2030-01-01T00:00:00Z", times: ["23:00", "23:55"] }, "2030-01-01T00:00:00Z");
+}

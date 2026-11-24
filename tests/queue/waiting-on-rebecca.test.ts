@@ -1,7 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { WaitingOnRebecca, approvalLabel } from "@/components/leads/WaitingOnRebecca";
 import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
 
 /** The lead page's "Waiting on Rebecca" panel, per state: a failed read is never "nothing waiting". */
 

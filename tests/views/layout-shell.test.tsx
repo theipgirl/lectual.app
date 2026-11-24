@@ -7,8 +7,13 @@ const resolveFirmSession = vi.fn();
 vi.mock("@/lib/firm/session", () => ({ resolveFirmSession: (...a: unknown[]) => resolveFirmSession(...a) }));
 vi.mock("@/lib/queue/load", () => ({ loadActiveQueue: async () => ({ status: "ok", items: [] }) }));
 vi.mock("@/lib/queue/mine-load", () => ({ mineQueue: async () => ({ status: "ok", items: [{ id: "q1" }, { id: "q2" }] }) }));
+const loadDealNudge = vi.fn(async (...args: unknown[]) => {
+  void args;
+  return { ready: false };
+});
+vi.mock("@/lib/queue/deal-nudge-load", () => ({ loadDealNudge: (...a: unknown[]) => loadDealNudge(...a) }));
 vi.mock("@/lib/nav-counts", () => ({ loadRailCounts: async () => ({}) }));
-vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }) }));
+vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }), headers: async () => new Headers() }));
 vi.mock("next/navigation", () => ({
   redirect: (to: string) => {
     throw new Error(`redirect:${to}`);
@@ -16,6 +21,7 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/dashboard/queue/deck/",
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
+vi.mock("@/lib/org/profile", () => ({ getFirmTimeZone: async () => "America/New_York" }));
 vi.mock("@/lib/ai/claude", () => ({ aiConfigured: () => true }));
 vi.mock("@/lib/auth/actions", () => ({ signOutAction: async () => {}, switchFirmAction: async () => ({}) }));
 vi.mock("@/lib/account/view-actions", () => ({ saveViewAction: vi.fn() }));
@@ -24,6 +30,7 @@ vi.mock("@/components/shell/NoFirmAccess", () => ({ NoFirmAccess: () => null }))
 vi.mock("@/components/notifications/NotificationBell", () => ({ NotificationBell: () => null }));
 vi.mock("@/components/copilot/CopilotLauncher", () => ({ CopilotLauncher: () => null }));
 vi.mock("@/components/onboarding/OnboardingTour", () => ({ OnboardingTour: () => null }));
+vi.mock("@/components/onboarding/WelcomeDeal", () => ({ WelcomeDeal: () => null }));
 vi.mock("@/components/onboarding/GettingStartedRunner", () => ({ GettingStartedRunner: () => null }));
 
 import DashboardLayout from "@/app/dashboard/layout";
@@ -32,6 +39,7 @@ import { MobileBar } from "@/components/shell/MobileBar";
 import { AccountMenu } from "@/components/shell/AccountMenu";
 import { SectionLabel } from "@/components/shell/SectionLabel";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
+import { WelcomeDeal } from "@/components/onboarding/WelcomeDeal";
 import { mobileBarItems, moreSections, railGroups, visibleNav } from "@/lib/nav";
 import { DECK_PATH } from "@/lib/views";
 
@@ -63,12 +71,15 @@ async function mount(s: unknown) {
   resolveFirmSession.mockResolvedValue(s);
   const tree = await DashboardLayout({ children: null });
   const one = (t: unknown) => findAll(tree, t)[0] as ReactElement<AnyProps> | undefined;
-  return { tree, rail: one(Rail)!, bar: one(MobileBar)!, menu: one(AccountMenu)!, tour: one(OnboardingTour)!, label: findAll(tree, SectionLabel), header: findAll(tree, "header")[0] as ReactElement<AnyProps> };
+  return { tree, rail: one(Rail)!, bar: one(MobileBar)!, menu: one(AccountMenu)!, tour: one(OnboardingTour), welcome: one(WelcomeDeal)!, label: findAll(tree, SectionLabel), header: findAll(tree, "header")[0] as ReactElement<AnyProps> };
 }
 
 const MODULES = ["mailbox", "agents", "proposals"];
 
-beforeEach(() => resolveFirmSession.mockReset());
+beforeEach(() => {
+  resolveFirmSession.mockReset();
+  loadDealNudge.mockClear();
+});
 
 describe("switch off: today's shell, byte for byte", () => {
   it.each(["owner", "admin", "attorney"])("%s gets visibleNav's own list and every default", async (role) => {
@@ -77,7 +88,7 @@ describe("switch off: today's shell, byte for byte", () => {
       const items = visibleNav(MODULES, role as never);
       expect(m.rail.props.items).toEqual(items);
       expect(m.bar.props.items).toEqual(items);
-      expect(m.tour.props.navSlugs).toEqual(items.map((i) => i.slug));
+      expect(m.tour!.props.navSlugs).toEqual(items.map((i) => i.slug));
       for (const k of ["tree", "variant"]) expect(m.rail.props[k]).toBeUndefined();
       expect(m.rail.props.showSettings).toBe(true);
       expect(m.rail.props.showReports).toBe(true);
@@ -87,6 +98,10 @@ describe("switch off: today's shell, byte for byte", () => {
       expect(m.menu.props.variant).toBeUndefined();
       expect(m.label).toHaveLength(1);
       expect(m.header.props.className).toBe("lx-top");
+      // The deal-ready nudge is the owner shell's alone: no read, no dot words.
+      expect(loadDealNudge).not.toHaveBeenCalled();
+      expect(m.rail.props.dealReady).toBeNull();
+      expect(m.bar.props.dealReady).toBeNull();
     }
   });
 
@@ -104,13 +119,25 @@ describe("switch off: today's shell, byte for byte", () => {
 });
 
 describe("switch on", () => {
+  it("the owner shell derives the deal-ready words from the queue it already loaded; a nudge that is off passes null", async () => {
+    loadDealNudge.mockResolvedValueOnce({ ready: true, label: "2:00 PM", count: 3 } as never);
+    const on = await mount(session("owner", [...MODULES, "role-views"]));
+    expect(loadDealNudge).toHaveBeenCalledTimes(1);
+    expect(on.rail.props.dealReady).toBe("Your 2:00 PM deal is ready \u00b7 3 cards");
+    expect(on.bar.props.dealReady).toBe("Your 2:00 PM deal is ready \u00b7 3 cards");
+    const off = await mount(session("owner", [...MODULES, "role-views"]));
+    expect(off.rail.props.dealReady).toBeNull();
+  });
+
   it("an owner gets the owner shell: drawn items, owner tree, no Settings/Reports rows, no section label", async () => {
     const m = await mount(session("owner", [...MODULES, "role-views"]));
     const slugs = (m.rail.props.items as { slug: string }[]).map((i) => i.slug);
-    expect(slugs).toEqual(["", "queue", "review", "proposals", "intake", "matters", "calendar"]);
+    expect(slugs).toEqual(["", "queue", "review", "proposals", "intake", "forms", "matters", "calendar"]);
     expect(m.bar.props.items).toBe(m.rail.props.items);
-    expect(m.tour.props.navSlugs).toEqual(slugs);
-    expect(Object.keys(m.tour.props).sort()).toEqual(["aiConfigured", "firmName", "navSlugs", "open", "role"]);
+    // The owner shell draws the welcome deal INSTEAD of the tour (Phase 2 item 5).
+    expect(m.tour).toBeUndefined();
+    expect(m.welcome).toBeDefined();
+    expect(Object.keys(m.welcome.props).sort()).toEqual(["dealTimes", "open", "persist"]);
     expect(m.rail.props).toMatchObject({ showSettings: false, showReports: false, variant: "owner" });
     expect(m.bar.props).toMatchObject({ variant: "owner" });
     expect(m.menu.props).toMatchObject({ settingsInMenu: true, variant: "owner" });
@@ -140,7 +167,7 @@ describe("switch on", () => {
     ]) {
       const m = await mount(session(role, [...MODULES, "role-views"], meta, { org: { id: "11111111-1111-4111-8111-111111111111", name: "Hartwell IP", slug: "h", modules: [...MODULES, "role-views"] } }));
       expect(m.menu.props.viewMenu).toBeUndefined();
-      expect(m.rail.props.variant).toBe(role === "owner" ? "owner" : undefined);
+      expect(m.rail.props.variant).toBe(role === "owner" || role === "admin" ? "owner" : undefined);
     }
   });
 
@@ -152,17 +179,17 @@ describe("switch on", () => {
   it("Lectual staff see today's shell by default, with the switch", async () => {
     const m = await mount(staffIn(FIRM_A));
     expect(m.rail.props.variant).toBeUndefined();
-    expect(m.menu.props.viewMenu).toEqual({ pref: "technician", previewRoles: ["owner"] });
+    expect(m.menu.props.viewMenu).toEqual({ pref: "technician", previewRoles: ["owner", "admin"] });
   });
 
   it("a staff preview applies in the firm it was chosen in, never in another", async () => {
     const meta = { lectual_view_preview: { [FIRM_A]: "as:owner" } };
     const a = await mount(staffIn(FIRM_A, meta));
     expect(a.rail.props.variant).toBe("owner");
-    expect(a.menu.props.viewMenu).toEqual({ pref: "as:owner", previewRoles: ["owner"] });
+    expect(a.menu.props.viewMenu).toEqual({ pref: "as:owner", previewRoles: ["owner", "admin"] });
     const b = await mount(staffIn(FIRM_B, meta));
     expect(b.rail.props.variant).toBeUndefined();
-    expect(b.menu.props.viewMenu).toEqual({ pref: "technician", previewRoles: ["owner"] });
+    expect(b.menu.props.viewMenu).toEqual({ pref: "technician", previewRoles: ["owner", "admin"] });
   });
 
   it("Lectual staff in a firm without role views get no switch", async () => {
@@ -176,11 +203,11 @@ describe("account menu", () => {
   const menu = (extra: AnyProps) =>
     renderToStaticMarkup(createElement(AccountMenu, { initials: "AB", name: "Ada", email: "a@b.co", role: "owner", firmName: "F", activeOrgId: "o1", switchableFirms: [], ...extra } as never));
 
-  it("the owner menu: header, Your name, Settings, Help and tips, Sign out; no View group for a firm member", () => {
+  it("the owner menu: header, Your name, Deal times, Settings, Help and tips, Sign out; no View group for a firm member", () => {
     const html = menu({ settingsInMenu: true, variant: "owner" });
     expect(html).toContain('class="lx-am"');
     expect(html).toContain("Owner · F");
-    expect([...html.matchAll(/role="menuitem"[^>]*>([^<]+)</g)].map((m) => m[1])).toEqual(["Your name", "Settings", "Getting started", "Show tips again", "Send feedback", "Sign out"]);
+    expect([...html.matchAll(/role="menuitem"[^>]*>([^<]+)</g)].map((m) => m[1])).toEqual(["Your name", "Deal times", "Settings", "Getting started", "Show tips again", "Send feedback", "Sign out"]);
     expect(html).toMatch(/href="\/dashboard\/settings\/?"/);
     expect(html).not.toContain("menuitemradio");
     expect(html).not.toContain("Technician view");
@@ -191,8 +218,8 @@ describe("account menu", () => {
   });
 
   it("staff see the View group: Technician view current by default, a preview chip, the firm-only sentence", () => {
-    const html = menu({ viewMenu: { pref: "technician", previewRoles: ["owner"] } });
-    expect(html).toMatch(/role="menuitemradio" aria-checked="true"[^>]*><span>Technician view<\/span><span class="lx-am-pill">Showing<\/span>/);
+    const html = menu({ viewMenu: { pref: "technician", previewRoles: ["owner", "admin"] } });
+    expect(html).toMatch(/role="menuitemradio" aria-checked="true"[^>]*><span>Technician view<\/span><span class="lx-pill lx-pill-ox">Showing<\/span>/);
     expect(html).toContain("Preview a view");
     expect(html).toMatch(/role="menuitemradio" aria-checked="false" class="lx-am-chip"[^>]*>Owner</);
     expect(html).toContain("A preview for this firm only. It changes what is drawn, not what can be opened.");
@@ -200,7 +227,7 @@ describe("account menu", () => {
   });
 
   it("a staff preview marks its chip and the owner menu carries the switch", () => {
-    const html = menu({ variant: "owner", settingsInMenu: true, viewMenu: { pref: "as:owner", previewRoles: ["owner"] } });
+    const html = menu({ variant: "owner", settingsInMenu: true, viewMenu: { pref: "as:owner", previewRoles: ["owner", "admin"] } });
     expect(html).toMatch(/role="menuitemradio" aria-checked="true" class="lx-am-chip"[^>]*>Owner</);
     expect(html).toMatch(/role="menuitemradio" aria-checked="false"[^>]*><span>Technician view<\/span>/);
   });

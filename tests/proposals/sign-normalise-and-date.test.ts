@@ -81,8 +81,8 @@ describe("item 3: one normaliser for what a client types", () => {
 
   it("the nine details go through the same cleaning on both sides (double spaces, tabs, non-breaking spaces)", async () => {
     const w = world();
-    const typed = { ...TEST_DETAILS, client_name: `Sevetri${NBSP}${NBSP}Wilson`, street: "100\tExample   Street ", city: `  Miami${NBSP}` };
-    const b = await browserSigning(w.db, { details: typed, typedName: `Sevetri${NBSP}Wilson` });
+    const typed = { ...TEST_DETAILS, client_name: `Callum${NBSP}${NBSP}Ferreira`, street: "100\tExample   Street ", city: `  Miami${NBSP}` };
+    const b = await browserSigning(w.db, { details: typed, typedName: `Callum${NBSP}Ferreira` });
     for (const signing of [b.signing, b.rawSigning]) {
       const fresh = world();
       const r = await acceptPublicProposal(TOKEN, b.selection, NOW, fresh.db, undefined, signing);
@@ -141,9 +141,9 @@ function pageState(dateText: string, over: Partial<PageSigningState> = {}): Page
   return {
     body: fullLetterBody(),
     details: TEST_DETAILS,
-    typedName: "Sevetri Wilson",
+    typedName: "Callum Ferreira",
     dateText,
-    clientEmail: "sevetri@example.com",
+    clientEmail: "callum@example.com",
     exhibit: buildExhibit(priced.content, priced.quote, money),
     ...over,
   };
@@ -172,7 +172,7 @@ describe("item 4: the fingerprint does not cover the date", () => {
     const base = (await pageSigningPayload({ ...pageState("November 12, 2026"), agree: true }))!.fingerprint;
     const fp = async (over: Partial<PageSigningState>) => (await pageSigningPayload({ ...pageState("November 12, 2026", over), agree: true }))!.fingerprint;
     expect(await fp({ details: { ...TEST_DETAILS, street: "101 Example Street" } })).not.toBe(base);
-    expect(await fp({ typedName: "Sevetri W Wilson" })).not.toBe(base);
+    expect(await fp({ typedName: "Callum W Ferreira" })).not.toBe(base);
     expect(await fp({ body: `${fullLetterBody()}\n\nOne more paragraph.` })).not.toBe(base);
     expect(await fp({ clientEmail: "other@example.com" })).not.toBe(base);
   });

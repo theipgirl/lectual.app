@@ -1,3 +1,4 @@
+import { loadIntakeStageIds, withoutIntake } from "@/lib/matters/intake-ids";
 import { aiConfigured } from "@/lib/ai/claude";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { getFirmTimeZone } from "@/lib/org/profile";
@@ -12,6 +13,8 @@ import { getScopedClient } from "@/lib/db/scoped-client";
 import { listConversations, loadConversation, type ListResult } from "@/lib/copilot/history-store";
 import { exchangesFromMessages } from "@/lib/copilot/history-pure";
 import type { Exchange } from "@/lib/copilot/client";
+import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { CopilotWorkspace } from "@/components/copilot/CopilotWorkspace";
 import { StatCards } from "./stat-cards";
 import "./copilot.css";
@@ -82,16 +85,21 @@ export default async function CopilotPage(props?: { searchParams?: Promise<{ c?:
 
   let landing: React.ReactNode = null;
   let greeting = "";
+  let firmZone = DEFAULT_TIME_ZONE;
   if (configured && session?.kind === "ok") {
     const now = new Date();
-    const [tzS, membersS, mattersS, deadlinesS, queueS] = await Promise.allSettled([
+    const [tzS, membersS, mattersS, deadlinesS, queueS, intakeS] = await Promise.allSettled([
       getFirmTimeZone(),
       listMemberDirectory(),
       listMatters(),
       listUpcomingDeadlines({ withinDays: DEADLINE_WINDOW_DAYS }),
       loadActiveQueue(),
+      loadIntakeStageIds(),
     ]);
-    const tz = tzS.status === "fulfilled" ? tzS.value : "America/New_York";
+    // Matters still in an intake stage are not on the Matters page, so they are not counted as open or stalled here.
+    const intakeIds = intakeS.status === "fulfilled" ? intakeS.value : null;
+    const tz = tzS.status === "fulfilled" ? tzS.value : DEFAULT_TIME_ZONE;
+    firmZone = tz;
     const members = membersS.status === "fulfilled" ? membersS.value : [];
     greeting = copilotGreeting(
       hourInZone(now, tz),
@@ -109,8 +117,8 @@ export default async function CopilotPage(props?: { searchParams?: Promise<{ c?:
     landing = (
       <StatCards
         cards={buildStatCards({
-          open: statOf(mattersS, (m) => summarizeDocket(m, now).open),
-          stalled: statOf(mattersS, (m) => summarizeDocket(m, now).stalled.length),
+          open: statOf(mattersS, (m) => summarizeDocket(withoutIntake(m, intakeIds), now).open),
+          stalled: statOf(mattersS, (m) => summarizeDocket(withoutIntake(m, intakeIds), now).stalled.length),
           deadlines: statOf(deadlinesS, (d) => d.length),
           approvals: queueRead,
         })}
@@ -135,16 +143,12 @@ export default async function CopilotPage(props?: { searchParams?: Promise<{ c?:
           greeting={greeting}
           stats={landing}
           now={new Date().getTime()}
+          timeZone={firmZone}
         />
       ) : (
-        <div className="lx-card lx-empty-card">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            Copilot isn&apos;t switched on for your firm yet
-          </h2>
-          <p className="lx-note" style={{ margin: 0 }}>
-            Lectual will turn it on. Nothing here is broken: there is simply nothing to ask yet.
-          </p>
-        </div>
+        <EmptyState title="Copilot isn't switched on for your firm yet">
+          Lectual will turn it on. Nothing here is broken: there is simply nothing to ask yet.
+        </EmptyState>
       )}
 
       <div className="lx-upl">

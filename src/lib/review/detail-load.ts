@@ -1,78 +1,11 @@
 import "server-only";
 import { getScopedClient } from "@/lib/db/scoped-client";
-import { listMatterStages } from "@/lib/matters/stages";
-import { listStages } from "@/lib/pipeline/stages";
-import { ACTIVITY_LIMIT, clipNote, leadStageChoices, type ActivityIn, type StageOption } from "./detail";
+import { loadDocumentsRead } from "@/lib/files/read";
+import { mergedSetFor } from "@/lib/leads/live";
+import type { RecordDocuments } from "./documents";
+import { activeOrgModulesOrNull } from "@/lib/org/modules";
+import { clipNote } from "./detail";
 import type { OpenRef } from "./open";
-
-/**
- * Everything the detail panel reads about ONE record, through the caller's scoped client only. The record
- * itself is the gate: an id the scoped read cannot see is "missing", never a guess. The three optional reads
- * (open steps, recent activity, stages) each name their own failure and never read as "none".
- */
-export type DetailStep = { id: string; title: string; dueDate: string | null; assigneeId: string | null };
-
-export type DetailLoad =
-  | {
-      status: "ok";
-      currentStageId: string | null;
-      assignedTo: string | null;
-      cameFrom: string | null;
-      steps: { ok: true; items: DetailStep[] } | { ok: false };
-      activity: { ok: true; items: ActivityIn[] } | { ok: false };
-      stages: { ok: true; options: StageOption[] } | { ok: false };
-    }
-  | { status: "missing" }
-  | { status: "unavailable" };
-
-export async function loadReviewDetail(ref: OpenRef): Promise<DetailLoad> {
-  let db;
-  try {
-    db = await getScopedClient();
-  } catch {
-    return { status: "unavailable" };
-  }
-  const column = ref.kind === "matter" ? "matter_id" : "lead_id";
-
-  let currentStageId: string | null = null;
-  let assignedTo: string | null = null;
-  let cameFrom: string | null = null;
-  try {
-    if (ref.kind === "matter") {
-      const { data, error } = await db.from("crm_matter").select("id, stage_id, assigned_to, referral_source").eq("id", ref.id).maybeSingle();
-      if (error) throw error;
-      if (!data) return { status: "missing" };
-      currentStageId = data.stage_id;
-      assignedTo = data.assigned_to;
-      cameFrom = data.referral_source?.trim() || null;
-    } else {
-      const { data, error } = await db.from("crm_lead").select("id, current_stage_id, assigned_to, referral_source").eq("id", ref.id).maybeSingle();
-      if (error) throw error;
-      if (!data) return { status: "missing" };
-      currentStageId = data.current_stage_id;
-      assignedTo = data.assigned_to;
-      cameFrom = data.referral_source?.trim() || null;
-    }
-  } catch {
-    return { status: "unavailable" };
-  }
-
-  const [stepsS, activityS, stagesS] = await Promise.allSettled([
-    db.from("crm_task").select("id, title, due_at, assignee_id, created_at").eq("status", "open").eq(column, ref.id).order("due_at", { ascending: true, nullsFirst: false }).order("created_at", { ascending: true }),
-    db.from("crm_activity").select("id, type, actor_type, created_at, payload").eq(column, ref.id).order("created_at", { ascending: false }).limit(ACTIVITY_LIMIT),
-    ref.kind === "matter" ? listMatterStages().then((s) => s.map((x) => ({ id: x.id, name: x.label }))) : listStages().then((s) => leadStageChoices(s)),
-  ]);
-
-  const steps: Extract<DetailLoad, { status: "ok" }>["steps"] =
-    stepsS.status === "fulfilled" && !stepsS.value.error
-      ? { ok: true, items: (stepsS.value.data ?? []).map((t) => ({ id: t.id, title: t.title, dueDate: t.due_at ? t.due_at.slice(0, 10) : null, assigneeId: t.assignee_id })) }
-      : { ok: false };
-  const activity: Extract<DetailLoad, { status: "ok" }>["activity"] =
-    activityS.status === "fulfilled" && !activityS.value.error ? { ok: true, items: (activityS.value.data ?? []) as ActivityIn[] } : { ok: false };
-  const stages: Extract<DetailLoad, { status: "ok" }>["stages"] = stagesS.status === "fulfilled" ? { ok: true, options: stagesS.value } : { ok: false };
-
-  return { status: "ok", currentStageId, assignedTo, cameFrom, steps, activity, stages };
-}
 
 export type LatestNote = { status: "ok"; text: string | null } | { status: "unavailable" };
 
@@ -88,5 +21,54 @@ export async function loadLatestNote(ref: OpenRef): Promise<LatestNote> {
     return { status: "ok", text: typeof raw === "string" ? clipNote(raw) : null };
   } catch {
     return { status: "unavailable" };
+  }
+}
+
+/**
+ * The record's documents through the existing Documents & files loader (no second reader of crm_file). A matter
+ * also lists its generated letters, as a separate read, only for a firm with Document Center; an UNREADABLE module
+ * list makes the letters read "unavailable" (never "none", never "No documents yet."). A lead lists its own files
+ * plus those of leads merged into it, as the lead page does (`mergedSetFor`); when that set can't be read the
+ * keeper's own files are listed and `mergedPartial` says so. Never throws.
+ */
+export async function readRecordDocuments(ref: OpenRef): Promise<RecordDocuments> {
+  let includeLetters = false;
+  let modulesUnreadable = false;
+  if (ref.kind === "matter") {
+    try {
+      const modules = await activeOrgModulesOrNull();
+      if (modules === null) modulesUnreadable = true;
+      else includeLetters = modules.includes("document-center");
+    } catch {
+      modulesUnreadable = true;
+    }
+  }
+  let mergedIds: string[] = [];
+  let mergedPartial = false;
+  if (ref.kind === "lead") {
+    try {
+      const set = await mergedSetFor(await getScopedClient(), ref.id);
+      mergedIds = set.ids.filter((x) => x !== ref.id);
+      mergedPartial = set.status === "unavailable";
+    } catch {
+      mergedPartial = true;
+    }
+  }
+  const read = await loadDocumentsRead({ kind: ref.kind, id: ref.id, mergedIds }, { includeLetters });
+  return { ...read, letters: modulesUnreadable ? { status: "unavailable" } : read.letters, mergedPartial };
+}
+
+/**
+ * The newest documents for the Cards deck's CURRENT card only. It is the same reader as the opened record card (one small
+ * read for one record, up to 100 files and 100 letters, of which the card draws three), not a read per card.
+ * `ok: false` is a read that threw; the loader's own per-source failures ride inside `read`.
+ */
+export type DeckDocuments = { ok: true; read: RecordDocuments } | { ok: false };
+
+export async function loadDeckDocuments(ref: OpenRef): Promise<DeckDocuments> {
+  try {
+    return { ok: true, read: await readRecordDocuments(ref) };
+  } catch {
+    return { ok: false };
   }
 }

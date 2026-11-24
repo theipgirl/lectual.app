@@ -9,7 +9,7 @@ import {
   type ValidationIssue,
 } from "@/lib/proposals/validate";
 import { DEFAULT_OFFICE_ACTION_NOTE, DEFAULT_PROPOSAL_INCLUDES, type ProposalContent } from "@/lib/proposals/types";
-import { sevetri } from "./fixture";
+import { callum } from "./fixture";
 
 const errors = (issues: ValidationIssue[]) => issues.filter((i) => i.level === "error");
 const warnings = (issues: ValidationIssue[]) => issues.filter((i) => i.level === "warning");
@@ -21,21 +21,21 @@ const READY = {
   title: "Trademark Proposal",
   expires_on: "2026-10-26",
   pay_url: "https://app.lawmatics.com/forms/share/abc",
-  client_email: "sevetri@example.com",
+  client_email: "callum@example.com",
 } as const;
 
-describe("validateContent: the Sevetri proposal", () => {
+describe("validateContent: the Callum proposal", () => {
   it("is clean, with no errors and no warnings", () => {
-    expect(validateContent(sevetri())).toEqual([]);
+    expect(validateContent(callum())).toEqual([]);
   });
 
   it("is ready to approve when the row has expiry, pay link and email", () => {
-    expect(validateContent(sevetri(), READY)).toEqual([]);
+    expect(validateContent(callum(), READY)).toEqual([]);
   });
 });
 
 describe("validateContent: International Class numbers are never client-facing", () => {
-  const withGreeting = (text: string): ProposalContent => ({ ...sevetri(), greeting: text });
+  const withGreeting = (text: string): ProposalContent => ({ ...callum(), greeting: text });
 
   it.each([
     "We will file in IC 035 and IC 9.",
@@ -52,11 +52,11 @@ describe("validateContent: International Class numbers are never client-facing",
   });
 
   it("catches it in every client-facing field", () => {
-    const c = sevetri();
+    const c = callum();
     c.recommendation = "IC 9 is best";
     c.office_action_note = "Class 35 office actions";
     c.pricing.package = "Class 25 package";
-    c.names[0].name = "Prosperall (IC 42)";
+    c.names[0].name = "Larkmoor (IC 42)";
     c.names[0].what = "Class 09 goods";
     c.names[0].note = "**Note** International Class 9";
     c.names[0].marks[0].desc = "Protects Class 25";
@@ -87,35 +87,35 @@ describe("validateContent: International Class numbers are never client-facing",
   });
 
   it("also checks the row title", () => {
-    const issues = validateContent(sevetri(), { title: "Proposal for IC 9" });
+    const issues = validateContent(callum(), { title: "Proposal for IC 9" });
     expect(at(issues, "title")[0]?.level).toBe("error");
   });
 
   it("does not mistake ordinary words for it", () => {
-    const c = sevetri();
+    const c = callum();
     c.greeting = "A classic, classy approach. Our Classes included are listed below. Basic 3-step plan, public 5 times.";
     expect(validateContent(c)).toEqual([]);
   });
 
   it("'Class 1', 'Class 2' and 'Class 3' counting labels are allowed, with a warning", () => {
     for (const n of [1, 2, 3]) {
-      const issues = validateContent({ ...sevetri(), recommendation: `Class ${n} is your first filing.` });
+      const issues = validateContent({ ...callum(), recommendation: `Class ${n} is your first filing.` });
       expect(errors(issues)).toEqual([]);
       expect(warnings(issues).map((i) => i.path)).toContain("recommendation");
     }
   });
 
   it.each([4, 5, 6, 7, 8, 9])("'Class %i' is an error: past 3 it reads as an International Class number", (n) => {
-    const issues = validateContent({ ...sevetri(), recommendation: `Your Class ${n} filing.` });
+    const issues = validateContent({ ...callum(), recommendation: `Your Class ${n} filing.` });
     expect(errors(issues).map((i) => i.path)).toEqual(["recommendation"]);
     expect(errors(issues)[0].message).toContain(`Class ${n}`);
   });
 
   it("'Class 0', and a list that reaches past 3, are errors; a list within 1..3 only warns", () => {
-    expect(errors(validateContent({ ...sevetri(), recommendation: "Your Class 0 filing." }))).toHaveLength(1);
-    expect(errors(validateContent({ ...sevetri(), recommendation: "Classes 1, 2 and 5 are covered." }))).toHaveLength(1);
-    expect(errors(validateContent({ ...sevetri(), recommendation: "Class 2 and Class 7 are covered." }))).toHaveLength(1);
-    const ok = validateContent({ ...sevetri(), recommendation: "Classes 1, 2 and 3 are covered." });
+    expect(errors(validateContent({ ...callum(), recommendation: "Your Class 0 filing." }))).toHaveLength(1);
+    expect(errors(validateContent({ ...callum(), recommendation: "Classes 1, 2 and 5 are covered." }))).toHaveLength(1);
+    expect(errors(validateContent({ ...callum(), recommendation: "Class 2 and Class 7 are covered." }))).toHaveLength(1);
+    const ok = validateContent({ ...callum(), recommendation: "Classes 1, 2 and 3 are covered." });
     expect(errors(ok)).toEqual([]);
     expect(warnings(ok)).toHaveLength(1);
   });
@@ -135,7 +135,7 @@ describe("validateContent: International Class numbers are never client-facing",
 
 describe("validateContent: the substantive office action response is never in a package", () => {
   const labelIssues = (label: string) => {
-    const c = sevetri();
+    const c = callum();
     c.includes.push({ label, included: "✓" });
     return at(validateContent(c), `includes[${c.includes.length - 1}].label`);
   };
@@ -181,7 +181,7 @@ describe("validateContent: the office action response, in any client-facing text
     ["includes[].included", (c, t) => c.includes.push({ label: "Extras", included: t }), "includes[*]"],
   ];
   const run = (set: (c: ProposalContent, text: string) => void, text: string, path: string) => {
-    const c = sevetri();
+    const c = callum();
     set(c, text);
     const target = path.endsWith("[*]") ? `includes[${c.includes.length - 1}].label` : path;
     return at(validateContent(c), target).filter((i) => i.level === "error");
@@ -208,7 +208,7 @@ describe("validateContent: the office action response, in any client-facing text
     "A substantive response is included.",
   ])("errors on %j", (text) => {
     expect(offersSubstantiveOfficeActionResponse(text)).toBe(true);
-    expect(errors(validateContent({ ...sevetri(), recommendation: text })).map((i) => i.path)).toContain("recommendation");
+    expect(errors(validateContent({ ...callum(), recommendation: text })).map((i) => i.path)).toContain("recommendation");
   });
 
   it.each([
@@ -226,11 +226,11 @@ describe("validateContent: the office action response, in any client-facing text
     "Your package includes a substantive office action legal strategy review.",
   ])("allows %j", (text) => {
     expect(offersSubstantiveOfficeActionResponse(text)).toBe(false);
-    expect(errors(validateContent({ ...sevetri(), office_action_note: text }))).toEqual([]);
+    expect(errors(validateContent({ ...callum(), office_action_note: text }))).toEqual([]);
   });
 
   it("the shipped defaults (note and includes table) are clean", () => {
-    const c = sevetri();
+    const c = callum();
     c.office_action_note = DEFAULT_OFFICE_ACTION_NOTE;
     c.includes = DEFAULT_PROPOSAL_INCLUDES.map((r) => ({ ...r }));
     expect(validateContent(c)).toEqual([]);
@@ -238,7 +238,7 @@ describe("validateContent: the office action response, in any client-facing text
 
   it("an includes row is judged whole: a row that says 'Not included' is allowed, one that gives it away is not", () => {
     const row = (included: string, note?: string) => {
-      const c = sevetri();
+      const c = callum();
       c.includes.push({ label: "Substantive Office Action Response", value: "$900 each", included, note });
       return at(validateContent(c), `includes[${c.includes.length - 1}].label`);
     };
@@ -267,7 +267,7 @@ describe("validateContent: the office action response, in any client-facing text
 
 describe("validateContent: at most 3 classes per brand name", () => {
   const withClasses = (n: number): ProposalContent => {
-    const c = sevetri();
+    const c = callum();
     c.names[0].classes = Array.from({ length: n }, (_, i) => ({ id: `cx${i}`, label: `Thing ${i}`, preselected: true }));
     return c;
   };
@@ -280,7 +280,7 @@ describe("validateContent: at most 3 classes per brand name", () => {
   });
 
   it("names the brand that is over, not the others", () => {
-    const c = sevetri();
+    const c = callum();
     c.names[1].classes = withClasses(5).names[0].classes.map((x) => ({ ...x, id: `y${x.id}` }));
     expect(errors(validateContent(c)).map((i) => i.path)).toEqual(["names[1].classes"]);
   });
@@ -298,7 +298,7 @@ describe("validateContent: at most 3 classes per brand name", () => {
 
 describe("validateContent: ids", () => {
   it("duplicate mark ids, even across brand names", () => {
-    const c = sevetri();
+    const c = callum();
     c.names[1].marks[0].id = "p-word";
     const e = errors(validateContent(c));
     expect(e.map((i) => i.path)).toContain("names[1].marks[0].id");
@@ -306,13 +306,13 @@ describe("validateContent: ids", () => {
   });
 
   it("a class id colliding with a mark id", () => {
-    const c = sevetri();
+    const c = callum();
     c.names[0].classes[0].id = "p-logo";
     expect(errors(validateContent(c)).map((i) => i.path)).toContain("names[0].classes[0].id");
   });
 
   it("duplicate brand name ids and duplicate adjustment ids", () => {
-    const c = sevetri();
+    const c = callum();
     c.names[1].id = "p";
     c.adjustments = [
       { id: "a", label: "One", kind: "amount", value: 1 },
@@ -324,7 +324,7 @@ describe("validateContent: ids", () => {
   });
 
   it("a blank id", () => {
-    const c = sevetri();
+    const c = callum();
     c.names[0].marks[0].id = "  ";
     expect(errors(validateContent(c)).map((i) => i.path)).toContain("names[0].marks[0].id");
   });
@@ -339,20 +339,20 @@ describe("validateContent: money and percentages", () => {
     ["null", null],
   ])("package money that is %s", (_n, value) => {
     for (const key of ["base_cents", "per_class_cents", "gov_per_class_cents"] as const) {
-      const c = sevetri();
+      const c = callum();
       (c.pricing as unknown as Record<string, unknown>)[key] = value;
       expect(errors(validateContent(c)).map((i) => i.path)).toContain(`pricing.${key}`);
     }
   });
 
   it("zero is valid money", () => {
-    const c = sevetri();
+    const c = callum();
     c.pricing.gov_per_class_cents = 0;
     expect(validateContent(c)).toEqual([]);
   });
 
   it("override money", () => {
-    const c = sevetri();
+    const c = callum();
     c.names[0].price_override = { base_cents: 4500.5, per_class_cents: -5 };
     const paths = errors(validateContent(c)).map((i) => i.path);
     expect(paths).toContain("names[0].price_override.base_cents");
@@ -360,31 +360,31 @@ describe("validateContent: money and percentages", () => {
   });
 
   it("an empty override is fine", () => {
-    const c = sevetri();
+    const c = callum();
     c.names[0].price_override = {};
     expect(validateContent(c)).toEqual([]);
   });
 
   it.each([-1, 101, NaN])("second-mark discount of %s", (pct) => {
-    const c = sevetri();
+    const c = callum();
     c.pricing.second_mark_discount_pct = pct;
     expect(errors(validateContent(c)).map((i) => i.path)).toContain("pricing.second_mark_discount_pct");
   });
 
   it.each([0, 20, 12.5, 100])("second-mark discount of %s is fine", (pct) => {
-    const c = sevetri();
+    const c = callum();
     c.pricing.second_mark_discount_pct = pct;
     expect(at(validateContent(c), "pricing.second_mark_discount_pct")).toEqual([]);
   });
 
   it("included classes must be a whole number", () => {
-    const c = sevetri();
+    const c = callum();
     c.pricing.included_classes = 2.5;
     expect(errors(validateContent(c)).map((i) => i.path)).toContain("pricing.included_classes");
   });
 
   it("adjustment amounts are whole cents; percents are 0..100", () => {
-    const c = sevetri();
+    const c = callum();
     c.adjustments = [
       { id: "a", label: "A", kind: "amount", value: 12.5 },
       { id: "b", label: "B", kind: "amount", value: -100 },
@@ -403,7 +403,7 @@ describe("validateContent: money and percentages", () => {
   });
 
   it("an unknown adjustment kind", () => {
-    const c = sevetri();
+    const c = callum();
     c.adjustments = [{ id: "a", label: "A", kind: "bogus" as "amount", value: 1 }];
     expect(errors(validateContent(c)).map((i) => i.path)).toContain("adjustments[0].kind");
   });
@@ -411,31 +411,31 @@ describe("validateContent: money and percentages", () => {
 
 describe("validateContent: something to buy", () => {
   it("no brand names", () => {
-    const c = sevetri();
+    const c = callum();
     c.names = [];
     expect(errors(validateContent(c)).map((i) => i.path)).toContain("names");
   });
 
   it("a brand name with marks but no classes", () => {
-    const c = sevetri();
+    const c = callum();
     c.names = [{ ...c.names[0], classes: [] }];
     expect(errors(validateContent(c)).map((i) => i.path)).toContain("names");
   });
 
   it("a brand name with classes but no marks", () => {
-    const c = sevetri();
+    const c = callum();
     c.names = [{ ...c.names[0], marks: [] }];
     expect(errors(validateContent(c)).map((i) => i.path)).toContain("names");
   });
 
   it("one buyable brand is enough even if another is empty", () => {
-    const c = sevetri();
+    const c = callum();
     c.names[1].marks = [];
     expect(at(validateContent(c), "names")).toEqual([]);
   });
 
   it("a mark must be word or logo; preselected must be a boolean", () => {
-    const c = sevetri();
+    const c = callum();
     (c.names[0].marks[0] as unknown as Record<string, unknown>).kind = "design";
     (c.names[0].marks[1] as unknown as Record<string, unknown>).preselected = "yes";
     const paths = errors(validateContent(c)).map((i) => i.path);
@@ -444,7 +444,7 @@ describe("validateContent: something to buy", () => {
   });
 
   it("a blank mark description is a warning, a blank class label an error", () => {
-    const c = sevetri();
+    const c = callum();
     c.names[0].marks[0].desc = " ";
     c.names[0].classes[0].label = "";
     const issues = validateContent(c);
@@ -457,53 +457,53 @@ describe("validateContent: the pay link", () => {
   it.each(["http://app.lawmatics.com/forms/x", "javascript:alert(1)", "app.lawmatics.com/forms/x", "ftp://x.com", "https://", "not a url"])(
     "rejects %j",
     (pay_url) => {
-      expect(errors(validateContent(sevetri(), { pay_url })).map((i) => i.path)).toContain("pay_url");
+      expect(errors(validateContent(callum(), { pay_url })).map((i) => i.path)).toContain("pay_url");
     },
   );
 
   it("accepts https and ignores an empty one for a draft", () => {
-    expect(validateContent(sevetri(), { pay_url: "https://app.lawmatics.com/forms/share/abc" })).toEqual([]);
-    expect(validateContent(sevetri(), { pay_url: "" })).toEqual([]);
-    expect(validateContent(sevetri(), { pay_url: null })).toEqual([]);
+    expect(validateContent(callum(), { pay_url: "https://app.lawmatics.com/forms/share/abc" })).toEqual([]);
+    expect(validateContent(callum(), { pay_url: "" })).toEqual([]);
+    expect(validateContent(callum(), { pay_url: null })).toEqual([]);
   });
 
   it("rejects an absurdly long one", () => {
-    expect(errors(validateContent(sevetri(), { pay_url: "https://x.com/" + "a".repeat(2000) })).map((i) => i.path)).toContain("pay_url");
+    expect(errors(validateContent(callum(), { pay_url: "https://x.com/" + "a".repeat(2000) })).map((i) => i.path)).toContain("pay_url");
   });
 });
 
 describe("validateContent: forApproval", () => {
   it("a draft without expiry, pay link or email is fine", () => {
-    expect(validateContent(sevetri(), { title: "Trademark Proposal" })).toEqual([]);
+    expect(validateContent(callum(), { title: "Trademark Proposal" })).toEqual([]);
   });
 
   it("approval requires expires_on, pay_url and the client's email", () => {
-    const issues = validateContent(sevetri(), { forApproval: true });
+    const issues = validateContent(callum(), { forApproval: true });
     expect(errors(issues).map((i) => i.path).sort()).toEqual(["client_email", "expires_on", "pay_url"]);
   });
 
   it("each one is checked independently", () => {
     for (const missing of ["expires_on", "pay_url", "client_email"] as const) {
-      const issues = validateContent(sevetri(), { ...READY, [missing]: null });
+      const issues = validateContent(callum(), { ...READY, [missing]: null });
       expect(errors(issues).map((i) => i.path)).toEqual([missing]);
     }
-    expect(validateContent(sevetri(), { ...READY, client_email: "   " }).map((i) => i.path)).toEqual(["client_email"]);
+    expect(validateContent(callum(), { ...READY, client_email: "   " }).map((i) => i.path)).toEqual(["client_email"]);
   });
 
   it("a malformed expiry or email is an error even for a draft", () => {
-    expect(errors(validateContent(sevetri(), { expires_on: "10/26/2026" })).map((i) => i.path)).toEqual(["expires_on"]);
-    expect(errors(validateContent(sevetri(), { expires_on: "2026-02-30" })).map((i) => i.path)).toEqual(["expires_on"]);
-    expect(errors(validateContent(sevetri(), { client_email: "not-an-email" })).map((i) => i.path)).toEqual(["client_email"]);
+    expect(errors(validateContent(callum(), { expires_on: "10/26/2026" })).map((i) => i.path)).toEqual(["expires_on"]);
+    expect(errors(validateContent(callum(), { expires_on: "2026-02-30" })).map((i) => i.path)).toEqual(["expires_on"]);
+    expect(errors(validateContent(callum(), { client_email: "not-an-email" })).map((i) => i.path)).toEqual(["client_email"]);
   });
 
   it("content problems still block approval", () => {
-    const c = sevetri();
+    const c = callum();
     c.greeting = "Filing in IC 9.";
     expect(hasErrors(validateContent(c, READY))).toBe(true);
   });
 
   it("warnings do not block approval", () => {
-    const issues = validateContent({ ...sevetri(), recommendation: "Class 1 first." }, READY);
+    const issues = validateContent({ ...callum(), recommendation: "Class 1 first." }, READY);
     expect(hasErrors(issues)).toBe(false);
     expect(warnings(issues)).not.toEqual([]);
   });
@@ -517,7 +517,7 @@ describe("validateContent: total, never throwing", () => {
 
   it("junk inside a valid shell", () => {
     const junk = {
-      client: "Sevetri",
+      client: "Callum",
       greeting: 7,
       pricing: [],
       names: [null, 5, { id: 1, marks: "x", classes: {} }],
@@ -529,20 +529,20 @@ describe("validateContent: total, never throwing", () => {
   });
 
   it("a circular document does not throw", () => {
-    const loop: Record<string, unknown> = { ...sevetri() };
+    const loop: Record<string, unknown> = { ...callum() };
     loop.self = loop;
     expect(() => validateContent(loop)).not.toThrow();
     expect(errors(validateContent(loop)).map((i) => i.path)).toContain("content");
   });
 
   it("a document over 256KB is refused", () => {
-    const c = sevetri();
+    const c = callum();
     c.greeting = "x".repeat(300 * 1024);
     expect(errors(validateContent(c)).map((i) => i.path)).toContain("content");
   });
 
   it("requires the client and greeting", () => {
-    const c = sevetri();
+    const c = callum();
     c.client.full_name = "";
     c.greeting = "";
     const paths = errors(validateContent(c)).map((i) => i.path);

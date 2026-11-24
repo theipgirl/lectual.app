@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { mobileBarItems, moreSections, railCountFor, type MobileBarSpec, type MoreGroup, type MoreSection, type NavItem } from "@/lib/nav";
-import { focusRestoreTarget, tourKeyAction } from "@/lib/onboarding/engine";
-import { menuKeyAction } from "@/lib/shell/menu-behaviour";
+import { CloseButton, useDialogKeys } from "@/components/ui/Dialog";
+import { Icon as GlyphIcon } from "@/components/ui/Icon";
 import { MORE_NAME } from "@/lib/ui/words";
 import type { QueueLoadStatus } from "@/lib/queue/load";
 import "./owner-shell.css";
@@ -13,9 +13,11 @@ import "./owner-shell.css";
 type Props = {
   items: NavItem[];
   queueStatus: QueueLoadStatus;
+  /** Owner shell only: the deal-ready words, or null. */
+  dealReady?: string | null;
   pendingCount: number;
   counts: Partial<Record<string, number>>;
-  /** A view's own bar (default: Today, Leads, Approvals, Mail or Matters). Still filtered through `items`. */
+  /** A view's own bar (default: Today, Intake, Approvals, Mail or Matters). Still filtered through `items`. */
   bar?: MobileBarSpec;
   /** A view's own More sheet groups (default: the rail's groups plus Reports). */
   groups?: readonly MoreGroup[];
@@ -25,8 +27,6 @@ type Props = {
   initialOpen?: boolean;
 };
 
-const MORE_ICON = "M5 12h.01M12 12h.01M19 12h.01";
-
 function Icon({ d }: { d: string }) {
   return (
     <svg width={20} height={20} viewBox="0 0 24 24" aria-hidden="true">
@@ -35,10 +35,19 @@ function Icon({ d }: { d: string }) {
   );
 }
 
-/** The sections the bar does not carry, grouped as the rail groups them. Presentational: the bar owns open/close. */
-export function MoreSheet({ sections, onClose, sheetRef, note }: { sections: MoreSection[]; onClose: () => void; sheetRef?: React.Ref<HTMLDivElement>; note?: string }) {
+/**
+ * The sections the bar does not carry, grouped as the rail groups them. Presentational: the bar owns open/close.
+ * One dialog: a header with a Close control, focus moves in, Tab wraps, Esc closes, focus goes back to the opener.
+ */
+export function MoreSheet({ sections, onClose }: { sections: MoreSection[]; onClose: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useDialogKeys(ref, { onClose });
   return (
-    <div ref={sheetRef} id="lx-more-sheet" className="lx-more" role="dialog" aria-modal="true" aria-label={MORE_NAME}>
+    <div ref={ref} id="lx-more-sheet" className="lx-more" role="dialog" aria-modal="true" aria-label={MORE_NAME} tabIndex={-1}>
+      <header className="lx-more-head">
+        <span className="lx-more-title">{MORE_NAME}</span>
+        <CloseButton onClick={onClose} />
+      </header>
       {sections.map((section) => (
         <div key={section.label} className="lx-more-group">
           <div className="lx-more-label">{section.label}</div>
@@ -49,30 +58,22 @@ export function MoreSheet({ sections, onClose, sheetRef, note }: { sections: Mor
           ))}
         </div>
       ))}
-      {note && <p className="lx-more-note">{note}</p>}
     </div>
   );
 }
 
 /**
- * The phone navigation (under 900px, where the rail is hidden): Leads,
+ * The phone navigation (under 900px, where the rail is hidden): Intake,
  * Approvals, Mail and Matters straight to their lists, and More for the rest.
  * What shows comes from the rail's own visibility, so a section the firm lacks
  * (Mail without the mailbox module) is never offered. The Approvals count
  * keeps the queue's three states. Hiding an entry is a courtesy; every page
  * still checks its own gate.
  */
-export function MobileBar({ items, queueStatus, pendingCount, counts, bar: barSpec, groups, variant, initialOpen = false }: Props) {
+export function MobileBar({ items, queueStatus, pendingCount, counts, dealReady = null, bar: barSpec, groups, variant, initialOpen = false }: Props) {
   const pathname = usePathname() ?? "/dashboard/";
   const [open, setOpen] = useState(initialOpen);
-  const moreButton = useRef<HTMLButtonElement>(null);
-  const sheet = useRef<HTMLDivElement>(null);
   const lastPath = useRef(pathname);
-
-  const close = (returnFocus: boolean) => {
-    setOpen(false);
-    if (returnFocus) focusRestoreTarget(moreButton.current)?.focus();
-  };
 
   // Navigating closes the sheet (the link click already did; this covers back/forward).
   useEffect(() => {
@@ -82,34 +83,8 @@ export function MobileBar({ items, queueStatus, pendingCount, counts, bar: barSp
     }
   }, [pathname]);
 
-  // Escape closes the sheet wherever focus is, and focus goes back to More.
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (menuKeyAction(e.key, true) === "close") {
-        setOpen(false);
-        focusRestoreTarget(moreButton.current)?.focus();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
-
-  useEffect(() => {
-    if (open) sheet.current?.querySelector<HTMLElement>("a")?.focus();
-  }, [open]);
-
   const bar = mobileBarItems(items, pathname, barSpec);
   const sections = moreSections(items, pathname, groups, barSpec);
-
-  const onKeyDown = (e: React.KeyboardEvent) => {
-    const controls = [...(sheet.current?.querySelectorAll<HTMLElement>("a") ?? [])];
-    const current = controls.findIndex((el) => el === e.target);
-    const action = tourKeyAction({ key: e.key, shiftKey: e.shiftKey, inField: false }, { count: controls.length, current });
-    if (action?.kind !== "focus") return;
-    e.preventDefault();
-    controls[action.index]?.focus();
-  };
 
   // The owner's open sheet takes the active tile (PhoneBar board); the page you are on is still named by aria-current.
   const sheetOwnsTile = variant === "owner" && open;
@@ -120,24 +95,25 @@ export function MobileBar({ items, queueStatus, pendingCount, counts, bar: barSp
       <nav className={`lx-mbar${variant === "owner" ? " lx-mbar--owner" : ""}`} aria-label="Main">
         {bar.map((item) => {
           const count = railCountFor(item.countKey, queueStatus, pendingCount, counts);
+          const ready = variant === "owner" && item.countKey === "queue" ? dealReady : null;
           return (
             <Link
               key={item.slug || "today"}
               href={item.href}
               className={`lx-mbar-item${item.active && !sheetOwnsTile ? " is-active" : ""}`}
               aria-current={item.active ? "page" : undefined}
-              aria-label={count ? `${item.label} (${count === "!" ? "couldn't reach the queue" : count})` : item.label}
+              aria-label={`${count ? `${item.label} (${count === "!" ? "couldn't reach the queue" : count})` : item.label}${ready ? `, ${ready}` : ""}`}
             >
               <span className="lx-mbar-icon">
                 <Icon d={item.icon} />
                 {count && <span className={`lx-mbar-badge${count === "!" ? " is-alert" : ""}`}>{count}</span>}
+                {ready && <span className="lx-ready-dot lx-ready-dot--bar" aria-hidden="true" />}
               </span>
               <span className="lx-mbar-label">{item.label}</span>
             </Link>
           );
         })}
         <button
-          ref={moreButton}
           type="button"
           className={`lx-mbar-item${open || moreActive ? " is-active" : ""}`}
           aria-haspopup="dialog"
@@ -146,18 +122,17 @@ export function MobileBar({ items, queueStatus, pendingCount, counts, bar: barSp
           onClick={() => setOpen((o) => !o)}
         >
           <span className="lx-mbar-icon">
-            <Icon d={MORE_ICON} />
+            <GlyphIcon name="more" size={20} />
           </span>
           <span className="lx-mbar-label">{MORE_NAME}</span>
         </button>
       </nav>
       {open && (
-        <div onKeyDown={onKeyDown}>
-          <div className="lx-more-scrim" onPointerDown={() => close(true)} aria-hidden="true" />
-          <MoreSheet sections={sections} sheetRef={sheet} onClose={() => setOpen(false)} />
-        </div>
+        <>
+          <div className="lx-more-scrim" onPointerDown={() => setOpen(false)} aria-hidden="true" />
+          <MoreSheet sections={sections} onClose={() => setOpen(false)} />
+        </>
       )}
     </>
   );
 }
-

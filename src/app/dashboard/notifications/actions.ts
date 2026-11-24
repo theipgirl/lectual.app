@@ -1,5 +1,6 @@
 "use server";
 
+import { REFRESH_TO_TRY_AGAIN } from "@/lib/ui/words";
 import { revalidatePath } from "next/cache";
 import { markAllRead, markRead } from "@/lib/notifications";
 import { UUID } from "@/lib/queue/link-rules";
@@ -17,7 +18,7 @@ export async function markNotificationRead(id: string): Promise<NotificationActi
     await markRead(id);
   } catch (err) {
     console.warn(`[notifications] mark read failed: ${err instanceof Error ? err.message : String(err)}`);
-    return { error: "Couldn't mark that notification read. Try again shortly." };
+    return { error: `Couldn't mark that notification read. ${REFRESH_TO_TRY_AGAIN}` };
   }
   revalidatePath("/dashboard", "layout");
   return { ok: true };
@@ -28,7 +29,7 @@ export async function markAllNotificationsRead(): Promise<NotificationActionResu
     await markAllRead();
   } catch (err) {
     console.warn(`[notifications] mark all read failed: ${err instanceof Error ? err.message : String(err)}`);
-    return { error: "Couldn't mark your notifications read. Try again shortly." };
+    return { error: `Couldn't mark your notifications read. ${REFRESH_TO_TRY_AGAIN}` };
   }
   revalidatePath("/dashboard", "layout");
   return { ok: true };

@@ -1,3 +1,5 @@
+import { FORMS_NAME, SCORED_ASSESSMENT } from "@/lib/ui/words";
+import { PageHeader } from "@/components/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -16,6 +18,9 @@ import { assessmentResults } from "@/lib/intake-forms/results";
 import { AssessmentBlocks } from "./AssessmentBlocks";
 import { Unreadable } from "./IntakeDrawer";
 import { eventHref } from "./EventAssessments";
+import { EventPeople } from "./EventPeople";
+import { eventDisplayName } from "@/lib/intake-forms/event-name";
+import "./event.css";
 
 /**
  * `/dashboard/forms/?event=<code>`: one booth event's numbers, read-only. The
@@ -30,30 +35,30 @@ import { eventHref } from "./EventAssessments";
 
 const RANGE_LABEL = (r: EventRange) => (r === "all" ? "All time" : `${r} days`);
 
-export async function EventPage({ code, range, now = new Date() }: { code: string; range: EventRange; now?: Date }) {
+export async function EventPage({ code, range, role, now = new Date() }: { code: string; range: EventRange; role?: unknown; now?: Date }) {
   const read = await loadBoothEvent(code);
   if (read.status === "ok" && read.value.rows.length === 0) notFound();
 
   const header = (
-    <>
-      <Link href="/dashboard/forms/" className="ifm-back">
-        ← All intakes
-      </Link>
-      <div className="lx-page-head">
-        <div style={{ flex: 1, minWidth: 240 }}>
-          <div className="lx-label">Event assessment</div>
-          <h1 className="lx-h1">{code}</h1>
-          <p className="lx-sub">Booth scorecards taken at this event. Read-only: nothing here changes a card or a lead.</p>
-        </div>
-        <nav className="ifm-seg" aria-label="Date range">
+    <PageHeader
+      back={{ href: "/dashboard/forms/", label: FORMS_NAME }}
+      title={
+        <>
+          {eventDisplayName(code)} <span className="ev-name-code">{code}</span>
+        </>
+      }
+      details={SCORED_ASSESSMENT}
+      sub="Read-only: nothing here changes a card or a lead."
+      actions={
+        <nav className="vs-switch" aria-label="Date range">
           {EVENT_RANGES.map((r) => (
-            <Link key={r} href={eventHref(code, String(r))} scroll={false} className={range === r ? "on" : ""} aria-current={range === r ? "page" : undefined}>
+            <Link key={r} href={eventHref(code, String(r))} scroll={false} aria-current={range === r ? "page" : undefined}>
               {RANGE_LABEL(r)}
             </Link>
           ))}
         </nav>
-      </div>
-    </>
+      }
+    />
   );
 
   if (read.status !== "ok") {
@@ -70,6 +75,7 @@ export async function EventPage({ code, range, now = new Date() }: { code: strin
   const variant = eventVariant(read.value.rows);
   const results = assessmentResults(rows.map(sampleFromBooth), boothCardQuestions(variant, "business"));
   const drop = dropOffByQuestion(rows, variant);
+  const people = await EventPeople({ code, range, role, now });
   const maxDrop = Math.max(0, ...drop.steps.map((s) => s.count));
 
   return (
@@ -77,9 +83,9 @@ export async function EventPage({ code, range, now = new Date() }: { code: strin
       {header}
       <div className="ifm-perf">
         <h2 className="ifm-title">Performance</h2>
-        <div className="ifm-stats" role="group" aria-label="Booth cards at this event">
+        <div className="ifm-stats" role="group" aria-label="Assessments taken">
           {[
-            { label: "Started", value: stats.started.toLocaleString("en-US"), sub: "Gave contact details at the booth" },
+            { label: "Started", value: stats.started.toLocaleString("en-US"), sub: "Gave contact details" },
             { label: "Finished", value: stats.finished.toLocaleString("en-US"), sub: "Completed the card" },
             { label: "Completion rate", value: stats.completionRate, sub: "Of those who started" },
             { label: "Typical time (median)", value: formatDuration(stats.medianMs), sub: "From contact details to the last answer" },
@@ -94,7 +100,7 @@ export async function EventPage({ code, range, now = new Date() }: { code: strin
         {read.value.capped && <p className="ifm-help">{`Numbers cover the latest ${EVENT_ROW_LIMIT.toLocaleString("en-US")} cards.`}</p>}
 
         <h2 className="ifm-title">Results</h2>
-        <AssessmentBlocks results={results} who={range === "all" ? "at this event" : `at this event in the last ${range} days`} />
+        <AssessmentBlocks results={results} who={range === "all" ? "" : `in the last ${range} days`} />
 
         <h2 className="ifm-title">Drop-off by question</h2>
         <div className="ifm-card ifr-block">
@@ -102,12 +108,12 @@ export async function EventPage({ code, range, now = new Date() }: { code: strin
             <p className="ifm-help">Everyone who gave contact details finished the card in this range.</p>
           ) : !drop.recorded ? (
             <p className="ifm-help">
-              {`${drop.unfinished.toLocaleString("en-US")} ${drop.unfinished === 1 ? "card was" : "cards were"} started and not finished. Answers are saved when a card is finished, so where people stopped isn't recorded for these cards.`}
+              {`${drop.unfinished.toLocaleString("en-US")} ${drop.unfinished === 1 ? "assessment was" : "assessments were"} started and not finished. Answers are saved only when one is finished, so where people stopped isn't recorded for these.`}
             </p>
           ) : (
             <>
               <p className="ifm-help">
-                {`${drop.unfinished.toLocaleString("en-US")} ${drop.unfinished === 1 ? "card was" : "cards were"} started and not finished. Each is counted at the first question it has no answer for.`}
+                {`${drop.unfinished.toLocaleString("en-US")} ${drop.unfinished === 1 ? "assessment was" : "assessments were"} started and not finished. Each is counted at the first question it has no answer for.`}
               </p>
               <ul className="ifr-bars" aria-label="Unfinished cards by the question they stopped at">
                 {drop.steps.map((s) => (
@@ -124,6 +130,8 @@ export async function EventPage({ code, range, now = new Date() }: { code: strin
             </>
           )}
         </div>
+
+        {people}
       </div>
     </div>
   );

@@ -44,44 +44,6 @@ import TimeEntryDialog, { type TimeEntrySubmit } from "./TimeEntryDialog";
  * anywhere, and never reaches a client.
  */
 
-const CHIP_BASE: React.CSSProperties = {
-  fontFamily: "var(--font-jetbrains-mono), monospace",
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 4,
-  borderRadius: 5,
-  border: "1px solid var(--line)",
-  background: "var(--surface)",
-  color: "var(--mute)",
-  cursor: "pointer",
-  whiteSpace: "nowrap",
-  flex: "0 0 auto",
-  lineHeight: 1.5,
-};
-
-/** Running is the one state the chip colours — it is the row that is costing time now. */
-const CHIP_RUNNING: React.CSSProperties = {
-  borderColor: "var(--ox)",
-  background: "var(--oxbg)",
-  color: "var(--ox)",
-};
-
-const MENU_ITEM: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 8,
-  textAlign: "left",
-  width: "100%",
-  fontSize: 13,
-  fontFamily: "inherit",
-  padding: "6px 8px",
-  borderRadius: 6,
-  border: "none",
-  background: "transparent",
-  color: "var(--ink)",
-  cursor: "pointer",
-};
-
 type DialogMode = "stop" | "manual" | null;
 
 export default function TimeChip({
@@ -194,7 +156,7 @@ export default function TimeChip({
     <span
       role="presentation"
       onClick={(event) => event.stopPropagation()}
-      style={{ display: "inline-flex", minWidth: 0, flex: "0 0 auto" }}
+      className="ix-time-wrap"
     >
       <Popover
         label={`Time on ${leadName}. ${title.replace(/\n/g, ". ")}`}
@@ -208,14 +170,8 @@ export default function TimeChip({
             title={title}
             disabled={pending}
             onClick={onClick}
-            style={{
-              ...CHIP_BASE,
-              ...(runningHere ? CHIP_RUNNING : null),
-              fontSize: 13,
-              padding: compact ? "2px 5px" : "3px 6px",
-              cursor: pending ? "progress" : "pointer",
-              opacity: pending ? 0.6 : 1,
-            }}
+            className={`lx-pill lx-pill-num ix-pill-btn ix-time-btn ${runningHere ? "lx-pill-ox" : "lx-pill-mute"}`}
+            data-compact={compact ? "" : undefined}
           >
             <span aria-hidden>⏱</span>
             {face}
@@ -224,7 +180,7 @@ export default function TimeChip({
       >
         {(close) => (
           <>
-            <span className="intake-eyebrow" style={{ padding: "4px 8px" }}>
+            <span className="lx-label ix-menu-h">
               {unavailable
                 ? "Time unavailable"
                 : `This week · ${formatDuration(weekSeconds)}`}
@@ -234,7 +190,7 @@ export default function TimeChip({
               <button
                 type="button"
                 role="menuitem"
-                style={{ ...MENU_ITEM, color: "var(--ox)" }}
+                className="lp-pop-item ix-menu-ox"
                 onClick={() => {
                   close();
                   setDialog("stop");
@@ -247,21 +203,10 @@ export default function TimeChip({
               // running timer per person is a database fact (0056's partial
               // unique index), so a Start that silently did nothing would be
               // the worse lie.
-              <span
-                style={{
-                  display: "block",
-                  padding: "6px 8px",
-                  fontSize: 13,
-                  lineHeight: 1.45,
-                  color: "var(--mute)",
-                }}
-              >
+              <span className="ix-menu-note lx-note">
                 A timer is already running on{" "}
                 {runningElsewhere.leadId ? (
-                  <Link
-                    href={`/dashboard/leads/${runningElsewhere.leadId}`}
-                    style={{ color: "var(--ox)" }}
-                  >
+                  <Link href={`/dashboard/leads/${runningElsewhere.leadId}`}>
                     {runningElsewhere.leadName ?? "another lead"}
                   </Link>
                 ) : (
@@ -273,7 +218,7 @@ export default function TimeChip({
               <button
                 type="button"
                 role="menuitem"
-                style={MENU_ITEM}
+                className="lp-pop-item"
                 onClick={() => {
                   close();
                   run(() => startTimerAction(leadId));
@@ -286,7 +231,7 @@ export default function TimeChip({
             <button
               type="button"
               role="menuitem"
-              style={MENU_ITEM}
+              className="lp-pop-item"
               onClick={() => {
                 close();
                 setDialog("manual");
@@ -297,28 +242,18 @@ export default function TimeChip({
 
             {breakdown.length > 0 && (
               <>
-                <span className="intake-eyebrow" style={{ padding: "8px 8px 4px" }}>
+                <span className="lx-label ix-menu-h">
                   Who logged it
                 </span>
                 {breakdown.map((line) => (
-                  <span
-                    key={line}
-                    style={{
-                      padding: "3px 8px",
-                      fontSize: 13,
-                      lineHeight: 1.4,
-                      color: "var(--ink2)",
-                    }}
-                  >
+                  <span key={line} className="ix-menu-note">
                     {line}
                   </span>
                 ))}
               </>
             )}
 
-            <span
-              style={{ padding: "6px 8px 2px", fontSize: 13, lineHeight: 1.4, color: "var(--mute)" }}
-            >
+            <span className="ix-menu-note lx-note">
               Internal effort only — never a client invoice.
             </span>
           </>
@@ -326,19 +261,7 @@ export default function TimeChip({
       </Popover>
 
       {error && (
-        <span
-          role="status"
-          style={{
-            marginLeft: 6,
-            fontSize: 13,
-            color: "var(--crit)",
-            maxWidth: 220,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-          title={error}
-        >
+        <span role="status" className="ix-err-inline ix-time-err" title={error}>
           {error}
         </span>
       )}

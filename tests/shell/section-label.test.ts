@@ -5,8 +5,8 @@ import { sectionLabelFor } from "@/lib/section-label";
 
 describe("sectionLabelFor (F17)", () => {
   it.each([
-    ["/dashboard/leads/abc/", "Leads"],
-    ["/dashboard/leads/abc", "Leads"],
+    ["/dashboard/leads/abc/", "Intake"],
+    ["/dashboard/leads/abc", "Intake"],
     ["/dashboard/", "Today"],
     ["/dashboard", "Today"],
     ["/dashboard/reports/ipos/", "AI tools · Report"],
@@ -16,8 +16,8 @@ describe("sectionLabelFor (F17)", () => {
     ["/dashboard/reports/", "Report"],
     ["/dashboard/queue/abc/", "Approvals"],
     ["/dashboard/settings/modules/", "Settings"],
-    ["/dashboard/intake/", "Leads"],
-    ["/dashboard/proposals/new/", "Client proposals"],
+    ["/dashboard/intake/", "Intake"],
+    ["/dashboard/proposals/new/", "Proposals"],
     ["/dashboard/matters/m1/", "Matters"],
   ])("%s -> %s", (pathname, label) => {
     expect(sectionLabelFor(pathname)).toBe(label);

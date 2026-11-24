@@ -4,7 +4,7 @@ import { loadSetupState } from "@/lib/setup/load";
 import { setupChecklist } from "@/lib/setup/checklist";
 import { ADMIN_TIER_PHRASE, canSeeSetup } from "@/lib/setup/roles";
 import { SETUP_PATH } from "@/lib/setup/routes";
-import { APPROVALS_NAME, ASSISTANTS_NAME, FEATURES_NAME, SETUP_NAME } from "@/lib/ui/words";
+import { APPROVAL_SETTINGS_NAME, ASSISTANTS_NAME, COLUMNS_SETTINGS_NAME, FEATURES_NAME, PROPOSAL_SETTINGS_NAME, SETUP_NAME, TEAM_NAME } from "@/lib/ui/words";
 import { SettingsNav, type SettingsTab } from "@/components/settings/SettingsNav";
 
 type Tab = SettingsTab & { module?: string; adminOnly?: boolean };
@@ -13,11 +13,12 @@ type Tab = SettingsTab & { module?: string; adminOnly?: boolean };
 const TABS: Tab[] = [
   { label: "Integrations", href: "/dashboard/settings/integrations/" },
   { label: ASSISTANTS_NAME, href: "/dashboard/agents/", module: "agents" },
-  { label: "Team & roles", href: "/dashboard/settings/team/" },
+  { label: TEAM_NAME, href: "/dashboard/settings/team/" },
   { label: "Firm profile", href: "/dashboard/settings/firm/" },
   { label: "Service library", href: "/dashboard/settings/services/" },
-  { label: APPROVALS_NAME, href: "/dashboard/settings/approvals/", adminOnly: true },
-  { label: "Client proposals", href: "/dashboard/settings/proposals/", module: "proposals" },
+  { label: APPROVAL_SETTINGS_NAME, href: "/dashboard/settings/approvals/", adminOnly: true },
+  { label: COLUMNS_SETTINGS_NAME, href: "/dashboard/settings/columns/", adminOnly: true },
+  { label: PROPOSAL_SETTINGS_NAME, href: "/dashboard/settings/proposals/", module: "proposals" },
   { label: FEATURES_NAME, href: "/dashboard/settings/modules/" },
 ];
 

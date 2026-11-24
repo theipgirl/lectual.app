@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
+import { INTAKE_NAME } from "@/lib/ui/words";
 import { pageTitle } from "@/lib/ui/page-title";
+import { intakeListHref } from "@/lib/intake/list-href";
 
-export const metadata: Metadata = { title: pageTitle("Leads") };
+export const metadata: Metadata = { title: pageTitle(INTAKE_NAME) };
 
 /**
  * The lead list is Intake now (/dashboard/intake/: table, board by stage,
@@ -16,5 +18,5 @@ export default async function LeadsRedirect({ searchParams }: { searchParams: Pr
   if (stage) params.set("stage", stage);
   if (q) params.set("q", q);
   const query = params.toString();
-  redirect(query ? `/dashboard/intake/?${query}` : "/dashboard/intake/");
+  redirect(intakeListHref(query));
 }

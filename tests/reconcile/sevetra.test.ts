@@ -22,14 +22,14 @@ const NOW = new Date("2026-10-22T20:00:00Z");
 const sheetCsv = [
   "0,Trademark Owner,Trademark Name,Serial No.,Status,Description,Source,Notes,Priority,,Assigned To",
   // Dates end each log entry, as in the real sheet.
-  "Sevetra Wrenfield,,Prosperall Goods,,1. Potential New Client,PNC scheduled consult for 10.12.26; consult done - proposal sent 10.16.26,Referral,,,,RL",
+  "Sevetra Wrenfield,,Larkmoor Goods,,1. Potential New Client,PNC scheduled consult for 10.12.26; consult done - proposal sent 10.16.26,Referral,,,,RL",
   "",
   "First Name,Last Name,Email Address,Phone Number,Practice Area,Trademark Name,Website/Instagram,Priority,Notes",
-  "Sevetra,Wrenfield,sevetra@prosperall.example,,Trademark,Prosperall Goods,,,",
+  "Sevetra,Wrenfield,sevetra@larkmoor.example,,Trademark,Larkmoor Goods,,,",
 ].join("\n");
 
 const lm = () =>
-  prospectsPayload([{ id: "700", matterName: "Prosperall Goods", firstName: "Sevetra", lastName: "Wrenfield", email: "sevetra@prosperall.example", stage: "Proposal Sent", practiceArea: "Trademark", updatedAt: "2026-10-16T18:00:00Z" }]);
+  prospectsPayload([{ id: "700", matterName: "Larkmoor Goods", firstName: "Sevetra", lastName: "Wrenfield", email: "sevetra@larkmoor.example", stage: "Proposal Sent", practiceArea: "Trademark", updatedAt: "2026-10-16T18:00:00Z" }]);
 
 const lmNote = () => ({
   type: "note",
@@ -55,7 +55,7 @@ const world = (over: Parameters<typeof makeWorld>[0] = {}) =>
         last_name: "Wrenfield",
         email: "sheet+abc@intake.invalid",
         current_stage_id: S.pnc,
-        sheet_key: key("Sevetra Wrenfield", "Prosperall Goods", "1"),
+        sheet_key: key("Sevetra Wrenfield", "Larkmoor Goods", "1"),
         lawmatics_id: "700",
         practice_area: "Trademark",
       }),
@@ -90,7 +90,7 @@ describe("imported (A)", () => {
       { id: "s7", name: "Signed LOE / Deposit Received", category: "won", orderIndex: 7 },
     ];
     const record: LawmaticsSourceRecord = {
-      lawmaticsId: "700", matterName: "Prosperall Goods", firstName: "Sevetra", lastName: "Wrenfield", email: "sevetra@prosperall.example", phone: null,
+      lawmaticsId: "700", matterName: "Larkmoor Goods", firstName: "Sevetra", lastName: "Wrenfield", email: "sevetra@larkmoor.example", phone: null,
       businessName: null, website: null, stageName: "Proposal Sent", practiceArea: "Trademark", createdAt: null, updatedAt: null, contactId: null, referralSource: null,
     };
     const plan = planImport([record], stages, [], DEFAULT_PLAN_OPTIONS);

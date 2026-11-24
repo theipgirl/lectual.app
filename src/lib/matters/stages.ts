@@ -2,6 +2,7 @@ import { getScopedClient } from "@/lib/db/scoped-client";
 import type { Database } from "@/lib/db/types";
 import { requireMatterWriteRole } from "./matters";
 import { ReadableError } from "@/lib/ui/readable-error";
+import { isMissingColumnError } from "./phase-group";
 
 
 /**
@@ -46,10 +47,17 @@ export type MatterStage = {
   order_index: number;
   is_open: boolean;
   waiting_on: MatterWaitingOn;
+  /**
+   * pipeline | pre_filing | post_filing | maintenance, or null. ABSENT (undefined) when the database has no
+   * `phase` column yet: every read falls back to the old columns. Read only by phase-group.ts.
+   */
+  phase?: string | null;
 };
 
 /** The columns selected wherever a MatterStage is built, embed included. */
-export const MATTER_STAGE_COLUMNS = "id, code, label, order_index, is_open, waiting_on";
+export const MATTER_STAGE_COLUMNS = "id, code, label, order_index, is_open, waiting_on, phase";
+/** What every read falls back to on a database whose crm_matter_stage has no `phase` column (42703 / PGRST204). */
+export const MATTER_STAGE_COLUMNS_NO_PHASE = "id, code, label, order_index, is_open, waiting_on";
 
 /**
  * Lists the active org's docket stages in board order (order_index ascending,
@@ -60,13 +68,41 @@ export const MATTER_STAGE_COLUMNS = "id, code, label, order_index, is_open, wait
  * in memory, which is exactly what listMatters/getMatter do.
  */
 export async function listMatterStages(): Promise<MatterStage[]> {
+  const read = await loadMatterStages();
+  if (read.status === "unavailable") throw read.error;
+  return read.stages;
+}
+
+/**
+ * The stage list with its phase state, three states, never two:
+ *  - ok: read with the `phase` column.
+ *  - not-set-up: the database has no `phase` column (error CODE 42703 / PGRST204, never message text); the stages are
+ *    read again without it and carry no phase.
+ *  - unavailable: any other failure. A failed read, never "no phases".
+ */
+export type MatterStageRead =
+  | { status: "ok"; stages: MatterStage[] }
+  | { status: "not-set-up"; stages: MatterStage[] }
+  | { status: "unavailable"; error: unknown };
+
+export async function loadMatterStages(): Promise<MatterStageRead> {
   const supabase = await getScopedClient();
-  const { data, error } = await supabase
-    .from("crm_matter_stage")
-    .select(MATTER_STAGE_COLUMNS)
-    .order("order_index", { ascending: true });
-  if (error) throw error;
-  return (data ?? []) as MatterStage[];
+  const withPhase = await supabase.from("crm_matter_stage").select(MATTER_STAGE_COLUMNS).order("order_index", { ascending: true });
+  if (!withPhase.error) return { status: "ok", stages: (withPhase.data ?? []) as MatterStage[] };
+  if (!isMissingColumnError(withPhase.error)) return { status: "unavailable", error: withPhase.error };
+  const plain = await supabase.from("crm_matter_stage").select(MATTER_STAGE_COLUMNS_NO_PHASE).order("order_index", { ascending: true });
+  if (plain.error) return { status: "unavailable", error: plain.error };
+  return { status: "not-set-up", stages: (plain.data ?? []) as MatterStage[] };
+}
+
+/** One stage by id, with the same fall-back to the old columns when `phase` isn't there. */
+async function readStageById(supabase: Awaited<ReturnType<typeof getScopedClient>>, id: string): Promise<MatterStage | null> {
+  const withPhase = await supabase.from("crm_matter_stage").select(MATTER_STAGE_COLUMNS).eq("id", id).maybeSingle();
+  if (!withPhase.error) return (withPhase.data as MatterStage | null) ?? null;
+  if (!isMissingColumnError(withPhase.error)) throw withPhase.error;
+  const plain = await supabase.from("crm_matter_stage").select(MATTER_STAGE_COLUMNS_NO_PHASE).eq("id", id).maybeSingle();
+  if (plain.error) throw plain.error;
+  return (plain.data as MatterStage | null) ?? null;
 }
 
 // The pure rules live in ./stage-rules so the board can import them from a
@@ -110,12 +146,7 @@ export async function updateMatterStage(matterId: string, stageId: string): Prom
   if (matterError) throw matterError;
   if (!matter) throw new ReadableError("Matter not found.");
 
-  const { data: toStage, error: toStageError } = await supabase
-    .from("crm_matter_stage")
-    .select(MATTER_STAGE_COLUMNS)
-    .eq("id", stageId)
-    .maybeSingle();
-  if (toStageError) throw toStageError;
+  const toStage = await readStageById(supabase, stageId);
   if (!toStage) throw new ReadableError("That stage isn't on this firm's docket.");
 
   // The stage being left, for the timeline entry. Absent when the matter was
@@ -123,13 +154,7 @@ export async function updateMatterStage(matterId: string, stageId: string): Prom
   // than inventing a starting point.
   let fromStage: MatterStage | null = null;
   if (matter.stage_id) {
-    const { data, error } = await supabase
-      .from("crm_matter_stage")
-      .select(MATTER_STAGE_COLUMNS)
-      .eq("id", matter.stage_id)
-      .maybeSingle();
-    if (error) throw error;
-    fromStage = (data as MatterStage | null) ?? null;
+    fromStage = await readStageById(supabase, matter.stage_id);
   }
 
   if (matter.stage_id === stageId) return;

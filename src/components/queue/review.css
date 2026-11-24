@@ -1,17 +1,40 @@
 /* The queue item view: the aside's detail list and "For the reviewer". Design tokens only (src/app/globals.css). */
 
-.lx-dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: 12px; row-gap: 6px; margin: 0; font-size: 14px; }
-.lx-dl dt { color: var(--muted); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; align-self: baseline; padding-top: 2px; }
+.lx-dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: 12px; row-gap: 6px; margin: 0; font-size: var(--fs-2); }
+.lx-dl dt { color: var(--muted); font-size: var(--fs-1); align-self: baseline; padding-top: 2px; }
 .lx-dl dd { margin: 0; color: var(--ink); overflow-wrap: anywhere; min-width: 0; }
 
 .lx-rv { display: grid; gap: 6px; }
 .lx-rv-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.lx-rv-item { padding: 6px 8px; border-radius: 8px; color: var(--body); font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; background: var(--well); }
+.lx-rv-item { padding: 6px 8px; border-radius: var(--r-sm); color: var(--body); font-size: var(--fs-2); line-height: 1.45; overflow-wrap: anywhere; background: var(--well); }
 .lx-rv-item[data-check-first="true"] { background: var(--cream); border: 1px solid var(--warn); color: var(--ink); }
-.lx-rv-tag { display: inline-block; margin-right: 6px; color: var(--warn); font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
-.lx-rv-more > summary { cursor: pointer; color: var(--ox); font-size: 13px; padding: 4px 0; }
-.lx-rv-more > summary:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; border-radius: 4px; }
+.lx-rv-tag { display: inline-block; margin-right: 6px; color: var(--warn); font-size: var(--fs-1); font-weight: 600; }
+.lx-rv-more > summary { cursor: pointer; color: var(--ox); font-size: var(--fs-1); padding: 4px 0; }
+.lx-rv-more > summary:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; border-radius: var(--r-sm); }
 .lx-rv-more[open] > summary { margin-bottom: 6px; }
+.lx-rv-plain { margin: 0; color: var(--body); }
+
+/* The item page: the draft card, the stale tick, the checks banner and the aside's small parts. */
+.lx-qi-draft-label { margin-bottom: 8px; }
+.lx-qi-refusal { margin: 0 0 12px; }
+.lx-qi-status { justify-self: start; }
+.lx-qi-owner { margin: 0; }
+.lx-checks { display: grid; gap: 8px; margin: 0; }
+.lx-checks-title { font-size: var(--fs-4); }
+.lx-checks-list { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.lx-edited { color: var(--warn); }
+.lx-edit-actions-head { display: flex; gap: 8px; }
+.lx-stale-tick { display: flex; gap: 10px; align-items: flex-start; margin: 0; cursor: pointer; }
+.lx-stale-tick input { margin-top: 3px; }
+.lx-review-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.lx-review-foot { margin: 0; }
+.lx-linked { padding: 14px; display: grid; gap: 8px; }
+.lx-linked-open { justify-self: start; }
+.lx-routing { display: grid; gap: 16px; }
+.lx-routing-row { display: grid; gap: 4px; }
+.lx-routing-label { font-weight: 600; }
+.lx-routing-help { margin: 0; }
+.lx-routing-select { max-width: 420px; }
 
 .lx-view-draft { display: grid; gap: 8px; }
 .lx-view-draft-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
@@ -34,15 +57,11 @@
   .lx-app:has(.lx-top--owner) .lx-qi .lx-review,
   .lx-app:has(.lx-top--owner) .lx-qi > .lx-qi-aside { display: contents; }
 
-  .lx-app:has(.lx-top--owner) .lx-qi-back { font-size: 14px; color: var(--ox); text-decoration: underline; text-underline-offset: 2px; min-height: 44px; display: inline-flex; align-items: center; }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-qi-kind { font-size: 12px; letter-spacing: 0.1em; color: var(--muted); }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-h1 { font-size: 28px !important; margin-top: 4px; }
-
   /* Stale notice, then its tick, then the checks. */
-  .lx-app:has(.lx-top--owner) .lx-qi [role="alert"].lx-banner { border-radius: 14px; padding: 12px 14px; font-size: 14px; }
-  .lx-app:has(.lx-top--owner) .lx-qi [role="alert"].lx-banner strong { font-size: 14px !important; }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-stale-tick { order: 1; margin: 0; padding: 12px 14px; font-size: 15px; border-radius: 14px; min-height: 44px; align-items: center !important; }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-stale-tick input { width: 22px; height: 22px; accent-color: var(--ox); margin-top: 0 !important; }
+  .lx-app:has(.lx-top--owner) .lx-qi [role="alert"].lx-banner { padding: 12px 14px; font-size: var(--fs-2); }
+  .lx-app:has(.lx-top--owner) .lx-qi [role="alert"].lx-banner strong { font-size: var(--fs-2); }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-stale-tick { order: 1; margin: 0; padding: 12px 14px; font-size: var(--fs-3); min-height: 44px; align-items: center; }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-stale-tick input { width: 22px; height: 22px; accent-color: var(--ox); margin-top: 0; }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-review > [role="alert"] { order: 2; }
 
   /* The draft card: one card, title in the board's sans, Edit as a 44px outlined button. */
@@ -50,48 +69,40 @@
     order: 3;
     gap: 8px;
     padding: 14px 16px;
-    border-radius: 16px;
+    border-radius: var(--r-lg);
     border: 1px solid var(--line);
     background: var(--card);
     box-shadow: var(--shadow);
   }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-view-draft-head { flex-wrap: nowrap; align-items: center; }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-view-draft-head .lx-label {
-    font-family: var(--sans); font-size: 16px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--ink);
-  }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-view-draft-head .lx-btn {
-    min-height: 44px; padding: 0 16px; border-radius: 14px; font-size: 14px; font-weight: 600; background: var(--card); color: var(--ink); border: 1px solid var(--line);
-  }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-view-draft > .lx-note { font-size: 14px; }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-view-draft .lx-draft { min-height: 160px; font-size: 16px; line-height: 1.5; border-radius: 12px; padding: 11px 13px; }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-view-draft-head .lx-label { font-size: var(--fs-4); font-weight: 600; color: var(--ink); }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-view-draft-head .lx-btn { min-height: 44px; padding: 0 16px; }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-view-draft > .lx-note { font-size: var(--fs-2); }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-view-draft .lx-draft { min-height: 160px; font-size: var(--fs-4); line-height: 1.5; padding: 11px 13px; }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-edit-actions-head { display: none !important; }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-edit-actions { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-edit-actions .lx-btn { min-height: 48px; border-radius: 14px; font-size: 15px; font-weight: 600; justify-content: center; border: 1px solid var(--line); background: var(--card); color: var(--ink); }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-edit-actions .lx-btn-sec { background: var(--ox); border-color: var(--ox); color: var(--cream); }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-edit-actions .lx-btn { min-height: 48px; font-size: var(--fs-3); font-weight: 600; justify-content: center; }
 
   /* The reject note stays, quietly, under the draft. */
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-note-label { order: 4; font-size: 12px; letter-spacing: 0.1em; margin-bottom: -6px; }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-note-label { order: 4; margin-bottom: -6px; }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-note-input { order: 4; }
 
   /* The aside's parts become cards in the board's order: reviewer, proposal, status line, facts. */
   .lx-app:has(.lx-top--owner) .lx-qi .lx-rv,
   .lx-app:has(.lx-top--owner) .lx-qi .lx-qi-facts,
   .lx-app:has(.lx-top--owner) .lx-qi-aside > .lx-card {
-    padding: 14px 16px; border-radius: 16px; border: 1px solid var(--line); background: var(--card); box-shadow: var(--shadow);
+    padding: 14px 16px; border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--card); box-shadow: var(--shadow);
   }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-rv { order: 5; gap: 8px; }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-rv > .lx-label { font-family: var(--sans); font-size: 16px !important; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--ink); }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-rv-item { background: transparent; padding: 0; border-radius: 0; font-size: 14px; line-height: 1.45; color: var(--ink); }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-rv > .lx-label { font-size: var(--fs-4); font-weight: 600; color: var(--ink); }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-rv-item { background: transparent; padding: 0; border-radius: 0; font-size: var(--fs-2); line-height: 1.45; color: var(--ink); }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-rv-item[data-check-first="true"] { background: transparent; border: 0; }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-rv-tag {
-    font-family: var(--mono); font-size: 12px; letter-spacing: 0.6px; color: var(--cream); background: var(--ox); border-radius: 5px; padding: 2px 7px; margin-right: 8px;
-  }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-rv-more > summary { font-size: 14px; text-decoration: underline; text-underline-offset: 2px; min-height: 44px; display: inline-flex; align-items: center; }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-rv-tag { font-size: var(--fs-1); color: var(--warn); background: var(--tint-warn); border-radius: var(--r-sm); padding: 2px 7px; margin-right: 8px; }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-rv-more > summary { font-size: var(--fs-2); text-decoration: none; text-underline-offset: 2px; min-height: 44px; display: inline-flex; align-items: center; }
   .lx-app:has(.lx-top--owner) .lx-qi-aside > .lx-card { order: 6; }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-qi-status { order: 7; justify-self: start; }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-qi-owner { order: 7; margin: 0; font-size: 14px; }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-qi-facts { order: 8; font-size: 14px; row-gap: 6px; }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-qi-facts dt { font-family: var(--mono); font-size: 13px; letter-spacing: 0; text-transform: none; color: var(--muted); }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-qi-owner { order: 7; margin: 0; font-size: var(--fs-2); }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-qi-facts { order: 8; font-size: var(--fs-2); row-gap: 6px; }
 
   /* Messages after the cards. */
   .lx-app:has(.lx-top--owner) .lx-qi .lx-review > p { order: 20; margin: 0; }
@@ -100,22 +111,20 @@
   .lx-app:has(.lx-top--owner) .lx-qi .lx-review-actions[data-pinned="true"] {
     order: 30;
     position: fixed; left: 8px; right: 8px; bottom: 86px; z-index: 60;
-    display: grid !important; grid-template-columns: 1fr 1.4fr; gap: 8px; padding: 10px; border-radius: 20px;
+    display: grid !important; grid-template-columns: 1fr 1.4fr; gap: 8px; padding: 10px; border-radius: var(--r-lg);
     background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow-lift);
   }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-review-actions .lx-btn { min-height: 48px; border-radius: 14px; font-size: 15px; font-weight: 600; justify-content: center; }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-review-actions .lx-btn-pri { order: 2; background: var(--ox); border-color: var(--ox); color: var(--cream); }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-review-actions .lx-btn-danger { order: 1; background: var(--card); border-color: var(--ox); color: var(--ox); }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-review-actions .lx-btn { min-height: 48px; font-size: var(--fs-4); font-weight: 600; justify-content: center; }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-review-actions .lx-btn-pri { order: 2; }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-review-actions .lx-btn-danger { order: 1; }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-review-actions .lx-btn-sec { order: 0; grid-column: 1 / -1; }
   .lx-app:has(.lx-top--owner) .lx-qi .lx-review-actions .lx-btn-sec:disabled { display: none; }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-review-actions .lx-btn:disabled { opacity: 0.45; }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-review-actions .lx-btn:disabled { opacity: 0.5; }
 }
 
 
-/* Legibility pass (founder, Nov 10): the pill and the note input on the owner phone item. */
+/* Legibility pass (founder, Nov 10): the note input on the owner phone item. */
 @media (max-width: 900px) {
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-qi-status { font-size: 13px; }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-note-label span { font-size: 13px; }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-note-input { font-size: 16px; }
-  .lx-app:has(.lx-top--owner) .lx-qi .lx-review-actions .lx-btn { font-size: 16px; }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-note-label span { font-size: var(--fs-1); }
+  .lx-app:has(.lx-top--owner) .lx-qi .lx-note-input { font-size: var(--fs-4); }
 }

@@ -47,6 +47,8 @@ function ids(formData: FormData): { leadId: string; activityId: string } | null 
 function refresh(leadId: string) {
   revalidatePath(`/dashboard/leads/${leadId}/`);
   revalidatePath("/dashboard/intake/");
+  // The Weekly review opens the same card (its suggestion cards and timeline Undo), and its rows show the stage.
+  revalidatePath("/dashboard/review/");
 }
 
 /** The date a person's accept stamps as when the lead entered the stage: the mail's own date. A future or unusable date is ignored downstream. */
@@ -74,6 +76,7 @@ export async function undoAgentMoveAction(_prev: StageKeeperActionState, formDat
     const move = row && isAgentMoveRow(row as ActivityRow) ? parseAgentMove(row as ActivityRow) : null;
     if (!row || !move) return { error: NOT_FOUND };
 
+    // live-guard: reads the lead a suggestion card belongs to, then moves it through moveLeadStage (refusal mapped)
     const { data: lead, error: leadErr } = await supabase.from("crm_lead").select("id, current_stage_id").eq("id", target.leadId).maybeSingle();
     if (leadErr) throw leadErr;
     if (!lead) return { error: NOT_FOUND };
@@ -141,6 +144,7 @@ export async function acceptStageSuggestionAction(_prev: StageKeeperActionState,
     const { suggestion } = found;
     if (!suggestion.toStageId || !suggestion.fromStageId) return { error: NOT_FOUND };
 
+    // live-guard: reads the lead a suggestion card belongs to, then moves it through moveLeadStage (refusal mapped)
     const { data: lead, error: leadErr } = await supabase.from("crm_lead").select("id, current_stage_id").eq("id", target.leadId).maybeSingle();
     if (leadErr) throw leadErr;
     if (!lead) return { error: NOT_FOUND };

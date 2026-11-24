@@ -10,9 +10,9 @@ vi.mock("next/font/google", () => ({
 
 import { ProposalDocument } from "@/components/client-proposal/ProposalDocument";
 import { defaultSelection, quoteProposal } from "@/lib/proposals/pricing";
-import { sevetri } from "../proposals/fixture";
-import { danielle } from "../proposals/danielle-fixture";
-import { faithe } from "../proposals/general-fixture";
+import { callum } from "../proposals/fixture";
+import { renata } from "../proposals/renata-fixture";
+import { imogen } from "../proposals/general-fixture";
 import type { ProposalContent } from "@/lib/proposals/types";
 
 /**
@@ -23,9 +23,9 @@ import type { ProposalContent } from "@/lib/proposals/types";
 const DIR = join(__dirname, "__baseline__");
 
 const FIXTURES: Array<[string, () => ProposalContent, string]> = [
-  ["sevetri", sevetri, "Sevetri Wilson"],
-  ["danielle", danielle, "Danielle Milton"],
-  ["faithe", faithe, "Faithe Williams"],
+  ["callum", callum, "Callum Ferreira"],
+  ["renata", renata, "Renata Ostrowski"],
+  ["imogen", imogen, "Imogen Pellegrino"],
 ];
 
 function render(content: ProposalContent, clientName: string, state: "live" | "accepted"): string {

@@ -53,7 +53,7 @@ export function PackagePricesSection({ packages }: { packages: SettingsPackageVa
     <>
         <section className="lx-card pe-card pe-pkgs" aria-labelledby="package-prices-h">
           <header className="pe-card-head">
-            <h2 className="pe-h" id="package-prices-h">
+            <h2 className="lx-h3" id="package-prices-h">
               Packages
             </h2>
             <p className="lx-note pe-hint">

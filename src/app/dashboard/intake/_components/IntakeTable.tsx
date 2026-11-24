@@ -1,324 +1,391 @@
 "use client";
 
+import { Fragment, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import type { Stage } from "@/lib/pipeline";
 import type { MemberIdentity } from "@/lib/members/directory";
 import type { ReferralSource } from "@/lib/intake";
 import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
 import { pendingFor } from "@/lib/intake/needs-rebecca";
 import type { IntakeRow, SortDir, SortKey } from "@/lib/intake/rows";
-import { nextStepFor, stageCodeFor, stageLabelFor, touchStampFor } from "@/lib/intake/views";
+import { nextStepFor, stageLabelFor, touchStampFor } from "@/lib/intake/views";
+import { showTimeChip } from "@/lib/intake/leads-view";
+import { decisionOpen } from "@/lib/intake/stage-decision";
+import { needsStageTitle } from "@/lib/intake/leads-view";
 import type { IntakeTime } from "@/lib/time";
 import TimeChip from "@/components/intake/TimeChip";
-import { LtnSuggestion } from "@/components/intake/LtnSuggestion";
 import OwnerCell from "./OwnerCell";
 import TemperatureCell from "./TemperatureCell";
 import NeedsRebeccaBadge from "./NeedsRebeccaBadge";
-import AgentMoveChip from "./AgentMoveChip";
+import AssistantChips from "./AssistantChips";
+import { useColWidths } from "./useColWidths";
+import { assistantColumnShown } from "@/lib/intake/assistant-column";
+import { MAX_COL, MENU_COL_WIDTH, MIN_COL, NEXT_MIN_WIDTH, colWidth, tableMinWidth, visibleColumns, type ColKey } from "@/lib/intake/col-widths";
+import "@/components/review/review.css";
+import "@/components/review/review-sheet-edit.css";
 import SourceCell from "./SourceCell";
+import RowMenu from "./RowMenu";
 import type { Lane } from "@/lib/leads/lane";
-import { NEXT, NEXT_CLAMP, NEXT_HOT, TOUCH_IN, TOUCH_OUT } from "./styles";
-import { NO_LEADS_YET, NO_LEAD_MATCHES } from "@/lib/ui/words";
+import { SheetCard, SheetScroll, SheetTable } from "@/components/ui/SheetTable";
+import { ShowingCount } from "@/components/ui/ShowingCount";
+import { Pill } from "@/components/ui/Pill";
+import { MEANING_TONE } from "@/lib/ui/tones";
+import {
+  NEXT_STEP,
+  OWNER_COLUMN,
+  LEADS_ACTIONS_SR,
+  LEADS_ASSISTANT_COLUMN,
+  LEADS_COMPARE_OPEN,
+  LEADS_CONTACT_COLUMN,
+  LEADS_DUPLICATE,
+  LEADS_MOVED_MARK,
+  LEADS_MOVED_MARK_TITLE,
+  LEADS_NEEDS_STAGE,
+  LEADS_RESIZE_COLUMN, BLANK } from "@/lib/ui/words";
+import { duplicateTitle, type DuplicateOf } from "@/lib/intake/duplicates";
+import { leadLabel } from "@/lib/record-card/lead-label";
+import type { IntakeCardData } from "@/lib/record-card/intake-cards";
+import { NextStepLine, StagePick } from "@/components/record-card/controls";
+import { SavedNote } from "@/components/ui/SavedNote";
+import { RECORD_CARD_SAVED, recordCardOpenLabel } from "@/lib/ui/words";
+import "@/components/record-card/record-card.css";
 
-/**
- * The canvas's column widths. The checkbox column is omitted (§11), and the
- * single Temperature column takes the room two columns used to, so
- * a "Suggested: Warm" chip never runs into its neighbour. Seven columns, in
- * the header strip and in every row.
- */
-const GRID = "1.8fr 1.45fr 1.35fr .9fr 64px 1.35fr 1.7fr";
-
-/** What the ← and → in the Last touch column mean. */
-const ARROW_LEGEND = "← waiting on us, → waiting on them";
-
-const COLUMNS: Array<{ key: SortKey; label: string }> = [
-  { key: "lead", label: "Lead" },
-  { key: "stage", label: "Stage" },
-  { key: "temperature", label: "Temperature" },
-  { key: "source", label: "Source" },
-  { key: "owner", label: "Owner" },
-  { key: "lastTouch", label: "Last touch" },
-  { key: "notes", label: "Next step" },
-];
-
-const ellipsis: React.CSSProperties = {
-  minWidth: 0,
-  whiteSpace: "nowrap",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
+/** The sort key and the words of each column. The Assistant activity column has no sort: it is not a value a person ranks by. */
+const COLUMNS: Record<ColKey, { key: SortKey | null; label: string }> = {
+  lead: { key: "lead", label: "Lead" },
+  stage: { key: "stage", label: "Stage" },
+  temp: { key: "temperature", label: "Temperature" },
+  source: { key: "source", label: "Source" },
+  owner: { key: "owner", label: OWNER_COLUMN },
+  assistant: { key: null, label: LEADS_ASSISTANT_COLUMN },
+  touch: { key: "lastTouch", label: LEADS_CONTACT_COLUMN },
+  next: { key: "notes", label: NEXT_STEP },
 };
 
 /**
- * The intake list as a table (canvas 10a) — the default view, because 25 leads
- * with dates in them is a table.
+ * The Leads list. A row is at least one even height and grows only when a name needs a second line: the lead's FULL name (it
+ * wraps, it is never cut) over its business (cut with a tooltip), the stage pill with the person's own markers ("Needs
+ * attorney", "Needs a stage", "Possible duplicate"), the temperature pill, the source, the owner (only when somebody in view has
+ * one), what the assistants did (only while somebody in view has something), the last contact in words ("Our turn · 16 Nov"), the
+ * next step (two lines, "No activity yet" muted) and a "…" menu. Every column's right edge can be dragged (or moved with the arrow
+ * keys) and the width is remembered for this person; the table scrolls inside its own box only if a person makes it wider than the
+ * page, never the page. Under 640px a row is a card.
  *
- * Every value on a row is derived: stage and source are columns, temperature
- * (a person's lane, else the derived one) and reply state come from the pure helpers, and "Next step" is the latest
- * note or a statement of the reply state (views.ts). Nothing here is invented
- * and nothing reads as advice.
+ * `rows` is ONE PAGE of the sorted, filtered list; `total` is the whole filtered list and `left` what the page leaves out.
  */
 export default function IntakeTable({
   rows,
-  totalCount,
+  total,
+  left,
+  setLabel,
+  hasOwnerColumn,
   members,
+  stages,
   sortKey,
   sortDir,
   now,
   pendingLeadId,
   errors,
+  cards,
+  openHrefFor,
+  savedId,
   time,
   pendingApprovals,
+  notesUnavailable,
+  duplicates = {},
+  movedOut,
+  timeZone,
   onSort,
   onSetLane,
   onAssign,
   onSetSource,
+  onMoveStage,
+  onShowMore,
   onClearFilters,
   emptyAction,
+  anyLeads,
+  onCompare,
 }: {
   rows: IntakeRow[];
-  /** Rows before filtering — the footer's "of M". */
-  totalCount: number;
+  total: number;
+  left: number;
+  setLabel: string;
+  hasOwnerColumn: boolean;
   members: MemberIdentity[];
+  /** Stages a lead can be moved to from the row menu. */
+  stages: Stage[];
   sortKey: SortKey;
   sortDir: SortDir;
   now: Date;
   pendingLeadId: string | null;
   errors: Record<string, string>;
-  /** This week's time per lead, or null when that read failed (§13.1). */
+  /** Sprint 10: what each role may do on each row, the open link and the next-step line. Absent: the plain list, as before. */
+  cards?: Record<string, IntakeCardData>;
+  openHrefFor?: (leadId: string) => string;
+  savedId?: string | null;
   time: IntakeTime | null;
-  /** Absent = nothing to show; see needs-rebecca.ts for the three states. */
   pendingApprovals?: LeadPendingApprovals;
+  notesUnavailable?: boolean;
+  duplicates?: Record<string, DuplicateOf>;
+  /** Leads moved this session out of the set they were listed in: a quiet "Moved" mark. */
+  movedOut?: ReadonlySet<string>;
+  timeZone?: string;
   onSort: (key: SortKey) => void;
-  /** Sets or clears the person's lane, which is the temperature the chip shows. */
   onSetLane: (leadId: string, lane: Lane | null) => void;
   onAssign: (leadId: string, userId: string | null) => void;
   onSetSource: (leadId: string, source: ReferralSource | null) => void;
-  /** Resets every filter, for the "No lead matches these filters" state. */
+  onMoveStage: (leadId: string, stageId: string) => void;
+  onShowMore: () => void;
   onClearFilters?: () => void;
-  /** The Add lead control, offered when there are no leads at all. */
   emptyAction?: React.ReactNode;
+  /** The firm has leads at all (else "No leads yet"). */
+  anyLeads: boolean;
+  /** Opens the compare panel for a possible duplicate (the trigger gets focus back when it closes). */
+  onCompare?: (leadId: string, otherId: string, trigger: HTMLElement) => void;
 }) {
   const router = useRouter();
+  const showAssistant = assistantColumnShown(rows);
+  const cols = visibleColumns({ owner: hasOwnerColumn, assistant: showAssistant });
+  const { sizes, drag, startDrag, onKeyDown, reset } = useColWidths();
+  const dragCol = drag?.col ?? null;
+  const minWidth = tableMinWidth(cols, sizes);
+  // The card scrolls sideways inside itself by default (so the PAGE never does, whatever the columns add up to). Only after a
+  // measurement shows the table fits does it switch to overflow visible, so a menu opened on the last row is never clipped and adds
+  // no scrollbar. With no ResizeObserver it simply stays scrollable.
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [needsScroll, setNeedsScroll] = useState(true);
+  // The drawn width of each column, for the separator's aria-valuenow (the flexible Next step column has no fixed width).
+  const [drawn, setDrawn] = useState<Partial<Record<ColKey, number>>>({});
+  const colsKey = cols.join(",");
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const measure = () => {
+      setNeedsScroll(minWidth > el.clientWidth);
+      const next: Partial<Record<ColKey, number>> = {};
+      for (const th of el.querySelectorAll<HTMLElement>("thead th[data-col]")) next[th.dataset.col as ColKey] = Math.round(th.getBoundingClientRect().width);
+      setDrawn(next);
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    for (const th of el.querySelectorAll("thead th")) observer.observe(th);
+    return () => observer.disconnect();
+  }, [minWidth, colsKey]);
 
   return (
-    <div className="lp-panel">
-      <div className="intake-scroll" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-        {/* Wide screens keep a minimum width and scroll inside the panel (.lp-table-min in list-page.css); under 640px each row is a stacked card. */}
-        <div className="lp-table-min" style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-          {/* No role="row": there is no table/grid role around it, and a lone
-              row role is worse for a screen reader than none. It is a strip of
-              sort buttons, each of which says what it sorts. */}
-          <div className="lp-table-head" style={{ gridTemplateColumns: GRID }}>
-            {COLUMNS.map((column) => {
-              const active = sortKey === column.key;
-              const button = (
-                <button
-                  key={column.key}
-                  type="button"
-                  onClick={() => onSort(column.key)}
-                  aria-label={`Sort by ${column.label}`}
-                  style={{
-                    font: "inherit",
-                    letterSpacing: "inherit",
-                    textTransform: "inherit",
-                    textAlign: "left",
-                    border: "none",
-                    background: "transparent",
-                    padding: 0,
-                    color: active ? "var(--ox)" : "var(--mute)",
-                    cursor: "pointer",
-                    ...ellipsis,
-                  }}
-                >
-                  {column.label}
-                  {active ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
-                </button>
-              );
-              return column.key === "lastTouch" ? (
-                // The arrows' meaning sits beside the column it explains, not in a footer.
-                <div key={column.key} style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-                  {button}
-                  <span className="lp-legend" data-arrow-legend>
-                    {ARROW_LEGEND}
-                  </span>
-                </div>
-              ) : (
-                button
-              );
-            })}
-          </div>
-
-          {rows.map((row) => {
-            const lead = row.lead;
-            const name = `${lead.first_name} ${lead.last_name}`.trim() || lead.email;
-            const step = nextStepFor(row, now);
-            const touch = touchStampFor(row);
-            const error = errors[lead.id];
-            const pending = pendingLeadId === lead.id;
-            const pendingDrafts = pendingFor(pendingApprovals, lead.id);
-
-            return (
-              <div key={lead.id}>
-                <div
-                  onClick={(event) => {
-                    // A menu, a link or a field inside the row is its own
-                    // target — only bare row surface navigates.
-                    if ((event.target as HTMLElement).closest("button, a, input, select")) return;
-                    router.push(`/dashboard/leads/${lead.id}`);
-                  }}
-                  className="lp-row lp-row-grid"
-                  style={{
-                    gridTemplateColumns: GRID,
-                    cursor: "pointer",
-                    opacity: pending ? 0.55 : 1,
-                    // Waiting on us is the one thing the canvas colours a whole
-                    // row for; everything else stays ink.
-                    color: touch.waitingOnUs ? "var(--burg)" : "var(--ink)",
-                  }}
-                >
-                  <div style={{ minWidth: 0 }} data-primary="true">
-                    <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
-                      <Link
-                        href={`/dashboard/leads/${lead.id}`}
-                        style={{ ...ellipsis, display: "block", color: "inherit" }}
-                      >
-                        {name}
-                      </Link>
-                      <NeedsRebeccaBadge pending={pendingDrafts} />
-                      <AgentMoveChip move={row.agentMove} />
-                    </div>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0, marginTop: 2 }}>
+    <div className="rv-owner ix-sheet" data-leads-sheet>
+      <SheetCard>
+        <SheetScroll className="ix-scroll" ref={scrollRef} scroll={needsScroll}>
+          <SheetTable className="ix-tbl" fixed minWidth={minWidth}>
+            <colgroup>
+              {cols.map((c) => {
+                const w = colWidth(sizes, c);
+                return <col key={c} style={w ? { width: w } : undefined} />;
+              })}
+              <col style={{ width: MENU_COL_WIDTH }} />
+            </colgroup>
+            <thead>
+              <tr>
+                {cols.map((c) => {
+                  const { key, label } = COLUMNS[c];
+                  const active = key !== null && sortKey === key;
+                  const w = colWidth(sizes, c);
+                  return (
+                    <th key={c} scope="col" data-col={c} aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : undefined}>
+                      {key ? (
+                        <button type="button" className="sheet-sort ix-sort" onClick={() => onSort(key)} aria-label={`Sort by ${label}`} data-on={active ? "" : undefined}>
+                          {label}
+                          {active ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
+                        </button>
+                      ) : (
+                        label
+                      )}
                       <span
-                        style={{ ...ellipsis, fontSize: "var(--lp-meta, 13px)", lineHeight: 1.4, color: "var(--mute)" }}
-                      >
-                        {lead.mark_text?.trim() || lead.business_name?.trim() || "—"}
-                      </span>
-                      {/* A suggestion, in the lead cell: the Temperature column is too narrow for a sentence. */}
-                      <LtnSuggestion suggestion={row.temperature.suggestion} leadId={lead.id} />
-                    </div>
-                  </div>
-
-                  <div style={{ minWidth: 0 }} data-label="Stage">
-                    <span
-                      className={`lp-pill lp-pill-wrap${row.stage ? "" : " lp-pill-warn"}`}
-                      title={row.stage?.name ?? "This lead's stage no longer exists"}
+                        className={`rse-col-grip${dragCol === c ? " is-active" : ""}`}
+                        role="separator"
+                        aria-orientation="vertical"
+                        aria-valuenow={w ?? drawn[c] ?? NEXT_MIN_WIDTH}
+                        aria-valuemin={MIN_COL}
+                        aria-valuemax={MAX_COL}
+                        aria-label={LEADS_RESIZE_COLUMN(label)}
+                        tabIndex={0}
+                        onPointerDown={startDrag(c)}
+                        onKeyDown={onKeyDown(c)}
+                        onDoubleClick={() => reset(c)}
+                      />
+                      {dragCol === c && <span className="rse-col-tip">{drag?.width ?? Math.round(w ?? drawn[c] ?? NEXT_MIN_WIDTH)} px</span>}
+                    </th>
+                  );
+                })}
+                <th scope="col">
+                  <span className="rse-sr">{LEADS_ACTIONS_SR}</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => {
+                const lead = row.lead;
+                const card = cards?.[lead.id];
+                const openHref = openHrefFor?.(lead.id) ?? card?.openHref;
+                const label = leadLabel(lead);
+                const name = label.name;
+                const business = label.sub ?? "";
+                const step = nextStepFor(row, now, { notesUnavailable, timeZone });
+                const touch = touchStampFor(row, { now, timeZone });
+                const error = errors[lead.id];
+                const pending = pendingLeadId === lead.id;
+                const pendingDrafts = pendingFor(pendingApprovals, lead.id, row.stage);
+                const decision = decisionOpen(row.decision, lead.current_stage_id) ? row.decision : null;
+                const dup = duplicates[lead.id];
+                return (
+                  <Fragment key={lead.id}>
+                    <tr
+                      className="ix-row"
+                      data-lead-row={lead.id}
+                      onClick={(event) => {
+                        if ((event.target as HTMLElement).closest("button, a, input, select")) return;
+                        router.push(openHref ?? `/dashboard/leads/${lead.id}`, card ? { scroll: false } : undefined);
+                      }}
+                      style={{ opacity: pending ? 0.55 : 1 }}
                     >
-                      {stageCodeFor(row.stage)} · {stageLabelFor(row.stage)}
-                    </span>
-                  </div>
+                      <td className="ix-lead-td" data-col="lead" data-primary="true">
+                        <Link href={openHref ?? `/dashboard/leads/${lead.id}`} scroll={card ? false : undefined} data-card-open={card ? "" : undefined} aria-label={card ? recordCardOpenLabel(name) : undefined} className="ix-name sheet-link" title={name}>
+                          {name}
+                        </Link>
+                        <span className="ix-subline">
+                          <span className="ix-sub" title={business || undefined}>
+                            {business || BLANK}
+                          </span>
+                          <SavedNote show={savedId === lead.id}>{RECORD_CARD_SAVED}</SavedNote>
+                          {movedOut?.has(lead.id) && (
+                            <span className="lx-pill lx-pill-mute" data-moved title={LEADS_MOVED_MARK_TITLE}>
+                              {LEADS_MOVED_MARK}
+                            </span>
+                          )}
+                        </span>
+                      </td>
 
-                  <div style={{ minWidth: 0 }} data-label="Temperature">
-                    <TemperatureCell
-                      leadName={name}
-                      temperature={row.temperature}
-                      pending={pending}
-                      onSet={(lane) => onSetLane(lead.id, lane)}
-                    />
-                  </div>
+                      <td data-col="stage" data-label="Stage">
+                        <span className="ix-stage-line">
+                          {card && card.edits.stage ? (
+                            <StagePick
+                              kind="lead"
+                              id={lead.id}
+                              name={name}
+                              stage={{ id: lead.current_stage_id, name: stageLabelFor(row.stage), targets: stages.filter((s) => s.id !== lead.current_stage_id).map((s) => ({ id: s.id, name: stageLabelFor(s) })) }}
+                              onPick={(stageId) => onMoveStage(lead.id, stageId)}
+                            />
+                          ) : (
+                            <Pill tone={row.stage ? MEANING_TONE.neutral : MEANING_TONE.needsPerson} wrap title={row.stage?.name ?? "This lead's stage no longer exists"}>
+                              {stageLabelFor(row.stage)}
+                            </Pill>
+                          )}
+                          {card?.approvals ? (
+                            card.approvals.href ? (
+                              <Link href={card.approvals.href === card.openHref && openHref ? openHref : card.approvals.href} className="lx-pill lx-pill-warn lx-pill-wrap rc-attn">
+                                {card.approvals.text}
+                              </Link>
+                            ) : (
+                              <span className="lx-pill lx-pill-mute">{card.approvals.text}</span>
+                            )
+                          ) : (
+                            !card && <NeedsRebeccaBadge pending={pendingDrafts} />
+                          )}
+                          {decision && (
+                            <span className="lx-pill lx-pill-warn lx-pill-wrap" data-needs-decision title={needsStageTitle(decision)}>
+                              {LEADS_NEEDS_STAGE}
+                            </span>
+                          )}
+                          {dup && (
+                            <button
+                              type="button"
+                              className="lx-pill lx-pill-warn lx-pill-wrap ix-pill-btn"
+                              data-duplicate
+                              aria-haspopup="dialog"
+                              aria-label={LEADS_COMPARE_OPEN(name)}
+                              title={duplicateTitle(dup)}
+                              onClick={(event) => onCompare?.(lead.id, dup.leadId, event.currentTarget)}
+                            >
+                              {LEADS_DUPLICATE}
+                            </button>
+                          )}
+                        </span>
+                      </td>
 
-                  <div style={{ minWidth: 0, display: "flex" }} data-label="Source">
-                    <SourceCell
-                      leadName={name}
-                      source={lead.referral_source}
-                      detail={lead.referral_detail}
-                      pending={pending}
-                      onSet={(source) => onSetSource(lead.id, source)}
-                    />
-                  </div>
+                      <td data-col="temp" data-label="Temperature">
+                        <TemperatureCell leadName={name} temperature={row.temperature} pending={pending} canEdit={card ? card.edits.temperature : true} onSet={(lane) => onSetLane(lead.id, lane)} />
+                      </td>
 
-                  <div style={{ minWidth: 0 }} data-label="Owner">
-                    <OwnerCell
-                      leadName={name}
-                      owner={row.owner}
-                      assignedTo={lead.assigned_to}
-                      members={members}
-                      pending={pending}
-                      onAssign={(userId) => onAssign(lead.id, userId)}
-                    />
-                  </div>
+                      <td data-col="source" data-label="Source">
+                        <SourceCell leadName={name} source={lead.referral_source} detail={lead.referral_detail} pending={pending} canEdit={card ? card.edits.source : true} onSet={(source) => onSetSource(lead.id, source)} />
+                      </td>
 
-                  <div data-label="Last touch" style={touch.waitingOnUs ? TOUCH_IN : TOUCH_OUT} title={touch.waitingOnUs ? "Waiting on us" : "Waiting on them"}>
-                    <span className="lx-sr">{touch.waitingOnUs ? "Waiting on us: " : "Waiting on them: "}</span>
-                    {touch.text}
-                  </div>
+                      {hasOwnerColumn && (
+                        <td data-col="owner" data-label={OWNER_COLUMN}>
+                          <OwnerCell leadName={name} owner={row.owner} assignedTo={lead.assigned_to} members={members} pending={pending} canEdit={card ? card.edits.owner : true} onAssign={(userId) => onAssign(lead.id, userId)} />
+                        </td>
+                      )}
 
-                  {/* §13.1 — the ⏱ rides at the end of the last cell rather
-                      than in a column of its own, so GRID and the table's
-                      minimum width are untouched and the chip can never push
-                      the row past its container. */}
-                  <div data-label="Next step" style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                    <span
-                      style={{ ...(step.urgent ? NEXT_HOT : NEXT), ...NEXT_CLAMP, flex: 1, overflowWrap: "anywhere" }}
-                      title={step.text}
-                    >
-                      {step.text}
-                    </span>
-                    <TimeChip
-                      leadId={lead.id}
-                      leadName={name}
-                      summary={time?.byLeadId[lead.id]}
-                      unavailable={time === null}
-                      running={time?.running ?? null}
-                      members={members}
-                    />
-                  </div>
-                </div>
+                      {showAssistant && (
+                        <td className="ix-asst-td" data-col="assistant" data-label={LEADS_ASSISTANT_COLUMN}>
+                          <div className="ix-asst-cell">
+                            <AssistantChips row={row} />
+                          </div>
+                        </td>
+                      )}
 
-                {error && (
-                  // The refusal sits under the row it belongs to, not in a
-                  // toast: by the time a toast is read the row it was about is
-                  // ten rows up.
-                  <div
-                    role="status"
-                    style={{
-                      padding: "6px 18px",
-                      fontSize: "var(--lp-meta, 13px)",
-                      color: "var(--crit)",
-                      background: "var(--critbg)",
-                      borderBottom: "1px solid var(--line)",
-                    }}
-                  >
-                    {error}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                      <td className="ix-touch" data-col="touch" data-label={LEADS_CONTACT_COLUMN} data-in={touch.waitingOnUs ? "" : undefined} data-touch={touch.state} title={touch.title}>
+                        {touch.text}
+                      </td>
 
-          {rows.length === 0 && (
-            // Only reachable when the read SUCCEEDED — a failed read never gets
-            // this far (see the page's three-state branch).
-            <div className="lp-empty" data-empty={totalCount === 0 ? "none" : "filtered"}>
-              {totalCount === 0 ? (
-                <>
-                  <p style={{ margin: 0 }}>{NO_LEADS_YET}</p>
-                  <span style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
-                    {emptyAction}
-                    <Link href="/dashboard/forms/">Open your intake form</Link>
-                  </span>
-                </>
-              ) : (
-                <>
-                  <p style={{ margin: 0 }}>{NO_LEAD_MATCHES}</p>
-                  {onClearFilters && (
-                    <button type="button" className="lp-clear" onClick={onClearFilters}>
-                      Clear filters
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-          )}
+                      <td className="rse-next-td" data-col="next" data-label={NEXT_STEP}>
+                        <div className="ix-next-wrap">
+                          {card && <NextStepLine kind="lead" id={lead.id} line={card.nextStep} dueIso={card.dueIso} text={card.bottom.nextStep} />}
+                          {/* Amber only on a person's own note; the sentences the page writes (waiting on, consult held) read the same on every row. */}
+                          <span className="ix-next" data-urgent={step.urgent && row.latestNote?.trim() ? "" : undefined} data-muted={step.muted ? "" : undefined} title={step.text}>
+                            {step.text}
+                          </span>
+                          {showTimeChip(time?.byLeadId[lead.id], time?.running ?? null, lead.id, time === null) && (
+                            <TimeChip leadId={lead.id} leadName={name} summary={time?.byLeadId[lead.id]} unavailable={time === null} running={time?.running ?? null} members={members} />
+                          )}
+                        </div>
+                      </td>
 
-          <div style={{ flex: 1 }} />
+                      <td data-col="menu" className="ix-menu-td">
+                        <RowMenu card={card} openHref={openHref} lead={lead} name={name} stages={stages} members={members} running={time?.running ?? null} onMoveStage={onMoveStage} onAssign={onAssign} />
+                      </td>
+                    </tr>
+                    {error && (
+                      <tr>
+                        <td colSpan={cols.length + 1} className="ix-err">
+                          <div role="status">{error}</div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </SheetTable>
+        </SheetScroll>
+
+        {rows.length === 0 && (
+          <div className="lx-state-card" data-empty={!anyLeads ? "none" : "filtered"}>
+            {emptyAction}
+            {onClearFilters && anyLeads && (
+              <button type="button" className="lp-clear" onClick={onClearFilters}>
+                Clear filters
+              </button>
+            )}
+          </div>
+        )}
+
+        <div className="ix-foot">
+          <ShowingCount shown={rows.length} total={total} onMore={left > 0 ? onShowMore : undefined} />
+          <span className="lx-sr">{setLabel}</span>
         </div>
-      </div>
-
-      <div className="lp-foot">
-        <span>
-          Showing {rows.length} of {totalCount}
-        </span>
-      </div>
+      </SheetCard>
     </div>
   );
 }

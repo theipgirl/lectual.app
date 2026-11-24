@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { env } from "@/lib/env";
 import { cronAuthorized } from "@/lib/cron-auth";
+import { NOT_THIS_HOUR, shouldRunNow } from "@/lib/cron/ny-hour";
 import { aiConfigured } from "@/lib/ai/claude";
 import { runAllAgents } from "@/lib/agents/runner";
 import { productionRunnerDeps } from "@/lib/agents/deps";
@@ -15,6 +16,8 @@ export async function GET(req: NextRequest) {
   if (!cronAuthorized(req.headers.get("authorization"), env.CRON_SECRET)) {
     return new NextResponse(null, { status: 401 });
   }
+  // Two vercel.json entries per job (EST and EDT); only the tick in this job's New York hour works.
+  if (shouldRunNow("agents", new Date()) === null) return NextResponse.json(NOT_THIS_HOUR);
   if (!aiConfigured()) {
     return NextResponse.json({ ok: false, reason: "ANTHROPIC_API_KEY is not configured" }, { status: 503 });
   }

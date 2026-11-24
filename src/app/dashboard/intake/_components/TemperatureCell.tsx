@@ -1,100 +1,37 @@
 "use client";
 
-import { LANES, LANE_LABEL, type Lane } from "@/lib/leads/lane";
-import { NOT_RATED } from "@/lib/ui/words";
-import { temperatureLabel, temperatureTitle, type EffectiveTemperature } from "@/lib/intake/effective-temperature";
-import Popover, { PopoverItem } from "./Popover";
-import { TEMP_NONE, TEMP_PILL } from "./styles";
+import type { Lane } from "@/lib/leads/lane";
+import { temperatureLabel, type EffectiveTemperature } from "@/lib/intake/effective-temperature";
+import { temperaturePill } from "@/lib/intake/temperature-pill";
+import { temperatureControl, type TemperatureControl } from "@/lib/record-card/rules";
+import { TempMenu } from "@/components/record-card/controls";
 
 /**
- * The one Temperature cell: the chip and the menu that sets it (intake SOP
- * Stage 2).
- *
- * A temperature a PERSON set is a solid chip. A derived one is a dashed chip
- * that says "Suggested" in words, never the same chip in a different shade,
- * because "a routing suggestion once rendered as an assignment status on the
- * dashboard and read as fact". A lead with neither shows a dashed neutral
- * "Not rated". The tooltip is the reason, so the team can see why someone
- * went cold without asking anyone.
- *
- * Choosing Hot, Warm or Cold sets the person's lane (recorded on the timeline,
- * who and from → to); Clear removes it and the derived value shows again.
+ * The one Temperature cell (Sprint 10): a level a person set is a FILLED pill; a level Lectual only suggested is a quiet OUTLINED
+ * pill with a "suggested" mark, and the menu starts with "Lectual suggests Warm · Accept". Choosing a level (or Accept) sets the
+ * person's lane; Not rated clears it and the suggestion shows again. A role that can't set it (`canEdit` false) gets the pill as
+ * plain text, with no menu. `control` may be passed in; otherwise it is worked out here from the temperature.
  */
 export default function TemperatureCell({
   leadName,
   temperature,
   pending,
   onSet,
+  canEdit = true,
+  control,
 }: {
   leadName: string;
   temperature: EffectiveTemperature;
   pending: boolean;
   onSet: (lane: Lane | null) => void;
+  canEdit?: boolean;
+  control?: TemperatureControl;
 }) {
-  const { value, source } = temperature;
-  const title = temperatureTitle(temperature);
-  const person = source === "person" && value !== null;
-
-  return (
-    <div style={{ minWidth: 0, display: "flex" }}>
-      <Popover
-        label={`${leadName}: ${temperatureLabel(temperature)}. ${title.replace("\n", ". ")}. Set temperature`}
-        width={165}
-        trigger={({ onClick, ref, ...aria }) => (
-          <button
-            {...aria}
-            ref={ref}
-            type="button"
-            title={title}
-            disabled={pending}
-            onClick={onClick}
-            data-testid="temperature-cell"
-            style={{
-              ...(value ? TEMP_PILL[value] : TEMP_NONE),
-              ...(person
-                ? { border: "1px solid currentColor", textTransform: "uppercase", letterSpacing: "0.06em" }
-                : value
-                  ? { border: "1px dashed currentColor", background: "transparent", fontStyle: "italic", fontFamily: "var(--font-geist), system-ui, sans-serif", fontSize: "var(--lp-meta, 13px)" }
-                  : { border: "1px dashed var(--line)", background: "transparent", padding: "3px 7px", borderRadius: 5 }),
-              maxWidth: "100%",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              lineHeight: 1.5,
-              cursor: pending ? "progress" : "pointer",
-              opacity: pending ? 0.6 : 1,
-            }}
-          >
-            {temperatureLabel(temperature)}
-          </button>
-        )}
-      >
-        {(close) => (
-          <>
-            {LANES.map((lane) => (
-              <PopoverItem
-                key={lane}
-                checked={person && value === lane}
-                onSelect={() => {
-                  close();
-                  onSet(lane);
-                }}
-              >
-                {LANE_LABEL[lane]}
-              </PopoverItem>
-            ))}
-            <PopoverItem
-              muted
-              checked={false}
-              onSelect={() => {
-                close();
-                onSet(null);
-              }}
-            >
-              {NOT_RATED}
-            </PopoverItem>
-          </>
-        )}
-      </Popover>
-    </div>
-  );
+  // No hooks here, so a test can call the cell for its element tree.
+  const base = control ?? temperatureControl(temperature, { canEdit });
+  // The tooltip keeps the Leads page's own wording: "Suggested: Hot" and the reason, or the stale-lane activity hint.
+  const title = temperaturePill(temperature)?.title;
+  return TempMenu({ name: leadName, control: title && base.pill.value ? { ...base, pill: { ...base.pill, title } } : base, pending, onPick: onSet });
 }
+
+export { temperatureLabel };

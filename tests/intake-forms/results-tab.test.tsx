@@ -22,7 +22,7 @@ const NEW_CARD = /<div class="ifm-card ifm-kpi"><div class="ifm-field-label">(?:
 
 // Sprint 10 deliberately adds a "Typical time per step (median)" section and a "Stopped at" column to the Performance tab;
 // they are taken out here so the rest of the markup is still compared byte for byte against the Sprint 9 fixtures.
-const SPRINT_10 = /<section class="ifm-card ifm-steps".*?<\/section>|<th>Stopped at<\/th>|<td class="ifm-stopped[^"]*">[^<]*<\/td>/g;
+const SPRINT_10 = /<section class="ifm-card ifm-steps".*?<\/section>|<th>Stopped at<\/th>|<td class="ifm-stopped[^"]*"[^>]*>[^<]*<\/td>/g;
 
 // The fixtures are dated Oct 18 and the rows render relative times ("3 days ago"): pin the clock so they don't drift.
 beforeEach(() => {
@@ -166,7 +166,7 @@ beforeEach(() => {
 describe("Results tab, intake form (F12)", () => {
   it("lists answers per question: who, when and the answer, newest first, with a link to the lead", async () => {
     const html = await renderResults();
-    expect(html).toContain("<h2 class=\"ifm-title\" style=\"flex:1\">Results</h2>");
+    expect(html).toContain("<h2 class=\"ifm-title ifm-grow\">Results</h2>");
     const first = html.slice(html.indexOf('aria-label="What name do you want to protect?"'));
     expect(first.indexOf("Dana Cole")).toBeLessThan(first.indexOf("Mireille Toussaint"));
     expect(first).toContain("ACME");
@@ -183,29 +183,29 @@ describe("Results tab, intake form (F12)", () => {
   it("opens the existing drawer from a row, through a link carrying tab=results and the person's id", async () => {
     const html = await renderResults();
     expect(html).toMatch(/href="\/dashboard\/forms\?form=11111111-1111-4111-8111-111111111111&tab=results&range=30&intake=22222222-2222-4222-8222-222222222222"/);
-    expect(html).not.toContain("ifm-drawer-wrap");
+    expect(html).not.toContain("lx-drawer-root");
   });
 
   it("D2: with that intake open it shows the drawer with the person's answers, a lead link, and a close link back to the Results URL with its range", async () => {
     const html = await renderResults({ intakeId: "22222222-2222-4222-8222-222222222222", range: 90 });
-    const drawer = html.slice(html.indexOf("ifm-drawer-wrap"));
+    const drawer = html.slice(html.indexOf("lx-drawer-root"));
     expect(drawer).toContain("Mireille Toussaint");
     expect(drawer).toContain("SANKOFA");
     expect(drawer).toContain("What name do you want to protect?");
     expect(drawer).toMatch(/<a href="\/dashboard\/leads\/lead-mt\/?">Open the lead<\/a>/);
-    expect(drawer).toMatch(/class="ifm-drawer-scrim" aria-label="Close" href="\/dashboard\/forms\?form=11111111-1111-4111-8111-111111111111&tab=results&range=90"/);
+    expect(drawer).toMatch(/class="lx-close" aria-label="Close" href="\/dashboard\/forms\?form=11111111-1111-4111-8111-111111111111&tab=results&range=90"/);
     expect(drawer).not.toContain("tab=performance");
   });
 
   it("offers no lead link in the drawer for a person with no lead", async () => {
     const html = await renderResults({ intakeId: "33333333-3333-4333-8333-333333333333" });
-    expect(html).toContain("ifm-drawer-wrap");
+    expect(html).toContain("lx-drawer-root");
     expect(html).not.toContain("Open the lead");
   });
 
   it("the range links change range and keep tab=results", async () => {
     const html = await renderResults({ range: 7 });
-    const links = [...html.matchAll(/<a class="(on)?" (?:aria-current="page" )?href="([^"]+)">(\d+) days<\/a>/g)].map((m) => [m[3], m[2], m[1]]);
+    const links = [...html.matchAll(/<a (aria-current="page" )?href="([^"]+)">(\d+) days<\/a>/g)].map((m) => [m[3], m[2], m[1] ? "on" : ""]);
     expect(links.map((l) => l[0])).toEqual(["7", "30", "90"]);
     for (const [days, href] of links) expect(href).toBe(`/dashboard/forms?form=${FORM_ID}&tab=results&range=${days}`);
     expect(links.find((l) => l[0] === "7")![2]).toBe("on");
@@ -227,10 +227,10 @@ describe("Results tab, intake form (F12)", () => {
     expect(html).toContain("No answers to this question in this range.");
   });
 
-  it("says 'Showing the latest 50 of N' for a question with more answers", async () => {
+  it("says 'Showing 50 of N' for a question with more answers", async () => {
     const rows = Array.from({ length: 53 }, (_, i) => ({ ...people()[0], id: `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`, started_at: t(i), submitted_at: t(i + 1), answers: [{ id: "q-name", question: "q", answer: `answer ${i}` }] }));
     const html = await renderResults({ read: { status: "ok", value: { rows, capped: false } } });
-    expect(html).toContain("Showing the latest 50 of 53.");
+    expect(html).toContain("Showing 50 of 53");
     expect(html.match(/answer \d+/g)!.length).toBeGreaterThanOrEqual(50);
   });
 
@@ -380,7 +380,7 @@ describe("workspace tabs", () => {
         />,
       ),
     );
-    const nav = html.slice(html.indexOf('<nav class="ifm-tabs"'), html.indexOf("</nav>", html.indexOf('<nav class="ifm-tabs"')));
+    const nav = html.slice(html.indexOf('<nav class="lx-tabs"'), html.indexOf("</nav>", html.indexOf('<nav class="lx-tabs"')));
     expect([...nav.matchAll(/>([^<]+)<\/a>/g)].map((m) => m[1])).toEqual(["Setup", "Results", "Performance"]);
     expect(nav).toMatch(/href="\/dashboard\/forms\?form=11111111-1111-4111-8111-111111111111&tab=results&range=90"/);
     expect(nav).toMatch(/aria-current="page" href="[^"]*tab=results/);

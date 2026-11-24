@@ -6,10 +6,11 @@ import { hasCalendarScope } from "@/lib/mailbox/providers";
 import { ownZoomAccess } from "@/lib/meetings/connection";
 import { listUpcomingZoomMeetings } from "@/lib/meetings/zoom";
 import { loadConsultsForToday } from "./outlook-read";
+import { lawmaticsConsultGate } from "./lawmatics-read";
 import { joinKey, zoomMeetingKey, type ConsultDeps, type LeadRef } from "./consult-sources";
 
 /**
- * The real reads behind Today's Consults card. Scoped client throughout; the only sealed-token read is
+ * The real reads behind Today's Consults card (Outlook, Lawmatics, Zoom). Scoped client throughout; the only sealed-token read is
  * `ownZoomAccess` (the meetings module's own helper). A Zoom meeting is linked to a lead only when an
  * imported `crm_meeting` with a lead matches its meeting id or join link exactly.
  */
@@ -24,6 +25,10 @@ export const liveConsultDeps: ConsultDeps = {
   },
 
   outlook: (now, timeZone) => loadConsultsForToday(now, timeZone),
+
+  // Not behind the Mailboxes feature: the Lawmatics daily sync's own rows, whenever the firm connected Lawmatics.
+  lawmaticsGate: () => lawmaticsConsultGate(),
+  lawmatics: (now, timeZone) => loadConsultsForToday(now, timeZone, "lawmatics"),
 
   async zoomAccess() {
     const access = await ownZoomAccess();
@@ -55,6 +60,7 @@ export const liveConsultDeps: ConsultDeps = {
     const leadIds = [...new Set(rows.map((r) => r.lead_id).filter((x): x is string => !!x))];
     const names = new Map<string, string>();
     if (leadIds.length > 0) {
+      // live-guard: names the leads of Today's consults
       const { data: leads } = await supabase.from("crm_lead").select("id, first_name, last_name, business_name, email").in("id", leadIds);
       for (const l of leads ?? []) {
         const name = `${l.first_name ?? ""} ${l.last_name ?? ""}`.trim() || l.business_name || l.email;

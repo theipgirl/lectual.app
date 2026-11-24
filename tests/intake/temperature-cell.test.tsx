@@ -36,17 +36,18 @@ describe("TemperatureCell's menu", () => {
     return { popover, items, close };
   }
 
-  it("offers Hot, Warm, Cold and Not rated, in that order", () => {
+  it("starts with Lectual's suggestion for a suggested level, then Hot, Warm, Cold and Not rated", () => {
     const { items } = menuOf(() => {});
-    expect(items.map((item) => (item.props as { children: ReactNode }).children)).toEqual(["Hot", "Warm", "Cold", "Not rated"]);
+    expect(items.map((item) => (item.props as { children: ReactNode }).children)).toEqual(["Lectual suggests Hot · Accept", "Hot", "Warm", "Cold", "Not rated"]);
   });
 
   it("calls the set handler with hot, warm, cold and null, closing the menu each time", () => {
     const onSet = vi.fn();
     const { items, close } = menuOf(onSet);
     for (const item of items) (item.props as { onSelect: () => void }).onSelect();
-    expect(onSet.mock.calls).toEqual([["hot"], ["warm"], ["cold"], [null]]);
-    expect(close).toHaveBeenCalledTimes(4);
+    // Accept writes the suggested level like any other choice.
+    expect(onSet.mock.calls).toEqual([["hot"], ["hot"], ["warm"], ["cold"], [null]]);
+    expect(close).toHaveBeenCalledTimes(5);
   });
 
   it("checks the current choice only for a person's temperature", () => {
@@ -55,7 +56,7 @@ describe("TemperatureCell's menu", () => {
     const items = elements((popover.props as { children: (c: () => void) => ReactNode }).children(() => {})).filter((el) => el.type === PopoverItem);
     expect(items.map((item) => (item.props as { checked: boolean }).checked)).toEqual([false, true, false, false]);
     const { items: suggested } = menuOf(() => {});
-    expect(suggested.map((item) => (item.props as { checked: boolean }).checked)).toEqual([false, false, false, false]);
+    expect(suggested.map((item) => (item.props as { checked: boolean }).checked)).toEqual([false, false, false, false, true]);
   });
 
   it("is a disabled chip while a write is pending", () => {
@@ -76,7 +77,14 @@ describe("the table row's refusal", () => {
     const html = renderToStaticMarkup(
       <IntakeTable
         rows={rows}
-        totalCount={1}
+        total={1}
+        left={0}
+        setLabel="All open"
+        hasOwnerColumn={false}
+        stages={[stage]}
+        anyLeads
+        onMoveStage={() => {}}
+        onShowMore={() => {}}
         members={[]}
         sortKey="lastTouch"
         sortDir="desc"
@@ -95,22 +103,17 @@ describe("the table row's refusal", () => {
 });
 
 describe("the merged control styling", () => {
-  it("keeps the controlled-mode toggle rules in the shared list-page.css, built from the design's own tokens", () => {
-    const css = read("src/components/list-page/list-page.css");
-    expect(css).toContain(".lp-root .lx-view-toggle button");
-    expect(css).toContain(".lp-root .lx-view-toggle button.on");
-    const block = css.slice(css.indexOf(".lp-root .lx-view-toggle button {"), css.indexOf(".lp-link-button:hover"));
-    // Same pill as the link mode: the design's tokens, no new colour or font.
-    expect(block).toContain("var(--card)");
-    expect(block).toContain("var(--body)");
-    expect(block).not.toMatch(/#[0-9a-f]{3,8}\b/i);
-    expect(block).not.toMatch(/font-family/);
-    expect(read("src/app/dashboard/intake/intake.css")).not.toContain("lx-view-toggle button");
+  it("the view switch's rules live once, in globals.css, in tokens (D1)", () => {
+    const css = read("src/app/globals.css");
+    expect(css).toContain(".vs-switch button");
+    expect(css).toContain(".vs-switch [aria-current]");
+    expect(read("src/components/list-page/list-page.css")).not.toContain("lx-view-toggle");
+    expect(read("src/app/dashboard/intake/intake.css")).not.toContain("lx-view-toggle");
   });
 
-  it("leaves the design-owned stylesheet's toggle rules untouched", () => {
+  it("the older .lx-view-toggle name is only an alias of the shared look (Reports' period control)", () => {
     const globals = read("src/app/globals.css");
-    expect(globals).toContain(".lx-view-toggle a.on { background: var(--card);");
-    expect(globals).not.toContain(".lx-view-toggle button");
+    expect(globals).toContain(".lx-view-toggle a,");
+    expect(globals).toContain(".lx-view-toggle [aria-current]");
   });
 });

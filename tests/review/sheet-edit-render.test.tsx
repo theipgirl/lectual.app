@@ -31,16 +31,25 @@ async function render(perms: SheetPerms) {
 describe("the owner's editable Sheet", () => {
   beforeEach(() => vi.resetModules());
 
-  it("draws an editor on Status, Next step, Whose court and Source, and + Note on every row", async () => {
+  // Changed on purpose: "+ Note" became the Notes column (an inline editor in the cell, the same note action).
+  it("draws an editor on Status, Next step, Whose court and Source, and a Notes cell editor on every row", async () => {
     const html = await render(OWNER);
     for (const col of ["status", "next", "court", "source"]) {
       expect(html).toContain(`data-rse-cell="m-1|${col}"`);
       expect(html).toContain(`data-rse-cell="l-1|${col}"`);
     }
-    expect(html.match(/aria-label="Add a note for /g)?.length).toBe(2);
+    expect(html.match(/aria-label="Note for /g)?.length).toBe(2);
     expect(html).toContain("You type these");
     expect(html).toContain("Lectual works these out");
     expect(html).toContain('role="separator"');
+  });
+
+  it("legend names new columns: Serial No., Start Date, Practice Area and Office Action Due Date are worked out, not typed", async () => {
+    const html = await render(OWNER);
+    const legend = html.slice(html.indexOf("Lectual works these out"));
+    for (const name of ["Serial No.", "Start Date", "Practice Area", "Office Action Due Date"]) expect(legend).toContain(name);
+    // no fee mention here: this render is for a viewer who may not see money
+    expect(legend).not.toMatch(/fee column/i);
   });
 
   it("Waiting on and Last contact are locked: no editor, styled as locked", async () => {
@@ -59,13 +68,23 @@ describe("the owner's editable Sheet", () => {
     expect(leadCourt.slice(0, 300)).toContain(">Unassigned<");
   });
 
+  it("a header's pencil is drawn only on a column someone here can type in", async () => {
+    const th = (html: string, label: string) => html.match(new RegExp(`<th[^>]*>${label}[\\s\\S]*?</th>`))?.[0] ?? "";
+    const noStages = await render({ ...OWNER, matterStages: null, leadStages: null });
+    expect(th(noStages, "Status")).not.toContain("<svg");
+    expect(th(noStages, "Notes")).toContain("<svg");
+    const leadOnly = await render({ ...OWNER, writeMatter: false, moveLead: false, matterStages: null, leadStages: null });
+    expect(th(leadOnly, "Notes")).toContain("<svg");
+    expect(th(leadOnly, "Status")).not.toContain("<svg");
+  });
+
   it("a read-only role sees the same table with no editors, grips, + Note or legend", async () => {
     const html = await render(READ_ONLY);
     expect(html).not.toContain("<button");
     expect(html).not.toContain("data-rse-cell");
     expect(html).not.toContain("tabindex");
     expect(html).not.toContain('role="separator"');
-    expect(html).not.toContain("+ Note");
+    expect(html).not.toContain("Add a note");
     expect(html).not.toContain("You type these");
     for (const name of ["Matter Co", "Lead Co", "Caitlyn", "Referral", "Call back"]) expect(html).toContain(name);
   });
@@ -81,7 +100,7 @@ describe("the owner's editable Sheet", () => {
 
   it("the Client cell is the link to the record panel; an overdue step is marked in words too", async () => {
     const html = await render(OWNER);
-    expect(html).toMatch(/class="rse-client" href="[^"]*open=matter%3A/);
+    expect(html).toMatch(/class="sheet-link" href="[^"]*open=matter%3A/);
     expect(html).toContain("(overdue)");
   });
 });

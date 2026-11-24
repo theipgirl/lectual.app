@@ -152,8 +152,14 @@ describe("the mailbox-sync route", () => {
     vi.doMock("@/lib/agents/stage-keeper/after-sync", () => ({ runStageKeeperAfterSync: afterSync }));
     return import("../../src/app/api/cron/mailbox-sync/route");
   }
+  // The route only works in its New York hour (src/lib/cron/ny-hour.ts); pin the clock inside it (4:53 AM EDT).
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-07-15T08:53:00Z"));
+  });
   const req = (token = "s3cret") => ({ headers: { get: (h: string) => (h.toLowerCase() === "authorization" ? `Bearer ${token}` : null) } }) as never;
   afterEach(() => {
+    vi.useRealTimers();
     vi.doUnmock("@/lib/env");
     vi.doUnmock("@/lib/db/admin");
     vi.doUnmock("@/lib/mailbox/config");
@@ -201,9 +207,10 @@ describe("the mailbox-sync route", () => {
     expect(runMailboxSync).not.toHaveBeenCalled();
   });
 
-  it("vercel.json is unchanged: the same three crons, no new one", () => {
+  it("vercel.json names the same four crons (each an EST/EDT pair per hour; the Lawmatics sync has three hours), no new one", () => {
     const crons = JSON.parse(readFileSync("vercel.json", "utf8")).crons as { path: string; schedule: string }[];
-    expect(crons.map((c) => c.path)).toEqual(["/api/cron/mailbox-sync/", "/api/cron/agents/", "/api/cron/meetings-import/", "/api/cron/lawmatics-matters/"]);
+    expect([...new Set(crons.map((c) => c.path))].sort()).toEqual(["/api/cron/agents/", "/api/cron/lawmatics-matters/", "/api/cron/mailbox-sync/", "/api/cron/meetings-import/"]);
+    expect(crons).toHaveLength(12);
   });
 
   it("the route adds no admin client of its own: the step reaches the runner only through productionRunnerDeps", () => {

@@ -8,6 +8,8 @@ import type { IntakeFormRecord } from "@/lib/intake-forms/store";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { IntakeDrawer, Unreadable, FIT_TONE, STATUS_TONE } from "./IntakeDrawer";
 import { StepMedians, StoppedAtCell } from "./StepTables";
+import { Pill, SheetCard, SheetScroll, SheetTable } from "@/components/ui";
+import { ALL_FORMS, LAST_CONTACT, showingAtLeast } from "@/lib/ui/words";
 
 /**
  * The Performance tab (server-rendered, handed to the workspace as a slot).
@@ -59,12 +61,12 @@ export async function IntakePerformance({
   return (
     <div className="ifm-perf">
       <div className="ifm-perf-head">
-        <h2 className="ifm-title" style={{ flex: 1 }}>
+        <h2 className="ifm-title ifm-grow">
           Performance
         </h2>
-        <nav className="ifm-seg" aria-label="Date range">
+        <nav className="vs-switch" aria-label="Date range">
           {RANGES.map((r) => (
-            <Link key={r} href={hrefFor(form.id, r)} scroll={false} className={range === r ? "on" : ""} aria-current={range === r ? "page" : undefined}>
+            <Link key={r} href={hrefFor(form.id, r)} scroll={false} aria-current={range === r ? "page" : undefined}>
               {r} days
             </Link>
           ))}
@@ -157,67 +159,63 @@ export async function IntakePerformance({
 
           <StepMedians state={steps} range={range} />
 
-          <div className="ifm-card ifm-table-card">
-            <h2 className="ifm-title ifm-table-title">All intakes</h2>
+          <SheetCard as="section" className="ifm-table-card" aria-label={ALL_FORMS}>
+            <h2 className="ifm-title ifm-table-title">{ALL_FORMS}</h2>
             {list.status !== "ok" ? (
-              <div style={{ padding: "0 24px 20px" }}>
+              <div className="ifm-pad-x">
                 <Unreadable what="Intakes" unconfigured={list.status === "unconfigured"} />
               </div>
             ) : rows.length === 0 ? (
-              <p className="ifm-help" style={{ padding: "0 24px 22px", margin: 0 }}>
-                No intakes yet. They appear here as soon as someone starts your intake.
-              </p>
+              <p className="ifm-help ifm-pad-x">No intakes yet. They appear here as soon as someone starts your intake.</p>
             ) : (
-              <div style={{ overflowX: "auto" }}>
-                <table className="lx-tbl ifm-tbl">
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>Started</th>
-                      <th>Mode</th>
-                      <th>{form.kind === "assessment" ? "Heat · score" : "Fit"}</th>
-                      <th>Status</th>
-                      <th>Last active</th>
-                      <th>Stopped at</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((r) => (
-                      <tr key={r.id} className={intakeId === r.id ? "sel" : undefined}>
-                        <td className="pri">
-                          <Link href={hrefFor(form.id, range, r.id)} scroll={false} className="lx-rowlink">
-                            {r.name}
-                          </Link>
-                          <div className="ifm-help">{r.company}</div>
-                        </td>
-                        <td>{r.started}</td>
-                        <td>
-                          {r.mode}
-                          {!r.finished && <span className="lx-pill lx-pill-warn ifm-unfinished">Didn&apos;t finish</span>}
-                        </td>
-                        <td>
-                          <span className={`ifm-badge ${FIT_TONE[r.fitKey] ?? "mute"}`}>{r.fit}</span>
-                        </td>
-                        <td>
-                          <span className={`ifm-badge ${STATUS_TONE[r.statusKey] ?? "mute"}`}>{r.status}</span>
-                        </td>
-                        <td className="ifm-muted">{r.last}</td>
-                        <StoppedAtCell
-                          state={stopped === null ? "unavailable" : stopped.status === "ok" ? "ok" : stopped.status}
-                          reading={stoppedReading(stopped, r.id, r.finished)}
-                        />
+              <>
+                <SheetScroll>
+                  <SheetTable minWidth={860}>
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Started</th>
+                        <th>Mode</th>
+                        <th>{form.kind === "assessment" ? "Heat · score" : "Fit"}</th>
+                        <th>Status</th>
+                        <th>{LAST_CONTACT}</th>
+                        <th>Stopped at</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {rows.length >= INTAKE_TABLE_LIMIT && (
-                  <p className="ifm-help" style={{ padding: "10px 24px 16px", margin: 0 }}>
-                    Showing the latest {INTAKE_TABLE_LIMIT}.
-                  </p>
-                )}
-              </div>
+                    </thead>
+                    <tbody>
+                      {rows.map((r) => (
+                        <tr key={r.id} className={intakeId === r.id ? "sel" : undefined}>
+                          <td className="pri">
+                            <Link href={hrefFor(form.id, range, r.id)} scroll={false} className="lx-rowlink">
+                              {r.name}
+                            </Link>
+                            <div className="ifm-help">{r.company}</div>
+                          </td>
+                          <td data-label="Started">{r.started}</td>
+                          <td data-label="Mode">
+                            {r.mode}
+                            {!r.finished && <span className="lx-pill lx-pill-warn ifm-unfinished">Didn&apos;t finish</span>}
+                          </td>
+                          <td data-label={form.kind === "assessment" ? "Heat · score" : "Fit"}>
+                            <Pill tone={FIT_TONE[r.fitKey] ?? "mute"}>{r.fit}</Pill>
+                          </td>
+                          <td data-label="Status">
+                            <Pill tone={STATUS_TONE[r.statusKey] ?? "mute"}>{r.status}</Pill>
+                          </td>
+                          <td className="ifm-muted" data-label={LAST_CONTACT}>{r.last}</td>
+                          <StoppedAtCell
+                            state={stopped === null ? "unavailable" : stopped.status === "ok" ? "ok" : stopped.status}
+                            reading={stoppedReading(stopped, r.id, r.finished)}
+                          />
+                        </tr>
+                      ))}
+                    </tbody>
+                  </SheetTable>
+                </SheetScroll>
+                {rows.length >= INTAKE_TABLE_LIMIT && <p className="ifm-help ifm-pad-x">{showingAtLeast(INTAKE_TABLE_LIMIT)}</p>}
+              </>
             )}
-          </div>
+          </SheetCard>
         </>
       )}
 

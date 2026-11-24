@@ -2,6 +2,7 @@
 
 import { REFERRAL_SOURCES, type ReferralSource } from "@/lib/intake";
 import Popover, { PopoverItem } from "./Popover";
+import { BLANK } from "@/lib/ui/words";
 
 /**
  * A lead's referral source, correctable in place (the same shape as OwnerCell).
@@ -20,6 +21,7 @@ export default function SourceCell({
   detail,
   pending,
   compact = false,
+  canEdit = true,
   onSet,
 }: {
   leadName: string;
@@ -28,10 +30,12 @@ export default function SourceCell({
   detail: string | null;
   pending: boolean;
   compact?: boolean;
+  /** A role that can't change the source sees it as text, with no control. */
+  canEdit?: boolean;
   onSet: (source: ReferralSource | null) => void;
 }) {
   const current = source?.trim() || null;
-  const fontSize = "var(--lp-meta, 13px)";
+  if (!canEdit) return <span className="ix-sub" title={detail?.trim() || current || undefined}>{current ?? (compact ? `Source ${BLANK}` : BLANK)}</span>;
 
   return (
     <Popover
@@ -45,24 +49,10 @@ export default function SourceCell({
           title={detail?.trim() || (current ? current : "No source recorded")}
           disabled={pending}
           onClick={onClick}
-          style={{
-            font: "inherit",
-            fontSize,
-            color: current ? "var(--ink2)" : "var(--mute)",
-            background: "transparent",
-            border: "1px solid transparent",
-            borderRadius: 5,
-            padding: compact ? "1px 4px" : "2px 5px",
-            maxWidth: "100%",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-            textAlign: "left",
-            cursor: pending ? "progress" : "pointer",
-            opacity: pending ? 0.6 : 1,
-          }}
+          className={`ix-cell-btn${compact ? " ix-cell-btn-compact" : ""}`}
+          data-empty={current ? undefined : ""}
         >
-          {current ?? (compact ? "Source —" : "—")}
+          {current ?? (compact ? `Source ${BLANK}` : BLANK)}
         </button>
       )}
     >

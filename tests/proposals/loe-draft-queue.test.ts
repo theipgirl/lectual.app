@@ -9,7 +9,7 @@ import { acceptedSnapshot, CONCIERGE } from "./accepted-fixture";
  * ordinary LOE queue path as an ENGAGEMENT_LETTER, and the draft row carries the proposal's id.
  */
 
-const matter = { id: "matter-1", org_id: "org-1", mark_text: "Prosperall", lead_id: "lead-1", owner_name: "Sevetri Wilson" };
+const matter = { id: "matter-1", org_id: "org-1", mark_text: "Larkmoor", lead_id: "lead-1", owner_name: "Callum Ferreira" };
 const PROPOSAL = "44444444-4444-4444-8444-444444444444";
 
 function mocks(opts: { orgKey?: string | null; createDraftThrows?: boolean } = {}) {
@@ -33,7 +33,7 @@ function mocks(opts: { orgKey?: string | null; createDraftThrows?: boolean } = {
   vi.doMock("@/lib/db/scoped-client", () => ({ getScopedClient: vi.fn(async () => ({})) }));
   vi.doMock("@/lib/matters/matters", () => ({ getMatter: vi.fn(async () => matter) }));
   vi.doMock("@/lib/pipeline/leads", () => ({ getLead: vi.fn(async () => null) }));
-  vi.doMock("@/lib/matters/client-name", () => ({ resolveMatterClientName: vi.fn(async () => ({ name: "Sevetri Wilson", source: "owner_name" })) }));
+  vi.doMock("@/lib/matters/client-name", () => ({ resolveMatterClientName: vi.fn(async () => ({ name: "Callum Ferreira", source: "owner_name" })) }));
   vi.doMock("@/lib/queue/org", () => ({ activeQueueOrgKey: vi.fn(async () => (opts.orgKey === undefined ? "rpb-law" : opts.orgKey)) }));
   vi.doMock("@/lib/queue/api", () => ({ createDraft }));
   vi.doMock("@/lib/documents/store", () => ({ requireDocumentWriteRole: vi.fn(async () => "owner"), createDocumentDraft, attachQueueItemId, deleteDocumentDraft }));
@@ -68,7 +68,7 @@ describe("an accepted proposal's LOE through the real queue path", () => {
       headline: built.headline,
       draftBody: built.draftBody,
       matterId: "matter-1",
-      clientName: "Prosperall", // the entity, as the form does it
+      clientName: "Larkmoor", // the entity, as the form does it
       dedupe: false,
     });
     // The queue item is a draft for a person to approve: nothing here sends.

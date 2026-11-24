@@ -5,7 +5,7 @@ import { mineItems } from "@/lib/queue/mine";
 import { parseReviewerSummary } from "@/lib/queue/reviewer-summary";
 import { QUEUE_APPROVE_ROLES, QUEUE_EDIT_ROLES } from "@/lib/queue/roles";
 import { DECK_NOTHING_FOR_YOU, DECK_NOTHING_NOW, deckAllDecided, deckHandedCount, deckOthersWaiting, deckLaterArrivals, deckLaterBack, deckLaterBackWhen } from "@/lib/ui/words";
-import { canApproveItem, classifyQueueItem, type ApprovalRouting, type QueueKind, type Viewer } from "@/lib/queue/routing";
+import { canApproveItem, classifyQueueItem, type ApprovalRouting, type QueueKind, type RoutableItem, type Viewer } from "@/lib/queue/routing";
 
 /**
  * The approval deck: which pending approvals are dealt to one person, in what order, and what each card says. Pure.
@@ -19,7 +19,16 @@ import { canApproveItem, classifyQueueItem, type ApprovalRouting, type QueueKind
  * When the events can't be read (or the table isn't there yet) every card the viewer may approve is dealt: never fewer.
  */
 
-export type CardEventKind = "handoff" | "later" | "returned";
+/**
+ *  · draft_to  (Sprint 4, lectual 0112) an APPROVED client email is passed to the firm's drafter: the approver wrote it
+ *              at approve time instead of drafting in their own mailbox. `note` carries the approved text's sha256.
+ *  · drafting  the drafter CLAIMED attempt <n> (the `attempt` column, lectual 0112), before making the draft in their OWN Outlook.
+ *  · drafted   the draft is confirmed made (only after Outlook said so). Ends the draft_to.
+ *  · draft_failed  attempt <n> didn't make a draft; the item is open again for the same drafter.
+ *  · pass_failed   the approve path couldn't write the draft_to: the marker that lets the approver retry the pass.
+ * Neither changes who may approve anything, and neither is a hand-off (`currentHolder` ignores both).
+ */
+export type CardEventKind = "handoff" | "later" | "returned" | "draft_to" | "drafting" | "drafted" | "draft_failed" | "pass_failed";
 export type CardEvent = {
   queueItemId: string;
   kind: CardEventKind;
@@ -27,6 +36,8 @@ export type CardEvent = {
   targetUserId: string | null;
   until: string | null;
   note: string | null;
+  /** lectual 0112's `attempt` column: set only on drafting / drafted / draft_failed. `note` is free text and never read for it. */
+  attempt?: number | null;
   createdAt: string;
 };
 export type CardState = { status: "ok"; events: CardEvent[] } | { status: "not-set-up" } | { status: "unavailable" };
@@ -42,6 +53,116 @@ export function currentHolder(events: readonly CardEvent[], itemId: string): Hol
     else if (e.kind === "returned") holder = null;
   }
   return holder;
+}
+
+/**
+ * Who could have written a hand-off or a return. RLS (lectual 0103) lets any staff member insert a `handoff` or `returned`
+ * row for any queue item, so the fold does not take a row's word for it: it checks the actor against the members' roles
+ * and the routing, with the same `canApproveItem` the actions use. `unknown` (the routing or the member list could not
+ * be read) keeps the old behaviour: every event is trusted, so a failed read never hides a card.
+ */
+export type EventTrust =
+  | {
+      status: "known";
+      roles: ReadonlyMap<string, Role>;
+      routing: ApprovalRouting;
+      /** Sprint 4: each member's address, to tell who approved an item (`resolved_by`). Missing = a draft_to can't be checked. */
+      emails?: ReadonlyMap<string, string>;
+    }
+  | { status: "unknown" };
+
+/** The trust input from a routing load (`loadApprovalRouting`): known only when the routing AND its member list were read. */
+export function eventTrust(routed: { status: "ok"; routing: ApprovalRouting; members: readonly { userId: string; role: Role; email?: string | null }[] } | { status: "failed" }): EventTrust {
+  if (routed.status !== "ok") return { status: "unknown" };
+  const emails = new Map<string, string>();
+  for (const m of routed.members) if (m.email) emails.set(m.userId, m.email);
+  return { status: "known", roles: new Map(routed.members.map((m) => [m.userId, m.role])), routing: routed.routing, emails };
+}
+
+/** The same, from the Approvals pages' view context (`loadQueueViewContext`): a failed routing or member read is unknown. */
+export function viewEventTrust(view: { routing: ApprovalRouting; members: readonly { userId: string; role: Role; email?: string | null }[] | null; routingFailed: boolean }): EventTrust {
+  return view.routingFailed || !view.members ? { status: "unknown" } : eventTrust({ status: "ok", routing: view.routing, members: view.members });
+}
+
+/**
+ * The card events with the forged ones left out, in their order. Per item, walking oldest first:
+ *  · a `handoff` counts only when its actor may approve the item (`canApproveItem` with the actor's role and the
+ *    routing) or is the current holder (a holder may hand it on);
+ *  · a `returned` counts only while the card is handed off, and only from a current staff member (any member of the
+ *    firm in a staff role: not viewer / social media), the current holder or the person who made that hand-off, or someone
+ *    who may approve the item. A return only ever moves a card back toward the approvers, so it can't hide anything; this
+ *    keeps it counting after an earlier hand-off in the chain was dropped (its actor was demoted).
+ * Events are folded in the order given (the database order); two rows with the same `created_at` keep that order.
+ * `later` rows only ever change their own actor's deck and are kept. With trust `unknown` nothing is dropped. With trust
+ * `known`, a hand-off or return for an item not in `items` can't be checked and is dropped. Idempotent.
+ * Sprint 4: a `draft_to` counts only from the member who approved the item (address = `resolved_by`), written at or after
+ * `resolved_at`, and only to a current staff member; `drafting`, `drafted` and `draft_failed` only from the current draft_to
+ * target; a `pass_failed` only from the member who approved the item, at or after `resolved_at` (the draft_to rule, no target).
+ */
+/** Allowed difference between the queue service's clock (`resolved_at`) and the database's (`created_at`). */
+export const DRAFT_TO_CLOCK_SKEW_MS = 2 * 60 * 1000;
+
+type FoldItem = RoutableItem & { id: string } & Partial<Pick<QueueItem, "status" | "resolved_by" | "resolved_at">>;
+
+export function trustedEvents(events: readonly CardEvent[], items: readonly FoldItem[], trust: EventTrust): CardEvent[] {
+  if (trust.status !== "known") return [...events];
+  const byId = new Map(items.map((i) => [i.id, i]));
+  const holders = new Map<string, Holder | null>();
+  // The current draft_to target per item (Sprint 4): a `drafted` counts only from them.
+  const drafters = new Map<string, string>();
+  const mayApprove = (actorId: string, item: RoutableItem) => canApproveItem({ role: trust.roles.get(actorId) ?? null, userId: actorId, item, routing: trust.routing });
+  const out: CardEvent[] = [];
+  for (const e of events) {
+    if (e.kind === "later") {
+      out.push(e);
+      continue;
+    }
+    const item = byId.get(e.queueItemId);
+    if (!item) continue;
+    const holder = holders.get(e.queueItemId) ?? null;
+    if (e.kind === "handoff") {
+      if (!e.targetUserId) continue;
+      if (holder?.userId !== e.actorId && !mayApprove(e.actorId, item)) continue;
+      holders.set(e.queueItemId, { userId: e.targetUserId, by: e.actorId, note: e.note, at: e.createdAt });
+      out.push(e);
+    } else if (e.kind === "returned") {
+      if (!holder) continue;
+      const actorRole = trust.roles.get(e.actorId);
+      const isStaff = !!actorRole && QUEUE_EDIT_ROLES.includes(actorRole);
+      if (!isStaff && e.actorId !== holder.userId && e.actorId !== holder.by && !mayApprove(e.actorId, item)) continue;
+      holders.set(e.queueItemId, null);
+      out.push(e);
+    } else if (e.kind === "draft_to" || e.kind === "pass_failed") {
+      // Only the person who APPROVED the item passes it to a drafter (the approve path writes it as the approver, after
+      // resolving): the writer's address must be the item's `resolved_by`, the row no older than `resolved_at`, and the
+      // target a current staff member. Anything else (another attorney, a row written before approval, a forged row) is left out.
+      if (e.kind === "draft_to") {
+        if (!e.targetUserId) continue;
+        const targetRole = trust.roles.get(e.targetUserId);
+        if (!targetRole || !QUEUE_EDIT_ROLES.includes(targetRole)) continue;
+      } else if (e.targetUserId) continue;
+      const actorEmail = trust.emails?.get(e.actorId);
+      const by = (item.resolved_by ?? "").trim().toLowerCase();
+      if (item.status !== "approved" || !by || !actorEmail || actorEmail.trim().toLowerCase() !== by) continue;
+      const resolvedAt = item.resolved_at ? Date.parse(item.resolved_at) : NaN;
+      const writtenAt = Date.parse(e.createdAt);
+      // `resolved_at` is stamped by the queue service's clock and `created_at` by the database's: allow a small skew so a
+      // pass written right after approving isn't dropped. A row written well before approval is still left out.
+      if (!Number.isFinite(resolvedAt) || !Number.isFinite(writtenAt) || writtenAt < resolvedAt - DRAFT_TO_CLOCK_SKEW_MS) continue;
+      if (e.kind === "draft_to" && e.targetUserId) drafters.set(e.queueItemId, e.targetUserId);
+      out.push(e);
+    } else if (e.kind === "drafting" || e.kind === "drafted" || e.kind === "draft_failed") {
+      // Only the current draft_to target claims, confirms or fails an attempt.
+      if (drafters.get(e.queueItemId) !== e.actorId) continue;
+      out.push(e);
+    }
+  }
+  return out;
+}
+
+/** `trustedEvents` over a card-event read; a read that failed or isn't set up is returned as it is. */
+export function trustedCardState(state: CardState, items: readonly FoldItem[], trust: EventTrust): CardState {
+  return state.status === "ok" ? { status: "ok", events: trustedEvents(state.events, items, trust) } : state;
 }
 
 /** The viewer's own "later" on an item that is still in force: its `until`, else null. */
@@ -69,7 +190,21 @@ export function cardTag(item: QueueItem): CardTag {
 }
 
 /** Facts the page loader reads on the server, per item, that the pure deal cannot: a stale draft, a linked-proposal gate. */
-export type CloserLookFlags = { stale?: boolean; linkedProposal?: boolean };
+export type CloserLookFlags = {
+  stale?: boolean;
+  /** The linked-proposal gate refused, or could not be read. */
+  linkedProposal?: boolean;
+  /**
+   * The gate DEFINITELY passed for a real linked proposal (a named approver saved it and its link is on). Absent, false or
+   * unknown all mean "not passed": only this exact `true` lets a CHECK FIRST line stop forcing "Open to review".
+   */
+  linkedProposalPassed?: boolean;
+};
+
+/** The linked-proposal gate as the deck's flags need it. Only a pass for a proposal whose link is ON ("sent") waives CHECK FIRST; Saved ("approved") keeps "Open to review". */
+export function linkGateFlags(g: { ok: boolean; proposal?: { status: string } | null }): { failed: boolean; passedWithProposal: boolean } {
+  return { failed: !g.ok, passedWithProposal: g.ok && g.proposal?.status === "sent" };
+}
 
 export type CloserReason = "check-first" | "draft-issue" | "stale" | "linked-proposal";
 
@@ -90,7 +225,10 @@ export type DeckCard = {
 
 export function needsCloserLook(item: QueueItem, audit: Omit<AuditContext, "type"> | null, flags: CloserLookFlags | undefined): CloserReason[] {
   const reasons: CloserReason[] = [];
-  if (parseReviewerSummary(item.summary).some((s) => s.checkFirst)) reasons.push("check-first");
+  // A CHECK FIRST line is waived ONLY for an item whose linked proposal definitely passed the gate (and the gate has not
+  // also said no). Stale, draft-issue and a failed gate are never waived.
+  const checkFirstWaived = flags?.linkedProposalPassed === true && !flags.linkedProposal;
+  if (!checkFirstWaived && parseReviewerSummary(item.summary).some((s) => s.checkFirst)) reasons.push("check-first");
   if (audit && approvalBlock(auditDraft(item.final_body ?? item.draft_body, { type: item.type, ...audit }))) reasons.push("draft-issue");
   if (flags?.stale) reasons.push("stale");
   if (flags?.linkedProposal) reasons.push("linked-proposal");
@@ -136,6 +274,8 @@ export function buildDeck(args: {
   routing: ApprovalRouting;
   viewer: Viewer;
   cardState: CardState;
+  /** Who could have written the card events: forged hand-offs and returns are left out (`trustedEvents`). */
+  trust: EventTrust;
   now: Date;
   /** The deal on the table; null deals everything now ("Deal them now"). */
   dealtAt: Date | null;
@@ -145,7 +285,7 @@ export function buildDeck(args: {
   const { routing, viewer, cardState, now, dealtAt } = args;
   const pending = args.items.filter((i) => i.status === "pending");
   const audit = args.audit ?? null;
-  const events = cardState.status === "ok" ? cardState.events : [];
+  const events = cardState.status === "ok" ? trustedEvents(cardState.events, pending, args.trust) : [];
   const eventsApplied = cardState.status === "ok";
 
   // The viewer's own approvals: the same "Mine" the Approvals page and Today count, then only those they may decide.

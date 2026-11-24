@@ -23,8 +23,16 @@ class FakeQuery
     this.calls.push(["eq", a]);
     return this;
   }
+  is(...a: unknown[]) {
+    this.calls.push(["is", a]);
+    return this;
+  }
   order(...a: unknown[]) {
     this.calls.push(["order", a]);
+    return this;
+  }
+  limit(...a: unknown[]) {
+    this.calls.push(["limit", a]);
     return this;
   }
   update(...a: unknown[]) {
@@ -214,6 +222,11 @@ describe("createMatter role gating", () => {
 describe("updateMatterStatus role gating", () => {
   it("allows paralegal and stamps updated_at", async () => {
     state.role = "paralegal";
+    // The close guard reads the matter and its open deadlines first (none open here).
+    state.queue = [
+      { data: { type: "TM", status: "open" }, error: null },
+      { data: [], error: null },
+    ];
     state.fromResult = {
       data: { id: "matter-1", status: "closed" },
       error: null,
@@ -226,7 +239,7 @@ describe("updateMatterStatus role gating", () => {
     expect(result.id).toBe("matter-1");
 
     expect(mockFrom).toHaveBeenCalledWith("crm_matter");
-    const updateCall = state.queries[0].calls.find(([name]) => name === "update");
+    const updateCall = state.queries[2].calls.find(([name]) => name === "update");
     expect(updateCall).toBeTruthy();
     const payload = updateCall![1][0] as Record<string, unknown>;
     expect(payload.status).toBe("closed");
@@ -240,6 +253,46 @@ describe("updateMatterStatus role gating", () => {
       /Forbidden/,
     );
     expect(mockFrom).not.toHaveBeenCalled();
+  });
+});
+
+describe("AT4: the close guard inside updateMatterStatus (scoped client)", () => {
+  it("closing a matter with an open USPTO-kind deadline returns the fixed refusal and changes nothing", async () => {
+    state.role = "attorney";
+    state.queue = [
+      { data: { type: "TM", status: "open" }, error: null },
+      { data: [{ id: "d1", kind: "office_action_response", title: null, due_date: "2026-12-01", status: "open" }], error: null },
+    ];
+    await expect(updateMatterStatus("matter-1", "closed")).rejects.toThrow(/can't be closed while it has an open deadline: Office Action response \(due 2026-12-01\)/);
+    expect(state.queries.some((q) => q.calls.some(([name]) => name === "update"))).toBe(false);
+  });
+
+  it("a failed deadlines read refuses the close (never closes on a guess)", async () => {
+    state.role = "attorney";
+    state.queue = [
+      { data: { type: "TM", status: "open" }, error: null },
+      { data: null, error: { code: "57014", message: "timeout" } },
+    ];
+    await expect(updateMatterStatus("matter-1", "closed")).rejects.toThrow(/Couldn't check this matter's deadlines/);
+    expect(state.queries.some((q) => q.calls.some(([name]) => name === "update"))).toBe(false);
+  });
+
+  it("the same write refused by lectual 0110's trigger reads as the fixed sentence, never the database text", async () => {
+    state.role = "attorney";
+    state.queue = [
+      { data: { type: "TM", status: "open" }, error: null },
+      { data: [], error: null },
+      { data: null, error: { code: "P0001", message: "matter_close_open_deadline: this matter has an open USPTO deadline" } },
+    ];
+    const err = await updateMatterStatus("matter-1", "closed").catch((e: Error) => e);
+    expect((err as Error).message).toBe("This matter can't be closed while it has an open deadline. Close the deadline out first, or an attorney can close the matter with a reason.");
+  });
+
+  it("other statuses are not guarded (no deadline read)", async () => {
+    state.role = "attorney";
+    state.fromResult = { data: { id: "matter-1", status: "on_hold" }, error: null };
+    await updateMatterStatus("matter-1", "on_hold");
+    expect(state.fromTables).toEqual(["crm_matter"]);
   });
 });
 

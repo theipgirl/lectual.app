@@ -1,3 +1,4 @@
+import { BLANK } from "@/lib/ui/words";
 import { friendlyRunError } from "@/lib/agents/friendly-run-error";
 
 /**
@@ -7,12 +8,12 @@ import { friendlyRunError } from "@/lib/agents/friendly-run-error";
 export function runResultText(status: string, run: { summary: string | null; error: string | null }): string {
   if (status === "unfinished") return "Didn't finish. It was stopped before it could report back.";
   if (status === "error") return friendlyRunError(run.error);
-  return run.summary ?? "—";
+  return run.summary ?? BLANK;
 }
 
 export function RunResultCell({ status, run, failed }: { status: string; run: { summary: string | null; error: string | null }; failed: boolean }) {
   return (
-    <td className="wrap" style={failed ? { color: "var(--wine)" } : undefined}>
+    <td className="wrap" data-label="Result" style={failed ? { color: "var(--wine)" } : undefined}>
       {runResultText(status, run)}
     </td>
   );

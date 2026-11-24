@@ -146,13 +146,14 @@ function find<T = Record<string, unknown>>(tree: ReactNode, type: unknown): { pr
 
 
 type BoardProps = {
-  rows: IntakeRow[];
+  model: { columns: Array<{ shown: IntakeRow[] }>; renderedIds: string[] };
   selectedIds: ReadonlySet<string>;
   errors: Record<string, string>;
   onToggleSelect: (leadId: string) => void;
 };
 type BarProps = {
   selectedCount: number;
+  hiddenCount: number;
   shownCount: number;
   pending: boolean;
   message: { tone: string; text: string } | null;
@@ -162,7 +163,33 @@ type BarProps = {
 };
 const board = (tree: ReactElement) => find<BoardProps>(tree, IntakeBoard)!.props;
 const bar = (tree: ReactElement) => find<BarProps>(tree, BulkMoveBar)!.props;
-const stageOf = (tree: ReactElement, id: string) => board(tree).rows.find((r) => r.lead.id === id)!.lead.current_stage_id;
+const stageOf = (tree: ReactElement, id: string) => board(tree).model.columns.flatMap((c) => c.shown).find((r) => r.lead.id === id)!.lead.current_stage_id;
+
+/** Any element of the tree (props included: the toolbar's toggle slot is a prop, not a child) that is a <button> passing `test`. */
+function findButton(tree: unknown, test: (props: Record<string, unknown>) => boolean): { props: Record<string, unknown> } | undefined {
+  if (Array.isArray(tree)) {
+    for (const child of tree) {
+      const found = findButton(child, test);
+      if (found) return found;
+    }
+    return undefined;
+  }
+  if (!tree || typeof tree !== "object" || !("props" in tree)) return undefined;
+  const el = tree as { type: unknown; props: Record<string, unknown> };
+  if (el.type === "button" && test(el.props)) return el;
+  for (const value of Object.values(el.props)) {
+    const found = findButton(value, test);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+/** Mounts the board and presses the toolbar's Select button (the bar and the tick boxes exist only in select mode). */
+function mountSelecting(params: Record<string, string> = { view: "board" }) {
+  const view = mount(params);
+  (findButton(view.tree(), (p) => p.children === "Select")!.props.onClick as () => void)();
+  return view;
+}
 
 beforeEach(() => {
   actions.bulkMoveStageAction.mockReset();
@@ -171,6 +198,9 @@ beforeEach(() => {
 describe("Move to... for ticked cards", () => {
   it("ticking cards selects them, and Select shown ticks up to the cap", () => {
     const view = mount({ view: "board" });
+    // Not in select mode: no bar and no boxes.
+    expect(find(view.tree(), BulkMoveBar)).toBeUndefined();
+    (findButton(view.tree(), (p) => p.children === "Select")!.props.onClick as () => void)();
     expect(bar(view.tree())).toMatchObject({ selectedCount: 0, shownCount: 3 });
     board(view.tree()).onToggleSelect("l-1");
     board(view.tree()).onToggleSelect("l-2");
@@ -186,7 +216,7 @@ describe("Move to... for ticked cards", () => {
 
   it("sends the ticked ids and the stage to the action, shows it busy, then moves the cards and clears the ticks", async () => {
     actions.bulkMoveStageAction.mockResolvedValue({ ok: true, stageId: "s2", moved: ["l-1", "l-2"], skipped: [], failed: [] });
-    const view = mount({ view: "board" });
+    const view = mountSelecting();
     board(view.tree()).onToggleSelect("l-1");
     board(view.tree()).onToggleSelect("l-2");
     bar(view.tree()).onMove("s2");
@@ -198,7 +228,7 @@ describe("Move to... for ticked cards", () => {
     expect(stageOf(after, "l-2")).toBe("s2");
     expect(stageOf(after, "l-3")).toBe("s1");
     expect(bar(after)).toMatchObject({ pending: false, selectedCount: 0 });
-    expect(bar(after).message).toEqual({ tone: "ok", text: "Moved 2 leads to 2 · Consultation Scheduled." });
+    expect(bar(after).message).toEqual({ tone: "ok", text: "Moved 2 leads to Consultation Scheduled." });
   });
 
   it("a partial failure moves the rest, keeps the failed card ticked with its own reason, and says so", async () => {
@@ -209,7 +239,7 @@ describe("Move to... for ticked cards", () => {
       skipped: [],
       failed: [{ leadId: "l-2", error: "You don't have permission to move this lead to that stage." }],
     });
-    const view = mount({ view: "board" });
+    const view = mountSelecting();
     board(view.tree()).onToggleSelect("l-1");
     board(view.tree()).onToggleSelect("l-2");
     bar(view.tree()).onMove("s2");
@@ -225,7 +255,7 @@ describe("Move to... for ticked cards", () => {
 
   it("a refused request (a won stage, a viewer) moves nothing and says why", async () => {
     actions.bulkMoveStageAction.mockResolvedValue({ ok: false, error: "That stage opens a matter, so leads can't be moved there in bulk. Open the lead and move it from there." });
-    const view = mount({ view: "board" });
+    const view = mountSelecting();
     board(view.tree()).onToggleSelect("l-1");
     bar(view.tree()).onMove("s9");
     await view.settle();
@@ -237,7 +267,7 @@ describe("Move to... for ticked cards", () => {
 
   it("an action that throws is said, and nothing moves on screen", async () => {
     actions.bulkMoveStageAction.mockRejectedValue(new Error("network"));
-    const view = mount({ view: "board" });
+    const view = mountSelecting();
     board(view.tree()).onToggleSelect("l-1");
     bar(view.tree()).onMove("s2");
     await view.settle();

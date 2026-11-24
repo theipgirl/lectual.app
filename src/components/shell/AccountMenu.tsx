@@ -9,11 +9,13 @@ import {
 } from "@/lib/auth/actions";
 import type { SwitchableFirmRef } from "@/lib/firm/session";
 import { requestTourAgain } from "@/lib/onboarding/tour";
+import { requestWelcomeAgain } from "@/lib/onboarding/welcome-deal";
 import { requestFeedback } from "@/lib/feedback/open";
 import { requestNameDialog } from "@/lib/account/name";
 import { roleLabel } from "@/lib/auth/roles";
 import { isOutsidePress, menuKeyAction } from "@/lib/shell/menu-behaviour";
-import { HELP_AND_TIPS, SETTINGS_NAME } from "@/lib/ui/words";
+import { requestDealTimesDialog } from "@/lib/deal/person-times";
+import { DEAL_TIMES_MENU_ITEM, HELP_AND_TIPS, SETTINGS_NAME, SAVING } from "@/lib/ui/words";
 import type { ViewMenu } from "@/lib/views";
 import { ViewSwitch } from "./ViewSwitch";
 import "./account-menu.css";
@@ -56,6 +58,8 @@ export function AccountMenu({
   const [open, setOpen] = useState(false);
 
   const closeMenu = () => menu.current?.removeAttribute("open");
+  // "Show tips again": the owner view replays the welcome deal, every other view the tour.
+  const replayGuide = () => (variant === "owner" ? requestWelcomeAgain(window) : requestTourAgain(window));
   const avatar = () => menu.current?.querySelector("summary") ?? null;
 
   // Esc and a press outside close the menu; Esc returns focus to the avatar.
@@ -80,12 +84,11 @@ export function AccountMenu({
   return (
     <details
       ref={menu}
-      style={{ position: "relative" }}
+      className="lx-am-root"
       onToggle={(e) => setOpen(e.currentTarget.open)}
     >
       <summary
-        className="lx-avatar"
-        style={{ listStyle: "none" }}
+        className="lx-avatar lx-am-avatar"
         data-tour="account"
         aria-label={`Account: ${name}`}
         title={`${name} · ${roleLabel(role)}`}
@@ -124,14 +127,10 @@ export function AccountMenu({
                 className="lx-btn lx-btn-sec lx-btn-sm"
                 disabled={switching}
               >
-                {switching ? "Switching…" : "Open firm"}
+                {switching ? SAVING : "Open firm"}
               </button>
               {switchState.error && (
-                <p
-                  role="alert"
-                  className="lx-note"
-                  style={{ color: "var(--wine)", margin: 0 }}
-                >
+                <p role="alert" className="lx-am-error">
                   {switchState.error}
                 </p>
               )}
@@ -149,6 +148,18 @@ export function AccountMenu({
               }}
             >
               Your name
+            </button>
+
+            <button
+              type="button"
+              role="menuitem"
+              className="lx-am-item"
+              onClick={() => {
+                closeMenu();
+                requestDealTimesDialog(window, avatar());
+              }}
+            >
+              {DEAL_TIMES_MENU_ITEM}
             </button>
 
             {viewMenu && <ViewSwitch menu={viewMenu} onDone={closeMenu} />}
@@ -171,7 +182,7 @@ export function AccountMenu({
             >
               <div
                 id="lx-help-h"
-                className="lx-am-eyebrow lx-am-eyebrow--tight lx-am-sep"
+                className="lx-label lx-am-eyebrow lx-am-eyebrow--tight lx-am-sep"
               >
                 {HELP_AND_TIPS}
               </div>
@@ -189,7 +200,7 @@ export function AccountMenu({
                 className="lx-am-item lx-am-item--sm"
                 onClick={() => {
                   closeMenu();
-                  requestTourAgain(window);
+                  replayGuide();
                 }}
               >
                 Show tips again
@@ -216,35 +227,18 @@ export function AccountMenu({
           </div>
         </div>
       ) : (
-        <div
-          className="lx-card"
-          style={{
-            position: "absolute",
-            right: 0,
-            top: 44,
-            width: 280,
-            padding: 16,
-            zIndex: 60,
-            display: "grid",
-            gap: 12,
-            boxShadow: "var(--shadow-lift)",
-          }}
-        >
+        <div className="lx-card lx-am-plain">
           <div>
-            <div style={{ fontWeight: 500 }}>{name}</div>
+            <div className="lx-am-name">{name}</div>
             {email && <div className="lx-note">{email}</div>}
-            <div className="lx-label" style={{ fontSize: 11, marginTop: 6 }}>
+            <div className="lx-label lx-am-firmline">
               {firmName} · {roleLabel(role)}
             </div>
           </div>
 
           {switchableFirms.length > 1 && (
-            <form action={switchAction} style={{ display: "grid", gap: 8 }}>
-              <label
-                className="lx-label"
-                style={{ fontSize: 11 }}
-                htmlFor="lx-firm"
-              >
+            <form action={switchAction} className="lx-am-stack">
+              <label className="lx-label" htmlFor="lx-firm">
                 Switch firm
               </label>
               <select
@@ -264,30 +258,21 @@ export function AccountMenu({
                 className="lx-btn lx-btn-sec lx-btn-sm"
                 disabled={switching}
               >
-                {switching ? "Switching…" : "Open firm"}
+                {switching ? SAVING : "Open firm"}
               </button>
               {switchState.error && (
-                <p
-                  role="alert"
-                  className="lx-note"
-                  style={{ color: "var(--wine)", margin: 0 }}
-                >
+                <p role="alert" className="lx-am-error">
                   {switchState.error}
                 </p>
               )}
             </form>
           )}
 
-          <div
-            role="menu"
-            aria-label="Account"
-            style={{ display: "grid", gap: 8 }}
-          >
+          <div role="menu" aria-label="Account" className="lx-am-stack">
             <button
               type="button"
               role="menuitem"
-              className="lx-btn lx-btn-sec lx-btn-sm"
-              style={{ width: "100%" }}
+              className="lx-btn lx-btn-sec lx-btn-sm lx-am-btn"
               onClick={() => {
                 closeMenu();
                 requestNameDialog(window, avatar());
@@ -300,8 +285,7 @@ export function AccountMenu({
               <Link
                 href="/dashboard/settings/"
                 role="menuitem"
-                className="lx-btn lx-btn-sec lx-btn-sm"
-                style={{ width: "100%" }}
+                className="lx-btn lx-btn-sec lx-btn-sm lx-am-btn"
                 onClick={closeMenu}
               >
                 {SETTINGS_NAME}
@@ -310,19 +294,14 @@ export function AccountMenu({
 
             {viewMenu && <ViewSwitch menu={viewMenu} onDone={closeMenu} />}
 
-            <div
-              role="group"
-              aria-labelledby="lx-help-h"
-              style={{ display: "grid", gap: 8 }}
-            >
-              <div id="lx-help-h" className="lx-label" style={{ fontSize: 11 }}>
+            <div role="group" aria-labelledby="lx-help-h" className="lx-am-stack">
+              <div id="lx-help-h" className="lx-label">
                 {HELP_AND_TIPS}
               </div>
               <Link
                 href="/dashboard/getting-started/"
                 role="menuitem"
-                className="lx-btn lx-btn-sec lx-btn-sm"
-                style={{ width: "100%" }}
+                className="lx-btn lx-btn-sec lx-btn-sm lx-am-btn"
                 onClick={closeMenu}
               >
                 Getting started
@@ -330,11 +309,10 @@ export function AccountMenu({
               <button
                 type="button"
                 role="menuitem"
-                className="lx-btn lx-btn-sec lx-btn-sm"
-                style={{ width: "100%" }}
+                className="lx-btn lx-btn-sec lx-btn-sm lx-am-btn"
                 onClick={() => {
                   closeMenu();
-                  requestTourAgain(window);
+                  replayGuide();
                 }}
               >
                 Show tips again
@@ -342,8 +320,7 @@ export function AccountMenu({
               <button
                 type="button"
                 role="menuitem"
-                className="lx-btn lx-btn-sec lx-btn-sm"
-                style={{ width: "100%" }}
+                className="lx-btn lx-btn-sec lx-btn-sm lx-am-btn"
                 onClick={() => {
                   closeMenu();
                   // Focus returns to the avatar, which stays visible when the menu closes.
@@ -354,17 +331,8 @@ export function AccountMenu({
               </button>
             </div>
 
-            <form
-              action={signOutAction}
-              role="none"
-              style={{ borderTop: "1px solid var(--line-2)", paddingTop: 8 }}
-            >
-              <button
-                type="submit"
-                role="menuitem"
-                className="lx-btn lx-btn-ghost lx-btn-sm"
-                style={{ width: "100%" }}
-              >
+            <form action={signOutAction} role="none" className="lx-am-signout">
+              <button type="submit" role="menuitem" className="lx-btn lx-btn-ghost lx-btn-sm lx-am-btn">
                 Sign out
               </button>
             </form>

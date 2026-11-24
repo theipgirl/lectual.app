@@ -1,7 +1,9 @@
+import { SCORED_ASSESSMENT, SCORED_ASSESSMENTS, showingAtLeast } from "@/lib/ui/words";
 import { FIRM_TIME_ZONE } from "@/lib/quotes/firm-time";
 import { formatIntakeTime } from "@/lib/intake-forms/performance";
 import { scoreLine, mergeAnswerItems, type AnswerItem, type ScoreSummary } from "@/lib/answers/items";
 import type { AnswersRead, SourceRead } from "@/lib/answers/load-answers";
+import { Notice } from "@/components/ui/Notice";
 
 /**
  * "Intake & assessment answers": what this person (lead page) or this matter
@@ -22,7 +24,7 @@ export const EMPTY_LINE = "No intake or assessment answers yet.";
 
 const SOURCES = [
   { key: "submissions", name: "Intake submissions" },
-  { key: "booth", name: "Booth scorecards" },
+  { key: "booth", name: SCORED_ASSESSMENTS },
   { key: "requests", name: "Questions sent to the client" },
 ] as const;
 
@@ -92,14 +94,14 @@ function Item({ item, tz }: { item: AnswerItem; tz: string }) {
   const head =
     item.kind === "submission"
       ? `${item.formName} · ${item.formKind === "assessment" ? "Assessment" : "Intake"} · ${when} · ${state}`
-      : `Booth · ${item.eventCode} · ${when} · ${state}`;
+      : `${SCORED_ASSESSMENT} · ${item.eventCode} · ${when} · ${state}`;
   return (
     <details className="lx-disclosure-inline" data-kind={item.kind}>
       <summary>{score ? `${head} · ${score}` : head}</summary>
       <div style={{ display: "grid", gap: 10 }}>
         {item.kind === "booth" && (
           <div className="lx-meta">
-            <span>Event · track</span>
+            <span>Assessment · track</span>
             <span>{`${item.eventCode} · ${item.track === "brand" ? "Personal brand" : item.track === "business" ? "Business" : "Track not recorded"}`}</span>
           </div>
         )}
@@ -107,7 +109,7 @@ function Item({ item, tz }: { item: AnswerItem; tz: string }) {
         {!finished && (
           <p className="lx-note" style={{ margin: 0 }}>
             {item.kind === "booth"
-              ? "They gave contact details at the booth and didn't finish the card."
+              ? "They gave contact details and didn't finish the assessment."
               : "They gave contact details and didn't send answers."}
           </p>
         )}
@@ -129,14 +131,14 @@ export function AnswersCard({ read, tz = FIRM_TIME_ZONE }: { read: AnswersRead; 
     <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }} aria-label={TITLE}>
       <div>
         <div className="lx-label">Staff only</div>
-        <h2 className="lx-h2" style={{ fontSize: 23 }}>
+        <h2 className="lx-h3">
           {TITLE}
         </h2>
       </div>
       {failed.length > 0 && (
-        <div className="lx-banner lx-banner-warn" role="alert">
+        <Notice tone="warn" role="alert">
           {`Couldn't load answers: ${failed.map((s) => s.name).join(", ")}. Refresh to try again.`}
-        </div>
+        </Notice>
       )}
       {missing.map((s) => (
         <p key={s.key} className="lx-note" style={{ margin: 0 }}>
@@ -157,7 +159,7 @@ export function AnswersCard({ read, tz = FIRM_TIME_ZONE }: { read: AnswersRead; 
       )}
       {capped.map((s) => (
         <p key={s.key} className="lx-note" style={{ margin: 0 }}>
-          {`Showing the latest 200 ${s.name.toLowerCase()}.`}
+          {`${showingAtLeast(200)} ${s.name.toLowerCase()}.`}
         </p>
       ))}
     </section>

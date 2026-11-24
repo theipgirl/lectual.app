@@ -6,6 +6,7 @@ import { CAN_WRITE_LEAD, resolveCurrentRole } from "@/lib/pipeline/leads";
 import { LeadWriteError, forbiddenLeadWrite } from "@/lib/pipeline/errors";
 import type { Role } from "@/lib/auth/roles";
 import type { TimeEntry } from "./rollup";
+import { keeperForWrite } from "@/lib/leads/live";
 
 /**
  * Reads and writes for the ⏱ on an intake card (blueprint §13.1).
@@ -106,9 +107,18 @@ async function resolveSubject(
  * cross-org id becomes "isn't visible to your firm" instead of a foreign-key
  * error naming a table.
  */
+/**
+ * A page opened before a merge (lectual 0107) logs time on the KEEPER: the target's lead id is followed first. An
+ * unreadable pointer refuses with a fixed sentence and nothing is written.
+ */
+async function keeperTarget(supabase: ScopedClient, target: TimeTarget): Promise<TimeTarget> {
+  return target.leadId ? { ...target, leadId: await keeperForWrite(supabase, target.leadId) } : target;
+}
+
 async function orgIdForTarget(supabase: ScopedClient, target: TimeTarget): Promise<string> {
   if (target.leadId) {
     const { data, error } = await supabase
+      // live-guard: the target's lead was followed to its keeper by keeperTarget before this read
       .from("crm_lead")
       .select("org_id")
       .eq("id", target.leadId)
@@ -141,6 +151,7 @@ async function alreadyRunning(
   let where = "something else";
   if (running.lead_id) {
     const { data } = await supabase
+      // live-guard: reads the lead a time entry is on; time entries move to the keeper in the merge
       .from("crm_lead")
       .select("first_name, last_name, business_name")
       .eq("id", running.lead_id)
@@ -191,6 +202,7 @@ export async function startTimer(target: TimeTarget): Promise<TimeEntry> {
   const role = await requireTimeRole(supabase, "log time");
   const caller = await callerId(supabase);
   const userId = await resolveSubject(target, caller, role);
+  target = await keeperTarget(supabase, target);
   const orgId = await orgIdForTarget(supabase, target);
 
   const { data: open, error: openError } = await supabase
@@ -332,6 +344,7 @@ export async function addManualEntry(
   const role = await requireTimeRole(supabase, "log time");
   const caller = await callerId(supabase);
   const userId = await resolveSubject(target, caller, role);
+  target = await keeperTarget(supabase, target);
   const orgId = await orgIdForTarget(supabase, target);
 
   const { data, error } = await supabase
@@ -403,15 +416,26 @@ export async function listForLeads(leadIds: string[], since: Date | string): Pro
 
   const sinceIso = typeof since === "string" ? since : since.toISOString();
   const supabase = await getScopedClient();
-  const { data, error } = await supabase
-    .from("crm_time_entry")
-    .select("*")
-    .in("lead_id", ids)
-    .gte("started_at", sinceIso)
-    .order("started_at", { ascending: false });
-  if (error) throw error;
-  return data ?? [];
+  // 300+ uuids in ONE `.in()` is a URL over PostgREST's limit: the read failed and every row showed an em dash. Chunked.
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += LEAD_ID_CHUNK) chunks.push(ids.slice(i, i + LEAD_ID_CHUNK));
+  const parts = await Promise.all(
+    chunks.map(async (chunk) => {
+      const { data, error } = await supabase
+        .from("crm_time_entry")
+        .select("*")
+        .in("lead_id", chunk)
+        .gte("started_at", sinceIso)
+        .order("started_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    }),
+  );
+  return parts.flat().sort((a, b) => (a.started_at < b.started_at ? 1 : a.started_at > b.started_at ? -1 : 0));
 }
+
+/** Lead ids per `.in()`: 80 uuids stay well inside a request URL. */
+export const LEAD_ID_CHUNK = 80;
 
 /**
  * The timeline row for a closed entry (0056 adds the `time_logged` activity

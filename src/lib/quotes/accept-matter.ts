@@ -1,4 +1,5 @@
 import "server-only";
+import { resolveLeadId } from "@/lib/leads/live";
 
 // Type-only: the client is built (and fenced) in public.ts; this module only
 // ever receives it. No second service-role constructor exists in the quote
@@ -88,10 +89,16 @@ export async function openMatterForAcceptedQuote(
     const quote = quoteData as Record<string, unknown>;
     if (quote.status !== "accepted") return { status: "skipped", reason: "not_accepted" };
     if (quote.matter_id) return { status: "skipped", reason: "has_matter" };
-    const leadId = str(quote.lead_id);
-    if (!leadId) return { status: "skipped", reason: "no_lead" };
+    const quoteLeadId = str(quote.lead_id);
+    if (!quoteLeadId) return { status: "skipped", reason: "no_lead" };
+    // A quote stays on a merged lead (lectual 0107): the matter opens for the lead it was merged into.
+    const resolved = await resolveLeadId(db, quoteLeadId, orgId);
+    if (resolved.status === "unavailable") return fail("read the lead", null);
+    if (resolved.status === "not-found") return { status: "skipped", reason: "no_lead" };
+    const leadId = resolved.id;
 
     const { data: leadData, error: leadError } = await db
+      // live-guard: the lead resolveLeadId already followed to the keeper
       .from("crm_lead")
       .select("id, first_name, last_name, business_name, mark_text, referral_source")
       .eq("id", leadId)
@@ -247,10 +254,16 @@ export async function advanceLeadForAcceptedQuote(
     if (quoteError || !quoteData) return failLead("read the quote", quoteError);
     const quote = quoteData as Record<string, unknown>;
     if (quote.status !== "accepted") return { status: "skipped", reason: "not_accepted" };
-    const leadId = str(quote.lead_id);
-    if (!leadId) return { status: "skipped", reason: "no_lead" };
+    const quoteLeadId = str(quote.lead_id);
+    if (!quoteLeadId) return { status: "skipped", reason: "no_lead" };
+    // A quote stays on a merged lead (lectual 0107): the lead it was merged into is the one that moves.
+    const resolved = await resolveLeadId(db, quoteLeadId, orgId);
+    if (resolved.status === "unavailable") return failLead("read the lead", null);
+    if (resolved.status === "not-found") return { status: "skipped", reason: "no_lead" };
+    const leadId = resolved.id;
 
     const { data: leadData, error: leadError } = await db
+      // live-guard: the lead resolveLeadId already followed to the keeper
       .from("crm_lead")
       .select("id, current_stage_id")
       .eq("id", leadId)
@@ -276,6 +289,7 @@ export async function advanceLeadForAcceptedQuote(
 
     const stamp = context.now.toISOString();
     const { data: moved, error: moveError } = await db
+      // live-guard: the lead resolveLeadId already followed to the keeper
       .from("crm_lead")
       .update({ current_stage_id: wonId, stage_entered_at: stamp, last_activity_at: stamp })
       .eq("id", leadId)

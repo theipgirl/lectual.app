@@ -12,6 +12,8 @@
  */
 
 /** The fields of a Graph event the sync asks for. Everything is optional: Graph omits what is empty. */
+import { NO_FIRM_SENDERS, isFirmSender, type FirmSenders } from "@/lib/mailbox/firm-sender";
+
 export type GraphEvent = {
   id?: string | null;
   subject?: string | null;
@@ -182,6 +184,8 @@ export type NormaliseContext = {
   leadIndex: LeadIndex;
   /** Lowercased addresses of the org's connected mailboxes. */
   firmAddresses: ReadonlySet<string>;
+  /** The firm's own senders (addresses and non-webmail domains); they never identify a lead. Absent = none. */
+  firmSenders?: FirmSenders;
 };
 
 export type NormalisedEvent = { externalId: string; row: OutlookEventRow };
@@ -207,7 +211,10 @@ export function normaliseGraphEvent(event: GraphEvent, ctx: NormaliseContext): N
   const title = clip(event.subject, MAX_TITLE);
   const organizerEmail = cleanEmail(event.organizer?.emailAddress?.address);
   const attendees = normaliseAttendees((event.attendees ?? []).map((a) => a?.emailAddress?.address));
-  const leadId = linkLead(attendees, ctx.leadIndex);
+  // Firm staff and the organizer are on every invite; they never identify the client.
+  const senders = ctx.firmSenders ?? NO_FIRM_SENDERS;
+  const candidates = attendees.filter((a) => a !== organizerEmail && !isFirmSender(a, senders));
+  const leadId = linkLead(candidates, ctx.leadIndex);
 
   return {
     externalId: id,

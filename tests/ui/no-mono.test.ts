@@ -1,0 +1,48 @@
+import fs from "node:fs";
+import { describe, expect, it } from "vitest";
+import { ceilingCheck, cssFiles, read, staleCeilings, stripCssComments, tsxFiles } from "./_design-scan";
+
+/**
+ * No monospace where a person reads a list, label, count, date or number (design item 15): digits that must line up use
+ * font-variant-numeric: tabular-nums in the sans face. A RATCHET: a file's count of monospace font declarations may only go down.
+ * Allowed for good: `.lx-md code` / `.lx-md pre` in globals.css (code is code). The token definitions are not declarations and do not count.
+ */
+const MONO = /var\(--mono\)|monospace|courier|--font-courier-prime|--font-mono|jetbrains/i;
+const CSS: Record<string, number> = {};
+const TSX: Record<string, number> = {};
+const ALLOW_CSS_LINES: Array<[string, RegExp]> = [
+  ["src/app/globals.css", /^\.lx-md (code|pre)\b/],
+  // The Forms Share section's embed snippet is code a person copies into a website, not a list, label, count, date or number.
+  ["src/app/dashboard/forms/forms.css", /^\.ifm-code\b/],
+];
+
+function measure() {
+  const css: Record<string, number> = {}, tsx: Record<string, number> = {};
+  for (const f of cssFiles()) {
+    const text = stripCssComments(read(f));
+    let n = 0;
+    for (const rule of text.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const selector = rule[1].trim();
+      if (ALLOW_CSS_LINES.some(([file, re]) => file === f && re.test(selector))) continue;
+      for (const d of rule[2].matchAll(/(?:^|;)\s*(font-family|font)\s*:([^;]*)/g)) if (MONO.test(d[2])) n++;
+    }
+    if (n) css[f] = n;
+  }
+  for (const f of tsxFiles()) {
+    const src = read(f);
+    const n = [...src.matchAll(/fontFamily:\s*([^\n]*)/g)].filter((m) => MONO.test(m[1])).length + (src.match(/\bfont-mono\b/g) ?? []).length;
+    if (n) tsx[f] = n;
+  }
+  return { css, tsx };
+}
+
+describe("no monospace", () => {
+  const m = measure();
+  if (process.env.DESIGN_DUMP) fs.writeFileSync(`${process.env.DESIGN_DUMP}/no-mono.json`, JSON.stringify(m, null, 2));
+  it("CSS: no monospace font declaration beyond the ceilings", () => expect(ceilingCheck(m.css, CSS)).toEqual([]));
+  it("TSX: no monospace fontFamily or font-mono class beyond the ceilings", () => expect(ceilingCheck(m.tsx, TSX)).toEqual([]));
+  it("no ceiling is higher than what is measured", () => expect([...staleCeilings(m.css, CSS), ...staleCeilings(m.tsx, TSX)]).toEqual([]));
+  it("the shared stylesheets are clean", () => {
+    for (const f of ["src/app/globals.css", "src/components/list-page/list-page.css", "src/components/view-toggle.css"]) expect(m.css[f] ?? 0, f).toBe(0);
+  });
+});

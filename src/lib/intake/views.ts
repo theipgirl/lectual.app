@@ -6,6 +6,28 @@ import { inPipelineOrder } from "@/lib/pipeline/stage-order";
 import type { MemberIdentity } from "@/lib/members/directory";
 import { intakeStages } from "./scope";
 import type { IntakeRow } from "./rows";
+import { DEFAULT_ZONE } from "@/lib/stage-keeper/format";
+import { civilDay, formatDay, formatTime } from "@/lib/ui/dates";
+import {
+  LEADS_NOTE_UNAVAILABLE,
+  LEADS_NO_ACTIVITY_YET,
+  LEADS_TOUCH_ACTIVITY_ONLY,
+  LEADS_TOUCH_ACTIVITY_ONLY_TITLE,
+  LEADS_TOUCH_NONE_TITLE,
+  LEADS_TOUCH_NO_CONTACT,
+  LEADS_TOUCH_CONSULT_HELD,
+  LEADS_TOUCH_CONSULT_HELD_TITLE,
+  LEADS_TOUCH_CONSULT_LATER,
+  LEADS_TOUCH_CONSULT_TITLE,
+  LEADS_TOUCH_CONSULT_TODAY,
+  LEADS_TOUCH_OUR_TURN,
+  LEADS_TOUCH_OUR_TURN_TITLE,
+  LEADS_TOUCH_WAITING_ON_THEM,
+  LEADS_TOUCH_WAITING_TITLE,
+  TEAMMATE,
+  UNASSIGNED,
+  BLANK,
+} from "@/lib/ui/words";
 
 /**
  * Pure arrangement layer for /intake (blueprint §11): the same rows that
@@ -158,47 +180,116 @@ export function ownerColumns(rows: IntakeRow[], members: MemberIdentity[]): Owne
   );
 
   return [
-    build(null, "Unassigned", "—"),
+    build(null, UNASSIGNED, BLANK),
     ...members.map((member) => build(member.userId, memberLabel(member), initialsOf(member))),
-    ...strays.map((id) => build(id, "Unknown teammate", "?")),
+    ...strays.map((id) => build(id, TEAMMATE, "?")),
   ];
 }
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
 /**
- * "12 Sep" — the stamp the canvas puts in Last touch.
- *
- * Spelled out rather than handed to `toLocaleDateString`: that returns "Sept"
- * for September under newer ICU and "Sep" under older, so the same row renders
- * differently on the server and in the browser, which React reports as a
- * hydration mismatch. A twelve-entry table is not worth a locale.
+ * "Sep 12": the day a stamp falls on in the firm's zone (`formatDay`, the one date formatter; the year only when it is not this year).
+ * Null for no date or one that doesn't parse.
  */
-export function touchDate(iso: string | null): string | null {
-  if (!iso) return null;
-  const at = new Date(iso);
-  const ms = at.getTime();
-  if (Number.isNaN(ms)) return null;
-  return `${at.getUTCDate()} ${MONTHS[at.getUTCMonth()]}`;
+export function touchDate(iso: string | null, timeZone: string = DEFAULT_ZONE): string | null {
+  return formatDay(iso, { tz: timeZone });
 }
 
+export type TouchState = "consult" | "consult-held" | "our-turn" | "waiting" | "activity-only" | "none";
+
 export type TouchStamp = {
-  /** "12 Sep ←" / "9 Sep →" / "—". */
+  /** "Our turn · 16 Nov" / "Waiting on them · 15 Nov" / "Last activity · 12 Sep" / "No contact yet". */
   text: string;
   /** True when the lead spoke last, i.e. the firm owes the reply. */
   waitingOnUs: boolean;
+  state: TouchState;
+  /** One sentence for the cell's tooltip: what the words mean. */
+  title: string;
 };
 
 /**
- * The Last-touch cell. ← means waiting on US, → means waiting on THEM — the
- * legend is printed in the table footer, because an arrow nobody can decode is
- * decoration.
+ * The Last-contact cell, in words (no arrows, so no legend). Dates are the Sheet's ("Nov 16"), in the firm's time zone. The direction is `row.reply`, the same field the arrows
+ * read: "replied" = they wrote last (our turn), "awaiting" = we wrote last. "unknown" means no email or call is
+ * recorded, so only the date of the newest activity is known; it says that and does not guess a side.
  */
-export function touchStampFor(row: IntakeRow): TouchStamp {
-  const date = touchDate(row.lastTouchAt);
-  if (!date) return { text: "—", waitingOnUs: false };
-  if (row.reply === "replied") return { text: `${date} ←`, waitingOnUs: true };
-  return { text: `${date} →`, waitingOnUs: false };
+/**
+ * Every date on the Intake list and board, in the weekly review Sheet's words ("Nov 16", `shortDate`, the year only for another year),
+ * on the firm's calendar day, with the month and day kept together on one line. Null for no date or one that doesn't parse.
+ */
+export function sheetDay(iso: string | null | undefined, now: Date, timeZone: string = DEFAULT_ZONE): string | null {
+  // A date in the future is never shown ("Our turn · Dec 3" before Dec 3): it is treated as missing, like one that doesn't parse.
+  const usable = usableTime(iso, now);
+  if (!usable) return null;
+  const day = formatDay(usable, { tz: timeZone, now });
+  return day ? day.replace(" ", "\u00a0") : null;
+}
+
+/** The stamp itself when it parses and is not after `now`; else null. The ONE "is this a date we may show" rule: the cell and the sort both use it. */
+export function usableTime(iso: string | null | undefined, now: Date): string | null {
+  const at = iso ? Date.parse(iso) : NaN;
+  return iso && Number.isFinite(at) && at <= now.getTime() ? iso : null;
+}
+
+/**
+ * Which date the Last-contact cell shows, and what kind it is, BEFORE it is worded. `touchStampFor` words it and the sort orders by it, so the
+ * sort key and the shown date cannot disagree.
+ *   consult        a consult is booked today or later: its start (`consultAt`, already limited to the firm's today-or-later by the load); shown first
+ *   our-turn       they wrote or called last: `last_inbound_at`
+ *   waiting        we did: `last_outbound_at`
+ *   activity-only  no email or call to go by: the newest of the lead's own dates (`lastTouchAt`, else `last_activity_at`)
+ *   none           nothing usable (a future or unparseable date is missing): "No contact yet"
+ */
+export function shownTouch(row: IntakeRow, now: Date): { state: TouchState; iso: string | null } {
+  // A booked consult outranks every other state. Only a parseable start counts; the load already dropped earlier days.
+  if (row.consultAt && Number.isFinite(Date.parse(row.consultAt))) return { state: "consult", iso: row.consultAt };
+  // A consult that already happened, later than anything the firm sent (and than anything they sent): the firm owes the post-consult email.
+  const held = usableTime(row.pastConsultAt, now);
+  if (held && heldWithin30Days(held, now)) {
+    const heldMs = Date.parse(held);
+    const out = usableTime(row.lead.last_outbound_at, now);
+    const inn = usableTime(row.lead.last_inbound_at, now);
+    if ((!out || heldMs > Date.parse(out)) && (!inn || heldMs > Date.parse(inn))) return { state: "consult-held", iso: held };
+  }
+  const newest = usableTime(row.lastTouchAt, now) ?? usableTime(row.lead.last_activity_at, now);
+  if (!newest) return { state: "none", iso: null };
+  const inbound = usableTime(row.lead.last_inbound_at, now);
+  const outbound = usableTime(row.lead.last_outbound_at, now);
+  if (row.reply === "replied" && inbound) return { state: "our-turn", iso: inbound };
+  if (row.reply === "awaiting" && outbound) return { state: "waiting", iso: outbound };
+  return { state: "activity-only", iso: newest };
+}
+
+function heldWithin30Days(iso: string, now: Date): boolean {
+  return now.getTime() - Date.parse(iso) <= 30 * 86_400_000;
+}
+
+/** "Consult today · 12:30 PM" / "Consult · Nov 19" in the firm's zone, or null for an unusable time. */
+function consultWhen(iso: string, now: Date, timeZone: string): string | null {
+  const civil = civilDay(iso, timeZone);
+  const today = civilDay(now, timeZone);
+  if (!civil || !today) return null;
+  if (civil === today) {
+    const time = formatTime(iso, { tz: timeZone });
+    return time ? LEADS_TOUCH_CONSULT_TODAY(time.replace(" ", "\u00a0")) : null;
+  }
+  const day = formatDay(iso, { tz: timeZone, now });
+  return day ? LEADS_TOUCH_CONSULT_LATER(day.replace(" ", "\u00a0")) : null;
+}
+
+export function touchStampFor(row: IntakeRow, opts: { now: Date; timeZone?: string }): TouchStamp {
+  const { state, iso } = shownTouch(row, opts.now);
+  if (state === "consult" && iso) {
+    const zone = opts.timeZone ?? DEFAULT_ZONE;
+    const when = consultWhen(iso, opts.now, zone);
+    if (when) return { text: when, waitingOnUs: false, state, title: LEADS_TOUCH_CONSULT_TITLE };
+  }
+  if (state === "consult") return touchStampFor({ ...row, consultAt: undefined }, opts);
+  const day = sheetDay(iso, opts.now, opts.timeZone);
+  if (state === "consult-held" && day) return { text: LEADS_TOUCH_CONSULT_HELD(day), waitingOnUs: true, state, title: LEADS_TOUCH_CONSULT_HELD_TITLE };
+  if (state === "consult-held") return touchStampFor({ ...row, pastConsultAt: undefined }, opts);
+  if (state === "none" || !day) return { text: LEADS_TOUCH_NO_CONTACT, waitingOnUs: false, state: "none", title: LEADS_TOUCH_NONE_TITLE };
+  if (state === "our-turn") return { text: LEADS_TOUCH_OUR_TURN(day), waitingOnUs: true, state, title: LEADS_TOUCH_OUR_TURN_TITLE };
+  if (state === "waiting") return { text: LEADS_TOUCH_WAITING_ON_THEM(day), waitingOnUs: false, state, title: LEADS_TOUCH_WAITING_TITLE };
+  return { text: LEADS_TOUCH_ACTIVITY_ONLY(day), waitingOnUs: false, state, title: LEADS_TOUCH_ACTIVITY_ONLY_TITLE };
 }
 
 /** Days since a timestamp, or null when there isn't one / it doesn't parse. */
@@ -216,6 +307,8 @@ export type NextStep = {
   text: string;
   /** Render in NEXT_HOT: this row is past its stage's aging window, or unanswered. */
   urgent: boolean;
+  /** "No activity yet" and "Note couldn't load": drawn muted, because they say nothing happened (or that we could not look). */
+  muted: boolean;
 };
 
 /**
@@ -226,22 +319,31 @@ export type NextStep = {
  * anything a reader could mistake for legal advice. If nobody has written
  * anything and nothing has happened, it says so.
  */
-export function nextStepFor(row: IntakeRow, now: Date): NextStep {
+export function nextStepFor(row: IntakeRow, now: Date, opts: { notesUnavailable?: boolean; timeZone?: string } = {}): NextStep {
   const waited = daysSince(row.lastTouchAt, now);
   const urgent =
     row.stale || (row.reply === "replied" && waited != null && waited >= UNANSWERED_URGENT_DAYS);
 
   const note = row.latestNote?.trim();
-  if (note) return { text: note, urgent };
+  if (note) return { text: note, urgent, muted: false };
 
-  const since = touchDate(row.lastTouchAt);
-  if (row.reply === "replied" && since) {
-    return { text: `Waiting on our reply since ${since}`, urgent };
+  const held = shownTouch(row, now);
+  if (held.state === "consult-held") {
+    const day = sheetDay(held.iso, now, opts.timeZone);
+    if (day) return { text: `Consult held ${day}, nothing sent since`, urgent, muted: false };
   }
-  if (row.reply === "awaiting" && since) {
-    return { text: `Waiting on them since ${since}`, urgent };
+
+  // Dated like the Last contact cell: their last email or call for "our reply", ours for "them", in the Sheet's words.
+  const inbound = sheetDay(row.lead.last_inbound_at, now, opts.timeZone);
+  const outbound = sheetDay(row.lead.last_outbound_at, now, opts.timeZone);
+  if (row.reply === "replied" && inbound) {
+    return { text: `Waiting on our reply since ${inbound}`, urgent, muted: false };
   }
-  return { text: "No activity yet", urgent };
+  if (row.reply === "awaiting" && outbound) {
+    return { text: `Waiting on them since ${outbound}`, urgent, muted: false };
+  }
+  // A failed notes read is never "no activity": the row says it could not look.
+  return { text: opts.notesUnavailable ? LEADS_NOTE_UNAVAILABLE : LEADS_NO_ACTIVITY_YET, urgent, muted: true };
 }
 
 export type TopBarCounts = {
@@ -264,22 +366,6 @@ export function topBarCounts(rows: IntakeRow[]): TopBarCounts {
     needFirstReply: rows.filter((row) => row.reply === "replied").length,
     unassigned: rows.filter((row) => !row.lead.assigned_to).length,
   };
-}
-
-/**
- * The Leads page's sub-line: the former status strip folded into one short sentence, then one short
- * hint for the current view. `board` and `group` are the view state's own fields.
- */
-export const LEADS_VIEW_HINT = {
-  table: "Newest activity first.",
-  stage: "Drag a card to move it, or use the stage menu on the card.",
-  owner: "Leads with no owner are in the first column.",
-} as const;
-
-export function leadsSubline(counts: TopBarCounts, view: { board: boolean; group: "stage" | "owner" }): string {
-  const hint = view.board ? LEADS_VIEW_HINT[view.group] : LEADS_VIEW_HINT.table;
-  const total = `${counts.inIntake} ${counts.inIntake === 1 ? "lead" : "leads"}`;
-  return `${total} · ${counts.needFirstReply} need a first reply · ${counts.unassigned} unassigned. ${hint}`;
 }
 
 /** The counts as the one mono line the top bar renders. */

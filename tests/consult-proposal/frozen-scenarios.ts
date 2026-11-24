@@ -3,7 +3,7 @@ import type { ConsultProposalDraft, ConsultTranscriptTurn } from "@/lib/consult-
 import type { ProposalPricing } from "@/lib/proposals/types";
 import { standardProposalPricing } from "@/lib/proposals/types";
 import { fakeLlm } from "../agents/helpers";
-import { draftInput, meetingSource, SEVETRI_TURNS, sevetriOutput } from "./fixture";
+import { draftInput, meetingSource, CALLUM_TURNS, callumOutput } from "./fixture";
 
 /**
  * Scenarios whose output was captured from the pre-Sprint-5 drafter (commit 81cb513) into `frozen/pre-sprint.json`.
@@ -23,7 +23,7 @@ const MELVIN: ConsultTranscriptTurn[] = [
 ];
 
 function melvinOutput(over: Partial<ConsultProposalExtract> = {}): ConsultProposalExtract {
-  const base = sevetriOutput();
+  const base = callumOutput();
   return {
     ...base,
     brands: [
@@ -50,12 +50,12 @@ const melvinLead = { id: "lead-melvin", firstName: "Melvin", lastName: "Larry", 
 export { melvinOutput, MELVIN, melvinLead };
 
 export const SCENARIOS: Record<string, () => Promise<ConsultProposalDraft>> = {
-  sevetri_default: () => draftProposalFromConsult(draftInput(fakeLlm(sevetriOutput()).llm)),
-  sevetri_price_override: () => {
-    const out = sevetriOutput();
-    out.price_changes = [{ brand: "Prosperall", amount_usd: 4000, quote: "I can do Prosperall for $4,000 instead" }];
+  callum_default: () => draftProposalFromConsult(draftInput(fakeLlm(callumOutput()).llm)),
+  callum_price_override: () => {
+    const out = callumOutput();
+    out.price_changes = [{ brand: "Larkmoor", amount_usd: 4000, quote: "I can do Larkmoor for $4,000 instead" }];
     return draftProposalFromConsult(
-      draftInput(fakeLlm(out).llm, { source: meetingSource([...SEVETRI_TURNS, { speaker: "Rebecca", text: "I can do Prosperall for $4,000 instead." }]) }),
+      draftInput(fakeLlm(out).llm, { source: meetingSource([...CALLUM_TURNS, { speaker: "Rebecca", text: "I can do Larkmoor for $4,000 instead." }]) }),
     );
   },
   melvin_list_credit_second_mark: () =>

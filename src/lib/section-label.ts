@@ -4,7 +4,7 @@ import { NAV, REPORTS, isReportKey } from "@/lib/nav";
 export const FALLBACK_SECTION_LABEL = "Workspace";
 
 /**
- * The mono section name beside the wordmark, read off the current route.
+ * The section name beside the wordmark, read off the current route.
  * Sections that own extra prefixes (a lead's page belongs to Intake) are found
  * through `NAV[].also`; unbuilt sections and unknown paths get the neutral label.
  */

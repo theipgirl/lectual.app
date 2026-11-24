@@ -9,6 +9,8 @@ import {
 import type { QuoteStatus } from "./status";
 import type { QuoteEventType } from "./types";
 import { FIRM_TIME_ZONE } from "./firm-time";
+import { formatDay, formatDayTime } from "@/lib/ui/dates";
+import type { PillTone } from "@/lib/ui/tones";
 
 /**
  * Display vocabulary for the quote surfaces. Pure, so the builder's client
@@ -68,16 +70,22 @@ export function chargeAtOptionsFor(kind: string): QuoteChargeAt[] {
  */
 const STATUS_TONE: Record<QuoteStatus, string> = {
   draft: "lx-pill-mute",
-  sent: "lx-pill-ox",
+  sent: "lx-pill-ok",
   accepted: "lx-pill-ok",
   declined: "lx-pill-risk",
-  expired: "lx-pill-warn",
+  expired: "lx-pill-risk",
   withdrawn: "lx-pill-mute",
 };
 
 /** An unrecognised status gets the neutral tone — never a guess. */
 export function quoteStatusTone(status: string): string {
   return (STATUS_TONE as Record<string, string>)[status] ?? "lx-pill-mute";
+}
+
+/** The same tone as a `Pill` prop ("ok", "risk", ...), from the one table above. */
+export function quotePillTone(status: string): PillTone {
+  const m = /lx-pill-(mute|ok|warn|risk|ox)\b/.exec(quoteStatusTone(status));
+  return (m?.[1] as PillTone | undefined) ?? "mute";
 }
 
 export const EVENT_LABEL: Record<QuoteEventType, string> = {
@@ -155,7 +163,7 @@ export function formatShortFirmDate(value: string | null | undefined, tz: string
   if (!value) return "";
   const ms = Date.parse(value.replace(/^(\d{4}-\d{2}-\d{2}) /, "$1T").replace(/([+-]\d{2})$/, "$1:00"));
   if (Number.isNaN(ms)) return "";
-  return new Intl.DateTimeFormat("en-US", { timeZone: tz, month: "short", day: "numeric" }).format(new Date(ms));
+  return formatDay(new Date(ms), { tz }) ?? "";
 }
 
 /** "Sep 10, 4:02 PM" in the firm's zone — the activity log's time column. */
@@ -163,13 +171,7 @@ export function formatFirmStamp(value: string | null | undefined, tz: string = F
   if (!value) return "";
   const ms = Date.parse(value);
   if (Number.isNaN(ms)) return value;
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: tz,
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(ms));
+  return formatDayTime(new Date(ms), { tz }) ?? value;
 }
 
 /** "7 days" / "1 day" / "today" / "passed" — the expiry countdown's words. */

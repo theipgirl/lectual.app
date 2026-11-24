@@ -46,10 +46,10 @@ const html = (over: Partial<ApprovalCardProps> = {}) => renderToStaticMarkup(<Ap
 const buttons = (h: string) => [...h.replace(/<small>[^<]*<\/small>/g, "").matchAll(/<(?:button|a)[^>]*>([^<]*)<\/(?:button|a)>/g)].map((m) => m[1].trim()).filter(Boolean).filter((t) => !/^[‹›]$/.test(t));
 
 describe("ApprovalCard", () => {
-  it("draws the anatomy and the main row Reject · Later · Edit · Hand off · Yes", () => {
+  it("draws the anatomy and the main row Reject · Done · Later · Edit · Hand off · Yes", () => {
     const h = html();
     for (const t of ["Lectual · Post-consult", "Needs your yes · 2 min", "To ana@example.com.", "Hi Ana, thanks for the call.", "Check the class list", "2 / 6"]) expect(h).toContain(t);
-    expect(buttons(h).slice(0, 5)).toEqual(["Reject", "Later", "Edit", "Hand off", "Yes"]);
+    expect(buttons(h).slice(0, 6)).toEqual(["Reject", "Done", "Later", "Edit", "Hand off", "Yes"]);
     // Back and Skip are small arrows with the keys' hooks, not main buttons.
     expect(h).toMatch(/data-deck-prev/);
     expect(h).toMatch(/data-deck-next/);
@@ -113,16 +113,33 @@ describe("DeckFrame", () => {
     const h = frame();
     expect(h).toContain("Today&#x27;s deal · 7:00 AM");
     expect(h).toContain("Needs you");
-    expect(h).toContain("Your deal");
+    expect(h).toContain('<h1 class="lx-h1 dk-h1">Approvals</h1>'); // the deck page title is the section name (item 25), was "Your deal"
     for (const t of [">Cards<", ">List<", ">Board<"]) expect(h).toContain(t);
     expect(h).toMatch(/aria-current="true"[\s\S]*?First</);
     expect(h).toMatch(/Decided[\s\S]*Done one/);
     expect(h).toContain("3 more at 2:00 PM");
     expect(h).toContain(">Deal them now<");
-    expect(h).not.toMatch(/See all/i);
+    // Changed on purpose: the side column now carries a "See all" link on its Decided card (named for its list).
+    expect(h).toContain('aria-label="See all decided today"');
   });
 
   it("no later arrivals, no footer", () => {
     expect(frame({ laterArrivals: 0 })).not.toContain("Deal them now");
+  });
+});
+
+describe("the after-approve line claims a mailbox only when the approve result returned a draft", () => {
+  const ok = (draft: unknown, message = "Approved.") => html({ initial: { result: { ok: true, message, draft } as never } });
+  it("no draft: no Outlook or Gmail claim", () => {
+    expect(ok(null, "Approved. Nothing was sent.")).not.toMatch(/Draft is in (Outlook|Gmail)/);
+  });
+  it("a draft with no provider says no draft was made", () => {
+    const h = ok({ provider: null, webLink: null, draftId: null, canSend: false, sendNote: null });
+    expect(h).not.toMatch(/Draft is in (Outlook|Gmail)/);
+    expect(h).toContain("No draft was made");
+  });
+  it("a Microsoft draft says Outlook, a Google draft says Gmail", () => {
+    expect(ok({ provider: "microsoft", webLink: null, draftId: null, canSend: false, sendNote: null })).toContain("Draft is in Outlook");
+    expect(ok({ provider: "google", webLink: null, draftId: null, canSend: false, sendNote: null })).toContain("Draft is in Gmail");
   });
 });

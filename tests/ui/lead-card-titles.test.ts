@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { describeActivity } from "@/components/leads/describe";
 import { AGENT_DEFS } from "@/lib/agents/types";
@@ -28,7 +29,10 @@ describe("lead-page card titles are for people", () => {
   });
 
   it("anchors and tour hooks are untouched", () => {
-    for (const hook of ['id="prep-consult"', 'data-tour="lead-prep"', 'data-tour="lead-timeline"', 'data-tour="lead-head"']) expect(page, hook).toContain(hook);
+    // The prep-consult anchor and its tour hook moved with the Consult prep card (automatic consult prep) into its component.
+    const prepCard = readFileSync(path.join(process.cwd(), "src/components/leads/ConsultPrepCard.tsx"), "utf8");
+    for (const hook of ['id="prep-consult"', 'data-tour="lead-prep"']) expect(prepCard, hook).toContain(hook);
+    for (const hook of ['data-tour="lead-timeline"', 'tour="lead-head"']) expect(page, hook).toContain(hook);
   });
 });
 

@@ -13,8 +13,9 @@ type Session = { kind: "ok"; role: string | null } | { kind: "signed-out"; redir
 async function renderPage(session: Session, state: SetupState = ALL_DONE) {
   vi.resetModules();
   const loadSetupState = vi.fn(async () => state);
-  vi.doMock("@/lib/firm/session", () => ({ resolveFirmSession: vi.fn(async () => session) }));
+  vi.doMock("@/lib/firm/session", () => ({ resolveFirmSession: vi.fn(async () => ({ ...session, user: { id: "u-viewer" }, org: { modules: ["mailbox"] } })) }));
   vi.doMock("@/lib/setup/load", () => ({ loadSetupState }));
+  vi.doMock("@/lib/setup/first-users-load", () => ({ loadFirstUsers: vi.fn(async () => ({ status: "ok", rows: [] })) }));
   const { default: Page } = await import("../../src/app/dashboard/settings/setup/page");
   const html = renderToStaticMarkup(await Page());
   return { html: text(html), loadSetupState };
@@ -37,7 +38,7 @@ function items(html: string) {
 describe("the role gate", () => {
   it.each([...ADMIN_TIER])("%s sees the header and the ten items", async (role) => {
     const { html } = await renderPage({ kind: "ok", role });
-    expect(html).toContain("Get your firm set up");
+    expect(html).toContain(">Setup</h1>");
     expect(html).toContain(">Setup<");
     expect(items(html)).toHaveLength(10);
   });

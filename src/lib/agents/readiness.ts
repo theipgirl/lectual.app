@@ -44,8 +44,12 @@ const NEEDS_DATABASE_UPDATE: ReadonlySet<AgentId> = new Set<AgentId>(["morning-b
 export const agentNeedsDatabaseUpdate = (agent: AgentId): boolean => NEEDS_DATABASE_UPDATE.has(agent);
 /** The state's name, shared by the readiness label and the "Run now" reason so the two cannot drift apart. */
 export const NOT_AVAILABLE_UNTIL_UPDATE = "Not switched on yet";
-/** The agents that read connected mailboxes or the Outlook calendar, and so need the Mailboxes module. */
-const NEEDS_MAILBOX_MODULE: ReadonlySet<AgentId> = new Set<AgentId>(["email-intel", "stage-keeper", "consult-prep", "inbox-summary"]);
+/**
+ * The agents that read connected mailboxes or the Outlook calendar, and so need the Mailboxes module. Consult prep is NOT one:
+ * a consult from the Lawmatics sync and a lead in the consult stage need no mailbox; only an Outlook consult does, and without
+ * the feature it simply reads none.
+ */
+const NEEDS_MAILBOX_MODULE: ReadonlySet<AgentId> = new Set<AgentId>(["email-intel", "stage-keeper", "inbox-summary"]);
 
 export type ReadinessTone = "ok" | "warn" | "mute";
 
@@ -124,24 +128,6 @@ export function agentReadiness(input: AgentReadinessInput): AgentReadiness {
         label: "On · waiting for a mailbox",
         tone: "warn",
         reason: "No active mailbox is connected that this page can see, and no Outlook consults are readable, so there is no mail or consult to place a lead from.",
-      };
-    }
-  }
-
-  if (agent === "consult-prep") {
-    const calendar = input.calendar ?? "none";
-    if (calendar === "none") {
-      return {
-        label: "On · waiting for calendar events",
-        tone: "warn",
-        reason: "No Outlook consults are readable yet, so there is nothing to prepare. Connect a Microsoft mailbox and let the calendar sync.",
-      };
-    }
-    if (calendar === "unavailable") {
-      return {
-        label: "On · couldn't check the calendar",
-        tone: "warn",
-        reason: "The Outlook calendar couldn't be read just now, so it isn't known whether this assistant has any consults to prepare.",
       };
     }
   }

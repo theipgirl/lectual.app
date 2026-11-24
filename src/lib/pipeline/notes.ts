@@ -69,6 +69,7 @@ export async function addLeadNote(leadId: string, input: AddLeadNoteInput): Prom
   // read the same. Done here, not in each action, so every caller gets it, as
   // addMatterNote does for matters.
   const { data: visible, error: visibleError } = await supabase
+    // live-guard: checks the page's lead exists before a note; a note on a merged lead is history read on the keeper
     .from("crm_lead")
     .select("id")
     .eq("id", leadId)
@@ -150,6 +151,7 @@ export async function addLeadNote(leadId: string, input: AddLeadNoteInput): Prom
     let leadName: string | null = null;
     try {
       const { data: lead } = await supabase
+        // live-guard: checks the page's lead exists before a note; a note on a merged lead is history read on the keeper
         .from("crm_lead")
         .select("first_name, last_name, email")
         .eq("id", leadId)

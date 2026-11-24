@@ -24,7 +24,7 @@ const STREET = "100 Example Street";
 
 function tablesFor(snapshot: AcceptedSnapshot, extra: Record<string, Row[]> = {}): Record<string, Row[]> {
   return {
-    client_proposal: [{ id: PID, org_id: ORG, family_id: "f1", status: "accepted", client_name: "Sevetri Wilson", client_email: "sevetri@example.com", lead_id: null, matter_id: "m1", accepted_snapshot: snapshot }],
+    client_proposal: [{ id: PID, org_id: ORG, family_id: "f1", status: "accepted", client_name: "Callum Ferreira", client_email: "callum@example.com", lead_id: null, matter_id: "m1", accepted_snapshot: snapshot }],
     client_proposal_setting: [{ org_id: ORG, approver_user_ids: ["u1"] }],
     crm_org_member: [{ org_id: ORG, user_id: "u1", role: "owner" }],
     crm_matter: [{ id: "m1", org_id: ORG, lawmatics_id: "LM-77" }],
@@ -208,7 +208,7 @@ describe("the address step after a signed acceptance", () => {
     expect(f.addressPosts()).toHaveLength(0);
     expect(events(none.tables)[0].payload).toMatchObject({ outcome: "blocked", reason: STEP_TEXT.addressNoMatter });
 
-    const lead = (id: string) => ({ id, org_id: ORG, email: "sevetri@example.com", lawmatics_id: id });
+    const lead = (id: string) => ({ id, org_id: ORG, email: "callum@example.com", lawmatics_id: id });
     const many = fakeFollowupDb(tablesFor(snapshot, { crm_matter: [], client_proposal: [{ ...tablesFor(snapshot).client_proposal[0], matter_id: null }], crm_lead: [lead("L1"), lead("L2")] }));
     await run(many.db, fakes());
     expect(events(many.tables)[0].payload).toMatchObject({ outcome: "blocked", reason: STEP_TEXT.addressManyMatters });

@@ -39,6 +39,7 @@ type Props = {
   /** The firm's module list, or null when it could not be read (then no gated flow is offered). */
   modules: string[] | null;
   aiConfigured: boolean;
+  outlookConnectable?: boolean;
 };
 
 function sessionStore(): Storage | null {
@@ -55,10 +56,10 @@ function sessionStore(): Storage | null {
  * next page resumes it). It reuses the first-sign-in tour's popover, spotlight and
  * focus handling and writes nothing but the finished-flow flag, optimistically.
  */
-export function GettingStartedRunner({ role, modules, aiConfigured }: Props) {
+export function GettingStartedRunner({ role, modules, aiConfigured, outlookConnectable = false }: Props) {
   const router = useRouter();
   const pathname = usePathname();
-  const flows = useMemo(() => visibleFlows({ role, modules, aiConfigured }), [role, modules, aiConfigured]);
+  const flows = useMemo(() => visibleFlows({ role, modules, aiConfigured, outlookConnectable }), [role, modules, aiConfigured, outlookConnectable]);
   const [flow, setFlow] = useState<HubFlow | null>(null);
   const [index, setIndex] = useState(0);
   const [records, setRecords] = useState<HubRecords>(NO_RECORDS);

@@ -7,12 +7,12 @@ import { NameCard, NameRowsProvider, type NameValues } from "@/components/propos
 import { parseName } from "@/lib/proposal-editor/form";
 import { brandForm } from "@/lib/proposal-editor/save-draft";
 import { DEFAULT_CLIENT_ENTRY_PROMPT } from "@/lib/proposals/client-classes";
-import { sevetri } from "../proposals/fixture";
+import { callum } from "../proposals/fixture";
 
 /** The page builds NameValues from the stored brand name exactly like this (proposals/[id]/page.tsx). */
 const VALUE: NameValues = {
   id: "p",
-  name: "Prosperall",
+  name: "Larkmoor",
   what: "",
   note: "",
   overrideBase: "",
@@ -66,7 +66,7 @@ describe("editor: Let the client describe this / Let the client add classes", ()
   });
 
   it("round-trips: what the card posts parses back to the same open class and client_add", () => {
-    const content = sevetri();
+    const content = callum();
     const form = postedForm(render());
     form.set("mark.0.kind", "word"); // a <select>, which the input scan above does not read
     const r = parseName(form, content, () => "x");
@@ -85,7 +85,7 @@ describe("editor: Let the client describe this / Let the client add classes", ()
     expect(html).toContain("Blank is the default: up to 5");
     const form = postedForm(html);
     form.set("mark.0.kind", "word"); // a <select>, which the input scan above does not read
-    const r = parseName(form, sevetri(), () => "x");
+    const r = parseName(form, callum(), () => "x");
     if (!r.ok) throw new Error(r.error);
     expect("client_add" in r.value).toBe(false);
     expect(r.value.classes).toEqual([{ id: "p-c1", label: "Software", preselected: true }]);

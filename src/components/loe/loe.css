@@ -3,22 +3,22 @@
 .loe-kind { padding: 16px 18px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .loe-kind-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .loe-versions { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.loe-version { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 0; border-top: 1px solid var(--line-2); font-size: 14px; color: var(--body); }
+.loe-version { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 0; border-top: 1px solid var(--line-2); font-size: var(--fs-2); color: var(--body); }
 .loe-version:first-child { border-top: 0; }
 .loe-version-name { color: var(--ink); font-weight: 500; }
-.loe-version-when { color: var(--muted); font-size: 13px; }
+.loe-version-when { color: var(--muted); font-size: var(--fs-1); }
 .loe-form { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .loe-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.loe-body { font-family: var(--mono); font-size: 14px; line-height: 1.55; min-height: 280px; width: 100%; resize: vertical; box-sizing: border-box; }
+.loe-body { font-size: var(--fs-2); line-height: 1.55; min-height: 280px; width: 100%; resize: vertical; box-sizing: border-box; }
 .loe-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .loe-fields { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
-.loe-fields code { font-family: var(--mono); font-size: 12.5px; background: var(--well); border: 1px solid var(--line-2); border-radius: 6px; padding: 2px 6px; color: var(--ink); }
-.loe-readonly { margin: 0; padding: 14px 16px; background: var(--well); border: 1px solid var(--line-2); border-radius: 10px; font-family: var(--mono); font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--body); }
+.loe-fields code { font-size: var(--fs-1); background: var(--well); border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 2px 6px; color: var(--ink); }
+.loe-readonly { margin: 0; padding: 14px 16px; background: var(--well); border: 1px solid var(--line-2); border-radius: var(--r-md); font-size: var(--fs-2); line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--body); }
 .loe-preview { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-top: 12px; border-top: 1px solid var(--line-2); }
-.loe-preview-paper { max-width: 68ch; display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); font-size: 15px; line-height: 1.6; color: var(--ink); overflow-wrap: anywhere; }
+.loe-preview-paper { max-width: 68ch; display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--shadow); font-size: var(--fs-3); line-height: 1.6; color: var(--ink); overflow-wrap: anywhere; }
 .loe-preview-paper p { margin: 0; white-space: pre-line; }
 .loe-preview-paper strong { font-weight: 600; }
-.loe-problems { margin: 0; padding: 10px 14px 10px 28px; border: 1px solid var(--line); border-left: 3px solid var(--wine); border-radius: 8px; background: var(--card); color: var(--wine); font-size: 13.5px; line-height: 1.5; }
+.loe-problems { margin: 0; padding: 10px 14px 10px 28px; border: 1px solid var(--line); border-left: 3px solid var(--wine); border-radius: var(--r-md); background: var(--card); color: var(--wine); font-size: var(--fs-2); line-height: 1.5; }
 .loe-approve-note { margin: 0; }
 @media (max-width: 640px) {
   .loe-kind { padding: 14px; }
@@ -26,3 +26,5 @@
   .loe-body { min-height: 220px; }
 }
 .loe-preview-logo { display: block; margin: 0 auto 6px; width: 100%; max-width: 240px; height: auto; }
+.loe-address { font-style: normal; white-space: pre-line; overflow-wrap: anywhere; }
+.loe-page p, .loe-kind h3 { margin: 0; }

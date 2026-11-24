@@ -1,0 +1,117 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+/** Each cron route: a tick outside its New York hour answers 200 { skipped } and touches nothing; a tick inside works. */
+const admin = vi.fn(() => ({}));
+const runLawmaticsDailySync = vi.fn(async (o: { mode: string }) => ({
+  mode: o.mode,
+  connections: 0,
+  failedFirms: 0,
+  reauthNeeded: 0,
+  outOfTime: 0,
+  failures: {},
+  hired: { created: 0, linked: 0, skipped: 0, leadsMoved: 0, leadMovesFailed: 0 },
+  prospects: {},
+  consults: {},
+}));
+const runMeetingImports = vi.fn(async () => ({ connections: 0, ok: 0, failed: 0, inserted: 0 }));
+const runMailboxSync = vi.fn(async () => ({ orgs: 0, connections: 0, ok: 0, failed: 0, outcomes: [] }));
+const runAfterSync = vi.fn(async () => undefined);
+const runAllAgents = vi.fn(async () => []);
+const deps = vi.fn(() => ({}));
+const rootKey = vi.fn(() => "root");
+
+vi.mock("@/lib/env", () => ({ env: { CRON_SECRET: "s3cret" } }));
+vi.mock("@/lib/db/admin", () => ({ getAdminClient: admin }));
+vi.mock("@/lib/lawmatics/daily-sync", () => ({ runLawmaticsDailySync, WALL_BUDGET_MS: 270_000 }));
+vi.mock("@/lib/meetings/import", () => ({ runMeetingImports }));
+vi.mock("@/lib/meetings/config", () => ({ zoomClientCredentials: () => null }));
+vi.mock("@/lib/mailbox/config", () => ({ rootKeyOrNull: rootKey, providerCredentials: {} }));
+vi.mock("@/lib/mailbox/sync", () => ({ runMailboxSync }));
+vi.mock("@/lib/agents/stage-keeper/after-sync", () => ({ runStageKeeperAfterSync: runAfterSync }));
+vi.mock("@/lib/agents/deps", () => ({ productionRunnerDeps: deps }));
+vi.mock("@/lib/agents/runner", () => ({ runAllAgents }));
+vi.mock("@/lib/ai/claude", () => ({ aiConfigured: () => true }));
+
+const ROUTES = [
+  { job: "lawmatics-matters", intended: "2026-07-15T08:08:00Z", work: runLawmaticsDailySync },
+  { job: "meetings-import", intended: "2026-07-15T08:38:00Z", work: runMeetingImports },
+  { job: "mailbox-sync", intended: "2026-07-15T08:53:00Z", work: runMailboxSync },
+  { job: "agents", intended: "2026-07-15T09:23:00Z", work: runAllAgents },
+] as const;
+
+const LOAD: Record<string, () => Promise<{ GET: (r: never) => Promise<Response> }>> = {
+  "lawmatics-matters": () => import("@/app/api/cron/lawmatics-matters/route") as never,
+  "meetings-import": () => import("@/app/api/cron/meetings-import/route") as never,
+  "mailbox-sync": () => import("@/app/api/cron/mailbox-sync/route") as never,
+  agents: () => import("@/app/api/cron/agents/route") as never,
+};
+
+const call = async (job: string) => {
+  const { GET } = await LOAD[job]();
+  return GET(new Request(`https://x/api/cron/${job}/`, { headers: { authorization: "Bearer s3cret" } }) as never);
+};
+
+describe("cron routes and the New York hour guard", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+  });
+  afterEach(() => vi.useRealTimers());
+
+  for (const r of ROUTES) {
+    it(`${r.job}: a tick in the wrong hour is 200 { skipped } and calls no client factory or worker`, async () => {
+      // 2026-07-15 is EDT: the winter entry's hour (one UTC hour later) is the wrong one.
+      vi.setSystemTime(new Date(Math.floor(new Date(r.intended).getTime() / 3_600_000) * 3_600_000 + 3_600_000 + 3_599_000));
+      const res = await call(r.job);
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ skipped: "not this hour" });
+      for (const fn of [admin, deps, rootKey, runLawmaticsDailySync, runMeetingImports, runMailboxSync, runAfterSync, runAllAgents]) expect(fn).not.toHaveBeenCalled();
+    });
+
+    it(`${r.job}: a tick in its hour (even at :59) goes on to work`, async () => {
+      // the last second of the intended UTC hour (the latest a jittered tick can land)
+      vi.setSystemTime(new Date(Math.floor(new Date(r.intended).getTime() / 3_600_000) * 3_600_000 + 3_599_000));
+      const res = await call(r.job);
+      expect(res.status).toBe(200);
+      expect(await res.json()).not.toEqual({ skipped: "not this hour" });
+      expect(r.work).toHaveBeenCalled();
+    });
+
+    it(`${r.job}: auth still comes first (wrong secret in the wrong hour is 401, not a skip)`, async () => {
+      vi.setSystemTime(new Date("2026-07-15T12:00:00Z"));
+      const { GET } = await LOAD[r.job]();
+      const res = await GET(new Request("https://x/", { headers: { authorization: "Bearer nope" } }) as never);
+      expect(res.status).toBe(401);
+    });
+  }
+
+  describe("lawmatics-matters: the hour decides the mode", () => {
+    const at = async (iso: string) => {
+      vi.setSystemTime(new Date(iso));
+      return call("lawmatics-matters");
+    };
+    it("the 4 AM tick (winter `8 9`) is the full run: hired, prospects, consults", async () => {
+      await at("2026-12-01T09:08:00Z");
+      expect(runLawmaticsDailySync).toHaveBeenCalledWith(expect.objectContaining({ mode: "full" }));
+    });
+    it("the 12 PM and 4 PM ticks (summer `8 16`, `8 20`) are daytime runs: no hired step", async () => {
+      await at("2026-07-15T16:08:00Z");
+      expect(runLawmaticsDailySync).toHaveBeenLastCalledWith(expect.objectContaining({ mode: "daytime" }));
+      await at("2026-07-15T20:59:00Z");
+      expect(runLawmaticsDailySync).toHaveBeenLastCalledWith(expect.objectContaining({ mode: "daytime" }));
+    });
+    it("any other hour is 200 { skipped } with nothing read", async () => {
+      const res = await at("2026-07-15T14:08:00Z"); // 10 AM EDT
+      expect(await res.json()).toEqual({ skipped: "not this hour" });
+      expect(runLawmaticsDailySync).not.toHaveBeenCalled();
+      expect(admin).not.toHaveBeenCalled();
+    });
+    it("without CRON_SECRET it is 401", async () => {
+      vi.setSystemTime(new Date("2026-12-01T09:08:00Z"));
+      const { GET } = await LOAD["lawmatics-matters"]();
+      const res = await GET(new Request("https://x/", {}) as never);
+      expect(res.status).toBe(401);
+      expect(runLawmaticsDailySync).not.toHaveBeenCalled();
+    });
+  });
+});

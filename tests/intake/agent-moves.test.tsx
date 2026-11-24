@@ -106,7 +106,7 @@ function render(params: IntakeSearchParams = {}, props: Props = {}) {
       intakeStages={intakeStages(STAGES)}
       members={MEMBERS}
       initialFilters={parseIntakeFilters(params)}
-      initialViewState={parseIntakeViewState(params)}
+      initialViewState={parseIntakeViewState({ view: "table", ...params })}
       time={null}
       now={NOW.toISOString()}
       agentMoves={"agentMoves" in props ? props.agentMoves : { status: "ok", truncated: false }}
@@ -156,15 +156,15 @@ describe("the chip", () => {
     expect(html.match(/intake-agent-chip/g)).toHaveLength(2);
   });
 
-  it("the board card says the same thing as its one-line reason (Sprint 29), with the evidence as the tooltip", () => {
+  it("the board card carries the small chip (item L: no separate one-line reason), with the evidence as the tooltip", () => {
     for (const params of [{ view: "board" }, { view: "board", group: "owner" }] as IntakeSearchParams[]) {
       const html = text(render(params));
       expect(html, JSON.stringify(params)).toContain("Moved automatically · LOE sent Oct 20");
-      expect(html).toContain("Moved automatically · consult booked Oct 17");
+      expect(html).toContain("Moved automatically · Consult booked Oct 17");
       expect(html).toContain('title="Evidence: LOE and invoice email sent Oct 20."');
-      // One line per moved lead, and the lead a person moved afterwards, and the one never moved, carry none.
-      expect(html.match(/data-why="agent"/g)).toHaveLength(2);
-      expect(html).not.toContain("intake-agent-chip");
+      // One chip per moved lead; the lead a person moved afterwards, and the one never moved, carry none. No reason line.
+      expect(html.match(/data-agent-move=/g)).toHaveLength(2);
+      expect(html).not.toContain("intake-why");
     }
   });
 
@@ -188,7 +188,7 @@ describe("the Agent moves filter", () => {
       expect(filtersToQueryString(filters)).toBe(`agent=${agent}`);
       expect(parseIntakeFilters(Object.fromEntries(new URLSearchParams(intakeQueryString(filters, parseIntakeViewState({})))))).toMatchObject({ agent });
     }
-    expect(intakeHref({ ...EMPTY_INTAKE_FILTERS, agent: "today" }, parseIntakeViewState({ view: "board" }))).toBe("/dashboard/intake/?agent=today&view=board");
+    expect(intakeHref({ ...EMPTY_INTAKE_FILTERS, agent: "today" }, parseIntakeViewState({ view: "table" }))).toBe("/dashboard/intake/?agent=today&view=table");
     expect(filtersToQueryString({ ...EMPTY_INTAKE_FILTERS, agent: null })).toBe("");
     expect(filtersToQueryString(EMPTY_INTAKE_FILTERS)).toBe("");
   });
@@ -245,7 +245,8 @@ describe("when the moves couldn't be read", () => {
   it("shows a one-line note, no chip and no filter control, and the list is never filtered to nobody", () => {
     for (const view of [{}, { view: "board" }] as IntakeSearchParams[]) {
       const html = text(render({ ...view, agent: "today" }, unavailable));
-      expect(html).toContain("Some details couldn't load (automatic moves). Refresh to try again.");
+      // (the render passes no time, so "time" is named too)
+      expect(html).toContain("Some details couldn't load (automatic moves, time). Refresh to try again.");
       expect(html).not.toContain("intake-agent-chip");
       expect(html).not.toContain('aria-label="Filter by automatic moves"');
       expect(names(html)).toEqual(["Today", "Older", "Nobody", "Overridden"]);
@@ -265,8 +266,8 @@ describe("when the moves couldn't be read", () => {
   });
 
   it("a read that hit its row cap says only the most recent moves are marked", () => {
-    expect(text(render({}, { agentMoves: { status: "ok", truncated: true } }))).toContain("Some details couldn't load (automatic moves). Refresh to try again.");
-    expect(text(render())).not.toContain("Some details couldn't load");
+    expect(text(render({}, { agentMoves: { status: "ok", truncated: true } }))).toContain("Some details couldn't load (automatic moves, time). Refresh to try again.");
+    expect(text(render())).not.toContain("Some details couldn't load (automatic");
   });
 });
 
@@ -274,8 +275,11 @@ describe("styles", () => {
   it("the chip uses the Intake tokens in intake.css, and the global stylesheet is not touched", () => {
     const css = readFileSync("src/app/dashboard/intake/intake.css", "utf8");
     const block = css.slice(css.indexOf(".intake-agent-chip"));
-    expect(block).toContain("var(--oxbg)");
-    expect(block).toContain("var(--ox)");
+    // Item L2: the assistants' own colour, never the oxblood tint of a person's pills.
+    const chip = block.slice(0, block.indexOf("}"));
+    expect(chip).toContain("var(--tint-ok)");
+    expect(chip).toContain("var(--ok)");
+    expect(chip).not.toContain("var(--tint-ox)");
     expect(readFileSync("src/app/globals.css", "utf8")).not.toContain("intake-agent-chip");
   });
 });

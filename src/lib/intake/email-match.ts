@@ -25,6 +25,7 @@
 import type { NoteEntry } from "@/lib/matters/tracker-import";
 import { initialsFor } from "./initials";
 import type { Party, ThreadMessage } from "./email-threads";
+import { isUsptoSender, USPTO_PARTY } from "@/lib/mailbox/firm-sender";
 
 export type { Party, ThreadMessage } from "./email-threads";
 
@@ -753,7 +754,9 @@ export type BuildEvidenceInput = {
  */
 export function buildEmailEvidence(input: BuildEvidenceInput): EmailEvidenceReport {
   const notes = input.notesByLeadId ?? new Map<string, readonly NoteEntry[]>();
-  const leadById = new Map(input.leads.map((l) => [l.id, l]));
+  // The FIRST row per id: a keeper can be listed again with a merged lead's old address (M5), after its own row.
+  const leadById = new Map<string, EvidenceLead>();
+  for (const l of input.leads) if (!leadById.has(l.id)) leadById.set(l.id, l);
   const matchedByLead = new Map<string, MatchedMessage[]>();
   const ambiguous: AmbiguousMessage[] = [];
   const unmatched: ThreadMessage[] = [];
@@ -889,6 +892,8 @@ export function activityPayloadForMessage(m: MatchedMessage): Record<string, unk
     basis: m.basis,
     confidence: m.confidence,
     sensitive: m.sensitive,
+    // USPTO mail is inbound but never the client's reply: readers keep it out of "whose turn".
+    ...(isUsptoSender(message.from.address) ? { party: USPTO_PARTY } : {}),
   };
 }
 

@@ -5,29 +5,42 @@
   gap: 16px;
 }
 
-.rc-scroll {
-  overflow-x: auto;
+.rc-panel {
+  padding: var(--pad-card);
+  display: grid;
+  gap: 12px;
 }
 
-.rc-tbl {
-  min-width: 1040px;
+.rc-details {
+  padding: 12px var(--pad-card);
 }
 
+.rc-person-main {
+  min-width: 220px;
+  flex: 1;
+}
+
+/* The wide comparison table scrolls inside its card (the shared sheet kit); the page never does. */
 .rc-tbl td {
-  white-space: normal;
   vertical-align: top;
   height: auto;
-  min-width: 120px;
+}
+
+@media (min-width: 641px) {
+  .rc-tbl td {
+    min-width: 120px;
+  }
+  .rc-tbl td.rc-name {
+    min-width: 170px;
+  }
+  .rc-tbl td.rc-actions {
+    min-width: 230px;
+  }
 }
 
 .rc-tbl td.rc-name {
-  min-width: 170px;
   color: var(--ink);
   font-weight: 500;
-}
-
-.rc-tbl td.rc-actions {
-  min-width: 230px;
 }
 
 .rc-cell {
@@ -37,15 +50,13 @@
 
 .rc-cell small {
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: var(--fs-1);
   line-height: 1.4;
 }
 
 .rc-state {
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
+  font-size: var(--fs-1);
+  font-weight: 500;
 }
 
 .rc-state-unavailable {
@@ -72,27 +83,19 @@
 }
 
 .rc-select {
-  height: 32px;
+  width: auto;
   max-width: 190px;
-  font: inherit;
-  font-size: 13.5px;
-  color: var(--ink);
-  background-color: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  padding-block: 0;
-  padding-left: 8px;
 }
 
 .rc-chosen {
   margin-top: 6px;
-  font-size: 13px;
+  font-size: var(--fs-1);
   color: var(--ok);
 }
 
 .rc-reasons {
   margin: 6px 0 0;
-  font-size: 12.5px;
+  font-size: var(--fs-1);
   color: var(--muted);
 }
 
@@ -114,7 +117,7 @@
   gap: 8px 18px;
   align-items: center;
   padding: 12px 16px;
-  font-size: 14px;
+  font-size: var(--fs-2);
   color: var(--body);
 }
 
@@ -151,7 +154,7 @@
   list-style: none;
   display: grid;
   gap: 6px;
-  font-size: 14.5px;
+  font-size: var(--fs-3);
   color: var(--body);
 }
 
@@ -169,7 +172,7 @@
   list-style: none;
   display: grid;
   gap: 3px;
-  font-size: 12.5px;
+  font-size: var(--fs-1);
   color: var(--body);
 }
 
@@ -180,12 +183,8 @@
 
 .rc-touch {
   margin-top: 6px;
-  font-size: 12.5px;
+  font-size: var(--fs-1);
   color: var(--ink);
-}
-
-.rc-warn {
-  color: var(--warn);
 }
 
 .rc-people {
@@ -209,4 +208,29 @@
 .rc-person:first-child {
   border-top: 0;
   padding-top: 0;
+}
+
+.rc-warn {
+  color: var(--warn);
+}
+
+@media (max-width: 640px) {
+  .rc-select {
+    width: 100%;
+    max-width: 100%;
+  }
+  .rc-person-main {
+    min-width: 0;
+  }
+  .rc-bar-group {
+    width: 100%;
+  }
+}
+
+@media (pointer: coarse), (max-width: 640px) {
+  .rc-reasons summary {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+  }
 }

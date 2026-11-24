@@ -1,9 +1,11 @@
 import { civilDaysBetween } from "@/lib/matters/calendar-rows";
 import { civilInZone } from "@/lib/today/outcomes";
+import { formatDay, formatTime } from "@/lib/ui/dates";
 import { deadlineKindLabel, deadlineNeedsReview } from "@/lib/matters/deadline-rules";
 import type { UpcomingDeadline } from "@/lib/matters";
 import type { ConsultItem } from "@/lib/calendar/consult-sources";
 import type { DeckSummary } from "@/lib/queue/deck-summary";
+import type { DealNudge } from "@/lib/deal/nudge";
 import {
   ownerCardsAbout,
   ownerCardsCount,
@@ -15,6 +17,7 @@ import {
   OWNER_CARDS_NONE_STATUS,
   OWNER_CARDS_NOT_CONNECTED,
   OWNER_CARDS_UNREACHABLE,
+  ownerDealReadyLine,
   OWNER_WEEK_DUE,
   OWNER_WEEK_LAST_DAY,
 } from "@/lib/ui/words";
@@ -52,13 +55,16 @@ export type CardsHero = {
   message: string | null;
   dealLine: string | null;
   canStart: boolean;
+  /** True only while the nudge says a deal is ready: `dealLine` then reads "Your 2:00 PM deal is ready. Next deal ..." and the dot goes in front. */
+  ready: boolean;
 };
 
-export function cardsHero(summary: DeckSummary): CardsHero {
+export function cardsHero(summary: DeckSummary, nudge?: DealNudge): CardsHero {
   const line = cardsLine(summary);
-  const none = { big: null, unit: "", cards: "", about: "", dealLine: null };
+  const none = { big: null, unit: "", cards: "", about: "", dealLine: null, ready: false };
   if (summary.status !== "ok") return { state: line.state, ...none, message: line.headline, canStart: false };
-  const dealLine = ownerDealLine(summary.dealLabel, summary.nextDealLabel, summary.laterArrivals);
+  const ready = !!(nudge && nudge.ready);
+  const dealLine = nudge && nudge.ready ? ownerDealReadyLine(nudge.label, summary.nextDealLabel, summary.laterArrivals) : ownerDealLine(summary.dealLabel, summary.nextDealLabel, summary.laterArrivals);
   if (summary.count === 0) return { state: "ok", ...none, message: line.headline, canStart: false };
   return {
     state: "ok",
@@ -69,6 +75,7 @@ export function cardsHero(summary: DeckSummary): CardsHero {
     message: null,
     dealLine,
     canStart: true,
+    ready,
   };
 }
 
@@ -90,9 +97,9 @@ export function dayTone(days: number): Tone {
   return days <= 5 ? "risk" : days <= 10 ? "warn" : "plain";
 }
 
-/** "Fri Nov 14" for a civil date. */
-export function weekdayDate(civil: string): string {
-  return new Intl.DateTimeFormat("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric" }).format(new Date(`${civil}T12:00:00Z`));
+/** "Fri, Nov 14" for a civil date (the year only when it is not this year), through the shared day formatter. */
+export function weekdayDate(civil: string, tz = "UTC", now?: Date): string {
+  return formatDay(civil, { tz, now, civil: true, weekday: "short" }) ?? civil;
 }
 
 export function deadlineChip(d: Pick<OwnerDeadline, "dueDate" | "overdueDays">, today: string): { text: string; tone: Tone } {
@@ -197,7 +204,7 @@ export function mondayOf(civil: string): string {
 }
 
 function clock(iso: string, tz: string): string {
-  return new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit" }).format(new Date(iso));
+  return formatTime(iso, { tz }) ?? "";
 }
 
 /**

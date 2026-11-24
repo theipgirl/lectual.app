@@ -173,6 +173,8 @@ read as settled) fixed in `payment-state.ts`; #4 (pre-signature "nothing is char
 package) fixed by answering from the firm's setup only (`firmTakesCardPayments`); #5 (5xx/429 as decline) kept
 fixed in `lawpay.ts`; #1 and #3 concern client line requests (0071/0073), which this app does not have.
 
+**lectual needs the same fix (Nov 23):** `src/lib/settings/members.ts` `removeMember` and `src/lib/settings/admin.ts` `setMemberRole` now require the caller's own OWNER `crm_org_member` row (`assertCallerIsOwnerMember`) before touching an owner row, checked before `revoke_member_sessions`; lectual's copies still trust the owner role claim alone.
+
 ## Ported from `lawmatics-mcp`
 
 Source commit: `73355ec`. Copy, don't import: lawmatics-mcp is a separate deployment.
@@ -180,3 +182,6 @@ Source commit: `73355ec`. Copy, don't import: lawmatics-mcp is a separate deploy
 | lectual.app | From lawmatics-mcp | Changes |
 |---|---|---|
 | `src/lib/inbox/triage.ts` | `src/triage.ts` | bucket order, labels and rule order unchanged. Three deliberate changes: (a) the firm's own domains come from its connected mailbox addresses (`firmDomainsOf`), not the `FIRM_DOMAINS` environment variable; (b) `assignTo` is a role label (Attorney, Intake, Filings, Partnerships, Discovery calls), not a named RPB teammate, because the agent runs for every firm and one firm's staff names must not appear in another's digest; (c) the six sensitive phrases are the app's own `SENSITIVE_PHRASES` (`src/lib/intake/email-match.ts`), not a second copy, so the reason quotes the first matching phrase in this order. Reasons and labels also drop the source's em dashes. |
+| `src/lib/consult-prep/lawmatics-intake.ts` | lawmatics-mcp `src/consult-brief/facts.ts` (commit e738c24's tree, 2026-11) | the tolerant intake-label patterns (`INTAKE_PATTERNS`, `mapIntake`, `sanitizeText`), the custom-field pair reader and the "all fields first, then a plain read" prospect fetch, over lectual.app's read-only per-firm `LawmaticsClient` (`get`/`listAll`) instead of lawmatics-mcp's `ReadOnlyLawmatics`; adds the patterns for competitors, goals and consult fee paid, a `/custom_fields` name lookup for id-keyed values, and three states instead of throws; nothing logged. The USPTO knockout, the model judgment and the packages PDF are NOT ported (S2). |
+| `src/lib/pipeline/{leads,move-as}.ts` | `src/lib/pipeline/leads.ts` (lectual) | lectual.app only: after a stage move that landed, both call `scheduleConsultPrepOnEntry` (`src/lib/consult-prep/hook.ts`, inside try/catch) so a lead entering the consult stage is prepped. lectual has no consult prep assistant, so it needs no matching change. |
+

@@ -171,13 +171,13 @@ describe("buildEntries", () => {
     expect(out.map((e) => e.id)).toEqual(["a", "b", "c", "d"]);
   });
 
-  it("says 'A teammate' when the directory failed, the user is gone, or there is no uploader", async () => {
+  it("says 'Teammate' when the directory failed, the user is gone, or there is no uploader", async () => {
     const { buildEntries, UNKNOWN_WHO } = await reads(makeWorld());
     const read = { files: { status: "ok" as const, capped: false, files: [file("a", "2026-10-20T00:00:00Z"), file("b", "2026-10-19T00:00:00Z", "gone-user"), file("c", "2026-10-18T00:00:00Z", null)] }, letters: null };
-    expect(UNKNOWN_WHO).toBe("A teammate");
-    expect(buildEntries(read, null).map((e) => e.who)).toEqual(["A teammate", "A teammate", "A teammate"]);
-    expect(buildEntries(read, [{ userId: "user-1", name: "Dawn" }]).map((e) => e.who)).toEqual(["Dawn", "A teammate", "A teammate"]);
-    expect(buildEntries(read, [{ userId: "user-1", name: "  " }]).map((e) => e.who)[0]).toBe("A teammate");
+    expect(UNKNOWN_WHO).toBe("Teammate");
+    expect(buildEntries(read, null).map((e) => e.who)).toEqual(["Teammate", "Teammate", "Teammate"]);
+    expect(buildEntries(read, [{ userId: "user-1", name: "Dawn" }]).map((e) => e.who)).toEqual(["Dawn", "Teammate", "Teammate"]);
+    expect(buildEntries(read, [{ userId: "user-1", name: "  " }]).map((e) => e.who)[0]).toBe("Teammate");
   });
 
   it("lists nothing from a read that did not succeed", async () => {

@@ -1,6 +1,6 @@
 import type { ProposalContent } from "@/lib/proposals/types";
 import { fold, DESIGN_OPTIONS, WORD_OPTIONS } from "../proposals/mark-fixture";
-import { faithe } from "../proposals/general-fixture";
+import { imogen } from "../proposals/general-fixture";
 import { fullLetterBody } from "./full-letter-fixture";
 
 /** A proposal's `loe` block as the stored content carries it (public reads keep title, body and kind only). */
@@ -17,7 +17,7 @@ export function withLoe(content: ProposalContent, kind: "trademark" | "general" 
   };
 }
 
-/** Two brand names, a package per mark on each (the Danielle-shaped offer with a second brand). */
+/** Two brand names, a package per mark on each (the Renata-shaped offer with a second brand). */
 export function twoBrandPerMark(): ProposalContent {
   const base = fold();
   return {
@@ -26,7 +26,7 @@ export function twoBrandPerMark(): ProposalContent {
       ...base.names,
       {
         id: "ci",
-        name: "The Confidence Interval",
+        name: "The Margin Note",
         marks: [
           { id: "ci-word", kind: "word", desc: "Protects the words.", preselected: true, package_choice: { options: [...WORD_OPTIONS], default: "Concierge" } },
           { id: "ci-logo", kind: "logo", desc: "Protects the design.", preselected: false, package_choice: { options: [...DESIGN_OPTIONS], default: "Enhanced" } },
@@ -41,5 +41,5 @@ export function twoBrandPerMark(): ProposalContent {
 }
 
 export function generalWithLoe(): ProposalContent {
-  return withLoe(faithe(), "general");
+  return withLoe(imogen(), "general");
 }

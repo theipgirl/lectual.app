@@ -22,7 +22,7 @@ type Reads = {
   ai?: boolean;
 };
 
-const dl = (over: Partial<OwnerDeadline> = {}): OwnerDeadline => ({ key: "d1", href: "/dashboard/matters/m1/", name: "Office action response", detail: "TM-1 · The Fold", dueDate: "2026-11-12", overdueDays: 0, ...over });
+const dl = (over: Partial<OwnerDeadline> = {}): OwnerDeadline => ({ key: "d1", href: "/dashboard/matters/m1/", name: "Office action response", detail: "TM-1 · The Pleat", dueDate: "2026-11-12", overdueDays: 0, ...over });
 const okConsults: TodayConsultsResult = { consults: [], outlook: "ok", zoom: "ok" };
 
 async function render(r: Reads = {}) {
@@ -67,7 +67,8 @@ describe("Owner Today", () => {
     expect(html).toContain("Good morning, Rebecca.");
     expect(html).toContain('<span class="ot-big">3</span>');
     expect(html).toContain("cards for you · about 6 min");
-    expect(html).toContain("Deal opened 7:00 AM. Next deal 2:00 PM.");
+    expect(html).toContain("Your 7:00 AM deal is ready. Next deal 2:00 PM.");
+    expect(html).not.toContain("ot-hero-ready");
     expect(html).toMatch(/href="\/dashboard\/queue\/deck\/"[^>]*>Start</);
   });
 
@@ -105,10 +106,10 @@ describe("Owner Today", () => {
   it("flags an overdue deadline and lists a live proposal; empty is only said for a read that worked", async () => {
     const html = await render({
       deadlines: [dl({ dueDate: "2026-11-07", overdueDays: 3 })],
-      proposals: [{ id: "p1", href: "/dashboard/proposals/p1/", client: "Sevetri Wilson", title: "The Fold", expiry: "Last day Nov 12", expired: false, expiresOn: "2026-11-12" }],
+      proposals: [{ id: "p1", href: "/dashboard/proposals/p1/", client: "Callum Ferreira", title: "The Pleat", expiry: "Last day Nov 12", expired: false, expiresOn: "2026-11-12" }],
     });
     expect(html).toContain("3 days overdue");
-    expect(html).toContain("Sevetri Wilson");
+    expect(html).toContain("Callum Ferreira");
     expect(html).toContain("Last day Nov 12");
     const empty = await render({ deadlines: [], proposals: [] });
     expect(empty).toContain("Nothing due in the next 14 days.");

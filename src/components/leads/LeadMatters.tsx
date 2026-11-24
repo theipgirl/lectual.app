@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { stageDisplayName } from "@/lib/matters/list-view";
+import { LoadFailedLine } from "@/components/ui/LoadFailed";
 import type { LeadMattersRead } from "@/lib/matters/for-lead";
 
 /**
@@ -16,7 +18,7 @@ export function LeadMattersLine({ read }: { read: LeadMattersRead }) {
             <span key={m.id} style={{ display: "block" }}>
               <Link href={`/dashboard/matters/${m.id}/`}>{m.label}</Link>
               <span className="lx-note" style={{ display: "block" }}>
-                {m.matterNumber} · {m.stageLabel}
+                {m.matterNumber} · {stageDisplayName(m.stageLabel)}
               </span>
             </span>
           ))}
@@ -24,9 +26,7 @@ export function LeadMattersLine({ read }: { read: LeadMattersRead }) {
       ) : read.status === "none" ? (
         <span>No matters yet.</span>
       ) : (
-        <span role="alert" style={{ color: "var(--wine)" }}>
-          Matters couldn&apos;t be loaded.
-        </span>
+        <LoadFailedLine role="alert">Matters couldn&apos;t be loaded.</LoadFailedLine>
       )}
     </div>
   );

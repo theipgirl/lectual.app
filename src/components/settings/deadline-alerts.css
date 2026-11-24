@@ -1,0 +1,9 @@
+/* Settings -> Team: who gets the deadline alerts. Tokens only. */
+.lx-dl-alerts { padding: 18px; display: grid; gap: 10px; }
+.lx-dl-alerts .lx-h2 { margin: 0; }
+.lx-dl-alerts-form { display: grid; gap: 12px; }
+.lx-dl-alerts-list { border: 0; margin: 0; padding: 0; display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); }
+.lx-dl-alerts-row { display: flex; gap: 8px; align-items: center; min-height: 32px; min-width: 0; overflow-wrap: anywhere; }
+.lx-dl-alerts-row input:focus-visible { outline: 2px solid var(--ox); outline-offset: 2px; }
+.lx-dl-alerts-names { margin: 0; padding-left: 18px; }
+@media (pointer: coarse) { .lx-dl-alerts-row { min-height: 44px; } }

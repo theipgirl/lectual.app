@@ -185,7 +185,7 @@ describe("Start blank", () => {
 
   it("a flat-fee start builds a general draft with the general letter only, no brand, no package list", async () => {
     const { created, run } = await setup({ letters: { trademark: LETTER, general: GENERAL_LETTER } });
-    await expect(run({ fullName: "Faithe Williams", kind: "general" })).rejects.toBeInstanceOf(Redirected);
+    await expect(run({ fullName: "Imogen Pellegrino", kind: "general" })).rejects.toBeInstanceOf(Redirected);
     const input = call(created);
     expect(input.title).toBe("Proposal");
     expect(input.content.kind).toBe("general");

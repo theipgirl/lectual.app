@@ -91,7 +91,7 @@ function render(leads: Lead[], params: IntakeSearchParams = {}, extra: { viewSta
       intakeStages={intakeStages(STAGES)}
       members={MEMBERS}
       initialFilters={parseIntakeFilters(params)}
-      initialViewState={extra.viewState ?? parseIntakeViewState(params)}
+      initialViewState={extra.viewState ?? parseIntakeViewState({ view: "table", ...params })}
       time={null}
       now={NOW.toISOString()}
     />,
@@ -132,27 +132,33 @@ describe("default last-touch sort, rendered", () => {
     expect(html.match(/ ↓</g)).toBeNull();
   });
 
-  it("marks Last touch descending on first load", () => {
-    expect(render(THREE)).toMatch(/aria-label="Sort by Last touch"[^>]*>Last touch ↓</);
+  it("marks Last contact descending on first load (the column was called Last touch)", () => {
+    expect(render(THREE)).toMatch(/aria-label="Sort by Last contact"[^>]*>Last contact ↓</);
   });
 
-  it("the table sub-line folds the status counts into one short sentence", () => {
-    expect(render(THREE)).toContain("3 leads · 0 need a first reply · 3 unassigned. Newest activity first.");
+  it("the sub-line is one short sentence: the count, who needs a first reply, and ONE note about owners", () => {
+    // Without set data every lead is shown as All open. Nobody is assigned, so there is no "3 unassigned": one sentence says so.
+    expect(render(THREE)).toContain("3 open leads · 0 need a first reply · Nobody is assigned yet");
+    const assigned = [lead("l-a", "Ann", { assigned_to: "u-1" }), lead("l-b", "Bo")];
+    expect(render(assigned)).toContain("2 open leads · 0 need a first reply · 1 unassigned");
   });
 
-  it("the board sub-lines are the short ones, by stage and by owner", () => {
-    expect(render(THREE, { view: "board" })).toContain("Drag a card to move it, or use the stage menu on the card.");
-    expect(render(THREE, { view: "board", group: "owner" })).toContain("Leads with no owner are in the first column.");
+  it("the board has no drag caption and no sub-line hint (changed on purpose: Sprint 31 pinned them)", () => {
+    for (const html of [render(THREE, { view: "board" }), render(THREE, { view: "board", group: "owner" })]) {
+      expect(html).not.toContain("Drag a card to move it");
+      expect(html).not.toContain("Leads with no owner are in the first column.");
+      expect(html).not.toContain("Newest activity first");
+    }
   });
 });
 
 describe("the page header and toolbar (shared list-page components)", () => {
   const html = render(THREE);
-  const head = html.slice(html.indexOf('class="lp-header"'), html.indexOf('aria-label="Filter by stage"'));
+  const head = html.slice(html.indexOf('class="lx-page-head lx-head lp-header"'), html.indexOf('aria-label="Filter by stage"'));
 
   it("uses the shared header: one h1, one sub-line, no eyebrow label", () => {
-    expect(html).toContain('class="lp-header"');
-    expect(head).toContain('<h1 class="lx-h1">Leads</h1>');
+    expect(html).toContain('class="lx-page-head lx-head lp-header"');
+    expect(head).toContain('<h1 class="lx-h1">Intake</h1>');
     expect(head).toContain('class="lx-sub lp-sub"');
     expect(head).not.toContain("lx-label");
     expect(head.match(/<h1/g)).toHaveLength(1);
@@ -169,7 +175,7 @@ describe("the page header and toolbar (shared list-page components)", () => {
   it("orders search (with its submit button), then the toggle, then More, then Add a lead", () => {
     const search = head.indexOf('aria-label="Search leads"');
     const submit = head.indexOf(">Search</button>");
-    const toggle = head.indexOf("lx-view-toggle");
+    const toggle = head.indexOf("vs-switch");
     const more = head.indexOf("More");
     const add = head.indexOf("Add a lead");
     expect(search).toBeGreaterThan(0);
@@ -199,29 +205,29 @@ describe("the page header and toolbar (shared list-page components)", () => {
   });
 
   it("renders the toggle once, in the toolbar, and not in the control row", () => {
-    expect(html.match(/lx-view-toggle/g)).toHaveLength(1);
+    expect(html.match(/vs-switch/g)).toHaveLength(1);
     const controls = html.slice(html.indexOf('aria-label="Filter by stage"'));
-    expect(controls).not.toContain("lx-view-toggle");
+    expect(controls).not.toContain("vs-switch");
     expect(controls).not.toContain("How to arrange the list");
   });
 
   it("has no separate status strip above the header", () => {
     expect(html).not.toContain("intake-statusline");
-    expect(html.startsWith('<div class="lp-root"><header class="lp-header">')).toBe(true);
+    expect(html.startsWith('<div class="lp-root ix-leads"><header class="lx-page-head lx-head lp-header">')).toBe(true);
   });
 
   it("marks the current view on the controlled toggle", () => {
-    expect(head).toMatch(/<button type="button" aria-pressed="true" class="on">Table<\/button>/);
-    expect(head).toMatch(/<button type="button" aria-pressed="false">Board<\/button>/);
+    expect(head).toMatch(/<button type="button" aria-current="true">List<\/button>/);
+    expect(head).toMatch(/<button type="button">Board<\/button>/);
     const board = render(THREE, { view: "board" });
-    expect(board).toMatch(/<button type="button" aria-pressed="true" class="on">Board<\/button>/);
+    expect(board).toMatch(/<button type="button" aria-current="true">Board<\/button>/);
   });
 
   it("shows Group by in the control row only on the board", () => {
     expect(render(THREE)).not.toContain("Group by");
     const board = render(THREE, { view: "board" });
     expect(board).toContain("Group by");
-    expect(board.indexOf("Group by")).toBeGreaterThan(board.indexOf('class="lp-header"'));
+    expect(board.indexOf("Group by")).toBeGreaterThan(board.indexOf('class="lx-page-head lx-head lp-header"'));
     expect(board.indexOf("Group by")).toBeGreaterThan(board.indexOf("Add a lead"));
   });
 });
@@ -236,7 +242,9 @@ describe("the Temperature column, rendered", () => {
     expect(html.match(/aria-label="Sort by Temperature"/g)).toHaveLength(1);
     expect(html).not.toContain('aria-label="Sort by Temp"');
     expect(html).not.toContain("Sort by Lane");
-    expect(html.match(/aria-label="Sort by /g)).toHaveLength(7);
+    // No Owner column while nobody in view has an owner.
+    expect(html.match(/aria-label="Sort by /g)).toHaveLength(6);
+    expect(render([lead("l-o", "Owned", { assigned_to: "u-1" })]).match(/aria-label="Sort by /g)).toHaveLength(7);
   });
 
   it("has no Lane filter and no 'Suggested, not reviewed' option anywhere", () => {
@@ -247,28 +255,31 @@ describe("the Temperature column, rendered", () => {
     expect(html.match(/aria-label="Filter by temperature"/g)).toHaveLength(1);
   });
 
-  it("shows a person's temperature as a solid chip with no 'Suggested' text", () => {
+  it("shows a person's temperature as the filled pill, sentence case, with no 'suggested' marking", () => {
     const html = render([person]);
     expect(html).toMatch(/data-testid="temperature-cell"[^>]*>Hot</);
-    expect(html).toContain("border:1px solid currentColor");
+    expect(html).toContain('data-tone="hot"');
+    expect(html).not.toContain("data-suggested");
     expect(html).not.toContain("Suggested");
-    expect(html).not.toContain("dashed currentColor");
   });
 
-  it("shows an unrouted lead's derived temperature as a dashed chip that says Suggested", () => {
+  it("shows a suggested temperature as the SAME pill, lighter, with 'suggested' in its title and accessible name", () => {
     const html = render([suggested]);
-    expect(html).toMatch(/data-testid="temperature-cell"[^>]*>Suggested: Hot</);
-    expect(html).toContain("border:1px dashed currentColor");
-    expect(html).toContain("font-style:italic");
-    // The reason is the tooltip.
-    expect(html).toMatch(/<button[^>]*title="Replied 1 day ago — waiting on us"[^>]*data-testid="temperature-cell"/);
+    // Sprint 10: an OUTLINED pill with a small "suggested" mark (it replaced Item L2's dashed pill); a person's level is filled.
+    expect(html).toMatch(/data-testid="temperature-cell"[^>]*>Hot<span class="rc-temp-mark">suggested<\/span>/);
+    expect(html).toContain('data-tone="hot"');
+    expect(html).toContain('data-style="outlined"');
+    // The reason is in the tooltip, after "Suggested: Hot".
+    expect(html).toMatch(/<button[^>]*data-testid="temperature-cell"[^>]*title="Suggested: Hot\nReplied 1 day ago — waiting on us"/);
+    expect(html).toContain("(suggested)");
+    expect(html).not.toContain(">Suggested: Hot<");
   });
 
-  it("shows a lead with nothing recorded as a dashed neutral 'Not rated'", () => {
+  it("shows a lead with nothing recorded as no pill at all (the button stays, named 'Not rated', for setting one)", () => {
     const html = render([blank]);
-    expect(html).toMatch(/data-testid="temperature-cell"[^>]*>Not rated</);
-    expect(html).toContain("border:1px dashed var(--line)");
-    expect(html).not.toMatch(/data-testid="temperature-cell"[^>]*>Suggested/);
+    expect(html).toContain('data-empty=""');
+    expect(html).not.toMatch(/data-tone="/);
+    expect(html).toContain("Not rated");
   });
 
   it("puts the activity hint in the tooltip of a stale lane", () => {
@@ -278,17 +289,14 @@ describe("the Temperature column, rendered", () => {
     expect(html).toMatch(/data-testid="temperature-cell"[^>]*>Cold</);
   });
 
-  it("uses the same seven grid columns in the header strip and in every row", () => {
+  it("draws the same cells in every row (lead, stage, temperature, source, last touch, next step, menu) and no LTN line", () => {
     const html = render([person, suggested, blank]);
-    const grids = Array.from(html.matchAll(/grid-template-columns:([^;"]+)/g)).map((m) => m[1].trim().split(/\s+/).length);
-    // header strip + three rows
-    expect(grids).toEqual([7, 7, 7, 7]);
-  });
-
-  it("keeps the Long-Term Nurture line in the lead cell, not the Temperature cell", () => {
+    expect(html.match(/<td[^>]*data-col="/g)).toHaveLength(7 * 3);
+    expect(html).not.toContain("Long-Term Nurture suggested");
     const source = read("src/app/dashboard/intake/_components/IntakeTable.tsx");
-    expect(source).toContain("<LtnSuggestion");
-    expect(source).not.toContain("LaneCell");
+    // The suggestion is the "Suggestions" chip now (it stays on the lead page), not a line in the lead cell.
+    expect(source).not.toContain("<LtnSuggestion");
+    expect(read("src/app/dashboard/intake/_components/IntakeControls.tsx")).toContain("LEADS_SUGGESTIONS");
     expect(source).not.toContain("Sort by Lane");
   });
 
@@ -326,7 +334,7 @@ describe("the temperature filter, rendered", () => {
   });
 
   it("the sub-line counts follow the filtered rows", () => {
-    expect(render(leads, { temp: "none" })).toContain("1 lead · ");
+    expect(render(leads, { temp: "none" })).toContain("1 open lead · ");
   });
 });
 
@@ -336,7 +344,6 @@ describe("the board card's one temperature line", () => {
     return renderToStaticMarkup(
       <IntakeCard
         row={row}
-        variant="stage"
         stages={intakeStages(STAGES)}
         members={MEMBERS}
         now={NOW}
@@ -344,24 +351,28 @@ describe("the board card's one temperature line", () => {
         time={null}
         onMoveStage={() => {}}
         onAssign={() => {}}
-        onSetSource={() => {}}
       />,
     );
   }
 
   it("reads the level for a person's, with the reason as its tooltip", () => {
     const html = card(lead("a", "Ana", { lane: "warm", lane_set_by: "u-1", lane_set_at: daysBefore(0), last_activity_at: daysBefore(5) }));
-    expect(html).toContain('title="Set by a person">Warm<');
-    expect(html).not.toContain("Suggested");
+    expect(html).toContain('title="Set by a person"');
+    expect(html).toContain('data-tone="warm"');
+    expect(html).toContain(">Warm<");
+    expect(html).not.toContain("data-suggested");
   });
 
   it("reads 'Suggested: <level>' for a derived one", () => {
     const html = card(lead("a", "Ana", { last_inbound_at: daysBefore(1) }));
-    expect(html).toContain(">Suggested: Hot<");
+    expect(html).toContain('data-suggested=""');
+    expect(html).toContain(">Hot · suggested<");
+    expect(html).toContain("Hot, suggested");
   });
 
   it("reads 'Not rated' for neither", () => {
-    expect(card(lead("a", "Ana"))).toContain(">Not rated<");
+    // No pill at all (changed on purpose: "Not rated" used to be drawn on every unrated card).
+    expect(card(lead("a", "Ana"))).not.toMatch(/data-tone=/);
   });
 
   it("has no 'Lane:' text, no dot beside the name, and exactly one temperature line", () => {
@@ -373,10 +384,10 @@ describe("the board card's one temperature line", () => {
       const html = card(l);
       expect(html).not.toContain("Lane:");
       // The name row is the link and nothing else: no dot beside the name.
-      expect(html).toMatch(/^<div[^>]*><div style="display:flex;align-items:center;gap:7px"><a [^>]*>[^<]*<\/a><\/div>/);
+      expect(html).toMatch(/^<li[^>]*><div class="lx-board-card-top ix-card-top"><span class="lx-board-card-title"><a [^>]*>[^<]*<\/a><\/span><\/div>/);
       expect(html).not.toMatch(/width:7px;height:7px/);
-      const lines = html.match(/>(Hot|Warm|Cold|Suggested: (Hot|Warm|Cold)|Not rated)</g) ?? [];
-      expect(lines).toHaveLength(1);
+      const lines = html.match(/>(Hot|Warm|Cold)( · suggested)?</g) ?? [];
+      expect(lines).toHaveLength(l.id === "c" ? 0 : 1);
     }
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { sevetri } from "../proposals/fixture";
+import { callum } from "../proposals/fixture";
 
 /**
  * The queue item's linked-proposal panel reads the proposal and, separately,
@@ -34,10 +34,10 @@ const proposalRow = {
   id: PROPOSAL_ID,
   version: 1,
   status: "draft",
-  client_name: "Sevetri Wilson",
+  client_name: "Callum Ferreira",
   client_email: "s@example.com",
   title: "Trademark Proposal",
-  content: sevetri(),
+  content: callum(),
   expires_on: "2026-11-10",
   pay_url: "https://pay.example/x",
 };
@@ -74,7 +74,7 @@ describe("readLinkedProposal / loadLinkedPanel", () => {
     expect(read).toMatchObject({ status: "ok" });
     if (read.status !== "ok") return;
     expect(read.proposal.card?.receipts).toMatchObject({ status: "ok", verified: ["a word mark and a logo"] });
-    expect(read.proposal.card?.client).toBe("Sevetri Wilson");
+    expect(read.proposal.card?.client).toBe("Callum Ferreira");
     expect(read.proposal.card?.legalAtSigningCents).toBe(read.proposal.legalCents);
     expect(read.proposal.card?.usptoAtFilingCents).toBe(read.proposal.govCents);
   });

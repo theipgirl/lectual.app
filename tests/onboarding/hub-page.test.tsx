@@ -72,7 +72,11 @@ describe("Getting started page", () => {
     const html = await render(GettingStartedPage());
     expect(html).not.toContain(">Admin<");
     expect(html).not.toContain("Reconcile stages");
-    expect(html).toContain(">Leads<");
+    // Changed on purpose: outside the admin tier the hub is the short staff guide (name, own mailbox, tour), not the Intake track.
+    expect(html).not.toContain(">Intake<");
+    expect(html).toContain("Your first steps");
+    expect(html).toContain("Add your name");
+    expect(html).toContain("Take the tour");
   });
 
   it("reads a malformed progress flag as zero done without crashing", async () => {
@@ -100,11 +104,15 @@ describe("Getting started page", () => {
     expect(html).toContain(">Start<");
   });
 
-  it("renders nothing for a signed-out session, and a quiet note for a role with no guides", async () => {
+  it("renders nothing for a signed-out session, and the staff guide for an unknown role (fails closed)", async () => {
     resolveFirmSession.mockResolvedValue({ kind: "signed-out", redirectTo: "/sign-in" });
     expect(await GettingStartedPage()).toBeNull();
+    // Changed on purpose: an unknown role used to see no guide; it now gets the staff guide (no mailbox guide, no admin flow).
     resolveFirmSession.mockResolvedValue(session("mystery"));
-    expect(await render(GettingStartedPage())).toContain("no guides to show");
+    const html = await render(GettingStartedPage());
+    expect(html).toContain("Add your name");
+    expect(html).not.toContain("Connect your Outlook");
+    expect(html).not.toContain(">Admin<");
   });
 
   it("recordNote only speaks about the kinds a flow opens", () => {
@@ -123,7 +131,7 @@ describe("Today card", () => {
     expect(html).toContain(">Hide<");
   });
 
-  it("renders nothing when complete, when hidden, and for signed-out or unresolvable roles", async () => {
+  it("renders nothing when complete, when hidden, and for signed-out sessions; an unknown role gets the staff guide's card", async () => {
     const every = visibleFlows({ role: "viewer", modules: ALL, aiConfigured: true }).map((f) => f.id);
     resolveFirmSession.mockResolvedValue(session("viewer", { lectual_hub: { version: 1, done: every } }));
     expect(await GettingStartedCard()).toBeNull();
@@ -133,8 +141,9 @@ describe("Today card", () => {
     expect(await GettingStartedCard()).toBeNull();
     resolveFirmSession.mockResolvedValue({ kind: "no-access", user: {} });
     expect(await GettingStartedCard()).toBeNull();
+    // Changed on purpose: an unknown role now has the staff guide's two flows, so the card shows its count.
     resolveFirmSession.mockResolvedValue(session("mystery"));
-    expect(await GettingStartedCard()).toBeNull();
+    expect(await render(GettingStartedCard())).toContain("0 of 2 done");
   });
 
   it("a failed read still shows a card with the link and no count", async () => {

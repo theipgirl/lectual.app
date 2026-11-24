@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { Icon } from "@/components/ui/Icon";
 import type { LeadLinkState } from "@/lib/proposals/lead-link";
 
 /**
@@ -11,7 +12,7 @@ export function LeadLink({ lead, matterId, linker }: { lead: LeadLinkState; matt
     <div className="pe-for" aria-label="Who this proposal is for">
       {lead.state === "linked" && (
         <Link href={`/dashboard/leads/${lead.id}/`} className="pe-for-link" aria-label={`Open lead: ${lead.name}`}>
-          Open lead →
+          Open lead <Icon name="chevron-right" size={14} />
         </Link>
       )}
       {lead.state === "unreadable" && (
@@ -23,7 +24,7 @@ export function LeadLink({ lead, matterId, linker }: { lead: LeadLinkState; matt
       {lead.state === "none" && <span className="pe-for-none">Not linked to a lead</span>}
       {matterId && (
         <Link href={`/dashboard/matters/${matterId}/`} className="pe-for-link">
-          Open matter →
+          Open matter <Icon name="chevron-right" size={14} />
         </Link>
       )}
       {lead.state === "none" && linker}

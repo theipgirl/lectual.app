@@ -18,6 +18,7 @@ vi.mock("next/navigation", () => ({
   notFound: () => {
     throw new Error("NEXT_NOT_FOUND");
   },
+  useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
 }));
 vi.mock("@/lib/auth/current-role", () => ({ currentRole: async () => h.role }));
 vi.mock("@/lib/org/profile", () => ({ getFirmTimeZone: async () => "America/New_York" }));

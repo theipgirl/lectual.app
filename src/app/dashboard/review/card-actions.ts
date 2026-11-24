@@ -6,7 +6,7 @@ import { noticeCodeFor } from "@/lib/review/notice";
 import { parseReviewParams, reviewHref } from "@/lib/review/params";
 
 /**
- * The Cards view's buttons are plain forms, so they work without JavaScript: each runs the SAME action the detail panel
+ * The Cards view's buttons are plain forms, so they work without JavaScript: each runs the SAME action the opened record card
  * uses (role, record and member checks all happen there), then redirects back to the deck at the same place. The
  * return address is rebuilt from the posted view fields through `parseReviewParams`, never taken as a URL from the form.
  */

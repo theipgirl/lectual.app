@@ -1,9 +1,14 @@
+import { REVIEW_SHOWS_PROPOSALS } from "@/lib/review/scope";
+import { cardSubline } from "@/lib/review/format";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { BUCKET_COPY, type BucketKey, type ReviewRow } from "@/lib/review/buckets";
 import { WAITING_LABEL } from "@/lib/review/waiting";
 import { deadlineIsSoon, dueText, lastContactText, shortDate } from "@/lib/review/format";
 import { DoneButton } from "./DoneButton";
+import { Pill } from "@/components/ui/Pill";
+import { SheetCard, SheetScroll, SheetTable } from "@/components/ui/SheetTable";
+import { BLANK, LAST_CONTACT, OWNER_COLUMN, TEAMMATE } from "@/lib/ui/words";
 import { openHref, type Common } from "./shared";
 import "@/components/list-page/list-page.css";
 import "./review.css";
@@ -16,15 +21,16 @@ export type SectionProps = Common & {
 
 export function ReviewTable({ rows, today, members, canWrite, params }: Omit<SectionProps, "bucket">) {
   const names = new Map(members.map((m) => [m.userId, m.name]));
-  const who = (id: string | null) => (id ? names.get(id) ?? "Teammate" : null);
+  const who = (id: string | null) => (id ? names.get(id) ?? TEAMMATE : null);
   return (
-    <div style={{ overflow: "auto" }}>
-      <table className="lx-tbl lx-stack">
+    <SheetCard>
+      <SheetScroll>
+      <SheetTable className="rv-table">
         <thead>
           <tr>
             <th>Client</th>
             <th>Stage</th>
-            <th>Assigned to</th>
+            <th>{OWNER_COLUMN}</th>
             <th>Last contact</th>
             <th>Next step</th>
             <th>Waiting on</th>
@@ -43,17 +49,16 @@ export function ReviewTable({ rows, today, members, canWrite, params }: Omit<Sec
                     {r.client}
                   </Link>
                   <div className="lx-note">
-                    {r.kind === "lead" ? "Lead" : "Matter"}
-                    {r.mark ? ` · ${r.mark}` : ""}
+                    {cardSubline({ ...r, stageLabel: null })}
                   </div>
-                  {r.proposalExpiry && <span className={`lp-pill${r.proposalExpiry.expired ? " lp-pill-risk rv-deadline-soon" : ""}`}>{r.proposalExpiry.text}</span>}
+                  {REVIEW_SHOWS_PROPOSALS && r.proposalExpiry && <Pill tone={r.proposalExpiry.expired ? "risk" : "mute"}>{r.proposalExpiry.text}</Pill>}
                 </td>
                 <td data-label="Stage">
-                  {r.stageLabel ? <span className="lp-pill">{r.stageLabel}</span> : <span className="lx-note">—</span>}
+                  {r.stageLabel ? <Pill>{r.stageLabel}</Pill> : <span className="lx-note">{BLANK}</span>}
                   <span className="lx-note rv-sub">{r.stageDays !== null ? `${r.stageDays}d in stage` : r.stageNote ?? ""}</span>
                 </td>
-                <td data-label="Assigned to">{who(r.assignedTo) ?? <span className="lx-note">—</span>}</td>
-                <td data-label="Last contact">{lastContactText(r, today)}</td>
+                <td data-label={OWNER_COLUMN}>{who(r.assignedTo) ?? <span className="lx-note">{BLANK}</span>}</td>
+                <td data-label={LAST_CONTACT}>{lastContactText(r, today)}</td>
                 <td data-label="Next step">
                   {r.nextStep && due ? (
                     <>
@@ -68,22 +73,22 @@ export function ReviewTable({ rows, today, members, canWrite, params }: Omit<Sec
                   )}
                 </td>
                 <td data-label="Waiting on">
-                  {r.waiting ? <span className={`lp-pill rv-chip-${r.waiting}${r.waiting === "approval" ? " lp-pill-warn" : ""}`}>{WAITING_LABEL[r.waiting]}</span> : <span className="lx-note">—</span>}
+                  {r.waiting ? <Pill tone={r.waiting === "approval" || r.waiting === "us" ? "warn" : "mute"}>{WAITING_LABEL[r.waiting]}</Pill> : <span className="lx-note">{BLANK}</span>}
                 </td>
-                <td data-label="USPTO deadline" className="lx-num">
+                <td data-label="USPTO deadline">
                   {r.deadline ? (
                     <span className={deadlineIsSoon(r.deadline.dueDate, today) ? "rv-deadline-soon" : undefined}>
                       {shortDate(r.deadline.dueDate, today)}
                       {r.deadline.title ? <span className="lx-note rv-sub">{r.deadline.title}</span> : null}
                     </span>
                   ) : (
-                    <span className="lx-note">—</span>
+                    <span className="lx-note">{BLANK}</span>
                   )}
                 </td>
-                <td data-label="Actions">
+                <td className="lx-stack-actions">
                   <div className="rv-card-acts">
                     {canWrite && r.nextStep && <DoneButton taskId={r.nextStep.id} />}
-                    <Link href={openHref(params, r)} className="lx-btn lx-btn-ghost lx-btn-sm" scroll={false}>
+                    <Link href={openHref(params, r)} className="lx-link" scroll={false}>
                       Open
                     </Link>
                   </div>
@@ -92,8 +97,9 @@ export function ReviewTable({ rows, today, members, canWrite, params }: Omit<Sec
             );
           })}
         </tbody>
-      </table>
-    </div>
+      </SheetTable>
+      </SheetScroll>
+    </SheetCard>
   );
 }
 

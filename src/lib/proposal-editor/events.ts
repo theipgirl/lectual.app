@@ -13,6 +13,8 @@
  * to a guess and never to an exception.
  */
 
+import { formatMoney } from "@/lib/ui/format";
+import { TEAMMATE } from "@/lib/ui/words";
 import { describeStepEvent } from "@/lib/proposals/paid";
 import { EVENT_WORDS } from "./vocabulary";
 import { describePayLinkEvent } from "./pay-link";
@@ -40,17 +42,9 @@ export type EventLine = {
   text?: string;
 };
 
-/** "$4,950", or "$4,950.50" when there are cents. */
+/** "$4,950", or "$4,950.50" when there are cents (the one staff money formatter). */
 export function formatDollars(cents: number): string {
-  if (!Number.isFinite(cents)) return "—";
-  const rounded = Math.round(cents);
-  const whole = rounded % 100 === 0;
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: whole ? 0 : 2,
-    maximumFractionDigits: whole ? 0 : 2,
-  }).format(rounded / 100);
+  return formatMoney(cents);
 }
 
 function clip(s: string, n = 70): string {
@@ -75,7 +69,7 @@ export function formatChangeValue(format: ProposalChange["format"], value: Propo
   }
 }
 
-/** "Prosperall: base price" -> "Prosperall’s base price"; other labels unchanged. */
+/** "Larkmoor: base price" -> "Larkmoor’s base price"; other labels unchanged. */
 function possessive(label: string): string {
   const i = label.indexOf(": ");
   return i > 0 ? `${label.slice(0, i)}’s ${label.slice(i + 2)}` : label;
@@ -162,7 +156,7 @@ export function actorName(event: Pick<ProposalEventRow, "actor" | "actor_user_id
     case "system":
       return "Lectual";
     default:
-      return (event.actor_user_id && names.get(event.actor_user_id)) || "A teammate";
+      return (event.actor_user_id && names.get(event.actor_user_id)) || TEAMMATE;
   }
 }
 

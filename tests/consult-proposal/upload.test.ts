@@ -16,7 +16,7 @@ Rebecca: Thanks for joining the call today.
 
 2
 00:00:03.500 --> 00:00:06.000
-Ana: Happy to be here. We want to protect Prosperall.
+Ana: Happy to be here. We want to protect Larkmoor.
 We also have a logo.
 
 intro-cue
@@ -30,7 +30,7 @@ Rebecca: Thanks for joining the call today.
 
 2
 00:00:03,500 --> 00:00:06,000
-Ana: Happy to be here. We want to protect Prosperall.
+Ana: Happy to be here. We want to protect Larkmoor.
 We also have a logo.
 `;
 
@@ -45,7 +45,7 @@ describe("transcriptFromUpload", () => {
     expect(r.text).not.toContain("intro-cue");
     expect(r.text.split("\n")).toEqual([
       "Rebecca: Thanks for joining the call today.",
-      "Ana: Happy to be here. We want to protect Prosperall. We also have a logo.",
+      "Ana: Happy to be here. We want to protect Larkmoor. We also have a logo.",
       "Rebecca: A word mark and a logo mark then.",
     ]);
   });
@@ -54,7 +54,7 @@ describe("transcriptFromUpload", () => {
     const r = await transcriptFromUpload("call.SRT", bytes(SRT));
     expect(r).toEqual({
       ok: true,
-      text: "Rebecca: Thanks for joining the call today.\nAna: Happy to be here. We want to protect Prosperall. We also have a logo.",
+      text: "Rebecca: Thanks for joining the call today.\nAna: Happy to be here. We want to protect Larkmoor. We also have a logo.",
     });
   });
 

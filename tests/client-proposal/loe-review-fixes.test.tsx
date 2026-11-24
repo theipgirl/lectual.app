@@ -18,8 +18,8 @@ import {
   SIGN_LABEL,
 } from "@/lib/loe/client-words";
 import { commitmentSentence, generalCommitmentSentence } from "@/lib/proposals/commitment";
-import { sevetri } from "../proposals/fixture";
-import { faithe } from "../proposals/general-fixture";
+import { callum } from "../proposals/fixture";
+import { imogen } from "../proposals/general-fixture";
 import { TEST_DETAILS } from "../loe/full-letter-fixture";
 import { generalWithLoe, twoBrandPerMark, withLoe } from "../loe/loe-fixtures";
 
@@ -39,15 +39,15 @@ function esc(s: string): string {
 const count = (html: string, needle: string) => html.split(needle).length - 1;
 const slice = (html: string, from: RegExp) => html.match(from)?.[0] ?? "";
 
-const LETTER = { dateText: "November 12, 2026", clientEmail: "sevetri@example.com" };
-const SIGNED_LINE = "Signed November 13, 2026 at 10:30 AM EST by Sevetri Wilson";
+const LETTER = { dateText: "November 12, 2026", clientEmail: "callum@example.com" };
+const SIGNED_LINE = "Signed November 13, 2026 at 10:30 AM EST by Callum Ferreira";
 
 function render(over: Partial<ProposalDocumentProps> = {}) {
   return renderToStaticMarkup(
     <ProposalDocument
       content={withLoe(twoBrandPerMark())}
       title="Trademark Proposal"
-      clientName="Sevetri Wilson"
+      clientName="Callum Ferreira"
       expiresOn="2026-12-01"
       firm={{ name: "RPB Law", slug: "rpb-law" }}
       mode="live"
@@ -63,7 +63,7 @@ function render(over: Partial<ProposalDocumentProps> = {}) {
 /** The LIVE page, on step 3 with everything typed, right after `onAccept` answered ok for a signing. */
 function justSigned(over: Partial<ProposalDocumentProps> = {}) {
   return render({
-    initialLoe: { step: 3, details: TEST_DETAILS, typedName: "Sevetri Wilson", agree: true },
+    initialLoe: { step: 3, details: TEST_DETAILS, typedName: "Callum Ferreira", agree: true },
     initialDone: { payUrl: "https://example.com/pay", opened: true, signedLine: SIGNED_LINE, letterDate: "November 13, 2026", letterVerified: true },
     ...over,
   });
@@ -71,7 +71,7 @@ function justSigned(over: Partial<ProposalDocumentProps> = {}) {
 
 describe("item 2: the signed download is there the moment signing succeeds", () => {
   it("before signing, step 3 offers Sign and no signed download", () => {
-    const html = render({ initialLoe: { step: 3, details: TEST_DETAILS, typedName: "Sevetri Wilson", agree: true } });
+    const html = render({ initialLoe: { step: 3, details: TEST_DETAILS, typedName: "Callum Ferreira", agree: true } });
     expect(html).toContain(`>${SIGN_LABEL}</button>`);
     expect(html).not.toContain(DOWNLOAD_SIGNED_LABEL);
     expect(html).not.toContain(PAYNOTE_DOWNLOAD_ABOVE);
@@ -98,7 +98,7 @@ describe("item 2: the signed download is there the moment signing succeeds", () 
     const again = slice(html, /<section class="cp-signed-letter"[\s\S]*?<\/section>/);
     expect(again).toContain("November 13, 2026");
     expect(again).not.toContain("November 12, 2026");
-    expect(again).toContain("Dear Sevetri Wilson:");
+    expect(again).toContain("Dear Callum Ferreira:");
   });
 
   it("the note never claims a download that is not drawn", () => {
@@ -111,7 +111,7 @@ describe("item 2: the signed download is there the moment signing succeeds", () 
   });
 
   it("a flat-fee proposal with a letter does the same", () => {
-    const html = justSigned({ content: generalWithLoe(), title: "Proposal", clientName: "Faithe Williams" });
+    const html = justSigned({ content: generalWithLoe(), title: "Proposal", clientName: "Imogen Pellegrino" });
     const side = slice(html, /<aside class="cp-side"[\s\S]*?<\/aside>/);
     expect(side).toContain(`>${DOWNLOAD_SIGNED_LABEL}</button>`);
     expect(side).toContain(`${esc(PAYNOTE_AFTER_SIGNING)} ${esc(PAYNOTE_DOWNLOAD_ABOVE)}`);
@@ -167,7 +167,7 @@ describe("item 12: no commitment sentence and no '2' badge on a proposal that ca
 
   it("flat-fee with a letter: the same on every step", () => {
     for (const step of [1, 2, 3] as const) {
-      const html = render({ content: generalWithLoe(), title: "Proposal", clientName: "Faithe Williams", initialLoe: { step, details: TEST_DETAILS } });
+      const html = render({ content: generalWithLoe(), title: "Proposal", clientName: "Imogen Pellegrino", initialLoe: { step, details: TEST_DETAILS } });
       expect(html).not.toContain("By accepting, you agree");
       expect(html).not.toContain(GENERAL_SENTENCE);
       expect(html).not.toContain('class="cp-commit"');
@@ -189,13 +189,13 @@ describe("item 12: no commitment sentence and no '2' badge on a proposal that ca
   });
 
   it("a trademark proposal WITHOUT a letter keeps the sentence and the '2' badge exactly as before", () => {
-    const html = render({ content: sevetri(), letter: undefined, onDownloadReview: undefined, onDownloadSigned: undefined });
+    const html = render({ content: callum(), letter: undefined, onDownloadReview: undefined, onDownloadSigned: undefined });
     expect(html).toContain(`<p class="cp-commit">${SENTENCE}</p>`);
     expect(header(html)).toBe('<div class="cp-panel-h"><span class="cp-n" aria-hidden="true">2</span><h2 id="cp-s2">Review and accept</h2></div>');
   });
 
   it("a flat-fee proposal WITHOUT a letter keeps them too", () => {
-    const html = render({ content: faithe(), title: "Proposal", clientName: "Faithe Williams", letter: undefined, onDownloadReview: undefined, onDownloadSigned: undefined });
+    const html = render({ content: imogen(), title: "Proposal", clientName: "Imogen Pellegrino", letter: undefined, onDownloadReview: undefined, onDownloadSigned: undefined });
     expect(html).toContain(`<p class="cp-commit">${GENERAL_SENTENCE}</p>`);
     expect(header(html)).toBe('<div class="cp-panel-h"><span class="cp-n" aria-hidden="true">2</span><h2 id="cp-s2">Review and accept</h2></div>');
   });

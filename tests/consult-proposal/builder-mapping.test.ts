@@ -7,7 +7,7 @@ import { publicContent } from "@/lib/proposals/public";
 import { defaultSelection, quoteProposal } from "@/lib/proposals/pricing";
 import { validateContent } from "@/lib/proposals/validate";
 import { fakeLlm } from "../agents/helpers";
-import { draftInput, meetingSource, SEVETRI_TURNS, sevetriOutput } from "./fixture";
+import { draftInput, meetingSource, CALLUM_TURNS, callumOutput } from "./fixture";
 import { FROZEN_LIST, melvinLead, melvinOutput, MELVIN, SCENARIOS } from "./frozen-scenarios";
 
 type Ok = Extract<ConsultProposalDraft, { ok: true }>;
@@ -104,21 +104,21 @@ describe("F3 and D3: evidence rules hold with the choice setting on", () => {
   });
 
   it("a price whose quote is not in the record is not applied and the brand keeps its choice", async () => {
-    const out = sevetriOutput();
-    out.price_changes = [{ brand: "Prosperall", amount_usd: 4000, quote: "I can do Prosperall for $4,000 instead" }];
+    const out = callumOutput();
+    out.price_changes = [{ brand: "Larkmoor", amount_usd: 4000, quote: "I can do Larkmoor for $4,000 instead" }];
     const d = ok(await draftProposalFromConsult(draftInput(fakeLlm(out).llm, { packages: FROZEN_LIST, settingPricing: choiceSetting })));
     expect(d.content.names[0].price_override).toBeUndefined();
     expect(d.content.names[0].package_choice).toBeDefined();
-    expect(d.reviewerNotes).toContain("Not applied: a price of $4,000 for Prosperall, because its quote was not found");
+    expect(d.reviewerNotes).toContain("Not applied: a price of $4,000 for Larkmoor, because its quote was not found");
   });
 
   it("a brand with an applied price override is ONE package, and a flag says why", async () => {
-    const out = sevetriOutput();
-    out.price_changes = [{ brand: "Prosperall", amount_usd: 4000, quote: "I can do Prosperall for $4,000 instead" }];
+    const out = callumOutput();
+    out.price_changes = [{ brand: "Larkmoor", amount_usd: 4000, quote: "I can do Larkmoor for $4,000 instead" }];
     const d = ok(
       await draftProposalFromConsult(
         draftInput(fakeLlm(out).llm, {
-          source: meetingSource([...SEVETRI_TURNS, { speaker: "Rebecca", text: "I can do Prosperall for $4,000 instead." }]),
+          source: meetingSource([...CALLUM_TURNS, { speaker: "Rebecca", text: "I can do Larkmoor for $4,000 instead." }]),
           packages: FROZEN_LIST,
           settingPricing: choiceSetting,
         }),
@@ -127,7 +127,7 @@ describe("F3 and D3: evidence rules hold with the choice setting on", () => {
     expect(d.content.names[0].price_override).toEqual({ base_cents: 400_000 });
     expect(d.content.names[0].package_choice).toBeUndefined();
     expect(d.content.names[1].package_choice?.default).toBe("Concierge");
-    expect(d.reviewerNotes).toContain('"client chooses" package setting was not used for Prosperall');
+    expect(d.reviewerNotes).toContain('"client chooses" package setting was not used for Larkmoor');
     expect(validateContent(d.content).filter((i) => i.level === "error")).toEqual([]);
     expect(d.content.checks?.some((c) => c.path === "names[0].price_override")).toBe(true);
   });

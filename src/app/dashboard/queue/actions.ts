@@ -11,6 +11,11 @@ import { loadApprovalRouting } from "@/lib/queue/routing-load";
 import { loadActiveQueue } from "@/lib/queue/load";
 import { dismissStale, dismissableFollowups, type DismissResult } from "@/lib/queue/dismiss";
 import type { Role } from "@/lib/auth/roles";
+import { cardIdOf, cardNoteOf, sendCardBack } from "@/lib/queue/card-moves";
+import { sendBackNoteTooLong } from "@/lib/queue/handed";
+import { isDoneNote } from "@/lib/queue/done";
+import { clearOpenClaim, makeDraftInMyOutlook, retryPassToDrafter } from "@/lib/queue/make-draft";
+import { DECK_FAILED, REJECT_NOTE_IS_DONE_MARKER, SEND_BACK_NOTE_TOO_LONG } from "@/lib/ui/words";
 
 export type ReviewState = { error?: string };
 
@@ -23,6 +28,8 @@ export async function reviewQueueAction(_prev: ReviewState, formData: FormData):
   const id = String(formData.get("id") ?? "");
   const intent = String(formData.get("intent") ?? "");
   const body = formData.get("body");
+  // A person's own reject note may not be the Done marker (doneCardAction is the only thing that writes it).
+  if (intent === "reject" && isDoneNote(String(formData.get("note") ?? ""))) return { error: REJECT_NOTE_IS_DONE_MARKER };
   const outcome = await runQueueReview({
     id,
     intent,
@@ -39,7 +46,9 @@ export async function reviewQueueAction(_prev: ReviewState, formData: FormData):
   revalidatePath("/dashboard/queue/");
   revalidatePath(`/dashboard/queue/${id}/`);
   const sendParam = outcome.send ? `&send=${encodeURIComponent(outcome.send)}` : "";
-  redirect(`/dashboard/queue/${id}/?resolved=${outcome.intent}${sendParam}`);
+  // Sprint 4: before lectual 0112 the email went to the approver's own mailbox instead of the drafter; the page says so.
+  const passParam = outcome.kind === "resolved" && outcome.handoff?.status === "not-switched-on" ? "&pass=off" : outcome.handoff?.status === "queue-drafted" ? "&pass=queue" : "";
+  redirect(`/dashboard/queue/${id}/?resolved=${outcome.intent}${sendParam}${passParam}`);
 }
 
 export type DismissState = { message?: string; error?: string };
@@ -92,4 +101,63 @@ function dismissMessage(r: DismissResult): DismissState {
   if (r.attempted === 0) return { message: "Nothing to dismiss." };
   if (r.failed > 0) return { error: `Dismissed ${r.done}, ${r.failed} couldn't be dismissed. Refresh to try again.${rest}` };
   return { message: `Dismissed ${r.done} ${r.done === 1 ? "follow-up" : "follow-ups"}.${rest}` };
+}
+
+export type SendBackState = { error?: string };
+
+/**
+ * "Send back to <name>" on the approval page, for the colleague a card was handed to. The same core as the deck's Send
+ * back (`sendCardBack`): role and user re-resolved from the session, the item re-read (must be pending), the card events
+ * re-read, refused unless the caller is the CURRENT hand-off target. It records a `returned` event and tells the person who
+ * handed it (bell only). It never changes who may approve and sends nothing. The form posts the id and an optional note only.
+ */
+export async function sendBackAction(_prev: SendBackState, formData: FormData): Promise<SendBackState> {
+  const id = cardIdOf(formData.get("id"));
+  if (!id) return { error: DECK_FAILED };
+  const rawNote = formData.get("note");
+  if (sendBackNoteTooLong(rawNote)) return { error: SEND_BACK_NOTE_TOO_LONG };
+  const sent = await sendCardBack({ id, note: cardNoteOf(rawNote), allowHander: false });
+  if (!sent.ok) return { error: sent.error };
+  revalidatePath("/dashboard/queue/");
+  revalidatePath("/dashboard/queue/deck/");
+  revalidatePath(`/dashboard/queue/${id}/`);
+  redirect(`/dashboard/queue/${id}/?returned=1`);
+}
+
+export type MakeDraftState = { error?: string; message?: string; webLink?: string | null };
+
+/**
+ * "Make the draft in my Outlook" (Sprint 4). The form posts the item id; a posted `connection_id`, if any, is only ever
+ * compared with the caller's own connection (`makeDraftInMyOutlook`), never used. Every check is in the core.
+ */
+export async function makeDraftAction(_prev: MakeDraftState, formData: FormData): Promise<MakeDraftState> {
+  const id = cardIdOf(formData.get("id"));
+  if (!id) return { error: DECK_FAILED };
+  const made = await makeDraftInMyOutlook({ id, postedConnectionId: formData.get("connection_id") ?? undefined });
+  if (!made.ok) return { error: made.error };
+  revalidatePath("/dashboard/queue/");
+  revalidatePath(`/dashboard/queue/${id}/`);
+  return { message: made.message, webLink: made.webLink };
+}
+
+/** "Pass to <drafter>" (S3): the approver passes an approved email on again after a pass that didn't go through. */
+export async function retryPassAction(_prev: MakeDraftState, formData: FormData): Promise<MakeDraftState> {
+  const id = cardIdOf(formData.get("id"));
+  if (!id) return { error: DECK_FAILED };
+  const passed = await retryPassToDrafter({ id });
+  if (!passed.ok) return { error: passed.error };
+  revalidatePath("/dashboard/queue/");
+  revalidatePath(`/dashboard/queue/${id}/`);
+  return { message: passed.message };
+}
+
+/** "It isn't in my Drafts, try again": the drafter clears an open claim (the item id only; every check is in the core). */
+export async function clearClaimAction(_prev: MakeDraftState, formData: FormData): Promise<MakeDraftState> {
+  const id = cardIdOf(formData.get("id"));
+  if (!id) return { error: DECK_FAILED };
+  const cleared = await clearOpenClaim({ id });
+  if (!cleared.ok) return { error: cleared.error };
+  revalidatePath("/dashboard/queue/");
+  revalidatePath(`/dashboard/queue/${id}/`);
+  return { message: cleared.message };
 }

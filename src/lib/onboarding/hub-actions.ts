@@ -2,6 +2,7 @@
 
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { buildHubMeta, hideCard, isHubFlowId, markFlowDone, parseHubProgress, resetProgress, type HubProgress, type RecordPick } from "./hub";
+import { leadRead } from "@/lib/leads/live";
 
 export type HubSaveResult = { ok: true } | { ok: false; error: string };
 
@@ -69,7 +70,7 @@ export async function pickHubRecordsAction(): Promise<HubRecordPicks> {
     if (!user) return UNAVAILABLE;
 
     const [leads, matters] = await Promise.all([
-      supabase.from("crm_lead").select("id").order("last_activity_at", { ascending: false, nullsFirst: false }).limit(1),
+      leadRead(({ live }) => live(supabase.from("crm_lead").select("id")).order("last_activity_at", { ascending: false, nullsFirst: false }).limit(1)),
       supabase.from("crm_matter").select("id").order("created_at", { ascending: false }).limit(1),
     ]);
     const pick = (read: { data: { id: string }[] | null; error: unknown }): RecordPick => {

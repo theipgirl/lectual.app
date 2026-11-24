@@ -135,14 +135,14 @@ describe("describeNotification links (F2)", () => {
 
 describe("describeNotification: a client accepted a proposal (Sprint 19)", () => {
   const PROPOSAL = "44444444-4444-4444-8444-444444444444";
-  const accepted = { source: "proposal_accepted", proposal_id: PROPOSAL, headline: "Sevetri Wilson accepted Concierge · legal $4,950" };
+  const accepted = { source: "proposal_accepted", proposal_id: PROPOSAL, headline: "Callum Ferreira accepted Concierge · legal $4,950" };
 
   it("reads as 'Proposal accepted' with the headline and links to the proposal, not the queue", () => {
     const out = describeNotification(row("approval_needed", accepted));
     expect(out).toEqual({
       icon: "approval",
       label: "Proposal accepted",
-      sentence: "Sevetri Wilson accepted Concierge · legal $4,950",
+      sentence: "Callum Ferreira accepted Concierge · legal $4,950",
       href: `/dashboard/proposals/${PROPOSAL}/`,
     });
     expect(out.sentence).not.toContain("A draft is waiting");

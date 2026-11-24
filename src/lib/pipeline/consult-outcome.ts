@@ -50,6 +50,7 @@ export async function logConsultOutcome(leadId: string, input: LogConsultOutcome
 
   // Through the caller's own client: a lead outside their firm is simply absent.
   const { data: lead, error: leadError } = await supabase
+    // live-guard: reads the page's lead for a consult outcome
     .from("crm_lead")
     .select("first_name, last_name, email, assigned_to")
     .eq("id", leadId)

@@ -26,16 +26,19 @@ describe("compact page tops under 640px (Sprint 34 B)", () => {
     expect(sizes.at(-1)).toBeLessThanOrEqual(24);
   });
 
-  it("the sub-line is one line with an ellipsis, the eyebrow is hidden and no gap is stacked", () => {
-    expect(globals).toMatch(/\.lx-page-head \.lx-sub[^{]*\{[^}]*white-space:\s*nowrap[^}]*text-overflow:\s*ellipsis/);
-    expect(globals).toMatch(/\.lp-header \.lp-sub[^{]*\{[^}]*white-space:\s*nowrap/);
+  it("the sub-line wraps (whole, six-line backstop, never an ellipsis), the title is never cut, the eyebrow is hidden and no gap is stacked", () => {
+    expect(globals).toMatch(/\.lx-page-head \.lx-sub[^{]*\{[^}]*white-space:\s*normal[^}]*-webkit-line-clamp:\s*6/);
+    expect(globals).toMatch(/\.lp-header \.lp-sub[^{]*\{[^}]*white-space:\s*normal/);
+    expect(globals).not.toMatch(/\.lx-page-head \.lx-sub[^{]*\{[^}]*text-overflow:\s*ellipsis/);
+    // The phone header never truncates its title: no rule in the phone blocks gives the h1 nowrap or an ellipsis.
+    expect(globals).not.toMatch(/\.lx-h1[^{]*\{[^}]*(?:white-space:\s*nowrap|text-overflow:\s*ellipsis)/);
     expect(globals).toMatch(/\.lx-page-head-list \.lx-label\s*\{\s*display:\s*none/);
     expect(globals).toMatch(/\.lx-page\s*\{[^}]*gap:\s*10px/);
   });
 
-  it("filter chips are one horizontally scrolling row (both chip families)", () => {
-    expect(globals).toMatch(/\.lx-chips\s*\{[^}]*flex-wrap:\s*nowrap;[^}]*overflow-x:\s*auto/);
-    expect(listPage).toMatch(/\.lp-chips\s*\{[^}]*flex-wrap:\s*nowrap;[^}]*overflow-x:\s*auto/);
+  it("filter chips wrap onto more rows on a phone instead of scrolling out of sight (both chip families)", () => {
+    expect(globals).toMatch(/\.lx-chips\s*\{\s*flex-wrap:\s*wrap/);
+    expect(listPage).toMatch(/\.lp-chips\s*\{\s*flex-wrap:\s*wrap/);
   });
 
   it("toolbar buttons stay on one compact row", () => {
@@ -44,8 +47,8 @@ describe("compact page tops under 640px (Sprint 34 B)", () => {
     expect(globals).toMatch(/\.lx-head-actions\s*\{[^}]*flex-wrap:\s*nowrap/);
   });
 
-  it("the non-search toolbar controls sit on one nowrap row under 640px, with an icon and a short label", () => {
-    expect(listPage).toMatch(/\.lp-toolbar-actions\s*\{[^}]*display:\s*flex;[^}]*flex-wrap:\s*nowrap[^}]*overflow-x:\s*auto/);
+  it("the non-search toolbar controls wrap onto a second row under 640px, with an icon and a short label", () => {
+    expect(listPage).toMatch(/\.lp-toolbar-actions\s*\{[^}]*display:\s*flex;[^}]*flex-wrap:\s*wrap/);
     expect(listPage).toMatch(/\.lp-label-long\s*\{\s*display:\s*none/);
     expect(listPage).toMatch(/\.lp-label-short\s*\{\s*display:\s*inline/);
   });
@@ -62,7 +65,7 @@ describe("compact page tops under 640px (Sprint 34 B)", () => {
   });
 
   it("all eight pages draw their top with the shared header classes", () => {
-    const shared = /lx-page-head|<ListHeader/;
+    const shared = /lx-page-head|<ListHeader|<PageHeader/;
     for (const f of [
       "src/app/dashboard/page.tsx",
       "src/app/dashboard/intake/_components/IntakeWorkspace.tsx",

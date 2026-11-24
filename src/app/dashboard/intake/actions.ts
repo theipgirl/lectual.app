@@ -3,6 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { assignLead, moveLeadStage } from "@/lib/pipeline";
+import { listMemberDirectory } from "@/lib/members/directory";
+import { orgHasModule } from "@/lib/org/modules";
+import { getFirmTimeZone } from "@/lib/org/profile";
+import { compareRoleRules, loadCompare, type CompareResult } from "@/lib/intake/compare-load";
+import { LEADS_COMPARE_FAILED } from "@/lib/ui/words";
+import { canMergeLeads } from "@/lib/leads/merge";
+import { mergeAvailable } from "@/lib/leads/live";
 import { CAN_MOVE_STAGE, CAN_WRITE_LEAD, resolveCurrentRole } from "@/lib/pipeline/leads";
 import { runBulkMove, type BulkMoveResult } from "@/lib/pipeline/bulk-move";
 import { forbiddenLeadWrite } from "@/lib/pipeline/errors";
@@ -15,6 +22,7 @@ import { isReferralSource, type ReferralSource } from "@/lib/intake";
 import {
   friendlyLeadWriteError,
   friendlyMoveStageError,
+  MOVE_STAGE_NO_PERMISSION,
 } from "@/app/dashboard/leads/errors";
 
 /**
@@ -59,6 +67,16 @@ export async function assignLeadAction(
 
   try {
     await requireIntakeWriteRole();
+    if (userId) {
+      // Another firm's user id is refused, and an unreadable team list refuses the change rather than allowing it unchecked.
+      let member: boolean;
+      try {
+        member = (await listMemberDirectory()).some((m) => m.userId === userId);
+      } catch {
+        return { ok: false, error: "Couldn't check the team list right now, so nothing was saved. Try again." };
+      }
+      if (!member) return { ok: false, error: "That person isn't a member of your firm." };
+    }
     await assignLead(leadId, userId || null);
   } catch (err) {
     return {
@@ -85,6 +103,20 @@ export async function moveStageAction(
   if (!leadId || !stageId) return { ok: false, error: "Missing lead or stage." };
 
   try {
+    // The same refusals as the review's move: never a `won` stage (that move runs the matter handoff), and a lead already
+    // there is a no-op. The target is read through the caller's scoped client, so another firm's stage reads as missing.
+    const supabase = await getScopedClient();
+    // The role first: a role that may not move a stage reads nothing (not the lead, not the stage) and gets the one sentence.
+    if (!CAN_MOVE_STAGE.includes(await resolveCurrentRole(supabase))) return { ok: false, error: MOVE_STAGE_NO_PERMISSION };
+    // live-guard: re-reads one lead (live list) before a move whose guard refusal is mapped to a fixed sentence
+    const { data: lead, error: leadErr } = await supabase.from("crm_lead").select("id, current_stage_id").eq("id", leadId).maybeSingle();
+    if (leadErr) throw leadErr;
+    if (!lead) return { ok: false, error: "That record couldn't be found. It may have been removed." };
+    const { data: stage, error: stageErr } = await supabase.from("crm_stage").select("id, category").eq("id", stageId).maybeSingle();
+    if (stageErr) throw stageErr;
+    if (!stage) return { ok: false, error: "That stage isn't on your pipeline." };
+    if (stage.category === "won") return { ok: false, error: "Open the lead to move it to a won stage." };
+    if (lead.current_stage_id === stage.id) return { ok: false, error: "This lead is already in that stage." };
     await moveLeadStage(leadId, stageId);
   } catch (err) {
     return { ok: false, error: friendlyMoveStageError(err) };
@@ -117,6 +149,7 @@ export async function bulkMoveStageAction(leadIds: string[], stageId: string): P
       },
       readLeads: async (ids) => {
         const supabase = await getScopedClient();
+        // live-guard: bulk move re-reads the ticked (live) leads by id and moves each through moveLeadStage (refusal mapped); the compare panel reads two leads by id
         const { data, error } = await supabase.from("crm_lead").select("id, current_stage_id").in("id", ids);
         if (error) throw error;
         return data ?? [];
@@ -152,6 +185,8 @@ export async function setLaneAction(leadId: string, lane: Lane | null): Promise<
 
   revalidatePath("/dashboard/intake/");
   revalidatePath(`/dashboard/leads/${leadId}`);
+  // The Weekly review opens the same card; its rows read these fields too.
+  revalidatePath("/dashboard/review/");
   return { ok: true };
 }
 
@@ -178,5 +213,59 @@ export async function setSourceAction(
 
   revalidatePath("/dashboard/intake/");
   revalidatePath(`/dashboard/leads/${leadId}`);
+  // The Weekly review opens the same card; its rows read these fields too.
+  revalidatePath("/dashboard/review/");
   return { ok: true };
+}
+
+/**
+ * The "Possible duplicate" compare panel: two leads side by side, with what is on file for each. READ ONLY: nothing is
+ * merged, moved or written. Everything goes through the caller's scoped client (RLS is the tenant boundary, so another
+ * firm's id reads as "gone"); each count is its own read and a failed one says so. Proposals are counted only for a firm that
+ * has the Proposals feature (the module list that can't be read counts as off).
+ */
+export async function loadCompareAction(leadId: string, otherId: string): Promise<CompareResult> {
+  try {
+    const db = await getScopedClient();
+    // The role is resolved first: a caller with no resolvable role reads nothing and gets the one fixed sentence.
+    const role = await resolveCurrentRole(db);
+    const rules = compareRoleRules(role);
+    // The Merge link (M5): only for the roles that may merge, and only where lectual 0107 is there. Hidden otherwise.
+    const merge = canMergeLeads(role) && (await mergeAvailable(db));
+    const result = await loadCompare(leadId, otherId, {
+      readLead: async (id) => {
+        const { data, error } = await db
+          // live-guard: bulk move re-reads the ticked (live) leads by id and moves each through moveLeadStage (refusal mapped); the compare panel reads two leads by id
+          .from("crm_lead")
+          .select("id, first_name, last_name, business_name, mark_text, email, referral_source, created_at, current_stage_id")
+          .eq("id", id)
+          .maybeSingle();
+        if (error) throw error;
+        return data ?? null;
+      },
+      readStageName: async (stageId) => {
+        const { data, error } = await db.from("crm_stage").select("name").eq("id", stageId).maybeSingle();
+        if (error) throw error;
+        return data?.name ?? null;
+      },
+      count: async (table, id) => {
+        // `client_proposal` is not in the generated types (the proposals store casts the same way), so the count is typed here.
+        const counter = db as unknown as { from: (t: string) => { select: (c: string, o: { count: "exact"; head: true }) => { eq: (c: string, v: string) => PromiseLike<{ count: number | null; error: unknown }> } } };
+        const { count, error } = await counter.from(table).select("id", { count: "exact", head: true }).eq("lead_id", id);
+        if (error || count === null || count === undefined) throw new Error("count");
+        return count;
+      },
+      // Proposals are counted only for the roles that read them (the proposals roles of lectual 0089, PROPOSAL_STAFF_WRITE_ROLES) in a firm
+      // that has the feature. Any other role gets no Proposals row at all, never a "0". The count is by lead_id only: a proposal filed on the
+      // lead's matter but not on the lead is not counted.
+      // viewer and social_media see no email address in the comparison (it is left out, not blanked).
+      showEmail: rules.showEmail,
+      now: new Date(),
+      timeZone: await getFirmTimeZone().catch(() => "UTC"),
+      proposalsOn: async () => rules.mayCountProposals && (await orgHasModule("proposals")),
+    });
+    return result.ok && merge ? { ok: true, data: { ...result.data, merge: true } } : result;
+  } catch {
+    return { ok: false, error: LEADS_COMPARE_FAILED };
+  }
 }

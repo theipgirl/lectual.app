@@ -11,13 +11,15 @@
  * own chip: the move is a person's review.
  */
 
+import { OUR_TURN } from "@/lib/ui/words";
+
 export type Waiting = "uspto" | "approval" | "us" | "client";
 export type Direction = "we" | "they";
 
 export const WAITING_LABEL: Record<Waiting, string> = {
   uspto: "USPTO",
   approval: "Approval",
-  us: "Us",
+  us: OUR_TURN,
   client: "Client",
 };
 
@@ -38,10 +40,23 @@ export const USPTO_STAGE_PATTERNS: readonly RegExp[] = [
   /awaiting uspto/,
 ];
 
+/** A stage name with its code prefix ("19D · ", "19D. ", "19D ") removed. */
+function nameWithoutCode(label: string): string {
+  return label.replace(/^\s*\d+[a-z]?\s*[·.:\-–]?\s+/i, "").trim();
+}
+
+/** Invoice and payment stages are the client's turn, whatever else their name says ("Invoice for OA Response Sent"). */
+const NOT_USPTO_NAME = /^(send\s+)?(invoice|payment)\b/;
+
+/**
+ * A stage's own `waiting_on`, when set, always wins: "uspto" is the USPTO; "firm", "client" or
+ * "court" is not. The name table is only for a stage with no `waiting_on`.
+ */
 export function stageIsWithUspto(stage: { label: string; waiting_on?: string | null } | null | undefined): boolean {
   if (!stage) return false;
-  if (stage.waiting_on === "uspto") return true;
-  const label = String(stage.label ?? "").toLowerCase();
+  if (stage.waiting_on) return stage.waiting_on === "uspto";
+  const label = nameWithoutCode(String(stage.label ?? "").toLowerCase());
+  if (NOT_USPTO_NAME.test(label)) return false;
   return USPTO_STAGE_PATTERNS.some((p) => p.test(label));
 }
 

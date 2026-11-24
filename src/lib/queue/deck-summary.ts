@@ -1,7 +1,8 @@
 import "server-only";
 import type { Role } from "@/lib/auth/roles";
-import { dealFor, dealtAt } from "@/lib/deal/times";
-import { buildDeck, deckMinutes } from "@/lib/queue/deck";
+import { DEFAULT_DEAL_TIMES, dealFor, dealtAt } from "@/lib/deal/times";
+import type { QueueItem } from "@/lib/queue/api";
+import { buildDeck, deckMinutes, eventTrust } from "@/lib/queue/deck";
 import { loadCardState } from "@/lib/queue/card-state";
 import { loadActiveQueue } from "@/lib/queue/load";
 import { loadApprovalRouting } from "@/lib/queue/routing-load";
@@ -18,22 +19,29 @@ export type DeckSummary =
   | { status: "unconfigured" }
   | { status: "unavailable" };
 
-export async function loadDeckSummary(viewer: { userId: string; role: Role }): Promise<DeckSummary> {
+/** The viewer's deck from an already-loaded queue: the one `buildDeck` call the Today tile and the deal-ready nudge share. */
+export async function viewerDeck(items: readonly QueueItem[], viewer: { userId: string; role: Role }, dealTimes: readonly string[], at?: Date) {
+  const [routed, tz, cardState] = await Promise.all([loadApprovalRouting(), getFirmTimeZone(), loadCardState(items.map((i) => i.id))]);
+  const now = at ?? new Date();
+  const deck = buildDeck({
+    items: [...items],
+    routing: routed.status === "ok" ? routed.routing : {},
+    viewer,
+    cardState,
+    trust: eventTrust(routed),
+    now,
+    dealtAt: dealtAt(now, tz, dealTimes),
+  });
+  return { deck, now, tz };
+}
+
+export async function loadDeckSummary(viewer: { userId: string; role: Role }, dealTimes: readonly string[] = DEFAULT_DEAL_TIMES, at?: Date): Promise<DeckSummary> {
   try {
     const load = await loadActiveQueue("pending");
     if (load.status === "unconfigured") return { status: "unconfigured" };
     if (load.status !== "ok") return { status: "unavailable" };
-    const [routed, tz, cardState] = await Promise.all([loadApprovalRouting(), getFirmTimeZone(), loadCardState(load.items.map((i) => i.id))]);
-    const now = new Date();
-    const deal = dealFor(now, tz);
-    const deck = buildDeck({
-      items: load.items,
-      routing: routed.status === "ok" ? routed.routing : {},
-      viewer,
-      cardState,
-      now,
-      dealtAt: dealtAt(now, tz),
-    });
+    const { deck, now, tz } = await viewerDeck(load.items, viewer, dealTimes, at);
+    const deal = dealFor(now, tz, dealTimes);
     return {
       status: "ok",
       count: deck.cards.length,

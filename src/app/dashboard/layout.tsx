@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { RETURN_PATH_HEADER, isDashboardPath } from "@/lib/auth/return-path";
 import { redirect } from "next/navigation";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { loadActiveQueue } from "@/lib/queue/load";
@@ -17,12 +18,23 @@ import { CopilotLauncher } from "@/components/copilot/CopilotLauncher";
 import { aiConfigured } from "@/lib/ai/claude";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { GettingStartedRunner } from "@/components/onboarding/GettingStartedRunner";
+import { connectableProviders } from "@/lib/mailbox/config";
 import { FeedbackTrailRecorder } from "@/components/feedback/FeedbackTrailRecorder";
 import { FeedbackDialog } from "@/components/feedback/FeedbackDialog";
 import { NavProgress } from "@/components/shell/NavProgress";
 import { shouldShowTour } from "@/lib/onboarding/tour";
+import { guideFor, shouldShowWelcomeDeal } from "@/lib/onboarding/welcome-deal";
+import { WelcomeDeal } from "@/components/onboarding/WelcomeDeal";
 import { FirmWordmark } from "@/components/shell/FirmWordmark";
+import { DealTimesDialog } from "@/components/deck/DealTimesDialog";
+import { parseDealTimes } from "@/lib/deal/person-times";
+import { parseDeckSeen } from "@/lib/deal/nudge";
+import { loadDealNudge } from "@/lib/queue/deal-nudge-load";
+import { dealReadyLine, staffInsideFirm } from "@/lib/ui/words";
+import { friendlyZoneLabel } from "@/lib/org/firm-form";
+import { getFirmTimeZone } from "@/lib/org/profile";
 import { YourNameDialog } from "@/components/account/YourNameDialog";
+import { NoShowNotices } from "@/components/record-card/NoShowNotices";
 import { drawnNav, NO_PREVIEW, previewFor, shellFor, viewFor, viewMenuFor } from "@/lib/views";
 
 export const metadata: Metadata = { title: "Lectual" };
@@ -39,7 +51,9 @@ function initialsOf(name: string): string {
  * reachable — that is RLS's job on the active_org_id claim.
  */
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const session = await resolveFirmSession({ signInNext: "/dashboard/" });
+  // Come back to the page that was asked for (the proxy passes its path + query; see return-path.ts).
+  const returnTo = (await headers()).get(RETURN_PATH_HEADER);
+  const session = await resolveFirmSession({ signInNext: isDashboardPath(returnTo) ? returnTo : "/dashboard/" });
 
   if (session.kind === "signed-out") redirect(session.redirectTo);
   if (session.kind === "no-access") return <NoFirmAccess email={session.user.email} />;
@@ -66,7 +80,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
     cookies(),
   ]);
   // The badge counts what is the viewer's own (a routing read that fails counts every pending item).
-  const queue = await mineQueue(allQueue, { userId: user.id, role });
+  // The owner shell's deal-ready dot, from the queue read above (no second queue read), in parallel with the badge count.
+  // The technician shell never asks.
+  const [queue, nudge] = await Promise.all([
+    mineQueue(allQueue, { userId: user.id, role }),
+    shell.variant === "owner" ? loadDealNudge(allQueue, { userId: user.id, role }, parseDealTimes(user.user_metadata), parseDeckSeen(user.user_metadata)) : Promise.resolve(null),
+  ]);
+  const dealReady = nudge && nudge.ready ? dealReadyLine(nudge.label, nudge.count) : null;
   const railPinned = railIsPinned(cookieStore.get(RAIL_PIN_COOKIE)?.value);
 
   return (
@@ -75,19 +95,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <NavProgress />
       </Suspense>
       {actingAsStaff && (
-        <div
-          role="status"
-          style={{
-            background: "var(--warn)",
-            color: "var(--cream)",
-            fontSize: 13.5,
-            padding: "7px 26px",
-            fontFamily: "var(--mono)",
-            letterSpacing: ".08em",
-          }}
-        >
-          Lectual staff · you are inside {org.name}, a firm you are not a member of. This visit
-          is logged.
+        <div role="status" className="lx-staff-bar">
+          {staffInsideFirm(org.name)}
         </div>
       )}
       <header className={shell.variant === "owner" ? "lx-top lx-top--owner" : "lx-top"}>
@@ -95,7 +104,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <FirmWordmark org={org} />
         </div>
         {shell.variant !== "owner" && <SectionLabel />}
-        <div style={{ flex: 1 }} />
+        <div className="lx-top-spacer" />
         <NotificationBell />
         <AccountMenu
           initials={initialsOf(displayName)}
@@ -121,6 +130,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           showReports={shell.showReports}
           tree={shell.tree}
           variant={shell.variant}
+          dealReady={dealReady}
         />
         <div className="lx-content">
           <div className="lx-page">{children}</div>
@@ -134,13 +144,21 @@ export default async function DashboardLayout({ children }: { children: React.Re
         bar={shell.bar}
         groups={shell.moreGroups}
         variant={shell.variant}
+        dealReady={dealReady}
       />
       <CopilotLauncher configured={aiConfigured()} />
       <FeedbackTrailRecorder />
       <FeedbackDialog />
+      <NoShowNotices />
+      {shell.variant === "owner" && <DealTimesDialog current={parseDealTimes(user.user_metadata)} zoneLabel={friendlyZoneLabel(await getFirmTimeZone())} />}
       <YourNameDialog currentFullName={typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name : null} />
-      <OnboardingTour open={shouldShowTour(user.user_metadata) && !actingAsStaff} role={role} navSlugs={drawn.map((i) => i.slug)} firmName={org.name} aiConfigured={aiConfigured()} />
-      <GettingStartedRunner role={role} modules={org.modules} aiConfigured={aiConfigured()} />
+      {/* One first-sign-in guide, never both: the owner shell draws the welcome deal, every other shell the tour. */}
+      {guideFor(shell.variant) === "welcome" ? (
+        <WelcomeDeal open={shouldShowWelcomeDeal({ userMetadata: user.user_metadata, shellVariant: shell.variant, actingAsStaff })} dealTimes={parseDealTimes(user.user_metadata)} persist={!actingAsStaff} />
+      ) : (
+        <OnboardingTour open={shouldShowTour(user.user_metadata) && !actingAsStaff} role={role} navSlugs={drawn.map((i) => i.slug)} firmName={org.name} aiConfigured={aiConfigured()} />
+      )}
+      <GettingStartedRunner role={role} modules={org.modules} aiConfigured={aiConfigured()} outlookConnectable={connectableProviders().microsoft} />
     </div>
   );
 }

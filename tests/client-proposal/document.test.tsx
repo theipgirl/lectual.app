@@ -13,14 +13,14 @@ import {
   type ProposalDocumentProps,
 } from "@/components/client-proposal/ProposalDocument";
 import { defaultSelection, quoteProposal } from "@/lib/proposals/pricing";
-import { sevetri } from "../proposals/fixture";
+import { callum } from "../proposals/fixture";
 
 function render(over: Partial<ProposalDocumentProps> = {}) {
   return renderToStaticMarkup(
     <ProposalDocument
-      content={sevetri()}
+      content={callum()}
       title="Trademark Proposal"
-      clientName="Sevetri Wilson"
+      clientName="Callum Ferreira"
       expiresOn="2026-10-26"
       firm={{ name: "RPB Law", slug: "rpb-law" }}
       mode="live"
@@ -33,7 +33,7 @@ function render(over: Partial<ProposalDocumentProps> = {}) {
 describe("ProposalDocument", () => {
   it("shows the two labelled amounts and never a bare Total", () => {
     const html = render();
-    const q = quoteProposal(sevetri(), defaultSelection(sevetri()));
+    const q = quoteProposal(callum(), defaultSelection(callum()));
     expect(html).toContain("Legal fee due now");
     expect(html).toContain("USPTO filing fees, due at filing");
     expect(html).not.toMatch(/>\s*Total\s*</);
@@ -44,7 +44,7 @@ describe("ProposalDocument", () => {
   });
 
   it("renders firm text as text, never HTML", () => {
-    const content = sevetri();
+    const content = callum();
     content.names[0].note = '**<b onmouseover="x">hi</b>** <script>alert(1)</script>';
     content.greeting = "<img src=x onerror=alert(1)>";
     const html = render({ content });
@@ -60,7 +60,7 @@ describe("ProposalDocument", () => {
   });
 
   it("accepted mode shows the receipt with a Pay link and locked boxes", () => {
-    const content = sevetri();
+    const content = callum();
     const selection = defaultSelection(content);
     const html = render({
       mode: "accepted",
@@ -69,7 +69,7 @@ describe("ProposalDocument", () => {
       acceptedQuote: quoteProposal(content, selection),
       payUrl: "https://example.com/pay",
     });
-    expect(html).toContain("Thank you, Sevetri.");
+    expect(html).toContain("Thank you, Callum.");
     expect(html).toContain('href="https://example.com/pay"');
     expect(html).toContain("Pay my legal fee");
     expect(html).toContain('rel="noopener noreferrer"');
@@ -95,7 +95,7 @@ const checkboxes = (html: string) => html.match(/<input[^>]*type="checkbox"[^>]*
 
 /** One name, one mark, one class: nothing to choose. */
 function fixedOffer() {
-  const c = sevetri();
+  const c = callum();
   c.names = [c.names[0]];
   c.names[0].marks = [c.names[0].marks[0]];
   c.names[0].classes = [c.names[0].classes[0]];
@@ -134,7 +134,7 @@ describe("ProposalDocument: a fixed offer has no checkboxes", () => {
 describe("ProposalDocument: the last mark and class stay selected", () => {
   /** One name with word + logo and two classes, only the word mark and first class ticked. */
   function lastLeft() {
-    const c = sevetri();
+    const c = callum();
     c.names = [c.names[0]];
     c.names[0].marks[1].preselected = false;
     c.names[0].classes[1].preselected = false;

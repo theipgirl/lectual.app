@@ -149,6 +149,7 @@ describe("the Lawmatics settings page: LOE fields section", () => {
     vi.doMock("@/lib/firm/session", () => ({ resolveFirmSession: vi.fn(async () => ({ kind: "ok", role: opts.role ?? "owner", org: { id: "o", name: "RPB", slug: "rpb" }, user: { id: "u" } })) }));
     vi.doMock("@/lib/lawmatics/connection", () => ({
       getLawmaticsConnection: vi.fn(async () => ({ ok: true, connection: { id: "c", org_id: "o", status: opts.active === false ? "invalid" : "active", token_hint: "…0123", created_at: "2026-10-01T00:00:00Z", last_import_at: null, last_error: null } })),
+      getLawmaticsLastSync: vi.fn(async () => ({ status: "not-set-up" })),
     }));
     vi.doMock("@/lib/org/modules", () => ({ orgHasModule: vi.fn(async (m: string) => (opts.modules ?? ["proposals"]).includes(m)) }));
     vi.doMock("@/lib/proposals/loe-fields-load", () => ({
@@ -157,7 +158,7 @@ describe("the Lawmatics settings page: LOE fields section", () => {
     }));
     vi.doMock("@/components/lawmatics/LawmaticsImport", () => {
       const stub = () => createElement("div", { "data-stub": "import" });
-      return { ClientsImport: stub, ConnectLawmatics: stub, DisconnectLawmatics: stub, MattersImport: stub, HiredMattersSync: stub };
+      return { ClientsImport: stub, ConnectLawmatics: stub, DisconnectLawmatics: stub, MattersImport: stub, LawmaticsSyncNow: stub };
     });
     vi.doMock("@/app/dashboard/settings/integrations/lawmatics/loe-fields-actions", () => ({ saveLoeFieldsAction: vi.fn() }));
     const { default: Page } = await import("../../src/app/dashboard/settings/integrations/lawmatics/page");

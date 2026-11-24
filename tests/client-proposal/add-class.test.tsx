@@ -9,14 +9,14 @@ vi.mock("next/font/google", () => ({
 import { ProposalDocument, type ProposalDocumentProps } from "@/components/client-proposal/ProposalDocument";
 import { DESCRIBE_BEFORE_ACCEPT, DEFAULT_CLIENT_ENTRY_PROMPT, quoteWithClientClasses, type ClientClassInput } from "@/lib/proposals/client-classes";
 import type { ProposalContent } from "@/lib/proposals/types";
-import { sevetri } from "../proposals/fixture";
+import { callum } from "../proposals/fixture";
 
 function render(over: Partial<ProposalDocumentProps> = {}) {
   return renderToStaticMarkup(
     <ProposalDocument
-      content={sevetri()}
+      content={callum()}
       title="Trademark Proposal"
-      clientName="Sevetri Wilson"
+      clientName="Callum Ferreira"
       expiresOn="2026-10-26"
       firm={{ name: "RPB Law", slug: "rpb-law" }}
       mode="live"
@@ -28,7 +28,7 @@ function render(over: Partial<ProposalDocumentProps> = {}) {
 
 /** One brand name with one class, Essential-shaped. */
 function oneClass(): ProposalContent {
-  const c = sevetri();
+  const c = callum();
   c.pricing = { ...c.pricing, package: "Essential", base_cents: 195_000, included_classes: 1, per_class_cents: 82_500 };
   c.names = [{ ...c.names[0], classes: [c.names[0].classes[0]] }];
   return c;
@@ -64,7 +64,7 @@ describe("the client page: one class is always included", () => {
   });
 
   it("a multi-class mark with a single class left ticked is disabled with 'At least one class is included'", () => {
-    const c = sevetri();
+    const c = callum();
     c.names[0].classes[1].preselected = false;
     const html = render({ content: c });
     expect(html).toContain('<span class="cp-lock">At least one class is included</span>');
@@ -73,7 +73,7 @@ describe("the client page: one class is always included", () => {
   });
 
   it("with two classes ticked nothing is locked", () => {
-    const html = render({ content: sevetri() });
+    const html = render({ content: callum() });
     expect(html).not.toContain("cp-lock");
   });
 });
@@ -86,7 +86,7 @@ describe("the client page: Add a class (explicit max, else 5, else none on a fix
   });
 
   it("a brand name whose marks are all unticked has no control", () => {
-    const c = sevetri();
+    const c = callum();
     c.names[1].marks.forEach((m) => (m.preselected = false));
     expect(render({ content: c }).match(/Add a class<\/h4>/g)?.length).toBe(1);
   });
@@ -120,14 +120,14 @@ describe("the client page: Add a class (explicit max, else 5, else none on a fix
   it("at the max the button gives way to a sentence", () => {
     const html = render({ content: withRoom(1), initialClientClasses: added("p", ["Online store", true]) });
     expect(html).not.toContain("cp-add-btn");
-    expect(html).toContain("You can add up to 1 class for “Prosperall”.");
+    expect(html).toContain("You can add up to 1 class for “Larkmoor”.");
   });
 
   it("says in words what the package includes and what the next class costs", () => {
     const html = render({ content: withRoom() });
     expect(html).toContain("Essential includes 1 class.");
     expect(html).toContain("Each class past that is $825 legal + $350 USPTO per class.");
-    const concierge = sevetri();
+    const concierge = callum();
     concierge.names[0].client_add = { max: 1 };
     expect(render({ content: concierge })).toContain(
       "Concierge includes 3 classes. 1 more included at no extra legal fee; after that $825 legal + $350 USPTO per class.",
@@ -154,7 +154,7 @@ describe("the client page: open classes", () => {
     expect(html.match(/type="checkbox"/g)?.length).toBe(4);
     expect(html.match(/class="cp-entry"/g)?.length).toBe(3);
     expect(html).toContain(`Class 1 · ${DEFAULT_CLIENT_ENTRY_PROMPT}`);
-    expect(html).toContain(`aria-label="Class 2 for Prosperall: ${DEFAULT_CLIENT_ENTRY_PROMPT}"`);
+    expect(html).toContain(`aria-label="Class 2 for Larkmoor: ${DEFAULT_CLIENT_ENTRY_PROMPT}"`);
     // never a fixed offer
     expect(html).not.toContain("cp-fixed");
   });
@@ -185,8 +185,8 @@ describe("the client page: a class the client added", () => {
   it("has its own checkbox, text box and Remove, and is priced into the legal and USPTO lines", () => {
     const withOne = render({ content: withRoom(), initialClientClasses: added("p", ["Online store services", true]) });
     expect(withOne).toContain('value="Online store services"');
-    expect(withOne).toContain('aria-label="Remove added class 1 for Prosperall"');
-    expect(withOne).toContain('aria-label="Include added class 1 for Prosperall"');
+    expect(withOne).toContain('aria-label="Remove added class 1 for Larkmoor"');
+    expect(withOne).toContain('aria-label="Include added class 1 for Larkmoor"');
     expect(withOne).toContain(">Remove</button>");
     expect(withOne).toContain("Added by you");
     // Essential $1,950 + $825 for the first mark, the second mark 20% off that: legal 2,775 + 2,220; USPTO 2 classes x 2 marks
@@ -213,7 +213,7 @@ describe("the client page: a class the client added", () => {
     const c = withRoom();
     c.names[0].classes[0].preselected = false;
     const html = render({ content: c, initialClientClasses: added("p", ["Online store services", true]) });
-    expect(html).toMatch(/<button type="button" class="cp-link" disabled="" aria-describedby="cp-keep-p" aria-label="Remove added class 1 for Prosperall">/);
+    expect(html).toMatch(/<button type="button" class="cp-link" disabled="" aria-describedby="cp-keep-p" aria-label="Remove added class 1 for Larkmoor">/);
     expect(html).toContain("At least one class is included");
   });
 });
@@ -266,7 +266,7 @@ describe("the client page: accepted versions show the client's words read-only",
 
 describe("the client page: price words agree with the engine, and added classes carry no class number", () => {
   function custom(): ProposalContent {
-    const c = sevetri();
+    const c = callum();
     c.pricing = { ...c.pricing, reduce_under_included: true };
     c.names = [{ ...c.names[0], marks: [c.names[0].marks[0]], classes: [c.names[0].classes[0]], client_add: { max: 2 } }];
     return c;
@@ -291,7 +291,7 @@ describe("the client page: price words agree with the engine, and added classes 
   });
 
   it("three staff classes and two added: no 'Class 4' to 'Class 9' label anywhere", () => {
-    const base = sevetri();
+    const base = callum();
     base.names[0].classes.push({ id: "p-c3", label: "Printed goods", preselected: true });
     base.names[0].client_add = { max: 2 };
     const html = render({ content: base, initialClientClasses: added("p", ["Online store services", true], ["Event hosting", true]) });

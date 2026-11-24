@@ -189,7 +189,7 @@ describe("consult-held mapping", () => {
   const stage = (name: string, orderIndex: number, id = `s-${name}`): StageOpt => ({ id, name, category: "open", orderIndex });
 
   it("resolves Consult Held, then Consultation Held, then Consult Completed, in that order", () => {
-    expect(DEFAULT_STAGE_NAMES["consult-held"]).toEqual(["Consult Held", "Consultation Held", "Consult Completed"]);
+    expect(DEFAULT_STAGE_NAMES["consult-held"]).toEqual(["Consult Held – Proposal in Progress", "Consult Held", "Consultation Held", "Consult Completed"]);
     const all = [stage("Consult Completed", 4), stage("Consultation Held", 3), stage("Consult Held", 2), stage("Consultation Scheduled", 1)];
     expect(stageForSignal("consult-held", all, {})?.name).toBe("Consult Held");
     expect(stageForSignal("consult-held", all.filter((s) => s.name !== "Consult Held"), {})?.name).toBe("Consultation Held");
@@ -207,9 +207,9 @@ describe("consult-held mapping", () => {
     expect(stageForSignal("consult-held", stages, parseStageMapping([{ key: "consult-held", data: { stage: "Nowhere" } }]))).toBeNull();
   });
 
-  it("the ON HOLD board names are not added as defaults", () => {
-    const all = JSON.stringify(DEFAULT_STAGE_NAMES);
-    expect(all).not.toMatch(/Proposal in Progress/i);
+  it("the RPB board names lead the consult-held and post-consult lists; consult-scheduled is unchanged", () => {
+    expect(DEFAULT_STAGE_NAMES["consult-held"][0]).toBe("Consult Held – Proposal in Progress");
+    expect(DEFAULT_STAGE_NAMES["post-consult-sent"][0]).toBe("Proposal Sent");
     expect(JSON.stringify(DEFAULT_STAGE_NAMES["consult-scheduled"])).toBe(
       JSON.stringify(["Consultation Scheduled", "Consult Scheduled", "Consult Booked", "Strategy Session Scheduled", "Discovery Call Scheduled"]),
     );

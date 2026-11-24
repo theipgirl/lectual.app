@@ -14,75 +14,15 @@
 .ifm-root > * {
   flex-shrink: 0;
 }
-
-/* ── header + tabs ─────────────────────────────────────────── */
-.ifm-head-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.ifm-status {
-  height: 28px;
-  padding: 0 11px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 13px;
-  font-weight: 600;
-  background: var(--well);
-  color: var(--muted);
-}
-.ifm-status i {
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: #b8a7a0;
-}
-.ifm-status.live {
-  background: rgba(67, 96, 47, 0.12);
-  color: var(--ok);
-}
-.ifm-status.live i {
-  background: var(--ok);
-}
-.ifm-tabs {
-  display: flex;
-  gap: 24px;
-  border-bottom: 1px solid var(--line);
-  margin-top: -4px;
-}
-.ifm-tabs a {
-  height: 44px;
-  display: flex;
-  align-items: center;
-  font-size: 14.5px;
-  color: var(--muted);
-  margin-bottom: -1px;
-}
-.ifm-tabs a:hover {
-  text-decoration: none;
-  color: var(--ink);
-}
-.ifm-tabs a[aria-current="page"] {
-  color: var(--ink);
-  font-weight: 600;
-  box-shadow: inset 0 -2px 0 var(--ox);
-}
 .ifm-spin {
   width: 13px;
   height: 13px;
   box-sizing: border-box;
-  border: 2px solid rgba(253, 247, 235, 0.4);
-  border-top-color: var(--cream);
-  border-radius: 999px;
+  border: 2px solid var(--line-3);
+  border-top-color: var(--ox);
+  border-radius: var(--r-pill);
   display: inline-block;
   animation: ifm-spin 0.7s linear infinite;
-}
-.ifm-spin.dark {
-  border-color: rgba(42, 18, 22, 0.25);
-  border-top-color: var(--ink);
 }
 @keyframes ifm-spin {
   to {
@@ -109,8 +49,9 @@
 .ifm-card {
   background: var(--card);
   border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 24px;
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
+  padding: var(--pad-card);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -118,14 +59,14 @@
 }
 .ifm-title {
   font-family: var(--sans);
-  font-size: 16px;
+  font-size: var(--fs-4);
   line-height: 24px;
   font-weight: 600;
   color: var(--ink);
   margin: 0;
 }
 .ifm-help {
-  font-size: 13px;
+  font-size: var(--fs-1);
   line-height: 18px;
   color: var(--muted);
   margin: 0;
@@ -135,22 +76,21 @@
   color: var(--muted);
 }
 .ifm-err {
-  font-size: 13px;
+  font-size: var(--fs-1);
   line-height: 18px;
   color: var(--wine);
 }
 .ifm-caps {
-  font-family: var(--mono);
-  font-size: 11.5px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-size: var(--fs-1);
+  letter-spacing: 0;
+  font-weight: 500;
   color: var(--muted);
 }
 .ifm-count {
-  font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--fs-1);
   color: var(--muted);
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .ifm-field {
   display: flex;
@@ -165,7 +105,7 @@
   flex-wrap: wrap;
 }
 .ifm-field-label {
-  font-size: 14px;
+  font-size: var(--fs-2);
   line-height: 20px;
   font-weight: 500;
   color: var(--ink);
@@ -176,9 +116,9 @@
   gap: 5px;
   height: 22px;
   padding: 0 8px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--well);
-  font-size: 12px;
+  font-size: var(--fs-1);
   color: var(--body);
 }
 .ifm-grid2 {
@@ -191,37 +131,27 @@
   align-items: center;
   gap: 12px;
 }
-.ifm-input {
-  width: 100%;
-  box-sizing: border-box;
-  min-height: 40px;
-  padding: 9px 12px;
-  border: 1px solid rgba(42, 18, 22, 0.2);
-  border-radius: 8px;
-  background-color: #fff;
-  font: inherit;
-  font-size: 14px;
-  line-height: 20px;
-  color: var(--ink);
-  outline: none;
+/* The Share row (link + three buttons): wraps on a narrow screen instead of running past the edge. */
+.ifm-row-wrap {
+  flex-wrap: wrap;
 }
-textarea.ifm-input {
+.ifm-row-wrap > .lx-input {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+textarea.lx-input {
   resize: vertical;
 }
-.ifm-input:focus {
-  border-color: var(--ox);
-  box-shadow: 0 0 0 3px rgba(106, 31, 43, 0.12);
-}
-.ifm-input.bad {
+.lx-input.bad {
   border-color: var(--wine);
-  background-color: #fdf4f5;
+  background-color: var(--tint-wine);
 }
-.ifm-input.ifm-readonly {
+.lx-input.ifm-readonly {
   background-color: var(--paper);
   color: var(--body);
   border-color: var(--line);
 }
-.ifm-editor:disabled .ifm-input {
+.ifm-editor:disabled .lx-input {
   background-color: var(--paper);
   color: var(--body);
 }
@@ -232,7 +162,7 @@ textarea.ifm-input {
   font: inherit;
   font-size: 14px;
   font-weight: 500;
-  color: var(--ox);
+  color: var(--wine);
   cursor: pointer;
 }
 .ifm-link:hover {
@@ -246,13 +176,13 @@ textarea.ifm-input {
 .ifm-switch {
   width: 36px;
   height: 20px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   position: relative;
   flex: 0 0 auto;
   border: 0;
   padding: 0;
   cursor: pointer;
-  background: rgba(42, 18, 22, 0.2);
+  background: var(--line-3);
   transition: background 0.15s;
 }
 .ifm-switch i {
@@ -261,9 +191,9 @@ textarea.ifm-input {
   left: 2px;
   width: 16px;
   height: 16px;
-  border-radius: 999px;
-  background: #fff;
-  box-shadow: 0 1px 2px rgba(20, 4, 8, 0.3);
+  border-radius: var(--r-pill);
+  background: var(--card);
+  box-shadow: var(--shadow);
   transition: left 0.15s;
 }
 .ifm-switch.on {
@@ -273,75 +203,13 @@ textarea.ifm-input {
   left: 18px;
 }
 .ifm-switch:disabled {
-  opacity: 0.6;
-}
-
-/* segmented control */
-.ifm-seg {
-  display: inline-flex;
-  padding: 3px;
-  border-radius: 9px;
-  background: var(--well);
-  gap: 2px;
-  align-self: flex-start;
-}
-.ifm-seg button,
-.ifm-seg a {
-  height: 30px;
-  padding: 0 12px;
-  border-radius: 7px;
-  border: 0;
-  background: transparent;
-  display: flex;
-  align-items: center;
-  font: inherit;
-  font-size: 13.5px;
-  color: var(--muted);
-  cursor: pointer;
-  white-space: nowrap;
-}
-.ifm-seg a:hover {
-  text-decoration: none;
-  color: var(--ink);
-}
-.ifm-seg .on {
-  background: var(--card);
-  color: var(--ink);
-  font-weight: 600;
-  box-shadow: 0 1px 2px rgba(20, 4, 8, 0.12);
-}
-
-/* chips */
-.ifm-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.ifm-chip {
-  height: 32px;
-  padding: 0 12px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font: inherit;
-  font-size: 14px;
-  cursor: pointer;
-  white-space: nowrap;
-  background: #fff;
-  color: var(--body);
-  border: 1px solid rgba(42, 18, 22, 0.2);
-}
-.ifm-chip.on {
-  background: var(--ox);
-  color: var(--cream);
-  border-color: var(--ox);
+  opacity: 0.5;
 }
 
 /* checklist */
 .ifm-checklist {
-  border-color: rgba(106, 31, 43, 0.3);
-  box-shadow: 0 12px 28px -24px rgba(20, 4, 8, 0.5);
+  border-color: var(--line-ox);
+  box-shadow: var(--shadow-pop);
 }
 .ifm-checklist-head {
   display: flex;
@@ -350,13 +218,13 @@ textarea.ifm-input {
 }
 .ifm-progress {
   height: 6px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--well);
   overflow: hidden;
 }
 .ifm-progress > div {
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--ox);
   transition: width 0.3s;
 }
@@ -370,19 +238,19 @@ textarea.ifm-input {
   align-items: center;
   gap: 12px;
   min-height: 40px;
-  border-top: 1px solid rgba(42, 18, 22, 0.07);
+  border-top: 1px solid var(--line-2);
 }
 .ifm-check-icon {
   width: 20px;
   height: 20px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  border: 1.5px solid rgba(42, 18, 22, 0.3);
-  font-size: 12px;
+  border: 1.5px solid var(--line-3);
+  font-size: var(--fs-1);
   font-weight: 700;
 }
 .ifm-check-label {
@@ -395,7 +263,7 @@ textarea.ifm-input {
 .ifm-checklist-items li.ok .ifm-check-icon {
   background: var(--ok);
   border-color: var(--ok);
-  color: #fff;
+  color: var(--cream);
 }
 .ifm-checklist-items li.ok .ifm-check-label {
   color: var(--muted);
@@ -404,42 +272,11 @@ textarea.ifm-input {
 .ifm-checklist-items li.bad .ifm-check-icon {
   background: var(--wine);
   border-color: var(--wine);
-  color: #fff;
+  color: var(--cream);
 }
 .ifm-checklist-items li.bad .ifm-check-label {
   color: var(--wine);
   font-weight: 500;
-}
-.ifm-live-banner {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  border-radius: 12px;
-  background: rgba(67, 96, 47, 0.12);
-  border: 1px solid rgba(67, 96, 47, 0.3);
-  color: var(--ok);
-}
-.ifm-live-text {
-  flex: 1;
-  min-width: 0;
-  font-size: 14px;
-  line-height: 20px;
-  font-weight: 500;
-  color: #2f4a20;
-  overflow-wrap: anywhere;
-}
-.ifm-live-copy {
-  height: 32px;
-  padding: 0 12px;
-  border-radius: 8px;
-  border: 0;
-  background: var(--ok);
-  color: #fff;
-  font: inherit;
-  font-size: 13.5px;
-  font-weight: 500;
-  cursor: pointer;
 }
 
 /* mode cards */
@@ -450,20 +287,20 @@ textarea.ifm-input {
 }
 .ifm-mode {
   padding: 16px;
-  border-radius: 10px;
+  border-radius: var(--r-md);
   cursor: pointer;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  background: #fff;
-  border: 1px solid rgba(42, 18, 22, 0.15);
+  background: var(--card);
+  border: 1px solid var(--line);
   text-align: left;
   font: inherit;
   color: var(--ink);
 }
 .ifm-mode.on {
   border: 1.5px solid var(--ox);
-  box-shadow: 0 0 0 3px rgba(106, 31, 43, 0.1);
+  box-shadow: 0 0 0 3px var(--tint-ox);
 }
 .ifm-mode-head {
   display: flex;
@@ -473,7 +310,7 @@ textarea.ifm-input {
 .ifm-mode-icon {
   width: 32px;
   height: 32px;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   background: var(--well);
   color: var(--ox);
   display: flex;
@@ -489,9 +326,9 @@ textarea.ifm-input {
 .ifm-mode-tick {
   width: 20px;
   height: 20px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--ox);
-  color: #fff;
+  color: var(--cream);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -504,7 +341,7 @@ textarea.ifm-input {
   gap: 12px;
   min-height: 56px;
   padding: 8px 14px;
-  border-radius: 10px;
+  border-radius: var(--r-md);
   background: var(--paper);
   border: 1px solid var(--line-2);
 }
@@ -527,14 +364,14 @@ textarea.ifm-input {
   min-height: 56px;
   box-sizing: border-box;
   padding: 8px 10px 8px 6px;
-  border-radius: 10px;
-  background: #fff;
-  border: 1px solid rgba(42, 18, 22, 0.1);
+  border-radius: var(--r-md);
+  background: var(--card);
+  border: 1px solid var(--line);
   transition: background 0.4s;
 }
 .ifm-q.added {
-  background: rgba(106, 31, 43, 0.08);
-  border-color: rgba(106, 31, 43, 0.25);
+  background: var(--tint-ox);
+  border-color: var(--line-ox);
 }
 .ifm-q.dragging {
   opacity: 0.4;
@@ -557,10 +394,9 @@ textarea.ifm-input {
   min-width: 0;
 }
 .ifm-q-pack {
-  font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: var(--fs-1);
   padding: 3px 7px;
-  border-radius: 5px;
+  border-radius: var(--r-sm);
   background: var(--well);
   color: var(--muted);
   white-space: nowrap;
@@ -579,7 +415,7 @@ textarea.ifm-input {
 .ifm-icon-btn {
   width: 32px;
   height: 32px;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -591,70 +427,18 @@ textarea.ifm-input {
 .ifm-icon-btn:hover {
   background: var(--well);
 }
-.ifm-menu {
-  position: absolute;
-  right: 0;
-  top: 36px;
-  z-index: 20;
-  width: 160px;
-  padding: 6px;
-  border-radius: 10px;
-  background: #fff;
-  border: 1px solid var(--line);
-  box-shadow: 0 14px 32px -12px rgba(20, 4, 8, 0.35);
-  display: flex;
-  flex-direction: column;
-}
-.ifm-menu button {
-  height: 34px;
-  padding: 0 10px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  font: inherit;
-  font-size: 14px;
-  color: var(--ink);
-  cursor: pointer;
-  background: transparent;
-  border: 0;
-  text-align: left;
-}
-.ifm-menu button:hover:not(:disabled) {
-  background: var(--paper);
-}
-.ifm-menu button:disabled {
-  color: rgba(42, 18, 22, 0.3);
-  cursor: default;
-}
-.ifm-menu button.danger {
-  color: var(--wine);
-}
-.ifm-menu button.danger:hover {
-  background: rgba(142, 39, 51, 0.08);
-}
-.ifm-empty {
-  padding: 20px;
-  border-radius: 10px;
-  border: 1px dashed rgba(42, 18, 22, 0.2);
-  font-size: 14px;
-  color: var(--muted);
-  text-align: center;
-}
-.ifm-empty.bad {
-  border-color: var(--wine);
-  color: var(--wine);
-}
+.ifm-empty-bad p { color: var(--wine); }
 .ifm-empty-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  text-align: left;
+  flex-wrap: wrap;
 }
 .ifm-add {
   align-self: flex-start;
   height: 36px;
   padding: 0 12px;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -667,7 +451,7 @@ textarea.ifm-input {
   border: 0;
 }
 .ifm-add:hover:not(:disabled) {
-  background: rgba(106, 31, 43, 0.07);
+  background: var(--tint-ox);
 }
 
 /* fee packages */
@@ -675,8 +459,8 @@ textarea.ifm-input {
   list-style: none;
   margin: 0;
   padding: 0;
-  border: 1px solid rgba(42, 18, 22, 0.1);
-  border-radius: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
   overflow: hidden;
 }
 .ifm-pkgs.off {
@@ -689,7 +473,7 @@ textarea.ifm-input {
   padding: 12px 14px;
 }
 .ifm-pkgs li + li {
-  border-top: 1px solid rgba(42, 18, 22, 0.08);
+  border-top: 1px solid var(--line-2);
 }
 .ifm-pkg-head {
   display: flex;
@@ -703,49 +487,14 @@ textarea.ifm-input {
   color: var(--ink);
 }
 .ifm-pkg-price {
-  font-family: var(--mono);
   font-size: 14px;
   font-variant-numeric: tabular-nums;
   color: var(--ink);
-}
-
-/* compliance */
-.ifm-badge {
-  height: 24px;
-  padding: 0 9px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  font-size: 12.5px;
-  font-weight: 500;
-  white-space: nowrap;
-  background: var(--well);
-  color: var(--muted);
-}
-.ifm-badge.ok {
-  background: rgba(67, 96, 47, 0.12);
-  color: var(--ok);
-}
-.ifm-badge.warn {
-  background: rgba(124, 83, 18, 0.14);
-  color: var(--warn);
-}
-.ifm-badge.risk {
-  background: rgba(142, 39, 51, 0.1);
-  color: var(--wine);
-}
-.ifm-badge.ox {
-  background: rgba(106, 31, 43, 0.1);
-  color: var(--ox);
-}
-.ifm-badge.sand {
-  background: #efe7d6;
-  color: var(--body);
-  font-weight: 400;
+  font-variant-numeric: tabular-nums;
 }
 .ifm-quote {
   padding: 12px 14px;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   background: var(--paper);
   border: 1px solid var(--line-2);
   font-size: 14px;
@@ -771,9 +520,9 @@ textarea.ifm-input {
   width: 36px;
   height: 36px;
   padding: 2px;
-  border: 1px solid rgba(42, 18, 22, 0.2);
-  border-radius: 8px;
-  background: #fff;
+  border: 1px solid var(--line-3);
+  border-radius: var(--r-md);
+  background: var(--card);
   cursor: pointer;
   flex: 0 0 auto;
 }
@@ -789,13 +538,11 @@ textarea.ifm-input {
   box-sizing: border-box;
   height: 30px;
   padding: 0 8px;
-  border: 1px solid rgba(42, 18, 22, 0.2);
-  border-radius: 6px;
-  background: #fff;
-  font-family: var(--mono);
-  font-size: 13px;
+  border: 1px solid var(--line-3);
+  border-radius: var(--r-sm);
+  background: var(--card);
+  font-size: var(--fs-1);
   color: var(--ink);
-  outline: none;
 }
 .ifm-hex:focus {
   border-color: var(--ox);
@@ -805,11 +552,11 @@ textarea.ifm-input {
 .ifm-code {
   margin: 0;
   padding: 14px 16px;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   background: var(--ink);
-  color: #f1e3da;
+  color: var(--on-deep);
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: var(--fs-1);
   line-height: 20px;
   white-space: pre-wrap;
   word-break: break-all;
@@ -818,9 +565,9 @@ textarea.ifm-input {
   min-height: 40px;
   box-sizing: border-box;
   padding: 5px 6px;
-  border: 1px solid rgba(42, 18, 22, 0.2);
-  border-radius: 8px;
-  background: #fff;
+  border: 1px solid var(--line-3);
+  border-radius: var(--r-md);
+  background: var(--card);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -831,7 +578,6 @@ textarea.ifm-input {
   min-width: 160px;
   height: 28px;
   border: 0;
-  outline: none;
   background: transparent;
   font: inherit;
   font-size: 14px;
@@ -841,19 +587,18 @@ textarea.ifm-input {
 .ifm-domain {
   height: 28px;
   padding: 0 6px 0 10px;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   background: var(--well);
   display: flex;
   align-items: center;
   gap: 6px;
-  font-family: var(--mono);
-  font-size: 13px;
+  font-size: var(--fs-1);
   color: var(--ink);
 }
 .ifm-domain button {
   width: 18px;
   height: 18px;
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -864,7 +609,7 @@ textarea.ifm-input {
   padding: 0;
 }
 .ifm-domain button:hover {
-  background: rgba(42, 18, 22, 0.1);
+  background: var(--well);
 }
 
 /* ── live preview ──────────────────────────────────────────── */
@@ -876,7 +621,7 @@ textarea.ifm-input {
   display: flex;
   flex-direction: column;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   background: var(--paper);
   overflow: hidden;
 }
@@ -890,9 +635,6 @@ textarea.ifm-input {
   background: var(--card);
   flex-wrap: wrap;
 }
-.ifm-pv-bar .ifm-seg {
-  align-self: center;
-}
 .ifm-pv-title {
   flex: 1;
   min-width: 0;
@@ -903,12 +645,12 @@ textarea.ifm-input {
 .ifm-pv-restart {
   height: 30px;
   padding: 0 10px;
-  border-radius: 7px;
+  border-radius: var(--r-sm);
   display: flex;
   align-items: center;
   gap: 6px;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--fs-1);
   color: var(--body);
   cursor: pointer;
   border: 0;
@@ -932,16 +674,16 @@ textarea.ifm-input {
   box-sizing: border-box;
   height: 100%;
   width: 100%;
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   background: var(--pv-bg);
   border: 1px solid var(--pv-line);
-  box-shadow: 0 20px 44px -28px rgba(20, 4, 8, 0.5);
+  box-shadow: var(--shadow-lift);
   color: var(--pv-ink);
 }
 .ifm-pv-frame.mobile {
   width: 390px;
   max-width: 100%;
-  border-radius: 28px;
+  border-radius: var(--r-lg);
 }
 .ifm-pv-head {
   flex: 0 0 auto;
@@ -952,9 +694,9 @@ textarea.ifm-input {
   border-bottom: 1px solid var(--pv-line);
 }
 .ifm-pv-firm {
-  font-size: 12px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-size: var(--fs-1);
+  letter-spacing: 0;
+  font-weight: 500;
   font-weight: 600;
   color: var(--pv-acc);
 }
@@ -984,12 +726,12 @@ textarea.ifm-input {
 }
 .ifm-pv-bubble.bot {
   align-self: flex-start;
-  border-radius: 14px 14px 14px 4px;
+  border-radius: var(--r-lg) var(--r-lg) var(--r-lg) var(--r-sm);
   background: var(--pv-bot);
 }
 .ifm-pv-bubble.you {
   align-self: flex-end;
-  border-radius: 14px 14px 4px 14px;
+  border-radius: var(--r-lg) var(--r-lg) var(--r-sm) var(--r-lg);
   background: var(--pv-acc);
   color: var(--pv-on-acc);
 }
@@ -1001,7 +743,7 @@ textarea.ifm-input {
 }
 .ifm-pv-card {
   padding: 12px 14px;
-  border-radius: 10px;
+  border-radius: var(--r-md);
   border: 1px solid var(--pv-line);
   background: var(--pv-field);
   display: flex;
@@ -1019,11 +761,11 @@ textarea.ifm-input {
   font-weight: 600;
 }
 .ifm-pv-pkg-price {
-  font-family: var(--mono);
   font-size: 14px;
+  font-variant-numeric: tabular-nums;
 }
 .ifm-pv-small {
-  font-size: 12.5px;
+  font-size: var(--fs-1);
   line-height: 17px;
   text-wrap: pretty;
   color: var(--pv-mute);
@@ -1041,7 +783,7 @@ textarea.ifm-input {
   align-items: center;
   gap: 8px;
   padding: 5px 5px 5px 14px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   border: 1px solid var(--pv-line);
   background: var(--pv-field);
 }
@@ -1049,16 +791,20 @@ textarea.ifm-input {
   flex: 1;
   min-width: 0;
   border: 0;
-  outline: none;
+  outline: none; /* preview mirror: the ring is drawn on the pill by :focus-within below */
   background: transparent;
   font: inherit;
   font-size: 14px;
   color: var(--pv-ink);
 }
+.ifm-pv-composer:focus-within {
+  outline: 2px solid var(--ox);
+  outline-offset: 2px;
+}
 .ifm-pv-send {
   width: 32px;
   height: 32px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1075,7 +821,7 @@ textarea.ifm-input {
 }
 .ifm-pv-link {
   font: inherit;
-  font-size: 12.5px;
+  font-size: var(--fs-1);
   font-weight: 500;
   cursor: pointer;
   color: var(--pv-acc);
@@ -1084,7 +830,7 @@ textarea.ifm-input {
   padding: 0;
 }
 .ifm-pv-powered {
-  font-size: 11.5px;
+  font-size: var(--fs-1);
   color: var(--pv-mute);
 }
 .ifm-pv-form {
@@ -1102,7 +848,7 @@ textarea.ifm-input {
   gap: 5px;
 }
 .ifm-pv-label {
-  font-size: 13px;
+  font-size: var(--fs-1);
   font-weight: 500;
 }
 .ifm-pv-req {
@@ -1110,7 +856,7 @@ textarea.ifm-input {
 }
 .ifm-pv-box {
   height: 38px;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   border: 1px solid var(--pv-line);
   background: var(--pv-field);
 }
@@ -1118,13 +864,13 @@ textarea.ifm-input {
   display: flex;
   gap: 8px;
   align-items: flex-start;
-  font-size: 12.5px;
+  font-size: var(--fs-1);
   line-height: 17px;
 }
 .ifm-pv-check {
   width: 16px;
   height: 16px;
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   flex: 0 0 auto;
   margin-top: 1px;
   box-sizing: border-box;
@@ -1132,7 +878,7 @@ textarea.ifm-input {
 }
 .ifm-pv-submit {
   height: 42px;
-  border-radius: 10px;
+  border-radius: var(--r-md);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1141,86 +887,11 @@ textarea.ifm-input {
   background: var(--pv-acc);
   color: var(--pv-on-acc);
 }
-
-/* ── unsaved bar + toast ───────────────────────────────────── */
-.ifm-unsaved {
-  position: sticky;
-  bottom: 16px;
-  z-index: 35;
-  align-self: center;
-  width: min(560px, calc(100% - 40px));
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 10px 10px 16px;
-  border-radius: 12px;
-  background: var(--ink);
-  color: var(--cream);
-  box-shadow: 0 20px 40px -18px rgba(20, 4, 8, 0.6);
-  font-size: 14px;
-  font-weight: 500;
-  animation: ifm-rise 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-.ifm-unsaved > i {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: #e0b36a;
-  flex: 0 0 auto;
-}
-.ifm-unsaved-discard {
-  height: 34px;
-  padding: 0 14px;
-  border-radius: 8px;
-  font: inherit;
-  font-size: 14px;
-  color: #f1e3da;
-  cursor: pointer;
-  background: transparent;
-  border: 0;
-}
-.ifm-unsaved-discard:hover {
-  background: rgba(253, 247, 235, 0.1);
-}
-.ifm-unsaved-save {
-  height: 34px;
-  padding: 0 16px;
-  border-radius: 8px;
-  background: var(--cream);
-  color: var(--ink);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  border: 0;
-}
 @keyframes ifm-rise {
   from {
     transform: translateY(140%);
     opacity: 0;
   }
-}
-.ifm-toast {
-  position: fixed;
-  top: 92px;
-  right: 30px;
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  background: var(--ink);
-  color: var(--cream);
-  font-size: 14px;
-  box-shadow: 0 14px 30px -14px rgba(20, 4, 8, 0.6);
-}
-.ifm-toast svg {
-  color: #9cc182;
 }
 
 /* ── performance ───────────────────────────────────────────── */
@@ -1237,8 +908,8 @@ textarea.ifm-input {
 }
 .ifm-perf-empty {
   padding: 56px 24px;
-  border-radius: 12px;
-  border: 1px dashed rgba(42, 18, 22, 0.2);
+  border-radius: var(--r-lg);
+  border: 1px dashed var(--line-3);
   background: var(--card);
   text-align: center;
   font-size: 15px;
@@ -1269,10 +940,10 @@ textarea.ifm-input {
   color: var(--muted);
 }
 .ifm-kpi-arrow span {
-  font-family: var(--mono);
-  font-size: 13px;
+  font-size: var(--fs-1);
   color: var(--ink);
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 .ifm-kpi {
   flex: 1;
@@ -1281,8 +952,8 @@ textarea.ifm-input {
   gap: 6px;
 }
 .ifm-kpi-value {
-  font-size: 32px;
-  line-height: 40px;
+  font-size: var(--fs-display);
+  line-height: 1;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
@@ -1296,71 +967,6 @@ textarea.ifm-input {
 .ifm-table-title {
   padding: 16px 24px;
 }
-@media (min-width: 641px) {
-  .ifm-tbl {
-    min-width: 760px;
-  }
-}
-.ifm-tbl th {
-  background: var(--paper);
-}
-.ifm-tbl th:first-child,
-.ifm-tbl td:first-child {
-  padding-left: 24px;
-}
-.ifm-tbl tr.sel td {
-  background: #fbf6ec;
-}
-
-/* drawer */
-.ifm-drawer-wrap {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: flex;
-  justify-content: flex-end;
-}
-.ifm-drawer-scrim {
-  position: absolute;
-  inset: 0;
-  background: rgba(42, 18, 22, 0.18);
-}
-.ifm-drawer {
-  position: relative;
-  width: 440px;
-  max-width: 100%;
-  height: 100%;
-  box-sizing: border-box;
-  background: var(--card);
-  border-left: 1px solid var(--line);
-  box-shadow: -24px 0 48px -24px rgba(20, 4, 8, 0.4);
-  display: flex;
-  flex-direction: column;
-}
-.ifm-drawer-head {
-  flex: 0 0 auto;
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--line);
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-.ifm-drawer-name {
-  font-size: 20px;
-  line-height: 28px;
-  font-weight: 600;
-  color: var(--ink);
-  overflow-wrap: anywhere;
-}
-.ifm-drawer-body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 20px 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
 .ifm-drawer-badges {
   display: flex;
   gap: 8px;
@@ -1368,7 +974,7 @@ textarea.ifm-input {
 }
 .ifm-note {
   padding: 12px 14px;
-  border-radius: 10px;
+  border-radius: var(--r-md);
   background: var(--paper);
   display: flex;
   flex-direction: column;
@@ -1391,7 +997,7 @@ textarea.ifm-input {
   gap: 14px;
 }
 .ifm-answers dt {
-  font-size: 13px;
+  font-size: var(--fs-1);
   color: var(--muted);
 }
 .ifm-answers dd {
@@ -1405,7 +1011,7 @@ textarea.ifm-input {
 }
 
 /* ── narrow screens ────────────────────────────────────────── */
-@media (max-width: 1100px) {
+@media (max-width: 900px) {
   .ifm-setup {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1417,7 +1023,7 @@ textarea.ifm-input {
     padding-bottom: 0;
   }
 }
-@media (max-width: 700px) {
+@media (max-width: 640px) {
   .ifm-grid2,
   .ifm-modes {
     grid-template-columns: minmax(0, 1fr);
@@ -1442,23 +1048,6 @@ textarea.ifm-input {
   .ifm-colors {
     grid-template-columns: minmax(0, 1fr);
   }
-  .ifm-toast {
-    right: 16px;
-    left: 16px;
-  }
-}
-
-/* ── many intakes (0093): editor details, numbers, list, QR ─────────────────── */
-.ifm-back {
-  display: inline-block;
-  margin-bottom: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ox);
-  text-decoration: none;
-}
-.ifm-back:hover {
-  text-decoration: underline;
 }
 .ifm-slug {
   display: flex;
@@ -1469,13 +1058,12 @@ textarea.ifm-input {
   display: inline-flex;
   align-items: center;
   padding: 0 10px;
-  border: 1px solid rgba(42, 18, 22, 0.2);
+  border: 1px solid var(--line-3);
   border-right: 0;
-  border-radius: 8px 0 0 8px;
+  border-radius: var(--r-md) 0 0 var(--r-md);
   background: var(--well);
   color: var(--muted);
-  font-family: var(--mono);
-  font-size: 12.5px;
+  font-size: var(--fs-1);
   white-space: nowrap;
   overflow: hidden;
   max-width: 60%;
@@ -1484,8 +1072,7 @@ textarea.ifm-input {
 .ifm-slug-input {
   flex: 1;
   width: auto;
-  border-radius: 0 8px 8px 0;
-  font-family: var(--mono);
+  border-radius: 0 var(--r-md) var(--r-md) 0;
   min-width: 0;
 }
 .ifm-stats {
@@ -1510,7 +1097,7 @@ textarea.ifm-input {
   flex: 0 1 460px;
   min-width: 0;
 }
-.ifl-new .ifm-input {
+.ifl-new .lx-input {
   flex: 1;
   min-width: 0;
 }
@@ -1543,7 +1130,7 @@ textarea.ifm-input {
   flex-wrap: wrap;
 }
 .ifl-name {
-  font-size: 18px;
+  font-size: var(--fs-4);
   font-weight: 600;
   color: var(--ink);
   text-decoration: none;
@@ -1557,8 +1144,7 @@ textarea.ifm-input {
   align-items: center;
   gap: 10px;
   min-width: 0;
-  font-family: var(--mono);
-  font-size: 12.5px;
+  font-size: var(--fs-1);
   color: var(--muted);
 }
 .ifl-link span {
@@ -1573,7 +1159,7 @@ textarea.ifm-input {
   padding: 0;
   font: inherit;
   font-family: var(--sans, inherit);
-  font-size: 12.5px;
+  font-size: var(--fs-1);
   font-weight: 600;
   color: var(--ox);
   cursor: pointer;
@@ -1586,18 +1172,18 @@ textarea.ifm-input {
   margin: 0;
 }
 .ifl-stats dt {
-  font-size: 12px;
+  font-size: var(--fs-1);
   color: var(--muted);
 }
 .ifl-stats dd {
   margin: 2px 0 0;
-  font-size: 20px;
+  font-size: var(--fs-5);
   font-weight: 600;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
 .ifl-stats dd small {
-  font-size: 12px;
+  font-size: var(--fs-1);
   font-weight: 500;
   color: var(--muted);
 }
@@ -1627,37 +1213,6 @@ textarea.ifm-input {
   color: var(--ox);
   cursor: pointer;
 }
-
-.ifq-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  background: rgba(42, 18, 22, 0.42);
-}
-.ifq-dialog {
-  width: min(420px, 100%);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 20px 22px;
-}
-.ifq-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.ifq-close {
-  border: 0;
-  background: none;
-  font-size: 24px;
-  line-height: 1;
-  color: var(--muted);
-  cursor: pointer;
-}
 .ifq-code {
   display: flex;
   justify-content: center;
@@ -1665,8 +1220,8 @@ textarea.ifm-input {
   min-height: 240px;
   padding: 8px;
   border: 1px solid var(--line);
-  border-radius: 10px;
-  background: #fff;
+  border-radius: var(--r-md);
+  background: var(--card);
 }
 .ifq-code img {
   width: 240px;
@@ -1675,24 +1230,13 @@ textarea.ifm-input {
 }
 .ifq-url {
   margin: 0;
-  font-family: var(--mono);
-  font-size: 12.5px;
+  font-size: var(--fs-1);
   color: var(--ink);
   text-align: center;
   word-break: break-all;
 }
-.ifq-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-}
-.ifq-actions a[aria-disabled="true"] {
-  pointer-events: none;
-  opacity: 0.5;
-}
 
-@media (max-width: 760px) {
+@media (max-width: 640px) {
   .ifm-stats,
   .ifl-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1732,7 +1276,7 @@ textarea.ifm-input {
   gap: 6px;
 }
 .ifm-asm-sub {
-  font-size: 13px;
+  font-size: var(--fs-1);
   min-height: 34px;
 }
 .ifm-asm-preview {
@@ -1752,7 +1296,7 @@ textarea.ifm-input {
   color: var(--ink);
 }
 .ifl-kind {
-  font-size: 12px;
+  font-size: var(--fs-1);
   font-weight: 600;
   color: var(--muted);
 }
@@ -1787,14 +1331,14 @@ textarea.ifm-input {
 }
 .ifr-bar {
   height: 10px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--well);
   overflow: hidden;
 }
 .ifr-bar > i {
   display: block;
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--ox);
 }
 .ifr-bar-count {
@@ -1816,13 +1360,13 @@ textarea.ifm-input {
   align-items: stretch;
   gap: 4px;
   height: 100%;
-  font-size: 12px;
+  font-size: var(--fs-1);
   color: var(--muted);
   text-align: center;
 }
 .ifr-bucket > i {
   display: block;
-  border-radius: 4px 4px 0 0;
+  border-radius: var(--r-sm) var(--r-sm) 0 0;
   background: var(--ox);
   min-height: 2px;
 }
@@ -1872,7 +1416,7 @@ textarea.ifm-input {
   white-space: pre-wrap;
 }
 .ifr-answers .ifr-meta {
-  font-size: 13px;
+  font-size: var(--fs-1);
   color: var(--muted);
   white-space: nowrap;
 }
@@ -1891,7 +1435,7 @@ textarea.ifm-input {
   flex-wrap: wrap;
   margin-top: 8px;
 }
-@media (max-width: 760px) {
+@media (max-width: 640px) {
   .ifr-bar-row {
     grid-template-columns: minmax(0, 1fr) 44px;
   }
@@ -1940,7 +1484,7 @@ textarea.ifm-input {
   align-items: center;
   gap: 4px;
 }
-.ifm-opt .ifm-input {
+.ifm-opt .lx-input {
   flex: 1;
   min-width: 0;
 }
@@ -1967,9 +1511,9 @@ textarea.ifm-input {
   gap: 10px;
   box-sizing: border-box;
   padding: 8px 10px;
-  border-radius: 10px;
-  background: #fff;
-  border: 1px solid rgba(42, 18, 22, 0.1);
+  border-radius: var(--r-md);
+  background: var(--card);
+  border: 1px solid var(--line);
 }
 .ifm-extra-moves {
   display: flex;
@@ -1984,7 +1528,7 @@ textarea.ifm-input {
 .ifm-asm-stays {
   font-style: italic;
 }
-.ifm-asm-q.hidden .ifm-input {
+.ifm-asm-q.hidden .lx-input {
   opacity: 0.55;
 }
 
@@ -1999,10 +1543,10 @@ textarea.ifm-input {
   align-items: flex-start;
   gap: 8px;
   padding: 7px 10px;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   border: 1px solid var(--pv-line);
   background: var(--pv-field);
-  font-size: 13px;
+  font-size: var(--fs-1);
   line-height: 18px;
 }
 .ifm-pv-choice-opt input {
@@ -2018,7 +1562,7 @@ textarea.ifm-input {
   flex-wrap: wrap;
 }
 .ifm-pv-choice.chat .ifm-pv-choice-opt {
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   padding: 5px 12px;
   cursor: pointer;
 }
@@ -2081,7 +1625,7 @@ textarea.ifm-input {
   padding: 0;
   min-width: 0;
 }
-.ifm-bare:disabled .ifm-input {
+.ifm-bare:disabled .lx-input {
   background-color: var(--paper);
   color: var(--body);
 }
@@ -2106,7 +1650,7 @@ textarea.ifm-input {
   align-items: center;
 }
 .ifl-chan-url {
-  font-size: 13px;
+  font-size: var(--fs-1);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2124,14 +1668,62 @@ textarea.ifm-input {
 }
 .ifl-create-hint {
   display: block;
-  font-size: 13px;
+  font-size: var(--fs-1);
   color: var(--muted);
 }
-@media (max-width: 700px) {
+@media (max-width: 640px) {
   .ifl-chan > li {
     grid-template-columns: minmax(0, 1fr) auto auto;
   }
   .ifl-chan > li > :first-child {
     grid-column: 1 / -1;
   }
+}
+
+/* ── Type floor (Nov 17): no readable text under 13px on desktop or 14px on a phone (<= 640px);
+   uppercase labels may be 12px. Scoped to the Forms pages (.ifl-root list, .ifm-root workspace, its
+   Setup / Results / Performance tabs); the live preview frame (.ifm-pv-*) draws the CLIENT's page and is left alone.
+   Placed last so it wins over the sizes above. ───────────────────────────────────────────────────── */
+:is(.ifl-root, .ifm-root) :is(.ifm-count, .ifm-private, .ifm-q-pack, .ifl-link, .ifl-copy, .ifl-stats dt, .ifl-stats dd small, .ifl-kind, .ifr-bucket, .ifm-slug-prefix, .ifq-url) {
+  font-size: var(--fs-1); /* were 11.5 to 12.5px */
+}
+.ifq-url { font-size: var(--fs-1); }
+/* A fact that appears only here is never cut: the share link (and its "Not live yet" line) and the channel links wrap. */
+.ifl-link span { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
+.ifl-link { align-items: flex-start; }
+.ifl-chan-url { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
+
+@media (max-width: 640px) {
+  /* The sub-line under the h1 carries facts (what a form is, who the leads are tagged with): let it wrap here, not on other pages. */
+  :is(.ifl-root, .ifm-root) .lx-page-head .lx-sub {
+    font-size: 14px;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    text-wrap: wrap;
+  }
+  :is(.ifl-root, .ifm-root) :is(
+      .lx-btn, .ifm-help, .ifm-err, .ifm-hex, .ifm-code, .ifm-domain, .ifm-kpi-arrow span,
+      .ifm-answers dt, .ifm-asm-sub, .ifr-meta, .ifl-toggle, .ifl-chan-url, .ifl-create-hint,
+      .ifm-count, .ifm-private, .ifm-q-pack, .ifl-link, .ifl-copy, .ifl-stats dt, .ifl-stats dd small, .ifl-kind,
+      .ifr-bucket, .ifm-slug-prefix, .ifq-url
+    ) {
+    font-size: 14px;
+  }
+  /* The Results / Performance header row (Export CSV, 7 / 30 / 90 days) wrapped to a second line instead of pushing the page sideways. */
+  .ifm-perf-head { flex-wrap: wrap; }
+  /* A wide table scrolls inside its card instead of being cut off or widening the page. */
+  .ifm-table-card { overflow-x: auto; }
+}
+
+/* Small shared rules (replace inline styles). */
+.ifm-grow { flex: 1; min-width: 0; }
+.ifm-pad-x { padding: 0 24px 20px; margin: 0; }
+.ifm-basis-full { flex-basis: 100%; }
+.ifl-list-gap { margin-top: 12px; }
+
+/* Touch and phones: the form's own small controls get a 44px target. */
+@media (pointer: coarse), (max-width: 640px) {
+  .ifm-icon-btn, .ifm-add, .ifl-copy, .ifl-toggle, .ifm-link, .ifm-domain button, .lx-input { min-height: 44px; }
+  .ifm-icon-btn, .ifm-domain button { min-width: 44px; }
 }

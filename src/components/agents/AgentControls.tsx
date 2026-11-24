@@ -6,6 +6,7 @@ import {
   saveAgentSettingAction,
   type AgentActionState,
 } from "@/app/dashboard/agents/actions";
+import { CANCEL, SAVING } from "@/lib/ui/words";
 import { autonomyHint, type AgentId, type Autonomy } from "@/lib/agents/types";
 import { autonomyChangeQuestion } from "@/lib/agents/health-line";
 import { decideRunNow, runResultLine, RUN_NOW_NO_ANSWER, type RunNowInput } from "@/lib/agents/run-now";
@@ -72,10 +73,10 @@ export function AgentControls(props: {
       </form>
 
       <div className="lx-agent-slot-autonomy">
-        <div className="lx-label" style={{ fontSize: 11, marginBottom: 6 }}>
+        <div className="lx-label">
           Autonomy
         </div>
-        <form action={save} className="lx-lv">
+        <form action={save} className="vs-switch lx-lv">
           <input type="hidden" name="agent" value={agent} />
           <input type="hidden" name="enabled" value={String(enabled)} />
           {asking === null ? (
@@ -96,15 +97,15 @@ export function AgentControls(props: {
             <span role="alert" className="lx-note" style={{ display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               {autonomyChangeQuestion(props.name, autonomy, asking)}
               <button type="submit" name="autonomy" value={asking} className="on" disabled={saving} onClick={() => setTimeout(() => setAsking(null), 0)}>
-                {saving ? "Saving…" : "Confirm"}
+                {saving ? SAVING : "Confirm"}
               </button>
               <button type="button" disabled={saving} onClick={() => setAsking(null)}>
-                Cancel
+                {CANCEL}
               </button>
             </span>
           )}
         </form>
-        <div className="lx-note" style={{ marginTop: 6 }}>
+        <div className="lx-note">
           {autonomyHint(agent, autonomy)}
         </div>
         {saveState.error && (
@@ -124,7 +125,7 @@ export function AgentControls(props: {
             disabled={!decision.canRun}
             aria-describedby={decision.canRun ? undefined : reasonId}
           >
-            {running ? "Running..." : "Run now"}
+            {running ? "Running…" : "Run now"}
           </button>
         </form>
       </div>

@@ -2,6 +2,8 @@
 
 import { useActionState, type ReactNode } from "react";
 import type { ReviewActionState } from "@/app/dashboard/review/actions";
+import { SavedNote } from "@/components/ui/SavedNote";
+import { SAVING } from "@/lib/ui/words";
 import "./review.css";
 
 /** One small form that runs one server action and says what happened in a fixed sentence. Rendered only for a role that can write. */
@@ -23,18 +25,14 @@ export function ActForm({
     <form action={formAction} className={className}>
       {children}
       <button type="submit" className={buttonClass} disabled={pending}>
-        {pending ? "…" : submit}
+        {pending ? SAVING : submit}
       </button>
       {state.error && (
         <p role="alert" className="rv-err">
           {state.error}
         </p>
       )}
-      {!state.error && state.saved && (
-        <p role="status" className="rv-saved">
-          Saved
-        </p>
-      )}
+      <SavedNote show={!state.error && !!state.saved} />
     </form>
   );
 }

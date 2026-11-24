@@ -5,7 +5,7 @@ describe("loadLeadOptions", () => {
 
   async function load(answer: { data: unknown; error: unknown } | "throw") {
     const q: Record<string, unknown> = {};
-    for (const m of ["select", "order"]) q[m] = () => q;
+    for (const m of ["select", "order", "is"]) q[m] = () => q;
     q.limit = async () => {
       if (answer === "throw") throw new Error("down");
       return answer;

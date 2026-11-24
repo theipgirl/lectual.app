@@ -94,9 +94,17 @@ vi.mock("@/lib/queue/api", async (orig) => ({
 }));
 vi.mock("@/lib/queue/org", async (orig) => ({ ...(await orig<typeof import("@/lib/queue/org")>()), activeQueueOrgKey: async () => "rpb" }));
 vi.mock("@/lib/db/scoped-client", async () => ({ getScopedClient: async () => (await import("./mono-data")).fakeClient() }));
-vi.mock("@/lib/queue/roles", async (orig) => ({ ...(await orig<typeof import("@/lib/queue/roles")>()), resolveQueueRole: async () => "owner" }));
+vi.mock("@/lib/queue/roles", async (orig) => ({ ...(await orig<typeof import("@/lib/queue/roles")>()), resolveQueueRole: async () => (state as { queueRole?: string }).queueRole ?? "owner" }));
 vi.mock("@/lib/queue/view-context", () => ({
-  loadQueueViewContext: async () => ({ viewer: { userId: "00000000-0000-4000-8000-0000000000a1", role: "owner" }, routing: {}, members: [], routingFailed: false, dropped: 0, now: Date.parse("2026-11-10T14:30:00Z") }),
+  // A screen can look as another member (`state.queueViewer`, with `state.queueMembers`); the default is the owner, as before.
+  loadQueueViewContext: async () => ({
+    viewer: (state as { queueViewer?: unknown }).queueViewer ?? { userId: "00000000-0000-4000-8000-0000000000a1", role: "owner" },
+    routing: {},
+    members: (state as { queueMembers?: unknown }).queueMembers ?? [],
+    routingFailed: false,
+    dropped: 0,
+    now: Date.parse("2026-11-10T14:30:00Z"),
+  }),
 }));
 
 // Lets a screen open the item page's draft editor (the page itself always starts in the rendered view).
@@ -115,10 +123,13 @@ vi.mock("@/lib/review/load", async (orig) => ({
   ...(await orig<typeof import("@/lib/review/load")>()),
   loadReview: async () => state.review,
 }));
-vi.mock("@/lib/review/detail-load", () => ({
-  loadReviewDetail: async () => null,
-  loadLatestNote: async () => null,
-}));
+vi.mock("@/lib/review/detail-load", async (orig) => {
+  const real = await orig<typeof import("@/lib/review/detail-load")>();
+  return {
+    ...real,
+    loadLatestNote: async () => null,
+  };
+});
 
 // Weekly review, the owner's editable Sheet (screens/review-sheet-edit.screen.tsx): the stage lists and the drawing-only
 // starting state (editors open) come from `state.sheetStages` / `state.sheetEditInitial`.
@@ -177,4 +188,63 @@ vi.mock("@/lib/meetings/connection", async (orig) => ({ ...(await orig<typeof im
 vi.mock("next/font/google", () => {
   const font = () => ({ className: "", variable: "", style: { fontFamily: "inherit" } });
   return { Bodoni_Moda: font, Source_Serif_4: font, Instrument_Serif: font, Geist: font, Courier_Prime: font };
+});
+
+// Forms page (screens/forms-owner.screen.tsx): the intake-forms loaders. Sample records come from `state.formsList` / `state.formRecord`.
+vi.mock("@/lib/intake-forms/store", async (orig) => ({
+  ...(await orig<typeof import("@/lib/intake-forms/store")>()),
+  listOrCreateIntakeForms: async () => ({ status: "ok", value: state.formsList ?? [] }),
+  loadIntakeForm: async () => ({ status: "ok", form: state.formRecord ?? null }),
+  loadIntakePackages: async () => ({ status: "ok", items: [] }),
+}));
+vi.mock("@/lib/intake-forms/load-performance", async (orig) => ({
+  ...(await orig<typeof import("@/lib/intake-forms/load-performance")>()),
+  loadSubmissionStatRows: async () => ({ status: "ok", value: { rows: (state as { formStatRows?: unknown[] }).formStatRows ?? [], capped: false } }),
+  // type-floor screens (Results / Performance tabs)
+  loadFunnel: async () => ({ status: "ok", value: { visited: 120, chat: 0, form: 48, started: 48, completed: 31, startRate: "40.0%", completeRate: "64.6%", capped: false } }),
+  loadIntakeList: async () => ({ status: "ok", value: (state as { formPeopleList?: never[] }).formPeopleList ?? [] }),
+}));
+vi.mock("@/lib/intake-forms/load-steps", async (orig) => {
+  const real = await orig<typeof import("@/lib/intake-forms/load-steps")>();
+  const { stepFunnel } = await import("@/lib/intake-forms/step-funnel");
+  return {
+    ...real,
+    loadStepFunnel: async (_id: string, _r: unknown, questions: { id: string; text: string }[]) => {
+      const people = Array.from({ length: 12 }, (_, i) => ({ id: `p${i}`, started_at: `2026-11-0${(i % 8) + 1}T14:00:00Z`, submitted_at: i % 3 ? `2026-11-0${(i % 8) + 1}T14:06:00Z` : null }));
+      const events = people.flatMap((p, i) => questions.slice(0, i % 3 ? questions.length : 2).map((q, k) => ({ submission_id: p.id, question_id: q.id, step_index: k, occurred_at: new Date(Date.parse(p.started_at) + (k + 1) * (20 + i * 3) * 1000).toISOString() })));
+      return { status: "ok", value: { ...stepFunnel({ questions, people, events } as never), capped: false } };
+    },
+    loadStoppedAt: async () => ({ status: "ok", value: {} }),
+    loadEarliestStep: async () => ({ status: "ok", value: "2026-11-01T00:00:00Z" }),
+  };
+});
+vi.mock("@/lib/intake-forms/origin", () => ({ intakeOrigin: async () => "https://app.example" }));
+vi.mock("@/lib/intake-forms/load-results", async (orig) => ({
+  ...(await orig<typeof import("@/lib/intake-forms/load-results")>()),
+  loadResultSubmissions: async () => ({ status: "ok", value: { rows: (state as { formResultRows?: never[] }).formResultRows ?? [], capped: false } }),
+  loadBoothEventList: async () => ({ status: "ok", value: { rows: (state as { boothList?: never[] }).boothList ?? [], capped: false } }),
+  loadBoothEvent: async () => ({ status: "ok", value: { rows: (state as { boothEventRows?: never[] }).boothEventRows ?? [], capped: false } }),
+  loadEventPeople: async () => {
+    const p = (state as { eventPeople?: { cards: never[]; leads: never[] } }).eventPeople ?? { cards: [], leads: [] };
+    return { status: "ok", value: { cards: p.cards, leads: p.leads, total: p.cards.length, over: false } };
+  },
+}));
+
+// Item L2 sample (screens/leads-l2.screen.tsx): a screen may set these; with none set the real loaders run as before.
+vi.mock("@/lib/queue/lead-pending", async (orig) => {
+  const o = await orig<typeof import("@/lib/queue/lead-pending")>();
+  return { ...o, loadPendingApprovalsByLead: async (...a: Parameters<typeof o.loadPendingApprovalsByLead>) => (state as { l2Pending?: Awaited<ReturnType<typeof o.loadPendingApprovalsByLead>> }).l2Pending ?? o.loadPendingApprovalsByLead(...a) };
+});
+vi.mock("@/lib/stage-keeper/read", async (orig) => {
+  const o = await orig<typeof import("@/lib/stage-keeper/read")>();
+  return { ...o, loadAgentMoves: async (...a: Parameters<typeof o.loadAgentMoves>) => (state as { l2Moves?: Awaited<ReturnType<typeof o.loadAgentMoves>> }).l2Moves ?? o.loadAgentMoves(...a) };
+});
+vi.mock("@/lib/intake/facts", async (orig) => {
+  const o = await orig<typeof import("@/lib/intake/facts")>();
+  return { ...o, loadTemperatureFacts: async (...a: Parameters<typeof o.loadTemperatureFacts>) => (state as { l2Facts?: Awaited<ReturnType<typeof o.loadTemperatureFacts>> }).l2Facts ?? o.loadTemperatureFacts(...a) };
+});
+// Lead page (Sprint 9 Part 2): the top card is decided from these facts; a screen sets `state.leadStep` (screens/lead-step.screen.tsx).
+vi.mock("@/lib/lead-step/load", async (orig) => {
+  const o = await orig<typeof import("@/lib/lead-step/load")>();
+  return { ...o, loadLeadStepFacts: async (...a: Parameters<typeof o.loadLeadStepFacts>) => (state as { leadStep?: Awaited<ReturnType<typeof o.loadLeadStepFacts>> }).leadStep ?? o.loadLeadStepFacts(...a) };
 });

@@ -1,0 +1,30 @@
+/* Documents list. Tokens only. */
+.doc-retry { display: inline-grid; gap: 4px; justify-items: end; }
+.doc-kind-cell { display: flex; gap: 12px; align-items: center; }
+.doc-kind-text { min-width: 0; }
+.doc-actions { text-align: right; white-space: nowrap; }
+@media (max-width: 640px) { .doc-actions { text-align: left; white-space: normal; } }
+.dl-stack { display: grid; gap: 12px; }
+.dl-stack p { margin: 0; }
+.dl-ref { font-weight: 600; color: var(--ink); }
+.dl-ink { color: var(--ink); font-size: var(--fs-3); }
+.dl-lead { font-size: var(--fs-3); }
+.dl-flags { color: inherit; }
+.dl-links { display: flex; gap: 14px; flex-wrap: wrap; }
+.dl-letter-name { font-weight: 600; color: var(--ink); font-size: var(--fs-3); }
+
+/* The letter forms. */
+.dl-form { display: grid; gap: 16px; max-width: 720px; }
+.dl-form-card { display: grid; gap: 14px; }
+.dl-submit { width: 100%; }
+.dl-two-pane { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 0.8fr); gap: 16px; align-items: start; }
+.dl-facts { display: grid; gap: 8px; }
+.dl-fact { font-size: var(--fs-2); color: var(--ink); }
+.dl-grid { display: grid; gap: 10px; }
+.dl-grid-200 { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.dl-grid-160 { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.dl-fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; }
+.dl-radio { display: flex; align-items: center; gap: 8px; font-size: var(--fs-2); }
+.dl-from { font-weight: 400; }
+@media (max-width: 900px) { .dl-two-pane { grid-template-columns: minmax(0, 1fr); } }
+@media (pointer: coarse), (max-width: 640px) { .dl-radio { min-height: 44px; } }

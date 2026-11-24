@@ -26,18 +26,18 @@ describe("copy shown to every firm names no person", () => {
   });
 });
 
-describe("Needs attorney badge and chip", () => {
+describe("Awaiting approval badge and chip", () => {
   const item = { queueId: "q1", headline: "Reply to Ada", kind: "client_draft", createdAt: null } as never;
   it("renders the role-neutral label with the count", () => {
     const html = renderToStaticMarkup(NeedsRebeccaBadge({ pending: [item, item] }) as never);
-    expect(html).toContain("Needs attorney · 2");
+    expect(html).toContain("Awaiting approval · 2");
   });
   it("renders nothing at zero", () => {
     expect(NeedsRebeccaBadge({ pending: [] })).toBeNull();
   });
   it("the filter chip hides its count at zero", () => {
     const src = readFileSync(`${dir}/IntakeControls.tsx`, "utf8");
-    expect(src).toContain("Needs attorney");
-    expect(src).toContain("needsRebeccaCount > 0 &&");
+    expect(src).toContain("Awaiting approval");
+    expect(src).toContain("counts.needsAttorney > 0");
   });
 });

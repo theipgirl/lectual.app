@@ -15,7 +15,8 @@ export type ViewId = (typeof VIEW_IDS)[number];
 /** The view each role would get. Only views in LIVE_VIEWS are ever drawn; every other role keeps today's shell. */
 export const ROLE_VIEW: Record<Role, ViewId> = {
   owner: "owner",
-  admin: "office",
+  // Firm owner, Nov 17: admins (RPB: Amor) get the simplified owner view too.
+  admin: "owner",
   senior_admin: "office",
   attorney: "attorney",
   intake: "intake",
@@ -139,12 +140,12 @@ export function prefAllowed(raw: unknown): ViewPref | null {
 export const DECK_PATH = "/dashboard/queue/deck/";
 
 /** The sections the owner view draws, in the order the owner rail lists them. */
-export const OWNER_SLUGS = ["", "queue", "review", "proposals", "quotes", "intake", "matters", "calendar"] as const;
+export const OWNER_SLUGS = ["", "queue", "review", "proposals", "quotes", "intake", "forms", "matters", "calendar"] as const;
 
-/** The owner rail: Today, Approvals, Weekly review, Proposals, then More (Leads, Matters, Calendar). No Settings row, no Reports row. */
+/** The owner rail: Today, Approvals, Weekly review, Proposals, then More (Intake, Forms, Matters, Calendar). No Settings row, no Reports row. */
 export const OWNER_TREE: readonly (readonly RailNode[])[] = [
   [{ slug: "" }, { slug: "queue" }, { slug: "review" }, { slug: "proposals" }, { slug: "quotes" }],
-  [{ label: MORE_NAME, icon: "M5 12h.01M12 12h.01M19 12h.01", kids: ["intake", "matters", "calendar"] }],
+  [{ label: MORE_NAME, icon: "M5 12h.01M12 12h.01M19 12h.01", kids: ["intake", "forms", "matters", "calendar"] }],
 ];
 
 /** The owner phone bar, before More: Today, Approvals, Review, Proposals. */
@@ -152,7 +153,7 @@ export const OWNER_BAR = ["", "queue", "review", "proposals", "quotes"] as const
 export const OWNER_BAR_LABEL: Record<string, string> = { "": "Today", queue: APPROVALS_NAME, review: REVIEW_SHORT_NAME, proposals: PROPOSALS_NAME, quotes: PROPOSALS_NAME };
 
 /** The owner phone bar's More sheet. */
-export const OWNER_MORE_GROUPS: readonly { label: string; slugs: readonly string[] }[] = [{ label: MORE_NAME, slugs: ["intake", "matters", "calendar"] }];
+export const OWNER_MORE_GROUPS: readonly { label: string; slugs: readonly string[] }[] = [{ label: MORE_NAME, slugs: ["intake", "forms", "matters", "calendar"] }];
 
 /**
  * What the rail, phone bar and tour are handed, from what `visibleNav` already allowed. A filter only: it never adds
@@ -169,7 +170,7 @@ export function drawnNav(items: NavItem[], view: ViewId): NavItem[] {
     if (slug === "queue") return [{ ...item, href: DECK_PATH, also: [...(item.also ?? []), "/dashboard/queue/"] }];
     // The owner's words (OwnerRail board): one "Proposals" row, and "Matters" under More (not the technician's "All matters").
     if (slug === "proposals" || slug === "quotes") return [{ ...item, label: PROPOSALS_NAME, railLabel: PROPOSALS_NAME }];
-    if (slug === "matters") return [{ ...item, railLabel: item.label }];
+    if (slug === "matters" || slug === "intake") return [{ ...item, railLabel: item.label }];
     return [item];
   });
 }

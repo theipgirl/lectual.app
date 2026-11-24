@@ -23,21 +23,21 @@ import { buildExhibit } from "@/lib/loe/exhibit";
 import { money } from "@/components/client-proposal/format";
 import { quoteWithClientClasses } from "@/lib/proposals/client-classes";
 import { defaultSelection } from "@/lib/proposals/pricing";
-import { sevetri } from "../proposals/fixture";
+import { callum } from "../proposals/fixture";
 import { TEST_DETAILS, fullLetterBlocks } from "./full-letter-fixture";
 import { generalWithLoe, twoBrandPerMark, withLoe } from "./loe-fixtures";
 import { NOW, world } from "../proposals/signing-world";
 import { signedTrademark } from "./signed-fixtures";
 
 const LOGO_IMG = 'src="/brand/rpb-logo-oxblood.png"';
-const LETTER = { dateText: "November 12, 2026", clientEmail: "sevetri@example.com" };
+const LETTER = { dateText: "November 12, 2026", clientEmail: "callum@example.com" };
 
 function render(slug: string, over: Partial<ProposalDocumentProps> = {}) {
   return renderToStaticMarkup(
     <ProposalDocument
       content={withLoe(twoBrandPerMark())}
       title="Trademark Proposal"
-      clientName="Sevetri Wilson"
+      clientName="Callum Ferreira"
       expiresOn="2026-12-01"
       firm={{ name: "Some Firm", slug }}
       mode="live"
@@ -90,7 +90,7 @@ describe("the client page draws the logo above the letter for RPB only", () => {
         <GeneralProposalDocument
           content={generalWithLoe()}
           title="Proposal"
-          clientName="Faithe Williams"
+          clientName="Imogen Pellegrino"
           expiresOn="2026-12-01"
           firm={{ name: "Some Firm", slug }}
           mode="live"
@@ -125,7 +125,7 @@ describe("the staff previews", () => {
 
 const hasImage = (bytes: Uint8Array) => Buffer.from(bytes).toString("latin1").includes("/Subtype /Image");
 function exhibit() {
-  const c = sevetri();
+  const c = callum();
   const priced = quoteWithClientClasses(c, defaultSelection(c), { entries: {}, added: {} });
   if (!priced.ok) throw new Error("no quote");
   return buildExhibit(priced.content, priced.quote, money);
@@ -150,8 +150,8 @@ describe("the PDF", () => {
     const bytes = await buildLetterPdf({
       ...base,
       mode: "signed",
-      storedText: "Dear Sevetri Wilson:\n\nA paragraph.",
-      signature: { signerName: "Sevetri Wilson", signedAtText: "x", signedAtUtc: "y", fingerprint: "ab".repeat(32) },
+      storedText: "Dear Callum Ferreira:\n\nA paragraph.",
+      signature: { signerName: "Callum Ferreira", signedAtText: "x", signedAtUtc: "y", fingerprint: "ab".repeat(32) },
       logo: RPB_LETTER_LOGO,
     });
     expect(hasImage(bytes)).toBe(true);

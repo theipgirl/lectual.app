@@ -1,12 +1,17 @@
 import { stageAgeDisplay } from "@/lib/lifecycle/stage-age";
 import { matterDisplayTitle } from "@/lib/matters/display-title";
 import { isOpenMatter } from "@/lib/matters/docket-summary";
+import { stageDisplayName } from "@/lib/matters/list-view";
 import { normalizeStageName } from "@/lib/lawmatics/stage-map";
 import type { MatterWaitingOn } from "@/lib/matters/stage-rules";
 import { newEnquiryStage } from "@/lib/pipeline/new-enquiry";
 import type { ReviewRow, ReviewNextStep } from "./buckets";
 import { summarizeContact, type ContactActivity } from "./contact";
+import type { FirmSenders } from "@/lib/mailbox/firm-sender";
 import { stageIsWithUspto, waitingOn } from "./waiting";
+import { isRegisteredTrademark, noOpenDeadline, openDeadlineIndex } from "@/lib/matters/deadline-safety";
+import { MATTER_TYPE_LABELS } from "@/lib/matters/matter-types";
+import { deadlineKindLabel, type DeadlineKind } from "@/lib/matters/deadline-rules";
 
 /**
  * Turns what the page read into review rows. Pure: structural inputs, no database, no server
@@ -21,6 +26,11 @@ export type ReviewMatterIn = {
   owner_name: string | null;
   status: string;
   type?: string | null;
+  /** "Filed" (PGE Sprint 3) is a TM matter with a serial number or a filing date. */
+  serial_number?: string | null;
+  /** The day the matter was opened in Lectual (Start Date); the row's `created_at` stands in when absent. */
+  opened_at?: string | null;
+  filing_date?: string | null;
   referral_source?: string | null;
   stage_id?: string | null;
   lead_id: string | null;
@@ -29,7 +39,8 @@ export type ReviewMatterIn = {
   created_at: string;
   lawmatics_id: string | null;
   lawmatics_synced_at: string | null;
-  stage: { code: string; label: string; is_open: boolean; waiting_on: MatterWaitingOn; order_index?: number } | null;
+  /** `phase` (crm_matter_stage.phase) is declared so the registered-mark deadline rule (`isRegisteredTrademark`) always gets it. */
+  stage: { code: string; label: string; is_open: boolean; waiting_on: MatterWaitingOn; order_index?: number; phase?: string | null } | null;
 };
 
 export type ReviewLeadIn = {
@@ -63,7 +74,15 @@ export type ReviewTaskIn = {
 
 export type ReviewActivityIn = ContactActivity & { lead_id: string | null; matter_id: string | null };
 
-export type ReviewDeadlineIn = { matter_id: string; due_date: string; title: string | null };
+export type ReviewDeadlineIn = {
+  matter_id: string;
+  due_date: string;
+  title: string | null;
+  /** Read for the Deadlines strip (PGE Sprint 3). Older callers may leave them out. */
+  id?: string;
+  kind?: string | null;
+  attorney_confirmed?: boolean | null;
+};
 
 /** The state of one source the page read. `unavailable` is never drawn as empty. */
 export type SourceState = "ok" | "unavailable";
@@ -81,6 +100,8 @@ export type ReviewInput = {
   pendingMatterIds: ReadonlySet<string> | null;
   pendingLeadIds: ReadonlySet<string> | null;
   sources: { activity: SourceState; deadlines: SourceState };
+  /** The firm's own sender addresses (its mailbox connections): their `email_received` rows count as ours. Missing = none known. */
+  firmSenders?: FirmSenders;
   timeZone: string;
   now: Date;
 };
@@ -141,6 +162,33 @@ function groupBy<T>(items: readonly T[], key: (t: T) => string | null): Map<stri
   return out;
 }
 
+function kindLabel(kind: string | null | undefined): string | null {
+  if (!kind) return null;
+  try {
+    return deadlineKindLabel(kind as DeadlineKind);
+  } catch {
+    return null;
+  }
+}
+
+/** Every open deadline of a matter, soonest first, for the Deadlines strip. */
+function openDeadlinesOf(list: readonly ReviewDeadlineIn[] | undefined): NonNullable<ReviewRow["openDeadlines"]> {
+  return [...(list ?? [])]
+    .sort((a, b) => a.due_date.localeCompare(b.due_date) || (a.id ?? "").localeCompare(b.id ?? ""))
+    .map((d, i) => ({
+      id: d.id ?? `${d.matter_id}-${i}`,
+      title: d.title?.trim() || kindLabel(d.kind) || "Deadline",
+      dueDate: d.due_date.slice(0, 10),
+      confirmed: d.attorney_confirmed === true,
+    }));
+}
+
+/** The earliest open `office_action_response` deadline (an open statement of use is another deadline and is ignored). */
+export function earliestOfficeAction(list: readonly ReviewDeadlineIn[] | undefined): { dueDate: string; confirmed: boolean } | null {
+  const oa = (list ?? []).filter((d) => d.kind === "office_action_response").sort((a, b) => a.due_date.localeCompare(b.due_date) || (a.id ?? "").localeCompare(b.id ?? ""));
+  return oa.length === 0 ? null : { dueDate: oa[0].due_date.slice(0, 10), confirmed: oa[0].attorney_confirmed === true };
+}
+
 function nearestDeadline(list: readonly ReviewDeadlineIn[] | undefined): ReviewRow["deadline"] {
   if (!list || list.length === 0) return null;
   const first = [...list].sort((a, b) => a.due_date.localeCompare(b.due_date))[0];
@@ -154,22 +202,34 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
   const activityByMatter = groupBy(input.activity, (a) => a.matter_id);
   const activityByLead = groupBy(input.activity, (a) => a.lead_id);
   const deadlinesByMatter = groupBy(input.deadlines, (d) => d.matter_id);
+  // Any open deadline, and an open Section 8 / renewal one (a registered mark's flag, Taylor Nov 23). input.deadlines are the open ones.
+  const openSet = openDeadlineIndex(input.deadlines.map((d) => ({ matter_id: d.matter_id, kind: String(d.kind ?? "") })));
   const contactKnown = input.sources.activity === "ok";
 
   const contactOf = (list: readonly ContactActivity[] | undefined) => {
-    if (!contactKnown) return { lastContact: null, direction: null, lastOutbound: null };
-    const { last, direction, lastOutbound } = summarizeContact(list ?? [], now);
+    if (!contactKnown) return { lastContact: null, direction: null, lastOutbound: null, lastOutboundType: null };
+    const { last, direction, lastOutbound } = summarizeContact(list ?? [], now, input.firmSenders);
     return {
       lastContact: last ? { date: civilDateIn(last.at, timeZone), type: last.type } : null,
       direction,
       lastOutbound: lastOutbound ? civilDateIn(lastOutbound.at, timeZone) : null,
+      lastOutboundType: lastOutbound ? lastOutbound.type : null,
     };
   };
 
   const rows: ReviewRow[] = [];
 
   const openMatters = input.matters.filter((m) => isOpenMatter(m) && (m.status === "open" || m.status === "on_hold"));
-  for (const m of openMatters) {
+  // Registered marks with no open Section 8 / Section 9 deadline (Taylor, Nov 23) become rows too, in On track with the tag. Only when
+  // the deadlines were read (a failed read admits none: never a guess), and never twice (a firm whose maintenance stage is open on the
+  // docket already has the matter in `openMatters`).
+  const openIds = new Set(openMatters.map((m) => m.id));
+  const admitted = new Set(
+    input.sources.deadlines === "ok"
+      ? input.matters.filter((m) => !openIds.has(m.id) && isRegisteredTrademark(m) && noOpenDeadline(m, openSet)).map((m) => m.id)
+      : [],
+  );
+  for (const m of [...openMatters, ...input.matters.filter((x) => admitted.has(x.id))]) {
     const age = stageAgeDisplay({
       stageEnteredAt: m.stage_entered_at,
       createdAt: m.created_at,
@@ -177,7 +237,11 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
       imported: Boolean(m.lawmatics_id || m.lawmatics_synced_at),
       now,
     });
-    const { lastContact, direction, lastOutbound } = contactOf(activityByMatter.get(m.id));
+    // Mail filed on the matter's lead before it signed feeds the matter's Sent line and last contact date, but NOT whose turn
+    // it is: the lead's last mail (often our proposal) must not flip a matter with an overdue step to "Waiting on client".
+    const own = activityByMatter.get(m.id) ?? [];
+    const { lastContact, lastOutbound, lastOutboundType } = contactOf([...own, ...(m.lead_id ? activityByLead.get(m.lead_id) ?? [] : [])]);
+    const { direction } = contactOf(own);
     const display = matterDisplayTitle(m);
     const client = m.owner_name?.trim() || display.title;
     rows.push({
@@ -187,7 +251,7 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
       href: `/dashboard/matters/${m.id}/`,
       client,
       mark: display.title !== client ? display.title : null,
-      stageLabel: m.stage ? m.stage.label : null,
+      stageLabel: m.stage ? stageDisplayName(m.stage.label) : null,
       stageId: m.stage_id ?? null,
       stageCode: m.stage ? m.stage.code : null,
       matterType: m.type ?? null,
@@ -199,14 +263,23 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
       lastContact,
       lastDirection: direction,
       lastOutbound,
+      lastOutboundType,
       source: m.referral_source?.trim() || null,
       waiting: waitingOn({
-        withUspto: stageIsWithUspto(m.stage),
+        // An admitted registered mark is never "waiting on the USPTO" (Taylor, Nov 23): its stage's waiting_on is not a to-do here.
+        withUspto: admitted.has(m.id) ? false : stageIsWithUspto(m.stage),
         pendingApproval: input.pendingMatterIds?.has(m.id) ?? false,
         lastDirection: direction,
       }),
       nextStep: matterTasks.get(m.id) ?? null,
       deadline: input.sources.deadlines === "ok" ? nearestDeadline(deadlinesByMatter.get(m.id)) : null,
+      // A tag only (never a bucket). Unknown when the deadlines could not be read: nothing is flagged then.
+      noOpenDeadline: noOpenDeadline(m, input.sources.deadlines === "ok" ? openSet : null),
+      ...(input.sources.deadlines === "ok" ? { openDeadlines: openDeadlinesOf(deadlinesByMatter.get(m.id)), officeActionDue: earliestOfficeAction(deadlinesByMatter.get(m.id)) } : {}),
+      serialNumber: m.serial_number?.trim() || null,
+      startDate: civilDateIn(m.opened_at || m.created_at, timeZone),
+      practiceArea: m.type && m.type in MATTER_TYPE_LABELS ? MATTER_TYPE_LABELS[m.type as keyof typeof MATTER_TYPE_LABELS] : null,
+      ...(admitted.has(m.id) ? { registeredNoDeadline: true as const } : {}),
     });
   }
 
@@ -225,17 +298,20 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
       lastStageChangeAt: input.lastStageChange?.get(l.id) ?? null,
       now,
     });
-    const { lastContact, direction, lastOutbound } = contactOf(activityByLead.get(l.id));
+    const { lastContact, direction, lastOutbound, lastOutboundType } = contactOf(activityByLead.get(l.id));
     const full = `${l.first_name ?? ""} ${l.last_name ?? ""}`.trim();
-    const client = l.business_name?.trim() || full || l.email || "Unnamed lead";
+    // The person's name first; the company is the sub-line, and stands in only when there is no person's name.
+    const company = l.business_name?.trim() || null;
+    const client = full || company || l.email || "Unnamed lead";
     rows.push({
       key: `l-${l.id}`,
       kind: "lead",
       id: l.id,
       href: `/dashboard/leads/${l.id}/`,
       client,
+      company: full && company && company.toLowerCase() !== full.toLowerCase() ? company : null,
       mark: l.mark_text?.trim() || null,
-      stageLabel: stageName.get(l.current_stage_id) ?? null,
+      stageLabel: stageName.has(l.current_stage_id) ? stageDisplayName(stageName.get(l.current_stage_id) as string) : null,
       stageId: l.current_stage_id,
       stageDays: age.days,
       stageNote: age.days === null ? age.label : null,
@@ -245,6 +321,7 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
       lastContact,
       lastDirection: direction,
       lastOutbound,
+      lastOutboundType,
       source: l.referral_source?.trim() || null,
       waiting: waitingOn({
         withUspto: false,
@@ -253,6 +330,7 @@ export function buildReviewRows(input: ReviewInput): ReviewRow[] {
       }),
       nextStep: leadTasks.get(l.id) ?? null,
       deadline: null,
+      startDate: civilDateIn(l.created_at, timeZone),
     });
   }
   return rows;

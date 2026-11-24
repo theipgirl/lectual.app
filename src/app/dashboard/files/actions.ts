@@ -58,15 +58,17 @@ export async function requestUploadAction(
   size: number,
 ): Promise<RequestUploadResult> {
   return guarded("request upload", async () => {
-    const target = parseParent(parent);
+    let target = parseParent(parent);
     if (!target) return refuse(FILE_MESSAGES.notFound);
 
     const supabase = await getScopedClient();
     const who = await authorize(supabase, FILE_UPLOAD_ROLES, FILE_MESSAGES.cantUpload);
     if (!who.ok) return who;
 
-    const org = await loadParentOrg(supabase, target);
-    if (!org.ok) return org;
+    const resolved = await loadParentOrg(supabase, target);
+    if (!resolved.ok) return resolved;
+    const org = resolved;
+    target = resolved.parent;
 
     const type = checkFileName(typeof fileName === "string" ? fileName : "");
     if (!type.ok) return refuse(type.error);
@@ -94,7 +96,7 @@ export async function requestUploadAction(
  */
 export async function confirmUploadAction(parent: FileParentInput, fileId: string, fileName: string): Promise<ConfirmUploadResult> {
   return guarded("confirm upload", async () => {
-    const target = parseParent(parent);
+    let target = parseParent(parent);
     if (!target) return refuse(FILE_MESSAGES.notFound);
     if (!isUuid(fileId)) return refuse(FILE_MESSAGES.badUpload);
 
@@ -102,8 +104,10 @@ export async function confirmUploadAction(parent: FileParentInput, fileId: strin
     const who = await authorize(supabase, FILE_UPLOAD_ROLES, FILE_MESSAGES.cantUpload);
     if (!who.ok) return who;
 
-    const org = await loadParentOrg(supabase, target);
-    if (!org.ok) return org;
+    const resolved = await loadParentOrg(supabase, target);
+    if (!resolved.ok) return resolved;
+    const org = resolved;
+    target = resolved.parent;
 
     const type = checkFileName(typeof fileName === "string" ? fileName : "");
     if (!type.ok) return refuse(type.error);
@@ -139,6 +143,7 @@ export async function confirmUploadAction(parent: FileParentInput, fileId: strin
       // The unique path (or id) means this exact file is already on the record.
       if (insertError.code === "23505") {
         revalidatePath(parentPath(target));
+        revalidatePath("/dashboard/review/");
         return { ok: true as const, fileId, alreadySaved: true as const };
       }
       logFileFailure("save file row", insertError);
@@ -157,6 +162,7 @@ export async function confirmUploadAction(parent: FileParentInput, fileId: strin
       payload: { file_id: fileId, file_name: type.name, size_bytes: sizeBytes },
     });
     revalidatePath(parentPath(target));
+    revalidatePath("/dashboard/review/");
     return { ok: true as const, fileId };
   }) as Promise<ConfirmUploadResult>;
 }
@@ -205,6 +211,8 @@ export async function deleteFileAction(fileId: string): Promise<DeleteFileResult
 
     const parent = row.lead_id ? { kind: "lead" as const, id: row.lead_id } : row.matter_id ? { kind: "matter" as const, id: row.matter_id } : null;
     if (parent) revalidatePath(parentPath(parent));
+    // The Weekly review's opened card lists the file and counts it on the row ("N documents").
+    revalidatePath("/dashboard/review/");
     return { ok: true as const };
   }) as Promise<DeleteFileResult>;
 }

@@ -1,5 +1,6 @@
 import { STOP_REASON_LABEL, type StopReason } from "./stops";
 import { rowsOf, str, type StopDb } from "./stop-db";
+import { leadRead, resolveLeadId } from "@/lib/leads/live";
 
 /**
  * Sequence stops — the write half (the rules are in ./stops.ts).
@@ -162,8 +163,17 @@ export async function leadsForQuote(db: StopDb, ids: { quoteId: string; orgId: s
   const leadId = str(q.lead_id);
   if (leadId) {
     leadIds.add(leadId);
+    // live-guard: the quote's own lead, merged or not: its own address still names the person (M5)
     const { data: lead } = await db.from("crm_lead").select("id, email").eq("id", leadId).eq("org_id", ids.orgId).maybeSingle();
     emails.push(...emailVariants(str((lead as Record<string, unknown> | null)?.email)));
+    // A quote stays on a merged lead (lectual 0107): the sequences to stop are its KEEPER's.
+    const keeper = await resolveLeadId(db, leadId, ids.orgId);
+    if (keeper.status === "ok" && keeper.id !== leadId) {
+      leadIds.add(keeper.id);
+      // live-guard: the keeper resolveLeadId just followed to, read for its address
+      const { data: kept } = await db.from("crm_lead").select("id, email").eq("id", keeper.id).eq("org_id", ids.orgId).maybeSingle();
+      emails.push(...emailVariants(str((kept as Record<string, unknown> | null)?.email)));
+    }
   }
   const contactId = str(q.contact_id);
   if (contactId) {
@@ -171,7 +181,7 @@ export async function leadsForQuote(db: StopDb, ids: { quoteId: string; orgId: s
     emails.push(...emailVariants(str((contact as Record<string, unknown> | null)?.email)));
   }
   if (emails.length > 0) {
-    const { data: same } = await db.from("crm_lead").select("id").eq("org_id", ids.orgId).in("email", [...new Set(emails)]);
+    const { data: same } = await leadRead(({ live }) => live(db.from("crm_lead").select("id")).eq("org_id", ids.orgId).in("email", [...new Set(emails)]));
     for (const row of rowsOf(same)) if (str(row.id)) leadIds.add(row.id as string);
   }
   return [...leadIds];

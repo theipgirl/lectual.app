@@ -6,6 +6,7 @@ import { logActivitySafe } from "./activity";
 import { recordNotFoundError } from "./not-found";
 import { validateTaskEdit, type TaskEditInput } from "./task-edit";
 import { ReadableError } from "@/lib/ui/readable-error";
+import { keeperForWrite } from "@/lib/leads/live";
 
 
 export type Task = Database["public"]["Tables"]["crm_task"]["Row"];
@@ -71,12 +72,15 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
   const supabase = await getScopedClient();
   await requireMatterWriteRole(supabase);
 
+  // A page opened before a merge (lectual 0107) files the task on the KEEPER; an unreadable pointer refuses.
+  const leadId = input.leadId ? await keeperForWrite(supabase, input.leadId) : null;
   let orgId: string;
-  if (input.leadId) {
+  if (leadId) {
     const { data, error } = await supabase
+      // live-guard: a merged lead id was followed to its keeper by keeperForWrite just above
       .from("crm_lead")
       .select("org_id")
-      .eq("id", input.leadId)
+      .eq("id", leadId)
       .single();
     if (error) throw error;
     orgId = data.org_id;
@@ -94,7 +98,7 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
     .from("crm_task")
     .insert({
       org_id: orgId,
-      lead_id: input.leadId ?? null,
+      lead_id: leadId,
       matter_id: input.matterId ?? null,
       title: input.title,
       type: input.type ?? "custom",

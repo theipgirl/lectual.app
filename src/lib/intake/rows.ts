@@ -1,3 +1,4 @@
+import { INTAKE_LIST_VALUE } from "./list-href";
 import type { Lead, Stage } from "@/lib/pipeline";
 // Type-only import: @/lib/members/directory is `import "server-only"`, but a
 // `import type` is erased at compile time, so nothing from it reaches the
@@ -10,6 +11,9 @@ import { REFERRAL_SOURCES } from "./referral-source";
 import { LANE_RANK } from "@/lib/leads/lane";
 import type { AgentMoveChip } from "@/lib/stage-keeper/moves";
 import { decisionOpen, type DecisionFlag } from "./stage-decision";
+import { shownTouch } from "./views";
+import { DEFAULT_LEAD_SET, parseLeadSet, type LeadSet } from "./working";
+import { SHOW_STEP, parseShow } from "./paging";
 
 /**
  * Pure view-model for /intake (blueprint §7, re-homed by §11): row building,
@@ -64,6 +68,10 @@ export type IntakeRow = {
    * were read and the lead has one; whether it is still OPEN depends on where the lead is now (`decisionOpen`).
    */
   decision?: DecisionFlag;
+  /** Start (ISO) of the lead's soonest booked consult, today (firm day) or later. Absent = none, or the read failed. */
+  consultAt?: string;
+  /** Start (ISO) of the lead's latest consult that already happened (last 30 days). Absent = none, or the read failed. */
+  pastConsultAt?: string;
 };
 
 /** Special `owner` filter value meaning "nobody is on the hook for this one". */
@@ -108,6 +116,10 @@ export type IntakeFilters = {
    * so the workspace turns it off when the flags couldn't be read: an unreadable list must never filter to "no leads".
    */
   decision?: boolean;
+  /** Only leads with a Long-Term Nurture suggestion (the "Suggestions" chip). */
+  suggest?: boolean;
+  /** Only leads with a "possible duplicate" (the workspace applies it: the duplicates are computed from the loaded leads). */
+  dup?: boolean;
   /** Free text over name / business / email / mark / referral detail / note. */
   q: string;
 };
@@ -174,6 +186,8 @@ export function parseIntakeFilters(params: IntakeSearchParams): IntakeFilters {
     // An unknown value is dropped, like every other param here: it must show the unfiltered list.
     ...(AGENT_MOVE_FILTERS.includes(agent) ? { agent } : {}),
     ...(firstValue(params.decision) === "1" ? { decision: true } : {}),
+    ...(firstValue(params.suggest) === "1" ? { suggest: true } : {}),
+    ...(firstValue(params.dup) === "1" ? { dup: true } : {}),
     q: firstValue(params.q),
   };
 }
@@ -193,6 +207,8 @@ export function filtersToQueryString(filters: IntakeFilters): string {
   if (filters.needsRebecca) params.set("needs", "rebecca");
   if (filters.agent) params.set("agent", filters.agent);
   if (filters.decision) params.set("decision", "1");
+  if (filters.suggest) params.set("suggest", "1");
+  if (filters.dup) params.set("dup", "1");
   if (filters.q.trim()) params.set("q", filters.q.trim());
   return params.toString();
 }
@@ -230,9 +246,17 @@ export type IntakeSort = { key: SortKey; dir: SortDir };
  */
 export const DEFAULT_SORT: IntakeSort = { key: "lastTouch", dir: "desc" };
 
-export type IntakeViewState = { view: IntakeView; group: IntakeGroup; sort: IntakeSort };
+export type IntakeViewState = {
+  view: IntakeView;
+  group: IntakeGroup;
+  sort: IntakeSort;
+  /** Which set of leads (`?set=`). Default: Working. */
+  set: LeadSet;
+  /** How many list rows are shown (`?show=`, steps of 25). */
+  show: number;
+};
 
-export const DEFAULT_VIEW_STATE: IntakeViewState = { view: "table", group: "stage", sort: DEFAULT_SORT };
+export const DEFAULT_VIEW_STATE: IntakeViewState = { view: "board", group: "stage", sort: DEFAULT_SORT, set: DEFAULT_LEAD_SET, show: SHOW_STEP };
 
 const VIEWS: readonly IntakeView[] = ["table", "board"];
 const GROUPS: readonly IntakeGroup[] = ["stage", "owner"];
@@ -278,12 +302,16 @@ function parseSort(params: IntakeSearchParams): IntakeSort {
  * `?view=kanban` should show the list, not a blank screen.
  */
 export function parseIntakeViewState(params: IntakeSearchParams): IntakeViewState {
-  const view = firstValue(params.view) as IntakeView;
+  const raw = firstValue(params.view);
+  // No `view` in the address opens the Board. A value that is present but not a view (`?view=kanban`) still shows the list, as before.
+  const view = (raw === "" ? DEFAULT_VIEW_STATE.view : VIEWS.includes(raw as IntakeView) ? raw : INTAKE_LIST_VALUE) as IntakeView;
   const group = firstValue(params.group) as IntakeGroup;
   return {
-    view: VIEWS.includes(view) ? view : DEFAULT_VIEW_STATE.view,
+    view,
     group: GROUPS.includes(group) ? group : DEFAULT_VIEW_STATE.group,
     sort: parseSort(params),
+    set: parseLeadSet(firstValue(params.set)),
+    show: parseShow(firstValue(params.show)),
   };
 }
 
@@ -303,6 +331,8 @@ export function intakeQueryString(filters: IntakeFilters, viewState: IntakeViewS
   if (viewState.view === "board" && viewState.group !== DEFAULT_VIEW_STATE.group) {
     params.set("group", viewState.group);
   }
+  if (viewState.set && viewState.set !== DEFAULT_VIEW_STATE.set) params.set("set", viewState.set);
+  if ((viewState.show ?? SHOW_STEP) > SHOW_STEP && viewState.view === "table") params.set("show", String(viewState.show));
   const { sort } = viewState;
   if (sort.key !== DEFAULT_SORT.key || sort.dir !== DEFAULT_SORT.dir) {
     params.set("sort", sort.key);
@@ -338,6 +368,10 @@ export type BuildIntakeRowsInput = {
   agentMoveByLeadId?: Record<string, AgentMoveChip>;
   /** lead id → the Lawmatics-import stage flag. Omit entirely when the flags couldn't be read. */
   decisionByLeadId?: Record<string, DecisionFlag>;
+  /** lead id -> start (ISO) of the soonest booked consult today or later. Omit entirely when the consult read failed. */
+  consultStartByLeadId?: Record<string, string>;
+  /** lead id -> start (ISO) of the latest consult already held (last 30 days). Omit entirely when the consult read failed. */
+  pastConsultStartByLeadId?: Record<string, string>;
   now: Date;
 };
 
@@ -357,7 +391,7 @@ function daysBetween(iso: string | null, now: Date): number | null {
  * strip and the row it counts can never disagree.
  */
 export function buildIntakeRows(input: BuildIntakeRowsInput): IntakeRow[] {
-  const { leads, stages, members, latestNoteByLeadId = {}, factsByLeadId = {}, agentMoveByLeadId = {}, decisionByLeadId = {}, now } = input;
+  const { leads, stages, members, latestNoteByLeadId = {}, factsByLeadId = {}, agentMoveByLeadId = {}, decisionByLeadId = {}, consultStartByLeadId = {}, pastConsultStartByLeadId = {}, now } = input;
   const stageById = new Map(stages.map((stage) => [stage.id, stage]));
   const memberById = new Map(members.map((member) => [member.userId, member]));
 
@@ -384,6 +418,9 @@ export function buildIntakeRows(input: BuildIntakeRowsInput): IntakeRow[] {
       // Only present when the agent placed the lead, so a row built without one is unchanged.
       ...(agentMove ? { agentMove } : {}),
       ...(decisionByLeadId[lead.id] ? { decision: decisionByLeadId[lead.id] } : {}),
+      // Only present for a lead with a booked consult today or later, so every other row is unchanged.
+      ...(consultStartByLeadId[lead.id] ? { consultAt: consultStartByLeadId[lead.id] } : {}),
+      ...(pastConsultStartByLeadId[lead.id] ? { pastConsultAt: pastConsultStartByLeadId[lead.id] } : {}),
     };
   });
 }
@@ -440,6 +477,7 @@ export function applyFilters(rows: IntakeRow[], filters: IntakeFilters): IntakeR
     if (filters.reply && row.reply !== filters.reply) return false;
     if (filters.agent && !(row.agentMove && (filters.agent === "7d" || row.agentMove.today))) return false;
     if (filters.decision && !decisionOpen(row.decision, row.lead.current_stage_id)) return false;
+    if (filters.suggest && row.temperature.suggestion !== "long_term_nurture") return false;
     if (query && !haystack(row).includes(query)) return false;
     return true;
   });
@@ -474,7 +512,7 @@ function touchCompare(a: IntakeRow, b: IntakeRow, dir: SortDir): number {
 }
 
 /** Per-key value extractor: a comparable, or null for "this row has no value". */
-function sortValue(row: IntakeRow, key: SortKey): string | number | null {
+function sortValue(row: IntakeRow, key: SortKey, now: Date): string | number | null {
   switch (key) {
     case "lead":
       return leadName(row) || null;
@@ -491,7 +529,9 @@ function sortValue(row: IntakeRow, key: SortKey): string | number | null {
     case "reply":
       return REPLY_RANK[row.reply];
     case "lastTouch":
-      return timeOf(row.lastTouchAt);
+      // The date the cell SHOWS (shownTouch): inbound for "Our turn", outbound for "Waiting on them", the last activity otherwise.
+      // "No contact yet" (and a future or unparseable date) has no value, so it sorts last in both directions.
+      return timeOf(shownTouch(row, now).iso);
     case "age":
       return row.daysInStage;
     case "notes":
@@ -506,10 +546,12 @@ function sortValue(row: IntakeRow, key: SortKey): string | number | null {
  * whichever direction is selected — flipping "Nurture" ascending shouldn't
  * fill the top of the table with a wall of em-dashes.
  */
-export function sortRows(rows: IntakeRow[], key: SortKey, dir: SortDir): IntakeRow[] {
+export function sortRows(rows: IntakeRow[], key: SortKey, dir: SortDir, opts: { now?: Date } = {}): IntakeRow[] {
+  // `now` decides which dates are in the future (never shown, so never sorted by). With no clock given nothing counts as future.
+  const now = opts.now ?? new Date(8.64e15);
   return [...rows].sort((a, b) => {
-    const av = sortValue(a, key);
-    const bv = sortValue(b, key);
+    const av = sortValue(a, key, now);
+    const bv = sortValue(b, key, now);
 
     if (av === null && bv !== null) return 1;
     if (av !== null && bv === null) return -1;

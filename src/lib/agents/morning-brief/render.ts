@@ -1,7 +1,7 @@
-import { civilLabel, dayInZone, whenInZone } from "../shared";
+import { civilDay, civilLabel, dayInZone, whenInZone } from "../shared";
+import { alertWindow, civilDaysUntil } from "@/lib/today/deadline-alerts";
 import type { ConsultItem, DeadlineItem, Section, SuggestionItem } from "./sections";
 import type { StalledLead, WaitingLead } from "./rules";
-import { DEADLINE_DAYS } from "./sections";
 
 /**
  * The morning brief's text, from the six sections. Pure. Plain headed sections with a count in each
@@ -74,13 +74,29 @@ function block<T>(title: string, section: Section<T>, line: (item: T) => string)
   const problem = notOk(section as { state: string; reason?: string });
   if (problem) return [...out, problem];
   if (section.state !== "ok") return out;
-  if (section.items.length === 0) return [...out, NOTHING];
+  const note = section.note ? [section.note] : [];
+  if (section.items.length === 0) return [...out, ...(note.length ? note : [NOTHING])];
   const extra = section.items.length - LIST_CAP;
-  return [...out, ...section.items.slice(0, LIST_CAP).map((item) => `- ${line(item)}`), ...(extra > 0 ? [`and ${extra} more`] : [])];
+  return [...out, ...section.items.slice(0, LIST_CAP).map((item) => `- ${line(item)}`), ...(extra > 0 ? [`and ${extra} more`] : []), ...note];
 }
 
 export function dayLabel(nowMs: number, tz: string): string {
   return `${dayInZone(nowMs, tz)}, ${new Intl.DateTimeFormat("en-US", { timeZone: tz, year: "numeric" }).format(nowMs)}`;
+}
+
+/** The same two windows as Today's Deadlines card (deadline-alerts.ts): due in 0..7 days, then 8..30. */
+export const DEADLINES_WEEK_TITLE = "Deadlines in the next 7 days";
+export const DEADLINES_MONTH_TITLE = "Deadlines in 8 to 30 days";
+
+function deadlineLine(d: DeadlineItem): string {
+  const status = d.confirmed ? "confirmed by the attorney" : "estimate, confirm against TSDR";
+  return `${civilLabel(d.dueDay)}: ${d.kind}, ${d.matterLabel} (${status})`;
+}
+
+/** One window of the deadlines section; a section that could not be read stays unread in both. */
+export function windowOf(section: Section<DeadlineItem>, window: 7 | 30, today: string): Section<DeadlineItem> {
+  if (section.state !== "ok") return section;
+  return { state: "ok", items: section.items.filter((d) => alertWindow(civilDaysUntil(d.dueDay, today)) === window) };
 }
 
 export function renderBrief(args: {
@@ -91,6 +107,7 @@ export function renderBrief(args: {
   followUps: FollowUpNote;
 }): { headline: string; summary: string; body: string } {
   const { sections: s, names, tz } = args;
+  const today = civilDay(args.nowMs, tz);
   const lead = (id: string | null) => names.lead(id);
   const lines: string[] = [];
 
@@ -113,10 +130,9 @@ export function renderBrief(args: {
   if (note && s.stalled.state === "ok" && s.stalled.items.length > 0) lines.push(note);
   lines.push(
     "",
-    ...block(`Matters with deadlines in the next ${DEADLINE_DAYS} days`, s.deadlines, (d) => {
-      const status = d.confirmed ? "confirmed by the attorney" : "estimate, confirm against TSDR";
-      return `${civilLabel(d.dueDay)}: ${d.kind}, ${d.matterLabel} (${status})`;
-    }),
+    ...block(DEADLINES_WEEK_TITLE, windowOf(s.deadlines, 7, today), deadlineLine),
+    "",
+    ...block(DEADLINES_MONTH_TITLE, windowOf(s.deadlines, 30, today), deadlineLine),
     "",
   );
   if (s.queue.state === "ok") {

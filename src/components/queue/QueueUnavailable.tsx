@@ -1,10 +1,13 @@
 import type { QueueLoad } from "@/lib/queue/load";
+import { LoadFailedCard } from "@/components/ui/LoadFailed";
+import { Notice } from "@/components/ui/Notice";
 import { notReadyYet } from "@/lib/ui/words";
 
 /**
  * Whenever the queue could not be read — any state that is not `ok`. Never an
  * empty queue. Three messages for three situations, in the glossary's plain words
- * (no setting names; the platform side is Lectual's to switch on).
+ * (no setting names; the platform side is Lectual's to switch on). "Not switched on"
+ * and "can't be reached" stay two different looks.
  */
 export type QueueUnavailableState = Pick<QueueLoad, "status" | "reason">;
 
@@ -29,10 +32,10 @@ export function queueUnavailableCopy(state: QueueUnavailableState): { title: str
 
 export function QueueUnavailable(props: QueueUnavailableState) {
   const copy = queueUnavailableCopy(props);
-  const risk = props.status === "unavailable";
+  if (props.status === "unavailable") return <LoadFailedCard what="approvals" body={copy.body} />;
   return (
-    <div role={risk ? "alert" : "status"} className={`lx-banner ${risk ? "lx-banner-risk" : "lx-banner-mute"}`}>
-      <strong>{copy.title}</strong> {copy.body}
-    </div>
+    <Notice tone="mute" role="status" title={copy.title}>
+      {copy.body}
+    </Notice>
   );
 }

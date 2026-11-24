@@ -1,7 +1,8 @@
 import type { Matter } from "./matters";
 import type { MatterWaitingOn } from "./stage-rules";
-import { daysInStage, matterIsStale } from "./stage-rules";
+import { STALE_THRESHOLD_DAYS, daysInStage, matterIsStale } from "./stage-rules";
 import { isOpenMatter } from "./docket-summary";
+import { OUR_TURN } from "@/lib/ui/words";
 
 /**
  * The Matters worklist from the design (design/Matters_Prototype.dc.html):
@@ -19,8 +20,8 @@ export type BandKey = MatterWaitingOn | "unplaced" | "closed";
 export const BAND_ORDER: readonly BandKey[] = ["firm", "client", "uspto", "court", "unplaced", "closed"];
 
 export const BAND_COPY: Record<BandKey, { label: string; hint: string }> = {
-  firm: { label: "Waiting on us", hint: "we owe the next move" },
-  client: { label: "Waiting on the client", hint: "nudge past 21 days" },
+  firm: { label: OUR_TURN, hint: "we owe the next move" },
+  client: { label: "Waiting on the client", hint: `nudge past ${STALE_THRESHOLD_DAYS.client} days` },
   uspto: { label: "With the USPTO", hint: "nothing to do but watch" },
   court: { label: "With the court", hint: "watch the docket" },
   unplaced: { label: "Not on the docket yet", hint: "give these a stage" },
@@ -51,7 +52,7 @@ export function groupIntoBands(matters: readonly Matter[], now: Date = new Date(
 /** The segment chips. `review` and `stalled` need sets the page computes. */
 export const SEGMENTS = [
   { key: "open", label: "Everything open" },
-  { key: "firm", label: "Waiting on us" },
+  { key: "firm", label: OUR_TURN },
   { key: "client", label: "Waiting on the client" },
   { key: "uspto", label: "With the USPTO" },
   { key: "court", label: "With the court" },

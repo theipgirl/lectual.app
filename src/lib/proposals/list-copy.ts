@@ -14,11 +14,6 @@ export const CONSULTS_SECTION_TITLE = "Consults and client meetings";
 export const CONSULTS_UNAVAILABLE = "Can't show meetings right now. Refresh to try again.";
 export const CONSULTS_EMPTY = "No consults or client meetings yet.";
 
-/** Shown when the list holds only the newest meetings: "Showing the newest 30." */
-export function consultsCapNote(shown: number): string {
-  return `Showing the newest ${shown}.`;
-}
-
 /** A filtered list with nothing in it: the sentence for that segment. */
 export function emptySegmentSentence(segment: ProposalSegment): string {
   switch (segment) {

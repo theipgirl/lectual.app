@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { notFound } from "next/navigation";
+import { stageDisplayName } from "@/lib/matters/list-view";
+import { notFound, redirect } from "next/navigation";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { MailingAddressCard } from "@/components/loe/MailingAddressCard";
@@ -20,8 +20,13 @@ import { ComposerTabs } from "@/components/leads/ComposerTabs";
 import { CollapsibleAside } from "@/components/leads/CollapsibleAside";
 import { needsAttention } from "@/lib/leads/needs-attention";
 import { LANE_LABEL } from "@/lib/leads/lane";
+import { temperaturePill } from "@/lib/intake/temperature-pill";
 import { AssignSelect, EditLeadForm, NoteComposer, ProposalCard, StageSelect } from "@/components/leads/LeadForms";
-import { LeadTags, PrepConsult } from "@/components/leads/LeadExtras";
+import { LeadTags } from "@/components/leads/LeadExtras";
+import { ConsultPrepCard } from "@/components/leads/ConsultPrepCard";
+import { loadConsultPrepCard } from "@/lib/consult-prep/card-load";
+import { canRerunConsultPrep } from "@/lib/consult-prep/roles";
+import { canSeeSetup } from "@/lib/setup/roles";
 import { LeadMattersLine } from "@/components/leads/LeadMatters";
 import { loadMattersForLead } from "@/lib/matters/for-lead";
 import { AnswersCard } from "@/components/answers/AnswersCard";
@@ -46,13 +51,21 @@ import { meetingsFor } from "@/lib/meetings/read";
 import { LinkedMeetings } from "@/components/meetings/LinkedMeetings";
 import { ConsultDetailsSection } from "@/components/leads/ConsultDetailsSection";
 import { TemperatureCard } from "@/components/leads/TemperatureCard";
-import { WaitingOnRebecca } from "@/components/leads/WaitingOnRebecca";
+import { TopCard } from "@/components/leads/TopCard";
+import { TopCardFrame } from "@/components/leads/TopCardFrame";
+import { WhatLectualDid } from "@/components/leads/WhatLectualDid";
+import { OtherApprovals } from "@/components/leads/OtherApprovals";
+import { FourFacts } from "@/components/leads/FourFacts";
+import { loadLeadStepFacts, type LeadStepLoad } from "@/lib/lead-step/load";
+import { buildLeadStepView } from "@/lib/lead-step/view-model";
 import { ConsultBookedView } from "@/components/calendar/ConsultBookedLine";
 import { recordPageTitle } from "@/lib/ui/page-title";
-import { AUTOMATIC_STAGE_MOVES, FIRST_READ, FROM_THEIR_EMAILS, LEADS_NAME } from "@/lib/ui/words";
+import { AUTOMATIC_STAGE_MOVES, BLANK, FIRST_READ, LAST_CONTACT, FROM_THEIR_EMAILS, INTAKE_NAME, LEAD_STEP_CANT_SHOW_NEEDS, LEAD_STEP_DID_UNAVAILABLE, LEAD_MERGED_INTO, MERGE_DONE, MERGE_HISTORY_PARTIAL, MERGE_OWN_ROWS_UNAVAILABLE } from "@/lib/ui/words";
+import { mergedSetFor, resolveLeadId } from "@/lib/leads/live";
+import { mergeNotice, mergedFromRedirect } from "@/lib/leads/merge-links";
 import { loadBookedConsult } from "@/lib/calendar/outlook-read";
-import { loadPendingApprovalsByLead } from "@/lib/queue/lead-pending";
-import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
+import { loadBookedLawmaticsConsult } from "@/lib/calendar/lawmatics-read";
+import { mergeBookedConsults } from "@/lib/calendar/booked-merge";
 import { SequencesCard, type SequenceRow } from "@/components/leads/SequencesCard";
 import { laneView, nextStepForLane } from "@/lib/leads/lane";
 import { getFirmTimeZone, getLaneLinks } from "@/lib/org/profile";
@@ -60,6 +73,10 @@ import { listLeadEnrollments } from "@/lib/automation/drips";
 import { AUTOMATION_STAFF_ROLES } from "@/lib/automation/rules";
 import { enrollmentStatusLabel, enrollmentStatusTone } from "@/lib/campaigns/steps";
 import { shortDate, stopLine } from "@/lib/campaigns/stops";
+import { intakeListHref } from "@/lib/intake/list-href";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Notice } from "@/components/ui/Notice";
+import { LoadFailedLine } from "@/components/ui/LoadFailed";
 
 /** Tab title: the lead's name through the scoped getter; "Lead" when the read fails or finds nothing. */
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -73,8 +90,28 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   };
 }
 
-export default async function LeadPage({ params }: { params: Promise<{ id: string }> }) {
+/** The one plain line of record facts under the name: each fact once (a business name that is also the mark is shown once). */
+function leadDetailsLine(lead: { business_name?: string | null; email?: string | null; phone?: string | null; mark_text?: string | null }): string {
+  const seen = new Set<string>();
+  const parts: string[] = [];
+  for (const raw of [lead.business_name, lead.email, lead.phone, lead.mark_text]) {
+    const part = raw?.trim();
+    if (!part || seen.has(part.toLowerCase())) continue;
+    seen.add(part.toLowerCase());
+    parts.push(part);
+  }
+  return parts.join(" · ");
+}
+
+export default async function LeadPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { id } = await params;
+  const sp = (await searchParams) ?? {};
   const session = await resolveFirmSession();
   if (session.kind !== "ok") notFound();
 
@@ -83,41 +120,68 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   if (!lead) notFound();
 
   const supabase = await getScopedClient();
-  const [hasAgentToolkit, hasProposals, hasMailbox, applied, catalog, meetings] = await Promise.all([
-    orgHasModule("agent-toolkit"),
+  // A merged lead (lectual 0107) is not a page of its own: its link goes to the lead it was merged into.
+  if (lead.merged_into_id) {
+    const followed = await resolveLeadId(supabase, id);
+    redirect(mergedFromRedirect(followed.status === "ok" ? followed.id : lead.merged_into_id, id));
+  }
+  // The history that stays on merged leads (timeline, files, proposals) is read with this lead's own.
+  const mergedSet = await mergedSetFor(supabase, id);
+  const mergedIds = mergedSet.ids.filter((x) => x !== id);
+  const notice = mergeNotice({ merged: sp.merged, from: sp.from }, mergedIds);
+  const [hasProposals, hasMailbox, applied, catalog, meetings] = await Promise.all([
     orgHasModule("proposals"),
     orgHasModule("mailbox"),
     tagsForLead(id).catch(() => []),
     listTags().catch(() => []),
     meetingsFor({ leadId: id }),
   ]);
-  const [stages, members, { data: activity }] = await Promise.all([
+  const [stages, membersRead, { data: activity }] = await Promise.all([
     listStages(),
-    listMemberDirectory().catch(() => []),
-    supabase
-      .from("crm_activity")
-      .select("id, type, actor_type, created_at, payload")
-      .eq("lead_id", id)
+    // Null on a failed read (never an empty team): the step forms then draw no picker and post no assignee.
+    listMemberDirectory().catch(() => null),
+    (mergedIds.length
+      ? supabase.from("crm_activity").select("id, lead_id, type, actor_type, created_at, payload").in("lead_id", mergedSet.ids)
+      : supabase.from("crm_activity").select("id, lead_id, type, actor_type, created_at, payload").eq("lead_id", id)
+    )
       .order("created_at", { ascending: false })
       .limit(100),
   ]);
+  const members = membersRead ?? [];
   const proposalRead = hasProposals
-    ? await listProposals({ leadId: id })
+    ? await listProposals(mergedIds.length ? { leadIds: mergedSet.ids } : { leadId: id })
         .then((proposals) => ({ status: "ok" as const, proposals }))
         .catch(() => ({ status: "unavailable" as const }))
     : null;
   const proposalCanWrite = CAN_WRITE_LEAD.includes(session.role) && PROPOSAL_STAFF_WRITE_ROLES.includes(session.role);
   const draftBlock = proposalRead && proposalCanWrite ? await loadDraftBlock() : null;
   const rows = activity ?? [];
+  // What a person can act on (suggestions, proposals from email) is this lead's OWN rows only. With leads merged into
+  // it, they are read on their own, so the 100-row cap over the merged history can't push them out.
+  const ownRead = mergedIds.length
+    ? await supabase
+        .from("crm_activity")
+        .select("id, lead_id, type, actor_type, created_at, payload")
+        .eq("lead_id", id)
+        .order("created_at", { ascending: false })
+        .limit(100)
+        .then(
+          (r) => (r.error ? null : (r.data ?? [])),
+          () => null,
+        )
+    : rows;
+  // Three states: rows, none, or couldn't be read (said on the page, never shown as "nothing waiting").
+  const ownRowsFailed = ownRead === null;
+  const ownRows = ownRead ?? [];
   const voiceUrls = await voiceNotePlaybackUrls(rows);
 
   // Lane + next step (SOP Stage 2) and the lead's sequences (SOP rule 1).
-  const [{ links, failed: linksFailed }, tz, enrollments, approvals, factsRead, mattersRead, answersRead, documentsRead, consultRead, mailingRead] = await Promise.all([
+  const [{ links, failed: linksFailed }, tz, enrollments, stepLoad, factsRead, mattersRead, answersRead, documentsRead, consultRead, mailingRead, prepCard] = await Promise.all([
     getLaneLinks(),
     getFirmTimeZone(),
     listLeadEnrollments(id).catch(() => null),
-    // Never throws on an outage (it says `unavailable`); the catch is for the unexpected.
-    loadPendingApprovalsByLead().catch((): LeadPendingApprovals => ({ status: "unavailable" })),
+    // The top card, the four facts and "What Lectual did" are decided from these (src/lib/lead-step/). Never throws; the catch is for the unexpected.
+    loadLeadStepFacts(lead.id).catch((): LeadStepLoad => ({ status: "unavailable" })),
     // The same facts the Intake board reads; a failed read leaves the existing rules, never a guessed "cold".
     loadTemperatureFacts([lead], stages).catch((): TemperatureFactsRead => ({ status: "unavailable" })),
     // Never throws (a failed read is `unavailable`), so it can't take the page down.
@@ -125,11 +189,14 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     // Three states per source and never throws; a failed read is named on the card, not an empty one.
     loadLeadAnswers(lead.id),
     // Files stored on this lead. Never throws: a failed read is named on the card, not an empty list.
-    loadDocumentsRead({ kind: "lead", id: lead.id }, { includeLetters: false }),
-    // Outlook consults exist only for a firm with the mailbox module: without it, no read. Never throws (three states).
-    hasMailbox ? loadBookedConsult(lead.id) : Promise.resolve(null),
+    loadDocumentsRead({ kind: "lead", id: lead.id, mergedIds }, { includeLetters: false }),
+    // Two reads, the earliest booking shown: Outlook only with the mailbox module, Lawmatics whenever it is connected
+    // (not behind Mailboxes). Never throws (three states each; null = not read).
+    Promise.all([hasMailbox ? loadBookedConsult(lead.id) : Promise.resolve(null), loadBookedLawmaticsConsult(lead.id).catch(() => ({ status: "unavailable" as const }))]).then(mergeBookedConsults),
     // The address the client gave when they signed their letter: staff roles only (null = not asked). Never throws (three states).
     loadSignedAddress(session.role, { leadId: lead.id }),
+    // The Consult prep card: markers, sends, recipients and the stored brief. Three states each; never throws.
+    getFirmTimeZone().then((zone) => loadConsultPrepCard({ leadIds: mergedSet.ids, adminTier: canSeeSetup(session.role), tz: zone })),
   ]);
   const temperature = effectiveTemperature(lead, stages, new Date(), factsRead.status === "ok" ? factsRead.byLead[lead.id] : undefined);
   const lane = laneView(lead);
@@ -151,11 +218,11 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     : null;
   const canOperate = AUTOMATION_STAFF_ROLES.includes(session.role);
   const renderedAt = new Date().getTime();
-  const proposals = pendingProposals(rows);
+  const proposals = pendingProposals(ownRows);
   const canWrite = CAN_WRITE_LEAD.includes(session.role);
   // The automatic stage moves suggestions waiting for a person, and who may act on them (the stage-move roles).
   const canMove = CAN_MOVE_STAGE.includes(session.role);
-  const stageSuggestions = pendingStageSuggestions(rows);
+  const stageSuggestions = pendingStageSuggestions(ownRows);
   const name = `${lead.first_name} ${lead.last_name}`.trim() || lead.email;
   const current: Record<string, string | null> = {
     business_name: lead.business_name,
@@ -165,48 +232,86 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     practice_area: lead.practice_area,
   };
 
-  const stageName = stages.find((s) => s.id === lead.current_stage_id)?.name ?? null;
+  const stageRaw = stages.find((s) => s.id === lead.current_stage_id)?.name ?? null;
+  const stageName = stageRaw === null ? null : stageDisplayName(stageRaw);
   const owner = lead.assigned_to ? members.find((m) => m.userId === lead.assigned_to) : undefined;
   const ownerName = owner ? (owner.displayName ?? owner.email ?? null) : null;
   const showAttention = needsAttention({
     leadId: lead.id,
     consult: consultRead,
-    approvals,
     clientEmailProposals: proposals.length,
     stageSuggestions: stageSuggestions.length,
   });
 
+  // The engine's view: exactly one top card. A lead the engine couldn't read is the "couldn't load" card, never a calm one.
+  // A view that can't be built is the same couldn't-load card, never the page's error screen.
+  let step: ReturnType<typeof buildLeadStepView> | null = null;
+  if (stepLoad.status === "ok") {
+    try {
+      step = buildLeadStepView(stepLoad.facts);
+    } catch {
+      step = null;
+    }
+  }
+  const yoursId = step?.top.kind === "yours" ? step.top.taskId : null;
+  const yoursTask = yoursId && stepLoad.status === "ok" && stepLoad.facts.tasks.status === "ok" ? stepLoad.facts.tasks.value.find((t) => t.id === yoursId) : undefined;
+  const stepMembers = membersRead ? membersRead.map((m) => ({ userId: m.userId, name: m.displayName ?? m.email ?? "Teammate" })) : null;
+
   return (
     <>
-      <Link href="/dashboard/intake/" className="lx-back">
-        ← {LEADS_NAME}
-      </Link>
-      <div className="lx-page-head">
-        <div style={{ flex: 1, minWidth: 260 }}>
-          <div className="lx-label">{lead.business_name ?? "Lead"}</div>
-          <h1 className="lx-h1" data-tour="lead-head">{name}</h1>
-          <p className="lx-note" style={{ margin: "6px 0 0" }}>
-            {lead.email}
-            {lead.phone ? ` · ${lead.phone}` : ""}
-            {lead.mark_text ? ` · ${lead.mark_text}` : ""}
-          </p>
-          <ContactActions phone={lead.phone} email={lead.email} />
-        </div>
-        {canWrite && (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <StageSelect leadId={lead.id} stageId={lead.current_stage_id} stages={stages.map((s) => ({ id: s.id, name: s.name }))} />
-            <AssignSelect leadId={lead.id} assignedTo={lead.assigned_to} members={members.map((m) => ({ userId: m.userId, name: m.displayName ?? m.email ?? "Teammate" }))} />
-          </div>
-        )}
-      </div>
+      <PageHeader
+        back={{ href: intakeListHref(), label: INTAKE_NAME }}
+        title={name}
+        tour="lead-head"
+        details={leadDetailsLine(lead)}
+        actions={
+          <>
+            <ContactActions phone={lead.phone} email={lead.email} />
+            {canWrite && (
+              <div className="lx-head-selects">
+                <StageSelect leadId={lead.id} stageId={lead.current_stage_id} stages={stages.map((s) => ({ id: s.id, name: s.name }))} />
+                <AssignSelect leadId={lead.id} assignedTo={lead.assigned_to} members={members.map((m) => ({ userId: m.userId, name: m.displayName ?? m.email ?? "Teammate" }))} />
+              </div>
+            )}
+          </>
+        }
+      />
+
+      {notice && (
+        <Notice tone={notice === "merged" ? "ok" : "mute"} role="status">
+          {notice === "merged" ? MERGE_DONE : LEAD_MERGED_INTO(name)}
+        </Notice>
+      )}
+      {ownRowsFailed && (
+        <LoadFailedLine>{MERGE_OWN_ROWS_UNAVAILABLE}</LoadFailedLine>
+      )}
+      {mergedSet.status === "unavailable" && (
+        <LoadFailedLine>{MERGE_HISTORY_PARTIAL}</LoadFailedLine>
+      )}
 
       <LeadStatusRow
         stageName={stageName}
-        temperatureLabel={temperature.value ? LANE_LABEL[temperature.value] : null}
+        temperatureLabel={temperature.value ? (temperaturePill(temperature)?.text ?? LANE_LABEL[temperature.value]) : null}
         ownerName={ownerName}
         lastInboundAt={lead.last_inbound_at}
         now={renderedAt}
+        hideLastHeard={!!step}
       />
+
+      <div className="ls-top">
+        <TopCardFrame>
+          <TopCard
+            leadId={lead.id}
+            view={step ? step.top : { kind: "couldnt-load", text: LEAD_STEP_CANT_SHOW_NEEDS }}
+            canWriteSteps={canWrite}
+            members={stepMembers}
+            yoursDueDate={yoursTask?.dueAt ? yoursTask.dueAt.slice(0, 10) : null}
+          />
+        </TopCardFrame>
+        {step && <OtherApprovals queue={step.queue} />}
+        <WhatLectualDid leadId={lead.id} did={step ? step.did : { status: "unavailable", text: LEAD_STEP_DID_UNAVAILABLE }} />
+        {step && <FourFacts facts={step.facts} />}
+      </div>
 
       <div className="lx-split lx-split-lead">
         <div className="lx-col">
@@ -214,13 +319,11 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             <NeedsAttentionCard>
               {consultRead && <ConsultBookedView read={consultRead} timeZone={tz} bare />}
 
-              <WaitingOnRebecca leadId={lead.id} approvals={approvals} now={renderedAt} bare />
-
               {proposals.length > 0 && (
-                <div style={{ display: "grid", gap: 12 }}>
+                <div className="lx-grid-12">
                   <div>
                     <div className="lx-label">{FROM_THEIR_EMAILS} · waiting on you</div>
-                    <h3 className="lx-h2" style={{ fontSize: 18, margin: 0 }}>
+                    <h3 className="lx-h3">
                       {proposals.length} proposal{proposals.length === 1 ? "" : "s"} from client email
                     </h3>
                   </div>
@@ -231,10 +334,10 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
               )}
 
               {stageSuggestions.length > 0 && (
-                <div style={{ display: "grid", gap: 12 }}>
+                <div className="lx-grid-12">
                   <div>
                     <div className="lx-label">{AUTOMATIC_STAGE_MOVES} · waiting on you</div>
-                    <h3 className="lx-h2" style={{ fontSize: 18, margin: 0 }}>
+                    <h3 className="lx-h3">
                       {stageSuggestions.length} stage suggestion{stageSuggestions.length === 1 ? "" : "s"}
                     </h3>
                   </div>
@@ -254,7 +357,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           )}
 
           {canWrite && (
-            <section className="lx-card" style={{ padding: 18 }} aria-label="Add to the timeline">
+            <section className="lx-card lx-pad" aria-label="Add to the timeline">
               <ComposerTabs
                 text={<NoteComposer leadId={lead.id} />}
                 voice={<VoiceNoteRecorder target={{ kind: "lead", id: lead.id }} action={addVoiceNoteAction} />}
@@ -262,23 +365,16 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             </section>
           )}
 
-          <section className="lx-card" style={{ padding: 18 }} data-tour="lead-timeline">
-            <h2 className="lx-h2" style={{ fontSize: 23, marginBottom: 10 }}>
+          <section className="lx-card lx-pad" data-tour="lead-timeline">
+            <h2 className="lx-h2" style={{ marginBottom: 10 }}>
               Timeline
             </h2>
             <Timeline rows={rows} mediaUrls={voiceUrls} timeZone={tz} undo={{ leadId: lead.id, canMove, currentStageId: lead.current_stage_id }} />
           </section>
 
-          {canWrite && hasAgentToolkit && (
-            <details id="prep-consult" className="lx-card lx-disclosure" data-tour="lead-prep">
-              <summary>Prep this consult</summary>
-              <div style={{ padding: "0 18px 18px" }}>
-                <PrepConsult leadId={lead.id} practiceArea={lead.practice_area} />
-              </div>
-            </details>
-          )}
+          <ConsultPrepCard data={prepCard} leadId={lead.id} canRerun={canRerunConsultPrep(session.role)} adminTier={canSeeSetup(session.role)} />
 
-          <ConsultDetailsSection leadId={lead.id} canWrite={canWrite} />
+          <ConsultDetailsSection leadId={lead.id} canWrite={canWrite} timeZone={tz} />
 
           <LinkedMeetings read={meetings} />
 
@@ -295,7 +391,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           {canWrite && (
             <details className="lx-card lx-disclosure" id="log-consult-outcome">
               <summary>Log a consult outcome</summary>
-              <div style={{ padding: "0 18px 18px" }}>
+              <div className="lx-disclosure-body">
                 <ConsultOutcomeForm leadId={lead.id} />
               </div>
             </details>
@@ -328,16 +424,16 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           />
           {lead.ai_summary && !lane.suggested && (
             // A first-read summary that carries no temperature (an older format) is still shown, as the assistant's words.
-            <section className="lx-card" style={{ padding: 18 }}>
+            <section className="lx-card lx-pad">
               <div className="lx-label" style={{ marginBottom: 6 }}>
                 {FIRST_READ}
               </div>
-              <p style={{ margin: 0, color: "var(--body)", lineHeight: 1.55 }}>{lead.ai_summary}</p>
+              <p className="lx-note">{lead.ai_summary}</p>
             </section>
           )}
         </div>
 
-        <aside className="lx-card lx-aside" style={{ width: 340 }}>
+        <aside className="lx-card lx-aside">
           <CollapsibleAside>
             <div className="lx-label">Tags</div>
             <LeadTags
@@ -356,16 +452,16 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
               <p className="lx-note">Your role can view this lead but not change it.</p>
             )}
             <div className="lx-meta">
-              <span>Last heard from</span>
-              <span>{lead.last_inbound_at ? relativeTime(lead.last_inbound_at) : "—"}</span>
+              <span>{LAST_CONTACT}</span>
+              <span>{lead.last_inbound_at ? relativeTime(lead.last_inbound_at, undefined, tz) : BLANK}</span>
             </div>
             <div className="lx-meta">
               <span>Last reached out</span>
-              <span>{lead.last_outbound_at ? relativeTime(lead.last_outbound_at) : "—"}</span>
+              <span>{lead.last_outbound_at ? relativeTime(lead.last_outbound_at, undefined, tz) : BLANK}</span>
             </div>
             <div className="lx-meta">
               <span>Came from</span>
-              <span>{[lead.referral_source, lead.referral_detail].filter(Boolean).join(" — ") || "—"}</span>
+              <span>{[lead.referral_source, lead.referral_detail].filter(Boolean).join(" — ") || BLANK}</span>
             </div>
             <MailingAddressCard read={mailingRead} />
             <LeadMattersLine read={mattersRead} />

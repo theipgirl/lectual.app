@@ -17,7 +17,16 @@ const NETWORK = "The upload didn't finish. Check your connection and try again."
  * .msg, .eml and .heic). The browser only ever holds the signed URL, never a
  * storage path it could change.
  */
-export function UploadControl({ parent }: { parent: FileParentInput }) {
+export function UploadControl({
+  parent,
+  onUploaded,
+  inputId,
+}: {
+  parent: FileParentInput;
+  /** Called after a saved upload. The record pages revalidate themselves; a page that does not (the Weekly review panel) refreshes here. */
+  onUploaded?: () => void;
+  inputId?: string;
+}) {
   const [busyName, setBusyName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [inputKey, setInputKey] = useState(0);
@@ -43,7 +52,8 @@ export function UploadControl({ parent }: { parent: FileParentInput }) {
 
       const saved = await confirmUploadAction(parent, request.fileId, file.name);
       if (!saved.ok) return setError(saved.error);
-      // confirmUploadAction revalidates this page, which refreshes the list.
+      // confirmUploadAction revalidates the record's own page, which refreshes the list there.
+      onUploaded?.();
     } catch {
       setError(FILE_MESSAGES.generic);
     } finally {
@@ -52,5 +62,5 @@ export function UploadControl({ parent }: { parent: FileParentInput }) {
     }
   }
 
-  return <UploadView busy={busyName !== null} busyName={busyName} error={error} inputKey={inputKey} onPick={(file) => file && void upload(file)} />;
+  return <UploadView inputId={inputId} busy={busyName !== null} busyName={busyName} error={error} inputKey={inputKey} onPick={(file) => file && void upload(file)} />;
 }

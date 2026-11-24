@@ -37,9 +37,9 @@ describe("markProposalPaid: the happy path", () => {
       proposalId: PROPOSAL_ID,
       variant: "current",
       packageName: "Concierge",
-      clientName: "Sevetri Wilson",
-      entityName: "Prosperall",
-      markText: "Prosperall",
+      clientName: "Callum Ferreira",
+      entityName: "Larkmoor",
+      markText: "Larkmoor",
       classCount: 2,
     });
     expect(t.latest("loe_draft")).toMatchObject({ outcome: "queued", queue_item_id: "queue-1", draft_id: "draft-1" });
@@ -51,7 +51,7 @@ describe("markProposalPaid: the happy path", () => {
     expect(t.spies.uploadMatterFile).toHaveBeenCalledTimes(1);
     const [token, file] = t.spies.uploadMatterFile.mock.calls[0] as unknown as [string, { matterId: string; fileName: string; mime: string; bytes: Uint8Array }];
     expect(token).toBe("TOKEN-ORG-1");
-    expect(file).toMatchObject({ matterId: "LM-MATTER-1", fileName: "Sevetri Wilson - Accepted Proposal.docx" });
+    expect(file).toMatchObject({ matterId: "LM-MATTER-1", fileName: "Callum Ferreira - Accepted Proposal.docx" });
     expect(file.mime).toContain("wordprocessingml");
     expect(Buffer.from(file.bytes.subarray(0, 2)).toString()).toBe("PK");
   });
@@ -270,7 +270,7 @@ describe("the LOE draft step: blocked and failed, never silent", () => {
     const t = await setupFlow({ generate: "other-error" });
     await t.flow.markProposalPaid(PROPOSAL_ID);
     expect(draftLine(t)).toMatchObject({ outcome: "failed", reason: STEP_TEXT.draftFailed });
-    expect(JSON.stringify(t.recorded)).not.toContain("sevetri@example.com");
+    expect(JSON.stringify(t.recorded)).not.toContain("callum@example.com");
     expect(JSON.stringify(t.recorded)).not.toContain("duplicate key");
   });
 
@@ -313,10 +313,10 @@ describe("independent steps", () => {
   it("a step that throws is recorded as failed with a fixed sentence, and the next still runs", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const t = await setupFlow();
-    t.spies.listDraftsForProposal.mockRejectedValueOnce(new Error("boom for sevetri@example.com"));
+    t.spies.listDraftsForProposal.mockRejectedValueOnce(new Error("boom for callum@example.com"));
     await t.flow.markProposalPaid(PROPOSAL_ID);
     expect(t.stepsRecorded()).toEqual(["paid_marked:marked", "loe_draft:failed", "accepted_file_upload:uploaded"]);
-    expect(JSON.stringify(t.recorded)).not.toContain("sevetri@example.com");
+    expect(JSON.stringify(t.recorded)).not.toContain("callum@example.com");
   });
 
   it("a timeline line that fails to save is reported on the step", async () => {
@@ -496,6 +496,6 @@ describe("no record data in logs", () => {
     await t.flow.retryProposalStep(PROPOSAL_ID, "accepted_file_upload");
     await t.flow.undoProposalPaid(PROPOSAL_ID);
     const logged = JSON.stringify(spies.flatMap((s) => s.mock.calls));
-    for (const secret of ["Sevetri", "sevetri@example.com", "Prosperall", "TOKEN-ORG-1", "$7,", "$1,400", "duplicate key"]) expect(logged).not.toContain(secret);
+    for (const secret of ["Callum", "callum@example.com", "Larkmoor", "TOKEN-ORG-1", "$7,", "$1,400", "duplicate key"]) expect(logged).not.toContain(secret);
   });
 });

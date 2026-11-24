@@ -2,19 +2,11 @@
 "use client";
 
 import { useActionState } from "react";
+import { Notice } from "@/components/ui";
+import { SAVING } from "@/lib/ui/words";
+import "@/components/documents/documents.css";
 import type { Matter } from "@/lib/matters";
 import { generateTrademarkClearanceAction, type TrademarkClearanceState } from "../actions";
-
-const buttonBase: React.CSSProperties = {
-  padding: "12px 18px",
-  fontSize: 14,
-  fontWeight: 700,
-  fontFamily: "var(--font-geist), sans-serif",
-  border: "none",
-  borderRadius: 12,
-  cursor: "pointer",
-  width: "100%",
-};
 
 /** Matter's on-file filing_basis (1a/1b/44d/44e/66a) mapped to this flow's
  * two domestic options — a starting point only, never assumed correct: staff
@@ -46,17 +38,10 @@ export default function TrademarkClearanceForm({
   return (
     <form action={formAction}>
       <input type="hidden" name="matterId" value={matterId} />
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1fr) minmax(240px, 0.8fr)",
-          gap: "16px",
-          alignItems: "start",
-        }}
-      >
-        <article className="lx-card" style={{ display: "grid", gap: 14, padding: 18 }}>
+      <div className="dl-two-pane">
+        <article className="lx-card lx-pad dl-form-card">
           <label className="lx-field">
-            <span className="lx-label" style={{ fontSize: 10 }}>
+            <span className="lx-label">
               Preliminary search findings — from your own USPTO TESS + web search
             </span>
             <textarea
@@ -64,21 +49,20 @@ export default function TrademarkClearanceForm({
               rows={10}
               required
               className="lx-input"
-              style={{ resize: "vertical", fontFamily: "inherit" }}
               placeholder={
                 "e.g. No live federal registrations found for identical marks in Class 25.\n" +
                 "SIMILARMARK (U.S. Reg. No. 1234567) — registered for \"t-shirts\" in Class 25, owner Acme Apparel LLC, live.\n" +
                 "No phonetic variants found. No common-law use found via web search."
               }
             />
-            <p style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 4 }}>
+            <p className="lx-note">
               This is the only source for every mark, registration number, owner, and status the
               draft cites — nothing here is invented.
             </p>
           </label>
 
           <label className="lx-field">
-            <span className="lx-label" style={{ fontSize: 10 }}>
+            <span className="lx-label">
               Proposed filing basis
             </span>
             <select
@@ -92,44 +76,44 @@ export default function TrademarkClearanceForm({
           </label>
 
           <label className="lx-field">
-            <span className="lx-label" style={{ fontSize: 10 }}>
+            <span className="lx-label">
               Entity name (leave blank if none on file)
             </span>
             <input type="text" name="entityName" className="lx-input" placeholder="e.g. Acme Co. LLC" />
           </label>
 
           {state.error && (
-            <p role="alert" style={{ color: "var(--wine)", fontSize: 13 }}>
+            <Notice tone="risk" role="alert">
               {state.error}
-            </p>
+            </Notice>
           )}
 
           <button
             type="submit"
+            className="lx-btn lx-btn-pri dl-submit"
             disabled={pending}
-            style={{ ...buttonBase, background: "var(--ox)", color: "var(--cream)" }}
           >
-            {pending ? "Drafting the clearance opinion…" : "Generate trademark clearance opinion"}
+            {pending ? SAVING : "Generate trademark clearance opinion"}
           </button>
         </article>
 
-        <aside className="lx-voice" style={{ display: "grid", gap: 8, padding: 16 }}>
-          <span className="lx-label" style={{ fontSize: 10 }}>
+        <aside className="lx-voice lx-pad dl-facts">
+          <span className="lx-label">
             Cited verbatim from the matter file
           </span>
-          <div style={{ fontSize: 13, color: "var(--ink)" }}>
+          <div className="dl-fact">
             <strong>Mark:</strong> {matter.mark_text ?? "— not on file —"}
           </div>
-          <div style={{ fontSize: 13, color: "var(--ink)" }}>
+          <div className="dl-fact">
             <strong>Class(es):</strong>{" "}
             {matter.international_classes?.length
               ? matter.international_classes.join(", ")
               : "— not on file —"}
           </div>
-          <div style={{ fontSize: 13, color: "var(--ink)" }}>
+          <div className="dl-fact">
             <strong>Goods/services:</strong> {matter.goods_services ?? "— not on file —"}
           </div>
-          <p style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 6 }}>
+          <p className="lx-note">
             This is a PRELIMINARY, pre-engagement knockout check — lighter than the comprehensive
             opinion letter, and never a substitute for it. Missing something above? Update it on
             the matter page before generating.

@@ -3,6 +3,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { QueueLoad } from "@/lib/queue/load";
 import { followup, MEMBERS, qitem, U } from "./routing-fixtures";
 
+// The failed-read card carries a Refresh button, which needs the app router.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
+
 process.env.__NEXT_TRAILING_SLASH = "true";
 
 const NOW = Date.parse("2026-10-28T12:00:00Z");
@@ -63,15 +66,15 @@ describe("Approvals page: person switch", () => {
     expect(rows(viewer)).toEqual(["f1", "f2", "p1"]);
   });
 
-  it("an empty Mine explains how many are waiting on others, not 'All caught up'", async () => {
+  it("an empty Mine explains how many are waiting on others, not the empty-queue title", async () => {
     const html = await render(ok([items[0], items[1]]), { routing: { stalled_followup: U.caitlyn } });
     expect(html).toContain("Nothing is waiting on you. 2 are waiting on others.");
     expect(html).toContain("who=all");
-    expect(html).not.toContain("All caught up");
+    expect(html).not.toContain("No approvals waiting yet.");
   });
 
   it("a genuinely empty queue still says all caught up", async () => {
-    expect(await render(ok([]))).toContain("All caught up");
+    expect(await render(ok([]))).toContain("No approvals waiting yet.");
   });
 
   it("an unavailable or unconfigured queue renders its own state: no counts, no switch", async () => {
@@ -79,7 +82,7 @@ describe("Approvals page: person switch", () => {
       const html = await render({ status, items: [], ...(status === "unconfigured" ? { reason: "org-key" as const } : {}) });
       expect(html).not.toContain("Mine (");
       expect(html).not.toContain("Everyone (");
-      expect(html).not.toContain("All caught up");
+      expect(html).not.toContain("No approvals waiting yet.");
       expect(html).not.toContain("data-queue-who");
     }
   });

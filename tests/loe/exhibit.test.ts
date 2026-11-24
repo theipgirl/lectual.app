@@ -8,8 +8,8 @@ import { buildExhibit, exhibitLines } from "@/lib/loe/exhibit";
 import { generalWithLoe, twoBrandPerMark, withLoe } from "./loe-fixtures";
 
 function priced(content = withLoe(twoBrandPerMark())) {
-  // Both brands' word marks, The Fold's design mark on Essential, The Fold's second class off, The Confidence Interval's class one;
-  // plus a class the client typed on The Confidence Interval.
+  // Both brands' word marks, The Pleat's design mark on Essential, The Pleat's second class off, The Margin Note's class one;
+  // plus a class the client typed on The Margin Note.
   const selection = normalizeSelection(content, {
     "fold-word": true,
     "fold-logo": true,
@@ -30,7 +30,7 @@ describe("Exhibit A (trademark, two brands, a package per mark)", () => {
     const p = priced();
     const exhibit = buildExhibit(p.content, p.quote, money);
     const all = JSON.stringify(exhibit);
-    expect(exhibit.groups.map((g) => g.title)).toEqual(["The Fold", "The Confidence Interval"]);
+    expect(exhibit.groups.map((g) => g.title)).toEqual(["The Pleat", "The Margin Note"]);
     const fold = exhibit.groups[0].rows;
     expect(fold.find((r) => r.label === "Word mark")?.detail).toContain("Enhanced");
     expect(fold.find((r) => r.label === "Logo mark" || r.label === "Design mark")?.detail).toContain("Essential");

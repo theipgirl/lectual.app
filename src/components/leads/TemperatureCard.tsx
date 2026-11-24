@@ -1,5 +1,6 @@
 "use client";
 
+import { Icon } from "@/components/ui/Icon";
 import { useActionState } from "react";
 import {
   addToNurtureAction,
@@ -7,13 +8,16 @@ import {
   type LeadSequenceState,
 } from "@/app/dashboard/leads/[id]/sequence-actions";
 import { LANES, LANE_LABEL, suggestionLine, type LaneView, type NextStep } from "@/lib/leads/lane";
-import { temperatureLabel, type EffectiveTemperature } from "@/lib/intake/effective-temperature";
+import type { EffectiveTemperature } from "@/lib/intake/effective-temperature";
+import { temperaturePill } from "@/lib/intake/temperature-pill";
 import { LtnSuggestion } from "@/components/intake/LtnSuggestion";
+import { NOT_RATED, SAVING } from "@/lib/ui/words";
+import { SavedNote } from "@/components/ui/SavedNote";
 
 /**
  * The lead page's ONE temperature card (intake SOP Stage 2), the twin of the
  * Intake table's Temperature column: the chip (a person's is solid, a derived
- * one is dashed and says "Suggested"), the reason, what the activity says now
+ * one says "suggested" in the same pill, no dashes), the reason, what the activity says now
  * when a person's lane has gone stale, the triage SUGGESTION labelled as one,
  * who set the lane and when, the control to set or clear it, the next step the
  * lane points at, and the Long-Term Nurture suggestion.
@@ -44,18 +48,20 @@ export function TemperatureCard(props: {
   const [laneState, laneAction, lanePending] = useActionState<LeadSequenceState, FormData>(setLeadLaneAction, {});
   const [nurtureState, nurtureAction, nurturePending] = useActionState<LeadSequenceState, FormData>(addToNurtureAction, {});
   const suggestion = suggestionLine(view);
+  // The one temperature pill the Intake list and board use: filled for a person's level, "Hot · suggested" (no dashes) for a derived one.
+  const pill = temperaturePill(temperature);
 
   return (
     <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }} aria-labelledby="temperature-heading">
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-        <h2 id="temperature-heading" className="lx-h2" style={{ fontSize: 23, margin: 0 }}>
+        <h2 id="temperature-heading" className="lx-h2">
           Temperature
         </h2>
         <span
           className={`lx-pill ${temperature.value === "hot" ? "lx-pill-risk" : temperature.value === "warm" ? "lx-pill-warn" : "lx-pill-mute"}`}
-          style={person ? undefined : { border: "1px dashed currentColor", background: "transparent", fontStyle: "italic" }}
+          {...(pill?.suggested ? { "data-suggested": "", "aria-label": pill.ariaLabel } : {})}
         >
-          {temperatureLabel(temperature)}
+          {pill ? pill.text : NOT_RATED}
         </span>
         {person && (
           <span className="lx-note">
@@ -76,7 +82,7 @@ export function TemperatureCard(props: {
       <LtnSuggestion suggestion={temperature.suggestion} leadId={leadId} target="sequences" />
 
       {suggestion ? (
-        <div style={{ borderLeft: "3px dashed var(--line)", paddingLeft: 12 }}>
+        <div className="lx-suggest-rule">
           <div className="lx-label" style={{ marginBottom: 4 }}>
             Triage suggestion — not a decision
           </div>
@@ -116,23 +122,19 @@ export function TemperatureCard(props: {
             </select>
           </label>
           <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={lanePending}>
-            {lanePending ? "Saving…" : "Save temperature"}
+            {lanePending ? SAVING : "Save temperature"}
           </button>
           {laneState.error && (
             <span role="alert" className="lx-note" style={{ color: "var(--wine)" }}>
               {laneState.error}
             </span>
           )}
-          {laneState.message && !laneState.error && (
-            <span role="status" className="lx-note" style={{ color: "var(--ok)" }}>
-              {laneState.message}
-            </span>
-          )}
+          <SavedNote show={Boolean(laneState.message) && !laneState.error}>{laneState.message}</SavedNote>
         </form>
       )}
 
       {nextStep && (
-        <div className="lx-card" style={{ padding: 14, display: "grid", gap: 8, background: "var(--surface2, transparent)" }}>
+        <div className="lx-card lx-next-step">
           <div className="lx-label">{props.nextStepIsSuggested ? "Suggested next step (from triage — set the temperature to confirm)" : "Next step"}</div>
           {nextStep.kind === "nurture" ? (
             props.nurtureStatus ? (
@@ -144,7 +146,7 @@ export function TemperatureCard(props: {
                 <form action={nurtureAction} style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                   <input type="hidden" name="leadId" value={leadId} />
                   <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={nurturePending}>
-                    {nurturePending ? "Adding…" : nextStep.label}
+                    {nurturePending ? SAVING : nextStep.label}
                   </button>
                   <span className="lx-note">Enrolls them in the firm&apos;s nurture campaign. Its emails draft into the approval queue.</span>
                   {nurtureState.error && (
@@ -152,11 +154,7 @@ export function TemperatureCard(props: {
                       {nurtureState.error}
                     </span>
                   )}
-                  {nurtureState.message && !nurtureState.error && (
-                    <span role="status" className="lx-note" style={{ color: "var(--ok)", flexBasis: "100%" }}>
-                      {nurtureState.message}
-                    </span>
-                  )}
+                  <SavedNote show={Boolean(nurtureState.message) && !nurtureState.error}>{nurtureState.message}</SavedNote>
                 </form>
               ) : (
                 <p className="lx-note" style={{ margin: 0 }}>{nextStep.label}</p>
@@ -169,7 +167,7 @@ export function TemperatureCard(props: {
           ) : nextStep.url ? (
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               <a href={nextStep.url} target="_blank" rel="noopener noreferrer" className="lx-btn lx-btn-pri lx-btn-sm">
-                {nextStep.label} ↗
+                {nextStep.label}{" "}<Icon name="external" size={14} />
               </a>
               <span className="lx-note" style={{ wordBreak: "break-all" }}>
                 {nextStep.url}

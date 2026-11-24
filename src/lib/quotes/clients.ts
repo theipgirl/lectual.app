@@ -2,6 +2,7 @@ import "server-only";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { contactDisplayName, leadDisplayName } from "@/lib/matters/client-name";
 import { leadPickerLabel } from "./client-labels";
+import { leadRead } from "@/lib/leads/live";
 
 /**
  * Who a quote is FOR, for the quote list and builder — and the options the
@@ -48,6 +49,7 @@ export async function quoteClientLabels(quotes: readonly QuoteLinks[]): Promise<
     const supabase = await getScopedClient();
     const [leads, matters, contacts] = await Promise.all([
       leadIds.length
+        // live-guard: names a quote's own lead (quotes stay on a merged lead); the picker list is live
         ? supabase.from("crm_lead").select("id, business_name, first_name, last_name").in("id", leadIds)
         : Promise.resolve({ data: [] as { id: string; business_name: string | null; first_name: string; last_name: string }[] }),
       matterIds.length
@@ -89,11 +91,11 @@ export async function quoteClientOptions(): Promise<QuoteClientOptions> {
   try {
     const supabase = await getScopedClient();
     const [leads, matters, contacts] = await Promise.all([
-      supabase
-        .from("crm_lead")
-        .select("id, business_name, first_name, last_name, email")
-        .order("updated_at", { ascending: false })
-        .limit(300),
+      leadRead(({ live }) =>
+        live(supabase.from("crm_lead").select("id, business_name, first_name, last_name, email"))
+          .order("updated_at", { ascending: false })
+          .limit(300),
+      ),
       supabase
         .from("crm_matter")
         .select("id, mark_text, title, matter_number, status")
@@ -151,6 +153,7 @@ export async function quoteDefaultMark(links: { lead_id: string | null; matter_i
   try {
     const supabase = await getScopedClient();
     if (links.lead_id) {
+      // live-guard: names a quote's own lead (quotes stay on a merged lead); the picker list is live
       const { data } = await supabase.from("crm_lead").select("mark_text").eq("id", links.lead_id).maybeSingle();
       if (data?.mark_text?.trim()) return data.mark_text.trim();
     }

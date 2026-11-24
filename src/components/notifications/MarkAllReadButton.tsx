@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { SAVING } from "@/lib/ui/words";
+import "./notifications.css";
 import { markAllNotificationsRead } from "@/app/dashboard/notifications/actions";
 
 export function MarkAllReadButton() {
@@ -16,10 +18,10 @@ export function MarkAllReadButton() {
   return (
     <>
       <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={run} disabled={pending}>
-        {pending ? "Marking…" : "Mark all read"}
+        {pending ? SAVING : "Mark all read"}
       </button>
       {error && (
-        <span role="alert" className="lx-note" style={{ color: "var(--wine)" }}>
+        <span role="alert" className="lx-note lx-notif-error">
           {error}
         </span>
       )}

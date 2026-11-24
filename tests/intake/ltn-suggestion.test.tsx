@@ -78,7 +78,7 @@ describe("TemperatureCard (lead page)", () => {
 
   it("shows the temperature, its reason and the suggestion", () => {
     const html = card({ firstTouchAt: daysBefore(11) });
-    expect(html).toContain("Suggested: Cold");
+    expect(html).toContain("Cold · suggested");
     expect(html).toContain("Unbooked by day 10");
     expect(html).toContain("Long-Term Nurture suggested");
     // Said once, not twice.
@@ -94,8 +94,11 @@ describe("TemperatureCard (lead page)", () => {
 
 describe("where the suggestion is shown", () => {
   it("the card, the table and the lead page each use the component", () => {
-    expect(read("src/app/dashboard/intake/_components/IntakeCard.tsx")).toContain("<LtnSuggestion");
-    expect(read("src/app/dashboard/intake/_components/IntakeTable.tsx")).toContain("<LtnSuggestion");
+    // Changed on purpose (item L): the list and the board no longer print the line; the "Suggestions" chip counts them
+    // and the lead page keeps the component.
+    expect(read("src/app/dashboard/intake/_components/IntakeCard.tsx")).not.toContain("<LtnSuggestion");
+    expect(read("src/app/dashboard/intake/_components/IntakeTable.tsx")).not.toContain("<LtnSuggestion");
+    expect(read("src/app/dashboard/intake/_components/IntakeControls.tsx")).toContain("LEADS_SUGGESTIONS");
     expect(read("src/components/leads/TemperatureCard.tsx")).toContain("<LtnSuggestion");
     expect(read("src/app/dashboard/leads/[id]/page.tsx")).toContain("<TemperatureCard");
   });
@@ -125,7 +128,6 @@ describe("where the suggestion is shown", () => {
     const html = renderToStaticMarkup(
       <IntakeCard
         row={row}
-        variant="stage"
         stages={[stage]}
         members={[]}
         now={NOW}
@@ -133,7 +135,6 @@ describe("where the suggestion is shown", () => {
         time={null}
         onMoveStage={() => {}}
         onAssign={() => {}}
-        onSetSource={() => {}}
       />,
     );
     expect(html).toContain("Long-Term Nurture suggested");

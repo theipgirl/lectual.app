@@ -66,9 +66,10 @@ export async function createMailboxDraft(
         );
 
   if (res.status === 401 || res.status === 403) {
-    throw new ProviderError("Your mailbox connection needs reconnecting before drafts can be created.", "reauth");
+    throw Object.assign(new ProviderError("Your mailbox connection needs reconnecting before drafts can be created.", "reauth"), { httpStatus: res.status });
   }
-  if (!res.ok) throw new ProviderError(`Couldn't create the draft (${res.status}).`, "fetch-failed");
+  // The status rides along so a caller can tell a refusal Graph returned (4xx) from an uncertain one (5xx): draft-outcome.ts.
+  if (!res.ok) throw Object.assign(new ProviderError(`Couldn't create the draft (${res.status}).`, "fetch-failed"), { httpStatus: res.status });
   const json = (await res.json()) as { id: string; message?: { id: string }; webLink?: string };
   return {
     id: json.id,

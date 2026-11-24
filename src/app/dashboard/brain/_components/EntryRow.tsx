@@ -1,9 +1,11 @@
 "use client";
 
+import { Notice } from "@/components/ui/Notice";
 import { useActionState } from "react";
 import type { BrainEntry } from "@/lib/brain";
 import { markdownToPlainText } from "@/lib/markdown";
 import { Markdown } from "@/components/markdown/Markdown";
+import { SAVING, DELETE } from "@/lib/ui/words";
 import { updateBrainEntryAction, deleteBrainEntryAction, type ActionState } from "../actions";
 
 /** One plain-text line: the entry's Markdown marks are taken out so it reads as a sentence. */
@@ -42,7 +44,7 @@ export default function EntryRow({ entry, canManage }: { entry: BrainEntry; canM
           <form action={deleteAction}>
             <input type="hidden" name="entryId" value={entry.id} />
             <button type="submit" disabled={deletePending} className="lx-btn lx-btn-sec lx-btn-sm">
-              {deletePending ? "…" : "Delete"}
+              {deletePending ? SAVING : DELETE}
             </button>
           </form>
         )}
@@ -71,13 +73,13 @@ export default function EntryRow({ entry, canManage }: { entry: BrainEntry; canM
               <textarea name="body" rows={4} defaultValue={entry.body} className="lx-input" />
             </label>
             <button type="submit" disabled={editPending} className="lx-btn lx-btn-pri lx-btn-sm" style={{ justifySelf: "start" }}>
-              {editPending ? "Saving…" : "Save entry"}
+              {editPending ? SAVING : "Save entry"}
             </button>
           </form>
         </details>
       )}
 
-      {error && <p role="alert" className="lx-brain-error">{error}</p>}
+      {error && <Notice tone="risk" role="alert">{error}</Notice>}
     </li>
   );
 }

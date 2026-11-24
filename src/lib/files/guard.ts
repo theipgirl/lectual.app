@@ -1,5 +1,7 @@
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { ROLES, type Role } from "@/lib/auth/roles";
+import { keeperForWrite } from "@/lib/leads/live";
+import { MERGE_POINTER_UNREADABLE } from "@/lib/ui/words";
 import { logFileFailure } from "./errors";
 import { FILE_MESSAGES, isFileParentKind, isUuid, type FileParentKind } from "./rules";
 
@@ -64,9 +66,20 @@ export async function authorize(
  * `org_id` FROM THAT ROW. Another firm's id (or a deleted record) reads as no
  * row under RLS, which is "not found". Nothing from the browser can supply an org.
  */
-export async function loadParentOrg(supabase: ScopedClient, parent: FileParentInput): Promise<{ ok: true; orgId: string } | Refusal> {
+export async function loadParentOrg(supabase: ScopedClient, parent: FileParentInput): Promise<{ ok: true; orgId: string; parent: FileParentInput } | Refusal> {
+  // A page opened before a merge (lectual 0107) uploads to the KEEPER, in request and confirm alike, so the path
+  // issued at request is the path rebuilt at confirm. An unreadable pointer refuses with the M5 sentence and writes nothing.
+  if (parent.kind === "lead") {
+    try {
+      parent = { kind: "lead", id: await keeperForWrite(supabase, parent.id) };
+    } catch (err) {
+      logFileFailure("read lead pointer", err);
+      return refuse(MERGE_POINTER_UNREADABLE);
+    }
+  }
   const query =
     parent.kind === "lead"
+      // live-guard: checks the parent of a file; files stay on a merged lead and are read on the keeper
       ? supabase.from("crm_lead").select("id, org_id").eq("id", parent.id).maybeSingle()
       : supabase.from("crm_matter").select("id, org_id").eq("id", parent.id).maybeSingle();
   const { data, error } = await query;
@@ -75,7 +88,7 @@ export async function loadParentOrg(supabase: ScopedClient, parent: FileParentIn
     return refuse(FILE_MESSAGES.generic);
   }
   if (!data || typeof data.org_id !== "string" || !data.org_id) return refuse(FILE_MESSAGES.notFound);
-  return { ok: true, orgId: data.org_id };
+  return { ok: true, orgId: data.org_id, parent };
 }
 
 /** The page whose list changes with a file, written the way the other actions write it. */

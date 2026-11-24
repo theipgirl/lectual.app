@@ -24,7 +24,7 @@ function json(status = 200) {
   const calls: Array<{ url: string; method: string; headers: Record<string, string>; body: Record<string, unknown> }> = [];
   const fetchImpl: FetchLike = async (url, init) => {
     calls.push({ url, method: init.method, headers: init.headers, body: JSON.parse(init.body) });
-    return { ok: status >= 200 && status < 300, status, json: async () => ({ echoed: "Sevetri Wilson" }), text: async () => "Sevetri Wilson sevetri@example.com" };
+    return { ok: status >= 200 && status < 300, status, json: async () => ({ echoed: "Callum Ferreira" }), text: async () => "Callum Ferreira callum@example.com" };
   };
   return { fetchImpl, calls };
 }
@@ -34,7 +34,7 @@ afterEach(() => vi.restoreAllMocks());
 describe("uploadMatterFile: POST /v1/files, multipart", () => {
   it("sends documentable_type, documentable_id, file and path[] with the bearer token and no Content-Type of its own", async () => {
     const { fetchImpl, calls } = multipart(201);
-    const r = await uploadMatterFile("tok-org-1", { matterId: "LM-9", fileName: "Sevetri Wilson - Accepted Proposal.docx", mime: DOCX, bytes: BYTES }, fetchImpl);
+    const r = await uploadMatterFile("tok-org-1", { matterId: "LM-9", fileName: "Callum Ferreira - Accepted Proposal.docx", mime: DOCX, bytes: BYTES }, fetchImpl);
     expect(r).toEqual({ ok: true });
     expect(calls).toHaveLength(1);
     const [call] = calls;
@@ -51,7 +51,7 @@ describe("uploadMatterFile: POST /v1/files, multipart", () => {
     expect(call.body.get("documentable_id")).toBe("LM-9");
     expect(call.body.getAll("path[]")).toEqual(["Engagement"]);
     const file = call.body.get("file") as File;
-    expect(file.name).toBe("Sevetri Wilson - Accepted Proposal.docx");
+    expect(file.name).toBe("Callum Ferreira - Accepted Proposal.docx");
     expect(file.type).toBe(DOCX);
     expect(file.size).toBe(BYTES.length);
     expect(new Uint8Array(await file.arrayBuffer())).toEqual(BYTES);
@@ -72,11 +72,11 @@ describe("uploadMatterFile: POST /v1/files, multipart", () => {
   ])("a %i is 'not uploaded' (retryable: %s) and never throws", async (status, retryable) => {
     const errors = vi.spyOn(console, "error").mockImplementation(() => {});
     const { fetchImpl } = multipart(status);
-    const r = await uploadMatterFile("secret-token", { matterId: "1", fileName: "Sevetri.docx", mime: DOCX, bytes: BYTES }, fetchImpl);
+    const r = await uploadMatterFile("secret-token", { matterId: "1", fileName: "Callum.docx", mime: DOCX, bytes: BYTES }, fetchImpl);
     expect(r).toMatchObject({ ok: false, reason: `HTTP ${status}`, retryable, status });
     // Nothing that was sent is logged: no token, no file name, no ids.
     const logged = JSON.stringify(errors.mock.calls);
-    for (const leak of ["secret-token", "Sevetri", "documentable"]) expect(logged).not.toContain(leak);
+    for (const leak of ["secret-token", "Callum", "documentable"]) expect(logged).not.toContain(leak);
   });
 
   it("a thrown request is 'not uploaded' (retryable) and its message is kept out of the result and the log", async () => {
@@ -114,14 +114,14 @@ describe("addNote: POST /v1/notes", () => {
     const { fetchImpl } = json(422);
     const r = await addNote("tok", { name: "n", body: "b", notableType: "Prospect", notableId: "1" }, fetchImpl);
     expect(r).toMatchObject({ ok: false, reason: "HTTP 422", status: 422, retryable: false });
-    expect(JSON.stringify(errors.mock.calls)).not.toContain("Sevetri");
-    expect(JSON.stringify(errors.mock.calls)).not.toContain("sevetri@example.com");
+    expect(JSON.stringify(errors.mock.calls)).not.toContain("Callum");
+    expect(JSON.stringify(errors.mock.calls)).not.toContain("callum@example.com");
   });
 
   it("a throw is not-added with a fixed reason", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const r = await addNote("tok", { name: "n", body: "b", notableType: "Prospect", notableId: "1" }, async () => {
-      throw new Error("boom for sevetri@example.com");
+      throw new Error("boom for callum@example.com");
     });
     expect(r).toEqual({ ok: false, reason: "request failed", retryable: true });
   });

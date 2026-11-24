@@ -96,11 +96,11 @@ describe("consultRowState", () => {
 });
 
 describe("consultWhen and consultLine", () => {
-  it("says today, yesterday, a weekday, then a date, in the firm's zone", () => {
+  it("says today, yesterday, then a date (no weekday), in the firm's zone", () => {
     expect(consultWhen("2026-10-20T14:00:00Z", NOW, TZ)).toBe("today");
     expect(consultWhen("2026-10-19T14:00:00Z", NOW, TZ)).toBe("yesterday");
-    expect(consultWhen("2026-10-17T14:00:00Z", NOW, TZ)).toBe("Saturday");
-    expect(consultWhen("2026-10-09T14:00:00Z", NOW, TZ)).toBe("9 Oct");
+    expect(consultWhen("2026-10-17T14:00:00Z", NOW, TZ)).toBe("Oct 17");
+    expect(consultWhen("2026-10-09T14:00:00Z", NOW, TZ)).toBe("Oct 9");
     expect(consultWhen(null, NOW, TZ)).toBe("date unknown");
     expect(consultWhen("not a date", NOW, TZ)).toBe("date unknown");
   });
@@ -115,7 +115,7 @@ describe("consultWhen and consultLine", () => {
       "Zoom consult · yesterday · 41 min · transcript synced",
     );
     expect(consultLine({ provider: "fathom", startedAt: "2026-10-09T14:00:00Z", durationSeconds: 52 * 60, hasTranscript: false, now: NOW, tz: TZ })).toBe(
-      "Fathom consult · 9 Oct · 52 min · transcribing",
+      "Fathom consult · Oct 9 · 52 min · transcribing",
     );
     expect(consultLine({ provider: "zoom", startedAt: "2026-10-19T14:00:00Z", durationSeconds: null, hasTranscript: true, now: NOW, tz: TZ })).toBe(
       "Zoom consult · yesterday · transcript synced",

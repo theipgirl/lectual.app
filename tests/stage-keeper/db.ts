@@ -40,6 +40,11 @@ function matches(row: Row, q: Recorded): boolean {
         return v !== null && v !== undefined && (v as string) < (f.value as string);
       case "contains":
         return Array.isArray(v) && (f.value as unknown[]).every((x) => v.includes(x));
+      case "like": {
+        // SQL LIKE with % only (enough for the `lmsync:%` prefix fence).
+        const re = new RegExp(`^${String(f.value).split("%").map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join(".*")}$`);
+        return typeof v === "string" && re.test(v);
+      }
       default:
         throw new Error(`keeper fake: unsupported filter ${f.op}`);
     }

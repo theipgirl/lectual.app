@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { sevetri } from "./fixture";
+import { callum } from "./fixture";
 
 /** P5c: a reset writes status: sent and nothing else. It never touches the signature table (earlier signature rows are kept). */
 
@@ -49,7 +49,7 @@ import { resetProposalAcceptance } from "@/lib/proposals/store";
 beforeEach(() => {
   touched = [];
   table = [
-    { id: ID, org_id: "org-1", family_id: ID, version: 1, status: "accepted", client_name: "Sevetri Wilson", client_email: "s@example.com", title: "T", content: sevetri(), expires_on: "2099-12-31", pay_url: "https://pay.example.com/pay", lead_id: null, matter_id: null, updated_at: T0 },
+    { id: ID, org_id: "org-1", family_id: ID, version: 1, status: "accepted", client_name: "Callum Ferreira", client_email: "s@example.com", title: "T", content: callum(), expires_on: "2099-12-31", pay_url: "https://pay.example.com/pay", lead_id: null, matter_id: null, updated_at: T0 },
   ];
 });
 

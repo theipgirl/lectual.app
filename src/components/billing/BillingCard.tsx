@@ -1,5 +1,8 @@
-import { formatCents } from "@/lib/quotes/money";
+import { formatMoney } from "@/lib/ui/format";
+import { LOADING } from "@/lib/ui/words";
+import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
 import { formatCivilDate } from "@/lib/matters/ip-fields";
+import "./billing.css";
 import {
   BILLING_TITLE,
   NOT_CONNECTED_LINE,
@@ -25,32 +28,19 @@ import {
  */
 
 function Line({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="lx-note" style={{ margin: 0 }}>
-      {children}
-    </p>
-  );
+  return <p className="lx-note">{children}</p>;
 }
 
-function InvoiceItem({ row }: { row: InvoiceRow }) {
-  const date = formatCivilDate(row.date);
+function InvoiceItem({ row, tz }: { row: InvoiceRow; tz: string }) {
+  const date = formatCivilDate(row.date, tz);
   const pastDue = isPastDue(row);
   return (
-    <li
-      data-past-due={pastDue ? "true" : undefined}
-      style={{
-        display: "grid",
-        gap: 2,
-        padding: "8px 0",
-        borderTop: "1px solid var(--line, rgba(0,0,0,0.1))",
-        ...(pastDue ? { borderLeft: "3px solid var(--ox)", paddingLeft: 8 } : {}),
-      }}
-    >
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+    <li data-past-due={pastDue ? "true" : undefined} className="bl-item">
+      <div className="bl-line">
         <strong>#{formatInvoiceNumber(row.number)}</strong>
-        <span style={pastDue ? { color: "var(--ox)", fontWeight: 600 } : undefined}>{statusWord(row)}</span>
+        <span className="bl-status">{statusWord(row)}</span>
       </div>
-      <div className="lx-note" style={{ margin: 0 }}>
+      <div className="lx-note">
         {date ?? "No date"}
         {row.pdfUrl ? (
           <>
@@ -61,10 +51,10 @@ function InvoiceItem({ row }: { row: InvoiceRow }) {
           </>
         ) : null}
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", fontSize: 14 }}>
-        <span>Amount {formatCents(row.amountCents)}</span>
-        <span>Paid {formatCents(row.paidCents)}</span>
-        <span>Outstanding {formatCents(row.outstandingCents)}</span>
+      <div className="bl-line bl-amounts">
+        <span>Amount {formatMoney(row.amountCents)}</span>
+        <span>Paid {formatMoney(row.paidCents)}</span>
+        <span>Outstanding {formatMoney(row.outstandingCents)}</span>
       </div>
     </li>
   );
@@ -72,18 +62,15 @@ function InvoiceItem({ row }: { row: InvoiceRow }) {
 
 function Totals({ totals }: { totals: InvoiceTotals }) {
   return (
-    <div
-      data-billing-totals
-      style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", fontWeight: 600, borderTop: "2px solid var(--ink)", paddingTop: 8 }}
-    >
-      <span>Billed {formatCents(totals.billedCents)}</span>
-      <span>Paid {formatCents(totals.paidCents)}</span>
-      <span>Outstanding {formatCents(totals.outstandingCents)}</span>
+    <div data-billing-totals className="bl-line bl-totals">
+      <span>Billed {formatMoney(totals.billedCents)}</span>
+      <span>Paid {formatMoney(totals.paidCents)}</span>
+      <span>Outstanding {formatMoney(totals.outstandingCents)}</span>
     </div>
   );
 }
 
-export function BillingCard({ read }: { read: BillingRead }) {
+export function BillingCard({ read, tz = DEFAULT_TIME_ZONE }: { read: BillingRead; /** The firm's time zone, for the dates. */ tz?: string }) {
   let body: React.ReactNode;
   switch (read.status) {
     case "not-linked":
@@ -106,9 +93,9 @@ export function BillingCard({ read }: { read: BillingRead }) {
             ) : null
           ) : (
             <>
-              <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+              <ul className="bl-list">
                 {read.invoices.map((row) => (
-                  <InvoiceItem key={row.id} row={row} />
+                  <InvoiceItem key={row.id} row={row} tz={tz} />
                 ))}
               </ul>
               <Totals totals={read.totals} />
@@ -122,7 +109,7 @@ export function BillingCard({ read }: { read: BillingRead }) {
       break;
   }
   return (
-    <section className="lx-card lx-aside" aria-label={BILLING_TITLE} data-billing-card style={{ display: "grid", gap: 8 }}>
+    <section className="lx-card lx-aside bl-card" aria-label={BILLING_TITLE} data-billing-card>
       <div className="lx-label">{BILLING_TITLE}</div>
       {body}
     </section>
@@ -133,9 +120,7 @@ export function BillingCardLoading() {
   return (
     <section className="lx-card lx-aside" aria-label={BILLING_TITLE} aria-busy="true">
       <div className="lx-label">{BILLING_TITLE}</div>
-      <p className="lx-note" style={{ margin: 0 }}>
-        Loading invoices from Lawmatics.
-      </p>
+      <p className="lx-note">{LOADING}</p>
     </section>
   );
 }

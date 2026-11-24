@@ -1,0 +1,100 @@
+/* Event page: People cards and event names. Tokens only; loaded by the components that use it. */
+.ev-name-code {
+  font-size: var(--fs-2);
+  font-weight: 400;
+  color: var(--muted);
+  margin-left: 10px;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+.ev-people-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 28px;
+}
+.ev-people-head .ifm-title {
+  margin: 0;
+}
+.ev-people {
+  list-style: none;
+  margin: 12px 0 8px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ifm-card.ev-person {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.5fr) minmax(0, 1.1fr) minmax(0, 1.2fr) minmax(0, 0.9fr) auto;
+  align-items: center;
+  gap: 12px 20px;
+  padding: 16px 20px;
+  flex-direction: row;
+}
+.ev-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.ev-label {
+  font-size: var(--fs-1);
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--muted);
+  line-height: 16px;
+}
+.ev-value {
+  font-size: var(--fs-3);
+  line-height: 20px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.ev-name {
+  font-weight: 600;
+  font-size: 15px;
+}
+.ev-sub {
+  font-size: var(--fs-2);
+  line-height: 18px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.ev-temp-hot {
+  color: var(--ox);
+  font-weight: 600;
+}
+.ev-link {
+  align-items: flex-start;
+}
+@media (max-width: 900px) {
+  .ifm-card.ev-person {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .ev-who {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 640px) {
+  .ifm-card.ev-person {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    padding: 16px;
+  }
+  .ev-cell {
+    gap: 2px;
+  }
+  .ev-value {
+    font-size: 15px;
+  }
+  .ev-sub,
+  .ev-name-code {
+    font-size: 14px;
+  }
+  .ev-people-head .lx-btn {
+    min-height: 44px;
+  }
+}

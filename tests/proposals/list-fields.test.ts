@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { sevetri } from "./fixture";
+import { callum } from "./fixture";
 import { buildAcceptedSnapshot } from "@/lib/proposals/public";
 import { defaultSelection, quoteProposal } from "@/lib/proposals/pricing";
 
@@ -25,7 +25,7 @@ const base = {
   accepted_snapshot: null,
   created_at: "2026-10-18T12:00:00Z",
   updated_at: "2026-10-19T12:00:00Z",
-  content: sevetri(),
+  content: callum(),
   client_email: "ana@example.com",
   pay_url: "https://pay.example/x",
 };
@@ -45,7 +45,7 @@ describe("listProposals carries what the table words", () => {
 
   it("brands in content order, the offered package with the two fees apart, the class count and created_at", async () => {
     const [it] = await list([{ ...base, id: "a", status: "sent" }]);
-    expect(it.brands).toEqual(["Prosperall", "Tech4PublicGood"]);
+    expect(it.brands).toEqual(["Larkmoor", "Open4Everyone"]);
     expect(it.offered).toHaveLength(1);
     expect(it.offered[0].name).toBe("Concierge");
     expect(it.offered[0].legalAtSigningCents).toBe(it.legal_total_cents);
@@ -57,14 +57,14 @@ describe("listProposals carries what the table words", () => {
   });
 
   it("a blank package name offers nothing", async () => {
-    const content = sevetri();
+    const content = callum();
     content.pricing.package = "";
     const [it] = await list([{ ...base, id: "a", status: "draft", content }]);
     expect(it.offered).toEqual([]);
   });
 
   it("an accepted row counts the classes the client chose and names the package signed", async () => {
-    const content = sevetri();
+    const content = callum();
     const selection = defaultSelection(content);
     selection["p-c2"] = false;
     const snapshot = buildAcceptedSnapshot({ version: 1, content, selection, quote: quoteProposal(content, selection), acceptedAt: "2026-10-18T15:00:00Z" });
@@ -75,8 +75,8 @@ describe("listProposals carries what the table words", () => {
   });
 
   it("carries the package basis only when a field was changed, and never the document", async () => {
-    const edited = { ...sevetri(), package_basis: { name: "Enhanced", edited: ["price"] } };
-    const untouched = { ...sevetri(), package_basis: { name: "Enhanced", edited: [] } };
+    const edited = { ...callum(), package_basis: { name: "Enhanced", edited: ["price"] } };
+    const untouched = { ...callum(), package_basis: { name: "Enhanced", edited: [] } };
     const [a, b] = await list([
       { ...base, id: "a", status: "draft", content: edited },
       { ...base, id: "b", status: "draft", family_id: "g", content: untouched },

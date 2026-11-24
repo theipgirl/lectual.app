@@ -16,6 +16,7 @@ vi.mock("@/lib/auth/current-role", () => ({ currentRole: async () => state.role 
 vi.mock("@/lib/org/modules", () => ({ orgHasModule: async () => state.proposals }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: () => {} }),
   notFound: () => {
     throw new Error("NEXT_NOT_FOUND");
   },
@@ -140,8 +141,9 @@ describe("Settings -> Approvals page", () => {
   it("the admin tier gets one row per kind with the right options", async () => {
     const html = await page();
     for (const label of ["Follow-up for a stalled lead", "Post-consult and proposal emails", "Welcome emails", "Engagement letters", "Opinion and clearance letters", "Internal briefings and digests", "Partnership and other follow-ups", "Other client emails"]) expect(html).toContain(label);
-    expect((html.match(/<select/g) ?? []).length).toBe(8);
-    expect((html.match(/Usual approvers \(default\)/g) ?? []).length).toBe(8);
+    // One per kind (Sprint 4 added four routine kinds) plus "Drafts go to".
+    expect((html.match(/<select/g) ?? []).length).toBe(13);
+    expect((html.match(/Usual approvers \(default\)/g) ?? []).length).toBe(12);
     const select = (kind: string) => html.slice(html.indexOf(`id="route-${kind}"`), html.indexOf("</select>", html.indexOf(`id="route-${kind}"`)));
     // attorney-only: attorney and owner tier only
     expect(select("engagement_letter")).toContain("Rebecca");
@@ -173,6 +175,7 @@ describe("Settings -> Approvals page", () => {
     state.directoryFails = true;
     let html = await page();
     expect(html).toContain('role="alert"');
+    expect(html).toContain("Can&#x27;t show the approval settings right now");
     expect(html).not.toContain("<select");
     state.directoryFails = false;
     state.settingsFail = true;

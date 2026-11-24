@@ -49,7 +49,8 @@ export type KeeperSignal =
       subject: string | null;
       sensitive: boolean;
     }
-  | { source: "calendar"; eventId: string; title: string | null; startsAt: string; sensitive: boolean }
+  /** A booked consult. `lawmatics`: stored by the Lawmatics daily sync (may be self-booked by the client): suggest only. */
+  | { source: "calendar"; eventId: string; title: string | null; startsAt: string; sensitive: boolean; lawmatics?: boolean }
   | { source: "payment"; ref: string; at: string | null }
   /** A Zoom or Fathom meeting linked to the lead (`lead_id`, never a suggestion) that has taken place. */
   | { source: "meeting"; meetingId: string; provider: string; title: string | null; startsAt: string; sensitive: boolean }

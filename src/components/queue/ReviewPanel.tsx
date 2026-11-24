@@ -4,6 +4,8 @@ import { useActionState, useState } from "react";
 import "./review.css";
 import { reviewQueueAction, type ReviewState } from "@/app/dashboard/queue/actions";
 import { Markdown } from "@/components/markdown/Markdown";
+import { Notice } from "@/components/ui/Notice";
+import { SAVING } from "@/lib/ui/words";
 // The pure module only: this component ships to the browser.
 import { auditDraft, removeInternalNotes, type AuditContext } from "@/lib/queue/hygiene";
 
@@ -46,14 +48,9 @@ export function ReviewPanel(props: {
     <form action={action} className="lx-review">
       <input type="hidden" name="id" value={id} />
       {issues.length > 0 && (
-        <div
-          role="alert"
-          aria-label="Checks on this draft"
-          className={`lx-banner ${blocking ? "lx-banner-risk" : "lx-banner-warn"}`}
-          style={{ display: "grid", gap: 8, margin: 0 }}
-        >
-          <strong style={{ fontSize: 16 }}>{blocking ? "Fix this before approving" : "Check this draft"}</strong>
-          <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 4 }}>
+        <div role="alert" aria-label="Checks on this draft" className={`lx-banner lx-checks ${blocking ? "lx-banner-risk" : "lx-banner-warn"}`}>
+          <strong className="lx-checks-title">{blocking ? "Fix this before approving" : "Check this draft"}</strong>
+          <ul className="lx-checks-list">
             {issues.map((issue) => (
               <li key={issue.code}>{issue.message}</li>
             ))}
@@ -71,10 +68,10 @@ export function ReviewPanel(props: {
         <div className="lx-view-draft" data-draft-mode="edit">
           <div className="lx-view-draft-head">
             <label htmlFor="body" className="lx-label">
-              Draft {dirty && <span style={{ color: "var(--warn)" }}>· edited</span>}
+              Draft {dirty && <span className="lx-edited">· edited</span>}
             </label>
             {/* Everyone: beside the label. The owner view on a phone hides this pair and shows the one under the editor. */}
-            <span className="lx-edit-actions-head" style={{ display: "flex", gap: 8 }}>
+            <span className="lx-edit-actions-head">
               <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={() => setEditing(false)}>
                 Done editing
               </button>
@@ -118,7 +115,7 @@ export function ReviewPanel(props: {
         <section aria-labelledby="draft-view-label" className="lx-view-draft lx-voice" data-draft-mode="view">
           <div className="lx-view-draft-head">
             <div id="draft-view-label" className="lx-label">
-              Draft {dirty && <span style={{ color: "var(--warn)" }}>· edited</span>}
+              Draft {dirty && <span className="lx-edited">· edited</span>}
             </div>
             {canEdit && (
               <button
@@ -133,8 +130,8 @@ export function ReviewPanel(props: {
               </button>
             )}
           </div>
-          {body.trim() ? <Markdown text={body} /> : <p className="lx-note" style={{ margin: 0 }}>Nothing to show yet.</p>}
-          <p className="lx-note" style={{ margin: 0 }}>
+          {body.trim() ? <Markdown text={body} /> : <p className="lx-note">Nothing to show yet.</p>}
+          <p className="lx-note">
             How this text reads. An email may show formatting marks as plain characters.
           </p>
           {/* An edit made in the editor is posted from here, so Approve and Save edit carry it whichever view is showing. */}
@@ -145,27 +142,26 @@ export function ReviewPanel(props: {
       {canApprove && (
         <>
           <label htmlFor="note" className="lx-label lx-note-label">
-            Note <span style={{ textTransform: "none", letterSpacing: 0 }}>(required to reject)</span>
+            Note <span>(required to reject)</span>
           </label>
           <input id="note" name="note" type="text" className="lx-input lx-note-input" placeholder="Why — e.g. wrong fee quoted, tone off…" />
         </>
       )}
 
       {canApprove && confirmStale && (
-        <label className="lx-banner lx-banner-risk lx-stale-tick" style={{ display: "flex", gap: 10, alignItems: "flex-start", margin: 0, cursor: "pointer" }}>
+        <label className="lx-banner lx-banner-risk lx-stale-tick">
           <input
             type="checkbox"
             name="confirm_stale"
             value="yes"
             checked={staleConfirmed}
             onChange={(e) => setStaleConfirmed(e.target.checked)}
-            style={{ marginTop: 3 }}
           />
           <span>{confirmStale}</span>
         </label>
       )}
 
-      <div className="lx-review-actions" data-pinned={canApprove ? "true" : undefined} style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+      <div className="lx-review-actions" data-pinned={canApprove ? "true" : undefined}>
         {canApprove && (
           <button
             type="submit"
@@ -175,7 +171,7 @@ export function ReviewPanel(props: {
             title={approveBlocked ? "Tick the box above first — this client's status changed since the draft was queued." : undefined}
             className="lx-btn lx-btn-pri"
           >
-            {pending ? "Working…" : dirty ? "Approve with edits" : "Approve"}
+            {pending ? SAVING : dirty ? "Approve with edits" : "Approve"}
           </button>
         )}
         {canEdit && (
@@ -191,18 +187,18 @@ export function ReviewPanel(props: {
       </div>
 
       {!canApprove && (
-        <p className="lx-banner lx-banner-mute" style={{ margin: 0 }}>
+        <Notice tone="mute">
           {canEdit
             ? "You can prepare and save edits to this draft, but approving or rejecting a client communication is an attorney's call."
             : "Your role is read-only for the approval queue."}
-        </p>
+        </Notice>
       )}
       {state.error && (
-        <p role="alert" className="lx-banner lx-banner-risk" style={{ margin: 0 }}>
+        <Notice tone="risk" role="alert">
           {state.error}
-        </p>
+        </Notice>
       )}
-      <p className="lx-note lx-review-foot" style={{ margin: 0 }}>
+      <p className="lx-note lx-review-foot">
         Approving creates a draft in your mail client — you still press Send. Nothing reaches a client on its own. The original draft is kept alongside your edits.
       </p>
     </form>

@@ -1,0 +1,236 @@
+import { describe, expect, it } from "vitest";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
+import type { Role } from "@/lib/auth/roles";
+import { buildDeck, currentHolder, eventTrust, trustedCardState, trustedEvents, viewEventTrust, type CardEvent, type EventTrust } from "@/lib/queue/deck";
+import { handedToViewer, returnDecision } from "@/lib/queue/handed";
+import type { ApprovalRouting, RoutingMember } from "@/lib/queue/routing";
+import { followup, MEMBERS, qitem, U } from "./routing-fixtures";
+
+/**
+ * The deck's fold ignores hand-off and return rows from people who couldn't have made them (RLS lets any staff member
+ * insert one). Approval itself never moves: this is only about whose deck shows a card.
+ */
+
+const MALLORY = "00000000-0000-4000-8000-0000000000aa";
+const members: RoutingMember[] = [...MEMBERS, { userId: MALLORY, role: "paralegal", displayName: "Mallory", email: "mallory@example.com" }];
+const known = (routing: ApprovalRouting = {}): EventTrust => eventTrust({ status: "ok", routing, members });
+const UNKNOWN: EventTrust = { status: "unknown" };
+
+let t = 0;
+const at = () => `2026-11-10T13:${String(t++ % 60).padStart(2, "0")}:00Z`;
+const handoff = (actorId: string, targetUserId: string, queueItemId = "pc"): CardEvent => ({ queueItemId, kind: "handoff", actorId, targetUserId, until: null, note: null, createdAt: at() });
+const returned = (actorId: string, queueItemId = "pc"): CardEvent => ({ queueItemId, kind: "returned", actorId, targetUserId: null, until: null, note: null, createdAt: at() });
+
+const pc = qitem({ id: "pc" }); // post-consult: attorney-only
+const fu = followup({ id: "fu" }); // a stalled follow-up: routable to any staff member
+const items = [pc, fu];
+const holderOf = (events: CardEvent[], id = "pc", trust: EventTrust = known()) => currentHolder(trustedEvents(events, items, trust), id);
+
+const NOW = new Date("2026-11-10T15:00:00Z");
+const rebecca = { userId: U.rebecca, role: "attorney" as Role };
+const deckFor = (events: CardEvent[], trust: EventTrust, routing: ApprovalRouting = {}, viewer = rebecca) =>
+  buildDeck({ items, routing, viewer, cardState: { status: "ok", events }, trust, now: NOW, dealtAt: null });
+const ids = (cards: { item: { id: string } }[]) => cards.map((c) => c.item.id).sort();
+
+describe("forged events are ignored", () => {
+  it("a hand-off by someone who may not approve and does not hold the card", () => {
+    // Mallory (paralegal) pulls Rebecca's attorney-only card to herself, then to Caitlyn.
+    expect(holderOf([handoff(MALLORY, MALLORY)])).toBeNull();
+    expect(holderOf([handoff(MALLORY, U.caitlyn)])).toBeNull();
+    const d = deckFor([handoff(MALLORY, U.caitlyn)], known());
+    expect(ids(d.cards)).toEqual(["fu", "pc"]);
+    expect(d.handedOff).toEqual([]);
+  });
+
+  it("a non-approver can't steal a non-attorney card either, without a routing that names them", () => {
+    expect(holderOf([handoff(MALLORY, MALLORY, "fu")], "fu")).toBeNull();
+  });
+
+  it("a member who has left (no role) counts as no one", () => {
+    expect(holderOf([handoff(U.ghost, U.caitlyn)])).toBeNull();
+  });
+
+  // Changed on purpose: any current STAFF member's return counts (it only moves a card back toward the approvers), so the
+  // forged-return case is now someone who is not staff: a viewer.
+  it("a return by someone who is not staff (a viewer) and neither holder, hander nor approver", () => {
+    const events = [handoff(U.rebecca, U.caitlyn), returned(U.viewer)];
+    expect(holderOf(events)).toMatchObject({ userId: U.caitlyn, by: U.rebecca });
+    expect(ids(deckFor(events, known()).handedOff)).toEqual(["pc"]);
+  });
+
+  it("a return by any other current staff member counts while the card is handed off", () => {
+    const events = [handoff(U.rebecca, U.caitlyn), returned(MALLORY)];
+    expect(holderOf(events)).toBeNull();
+    expect(trustedEvents(events, items, known())).toEqual(events);
+  });
+
+  it("a return by a member who has since left (no role) is dropped unless they held or handed the card", () => {
+    expect(holderOf([handoff(U.rebecca, U.caitlyn), returned(U.ghost)])).toMatchObject({ userId: U.caitlyn });
+  });
+
+  it("R hands to B, X hands to C, C sends back; X is later demoted: the return still counts", () => {
+    const X = "00000000-0000-4000-8000-0000000000bb";
+    const B = U.caitlyn;
+    const C = MALLORY;
+    const events = [handoff(U.rebecca, B), handoff(X, C), returned(C)];
+    const withX = (role: Role) => eventTrust({ status: "ok", routing: {}, members: [...members, { userId: X, role, displayName: "X", email: "x@example.com" }] });
+    // While X is still an approver all three count and the card is back with the approvers.
+    expect(holderOf(events, "pc", withX("attorney"))).toBeNull();
+    // X demoted to viewer: X's hand-off is dropped, but C's return (C is staff) still sends the card back from B.
+    expect(trustedEvents(events, items, withX("viewer"))).toEqual([events[0], events[2]]);
+    expect(holderOf(events, "pc", withX("viewer"))).toBeNull();
+    expect(ids(deckFor(events, withX("viewer")).handedOff)).toEqual([]);
+  });
+
+  it("two events on one item with the same created_at are folded in the order given (database order)", () => {
+    const stamp = "2026-11-10T13:00:00Z";
+    const h = { ...handoff(U.rebecca, U.caitlyn), createdAt: stamp };
+    const r = { ...returned(U.caitlyn), createdAt: stamp };
+    expect(holderOf([h, r])).toBeNull(); // hand-off then return: back with the approvers
+    expect(holderOf([r, h])).toMatchObject({ userId: U.caitlyn }); // return first has nothing to return: dropped, the hand-off stands
+  });
+
+  it("a return with nothing handed off is dropped", () => {
+    const events = [returned(U.rebecca)];
+    expect(trustedEvents(events, items, known())).toEqual([]);
+  });
+
+  it("the technician page's pill ignores a forged hand-off to the viewer", () => {
+    expect(handedToViewer(items, { status: "ok", events: [handoff(MALLORY, MALLORY)] }, MALLORY, known()).size).toBe(0);
+    expect(handedToViewer(items, { status: "ok", events: [handoff(U.rebecca, MALLORY)] }, MALLORY, known()).size).toBe(1);
+  });
+
+  it("Send back can't be claimed through a forged hand-off", () => {
+    const state = trustedCardState({ status: "ok", events: [handoff(MALLORY, MALLORY)] }, items, known());
+    expect(returnDecision({ callerId: MALLORY, callerRole: "paralegal", itemStatus: "pending", cardState: state, itemId: "pc", allowHander: true })).toEqual({ ok: false, reason: "not-yours" });
+  });
+});
+
+describe("legitimate chains", () => {
+  it("approver hands to A; A sends it back", () => {
+    const events = [handoff(U.rebecca, U.caitlyn), returned(U.caitlyn)];
+    expect(trustedEvents(events, items, known())).toEqual(events);
+    expect(holderOf(events)).toBeNull();
+  });
+
+  it("the holder may hand it on, and the next holder or the hander may send it back", () => {
+    const chain = [handoff(U.rebecca, U.caitlyn), handoff(U.caitlyn, MALLORY)];
+    expect(holderOf(chain)).toMatchObject({ userId: MALLORY, by: U.caitlyn });
+    expect(holderOf([...chain, returned(MALLORY)])).toBeNull();
+    expect(holderOf([...chain, returned(U.caitlyn)])).toBeNull(); // the hander of the current hand-off recalls it
+  });
+
+  it("someone who may approve can end a hand-off they didn't make", () => {
+    const chain = [handoff(U.rebecca, U.caitlyn), handoff(U.caitlyn, MALLORY), returned(U.taylor)];
+    expect(holderOf(chain)).toBeNull();
+  });
+
+  it("an earlier holder loses the right once the card has moved on", () => {
+    const chain = [handoff(U.rebecca, U.caitlyn), handoff(U.caitlyn, MALLORY), returned(MALLORY), handoff(MALLORY, U.caitlyn)];
+    // Mallory was holder, but after her return she holds nothing and may not approve: her hand-off is ignored.
+    expect(holderOf(chain)).toBeNull();
+  });
+
+  it("a routed owner who isn't an approver role counts for a non-attorney item (canApproveItem allows it)", () => {
+    const routing: ApprovalRouting = { stalled_followup: U.caitlyn };
+    const events = [handoff(U.caitlyn, MALLORY, "fu")];
+    expect(holderOf(events, "fu", known(routing))).toMatchObject({ userId: MALLORY, by: U.caitlyn });
+    // Without that routing she may not approve it, so the same row is ignored.
+    expect(holderOf(events, "fu", known())).toBeNull();
+  });
+
+  it("later rows are kept whoever wrote them: they only change their own actor's deck", () => {
+    const later: CardEvent = { queueItemId: "pc", kind: "later", actorId: MALLORY, targetUserId: null, until: "2026-11-11T12:00:00Z", note: null, createdAt: at() };
+    expect(trustedEvents([later], items, known())).toEqual([later]);
+  });
+
+  it("is idempotent: folding the kept events again keeps them all", () => {
+    const events = [handoff(MALLORY, U.caitlyn), handoff(U.rebecca, U.caitlyn), returned(MALLORY), handoff(U.caitlyn, MALLORY), returned(U.caitlyn)];
+    const once = trustedEvents(events, items, known());
+    expect(trustedEvents(once, items, known())).toEqual(once);
+  });
+
+  it("with trust known, a hand-off for an item that isn't in the list can't be checked and is dropped", () => {
+    expect(trustedEvents([handoff(U.rebecca, U.caitlyn, "elsewhere")], items, known())).toEqual([]);
+  });
+});
+
+describe("unreadable roles or routing keep today's behaviour", () => {
+  it("eventTrust is unknown when the routing load failed", () => {
+    expect(eventTrust({ status: "failed" })).toEqual(UNKNOWN);
+    expect(viewEventTrust({ routing: {}, members: null, routingFailed: false })).toEqual(UNKNOWN);
+    expect(viewEventTrust({ routing: {}, members, routingFailed: true })).toEqual(UNKNOWN);
+    expect(viewEventTrust({ routing: {}, members, routingFailed: false }).status).toBe("known");
+  });
+
+  it("every event is trusted, the forged ones included", () => {
+    const events = [handoff(MALLORY, U.caitlyn)];
+    expect(trustedEvents(events, items, UNKNOWN)).toEqual(events);
+    expect(holderOf(events, "pc", UNKNOWN)).toMatchObject({ userId: U.caitlyn, by: MALLORY });
+    expect(ids(deckFor(events, UNKNOWN).handedOff)).toEqual(["pc"]);
+  });
+
+  it("an unread card-event state passes through as it is", () => {
+    expect(trustedCardState({ status: "unavailable" }, items, known())).toEqual({ status: "unavailable" });
+    expect(trustedCardState({ status: "not-set-up" }, items, known())).toEqual({ status: "not-set-up" });
+    expect(ids(buildDeck({ items, routing: {}, viewer: rebecca, cardState: { status: "unavailable" }, trust: known(), now: NOW, dealtAt: null }).cards)).toEqual(["fu", "pc"]);
+  });
+});
+
+describe("every reader of the card events folds them with the trust rule", () => {
+  const walk = (dir: string): string[] =>
+    readdirSync(dir).flatMap((n) => {
+      const p = join(dir, n);
+      return statSync(p).isDirectory() ? walk(p) : /\.(ts|tsx)$/.test(n) ? [p] : [];
+    });
+  it("each file that calls loadCardState also applies trust", () => {
+    const readers = walk("src").filter((f) => !f.endsWith("card-state.ts") && /loadCardState\(/.test(readFileSync(f, "utf8")));
+    expect(readers.length).toBeGreaterThan(0);
+    for (const f of readers) expect(readFileSync(f, "utf8"), f).toMatch(/eventTrust\(|viewEventTrust\(|trustedCardState\(/);
+  });
+  it("no file hands a raw loadCardState(...) result to currentHolder(", () => {
+    // Heuristic: a file that calls currentHolder( and loadCardState( must route events through trustedCardState /
+    // trustedEvents / buildDeck, and must not pass the read (inline or through a variable) straight in.
+    for (const f of walk("src")) {
+      const src = readFileSync(f, "utf8");
+      if (f.endsWith("deck.ts") || !/currentHolder\(/.test(src)) continue;
+      if (/loadCardState\(/.test(src)) expect(src, f).toMatch(/trustedCardState\(|trustedEvents\(|buildDeck\(/);
+      expect(src, f).not.toMatch(/currentHolder\(\s*(await\s+)?loadCardState\(/);
+      expect(src, f).not.toMatch(/(\w+)\s*=\s*await\s+loadCardState\([^;]*;[\s\S]*currentHolder\(\s*\1(\.events)?\s*[,)]/);
+    }
+  });
+});
+
+describe("Sprint 4: draft_to and drafted in the fold", () => {
+  // Approved by Rebecca at 13:00; every event below is written after that (at() starts at 13:00 and only counts up).
+  const apc = qitem({ id: "apc", status: "approved", resolved_by: "rebecca@example.com", resolved_at: "2026-11-10T12:59:00Z" });
+  const afu = followup({ id: "afu", status: "approved", resolved_by: "mallory@example.com", resolved_at: "2026-11-10T12:59:00Z" });
+  const approvedItems = [apc, afu];
+  const draftTo = (actorId: string, targetUserId: string, queueItemId = "apc"): CardEvent => ({ queueItemId, kind: "draft_to", actorId, targetUserId, until: null, note: null, createdAt: at() });
+  const drafted = (actorId: string, queueItemId = "apc"): CardEvent => ({ queueItemId, kind: "drafted", actorId, targetUserId: null, until: null, note: null, createdAt: at() });
+  const fold = (events: CardEvent[], routing: ApprovalRouting = {}) => trustedEvents(events, approvedItems, known(routing));
+
+  it("a draft_to counts only from the member who approved the item, to a current staff member", () => {
+    expect(fold([draftTo(U.rebecca, U.caitlyn)])).toHaveLength(1);
+    expect(fold([draftTo(MALLORY, MALLORY)])).toHaveLength(0); // not the approver
+    expect(fold([draftTo(U.taylor, U.caitlyn)])).toHaveLength(0); // the owner, but not the approver of this item
+    expect(fold([draftTo(U.rebecca, U.viewer)])).toHaveLength(0); // a viewer can't hold a draft
+    expect(fold([draftTo(U.rebecca, U.ghost)])).toHaveLength(0); // not a member
+  });
+
+  it("a routed non-approver who approved a routine item may pass it; on a pending item nobody can", () => {
+    expect(fold([draftTo(MALLORY, U.caitlyn, "afu")], { stalled_followup: MALLORY })).toHaveLength(1);
+    expect(trustedEvents([draftTo(U.rebecca, U.caitlyn, "pc")], items, known())).toHaveLength(0); // pc is still pending
+  });
+
+  it("a drafted counts only from the current draft_to target", () => {
+    expect(fold([draftTo(U.rebecca, U.caitlyn), drafted(MALLORY)])).toHaveLength(1);
+    expect(fold([draftTo(U.rebecca, U.caitlyn), drafted(U.caitlyn)])).toHaveLength(2);
+    expect(fold([drafted(U.caitlyn)])).toHaveLength(0);
+  });
+
+  it("neither is a hand-off: the holder is untouched", () => {
+    expect(holderOf([handoff(U.rebecca, U.caitlyn), draftTo(U.rebecca, MALLORY, "pc"), drafted(MALLORY, "pc")])?.userId).toBe(U.caitlyn);
+  });
+});

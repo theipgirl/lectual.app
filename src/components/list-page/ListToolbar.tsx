@@ -21,6 +21,14 @@ type SearchProps = {
   clearHref?: string;
   /** What Clear does on a page that filters in the browser. */
   onClear?: () => void;
+  /** Where a plain GET submit goes (default: the current page). */
+  action?: string;
+  /** Longest term the box accepts. */
+  maxLength?: number;
+  /** The input's id, when a label or test points at it. */
+  id?: string;
+  /** An extra class on the form, beside `lp-search`. */
+  className?: string;
 };
 
 /** Search with a submit button, and a Clear link only when a term is set. */
@@ -28,8 +36,10 @@ export function ListSearch(props: SearchProps) {
   const term = props.value ?? props.defaultValue ?? "";
   return (
     <form
-      className="lp-search"
+      className={props.className ? `lp-search ${props.className}` : "lp-search"}
       role="search"
+      action={props.action}
+      method={props.action ? "get" : undefined}
       // A page that filters as you type has nothing to post: a submit must not reload it.
       onSubmit={props.onChange ? (event) => event.preventDefault() : undefined}
     >
@@ -37,8 +47,10 @@ export function ListSearch(props: SearchProps) {
         <input key={name} type="hidden" name={name} value={value} />
       ))}
       <input
+        id={props.id}
         className="lx-input"
         type="search"
+        maxLength={props.maxLength}
         name={props.name ?? "q"}
         {...(props.onChange
           ? { value: props.value ?? "", onChange: (event: React.ChangeEvent<HTMLInputElement>) => props.onChange?.(event.target.value) }

@@ -4,7 +4,30 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db/admin", () => ({ getAdminClient: () => ({}) }));
 vi.mock("@/lib/intake-forms/lawmatics-sync", () => ({ firmToken: async () => "tok" }));
 
-const { runHiredSync } = await import("@/lib/lawmatics/hired-sync");
+const { syncFirm } = await import("@/lib/lawmatics/hired-sync");
+
+/**
+ * The daily sync (./daily-sync.ts) runs `syncFirm` per active connection; this is that loop, reduced to what these tests
+ * need (the old runHiredSync was removed as dead code). The rules under test are syncFirm's.
+ */
+async function runHiredSync(o: { admin: never; client: () => never; getToken: (a: never, org: string) => Promise<string | null>; now?: () => Date }) {
+  const admin = o.admin as unknown as { from: (t: string) => { select: (c: string) => { eq: (k: string, v: string) => PromiseLike<{ data: Array<{ id: string; org_id: string }> | null }> } } };
+  const { data } = await admin.from("lawmatics_connection").select("id, org_id").eq("status", "active");
+  const s = { connections: data?.length ?? 0, created: 0, linked: 0, skipped: 0, failedFirms: 0, failedWrites: 0, leadsMoved: 0, leadMovesFailed: 0 };
+  for (const conn of data ?? []) {
+    const token = await o.getToken(o.admin, conn.org_id);
+    const r = token ? await syncFirm(o.admin, conn.org_id, o.client(), (o.now ?? (() => new Date()))()) : null;
+    if (!r || !r.ok) s.failedFirms += 1;
+    if (!r) continue;
+    s.created += r.created;
+    s.linked += r.linked;
+    s.skipped += r.skipped;
+    s.failedWrites += r.failedWrites;
+    s.leadsMoved += r.leadsMoved;
+    s.leadMovesFailed += r.leadMovesFailed;
+  }
+  return s;
+}
 
 type Row = Record<string, unknown>;
 

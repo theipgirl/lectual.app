@@ -11,6 +11,8 @@ export type QueueViewContext = {
   routingFailed: boolean;
   /** Entries in the stored routing that no longer name a valid member or kind. */
   dropped: number;
+  /** Sprint 4: "Drafts go to" (a current staff member), null when none is set or the routing couldn't be read. */
+  drafter?: string | null;
   /** The request's clock, read here so a page never calls Date.now() while rendering. */
   now: number;
 };
@@ -20,6 +22,6 @@ export async function loadQueueViewContext(): Promise<QueueViewContext> {
   const [session, routed] = await Promise.all([resolveFirmSession().catch(() => null), loadApprovalRouting()]);
   const viewer = session && session.kind === "ok" ? { userId: session.user.id, role: session.role } : null;
   return routed.status === "ok"
-    ? { viewer, routing: routed.routing, members: routed.members, routingFailed: false, dropped: routed.dropped, now: Date.now() }
+    ? { viewer, routing: routed.routing, members: routed.members, routingFailed: false, dropped: routed.dropped, drafter: routed.drafter ?? null, now: Date.now() }
     : { viewer, routing: {}, members: null, routingFailed: true, dropped: 0, now: Date.now() };
 }

@@ -107,6 +107,7 @@ export async function addVoiceNote(
   // storage RLS would be keyed on different tenants. Same lead-then-matter
   // branch logActivity uses, for the same reason.
   const parent = leadId
+    // live-guard: reads org_id of the page's (live) lead to file a note
     ? await supabase.from("crm_lead").select("org_id").eq("id", leadId).single()
     : await supabase.from("crm_matter").select("org_id").eq("id", matterId!).single();
   if (parent.error) throw parent.error;

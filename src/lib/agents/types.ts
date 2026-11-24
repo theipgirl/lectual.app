@@ -1,11 +1,18 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { AUTOMATIC_STAGE_MOVES, FROM_THEIR_EMAILS } from "@/lib/ui/words";
+import { AUTOMATIC_STAGE_MOVES, FROM_THEIR_EMAILS, SHORTCUTS_NAME } from "@/lib/ui/words";
 import type { StructuredCall } from "@/lib/ai/claude";
 import type { NewQueueDraft, QueueItem } from "@/lib/queue/api";
 
 export type AgentId = "email-intel" | "intake-triage" | "post-consult" | "stage-keeper" | "morning-brief" | "consult-prep" | "inbox-summary";
 export type Autonomy = "suggest" | "draft" | "act";
 export type AgentTrigger = "cron" | "manual" | "webhook" | "event";
+
+/**
+ * Narrows ONE run of an agent to some leads (only consult prep reads it today). `stage`: the lead just entered the
+ * consult stage. `sync`: a firm's Lawmatics sync just finished. `rerun`: a person asked for a fresh prep of this lead.
+ * Every gate of an ordinary run (the Assistants feature, the setting, Autopilot, the run row, the budget) still applies.
+ */
+export type RunScope = { leadIds: readonly string[]; reason: "stage" | "rerun"; /** Leads that entered the stage in the same request but did not fit the batch: the run says so. */ over?: number } | { leadIds?: undefined; reason: "sync" };
 
 export const AGENT_IDS: readonly AgentId[] = [
   "email-intel",
@@ -50,14 +57,14 @@ export const AGENT_DEFS: Record<AgentId, { name: string; reads: string; descript
     name: "Morning brief",
     reads: "Leads, matters, consults and Approvals",
     description:
-      "Writes the attorney a daily briefing into Approvals: today's consults, leads waiting on a reply, stage suggestions, stalled leads, deadlines in the next 14 days and the Approvals count. For up to five stalled leads a day it also drafts a follow-up email. It only drafts: an attorney reviews and sends everything.",
+      "Writes the attorney a daily briefing into Approvals: today's consults, leads waiting on a reply, stage suggestions, stalled leads, deadlines in the next 7 and 30 days and the Approvals count. For up to five stalled leads a day it also drafts a follow-up email. It only drafts: an attorney reviews and sends everything.",
     defaultAutonomy: "draft",
   },
   "consult-prep": {
     name: "Consult prep",
-    reads: "Outlook consults and the lead record",
+    reads: "Consults, the lead record and Lawmatics",
     description:
-      "For each consult in the next 24 hours that is linked to a lead, drafts an internal heads-up with the facts on file and, for firms with the Agent toolkit, a short client email about what to have ready. It never picks classes, a package or a price: that stays with the attorney. It only drafts: an attorney reviews and sends everything.",
+      `When a lead is in Consultation Scheduled (or a consult is booked), prepares the consult on its own: the facts on file, the answers the client gave and their Lawmatics intake. It emails the brief to the people you choose in Settings, Team when it is booked, a day before (if booked more than a day ahead) and an hour before, and keeps a copy on the lead's page. For firms with ${SHORTCUTS_NAME} switched on it also drafts a short client email about what to have ready. It never picks classes, a package or a price, and it sends nothing to a client: an attorney reviews and sends everything.`,
     defaultAutonomy: "draft",
   },
   "inbox-summary": {
@@ -95,9 +102,9 @@ const AGENT_AUTONOMY_HINT: Partial<Record<AgentId, Record<Autonomy, string>>> = 
     act: "Writes the internal briefing and a follow-up email draft for each stalled lead. Everything waits in Approvals; nothing is sent.",
   },
   "consult-prep": {
-    suggest: "Writes only the internal heads-up. No client email is drafted.",
-    draft: "Writes the internal heads-up and, if the Agent toolkit is on for this firm, a client email about what to have ready. Both wait in Approvals; nothing is sent.",
-    act: "Writes the internal heads-up and, if the Agent toolkit is on for this firm, a client email about what to have ready. Both wait in Approvals; nothing is sent.",
+    suggest: "Writes only the internal brief and emails it to your team. No client email is drafted.",
+    draft: `Prepares the internal brief, emails it to your team and, if ${SHORTCUTS_NAME} is on for this firm, drafts a client email about what to have ready. The client email waits in Approvals; nothing goes to a client.`,
+    act: `Prepares the internal brief, emails it to your team and, if ${SHORTCUTS_NAME} is on for this firm, drafts a client email about what to have ready. The client email waits in Approvals; nothing goes to a client.`,
   },
   "inbox-summary": {
     suggest: "Writes only the digest. No reply is left in Outlook.",
@@ -157,6 +164,8 @@ export type AgentContext = {
   timeLeftMs?: () => number;
   /** Aborted when the run reaches its time limit. The runner also hands it to every model call. */
   signal?: AbortSignal;
+  /** Set only for a run narrowed to some leads (see RunScope). Absent = the ordinary run of the whole firm. */
+  scope?: RunScope;
 };
 
 export type AgentResult = {

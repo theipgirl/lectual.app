@@ -1,8 +1,14 @@
-import { relativeTime } from "@/lib/relative-time";
+import { formatRelative } from "@/lib/ui/dates";
+import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
+import { EmptyState, Notice, Pill } from "@/components/ui";
+import { BLANK, noneYet, showingAtLeast } from "@/lib/ui/words";
+import "./files.css";
 import { buildEntries, LIST_CAP, type Directory, type DocEntry, type DocumentsRead } from "@/lib/files/read";
 import type { FileParentInput } from "@/lib/files/guard";
 import { FILE_MESSAGES, formatFileSize } from "@/lib/files/rules";
+import { DeleteAndRefresh } from "./DeleteAndRefresh";
 import { DeleteFileButton } from "./DeleteFileButton";
+import { UploadAndRefresh } from "./UploadAndRefresh";
 import { UploadControl } from "./UploadControl";
 
 /**
@@ -19,32 +25,32 @@ import { UploadControl } from "./UploadControl";
  */
 
 export const DOCS_TITLE = "Documents & files";
-export const EMPTY_LINE = "Nothing here yet";
+export const EMPTY_LINE = noneYet("files");
 export const INTERNAL_NOTE = "Files are internal to the firm. Nothing here is shared with a client.";
 export const FILES_ERROR_LINE =
   "Files couldn't be loaded. Refresh to try again.";
 export const LETTERS_ERROR_LINE =
   "Generated letters couldn't be loaded. Refresh to try again.";
 
-function Entry({ entry, now, canDelete }: { entry: DocEntry; now?: number; canDelete: boolean }) {
+function Entry({ entry, now, tz, canDelete, refresh }: { entry: DocEntry; now?: number; tz: string; canDelete: boolean; refresh: boolean }) {
   const href = entry.kind === "file" ? `/dashboard/files/${entry.id}/download/` : `/dashboard/documents/${entry.id}/download/`;
-  const meta = [entry.kind === "file" ? formatFileSize(entry.sizeBytes) : entry.typeLabel, entry.who, relativeTime(entry.at, now)]
+  const meta = [entry.kind === "file" ? formatFileSize(entry.sizeBytes) : entry.typeLabel, entry.who, formatRelative(entry.at, { tz, now: now === undefined ? undefined : new Date(now) }) ?? BLANK]
     .filter(Boolean)
     .join(" · ");
   return (
-    <li data-kind={entry.kind} style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", padding: "10px 0" }}>
-      <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <b style={{ overflowWrap: "anywhere" }}>{entry.name}</b>
-          {entry.kind === "letter" && <span className="lx-pill lx-pill-mute">Generated letter</span>}
+    <li data-kind={entry.kind} className="fl-entry">
+      <div className="fl-entry-main">
+        <div className="fl-entry-name">
+          <b>{entry.name}</b>
+          {entry.kind === "letter" && <Pill>Generated letter</Pill>}
         </div>
         <span className="lx-note">{meta}</span>
       </div>
-      <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+      <span className="fl-entry-actions">
         <a href={href} className="lx-btn lx-btn-sec lx-btn-sm">
           Download
         </a>
-        {entry.kind === "file" && canDelete && <DeleteFileButton fileId={entry.id} name={entry.name} />}
+        {entry.kind === "file" && canDelete && (refresh ? <DeleteAndRefresh fileId={entry.id} name={entry.name} /> : <DeleteFileButton fileId={entry.id} name={entry.name} />)}
       </span>
     </li>
   );
@@ -57,6 +63,8 @@ export function DocumentsCard({
   canUpload,
   canDelete,
   now,
+  tz = DEFAULT_TIME_ZONE,
+  refreshAfterUpload = false,
 }: {
   parent: FileParentInput;
   read: DocumentsRead;
@@ -65,6 +73,10 @@ export function DocumentsCard({
   canDelete: boolean;
   /** For tests; left out, times are relative to the moment of rendering. */
   now?: number;
+  /** The firm's time zone, for the dates. */
+  tz?: string;
+  /** Drawn on a page that is not the record's own (the Weekly review's card): the page refreshes itself after an upload AND after a delete. */
+  refreshAfterUpload?: boolean;
 }) {
   const { files, letters } = read;
   const entries = buildEntries(read, directory);
@@ -73,53 +85,38 @@ export function DocumentsCard({
   const lettersCapped = letters?.status === "ok" && letters.capped;
 
   return (
-    <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }} aria-label={DOCS_TITLE}>
-      <div>
-        <div className="lx-label">Internal to the firm</div>
-        <h2 className="lx-h2" style={{ fontSize: 23 }}>
-          {DOCS_TITLE}
-        </h2>
-      </div>
-      <p className="lx-note" style={{ margin: 0 }}>
-        {INTERNAL_NOTE}
-      </p>
+    <section id="documents" className="lx-card lx-pad fl-card" aria-label={DOCS_TITLE}>
+      <h2 className="lx-h3">{DOCS_TITLE}</h2>
+      <p className="lx-note">{INTERNAL_NOTE}</p>
       {files.status === "unavailable" && (
-        <div className="lx-banner lx-banner-warn" role="alert">
+        <Notice tone="warn" role="alert">
           {FILES_ERROR_LINE}
-        </div>
+        </Notice>
       )}
       {letters?.status === "unavailable" && (
-        <div className="lx-banner lx-banner-warn" role="alert">
+        <Notice tone="warn" role="alert">
           {LETTERS_ERROR_LINE}
-        </div>
+        </Notice>
       )}
       {files.status === "not-set-up" && (
-        <p className="lx-note" style={{ margin: 0 }}>
-          {FILE_MESSAGES.notSetUp}
-        </p>
+        <p className="lx-note">{FILE_MESSAGES.notSetUp}</p>
       )}
-      {canUpload && files.status !== "not-set-up" && <UploadControl parent={parent} />}
+      {canUpload && files.status !== "not-set-up" && (refreshAfterUpload ? <UploadAndRefresh parent={parent} /> : <UploadControl parent={parent} />)}
       {everyReadWorked && entries.length === 0 && (
-        <p className="lx-note" style={{ margin: 0 }}>
-          {EMPTY_LINE}
-        </p>
+        <EmptyState variant="line">{EMPTY_LINE}</EmptyState>
       )}
       {entries.length > 0 && (
         <ul className="lx-list">
           {entries.map((entry) => (
-            <Entry key={`${entry.kind}:${entry.id}`} entry={entry} now={now} canDelete={canDelete} />
+            <Entry key={`${entry.kind}:${entry.id}`} entry={entry} now={now} tz={tz} canDelete={canDelete} refresh={refreshAfterUpload} />
           ))}
         </ul>
       )}
       {filesCapped && (
-        <p className="lx-note" style={{ margin: 0 }}>
-          {`Showing the newest ${LIST_CAP} files.`}
-        </p>
+        <p className="lx-note">{`${showingAtLeast(LIST_CAP)} files.`}</p>
       )}
       {lettersCapped && (
-        <p className="lx-note" style={{ margin: 0 }}>
-          {`Showing the newest ${LIST_CAP} generated letters.`}
-        </p>
+        <p className="lx-note">{`${showingAtLeast(LIST_CAP)} generated letters.`}</p>
       )}
     </section>
   );

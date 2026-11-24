@@ -1,6 +1,12 @@
+import { SCORED_ASSESSMENT, SCORED_ASSESSMENTS, notReadyPlural } from "@/lib/ui/words";
 import Link from "next/link";
+import { eventDisplayName } from "@/lib/intake-forms/event-name";
+import "./event.css";
+import { Notice } from "@/components/ui/Notice";
 import { eventSummaries } from "@/lib/intake-forms/booth-results";
 import { formatDuration } from "@/lib/intake-forms/performance";
+import { shortDate } from "@/lib/campaigns/stops";
+import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
 import { EVENT_LIST_ROW_LIMIT, type loadBoothEventList } from "@/lib/intake-forms/load-results";
 
 /**
@@ -18,43 +24,44 @@ export function eventHref(code: string, range?: string) {
   return `/dashboard/forms/?event=${encodeURIComponent(code)}${range ? `&range=${range}` : ""}`;
 }
 
-export function EventAssessments({ read }: { read: Awaited<ReturnType<typeof loadBoothEventList>> }) {
+export function EventAssessments({ read, timeZone }: { read: Awaited<ReturnType<typeof loadBoothEventList>>; timeZone?: string }) {
   if (read.status === "unconfigured") {
     return (
       <p className="ifm-help">
-        Event assessments aren&apos;t switched on for your firm yet. Lectual will turn them on.
+        {notReadyPlural(SCORED_ASSESSMENTS)}
       </p>
     );
   }
   if (read.status === "unavailable") {
     return (
-      <div role="status" className="lx-banner lx-banner-warn" style={{ fontSize: 14 }}>
-        Event assessments couldn&apos;t be loaded. Refresh to try again.
-      </div>
+      <Notice tone="warn" role="status">
+        {`${SCORED_ASSESSMENTS} couldn't be loaded. Refresh to try again.`}
+      </Notice>
     );
   }
   const events = eventSummaries(read.value.rows);
   if (events.length === 0) return null;
   return (
-    <section className="ifl-root ife-section" aria-label="Event assessments">
+    <section className="ifl-root ife-section" aria-label={SCORED_ASSESSMENTS}>
       <div className="ife-head">
-        <h2 className="lx-h2" style={{ fontSize: 23 }}>
-          Event assessments
+        <h2 className="lx-h2">
+          {SCORED_ASSESSMENTS}
         </h2>
-        <span className="ifm-help">From booth scorecards taken at events. Read-only, all time.</span>
+        <span className="ifm-help">Taken on the firm&apos;s assessment page or at an event. Read-only, all time.</span>
       </div>
-      <div className="ifl-list" style={{ marginTop: 12 }}>
+      <div className="ifl-list ifl-list-gap">
         {events.map((e) => (
           <article key={e.code} className="lx-card ifl-item">
             <div className="ifl-main">
               <div className="ifl-title-row">
                 <Link href={eventHref(e.code)} className="ifl-name">
-                  {e.code}
+                  {eventDisplayName(e.code)}
                 </Link>
-                <span className="ifl-kind">Booth assessment</span>
+                <span className="ev-name-code">{e.code}</span>
+                <span className="ifl-kind">{SCORED_ASSESSMENT}</span>
               </div>
             </div>
-            <dl className="ifl-stats" aria-label={`${e.code}, all time`}>
+            <dl className="ifl-stats" aria-label={`${eventDisplayName(e.code)}, all time`}>
               <div>
                 <dt>Started</dt>
                 <dd>{e.started.toLocaleString("en-US")}</dd>
@@ -70,6 +77,10 @@ export function EventAssessments({ read }: { read: Awaited<ReturnType<typeof loa
                 <dt>Typical time (median)</dt>
                 <dd>{formatDuration(e.medianMs)}</dd>
               </div>
+              <div>
+                <dt>Last taken</dt>
+                <dd>{shortDate(e.latest || null, timeZone ?? DEFAULT_TIME_ZONE) || "\u2014"}</dd>
+              </div>
             </dl>
             <div className="ifl-actions">
               <Link className="lx-btn lx-btn-sm lx-btn-ghost" href={eventHref(e.code)}>
@@ -79,7 +90,7 @@ export function EventAssessments({ read }: { read: Awaited<ReturnType<typeof loa
           </article>
         ))}
       </div>
-      {read.value.capped && <p className="ifm-help">{`Numbers cover the latest ${EVENT_LIST_ROW_LIMIT.toLocaleString("en-US")} booth cards.`}</p>}
+      {read.value.capped && <p className="ifm-help">{`Numbers cover the latest ${EVENT_LIST_ROW_LIMIT.toLocaleString("en-US")} assessments.`}</p>}
     </section>
   );
 }

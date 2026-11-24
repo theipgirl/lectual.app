@@ -7,8 +7,12 @@ import { SETUP_PATH } from "@/lib/setup/routes";
 import { GoToIntegrationsLink, SetupChecklistView } from "@/components/setup/SetupChecklistView";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { SETUP_NAME } from "@/lib/ui/words";
+import { PageHeader } from "@/components/ui";
+import { TeamAccountsView } from "@/components/setup/TeamAccounts";
+import { loadFirstUsers } from "@/lib/setup/first-users-load";
 
-export const metadata: Metadata = { title: pageTitle("Setup") };
+export const metadata: Metadata = { title: pageTitle(SETUP_NAME) };
 
 export const dynamic = "force-dynamic";
 
@@ -22,22 +26,24 @@ export default async function SetupPage() {
   const session = await resolveFirmSession({ signInNext: SETUP_PATH });
   if (session.kind !== "ok" || !canSeeSetup(session.role)) notFound();
 
-  const checklist = setupChecklist(await loadSetupState());
+  const [state, accounts] = await Promise.all([loadSetupState(), loadFirstUsers({ id: session.user.id, role: session.role, actingAsStaff: session.actingAsStaff }, session.org.modules)]);
+  const checklist = setupChecklist(state);
 
   return (
     <>
-      <div className="lx-page-head">
-        <div style={{ flex: 1, minWidth: 260 }}>
-          <div className="lx-label">Setup</div>
-          <h1 className="lx-h1" data-tour="setup-head">Get your firm set up</h1>
-          <p className="lx-sub">
+      <PageHeader
+        title={SETUP_NAME}
+        tour="setup-head"
+        sub={
+          <>
             What makes Lectual work for your firm. Each step is checked against what is actually saved, not what someone
             ticked. Steps only Lectual can switch on are marked, and they don&apos;t count against you.
-          </p>
-        </div>
-        <GoToIntegrationsLink />
-      </div>
+          </>
+        }
+        actions={<GoToIntegrationsLink />}
+      />
       <SetupChecklistView checklist={checklist} />
+      <TeamAccountsView data={accounts} />
     </>
   );
 }

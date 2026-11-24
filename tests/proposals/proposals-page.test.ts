@@ -36,7 +36,7 @@ describe("proposals list page", () => {
     expect(html).toContain("Client e2");
     for (const other of ["a1", "a2", "b1", "s1", "c1", "x1"]) expect(html).not.toContain(`Client ${other}<`);
     expect(segments(html)).toEqual(ALL_SEGMENTS);
-    expect(html).toMatch(/aria-current="page"[^>]*><span>Expired/);
+    expect(html).toMatch(/aria-current="page"[^>]*>Expired/);
   });
 
   it("a sent row past its expiry shows an Expired pill; one open through today stays Sent", async () => {
@@ -65,24 +65,24 @@ describe("proposals list page", () => {
     expect(draft).toContain("Client a1");
     expect(draft).toContain("Client b1");
     expect(draft).not.toContain("Client c1<");
-    expect(draft).toMatch(/aria-current="page"[^>]*><span>Drafts and blocked/);
+    expect(draft).toMatch(/aria-current="page"[^>]*>Drafts and blocked/);
     vi.resetModules();
     const approved = await render({ status: "approved" });
     expect(approved).toContain("Client a2");
-    expect(approved).toMatch(/aria-current="page"[^>]*><span>Drafts and blocked/);
+    expect(approved).toMatch(/aria-current="page"[^>]*>Drafts and blocked/);
     vi.resetModules();
     const sent = await render({ status: "sent" });
     expect(sent).toContain("Client s1");
     expect(sent).not.toContain("Client e1<");
     vi.resetModules();
     const closed = await render({ status: "withdrawn" });
-    expect(closed).toMatch(/aria-current="page"[^>]*><span>Current/);
+    expect(closed).toMatch(/aria-current="page"[^>]*>Current/);
     expect(closed).toContain("Client x1");
   });
 
   it("a failed load says Proposals couldn't be loaded, with no counts and no empty-state wording", async () => {
     const html = await render({}, { rows: "fail" });
-    expect(html).toContain("Proposals couldn&#x27;t be loaded");
+    expect(html).toContain("Can&#x27;t show proposals right now");
     expect(segments(html)).toEqual(["Current", "Out with a client", "Drafts and blocked", "Accepted", "Paid", "Expired"]);
     expect(html).not.toContain("No proposals yet");
     expect(html).not.toContain("No accepted proposals yet.");

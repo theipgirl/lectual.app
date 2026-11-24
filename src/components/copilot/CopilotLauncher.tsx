@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { CopilotChat } from "./CopilotChat";
 import { FOCUSABLE_SELECTOR, focusFirstInput, launcherKeyAction, nextTabFocus, shouldShowLauncher } from "@/lib/copilot/launcher";
 import { COPILOT_NAME } from "@/lib/ui/words";
+import { CloseButton } from "@/components/ui/Dialog";
 import "./copilot.css";
 
 const DRAWER_TITLE_ID = "copilot-drawer-title";
@@ -23,15 +24,10 @@ export function CopilotDrawer(props: {
       <div className="cpd-scrim" hidden={!open} onClick={onClose} />
       <aside ref={drawerRef} className="cpd-drawer" role="dialog" aria-modal="true" aria-labelledby={DRAWER_TITLE_ID} hidden={!open} onKeyDown={onKeyDown}>
         <div className="cpd-head">
-          <h2 id={DRAWER_TITLE_ID} className="cpd-title">
+          <h2 id={DRAWER_TITLE_ID} className="lx-modal-title cpd-title">
             {COPILOT_NAME}
           </h2>
-          <span className="cpd-kbd" aria-hidden="true">
-            Esc to close
-          </span>
-          <button type="button" className="cpd-close" onClick={onClose}>
-            Close
-          </button>
+          <CloseButton onClick={onClose} />
         </div>
         <CopilotChat variant="drawer" pathname={pathname} />
       </aside>

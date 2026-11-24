@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { proposalsOut, reviewPerson, waitingOnPerson } from "@/lib/review/strips";
-import { isTrademarkRow, sheetSections, SHEET_COLUMNS, waitingCell } from "@/lib/review/sheet";
+import { isTrademarkRow, sheetSections, waitingCell } from "@/lib/review/sheet";
+import { NOTES_PRESENT, columnsFor } from "@/lib/review/sheet-columns";
 import { row, TODAY } from "./fixtures";
 
 const tag = (expiresOn: string, expired: boolean) => ({ text: "x", expiresOn, expired });
@@ -49,7 +50,10 @@ describe("Waiting on the review person", () => {
 
 describe("Sheet", () => {
   it("columns, in order", () => {
-    expect([...SHEET_COLUMNS]).toEqual(["Client", "Mark", "Status", "Next step", "Whose court", "Waiting on", "Source", "Last contact"]);
+    // Sprint 1: the columns are the registry's (headers renamed to the spreadsheet's words, new read-only columns added; money is owner-only).
+    // Merged with the Notes cell: Notes sits in the registry's slot, after Source.
+    expect(columnsFor("trademarks", { canSeeMoney: false, hasNotes: NOTES_PRESENT }).map((c) => c.header)).toEqual(["Trademark Owner", "Trademark Name", "Serial No.", "Status", "Source", "Notes", "Owner", "Start Date", "Office Action Due Date", "Next step", "Waiting on", "Last contact"]);
+    expect(columnsFor("trademarks", { canSeeMoney: false, hasNotes: false }).map((c) => c.header)).not.toContain("Notes");
   });
   it("Trademarks = leads + TM/CR/PATENT (no type reads TM); Contracts = the rest; stage order then client", () => {
     const s = sheetSections([
@@ -68,7 +72,7 @@ describe("Sheet", () => {
     const fmt = (d: string) => d;
     expect(waitingCell({ waiting: "client", contactKnown: true, lastOutbound: "Nov 4" }, fmt)).toBe("Client · followed up Nov 4");
     expect(waitingCell({ waiting: "client", contactKnown: true, lastOutbound: null }, fmt)).toBe("Client · no follow-up recorded");
-    expect(waitingCell({ waiting: "us", contactKnown: true }, fmt)).toBe("Us");
+    expect(waitingCell({ waiting: "us", contactKnown: true }, fmt)).toBe("Our turn");
     expect(waitingCell({ waiting: "uspto", contactKnown: true }, fmt)).toBe("USPTO");
     expect(waitingCell({ waiting: "approval", contactKnown: true }, fmt)).toBe("Approval");
     expect(waitingCell({ waiting: null, contactKnown: true }, fmt)).toBe("—");

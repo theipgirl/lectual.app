@@ -1,30 +1,43 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ListHeader } from "@/components/list-page/ListHeader";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { LoadFailedCard } from "@/components/ui/LoadFailed";
+import { Notice } from "@/components/ui/Notice";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { ListSearch, ListToolbar } from "@/components/list-page/ListToolbar";
 import { Chip, FilterChips } from "@/components/list-page/Chips";
 import "@/components/list-page/list-page.css";
 import { ReviewSection } from "@/components/review/ReviewSection";
-import { KpiStrip, ProposalsOutStrip, ReviewBoard, ViewSwitch, WaitingOnStrip } from "@/components/review/ReviewViews";
+import { DeadlinesStrip, KpiStrip, ReviewBoard, ViewSwitch, WaitingOnStrip } from "@/components/review/ReviewViews";
 import { SheetView } from "@/components/review/SheetView";
 import { SheetSaveStatus } from "@/components/review/SheetSaveStatus";
 import { loadSheetStages } from "@/lib/review/sheet-edit-load";
 import { READ_ONLY_PERMS, type SheetPerms } from "@/lib/review/sheet-edit";
 import { CardsDeck, PersonChips } from "@/components/review/CardsDeck";
-import { ReviewPanel } from "@/components/review/ReviewPanel";
+import { ReviewCardAside } from "@/components/review/ReviewCardExtras";
+import { RecordCardHost } from "@/components/record-card/RecordCardHost";
+import { loadRecordCard } from "@/lib/record-card/load";
+import { cardEdits } from "@/lib/record-card/rules";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { NO_PREVIEW, previewFor, viewFor } from "@/lib/views";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import { CAN_MOVE_STAGE, CAN_WRITE_LEAD } from "@/lib/pipeline/leads";
 import { loadReview } from "@/lib/review/load";
+import { canSeeBilling } from "@/lib/billing/can-see";
+import { ColumnChooser, type ChooserSection } from "@/components/review/ColumnChooser";
+import { NOTES_PRESENT, columnsFor } from "@/lib/review/sheet-columns";
+import { loadCardCustomColumns } from "@/lib/custom-columns/card-load";
+import { canSeeCustomMoney, canWriteCustomValue, firmColumnsBlock, withoutMoney, type FirmColumnsBlock } from "@/lib/custom-columns/rules";
+import { canSeeSetup } from "@/lib/setup/roles";
 import { reviewBuckets, reviewSubline } from "@/lib/review/buckets";
 import { boardLanes, kpis, meetingPosition, offBoard } from "@/lib/review/lanes";
-import { proposalsOut, reviewPerson, waitingOnPerson } from "@/lib/review/strips";
+import { deadlinesOut, reviewPerson, waitingOnPerson } from "@/lib/review/strips";
 import { applyReviewFilters, olderHiddenCount, sinceSuspended, DEFAULT_REVIEW_VIEW, parseReviewParams, reviewHref, type ReviewParams } from "@/lib/review/params";
 import { criticalAlert, detailsNote } from "@/lib/review/notes";
 import { noticeFor } from "@/lib/review/notice";
 import { buildDeck, chosenPerson, deckPeople } from "@/lib/review/deck";
-import { loadLatestNote, loadReviewDetail } from "@/lib/review/detail-load";
+import { loadDeckDocuments, loadLatestNote } from "@/lib/review/detail-load";
 import { pageTitle } from "@/lib/ui/page-title";
 import { QUEUE_APPROVE_ROLES } from "@/lib/queue/roles";
 import { REVIEW_NAME, REVIEW_SHOW_ALL, REVIEW_SHOWING_ALL, REVIEW_SINCE_LABEL, REVIEW_SINCE_SUSPENDED, reviewIntro, reviewOlderHidden } from "@/lib/ui/words";
@@ -43,20 +56,34 @@ type SearchParams = { since?: string | string[]; who?: string | string[]; kind?:
 export default async function ReviewPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;
   const params = parseReviewParams(sp);
-  const [load, session] = await Promise.all([loadReview(), resolveFirmSession()]);
+  // The session comes FIRST: whether this viewer may see fees is decided here from the re-resolved role, before anything is read, so
+  // the money reads are never made for anyone else. Fees are the List's columns, so no other view pays for them.
+  const session = await resolveFirmSession();
   const role = session.kind === "ok" ? session.role : null;
+  const canSeeMoney = canSeeBilling(role);
+  const withFees = canSeeMoney && params.view === "sheet";
+  // The firm's own columns are the List's too: only the List reads them (the opened card reads its own record when needed).
+  // So is the Notes column: each row's newest plain note is read with the review's other reads, only for the List (three-state).
+  const withCustom = params.view === "sheet";
+  const notes = params.view === "sheet";
+  // The firm's own Money columns follow the fee rule (Taylor, Nov 23): an amount is read only for the owner.
+  // Lectual staff acting inside the firm never see them, even with an owner role claim (Taylor, Nov 23).
+  const actingAsStaff = session.kind === "ok" ? session.actingAsStaff : true;
+  const customMoney = canSeeCustomMoney(role, actingAsStaff);
+  const load = await loadReview(new Date(), { withFees, withCustom, notes, customMoney });
   const userId = session.kind === "ok" ? session.user.id : null;
   const canWrite = !!role && MATTER_WRITE_ROLES.includes(role);
   const canMove = canWrite && CAN_MOVE_STAGE.includes(role);
+  // The admin tier (the setup roles) alone hears that custom columns aren't switched on yet, and gets "Add a column" (CO4, R11).
+  const adminTier = canSeeSetup(role);
+  // Typing in the firm's own columns: 0115's value policy list, from the role re-resolved above.
+  const writeCustom = canWriteCustomValue(role);
 
   if (load.status === "unavailable") {
     return (
       <div className="lp-root">
         <ListHeader title={REVIEW_NAME} tour="review-head" sub="Open matters and leads that need a person this week." />
-        <div className="lx-card lx-empty-card" role="alert">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>The weekly review couldn&apos;t be loaded</h2>
-          <p className="lx-note" style={{ margin: 0 }}>{criticalAlert(load.failed)}</p>
-        </div>
+        <LoadFailedCard role="alert" what="the weekly review" body={criticalAlert(load.failed)} />
       </div>
     );
   }
@@ -78,31 +105,50 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
     actingAsStaff: session.actingAsStaff,
   }) === "owner";
   const common = { owner, today: load.today, members: load.members, canWrite, params };
+  // Custom columns: the state the List drew from (null when not read), and the directory for person cells (null = it couldn't be read).
+  // Cleaned again here (the loader never read an amount for a non-owner): no Money field or amount reaches any table, card or chooser.
+  const custom = load.custom ? (customMoney ? load.custom : withoutMoney(load.custom)) : null;
+  const customFields = custom?.status === "ok" ? custom.fields : [];
+  const customMembers = load.failed.includes("team names") ? null : load.members;
   // The owner's Sheet edits in place. Each permission comes from the role re-resolved above; the stage lists are read only for a role that can move one.
   let sheetPerms: SheetPerms | null = null;
   if (owner && params.view === "sheet") {
     const writeLead = !!role && CAN_WRITE_LEAD.includes(role);
     const moveLead = writeLead && !!role && CAN_MOVE_STAGE.includes(role);
     const stages = canWrite || moveLead ? await loadSheetStages() : { matter: null, lead: null };
-    sheetPerms = canWrite || writeLead ? { writeMatter: canWrite, writeLead, moveLead, matterStages: canWrite ? stages.matter : null, leadStages: moveLead ? stages.lead : null } : READ_ONLY_PERMS;
+    sheetPerms = canWrite || writeLead ? { writeMatter: canWrite, writeLead, moveLead, matterStages: canWrite ? stages.matter : null, leadStages: moveLead ? stages.lead : null, writeCustom } : READ_ONLY_PERMS;
   }
-  const proposalsKnown = !load.failed.includes("proposals");
+  // "Columns" (draw-only, kept in this browser): offered on the List only, over exactly the columns this viewer may have.
+  const chooser =
+    params.view === "sheet" ? (
+      <ColumnChooser
+        sections={[
+          { id: "trademarks", title: "Trademarks", columns: columnsFor("trademarks", { canSeeMoney, canSeeCustomMoney: customMoney, hasNotes: NOTES_PRESENT, customFields }) },
+          { id: "contracts", title: "Contracts", columns: columnsFor("contracts", { canSeeMoney, canSeeCustomMoney: customMoney, hasNotes: NOTES_PRESENT, customFields }) },
+        ] satisfies ChooserSection[]}
+      />
+    ) : null;
+  // The Notes column: read with the review's other reads, only for the List (three-state; a failed read says so in the cells).
+  const sheetNotes = load.notes ?? null;
   const approvalsKnown = !load.failed.includes("approvals");
   // An approver sees the strip about THEM ("Waiting on you"); anyone else sees it about the review person, as before.
   const isApprover = !!role && !!userId && QUEUE_APPROVE_ROLES.includes(role);
   const person = isApprover ? { userId: userId!, firstName: "you" } : reviewPerson(load.members);
   const olderHidden = olderHiddenCount(load.rows, params, userId);
+  // No review person, no "Waiting on" strip. The Deadlines strip (PGE Sprint 3) is always drawn: the open deadlines in the
+  // rows on screen, or one line saying the deadlines couldn't load (never "no deadlines").
+  const deadlinesFailed = load.failed.includes("deadlines");
   const strips = (
     <div className="rv-strips">
-      <ProposalsOutStrip owner={owner} items={proposalsOut(shown, load.today)} known={proposalsKnown} params={params} />
       {person && <WaitingOnStrip owner={owner} firstName={person.firstName} you={isApprover} personId={person.userId} rows={waitingOnPerson(shown, person.userId)} approvalsKnown={approvalsKnown} params={params} />}
+      <DeadlinesStrip items={deadlinesFailed ? [] : deadlinesOut(shown, load.today)} failed={deadlinesFailed} params={params} />
     </div>
   );
   const lanes = boardLanes(buckets, load.members);
   const rest = offBoard(buckets);
 
   // Cards: one person's deck, built from every row that passes the search and the kind chips (Whose is ignored: the picker is the person).
-  let cards: { people: ReturnType<typeof deckPeople>; personId: string | null; card: ReturnType<typeof buildDeck>[number] | null; pos: ReturnType<typeof meetingPosition>; note: Awaited<ReturnType<typeof loadLatestNote>> | null } | null = null;
+  let cards: { people: ReturnType<typeof deckPeople>; personId: string | null; card: ReturnType<typeof buildDeck>[number] | null; pos: ReturnType<typeof meetingPosition>; note: Awaited<ReturnType<typeof loadLatestNote>> | null; docs: Awaited<ReturnType<typeof loadDeckDocuments>> | null } | null = null;
   if (params.view === "cards") {
     const deckBuckets = reviewBuckets(applyReviewFilters(load.rows, { ...filterParams, who: "all" }, userId), load.today);
     let people = deckPeople(load.members, boardLanes(deckBuckets, load.members).map((l) => l.userId));
@@ -111,35 +157,92 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
     const deck = buildDeck(deckBuckets, load.members, personId);
     const cardPos = meetingPosition(deck.length, params.i);
     const card = cardPos ? deck[cardPos.index] : null;
-    cards = { people, personId, card, pos: cardPos, note: card ? await loadLatestNote({ kind: card.row.kind, id: card.row.id }) : null };
+    // The current card only: one small read of its own record's documents, not every row's.
+    const [cardNote, cardDocs] = card ? await Promise.all([loadLatestNote({ kind: card.row.kind, id: card.row.id }), loadDeckDocuments({ kind: card.row.kind, id: card.row.id })]) : [null, null];
+    cards = { people, personId, card, pos: cardPos, note: cardNote, docs: cardDocs };
   }
 
-  // The detail panel: the record is read AGAIN through the scoped client; the review row only supplies the computed facts.
-  const panel = params.open
-    ? { detail: await loadReviewDetail(params.open), row: load.rows.find((r) => r.kind === params.open!.kind && r.id === params.open!.id) ?? null }
-    : null;
+  // `?open=` opens the record in the SAME centred card Intake and Matters open (no drawer). The card re-reads the record through the
+  // scoped client (`loadRecordCard`: a foreign or missing id is "couldn't be found", a failed read "couldn't be loaded"); the review
+  // row only supplies the facts it computed. A merged lead opened by URL shows its keeper (the loader followed the pointer).
+  const cardLoad = params.open ? await loadRecordCard(params.open) : null;
+  const cardShownId = cardLoad?.status === "ok" ? (cardLoad.kind === "lead" ? cardLoad.lead.id : cardLoad.matter.id) : null;
+  const cardRow = params.open && cardShownId ? (load.rows.find((r) => r.kind === params.open!.kind && r.id === cardShownId) ?? null) : null;
+  // "Firm columns" on the opened card: from the List's own read when the record is a row of it; otherwise ONE scoped read for the record the
+  // card shows (a merged lead opened by URL is its keeper). No card (not found, couldn't load) means no read at all.
+  let firmColumns: FirmColumnsBlock | null = null;
+  if (cardLoad?.status === "ok") {
+    const record =
+      cardLoad.kind === "lead"
+        ? { kind: "lead" as const, id: cardLoad.lead.id, matterType: null }
+        : { kind: "matter" as const, id: cardLoad.matter.id, matterType: cardLoad.matter.type ?? null };
+    const state =
+      custom && cardRow
+        ? custom
+        : await loadCardCustomColumns(cardLoad.kind === "lead" ? { kind: "lead", id: cardLoad.lead.id } : { kind: "matter", id: cardLoad.matter.id, leadId: cardLoad.matter.lead_id ?? null }, {
+            canSeeMoney: customMoney && canSeeCustomMoney(cardLoad.role, actingAsStaff),
+          });
+    // A staff role types in the card (the card's own re-resolved role); viewer and social media see the values only.
+    firmColumns = firmColumnsBlock(customMoney && canSeeCustomMoney(cardLoad.role, actingAsStaff) ? state : withoutMoney(state), custom && cardRow ? cardRow : record, customMembers, load.today, canWriteCustomValue(cardLoad.role));
+  }
+  // Close (and Back) land on the same review view: every other review param is kept, only `open` goes.
+  const cardBase = reviewHref({ ...params, open: null });
+  const cardParams = new URLSearchParams(cardBase.includes("?") ? cardBase.slice(cardBase.indexOf("?") + 1) : "");
+  // Rendered here (an async server component called once) so the page itself stays one synchronous tree.
+  const card =
+    params.open && cardLoad
+      ? await RecordCardHost({
+          open: params.open,
+          path: "/dashboard/review/",
+          params: cardParams,
+          load: cardLoad,
+          review: {
+            aside: (
+              <ReviewCardAside
+                open={{ kind: params.open.kind, id: cardShownId ?? params.open.id }}
+                row={cardRow}
+                members={load.members}
+                today={load.today}
+                // Said only to a role that could change the stage (the card's own `stage` edit, judged as if the stages had been read).
+                stagesFailed={cardLoad.status === "ok" && cardLoad.stages.status !== "ok" && cardEdits({ role: cardLoad.role, kind: cardLoad.kind }).stage}
+                closeStages={canMove ? load.closeStages : []}
+                deadlinesFailed={load.failed.includes("deadlines")}
+                firmColumns={firmColumns}
+              />
+            ),
+          },
+        })
+      : null;
   const notice = noticeFor(sp.notice);
 
   const searchHidden = { ...(params.since === "all" ? { since: "all" } : {}), ...(params.view !== DEFAULT_REVIEW_VIEW ? { view: params.view } : {}), ...(params.view === "cards" && params.person ? { person: params.person } : {}), ...(params.who === "mine" ? { who: "mine" } : {}), ...(params.kind !== "both" ? { kind: params.kind === "matter" ? "matters" : "leads" } : {}) };
 
   return (
-    <div className={owner ? "lp-root rv-root rv-owner" : "lp-root"}>
+    <div className={owner ? "lp-root rv-root rv-owner" : "lp-root rv-root"}>
       {owner ? (
         <>
-      <header className="rv-head">
-        <div className="rv-head-text">
-          <h1 className="lx-h1 rv-h1" data-tour="review-head">{REVIEW_NAME}</h1>
-          <p className="lx-sub rv-sub">{buckets.total === 0 ? reviewSubline(buckets) : reviewIntro(buckets.total)}</p>
-        </div>
-        {sheetPerms && sheetPerms !== READ_ONLY_PERMS ? (
-          <div className="rse-head-right">
-            <SheetSaveStatus />
+      <PageHeader
+        title={REVIEW_NAME}
+        tour="review-head"
+        className="rv-head lx-head-split"
+        sub={buckets.total === 0 ? reviewSubline(buckets) : reviewIntro(buckets.total)}
+        actions={
+          sheetPerms && sheetPerms !== READ_ONLY_PERMS ? (
+            <div className="rse-head-right">
+              <SheetSaveStatus />
+              {chooser}
+              <ViewSwitch params={params} />
+            </div>
+          ) : chooser ? (
+            <div className="rse-head-right">
+              {chooser}
+              <ViewSwitch params={params} />
+            </div>
+          ) : (
             <ViewSwitch params={params} />
-          </div>
-        ) : (
-          <ViewSwitch params={params} />
-        )}
-      </header>
+          )
+        }
+      />
 
       <div className="rv-filters">
         {sinceOff ? (
@@ -183,6 +286,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           clearHref: link({ q: "", i: 1 }),
         }}
         toggle={<ViewSwitch params={params} />}
+        more={chooser}
       />
 
       <KpiStrip kpis={kpis(buckets)} />
@@ -213,32 +317,29 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
       )}
 
       {note && (
-        <p className="lx-banner lx-banner-warn" role="status" style={{ margin: 0 }}>
+        <Notice tone="warn" role="status">
           {note}
-        </p>
+        </Notice>
       )}
       {notice && (
-        <p className="lx-banner lx-banner-warn" role="alert" style={{ margin: 0 }}>
+        <Notice tone="warn" role="alert">
           {notice}
-        </p>
+        </Notice>
       )}
 
       {shown.length === 0 ? (
-        <div className="lx-card lx-empty-card">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>{load.rows.length === 0 ? "Nothing to review" : "Nothing matches"}</h2>
-          <p className="lx-note" style={{ margin: 0 }}>
-            {load.rows.length === 0 ? "Open matters and leads past first contact will show up here." : "Try another filter or search."}
-          </p>
-        </div>
+        <EmptyState title={load.rows.length === 0 ? "Nothing to review" : "Nothing matches"}>
+          {load.rows.length === 0 ? "Open matters and leads past first contact will show up here." : "Try another filter or search."}
+        </EmptyState>
       ) : params.view === "cards" && cards ? (
         <>
           <PersonChips people={cards.people} personId={cards.personId} params={params} />
-          <CardsDeck card={cards.card} pos={cards.pos} personId={cards.personId} personName={cards.people.find((p) => p.userId === cards.personId)?.name ?? null} note={cards.note} {...common} />
+          <CardsDeck card={cards.card} pos={cards.pos} personId={cards.personId} personName={cards.people.find((p) => p.userId === cards.personId)?.name ?? null} note={cards.note} docs={cards.docs} timeZone={load.timeZone} {...common} />
         </>
       ) : params.view === "sheet" ? (
         <>
           {strips}
-          <SheetView rows={shown} {...common} {...(sheetPerms ? { sheetEdit: { perms: sheetPerms } } : {})} />
+          <SheetView rows={shown} canSeeMoney={canSeeMoney} canSeeCustomMoney={customMoney} custom={custom} customMembers={customMembers} adminTier={adminTier} notes={sheetNotes} {...common} {...(sheetPerms ? { sheetEdit: { perms: sheetPerms } } : {})} />
         </>
       ) : (
         <>
@@ -257,20 +358,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           )}
         </>
       )}
-      {panel && params.open && (
-        <ReviewPanel
-          open={params.open}
-          row={panel.row}
-          detail={panel.detail}
-          today={load.today}
-          timeZone={load.timeZone}
-          members={load.members}
-          canWrite={canWrite}
-          canMove={canMove}
-          closeStages={load.closeStages}
-          closeHref={reviewHref({ ...params, open: null })}
-        />
-      )}
+      {card}
     </div>
   );
 }

@@ -3,7 +3,7 @@
  *
  * `validateContent` reports paths like `names[1].marks[0].desc`. The editor
  * has one form per section, so each issue is shown inside the form that can fix
- * it, in words ("Prosperall, mark 1, description"), not as a path.
+ * it, in words ("Larkmoor, mark 1, description"), not as a path.
  */
 
 import type { ProposalContent } from "@/lib/proposals/types";
@@ -58,7 +58,7 @@ const FIELD_WORDS: Record<string, string> = {
   company: "company",
 };
 
-/** "names[1].marks[0].desc" -> "Prosperall, mark 1, description". */
+/** "names[1].marks[0].desc" -> "Larkmoor, mark 1, description". */
 export function describeIssuePath(path: string, content: ProposalContent | null): string {
   const parts: string[] = [];
   const re = /([A-Za-z_]+)(?:\[(\d+)\])?/g;

@@ -12,6 +12,10 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: unknown }> {
     this.calls.push(["eq", a]);
     return this;
   }
+  is(...a: unknown[]) {
+    this.calls.push(["is", a]);
+    return this;
+  }
   update(...a: unknown[]) {
     this.calls.push(["update", a]);
     return this;
@@ -71,7 +75,7 @@ describe("REFERRAL_SOURCES", () => {
   it("keeps the original order and appends the Lawmatics-origin buckets", () => {
     expect([...REFERRAL_SOURCES]).toEqual([
       "UGW", "Melanin Money", "Flourish Media", "Instagram", "Referral", "Event", "Inbound",
-      "Social media", "Search engine", "Website", "Other",
+      "Social media", "Search engine", "Website", "Other", "Assessment", "Intake form",
     ]);
   });
 });

@@ -14,11 +14,14 @@ import {
   type LoePrefill,
 } from "@/lib/documents/loe-prefill";
 import { loadSignedQuotesForMatter, type SignedQuoteForLoe } from "@/lib/documents/loe-prefill-load";
+import { Notice, PageHeader } from "@/components/ui";
+import { NEW_LETTER_NAMES } from "@/lib/ui/words";
+import "@/components/documents/documents.css";
 import LoeForm from "./_components/LoeForm";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 
-export const metadata: Metadata = { title: pageTitle("Engagement letter") };
+export const metadata: Metadata = { title: pageTitle(NEW_LETTER_NAMES.loe) };
 
 export const dynamic = "force-dynamic";
 
@@ -83,39 +86,32 @@ export default async function Page({
 
   return (
     <>
-      <Link href={`/dashboard/documents/new/${matter.id}/`} className="lx-back">
-        ← {matterLabel(matter)}
-      </Link>
-      <div>
-        <div className="lx-label">Document Center</div>
-        <h1 className="lx-h1">New letter of engagement</h1>
-        <p className="lx-sub">{"Trademark matters use the firm's fee chart: pick the current or legacy template explicitly, it's never guessed. Other matters use the general letter: describe the scope and it becomes bullet points; fee and deposit figures are exactly what you enter."}</p>
-      </div>
+      <PageHeader
+        back={{ href: `/dashboard/documents/new/${matter.id}/`, label: matterLabel(matter) }}
+        title={NEW_LETTER_NAMES.loe}
+        sub={"Trademark matters use the firm's fee chart: pick the current or legacy template explicitly, it's never guessed. Other matters use the general letter: describe the scope and it becomes bullet points; fee and deposit figures are exactly what you enter."}
+      />
 
       {load.status === "unavailable" && (
-        <div role="alert" className="lx-banner lx-banner-risk">
+        <Notice tone="risk" role="alert">
           We couldn&apos;t check whether this matter has a signed quote, so nothing is pre-filled. That does not mean there isn&apos;t one. Reload to try
           again, or fill the letter in by hand below.
-        </div>
+        </Notice>
       )}
       {load.status === "unconfigured" && (
-        <p className="lx-note" style={{ margin: 0 }}>
-          Quotes aren&apos;t switched on for your firm yet, so there is nothing to pre-fill from.
-        </p>
+        <p className="lx-note">Quotes aren&apos;t switched on for your firm yet, so there is nothing to pre-fill from.</p>
       )}
       {choice.invalidParam && (
-        <p role="status" className="lx-banner lx-banner-warn" style={{ margin: 0 }}>
+        <Notice tone="warn" role="status">
           The link named a quote that isn&apos;t a signed quote on this matter, so it was ignored.
-        </p>
+        </Notice>
       )}
 
       {choice.mode === "pick" && (
-        <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }}>
+        <section className="lx-card lx-pad dl-stack">
           <div>
-            <h2 className="lx-h2" style={{ fontSize: 23 }}>
-              This matter has {quotes.length} signed quotes
-            </h2>
-            <p className="lx-note" style={{ margin: "6px 0 0" }}>
+            <h2 className="lx-h2">This matter has {quotes.length} signed quotes</h2>
+            <p className="lx-note">
               Choose the one this letter is for. Nothing is guessed: the letter takes its package, class count and amounts from the quote you pick, exactly as
               the client signed it.
             </p>
@@ -125,10 +121,10 @@ export default async function Page({
               const preview = toPrefill(q);
               return preview ? (
                 <Link key={q.quoteId} href={quoteHref(q.quoteId)} className="lx-card lx-kpi">
-                  <span className="lx-num" style={{ fontWeight: 600, color: "var(--ink)" }}>
+                  <span className="dl-ref">
                     {preview.reference}
                   </span>
-                  <span style={{ color: "var(--ink)", fontSize: 15 }}>{preview.packageName || q.title || "Signed quote"}</span>
+                  <span className="dl-ink">{preview.packageName || q.title || "Signed quote"}</span>
                   <span className="lx-note">
                     {preview.acceptedOn ? `Signed ${preview.acceptedOn} · ` : ""}
                     {preview.totals.dueAtSigning} due at signing
@@ -136,7 +132,7 @@ export default async function Page({
                 </Link>
               ) : (
                 <div key={q.quoteId} className="lx-card lx-kpi" aria-disabled="true">
-                  <span className="lx-num" style={{ fontWeight: 600, color: "var(--ink)" }}>
+                  <span className="dl-ref">
                     {q.reference}
                   </span>
                   <span className="lx-note">Signed, but no readable signed copy is stored, so it can&apos;t be used to pre-fill.</span>
@@ -151,7 +147,7 @@ export default async function Page({
       )}
 
       {choice.mode === "unreadable" && chosen && (
-        <div role="alert" className="lx-banner lx-banner-warn">
+        <Notice tone="warn" role="alert">
           Signed quote <b>{chosen.reference}</b>{" "}has no readable signed copy stored, so nothing can be pre-filled from it. The letter is never built from the
           quote&apos;s current lines. Fill it in by hand below
           {canOpenQuote ? (
@@ -166,24 +162,24 @@ export default async function Page({
               <Link href={`${base}?quote=${LOE_QUOTE_PICK}`}>Choose a different signed quote</Link>.
             </>
           )}
-        </div>
+        </Notice>
       )}
 
       {choice.mode === "manual" && (
-        <p role="status" className="lx-banner lx-banner-mute" style={{ margin: 0 }}>
+        <Notice tone="mute" role="status">
           Filling this in by hand. This matter has {quotes.length === 1 ? "a signed quote" : `${quotes.length} signed quotes`} (
           {quotes.map((q) => q.reference).join(", ")}).{" "}
           <Link href={quotes.length === 1 ? quoteHref(quotes[0].quoteId) : `${base}?quote=${LOE_QUOTE_PICK}`}>
             {quotes.length === 1 ? "Pre-fill from it" : "Choose one to pre-fill from"}
           </Link>
           .
-        </p>
+        </Notice>
       )}
 
       {prefill && (
-        <section role="status" className="lx-card" style={{ padding: 16, display: "grid", gap: 10 }}>
+        <section role="status" className="lx-card lx-pad dl-stack">
           <div className="lx-label">Pre-filled from the signed quote</div>
-          <p style={{ margin: 0, fontSize: 15 }}>
+          <p className="dl-lead">
             From signed quote{" "}
             {canOpenQuote ? (
               <Link href={`/dashboard/quotes/${prefill.quoteId}/`}>
@@ -195,22 +191,22 @@ export default async function Page({
             {prefill.acceptedOn ? ` on ${prefill.acceptedOn}` : ""}
             {prefill.signerName ? `, signed by ${prefill.signerName}` : ""}.
           </p>
-          <p className="lx-note" style={{ margin: 0 }}>
+          <p className="lx-note">
             {prefill.totals.dueAtSigning} due at signing · {prefill.totals.dueAtFiling} due at filing · full project cost {prefill.totals.fullProjectCost}. These are
             the figures frozen when the client signed, not re-priced from the quote as it stands now. Every field below can be changed, and any change to a
             signed figure is flagged for the approver. The template is yours to choose; nothing here selects it.
           </p>
           {prefill.checks.length > 0 && (
-            <div className="lx-banner lx-banner-warn">
+            <Notice tone="warn">
               <b>Check before generating</b>
-              <ul className="lx-flags" style={{ color: "inherit" }}>
+              <ul className="lx-flags dl-flags">
                 {prefill.checks.map((check) => (
                   <li key={check}>{check}</li>
                 ))}
               </ul>
-            </div>
+            </Notice>
           )}
-          <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+          <div className="dl-links">
             {quotes.length > 1 && (
               <Link href={`${base}?quote=${LOE_QUOTE_PICK}`} className="lx-note">
                 Use a different signed quote

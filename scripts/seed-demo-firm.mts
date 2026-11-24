@@ -210,6 +210,7 @@ async function main() {
   ];
   const leads = must(
     await db
+      // live-guard: seeds a fresh demo firm; the inserts are new leads, none of them merged
       .from("crm_lead")
       .insert(
         leadSeeds.map((l) => ({

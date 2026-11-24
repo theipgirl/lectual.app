@@ -80,7 +80,7 @@ export type ConsultProposalDraft =
       clientName: string;
       clientEmail: string | null;
       title: string;
-      /** today + 10 calendar days (Rebecca's Sevetri precedent). */
+      /** today + 10 calendar days (Rebecca's Callum precedent). */
       expiresOn: string;
       /** Always null: the client's pay link is typed by a person; no default is copied. */
       payUrl: string | null;

@@ -4,7 +4,7 @@ import { acceptPublicProposal, readPublicProposal, type AcceptResult } from "@/l
 import { defaultSelection } from "@/lib/proposals/pricing";
 import type { Row } from "./public-db-double";
 import { SIGN_MESSAGES } from "@/lib/loe/client-words";
-import { sevetri } from "./fixture";
+import { callum } from "./fixture";
 import { TEST_DETAILS } from "../loe/full-letter-fixture";
 
 const mocks = vi.hoisted(() => ({
@@ -50,20 +50,20 @@ describe("a signed acceptance (content with an engagement letter)", () => {
     expect(call.args.p_agreement_sha256).toBe(createHash("sha256").update(b.text, "utf8").digest("hex"));
     expect(call.args.p_proposal_id).toBe("prop-2");
     expect(call.args.p_org_id).toBe("org-1");
-    expect(call.args.p_signer_name).toBe("Sevetri Wilson");
-    expect(call.args.p_entity_name).toBe("Prosperall Inc.");
+    expect(call.args.p_signer_name).toBe("Callum Ferreira");
+    expect(call.args.p_entity_name).toBe("Larkmoor Inc.");
     expect(call.args.p_address).toEqual({ street: "100 Example Street", street2: "Suite 4", city: "Miami", region: "FL", postal: "33101", country: "United States" });
     expect(call.args.p_ip).toBe("203.0.113.7");
     expect(String(call.args.p_user_agent)).toHaveLength(400);
     const snapshot = call.args.p_snapshot as { schema: number; agreement: { signer_name: string }; signing: { date_text: string } };
     expect(snapshot.schema).toBe(2);
-    expect(snapshot.agreement.signer_name).toBe("Sevetri Wilson");
+    expect(snapshot.agreement.signer_name).toBe("Callum Ferreira");
     expect(snapshot.signing.date_text).toBe("October 20, 2026");
     // No unsigned update of the proposal row is ever issued for a letter proposal.
     expect(w.calls.filter((c) => c.table === "client_proposal" && c.op === "update")).toHaveLength(0);
     if (r.ok) {
       // The zone is named (item 7): the firm is in New York and October is daylight time.
-      expect(r.signedLine).toBe("Signed October 20, 2026 at 11:00 AM EDT by Sevetri Wilson");
+      expect(r.signedLine).toBe("Signed October 20, 2026 at 11:00 AM EDT by Callum Ferreira");
       expect(r.signedDateText).toBe("October 20, 2026");
       expect(r.payUrl).toBe("https://app.lawmatics.com/forms/share/abc");
     }
@@ -160,12 +160,12 @@ describe("a signed acceptance (content with an engagement letter)", () => {
   it("markup and control characters in a typed name or address are stored cleaned", async () => {
     const w = world();
     const dirty = { ...TEST_DETAILS, street: "1 <script>alert(1)</script>\u0000Main\u0007St", city: "Mi\u2028ami" };
-    const b = await browserSigning(w.db, { details: dirty, typedName: "Sevetri <b>Wilson</b>\u0000" });
+    const b = await browserSigning(w.db, { details: dirty, typedName: "Callum <b>Ferreira</b>\u0000" });
     // Posted by hand with the values exactly as typed: the server cleans them itself and arrives at the page's fingerprint.
     const r = await acceptPublicProposal(TOKEN, b.selection, NOW, w.db, undefined, b.rawSigning);
     expect(r.ok).toBe(true);
     const args = w.rpcCalls[0].args;
-    expect(args.p_signer_name).toBe("Sevetri bWilson/b");
+    expect(args.p_signer_name).toBe("Callum bFerreira/b");
     expect(JSON.stringify(args.p_address)).not.toMatch(new RegExp("[<>\\u0000\\u0007\\u2028]"));
     expect((args.p_address as Record<string, string>).street).toBe("1 scriptalert(1)/script Main St");
     expect(String(args.p_agreement_text)).not.toMatch(new RegExp("<script>|\\u0000"));
@@ -175,8 +175,8 @@ describe("a signed acceptance (content with an engagement letter)", () => {
 
 describe("content without an engagement letter accepts exactly as before", () => {
   it("issues the plain conditional update, never the function, and ignores a signing", async () => {
-    const w = world({ content: sevetri() });
-    const r = await acceptPublicProposal(TOKEN, defaultSelection(sevetri()), NOW, w.db, undefined, { typedName: "X", agree: true });
+    const w = world({ content: callum() });
+    const r = await acceptPublicProposal(TOKEN, defaultSelection(callum()), NOW, w.db, undefined, { typedName: "X", agree: true });
     expect(r.ok).toBe(true);
     expect(w.rpcCalls).toHaveLength(0);
     const update = w.calls.find((c) => c.table === "client_proposal" && c.op === "update")!;
@@ -186,7 +186,7 @@ describe("content without an engagement letter accepts exactly as before", () =>
   });
 
   it("does not read the client's email for a proposal without a letter", async () => {
-    const w = world({ content: sevetri() });
+    const w = world({ content: callum() });
     await readPublicProposal(TOKEN, NOW, w.db);
     expect(w.calls.some((c) => c.columns === "client_email")).toBe(false);
   });

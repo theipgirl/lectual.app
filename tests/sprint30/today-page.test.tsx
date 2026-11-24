@@ -63,7 +63,10 @@ beforeEach(() => vi.resetModules());
 describe("Today header (A)", () => {
   it("starts with the h1, and repeats neither the firm name nor the date", async () => {
     const html = await renderToday({ metadata: { full_name: "Rebecca Pearl" } });
-    expect(html.indexOf("<h1")).toBe(html.indexOf("<div class=\"lx-page-head lx-page-head-list\"><div style=\"flex:1;min-width:260px\">") + "<div class=\"lx-page-head lx-page-head-list\"><div style=\"flex:1;min-width:260px\">".length);
+    // The shared PageHeader (design rollout): the h1 is the first thing in the header's title block.
+    const head = '<header class="lx-page-head lx-head"><div class="lx-head-title">';
+    expect(html.indexOf(head)).toBeGreaterThanOrEqual(0);
+    expect(html.indexOf("<h1")).toBe(html.indexOf(head) + head.length);
     expect(html).toContain("Good afternoon, Rebecca.");
     expect(html).not.toContain("Pearl Law Firm");
     expect(html).not.toMatch(/Tuesday|October 27/);
@@ -99,7 +102,7 @@ describe("Needs you: top three (C)", () => {
   it("seven items: three rows outside the details, 'See all 7' holding the other four in order", async () => {
     const items = [1, 2, 3, 4, 5, 6, 7].map((n) => item(n));
     const html = await renderToday({ items });
-    const [before, inside] = html.split('<details class="lx-needs-more">');
+    const [before, inside] = html.split('<details class="lx-needs-more td-more">');
     expect(before).toContain("Action 1");
     expect(before).toContain("Action 3");
     expect(before).not.toContain("Action 4");

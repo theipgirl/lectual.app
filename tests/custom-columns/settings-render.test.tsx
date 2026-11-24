@@ -1,0 +1,260 @@
+import { describe, expect, it, vi } from "vitest";
+import { renderToStaticMarkup } from "react-dom/server";
+import { ColumnsSettings } from "@/components/settings/ColumnsSettings";
+import { loadColumnsSettings } from "@/lib/custom-columns/settings-load";
+import * as W from "@/lib/ui/words";
+import { ARCHIVED, LIVE, OK, S, STAMP } from "./settings-fixtures";
+
+vi.mock("@/lib/custom-columns/actions", () => ({ createFieldAction: vi.fn(), updateFieldAction: vi.fn(), setCustomValueAction: vi.fn() }));
+
+const decode = (s: string) => s.replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, "&");
+const render = (state: Parameters<typeof ColumnsSettings>[0]["state"], initialConfirm?: string) => decode(renderToStaticMarkup(<ColumnsSettings state={state} initialConfirm={initialConfirm} />));
+const rows = (html: string) => [...html.matchAll(/data-column-row="([^"]+)"/g)].map((m) => m[1]);
+
+describe("Settings -> Columns: three states", () => {
+  it("F11: not switched on is the sentence, with no form and no alert", () => {
+    const html = render({ status: "not-set-up" });
+    expect(html).toContain(W.CUSTOM_COLUMNS_NOT_READY);
+    expect(html).not.toContain("<form");
+    expect(html).not.toContain('role="alert"');
+  });
+  it("couldn't load is an alert with no form", () => {
+    const html = render({ status: "unavailable" });
+    expect(html).toContain(`role="alert">${W.CANT_SHOW}`);
+    expect(html).not.toContain("<form");
+  });
+  it("ok with nothing live says so, and offers Add", () => {
+    const html = render({ status: "ok", live: [], archived: [], dropped: 0, use: { status: "ok", counts: {} } });
+    expect(html).toContain(W.COLUMNS_NONE);
+    expect(html).toContain('name="label"');
+    expect(html).toContain(W.columnsCount(0));
+  });
+});
+
+describe("P4: the one list and its controls", () => {
+  const html = render(OK);
+  it("the live columns in List order, then the archived ones in a closed details", () => {
+    expect(rows(html)).toEqual([S.fee, S.priority, S.review, S.old]);
+    expect(html).toMatch(/<details class="lx-card cs-card cs-archived"><summary class="cs-summary">Archived columns \(1\)<\/summary>/);
+    expect(html).toContain(W.columnsCount(3));
+  });
+  it("each row has its section word and kind word", () => {
+    expect(html).toContain("Both · Money");
+    expect(html).toContain("Trademarks · Choice");
+    expect(html).toContain("Contracts · Date");
+  });
+  it("Move up is disabled on the first row and Move down on the last; each posts only id, op and dir", () => {
+    const tag = (label: string) => new RegExp(`<button[^>]*aria-label="${label}"[^>]*>`).exec(html)?.[0] ?? "missing";
+    const up = (label: string) => tag(W.columnsMoveUp(label));
+    const down = (label: string) => tag(W.columnsMoveDown(label));
+    // Changed on purpose (Sprint 3 evaluation, item 1): the direction is a hidden field of each button's own form, not the button's name.
+    expect(up("Priority")).not.toContain("name=");
+    expect(down("Priority")).not.toContain("name=");
+    expect(up("Quoted fee")).toContain("disabled");
+    expect(up("Priority")).not.toContain("disabled");
+    expect(down("Review date")).toContain("disabled");
+    expect(down("Priority")).not.toContain("disabled");
+    const moveForms = [...html.matchAll(/<form class="cs-move-one"[^>]*>([\s\S]*?)<\/form>/g)].map((m) => m[1]);
+    expect(moveForms).toHaveLength(6);
+    for (const f of moveForms) expect([...f.matchAll(/name="(\w+)"/g)].map((m) => m[1]).sort()).toEqual(["dir", "id", "op"]);
+  });
+  /**
+   * What each Move form POSTS, worked out from the markup the way a browser builds the form data: every named control inside the form, plus
+   * the submitter's own name/value. `dropSubmitter` models React 19.2's `createFormDataWithSubmitter`, which loses a named submitter when the
+   * form holds an input named "id" (`form.id` is then that input). Either way each form must post exactly op, id and its own dir.
+   */
+  it("each Move button's form posts op, id and its own dir, even when the submitter's name is dropped (React 19.2)", () => {
+    const posted = (form: string, dropSubmitter: boolean) => {
+      const fields: [string, string][] = [];
+      for (const m of form.matchAll(/<input type="hidden" name="(\w+)" value="([^"]*)"\/?>/g)) fields.push([m[1], m[2]]);
+      const btn = /<button[^>]*>/.exec(form)![0];
+      const name = /name="(\w+)"/.exec(btn)?.[1];
+      const value = /value="([^"]*)"/.exec(btn)?.[1] ?? "";
+      if (name && !dropSubmitter) fields.push([name, value]);
+      return fields.sort();
+    };
+    const forms = [...html.matchAll(/<form class="cs-move-one" data-dir="(up|down)"[^>]*>([\s\S]*?)<\/form>/g)];
+    const forRow = forms.filter((m) => m[2].includes(`value="${S.priority}"`));
+    expect(forRow.map((m) => m[1])).toEqual(["up", "down"]);
+    for (const [, dir, form] of forRow) {
+      for (const drop of [false, true]) expect(posted(form, drop), `${dir} drop=${drop}`).toEqual([["dir", dir], ["id", S.priority], ["op", "move"]]);
+    }
+  });
+  it("Rename and Edit choices post the rendered updated_at; Edit choices only on a Choice column", () => {
+    expect((html.match(/name="op" value="rename"/g) ?? []).length).toBe(3);
+    expect((html.match(/name="op" value="options"/g) ?? []).length).toBe(1);
+    expect((html.match(new RegExp(`name="updatedAt" value="${STAMP.replace(/[.+]/g, "\\$&")}"`, "g")) ?? []).length).toBe(4);
+    expect(html).toContain(">High\nMedium\nLow</textarea>");
+  });
+  it("each choice's use count", () => {
+    expect(html).toContain(W.choiceUse("High", 3));
+    expect(html).toContain(W.choiceUse("Low", 1));
+    expect(html).toContain(W.choiceUse("Medium", 0));
+    expect(W.choiceUse("Low", 1)).toBe("Low: used on 1 record");
+  });
+  it("Archive on every live row, Restore on the archived one, no confirm on Restore", () => {
+    expect((html.match(new RegExp(`>${W.COLUMNS_ARCHIVE}<`, "g")) ?? []).length).toBe(3);
+    expect(html).toContain(`aria-label="${W.columnsRestoreLabel("Old flag")}"`);
+  });
+  it("Add a column: name, section, kind, choices with its hint", () => {
+    for (const n of ['name="label"', 'name="section"', 'name="kind"', 'name="choices"']) expect(html).toContain(n);
+    expect(html).toContain(W.COLUMNS_CHOICES_LABEL);
+    expect(html).toContain(W.COLUMNS_CHOICES_HINT);
+    for (const w of ["Trademarks", "Contracts", "Both", "Text", "Date", "Money", "Choice", "Person"]) expect(html).toContain(`>${w}</option>`);
+  });
+  it("outcome lines are polite live regions", () => {
+    expect(html).toContain('class="lx-note cs-outcome" aria-live="polite"');
+  });
+});
+
+describe("F7: the Archive question", () => {
+  it("asks the exact question before anything is written", () => {
+    const html = render(OK, S.priority);
+    expect(html).toContain(W.archiveQuestion("Priority"));
+    expect(W.archiveQuestion("Priority")).toBe("Archive Priority? It leaves the List; its values are kept.");
+  });
+});
+
+describe("F5: 40 live columns", () => {
+  it("replaces the Add form with the limit sentence", () => {
+    const live = Array.from({ length: 40 }, (_, i) => ({ ...LIVE[0], id: `00000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`, label: `Column ${i + 1}`, position: i }));
+    const html = render({ status: "ok", live, archived: [], dropped: 0, use: { status: "ok", counts: {} } });
+    expect(html).toContain(W.COLUMNS_AT_LIMIT);
+    expect(html).not.toContain('name="section"');
+  });
+});
+
+describe("F6 / R16: an unreadable use count keeps the page ok", () => {
+  it("the list and the forms, the one uncounted line, no per-choice counts", () => {
+    const html = render({ ...OK, use: { status: "unavailable" } });
+    expect(rows(html)).toHaveLength(4);
+    expect(html).toContain(W.COLUMNS_USE_UNCOUNTED);
+    expect(html).not.toContain("used on");
+    expect(html).toContain('name="choices"');
+  });
+});
+
+describe("N4: two Renames in a row in the same tab", () => {
+  it("the hidden stamp is the one rendered from the latest read", () => {
+    const first = render(OK);
+    const later = "2026-11-20T10:05:00.654321+00:00";
+    const second = render({ ...OK, live: OK.live.map((f) => (f.id === S.priority ? { ...f, label: "Urgency", updatedAt: later } : f)) });
+    expect(first).toContain(`value="${STAMP}"`);
+    expect(second).toContain(`name="updatedAt" value="${later}"`);
+    expect(second).toContain('defaultValue="Urgency"'.replace("defaultValue", "value"));
+  });
+});
+
+describe("V1: tokens only", () => {
+  it("no inline colour, only the shared classes", () => {
+    const html = render(OK);
+    expect(html).not.toMatch(/style="[^"]*colou?r/i);
+    expect(html).toContain("lx-card");
+    expect(html).toContain("lx-btn");
+  });
+});
+
+describe("the loader: three states, the database's order, archived kept apart, the count its own state", () => {
+  type Answer = { data: unknown; error: unknown };
+  /**
+   * A fake scoped client. Changed on purpose (Sprint 3 evaluation, item 4): live and archived columns are two reads, so the fake answers
+   * `crm_custom_field` by its `archived` filter (rows given as one list are split by their own flag, in the order given) and honours `range`.
+   * `fields` may also be a plain answer (an error, a non-list), returned to both reads.
+   */
+  const client = (fields: Answer, values: Answer = { data: [], error: null }) => {
+    const calls: string[][] = [];
+    return {
+      calls,
+      db: {
+        from(table: string) {
+          const chain: string[] = [table];
+          calls.push(chain);
+          let archived: boolean | null = null;
+          let range: [number, number] | null = null;
+          const q: Record<string, unknown> = {};
+          for (const m of ["select", "eq", "in", "not", "order", "range", "limit"])
+            q[m] = (...a: unknown[]) => {
+              chain.push(`${m}(${a.map((x) => JSON.stringify(x)).join(",")})`);
+              if (m === "eq" && a[0] === "archived") archived = a[1] as boolean;
+              if (m === "range") range = [a[0] as number, a[1] as number];
+              return q;
+            };
+          q.then = (res: (a: Answer) => unknown) => {
+            if (table !== "crm_custom_field") return Promise.resolve(values).then(res);
+            if (fields.error || !Array.isArray(fields.data) || archived === null) return Promise.resolve(fields).then(res);
+            let rows = (fields.data as { archived?: unknown }[]).filter((r) => (r.archived === true) === archived);
+            if (range) rows = rows.slice(range[0], range[1] + 1);
+            return Promise.resolve({ data: rows, error: null }).then(res);
+          };
+          return q;
+        },
+      },
+    };
+  };
+  const raw = (f: (typeof LIVE)[number]) => ({ id: f.id, section: f.section, label: f.label, kind: f.kind, options: f.options, position: f.position, archived: f.archived, updated_at: f.updatedAt });
+  it("ok, in the order returned (never re-sorted), a stored-impossible row dropped and counted", async () => {
+    const rowsIn = [raw(LIVE[2]), raw(ARCHIVED[0]), raw(LIVE[0]), { ...raw(LIVE[1]), label: " bad" }];
+    const c = client({ data: rowsIn, error: null }, { data: [{ field_id: S.priority, value_choice: "High" }], error: null });
+    const st = await loadColumnsSettings(c.db);
+    expect(st.status).toBe("ok");
+    if (st.status !== "ok") return;
+    expect(st.live.map((f) => f.label)).toEqual(["Review date", "Quoted fee"]);
+    expect(st.archived.map((f) => f.label)).toEqual(["Old flag"]);
+    expect(st.dropped).toBe(1);
+    expect(st.archivedMore).toBeUndefined();
+    const select = 'select("id, section, label, kind, options, position, archived, updated_at")';
+    expect(c.calls[0]).toEqual(["crm_custom_field", select, 'eq("archived",false)', 'order("position")', 'order("label")', 'order("id")', "limit(1000)"]);
+    expect(c.calls[1]).toEqual(["crm_custom_field", select, 'eq("archived",true)', 'order("position")', 'order("label")', 'order("id")', "range(0,200)"]);
+  });
+  it("not-set-up and unavailable", async () => {
+    expect(await loadColumnsSettings(client({ data: null, error: { code: "42P01" } }).db)).toEqual({ status: "not-set-up" });
+    expect(await loadColumnsSettings(client({ data: null, error: { code: "PGRST205" } }).db)).toEqual({ status: "not-set-up" });
+    expect(await loadColumnsSettings(client({ data: null, error: { code: "XX000" } }).db)).toEqual({ status: "unavailable" });
+    expect(await loadColumnsSettings(client({ data: "x", error: null }).db)).toEqual({ status: "unavailable" });
+    // 1,000 LIVE rows is a cut-short read (a firm has at most 40 live): still unavailable.
+    expect(await loadColumnsSettings(client({ data: Array.from({ length: 1000 }, () => ({ archived: false })), error: null }).db)).toEqual({ status: "unavailable" });
+  });
+  it("past 1,000 columns in all (archived ones piling up) the page still draws: the first 200 archived, and a note that there are more", async () => {
+    const live = [raw(LIVE[0]), raw(LIVE[1]), raw(LIVE[2])];
+    const archived = Array.from({ length: 1200 }, (_, i) => ({
+      ...raw(ARCHIVED[0]),
+      id: `00000000-0000-4000-8000-${String(100000000000 + i).padStart(12, "0")}`,
+      label: `Old ${i}`,
+      position: 100 + i,
+    }));
+    const c = client({ data: [...live, ...archived], error: null });
+    const st = await loadColumnsSettings(c.db);
+    expect(st.status).toBe("ok");
+    if (st.status !== "ok") return;
+    expect(st.live).toHaveLength(3);
+    expect(st.archived).toHaveLength(200);
+    expect(st.archived[0].label).toBe("Old 0");
+    expect(st.archivedMore).toBe(true);
+    // Use counts are read for the LIVE choice columns only, never for 1,200 archived ids.
+    const valueReads = c.calls.filter((ch) => ch[0] === "crm_custom_value");
+    expect(valueReads.length).toBeGreaterThan(0);
+    for (const ch of valueReads) {
+      expect(ch.join(" ")).toContain(S.priority);
+      expect(ch.join(" ")).not.toMatch(/8000-10000000/);
+    }
+    const html = render(st);
+    expect(html).toContain(W.archivedHeading(200));
+    expect(html).toContain(W.archivedShownNote(200));
+    expect(html).toContain("Showing the first 200 archived columns.");
+    expect(html).not.toContain('role="alert"');
+    expect(html.match(/data-column-row=/g)).toHaveLength(203);
+  });
+  it("exactly 200 archived: all listed, no note", async () => {
+    const archived = Array.from({ length: 200 }, (_, i) => ({ ...raw(ARCHIVED[0]), id: `00000000-0000-4000-8000-${String(200000000000 + i).padStart(12, "0")}`, label: `Gone ${i}` }));
+    const st = await loadColumnsSettings(client({ data: [raw(LIVE[0]), ...archived], error: null }).db);
+    expect(st).toMatchObject({ status: "ok" });
+    if (st.status !== "ok") return;
+    expect(st.archived).toHaveLength(200);
+    expect(st.archivedMore).toBeUndefined();
+    expect(render(st)).not.toContain("data-archived-more");
+  });
+  it("a failed count read leaves the page ok", async () => {
+    const st = await loadColumnsSettings(client({ data: [raw(LIVE[1])], error: null }, { data: null, error: { code: "XX000" } }).db);
+    expect(st).toMatchObject({ status: "ok", use: { status: "unavailable" } });
+  });
+});

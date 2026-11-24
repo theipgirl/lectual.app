@@ -13,14 +13,14 @@ export const LIST_CHIPS: readonly { key: SegmentKey; label: string }[] = [
   { key: "closed", label: "Closed" },
 ];
 
-/** "3. Filed" -> "Filed". The code is an ordering aid, not part of the stage's name. */
+/** "3. Filed" -> "Filed", "5b. Waiting" -> "Waiting", "oa. 4. Office Action" -> "Office Action". The code is an ordering aid, not part of the stage's name. */
 export function stageDisplayName(label: string): string {
-  return label.replace(/^\s*\d+\s*[.)]\s*/, "").trim() || label;
+  return label.replace(/^\s*(?:\d{1,3}[a-z]?\s*[.)]\s*|[a-z]{1,3}\s*[.)]\s+)+/i, "").trim() || label;
 }
 
 export function mattersSubtitle(view: "table" | "board"): string {
   return view === "board"
-    ? "Every open matter in its docket stage. Use Move on a card to change its stage."
+    ? "Every open matter in its docket stage. Open the menu on a card to move it to another stage."
     : "Every engaged matter, grouped by whose move it is. Longest in its stage first.";
 }
 
@@ -47,4 +47,6 @@ export function reviewHref(queueItemId: string): string {
   return `/dashboard/queue/${encodeURIComponent(queueItemId)}/`;
 }
 
+/** Fired (on window) when a board Move takes a card into another phase group; MovedOutNotice listens. */
+export const MOVED_GROUP_EVENT = "lx-matter-moved-group";
 export const MOVED_CARD_KEY = "lx_moved_matter";

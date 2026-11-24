@@ -2,7 +2,7 @@ import { vi } from "vitest";
 import type { ProposalRow } from "@/lib/proposals/types";
 import type { StepPayload } from "@/lib/proposals/paid";
 import { acceptedSnapshot, CONCIERGE } from "./accepted-fixture";
-import { sevetri } from "./fixture";
+import { callum } from "./fixture";
 import { APPROVALS_NOT_READY } from "@/lib/ui/words";
 
 /**
@@ -22,11 +22,11 @@ export function acceptedRow(over: Partial<ProposalRow> = {}, snapshot = accepted
     public_token: "t".repeat(43),
     lead_id: "lead-1",
     matter_id: "matter-1",
-    client_name: "Sevetri Wilson",
-    client_email: "sevetri@example.com",
+    client_name: "Callum Ferreira",
+    client_email: "callum@example.com",
     title: "Trademark Proposal",
     status: "accepted",
-    content: sevetri(),
+    content: callum(),
     expires_on: "2026-11-10",
     pay_url: "https://pay.example/x",
     source: "manual",
@@ -104,7 +104,7 @@ export async function setupFlow(opts: Opts = {}) {
   const queueItem = { draftId: "draft-1", queueItemId: "queue-1" };
   const generateTrademarkLoe = vi.fn(async () => {
     if (opts.generate === "flow-error") throw new DocumentFlowError(APPROVALS_NOT_READY);
-    if (opts.generate === "other-error") throw new Error("duplicate key value violates unique constraint for sevetri@example.com");
+    if (opts.generate === "other-error") throw new Error("duplicate key value violates unique constraint for callum@example.com");
     return queueItem;
   });
   const orgHasModule = vi.fn(async (m: string) => (opts.modules ?? ["document-center", "proposals"]).includes(m));

@@ -21,35 +21,30 @@ import {
 import { DraftEditor, StartDraftForm, StartFromVersionForm } from "./LetterForms";
 import type { LetterLogo } from "@/lib/loe/letter-logo";
 import { LetterPreview } from "./LetterPreview";
+import { EmptyState, Notice, PageHeader, Pill } from "@/components/ui";
+import { toneFor, type PillTone } from "@/lib/ui/tones";
+import { formatDay } from "@/lib/ui/dates";
+import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
 import "./loe.css";
 
-const PILL: Record<LetterVersion["status"], string> = { draft: "lx-pill lx-pill-warn", approved: "lx-pill lx-pill-ok", retired: "lx-pill lx-pill-mute" };
+const STATUS_TONE: Record<LetterVersion["status"], PillTone> = { draft: toneFor("needsPerson"), approved: toneFor("done"), retired: toneFor("neutral") };
 
-function whenText(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+function whenText(iso: string | null, tz: string): string {
+  return formatDay(iso, { tz }) ?? "";
 }
 
 function Head() {
-  return (
-    <div>
-      <div className="lx-label">Settings</div>
-      <h1 className="lx-h1">{ENGAGEMENT_LETTER_NAME}</h1>
-      <p className="lx-sub">{ENGAGEMENT_LETTER_SUB}</p>
-    </div>
-  );
+  return <PageHeader title={ENGAGEMENT_LETTER_NAME} sub={ENGAGEMENT_LETTER_SUB} />;
 }
 
-function Pill({ status }: { status: LetterVersion["status"] }) {
-  return <span className={PILL[status]}>{LETTER_STATUS_WORDS[status]}</span>;
+function StatusPill({ status }: { status: LetterVersion["status"] }) {
+  return <Pill tone={STATUS_TONE[status]}>{LETTER_STATUS_WORDS[status]}</Pill>;
 }
 
 function MergeFieldList() {
   return (
     <div className="loe-field">
-      <h3 className="lx-label" style={{ margin: 0 }}>
+      <h3 className="lx-label">
         {LETTER_FIELDS_HEADING}
       </h3>
       <ul className="loe-fields" aria-label={LETTER_FIELDS_HEADING}>
@@ -59,22 +54,22 @@ function MergeFieldList() {
           </li>
         ))}
       </ul>
-      <p className="lx-note" style={{ margin: 0 }}>
+      <p className="lx-note">
         {LETTER_FIELDS_NOTE}
       </p>
     </div>
   );
 }
 
-function VersionList({ versions }: { versions: LetterVersion[] }) {
+function VersionList({ versions, tz }: { versions: LetterVersion[]; tz: string }) {
   return (
     <ul className="loe-versions" aria-label="Versions">
       {versions.map((v) => (
         <li key={v.id} className="loe-version">
           <span className="loe-version-name">{`Version ${v.version}`}</span>
-          <Pill status={v.status} />
+          <StatusPill status={v.status} />
           <span className="loe-version-when">
-            {v.status === "approved" && v.approvedAt ? `Approved ${whenText(v.approvedAt)}` : `Updated ${whenText(v.updatedAt)}`}
+            {v.status === "approved" && v.approvedAt ? `Approved ${whenText(v.approvedAt, tz)}` : `Updated ${whenText(v.updatedAt, tz)}`}
           </span>
         </li>
       ))}
@@ -88,7 +83,9 @@ function KindSection({
   canEdit,
   canApprove,
   logo,
+  tz,
 }: {
+  tz: string;
   kind: LoeKindName;
   versions: LetterVersion[];
   canEdit: boolean;
@@ -104,21 +101,21 @@ function KindSection({
   if (versions.length === 0) {
     body = canEdit ? (
       <>
-        <p className="lx-note" style={{ margin: 0 }}>
+        <p className="lx-note">
           {LETTER_EMPTY_STATE}
         </p>
         <MergeFieldList />
         <StartDraftForm kind={kind} />
       </>
     ) : (
-      <p className="lx-note" style={{ margin: 0 }}>
+      <p className="lx-note">
         {LETTER_EMPTY_STATE}
       </p>
     );
   } else {
     body = (
       <>
-        <VersionList versions={versions} />
+        <VersionList versions={versions} tz={tz} />
         {draft && canEdit && (
           <>
             {problems.length > 0 && (
@@ -134,21 +131,21 @@ function KindSection({
         )}
         {draft && !canEdit && (
           <>
-            <h3 className="lx-label" style={{ margin: 0 }}>{`Draft, version ${draft.version}`}</h3>
+            <h3 className="lx-label">{`Draft, version ${draft.version}`}</h3>
             <pre className="loe-readonly">{draft.body}</pre>
           </>
         )}
         {draft && <LetterPreview body={draft.body} logo={logo} />}
         {!draft && approved && (
           <>
-            <h3 className="lx-label" style={{ margin: 0 }}>{`${approved.title}, version ${approved.version}`}</h3>
+            <h3 className="lx-label">{`${approved.title}, version ${approved.version}`}</h3>
             <pre className="loe-readonly">{approved.body}</pre>
             <LetterPreview body={approved.body} logo={logo} />
           </>
         )}
         {!draft && !approved && newest && (
           <>
-            <h3 className="lx-label" style={{ margin: 0 }}>{`${newest.title}, version ${newest.version}`}</h3>
+            <h3 className="lx-label">{`${newest.title}, version ${newest.version}`}</h3>
             <pre className="loe-readonly">{newest.body}</pre>
           </>
         )}
@@ -160,10 +157,10 @@ function KindSection({
   return (
     <section className="lx-card loe-kind" aria-labelledby={`loe-${kind}`}>
       <div className="loe-kind-head">
-        <h2 id={`loe-${kind}`} className="lx-h2" style={{ fontSize: 25, margin: 0 }}>
+        <h2 id={`loe-${kind}`} className="lx-h2">
           {LETTER_KIND_WORDS[kind]}
         </h2>
-        {approved && <Pill status="approved" />}
+        {approved && <StatusPill status="approved" />}
       </div>
       {body}
     </section>
@@ -175,16 +172,12 @@ function KindSection({
  * a missing table says it isn't switched on (no form), a failed read says it couldn't be loaded (never the
  * empty state), and only a read that worked shows versions or the start-a-draft form.
  */
-export function EngagementLetterSettings({ model, logo }: { model: LetterPageModel; logo?: LetterLogo | null }) {
+export function EngagementLetterSettings({ model, logo, tz = DEFAULT_TIME_ZONE }: { model: LetterPageModel; logo?: LetterLogo | null; /** The firm's time zone, for the dates. */ tz?: string }) {
   if (model.status === "not-set-up") {
     return (
       <div className="loe-page">
         <Head />
-        <div className="lx-card lx-empty-card">
-          <p className="lx-note" style={{ margin: 0 }}>
-            {notReadyYet("The engagement letter")}
-          </p>
-        </div>
+        <EmptyState>{notReadyYet("The engagement letter")}</EmptyState>
       </div>
     );
   }
@@ -192,9 +185,9 @@ export function EngagementLetterSettings({ model, logo }: { model: LetterPageMod
     return (
       <div className="loe-page">
         <Head />
-        <div role="alert" className="lx-banner lx-banner-risk">
+        <Notice tone="risk" role="alert">
           {LETTER_LOAD_FAILED}
-        </div>
+        </Notice>
       </div>
     );
   }
@@ -211,15 +204,15 @@ export function EngagementLetterSettings({ model, logo }: { model: LetterPageMod
     <div className="loe-page">
       <Head />
       {!canEdit && (
-        <p className="lx-note" style={{ margin: 0 }}>
+        <p className="lx-note">
           {LETTER_READ_ONLY_NOTE}
         </p>
       )}
-      <p className="lx-note" style={{ margin: 0 }} data-testid="approvers-line">
+      <p className="lx-note" data-testid="approvers-line">
         {approversLine}
       </p>
       {LOE_KIND_NAMES.map((kind) => (
-        <KindSection key={kind} kind={kind} versions={versionsOfKind(versions, kind)} canEdit={canEdit} canApprove={canApprove} logo={logo} />
+        <KindSection key={kind} kind={kind} versions={versionsOfKind(versions, kind)} canEdit={canEdit} canApprove={canApprove} logo={logo} tz={tz} />
       ))}
     </div>
   );

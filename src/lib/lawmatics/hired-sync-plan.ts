@@ -23,12 +23,14 @@
  * ./hired-sync.ts writes, conditional on the lead still being in its from-stage.
  */
 import { compareStageOrder } from "@/lib/pipeline/stage-order";
+import { isHiredStage, TM_HIRED_STAGE_LABEL } from "@/lib/matters/hired-stage";
 import { originAsMatterSource, type LeadOrigin } from "./lead-origin";
+import { keeperIn } from "@/lib/leads/live";
 
 /** Hired before this date came from the spreadsheet or were reconciled by hand. */
 export const HIRED_SYNC_CUTOFF = "2026-10-28";
 export const MAX_CREATES_PER_RUN = 50;
-export const TM_HIRED_STAGE_LABEL = "Signed LOE / Deposit Received";
+export { TM_HIRED_STAGE_LABEL };
 
 export type MatterType = "TM" | "CR" | "PATENT" | "LIT" | "BL";
 
@@ -62,7 +64,11 @@ export type PlanMatter = {
   /** The lead this matter belongs to; needed to repair a lead left behind by an earlier run. */
   lead_id?: string | null;
 };
-export type PlanLead = { id: string; email: string | null; lawmatics_id: string | null; current_stage_id?: string | null };
+/**
+ * `merged_into_id` (lectual 0107): a merged lead is never matched or moved itself. A Lawmatics id or email that only a
+ * merged lead holds is FOLLOWED to its keeper (src/lib/leads/live.ts `keeperIn`), so a matter links to the live lead.
+ */
+export type PlanLead = { id: string; email: string | null; lawmatics_id: string | null; current_stage_id?: string | null; merged_into_id?: string | null };
 export type PlanStage = { id: string; label: string };
 /** A lead-pipeline stage (`crm_stage`), as the lead move needs it. */
 export type LeadStageRef = { id: string; name: string; category: string; order_index: number | null };
@@ -224,8 +230,12 @@ export function planHiredSync(input: PlanInput): HiredSyncPlan {
   const target = wonTargetStage(leadStages);
   const stageById = new Map(leadStages.map((s) => [s.id, s]));
   const leadById = new Map(input.leads.map((l) => [l.id, l]));
-  const moveLead = (lawmaticsId: string, trigger: LeadMoveTrigger, leadId: string | null | undefined) => {
+  // A merged lead is read as its keeper; one that can't be resolved is no lead at all.
+  const live = (id: string | null | undefined): string | null => (id ? (leadById.has(id) ? keeperIn(id, leadById) : id) : null);
+  const moveLead = (lawmaticsId: string, trigger: LeadMoveTrigger, rawLeadId: string | null | undefined) => {
+    const leadId = live(rawLeadId);
     if (!target || !leadId) return;
+    if (leadMoves.some((m) => m.leadId === leadId)) return;
     const lead = leadById.get(leadId);
     const from = lead?.current_stage_id ? stageById.get(lead.current_stage_id) : undefined;
     if (!from || from.category !== "open") return; // already won / lost / nurture, or unknown: leave it
@@ -251,17 +261,18 @@ export function planHiredSync(input: PlanInput): HiredSyncPlan {
     owner: normalizeOwner(m.owner_name),
     titles: [normalizeTitle(m.title), normalizeTitle(m.mark_text)].filter(Boolean),
   }));
-  const stage = input.stages.find((s) => s.label === TM_HIRED_STAGE_LABEL) ?? null;
+  const stage = input.stages.find((s) => isHiredStage(s)) ?? null;
   const stageId = stage?.id ?? null;
 
   const leadFor = (p: HiredProspect): string | null => {
-    const byId = input.leads.filter((l) => l.lawmatics_id && l.lawmatics_id === p.lawmaticsId);
-    if (byId.length === 1) return byId[0].id;
+    const distinct = (rows: PlanLead[]) => [...new Set(rows.map((l) => live(l.id)))];
+    const byId = distinct(input.leads.filter((l) => l.lawmatics_id && l.lawmatics_id === p.lawmaticsId));
+    if (byId.length === 1) return byId[0];
     if (byId.length > 1) return null;
     const email = p.email?.trim().toLowerCase();
     if (!email) return null;
-    const byEmail = input.leads.filter((l) => l.email?.trim().toLowerCase() === email);
-    return byEmail.length === 1 ? byEmail[0].id : null;
+    const byEmail = distinct(input.leads.filter((l) => l.email?.trim().toLowerCase() === email));
+    return byEmail.length === 1 ? byEmail[0] : null;
   };
 
   const candidates = input.prospects

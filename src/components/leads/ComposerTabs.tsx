@@ -32,7 +32,7 @@ export function ComposerTabs({ text, voice }: { text: ReactNode; voice: ReactNod
 
   return (
     <div className="lx-composer" style={{ display: "grid", gap: 10 }}>
-      <div role="tablist" aria-label="Add to the timeline" className="lx-segs">
+      <div role="tablist" aria-label="Add to the timeline" className="vs-switch">
         {TABS.map((t) => (
           <button
             key={t.id}

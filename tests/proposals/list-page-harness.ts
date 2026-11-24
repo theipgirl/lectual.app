@@ -76,6 +76,7 @@ export const PACKAGES = [
 ];
 
 export async function renderListPage(search: { segment?: string; status?: string } = {}, opts: Opts = {}) {
+  vi.doMock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
   vi.doMock("@/app/dashboard/proposals/gate", () => ({ requireProposalsModule: vi.fn(async () => undefined) }));
   vi.doMock("@/lib/auth/current-role", () => ({ currentRole: vi.fn(async () => (opts.role === undefined ? "owner" : opts.role)) }));
   vi.doMock("@/lib/org/profile", () => ({ getFirmTimeZone: vi.fn(async () => "America/New_York") }));
@@ -121,7 +122,7 @@ export async function renderListPage(search: { segment?: string; status?: string
 export function segments(html: string): string[] {
   const nav = html.slice(html.indexOf('aria-label="Show"'));
   const end = nav.indexOf("</nav>");
-  return [...nav.slice(0, end).matchAll(/<a [^>]*><span>([^<]*)<\/span>(?:<span class="pq-count">(\d+|—)<\/span>)?<\/a>/g)].map((m) => (m[2] === undefined ? m[1] : `${m[1]}:${m[2]}`));
+  return [...nav.slice(0, end).matchAll(/<a [^>]*>([^<]*)(?:<span class="lp-chip-count">(\d+|—)<\/span>)?<\/a>/g)].map((m) => (m[2] === undefined ? m[1] : `${m[1]}:${m[2]}`));
 }
 
 /** The HTML of one table row, found by something in it. */

@@ -18,7 +18,7 @@ function item(over: Partial<ListRowInput> = {}): ListRowInput {
     id: "p1",
     family_id: "f1",
     version: 1,
-    client_name: "Sevetri Wilson",
+    client_name: "Callum Ferreira",
     title: "Trademark Proposal",
     status: "accepted",
     source: "manual",
@@ -28,7 +28,7 @@ function item(over: Partial<ListRowInput> = {}): ListRowInput {
     legal_total_cents: 495_000,
     gov_total_cents: 70_000,
     blocking_issue: null,
-    brands: ["Prosperall"],
+    brands: ["Larkmoor"],
     offered: [],
     class_count: 2,
     signed_package: "Concierge",
@@ -82,11 +82,11 @@ describe("the list's Accepted column", () => {
 describe("P4c: the firm notice and the Lawmatics note for a signed snapshot", () => {
   it("say it was signed, by whom and when, with no letter text, address, email or typed class words", () => {
     const snap = signedTrademark();
-    const headline = acceptanceHeadline({ clientName: "Sevetri Wilson", packageName: "Enhanced", legalTotalCents: snap.quote.legal_total_cents, signedBy: snap.agreement!.signer_name });
-    expect(headline).toContain("engagement letter signed by Sevetri Wilson");
-    const note = acceptanceNoteBody(snap, "Sevetri Wilson");
-    expect(note.body).toContain("Engagement letter signed by Sevetri Wilson on 2026-11-12T19:14:00.000Z (UTC).");
-    for (const never of ["100 Example Street", "Miami", "Dear ", "sevetri@example.com", "Gaming consoles", snap.agreement!.sha256, "Engagement letter\n"]) {
+    const headline = acceptanceHeadline({ clientName: "Callum Ferreira", packageName: "Enhanced", legalTotalCents: snap.quote.legal_total_cents, signedBy: snap.agreement!.signer_name });
+    expect(headline).toContain("engagement letter signed by Callum Ferreira");
+    const note = acceptanceNoteBody(snap, "Callum Ferreira");
+    expect(note.body).toContain("Engagement letter signed by Callum Ferreira on 2026-11-12T19:14:00.000Z (UTC).");
+    for (const never of ["100 Example Street", "Miami", "Dear ", "callum@example.com", "Gaming consoles", snap.agreement!.sha256, "Engagement letter\n"]) {
       expect(note.body, never).not.toContain(never);
       expect(headline, never).not.toContain(never);
     }
@@ -94,13 +94,13 @@ describe("P4c: the firm notice and the Lawmatics note for a signed snapshot", ()
   });
 
   it("the flat-fee note says it was signed and has no USPTO line", () => {
-    const note = acceptanceNoteBody(signedGeneral(), "Faithe Williams");
-    expect(note.body).toContain("Engagement letter signed by Faithe Williams");
+    const note = acceptanceNoteBody(signedGeneral(), "Imogen Pellegrino");
+    expect(note.body).toContain("Engagement letter signed by Imogen Pellegrino");
     expect(note.body).not.toMatch(/USPTO/);
   });
 
   it("an unsigned snapshot says nothing about a signing", () => {
-    expect(acceptanceNoteBody(acceptedSnapshot(), "Sevetri Wilson").body).not.toMatch(/signed/i);
+    expect(acceptanceNoteBody(acceptedSnapshot(), "Callum Ferreira").body).not.toMatch(/signed/i);
   });
 });
 

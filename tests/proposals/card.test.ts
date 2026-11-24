@@ -6,10 +6,10 @@ import { ProposalCard } from "@/components/proposal-editor/ProposalCard";
 import { defaultSelection, quoteProposal } from "@/lib/proposals/pricing";
 import { formatDollars } from "@/lib/proposal-editor/events";
 import type { ProposalContent, ProposalEventRow } from "@/lib/proposals/types";
-import { sevetri } from "./fixture";
+import { callum } from "./fixture";
 
 function brandWith(classCount: number, pricing: Partial<ProposalContent["pricing"]> = {}): ProposalContent {
-  const base = sevetri();
+  const base = callum();
   return {
     ...base,
     pricing: { ...base.pricing, package: "Concierge", included_classes: 3, per_class_cents: 82_500, ...pricing },
@@ -76,18 +76,18 @@ describe("coverage line", () => {
   });
 
   it("lists each brand's marks and never an International Class number", () => {
-    const card = buildProposalCard(row(sevetri()), []);
-    expect(card.brands.map((b) => b.name)).toEqual(["Prosperall", "Tech4PublicGood"]);
+    const card = buildProposalCard(row(callum()), []);
+    expect(card.brands.map((b) => b.name)).toEqual(["Larkmoor", "Open4Everyone"]);
     expect(card.brands[0].marks).toEqual(["Word mark", "Logo mark"]);
     expect(card.brands[0].classesHeard).toBe(2);
     expect(card.package).toBe("Concierge");
     expect(card.client).toBe("Ana Ruiz");
-    expect(card.company).toBe("Prosperall");
+    expect(card.company).toBe("Larkmoor");
   });
 });
 
 describe("the two fees", () => {
-  const content = sevetri();
+  const content = callum();
   const quote = quoteProposal(content, defaultSelection(content));
   const card = buildProposalCard(row(content), []);
 
@@ -119,7 +119,7 @@ describe("the two fees", () => {
 
 describe("receipts", () => {
   it("verified quotes are 'Heard on the call'; unverified ones are listed apart under 'check it'", () => {
-    const html = renderToStaticMarkup(createElement(ProposalCard, { card: buildProposalCard(row(sevetri()), [EVIDENCE]) }));
+    const html = renderToStaticMarkup(createElement(ProposalCard, { card: buildProposalCard(row(callum()), [EVIDENCE]) }));
     const heard = html.indexOf("Heard on the call");
     const check = html.indexOf("Not found word for word, check it");
     expect(heard).toBeGreaterThan(-1);
@@ -131,25 +131,25 @@ describe("receipts", () => {
   });
 
   it("a proposal with no agent event renders without receipts", () => {
-    const card = buildProposalCard(row(sevetri()), []);
+    const card = buildProposalCard(row(callum()), []);
     expect(card.receipts).toEqual({ status: "none" });
     const html = renderToStaticMarkup(createElement(ProposalCard, { card }));
     expect(html).not.toContain("Heard on the call");
     expect(html).not.toContain("couldn&#x27;t be loaded");
     // Another kind of event is not a receipt either.
-    expect(buildProposalCard(row(sevetri()), [event({ fields: ["title"] }, { actor: "staff" })]).receipts).toEqual({ status: "none" });
+    expect(buildProposalCard(row(callum()), [event({ fields: ["title"] }, { actor: "staff" })]).receipts).toEqual({ status: "none" });
   });
 
   it("a malformed evidence payload does not crash and reads as an empty list", () => {
     for (const evidence of ["nope", 42, null, [null, 3, { quote: 9 }, { quote: "  " }, { verified: true }]]) {
-      const card = buildProposalCard(row(sevetri()), [event({ source: "consult-proposal", evidence, notes: 5 })]);
+      const card = buildProposalCard(row(callum()), [event({ source: "consult-proposal", evidence, notes: 5 })]);
       expect(card.receipts).toMatchObject({ status: "ok", verified: [], unverified: [] });
       expect(() => renderToStaticMarkup(createElement(ProposalCard, { card }))).not.toThrow();
     }
   });
 
   it("a failed events read says receipts couldn't be loaded, not that there are none", () => {
-    const card = buildProposalCard(row(sevetri()), null);
+    const card = buildProposalCard(row(callum()), null);
     expect(card.receipts).toEqual({ status: "unavailable" });
     const html = renderToStaticMarkup(createElement(ProposalCard, { card }));
     expect(html).toContain("Receipts couldn&#x27;t be loaded");
@@ -158,7 +158,7 @@ describe("receipts", () => {
 
   it("caps a long list and says how many were left out", () => {
     const evidence = Array.from({ length: 30 }, (_, i) => ({ path: "p", quote: `quote ${i}`, verified: true }));
-    const card = buildProposalCard(row(sevetri()), [event({ source: "consult-proposal", evidence })]);
+    const card = buildProposalCard(row(callum()), [event({ source: "consult-proposal", evidence })]);
     expect(card.receipts).toMatchObject({ status: "ok", more: 18 });
   });
 });
@@ -174,7 +174,7 @@ describe("totality", () => {
 });
 
 describe("edited from a package (Sprint 6)", () => {
-  const edited = (basis: unknown) => buildProposalCard(row({ ...sevetri(), package_basis: basis } as unknown as ProposalContent), []);
+  const edited = (basis: unknown) => buildProposalCard(row({ ...callum(), package_basis: basis } as unknown as ProposalContent), []);
 
   it("shows 'Edited from <package>' and the changed fields when content.package_basis names some", () => {
     const card = edited({ name: "Enhanced", edited: ["price", "classes included"] });
@@ -186,11 +186,11 @@ describe("edited from a package (Sprint 6)", () => {
   });
 
   it("is absent when nothing was changed, or when the basis is missing or malformed", () => {
-    expect(buildProposalCard(row(sevetri()), []).editedFrom).toBeNull();
+    expect(buildProposalCard(row(callum()), []).editedFrom).toBeNull();
     expect(edited({ name: "Enhanced", edited: [] }).editedFrom).toBeNull();
     for (const junk of ["x", 4, null, [], { edited: ["price"] }, { name: "A", edited: "price" }, { name: "A", edited: [1, null, "  "] }]) {
       expect(edited(junk).editedFrom).toBeNull();
     }
-    expect(renderToStaticMarkup(createElement(ProposalCard, { card: buildProposalCard(row(sevetri()), []) }))).not.toContain("Edited from");
+    expect(renderToStaticMarkup(createElement(ProposalCard, { card: buildProposalCard(row(callum()), []) }))).not.toContain("Edited from");
   });
 });

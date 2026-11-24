@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { proposalDisplayStatus, parseDisplayFilter, proposalDisplayTone } from "@/lib/proposals/display-status";
 import { validateContent } from "@/lib/proposals/validate";
-import { sevetri } from "./fixture";
+import { callum } from "./fixture";
 import type { ProposalStatus } from "@/lib/proposals/types";
 
 const TODAY = "2026-10-20";
@@ -18,7 +18,7 @@ describe("proposalDisplayStatus", () => {
   });
 
   it("a draft with a blocking issue is Blocked, and the sub-label is the first issue's message", () => {
-    const issues = validateContent(sevetri(), { forApproval: true, title: "T", expires_on: null, pay_url: null, client_email: null }).filter((i) => i.level === "error");
+    const issues = validateContent(callum(), { forApproval: true, title: "T", expires_on: null, pay_url: null, client_email: null }).filter((i) => i.level === "error");
     expect(issues.length).toBeGreaterThan(0);
     const s = show("draft", null, issues.map((i) => i.message));
     expect(s).toMatchObject({ key: "blocked", label: "Blocked", sub: issues[0].message });

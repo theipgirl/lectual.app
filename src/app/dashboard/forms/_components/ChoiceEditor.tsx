@@ -1,5 +1,6 @@
 "use client";
 
+import { Icon } from "@/components/ui/Icon";
 import { CHOICE_LIMITS, moveItem, QUESTION_TYPES, TYPE_LABEL, withType, type ChoiceFields, type QuestionType } from "@/lib/intake-forms/choice";
 
 /**
@@ -23,7 +24,7 @@ export function QuestionTypeSelect({
 }) {
   return (
     <select
-      className="ifm-input ifm-q-type"
+      className="lx-input ifm-q-type"
       value={type}
       disabled={disabled}
       aria-label={`${label} type`}
@@ -58,7 +59,7 @@ export function OptionsEditor({
         {options.map((o, i) => (
           <li key={i} className="ifm-opt">
             <input
-              className="ifm-input"
+              className="lx-input"
               value={o}
               maxLength={CHOICE_LIMITS.option}
               disabled={disabled}
@@ -67,9 +68,7 @@ export function OptionsEditor({
               onChange={(e) => set(i, e.target.value)}
             />
             <button type="button" className="ifm-icon-btn" disabled={disabled || i === 0} aria-label={`Move ${label} option ${i + 1} up`} onClick={() => onChange(moveItem(options, i, -1))}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M6 15l6-6 6 6" />
-              </svg>
+              <Icon name="chevron-up" size={14} />
             </button>
             <button
               type="button"
@@ -78,14 +77,10 @@ export function OptionsEditor({
               aria-label={`Move ${label} option ${i + 1} down`}
               onClick={() => onChange(moveItem(options, i, 1))}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M6 9l6 6 6-6" />
-              </svg>
+              <Icon name="chevron-down" size={14} />
             </button>
             <button type="button" className="ifm-icon-btn" disabled={disabled} aria-label={`Remove ${label} option ${i + 1}`} onClick={() => onChange(options.filter((_, j) => j !== i))}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
-                <path d="M6 6l12 12M18 6L6 18" />
-              </svg>
+              <Icon name="close" size={14} />
             </button>
           </li>
         ))}

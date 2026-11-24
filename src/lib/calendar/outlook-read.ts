@@ -65,17 +65,27 @@ export async function listOutlookCalendarEvents(from: string, to: string): Promi
   }
 }
 
+/**
+ * Which stored consults a read covers: the Outlook sync's rows, or the Lawmatics daily sync's OWN rows (`lmsync:`
+ * external ids only; any other `source = 'lawmatics'` row is legacy and never read as a booked consult).
+ */
+export type ConsultSource = "outlook" | "lawmatics";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function bySource<Q extends { eq: (c: string, v: string) => any }>(query: Q, source: ConsultSource): Q {
+  const q = query.eq("source", source) as Q;
+  return source === "lawmatics" ? ((q as unknown as { like: (c: string, p: string) => Q }).like("external_id", "lmsync:%")) : q;
+}
+
 /** The earliest consult from now on that is linked to this lead. */
 export async function loadBookedConsult(
   leadId: string,
   now: Date = new Date(),
+  source: ConsultSource = "outlook",
 ): Promise<OutlookRead<{ event: OutlookCalendarEvent | null }>> {
   try {
     const supabase = await getScopedClient();
-    const { data, error } = await supabase
-      .from("crm_calendar_event")
-      .select(COLUMNS)
-      .eq("source", "outlook")
+    const { data, error } = await bySource(supabase.from("crm_calendar_event").select(COLUMNS), source)
       .eq("lead_id", leadId)
       .eq("is_consult", true)
       .gte("starts_at", now.toISOString())
@@ -101,16 +111,14 @@ export type TodayConsult = OutlookCalendarEvent & {
 export async function loadConsultsForToday(
   now: Date,
   timeZone: string,
+  source: ConsultSource = "outlook",
 ): Promise<OutlookRead<{ consults: TodayConsult[] }>> {
   try {
     const today = zonedParts(now.toISOString(), timeZone).date;
     const last = addDays(today, TODAY_CONSULT_DAYS);
     const supabase = await getScopedClient();
     // Padded a day each side; the firm-zone date below decides what is "today".
-    const { data, error } = await supabase
-      .from("crm_calendar_event")
-      .select(COLUMNS)
-      .eq("source", "outlook")
+    const { data, error } = await bySource(supabase.from("crm_calendar_event").select(COLUMNS), source)
       .eq("is_consult", true)
       .gte("starts_at", `${addDays(today, -1)}T00:00:00Z`)
       .lt("starts_at", `${addDays(last, 2)}T00:00:00Z`)
@@ -137,6 +145,7 @@ async function withLeadNames(events: OutlookCalendarEvent[]): Promise<TodayConsu
     try {
       const supabase = await getScopedClient();
       const { data, error } = await supabase
+        // live-guard: names the leads stored events point at; events move to the keeper in the merge
         .from("crm_lead")
         .select("id, first_name, last_name, business_name, email")
         .in("id", ids);

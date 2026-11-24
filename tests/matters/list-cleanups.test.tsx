@@ -32,6 +32,12 @@ describe("pure helpers", () => {
     expect(stageDisplayName("3. Filed")).toBe("Filed");
     expect(stageDisplayName("12) Preparing")).toBe("Preparing");
     expect(stageDisplayName("Filed")).toBe("Filed");
+    expect(stageDisplayName("5b. Waiting on Client Specimen")).toBe("Waiting on Client Specimen");
+    expect(stageDisplayName("oa. 4. Office Action Response")).toBe("Office Action Response");
+    expect(stageDisplayName("1. Signed LOE / Deposit Received")).toBe("Signed LOE / Deposit Received");
+    // A number code with no space after it is still a code, as before; a word ending in a dot with no space is not.
+    expect(stageDisplayName("3.Filed")).toBe("Filed");
+    expect(stageDisplayName("Pre.filing")).toBe("Pre.filing");
   });
   it("has exactly four chips", () => {
     expect(LIST_CHIPS.map((c) => c.label)).toEqual(["Open", "Needs your review", "Unassigned", "Closed"]);
@@ -62,7 +68,7 @@ async function render(opts: { queue: unknown; matters: Matter[]; view?: string; 
   vi.doMock("@/lib/members/directory", () => ({ listMemberDirectory: vi.fn(async () => []) }));
   vi.doMock("@/lib/queue/load", () => ({ loadActiveQueue: vi.fn(async () => opts.queue) }));
   vi.doMock("@/lib/org/modules", () => ({ orgHasModule: vi.fn(async () => false) }));
-  vi.doMock("@/lib/matters/stages", () => ({ listMatterStages: vi.fn(async () => [stage]) }));
+  vi.doMock("@/lib/matters/stages", () => ({ listMatterStages: vi.fn(async () => [stage]), loadMatterStages: vi.fn(async () => ({ status: "ok", stages: [stage] })) }));
   vi.doMock("@/lib/firm/session", () => ({ resolveFirmSession: vi.fn(async () => ({ kind: "ok", role: "attorney" })) }));
   vi.doMock("@/components/matters/MatterForms", () => ({ NewMatterForm: () => null }));
   vi.doMock("@/app/dashboard/matters/[id]/actions", () => ({ updateMatterStageAction: vi.fn() }));
@@ -90,14 +96,14 @@ describe("F5: Matters list", () => {
   });
 
   it("has an Open a matter header button, stage without a code, no Status column, In stage always, and a Review link", async () => {
-    const html = await render({ queue: ok, matters: [m({ status: "on_hold" })] });
+    const html = await render({ queue: ok, matters: [m({ status: "on_hold" })], view: "table" });
     expect(html).toContain("Open a matter</span>");
     expect(html).toContain('aria-label="Open a matter"');
     expect(html).toContain('id="open-matter"');
     expect(html).toContain(">Filed<");
     expect(html).not.toContain("3. Filed");
     expect(html).not.toContain("<th>Status</th>");
-    expect(html).toContain("<th>In stage</th>");
+    expect(html).toContain('<th class="num">In stage</th>');
     expect(html).toContain("On hold");
     expect(html).toMatch(/<a [^>]*href="\/dashboard\/queue\/q9\/?"[^>]*>Review<\/a>/);
     expect(html).toContain("2d");
@@ -105,9 +111,9 @@ describe("F5: Matters list", () => {
 
   it("only a stale matter gets the red pill", async () => {
     const fresh = await render({ queue: ok, matters: [m()] });
-    expect(fresh).not.toContain("lp-pill-risk");
+    expect(fresh).not.toContain("lx-pill-risk");
     const stale = await render({ queue: ok, matters: [m({ stage_entered_at: daysAgo(400) })] });
-    expect(stale).toContain("lp-pill lp-pill-num lp-pill-risk");
+    expect(stale).toContain("lx-pill lx-pill-risk lx-pill-num");
   });
 
   it("an unreachable queue uses the standard warning banner", async () => {
@@ -117,7 +123,9 @@ describe("F5: Matters list", () => {
   });
 
   it("the sub-line follows the view", async () => {
-    expect(await render({ queue: ok, matters: [m()] })).toContain(mattersSubtitle("table"));
+    // No view in the address is the Board; the explicit list value is the list.
+    expect(await render({ queue: ok, matters: [m()] })).toContain(mattersSubtitle("board"));
+    expect(await render({ queue: ok, matters: [m()], view: "table" })).toContain(mattersSubtitle("table"));
     expect(await render({ queue: ok, matters: [m()], view: "board" })).toContain(mattersSubtitle("board"));
   });
 });
@@ -133,15 +141,15 @@ describe("F6/P2: board cards", () => {
       <MatterBoard stages={stages} matters={[m()]} canMove reviewIds={new Set(["m1"])} reviewItems={new Map([["m1", "q9"]])} ownerName={() => null} />,
     );
     expect(html).toContain('id="matter-card-m1"');
-    expect(html).toContain(">Move</button>");
+    expect(html).toContain('aria-label="Move ');
     expect(html).not.toContain("<select");
-    expect(html).toContain(">None<");
+    expect(html).toContain("No matters here yet.");
     expect(html).toContain(">Filed<");
     expect(html).toMatch(/href="\/dashboard\/queue\/q9\/?"/);
     const noMove = renderToStaticMarkup(
       <MatterBoard stages={stages} matters={[m()]} canMove={false} reviewIds={new Set()} ownerName={() => null} />,
     );
-    expect(noMove).not.toContain(">Move<");
+    expect(noMove).not.toContain('aria-label="Move ');
   });
 
   it("the Move menu closes on Esc and outside click (shared Popover) and calls the existing stage action", () => {
@@ -149,7 +157,9 @@ describe("F6/P2: board cards", () => {
     expect(menu).toContain("updateMatterStageAction");
     expect(menu).toContain("Popover");
     const pop = readFileSync(path.join(root, "src/components/list-page/Popover.tsx"), "utf8");
-    expect(pop).toContain('"Escape"');
+    // Esc is decided by popoverClaimsKey (the menu claims it so a dialog around it stays open).
+    expect(pop).toContain("popoverClaimsKey");
+    expect(readFileSync(path.join(root, "src/lib/ui/dialog-keys.ts"), "utf8")).toMatch(/popoverClaimsKey[\s\S]*"Escape"/);
     expect(pop).toContain("mousedown");
   });
 });

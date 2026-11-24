@@ -43,6 +43,7 @@ export function fakeFollowupDb(
       };
       const matches = (r: Row, c: string, v: unknown) => {
         if (c.startsWith("in:")) return (v as unknown[]).includes(value(r, c.slice(3)));
+        if (c.startsWith("is:")) return v === null ? value(r, c.slice(3)) == null : value(r, c.slice(3)) === v;
         if (c.startsWith("ilike:")) {
           const want = String(v).replace(/\\(.)/g, "$1").toLowerCase();
           const got = value(r, c.slice(6));
@@ -69,6 +70,10 @@ export function fakeFollowupDb(
         },
         ilike(column: string, v: string) {
           call.filters.push([`ilike:${column}`, v]);
+          return q;
+        },
+        is(column: string, v: unknown) {
+          call.filters.push([`is:${column}`, v]);
           return q;
         },
         order() {

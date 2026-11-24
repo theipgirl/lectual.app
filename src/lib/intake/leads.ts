@@ -7,6 +7,7 @@ import { intakeStageIds } from "./scope";
 import { INTAKE_PRACTICE_AREA_FILTER } from "./counts";
 import { suggestedLane, type Lane } from "@/lib/leads/lane";
 import { isReferralSource, type ReferralSource } from "./referral-source";
+import { leadRead } from "@/lib/leads/live";
 
 /**
  * Server-side reads/writes for the intake dashboard (blueprint §7).
@@ -47,16 +48,17 @@ export async function listIntakeLeads(stages?: Stage[]): Promise<Lead[]> {
   if (stageIds.length === 0) return [];
 
   const supabase = await getScopedClient();
-  const { data, error } = await supabase
-    .from("crm_lead")
-    .select("*")
-    .in("current_stage_id", stageIds)
-    // Null practice_area is INCLUDED on purpose: sheet rows arrive before the
-    // importer stamps 'Trademark', and a lead with an unknown practice area
-    // silently vanishing from the Monday view is the failure this page exists
-    // to avoid.
-    .or(INTAKE_PRACTICE_AREA_FILTER)
-    .order("last_activity_at", { ascending: false, nullsFirst: false });
+  // A merged lead (lectual 0107) is never listed: src/lib/leads/live.ts.
+  const { data, error } = await leadRead(({ live }) =>
+    live(supabase.from("crm_lead").select("*"))
+      .in("current_stage_id", stageIds)
+      // Null practice_area is INCLUDED on purpose: sheet rows arrive before the
+      // importer stamps 'Trademark', and a lead with an unknown practice area
+      // silently vanishing from the Monday view is the failure this page exists
+      // to avoid.
+      .or(INTAKE_PRACTICE_AREA_FILTER)
+      .order("last_activity_at", { ascending: false, nullsFirst: false }),
+  );
   if (error) throw error;
   return data ?? [];
 }
@@ -89,6 +91,7 @@ export async function setLane(leadId: string, lane: Lane | null): Promise<Lead> 
   if (userError) throw userError;
 
   const { data: before, error: beforeError } = await supabase
+    // live-guard: setLane / setReferralSource read and write ONE lead by id; a merged lead's guard refusal is shown as LEAD_MERGED_WRITE
     .from("crm_lead")
     .select("lane, ai_summary")
     .eq("id", leadId)
@@ -97,12 +100,14 @@ export async function setLane(leadId: string, lane: Lane | null): Promise<Lead> 
   if (!before) throw new LeadWriteError("That lead no longer exists.");
   const from = before.lane ?? null;
   if (from === lane) {
+    // live-guard: setLane / setReferralSource read and write ONE lead by id; a merged lead's guard refusal is shown as LEAD_MERGED_WRITE
     const { data: unchanged, error } = await supabase.from("crm_lead").select("*").eq("id", leadId).single();
     if (error) throw error;
     return unchanged;
   }
 
   const { data, error } = await supabase
+    // live-guard: setLane / setReferralSource read and write ONE lead by id; a merged lead's guard refusal is shown as LEAD_MERGED_WRITE
     .from("crm_lead")
     .update({ lane, updated_at: new Date().toISOString() })
     .eq("id", leadId)
@@ -166,6 +171,7 @@ export async function setReferralSource(
   }
 
   const { data: before, error: beforeError } = await supabase
+    // live-guard: setLane / setReferralSource read and write ONE lead by id; a merged lead's guard refusal is shown as LEAD_MERGED_WRITE
     .from("crm_lead")
     .select("referral_source")
     .eq("id", leadId)
@@ -174,12 +180,14 @@ export async function setReferralSource(
   if (!before) throw new LeadWriteError("That lead no longer exists.");
   const from = before.referral_source ?? null;
   if (from === source) {
+    // live-guard: setLane / setReferralSource read and write ONE lead by id; a merged lead's guard refusal is shown as LEAD_MERGED_WRITE
     const { data: unchanged, error } = await supabase.from("crm_lead").select("*").eq("id", leadId).single();
     if (error) throw error;
     return unchanged;
   }
 
   const { data, error } = await supabase
+    // live-guard: setLane / setReferralSource read and write ONE lead by id; a merged lead's guard refusal is shown as LEAD_MERGED_WRITE
     .from("crm_lead")
     .update({ referral_source: source, updated_at: new Date().toISOString() })
     .eq("id", leadId)

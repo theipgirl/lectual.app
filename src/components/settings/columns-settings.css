@@ -1,0 +1,36 @@
+/* Settings -> Columns (Sprint 3). Tokens only; text at or above the type floor; rows stack and wrap on a phone. */
+.cs-note { margin: 0; }
+.cs-card { display: grid; gap: 12px; padding: 16px 20px; box-shadow: none; min-width: 0; }
+.cs-h { margin: 0; }
+.cs-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.cs-row { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px 16px; padding: 12px 0; border-top: 1px solid var(--line); min-width: 0; }
+.cs-row:first-child { border-top: 0; }
+.cs-facts { display: grid; gap: 2px; min-width: 0; flex: 1 1 220px; }
+.cs-label { font-size: var(--fs-3); font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
+.cs-meta, .cs-choices { font-size: var(--fs-2); overflow-wrap: anywhere; }
+.cs-acts { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; min-width: 0; max-width: 100%; }
+.cs-move { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+/* Move up / Move down: one form per button, laid out as if the buttons were siblings. */
+.cs-move-one { display: contents; }
+.cs-more { min-width: 0; max-width: 100%; }
+.cs-more > summary { list-style: none; cursor: pointer; }
+.cs-more > summary::-webkit-details-marker { display: none; }
+.cs-more[open] { flex-basis: 100%; }
+.cs-form { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: flex-end; margin-top: 8px; min-width: 0; }
+.cs-field { display: grid; gap: 4px; min-width: 0; flex: 1 1 180px; }
+.cs-field-wide { flex-basis: 100%; }
+.cs-textarea { height: auto; min-height: 72px; padding: 8px 10px; resize: vertical; line-height: 1.4; }
+.cs-form-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.cs-outcome { margin: 0; font-size: var(--fs-2); }
+.cs-outcome:empty { display: none; }
+.cs-use-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; flex-basis: 100%; }
+.cs-use { margin: 0; font-size: var(--fs-2); }
+.cs-archive { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; max-width: 100%; }
+.cs-archived > .cs-summary { cursor: pointer; font-size: var(--fs-3); font-weight: 600; color: var(--ink); }
+
+@media (max-width: 640px) {
+  .cs-card { padding: 14px 16px; }
+  .cs-row { flex-direction: column; }
+  .cs-acts { width: 100%; }
+  .cs-field { flex-basis: 100%; }
+}

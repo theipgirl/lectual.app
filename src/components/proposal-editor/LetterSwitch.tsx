@@ -15,6 +15,7 @@ import {
   LETTER_SWITCH_ON_NOTE,
   letterAttachedLabel,
 } from "@/lib/ui/words";
+import { Pill } from "@/components/ui/Pill";
 
 /**
  * The engagement letter switch. It is a plain checkbox INSIDE the editor's one form, so the page's unsaved-changes guard
@@ -56,7 +57,7 @@ export function LetterSwitch(props: {
       {on ? (
         <>
           <p className="pe-letter-version">
-            <span className="lx-pill lx-pill-ok">{letterAttachedLabel(props.version)}</span>
+            <Pill tone="ok">{letterAttachedLabel(props.version)}</Pill>
             {props.newerAvailable ? <span className="lx-note"> {LETTER_NEWER_VERSION_NOTE}</span> : null}
           </p>
           <PreviewBlock blocks={props.blocks} problems={props.problems} logo={props.logo} />

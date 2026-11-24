@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveViewAction } from "@/lib/account/view-actions";
 import { roleLabel } from "@/lib/auth/roles";
+import { Pill } from "@/components/ui/Pill";
 import type { ViewMenu } from "@/lib/views";
 import "./account-menu.css";
 import {
@@ -48,7 +49,7 @@ export function ViewSwitch({ menu, onDone }: { menu: ViewMenu; onDone?: () => vo
 
   return (
     <div role="group" aria-labelledby="lx-view-h" className="lx-am-menu">
-      <div id="lx-view-h" className="lx-am-eyebrow lx-am-sep">
+      <div id="lx-view-h" className="lx-label lx-am-eyebrow lx-am-sep">
         {VIEW_GROUP_NAME}
       </div>
       <button
@@ -60,11 +61,11 @@ export function ViewSwitch({ menu, onDone }: { menu: ViewMenu; onDone?: () => vo
         onClick={() => save("technician")}
       >
         <span>{TECHNICIAN_VIEW_NAME}</span>
-        {technicianOn ? <span className="lx-am-pill">{VIEW_CURRENT_PILL}</span> : <span className="lx-am-sub">{TECHNICIAN_VIEW_SUB}</span>}
+        {technicianOn ? <Pill tone="ox">{VIEW_CURRENT_PILL}</Pill> : <span className="lx-am-sub">{TECHNICIAN_VIEW_SUB}</span>}
       </button>
       {menu.previewRoles.length > 0 && (
         <>
-          <div id="lx-preview-h" className="lx-am-eyebrow lx-am-eyebrow--tight">
+          <div id="lx-preview-h" className="lx-label lx-am-eyebrow lx-am-eyebrow--tight">
             {PREVIEW_A_VIEW}
           </div>
           <div role="group" aria-labelledby="lx-preview-h" className="lx-am-chips">

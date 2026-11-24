@@ -36,7 +36,7 @@ export type NothingReason =
   | "unresolved"
   | "not-forward";
 
-export type TargetWhy = "won" | "lost" | "nurture" | "welcome-or-payment" | "current-stage";
+export type TargetWhy = "won" | "lost" | "nurture" | "welcome-or-payment" | "current-stage" | "lawmatics-consult";
 
 export type TargetResult =
   | { kind: "nothing"; reason: NothingReason }
@@ -71,6 +71,8 @@ export function targetStageFromSignals(
   let resolvedAny = false;
   for (const signal of signals) {
     if (signal.source === "calendar" && options.now !== undefined && Date.parse(signal.startsAt) < options.now) continue;
+    // A Lawmatics consult gives nothing at all for a lead outside an open stage (a came-back Lost, Won or Nurture lead).
+    if (isLawmaticsConsult(signal) && current.category !== "open") continue;
     const signalId = signalIdFor(signal);
     if (!signalId) continue;
     impliedAny = true;
@@ -85,8 +87,14 @@ export function targetStageFromSignals(
     return { kind: "nothing", reason: !impliedAny ? "implies-nothing" : resolvedAny ? "not-forward" : "unresolved" };
   }
 
+  // Furthest forward wins; on a tie a firm-side signal beats a Lawmatics consult (so when the same call is in Outlook and
+  // Lawmatics the Outlook signal acts and the Lawmatics key is recorded with it), then the newest evidence.
+  const lm = (c: Candidate) => (isLawmaticsConsult(c.signal) ? 1 : 0);
   const best = candidates.reduce((a, b) =>
-    b.stage.orderIndex > a.stage.orderIndex || (b.stage.orderIndex === a.stage.orderIndex && b.time > a.time) ? b : a,
+    b.stage.orderIndex > a.stage.orderIndex ||
+    (b.stage.orderIndex === a.stage.orderIndex && (lm(b) < lm(a) || (lm(b) === lm(a) && b.time > a.time)))
+      ? b
+      : a,
   );
 
   // The other forward signals this placement already accounts for (a held consult, an approved email, a sent proposal
@@ -98,6 +106,10 @@ export function targetStageFromSignals(
   return { kind: "move", stage: best.stage, signalId: best.signalId, signal: best.signal, covered };
 }
 
+function isLawmaticsConsult(signal: KeeperSignal): boolean {
+  return signal.source === "calendar" && signal.lawmatics === true;
+}
+
 /** Why this placement is only a suggestion, or null when the agent may make it itself. */
 function suggestionWhy(best: Candidate, current: StageOpt): TargetWhy | null {
   const { category } = best.stage;
@@ -107,5 +119,7 @@ function suggestionWhy(best: Candidate, current: StageOpt): TargetWhy | null {
   if (category !== "open") return "current-stage"; // an unknown category is never moved to
   if (SUGGEST_ONLY_SIGNALS.has(best.signalId)) return "welcome-or-payment";
   if (current.category === "lost" || current.category === "nurture") return "current-stage";
+  // A consult booked in Lawmatics may have been booked by the client: a card a person accepts, whatever the autonomy.
+  if (isLawmaticsConsult(best.signal)) return "lawmatics-consult";
   return null;
 }

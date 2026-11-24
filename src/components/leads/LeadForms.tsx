@@ -1,5 +1,6 @@
 "use client";
 
+import { stageDisplayName } from "@/lib/matters/list-view";
 import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createLeadAction, type CreateLeadState } from "@/app/dashboard/leads/actions";
@@ -16,6 +17,9 @@ import type { Proposal } from "@/lib/agents/proposals";
 import { FIELD_LABEL } from "@/lib/agents/proposals";
 // Pure module: the composer's four entry types, shared with the matter timeline composer.
 import { NOTE_KIND_OPTIONS } from "@/lib/pipeline/lead-input";
+import { SAVING, ADD_A_LEAD, ADD_TO_TIMELINE, OWNER_COLUMN, UNASSIGNED } from "@/lib/ui/words";
+import { Notice } from "@/components/ui/Notice";
+import { SavedNote } from "@/components/ui/SavedNote";
 
 function Err({ state }: { state: ActionState }) {
   return state.error ? (
@@ -65,14 +69,14 @@ export function NewLeadForm({ stages }: { stages: { id: string; name: string }[]
           <option value="">First stage</option>
           {stages.map((s) => (
             <option key={s.id} value={s.id}>
-              {s.name}
+              {stageDisplayName(s.name)}
             </option>
           ))}
         </select>
       </label>
       <div style={{ gridColumn: "1 / -1", display: "flex", gap: 10, alignItems: "center" }}>
         <button type="submit" className="lx-btn lx-btn-pri" disabled={pending}>
-          {pending ? "Adding…" : "Add lead"}
+          {pending ? SAVING : ADD_A_LEAD}
         </button>
         <Err state={state} />
       </div>
@@ -88,7 +92,7 @@ export function StageSelect({ leadId, stageId, stages }: { leadId: string; stage
       <select name="stageId" className="lx-input" defaultValue={stageId} aria-label="Stage" onChange={(e) => e.currentTarget.form?.requestSubmit()} disabled={pending}>
         {stages.map((s) => (
           <option key={s.id} value={s.id}>
-            {s.name}
+            {stageDisplayName(s.name)}
           </option>
         ))}
       </select>
@@ -102,9 +106,9 @@ export function AssignSelect({ leadId, assignedTo, members }: { leadId: string; 
   return (
     <form action={action} className="lx-inline-form">
       <input type="hidden" name="leadId" value={leadId} />
-      <select name="userId" className="lx-input" defaultValue={assignedTo ?? ""} aria-label="Owner" onChange={(e) => e.currentTarget.form?.requestSubmit()} disabled={pending}>
+      <select name="userId" className="lx-input" defaultValue={assignedTo ?? ""} aria-label={OWNER_COLUMN} onChange={(e) => e.currentTarget.form?.requestSubmit()} disabled={pending}>
         <option value="" disabled>
-          Unassigned
+          {UNASSIGNED}
         </option>
         {members.map((m) => (
           <option key={m.userId} value={m.userId}>
@@ -135,9 +139,9 @@ export function EditLeadForm(props: {
       <Field name="website" label="Website" defaultValue={v.website} error={fe.website} />
       <div style={{ gridColumn: "1 / -1", display: "flex", gap: 10, alignItems: "center" }}>
         <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
-          {pending ? "Saving…" : "Save details"}
+          {pending ? SAVING : "Save details"}
         </button>
-        {state.saved && <span className="lx-note" style={{ color: "var(--ok)" }}>Saved.</span>}
+        <SavedNote show={Boolean(state.saved)} />
         <Err state={state} />
       </div>
     </form>
@@ -154,7 +158,7 @@ export function NoteComposer({ leadId }: { leadId: string }) {
   return (
     <form action={action} style={{ display: "grid", gap: 8 }}>
       <input type="hidden" name="leadId" value={leadId} />
-      <div className="lx-segs" role="radiogroup" aria-label="Entry type">
+      <div className="vs-switch" role="radiogroup" aria-label="Entry type">
         {NOTE_KIND_OPTIONS.map(([k, label]) => (
           <label key={k} className={kind === k ? "on" : undefined}>
             <input type="radio" name="kind" value={k} checked={kind === k} onChange={() => setKind(k)} className="lx-sr" />
@@ -164,9 +168,9 @@ export function NoteComposer({ leadId }: { leadId: string }) {
       </div>
       {kind === "email_sent" && <input className="lx-input" name="subject" placeholder="Subject" />}
       <textarea id="lx-note-body" className="lx-input" name="body" rows={3} placeholder="What happened? Use @name to tag a teammate." />
-      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={pending}>
-          {pending ? "Saving…" : "Add to timeline"}
+          {pending ? SAVING : ADD_TO_TIMELINE}
         </button>
         <span className="lx-note">Records something that happened. Nothing is sent.</span>
       </div>
@@ -195,9 +199,9 @@ export function ProposalCard({ leadId, proposal, current, canWrite }: { leadId: 
         </label>
       ))}
       {proposal.legalQuestion && (
-        <p className="lx-banner lx-banner-mute" style={{ margin: 0 }}>
+        <Notice tone="mute">
           <b>Legal question for the attorney:</b> {proposal.legalQuestion}
-        </p>
+        </Notice>
       )}
       {canWrite && (
         <div style={{ display: "flex", gap: 8 }}>

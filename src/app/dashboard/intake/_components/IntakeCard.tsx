@@ -5,327 +5,189 @@ import type { Stage } from "@/lib/pipeline";
 import type { MemberIdentity } from "@/lib/members/directory";
 import type { IntakeRow } from "@/lib/intake/rows";
 import type { IntakeTime } from "@/lib/time";
-import type { ReferralSource } from "@/lib/intake";
 import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
 import { pendingFor } from "@/lib/intake/needs-rebecca";
 import TimeChip from "@/components/intake/TimeChip";
-import { LtnSuggestion } from "@/components/intake/LtnSuggestion";
-import {
-  initialsOf,
-  memberLabel,
-  nextStepFor,
-  stageCodeFor,
-  stageLabelFor,
-  touchStampFor,
-} from "@/lib/intake/views";
-import Popover, { PopoverItem } from "./Popover";
+import { stageLabelFor, touchStampFor } from "@/lib/intake/views";
+import { decisionOpen } from "@/lib/intake/stage-decision";
+import { needsStageTitle, showTimeChip } from "@/lib/intake/leads-view";
+import { temperaturePill } from "@/lib/intake/temperature-pill";
 import NeedsRebeccaBadge from "./NeedsRebeccaBadge";
+import AssistantChips from "./AssistantChips";
+import { assistantItems } from "@/lib/intake/assistant-column";
+import RowMenu from "./RowMenu";
+import { BLANK, LEADS_COMPARE_OPEN, LEADS_DUPLICATE, LEADS_MOVED_MARK, LEADS_MOVED_MARK_TITLE, LEADS_NEEDS_STAGE } from "@/lib/ui/words";
+import { MEANING_TONE } from "@/lib/ui/tones";
+import { duplicateTitle, type DuplicateOf } from "@/lib/intake/duplicates";
+import { leadLabel } from "@/lib/record-card/lead-label";
+import type { IntakeCardData } from "@/lib/record-card/intake-cards";
+import { NextStepLine } from "@/components/record-card/controls";
+import { SavedNote } from "@/components/ui/SavedNote";
+import { RECORD_CARD_SAVED, recordCardOpenLabel } from "@/lib/ui/words";
+import type { Lane } from "@/lib/leads/lane";
+import type { ReferralSource } from "@/lib/intake";
+import TemperatureCell from "./TemperatureCell";
 import SourceCell from "./SourceCell";
-import { temperatureLabel, temperatureTitle } from "@/lib/intake/effective-temperature";
-import { decisionOpen, decisionPillText, whyLine } from "@/lib/intake/stage-decision";
-import {
-  NEXT,
-  NEXT_HOT,
-  OWNER_CHIP,
-  OWNER_CHIP_NONE,
-  TEMP_PILL,
-  TOUCH_IN_SMALL,
-  TOUCH_OUT_SMALL,
-} from "./styles";
-
-const ellipsis: React.CSSProperties = {
-  minWidth: 0,
-  whiteSpace: "nowrap",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-};
+import OwnerCell from "./OwnerCell";
+import "@/components/record-card/record-card.css";
 
 /**
- * One lead on either board (canvas 10b / 10c).
- *
- * Draggable with the native HTML5 API — the lead id travels as `text/plain`,
- * the same contract `PipelineLeadCard` uses, so the two boards in this product
- * behave identically under the mouse.
- *
- * The ⋯ menu is NOT a duplicate of the drag: it is the only way a keyboard
- * gets a lead from one column to another, and it carries both moves (stage and
- * owner) on both boards so the answer to "how do I do this without a mouse"
- * doesn't depend on which grouping you happen to be looking at.
+ * One lead on either board. Draggable (the lead id travels as `text/plain`). The card is small on purpose: the name (two
+ * lines, never cut mid-word), "business · source" on one line, ONE temperature pill, the last touch date, and a "…" menu
+ * that carries the stage move and the owner (the keyboard route for both drags) and the time actions. A lead imported
+ * from Lawmatics whose stage nobody chose has one small "Needs a stage" marker (the Lawmatics stage is its title).
+ * The checkbox exists only while the board is in select mode.
  */
 export default function IntakeCard({
   row,
-  variant,
   stages,
   members,
-  now,
   pending,
   error,
   time,
   pendingApprovals,
   onMoveStage,
   onAssign,
-  onSetSource,
+  selecting = false,
   selected = false,
   onToggleSelect,
+  duplicate,
+  movedOut = false,
+  now,
+  timeZone,
+  onCompare,
+  card,
+  openHref,
+  saved = false,
+  onSetLane,
+  onSetSource,
 }: {
   row: IntakeRow;
-  /** 10b shows the owner chip; 10c shows the next step and the stage pill. */
-  variant: "stage" | "owner";
   stages: Stage[];
   members: MemberIdentity[];
-  now: Date;
   pending: boolean;
   error?: string;
-  /** This week's time per lead, or null when that read failed (§13.1). */
   time: IntakeTime | null;
-  /** Absent = nothing to show; see needs-rebecca.ts for the three states. */
   pendingApprovals?: LeadPendingApprovals;
   onMoveStage: (leadId: string, stageId: string) => void;
   onAssign: (leadId: string, userId: string | null) => void;
-  onSetSource: (leadId: string, source: ReferralSource | null) => void;
-  /** Ticked for the bulk "Move to..." bar. Only drawn when `onToggleSelect` is given. */
+  selecting?: boolean;
   selected?: boolean;
   onToggleSelect?: (leadId: string) => void;
+  duplicate?: DuplicateOf;
+  movedOut?: boolean;
+  now: Date;
+  timeZone?: string;
+  onCompare?: (leadId: string, otherId: string, trigger: HTMLElement) => void;
+  /** Sprint 10: what this role may do on the card, and the card's open link and lines. Absent: the plain card, as before. */
+  card?: IntakeCardData;
+  /** The opened-card address built on the client from the page's current address (overrides the server's, which is from the address the page loaded with). */
+  openHref?: string;
+  /** The action's own `{ ok: true }` just landed: a quiet "Saved". */
+  saved?: boolean;
+  onSetLane?: (leadId: string, lane: Lane | null) => void;
+  onSetSource?: (leadId: string, source: ReferralSource | null) => void;
 }) {
   const lead = row.lead;
-  const name = `${lead.first_name} ${lead.last_name}`.trim() || lead.email;
-  const mark = lead.mark_text?.trim() || lead.business_name?.trim() || "—";
-  const touch = touchStampFor(row);
-  const step = nextStepFor(row, now);
-  const temperature = row.temperature;
-  const ownerName = row.owner ? memberLabel(row.owner) : null;
-  const pendingDrafts = pendingFor(pendingApprovals, lead.id);
-  const why = whyLine({ agentMove: row.agentMove, decision: row.decision, currentStageId: lead.current_stage_id });
-  const openDecision = decisionOpen(row.decision, lead.current_stage_id) ? row.decision : null;
-
-  const menu = (
-    <Popover
-      label={`Move ${name}`}
-      align="right"
-      width={210}
-      trigger={({ onClick, ref, ...aria }) => (
-        <button
-          {...aria}
-          ref={ref}
-          type="button"
-          onClick={onClick}
-          className="intake-mono"
-          style={{
-            border: "1px solid var(--line)",
-            background: "var(--surface)",
-            color: "var(--mute)",
-            borderRadius: 5,
-            fontSize: "var(--lp-meta, 13px)",
-            lineHeight: 1,
-            padding: "4px 7px",
-            cursor: "pointer",
-          }}
-        >
-          ⋯
-        </button>
-      )}
-    >
-      {(close) => (
-        <>
-          <span className="intake-eyebrow" style={{ padding: "4px 8px" }}>
-            Move to stage
-          </span>
-          {stages.map((stage) => (
-            <PopoverItem
-              key={stage.id}
-              checked={lead.current_stage_id === stage.id}
-              onSelect={() => {
-                close();
-                if (lead.current_stage_id !== stage.id) onMoveStage(lead.id, stage.id);
-              }}
-            >
-              {stageCodeFor(stage)} · {stageLabelFor(stage)}
-            </PopoverItem>
-          ))}
-          <span className="intake-eyebrow" style={{ padding: "8px 8px 4px" }}>
-            Assign to
-          </span>
-          <PopoverItem
-            muted
-            checked={lead.assigned_to == null}
-            onSelect={() => {
-              close();
-              onAssign(lead.id, null);
-            }}
-          >
-            Unassigned
-          </PopoverItem>
-          {members.map((member) => (
-            <PopoverItem
-              key={member.userId}
-              checked={lead.assigned_to === member.userId}
-              onSelect={() => {
-                close();
-                onAssign(lead.id, member.userId);
-              }}
-            >
-              {memberLabel(member)}
-            </PopoverItem>
-          ))}
-        </>
-      )}
-    </Popover>
-  );
+  // The PERSON's name first; the business and the mark are the sub-line, and the company stands in only with no person's name.
+  const label = leadLabel(lead);
+  const name = label.name;
+  const source = lead.referral_source?.trim() || "";
+  const line = card ? (label.sub ?? "") : [label.sub, source].filter(Boolean).join(" · ");
+  const touch = touchStampFor(row, { now, timeZone });
+  const pill = temperaturePill(row.temperature);
+  const drafts = pendingFor(pendingApprovals, lead.id, row.stage);
+  const decision = decisionOpen(row.decision, lead.current_stage_id) ? row.decision : null;
 
   return (
-    <div
+    <li
       data-lead-id={lead.id}
-      className={`lp-board-card${selected ? " intake-card-selected" : ""}`}
+      className="lx-board-card ix-card"
+      data-tone={touch.waitingOnUs ? MEANING_TONE.needsPerson : undefined}
+      data-selected={selected ? "" : undefined}
       draggable
       onDragStart={(event) => event.dataTransfer.setData("text/plain", lead.id)}
-      style={{
-        cursor: "grab",
-        opacity: pending ? 0.55 : 1,
-      }}
+      data-pending={pending ? "" : undefined}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-        {onToggleSelect && (
-          <input
-            type="checkbox"
-            className="intake-select"
-            aria-label={`Select ${name}`}
-            checked={selected}
-            onChange={() => onToggleSelect(lead.id)}
-            // A tick is not a drag: the card is draggable, the box must not start one.
-            draggable={false}
-          />
+      <div className="lx-board-card-top ix-card-top">
+        {selecting && onToggleSelect && (
+          <input type="checkbox" className="intake-select" aria-label={`Select ${name}`} checked={selected} onChange={() => onToggleSelect(lead.id)} draggable={false} />
         )}
-        <Link
-          href={`/dashboard/leads/${lead.id}`}
-          style={{
-            ...ellipsis,
-            fontSize: 14,
-            fontWeight: 500,
-            lineHeight: 1.35,
-            color: touch.waitingOnUs ? "var(--burg)" : "var(--ink)",
-          }}
-        >
-          {name}
-        </Link>
+        <span className="lx-board-card-title">
+          <Link href={openHref ?? card?.openHref ?? `/dashboard/leads/${lead.id}`} scroll={card ? false : undefined} data-card-open={card ? "" : undefined} aria-label={card ? recordCardOpenLabel(name) : undefined} className={`${selecting ? "" : "lx-rowlink "}ix-card-name`} title={name} data-in={touch.waitingOnUs ? "" : undefined}>
+            {name}
+          </Link>
+        </span>
       </div>
-
-      <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-        <div style={{ ...ellipsis, fontSize: "var(--lp-meta, 13px)", lineHeight: 1.4, color: "var(--mute)", flex: 1 }}>
-          {mark}
-        </div>
-        <SourceCell
-          leadName={name}
-          source={lead.referral_source}
-          detail={lead.referral_detail}
-          pending={pending}
-          compact
-          onSet={(source) => onSetSource(lead.id, source)}
-        />
-      </div>
-
-      {pendingDrafts.length > 0 && (
-        <div>
-          <NeedsRebeccaBadge pending={pendingDrafts} />
-        </div>
-      )}
-
-      {/* Why the card is in this column, in one line; nothing at all when nothing says. A Stage Keeper move reads here
-          ("Moved automatically · consult held Oct 23", its evidence as the tooltip); the table keeps the chip. */}
-      {why && (
-        <div
-          className="intake-why"
-          data-why={why.kind}
-          data-agent-move={why.kind === "agent" ? row.agentMove?.activityId : undefined}
-          title={why.kind === "agent" ? row.agentMove?.tooltip : why.text}
-        >
-          {why.text}
-        </div>
-      )}
-      {openDecision && (
-        <div style={{ minWidth: 0 }}>
-          <span className="intake-decision-pill" data-needs-decision title="Nobody has chosen this person's stage yet. Move the card, or let automatic moves or Reconcile place it from evidence.">
-            {decisionPillText(openDecision)}
-          </span>
-        </div>
-      )}
-
-      {row.temperature.suggestion && (
-        <div style={ellipsis}>
-          <LtnSuggestion suggestion={row.temperature.suggestion} leadId={lead.id} />
+      <span className="lx-board-card-meta" title={line || undefined}>
+        {line || BLANK}
+      </span>
+      {(card || pill || drafts.length > 0 || decision || assistantItems(row).length > 0 || duplicate || movedOut) && (
+        <div className="ix-card-pills">
+          {card ? (
+            <TemperatureCell leadName={name} temperature={row.temperature} pending={pending} canEdit={card.edits.temperature} onSet={(lane) => onSetLane?.(lead.id, lane)} />
+          ) : (
+            pill && (
+              <span className="ix-temp" data-tone={pill.tone} data-suggested={pill.suggested ? "" : undefined} title={pill.title} aria-label={pill.ariaLabel}>
+                {pill.text}
+              </span>
+            )
+          )}
+          {card?.approvals ? (
+            card.approvals.href ? (
+              <Link href={card.approvals.href === card.openHref && openHref ? openHref : card.approvals.href} className="lx-pill lx-pill-warn lx-pill-wrap rc-attn">
+                {card.approvals.text}
+              </Link>
+            ) : (
+              <span className="lx-pill lx-pill-mute">{card.approvals.text}</span>
+            )
+          ) : (
+            !card && <NeedsRebeccaBadge pending={drafts} />
+          )}
+          {decision && (
+            <span className="lx-pill lx-pill-warn lx-pill-wrap" data-needs-decision title={needsStageTitle(decision)}>
+              {LEADS_NEEDS_STAGE}
+            </span>
+          )}
+          <AssistantChips row={row} />
+          {duplicate && (
+            <button type="button" className="lx-pill lx-pill-warn lx-pill-wrap ix-pill-btn" data-duplicate aria-haspopup="dialog" aria-label={LEADS_COMPARE_OPEN(name)} title={duplicateTitle(duplicate)} onClick={(event) => onCompare?.(lead.id, duplicate.leadId, event.currentTarget)}>
+              {LEADS_DUPLICATE}
+            </button>
+          )}
+          {movedOut && (
+            <span className="lx-pill lx-pill-mute" data-moved title={LEADS_MOVED_MARK_TITLE}>
+              {LEADS_MOVED_MARK}
+            </span>
+          )}
         </div>
       )}
-
-      {/* One temperature line. A person's reads as a fact, in its own colour; a
-          derived one reads as a suggestion, in words; with neither, "Not rated".
-          The reason is the tooltip. */}
-      <div
-        style={{
-          ...ellipsis,
-          fontSize: "var(--lp-meta, 13px)",
-          lineHeight: 1.4,
-          ...(temperature.source === "person" && temperature.value
-            ? { color: TEMP_PILL[temperature.value].color, fontWeight: 500 }
-            : { color: "var(--mute)", fontStyle: "italic" }),
-        }}
-        title={temperatureTitle(temperature)}
-      >
-        {temperatureLabel(temperature)}
-      </div>
-
-      {variant === "owner" && (
-        <div style={{ ...(step.urgent ? NEXT_HOT : NEXT), textWrap: "pretty" }}>
-          {step.text}
+      {card && (
+        <div className="rc-bottom" data-card-bottom>
+          <div className="rc-bottom-row">
+            <SourceCell leadName={name} source={lead.referral_source} detail={lead.referral_detail} pending={pending} compact canEdit={card.edits.source} onSet={(next) => onSetSource?.(lead.id, next)} />
+            <OwnerCell leadName={name} owner={row.owner} assignedTo={lead.assigned_to} members={members} pending={pending} canEdit={card.edits.owner} onAssign={(userId) => onAssign(lead.id, userId)} />
+            <SavedNote show={saved}>{RECORD_CARD_SAVED}</SavedNote>
+          </div>
+          <NextStepLine kind="lead" id={lead.id} line={card.nextStep} dueIso={card.dueIso} text={card.bottom.nextStep} />
+          <span title={touch.title}>{card.bottom.lastActivity}</span>
         </div>
       )}
-
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        {variant === "owner" ? (
-          <span
-            className={`lp-pill lp-pill-wrap${row.stage ? "" : " lp-pill-warn"}`}
-          >
-            {stageCodeFor(row.stage)} · {stageLabelFor(row.stage)}
-          </span>
-        ) : (
-          <span
-            style={{ ...(ownerName ? OWNER_CHIP : OWNER_CHIP_NONE), ...ellipsis, display: "inline-block" }}
-            title={ownerName ?? "Nobody owns the next response yet"}
-          >
-            {row.owner ? initialsOf(row.owner) : "—"}
-          </span>
+      <div className="lx-board-card-foot ix-card-foot">
+        {!card && <span className="ix-touch" data-in={touch.waitingOnUs ? "" : undefined} data-touch={touch.state} title={touch.title}>
+          {touch.text}
+        </span>}
+        {showTimeChip(time?.byLeadId[lead.id], time?.running ?? null, lead.id, time === null) && (
+          <TimeChip leadId={lead.id} leadName={name} summary={time?.byLeadId[lead.id]} unavailable={time === null} running={time?.running ?? null} members={members} compact />
         )}
-        <span style={{ flex: 1 }} />
-        <span style={touch.waitingOnUs ? TOUCH_IN_SMALL : TOUCH_OUT_SMALL}>{touch.text}</span>
-        {/* §13.1 — one slot, both boards: this footer row is the same on the
-            by-stage and by-owner variants, so the ⏱ lands in the same place
-            on either card. */}
-        <TimeChip
-          leadId={lead.id}
-          leadName={name}
-          summary={time?.byLeadId[lead.id]}
-          unavailable={time === null}
-          running={time?.running ?? null}
-          members={members}
-          compact
-        />
-        {menu}
+        <RowMenu card={card} openHref={openHref} lead={lead} name={name} stages={stages} members={members} running={time?.running ?? null} onMoveStage={onMoveStage} onAssign={onAssign} />
       </div>
-
+      <span className="lx-sr">{row.stage ? stageLabelFor(row.stage) : ""}</span>
       {error && (
-        <p
-          role="status"
-          style={{
-            margin: 0,
-            fontSize: "var(--lp-meta, 13px)",
-            lineHeight: 1.4,
-            color: "var(--crit)",
-            background: "var(--critbg)",
-            borderRadius: 6,
-            padding: "5px 7px",
-          }}
-        >
+        <p role="status" className="ix-err">
           {error}
         </p>
       )}
-    </div>
+    </li>
   );
 }
