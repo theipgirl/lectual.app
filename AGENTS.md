@@ -2646,6 +2646,9 @@ pull and packages PDF are S2 and are NOT built (the brief says "come in the next
   - **Candidates, again.** A lead in the consult stage with ANY future consult event (any source, however far off) is prepped by that consult, never by its stage. The client-address exclusion covers the old emails of merged leads and any
     email-shaped text in the intake answers or Lawmatics fields. An empty or scrubbed-away value in the brief reads "not recorded", never "null". The html keeps the text's line order (a list stays where it appears).
   - **Round 3.** (1) A person's re-run marker (`<base>:rerun:<ms>`) also marks its BASE key as prepped (`readMarkers`), so a sweep after a re-run builds no second BRIEFING, client draft or booked email; the base still gets its
+  - **Timeout then 409.** A `failed` send record whose request got no answer carries `no_response: true` (`SendRecord.noResponse`). A later
+    `duplicate` (409) on that slot then WINS the fold and the slot is done: Resend had accepted the first request, and retrying past its 24 h key
+    memory would deliver a second email. A `failed` row with an HTTP status is still never covered by a later `duplicate`.
     24h and 1h reminders planned under the base key, which a re-run never schedules (works for event and stage keys). (2) In the fold a `duplicate` never covers a `failed` row of ours: `failed` then `duplicate` with no Resend id is
     retried (a persistent 409 is therefore re-posted each sweep; the slot stays owed until a send lands). (4) The hook's `armed` flag resets in a `finally` inside the callback and when `after()` throws, and an armed hook whose
     callback never ran is re-armed after 60 s. (5) The overflow of a batch (`over`) rides on the scope (`RunScope.over`) into the run's summary ("N more leads entered the stage in the same request and are left for the next sweep"), and is

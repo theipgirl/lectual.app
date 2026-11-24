@@ -201,4 +201,15 @@ describe("review fixes: folding and planning", () => {
     // but a real sent row with an id keeps covering a later failed and duplicate
     expect(foldSendRecords([rec({ status: "sent", resendId: "re_1", at: T(0) }), rec({ status: "failed", resendId: null, at: T(1) }), rec({ status: "duplicate", resendId: null, at: T(2) })]).get(slot)?.status).toBe("sent");
   });
+
+  it("a failure that got no answer (timeout) followed by a 409 is done: Resend had accepted it, so it is never retried", () => {
+    const slot = recordSlot(KEY, "booked");
+    const folded = foldSendRecords([rec({ status: "failed", resendId: null, noResponse: true, at: T(0) }), rec({ status: "duplicate", resendId: null, at: T(1) })]);
+    expect(folded.get(slot)?.status).toBe("duplicate");
+    expect(plan(50, { existing: folded, madeNow: false }).actions.some((a) => a.kind === "booked")).toBe(false);
+    // the flag round-trips through the payload, and only on a failed row
+    expect(sendRecordPayload({ prepKey: KEY, kind: "booked", resendId: null, scheduledFor: null, status: "failed", noResponse: true }).no_response).toBe(true);
+    expect(sendRecordPayload({ prepKey: KEY, kind: "booked", resendId: null, scheduledFor: null, status: "sent", noResponse: true }).no_response).toBeUndefined();
+    expect(parseSendRecord({ lead_id: null, created_at: T(0), payload: { prep_key: KEY, kind: "booked", status: "failed", no_response: true } })?.noResponse).toBe(true);
+  });
 });

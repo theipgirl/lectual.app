@@ -33,6 +33,12 @@ export type SendRecord = {
   status: SendStatus;
   /** sha256 of the sorted, lower-cased final To + Cc list this send went to (no address is stored); null on an older row. */
   recipientsSha256?: string | null;
+  /**
+   * A `failed` send whose request got no answer (a timeout or a dropped connection): Resend may have accepted it. A later 409
+   * on the same key then means it did, so that slot is done and never retried (a retry after Resend's 24 h key memory would
+   * deliver a second email).
+   */
+  noResponse?: boolean;
   /** When the record was written. */
   at: string;
 };
@@ -53,6 +59,7 @@ export function parseSendRecord(row: { lead_id?: string | null; created_at?: str
     resendId: typeof p.resend_id === "string" ? p.resend_id : null,
     scheduledFor: typeof p.scheduled_for === "string" ? p.scheduled_for : null,
     status: p.status,
+    noResponse: p.no_response === true,
     recipientsSha256: typeof p.recipients_sha256 === "string" && /^[0-9a-f]{64}$/.test(p.recipients_sha256) ? p.recipients_sha256 : null,
     at: typeof row.created_at === "string" ? row.created_at : "",
   };
@@ -68,6 +75,7 @@ export function sendRecordPayload(r: Omit<SendRecord, "at" | "leadId">): Record<
     scheduled_for: r.scheduledFor,
     status: r.status,
     ...(r.recipientsSha256 ? { recipients_sha256: r.recipientsSha256 } : {}),
+    ...(r.status === "failed" && r.noResponse ? { no_response: true } : {}),
   };
 }
 
@@ -84,7 +92,8 @@ export function foldSendRecords(records: readonly SendRecord[]): Map<string, Sen
     // email exists and may still need cancelling. A later `cancelled` row does win.
     // A `duplicate` (another run holds the key) never covers a failure of ours: with a `failed` row and no Resend id behind it, the
     // slot is still owed and is retried. Only a sent or scheduled row with an id is protected from a later failure.
-    if (have && r.status === "duplicate" && have.status === "failed") continue;
+    // Exception: a `failed` row that got no answer at all may have been accepted, and a later 409 says it was: the duplicate wins.
+    if (have && r.status === "duplicate" && have.status === "failed" && !have.noResponse) continue;
     if (have && (r.status === "failed" || r.status === "duplicate") && have.resendId && (have.status === "sent" || have.status === "scheduled")) continue;
     if (!have || Date.parse(r.at) >= Date.parse(have.at) || !Number.isFinite(Date.parse(have.at))) out.set(slot, r);
   }

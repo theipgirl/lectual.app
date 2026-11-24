@@ -521,6 +521,7 @@ async function deliver(
       scheduledFor,
       status,
       recipientsSha256: listHash,
+      ...(status === "failed" && result.status === "failed" && result.http === null ? { noResponse: true } : {}),
     });
     if (!written) counts.unrecorded += 1;
   }
