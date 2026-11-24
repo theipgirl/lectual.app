@@ -1667,3 +1667,42 @@ export const LAWMATICS_CONSULTS_RECONNECT = "Lawmatics no longer accepts your fi
 export const LAWMATICS_CONSULTS_NOT_READY = notReadyYet("Consults from Lawmatics");
 /** Stage suggestion reason for a consult booked in Lawmatics (it may have been booked by the client). */
 export const WHY_LAWMATICS_CONSULT = "This consult was booked in Lawmatics, possibly by the client, so a person decides.";
+
+// Consult prep (auto): the lead page's card, Settings -> Team's recipients, the timeline lines.
+export const CONSULT_PREP_HEADING = "Consult prep";
+export const CONSULT_PREP_NOT_YET = "Not prepared yet: it runs when the lead is in Consultation Scheduled.";
+export const CONSULT_PREP_OFF = "Prep is off for your firm.";
+export const CONSULT_PREP_NO_RECIPIENTS = "No one is set to receive consult prep.";
+export const CONSULT_PREP_SET_IN_TEAM = "Set it in Settings → Team.";
+export const CONSULT_PREP_ASK_ADMIN = "An owner or admin can set it in Settings → Team.";
+export const CONSULT_PREP_COULDNT_LOAD = "Couldn't load consult prep. Refresh to try again.";
+export const CONSULT_PREP_EMAIL_OFF = "Email isn't switched on for your firm yet. Lectual will turn it on.";
+export const CONSULT_PREP_NOT_EMAILED = "not emailed";
+export const CONSULT_PREP_RECIPIENTS_UNREAD = "Who gets consult prep couldn't be read.";
+export const CONSULT_PREP_VIEW_BRIEF = "View the brief";
+export const CONSULT_PREP_BRIEF_NOT_KEPT = "The brief isn't kept in Lectual because approvals aren't connected for your firm. It was emailed to your team.";
+export const CONSULT_PREP_BRIEF_UNAVAILABLE = "The brief couldn't be loaded. Refresh to try again.";
+export const CONSULT_PREP_BRIEF_MISSING = "The brief is no longer in Approvals.";
+export const CONSULT_PREP_RERUN = "Re-run prep";
+export const CONSULT_PREP_RERUN_CONFIRM = "Re-run prep? It prepares this consult again and emails a new brief to your team. Reminders already scheduled are not repeated.";
+export const CONSULT_PREP_RERUN_RUNNING = "Preparing…";
+export const CONSULT_PREP_RERUN_DONE = "Prep re-run. Refresh to see it.";
+export const CONSULT_PREP_RERUN_NOT_ALLOWED = "Only an owner, admin or attorney can re-run consult prep.";
+export const CONSULT_PREP_RERUN_OFF = "Consult prep isn't switched on for your firm, so it wasn't re-run.";
+export const CONSULT_PREP_RERUN_NOTHING = "There is no consult to prepare for this lead yet.";
+export const CONSULT_PREP_RERUN_FAILED = "Couldn't re-run prep. Nothing was changed. Try again in a minute.";
+export const CONSULT_PREP_TIMELINE_PREP = "Consult prep made";
+export const consultPrepTimelineSend = (kind: "booked" | "24h" | "1h", status: "sent" | "scheduled" | "cancelled" | "failed"): string => {
+  const what = kind === "booked" ? "Consult prep email" : kind === "24h" ? "Consult prep reminder, a day before" : "Consult prep reminder, an hour before";
+  return `${what}: ${status === "failed" ? "couldn't be sent" : status}`;
+};
+export const CONSULT_PREP_TEAM_HEADING = "Consult prep emails";
+export const CONSULT_PREP_TEAM_HELP = "When a consult is prepared, the brief is emailed to the people chosen here when it is booked, a day before (if it was booked more than a day ahead) and an hour before. It goes only to the firm, never to a client. Cc addresses must be on the same email domain as someone chosen.";
+export const CONSULT_PREP_TEAM_NONE = "Nobody is chosen yet, so no consult prep emails go out.";
+export const CONSULT_PREP_TEAM_UNCHECKED = "Consult prep emails couldn't be checked. Refresh to try again.";
+export const CONSULT_PREP_TEAM_SAVE = "Save consult prep emails";
+export const CONSULT_PREP_TEAM_CC_LABEL = "Cc (optional, up to 5 addresses)";
+export const CONSULT_PREP_TEAM_INELIGIBLE = "Viewers and social media members can’t get consult prep. Pick someone else.";
+export const CONSULT_PREP_TEAM_CC_FORMAT = "Each Cc must be a plain email address, like info@yourfirm.com.";
+export const CONSULT_PREP_TEAM_CC_DOMAIN = "A Cc address must be on the same email domain as someone chosen above.";
+export const CONSULT_PREP_TEAM_CC_COUNT = "You can add up to 5 Cc addresses.";

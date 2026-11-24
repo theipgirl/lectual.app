@@ -308,7 +308,7 @@ describe("Skills page: the gate", () => {
   });
 
   it("reads a list only when a card that draws a picker needs it", async () => {
-    const { listLeads, listMatters } = await render({ modules: ["agent-toolkit"], leads: [lead(1)], matters: [matter(1)] });
+    const { listLeads, listMatters } = await render({ modules: ["agent-toolkit", "agents"], leads: [lead(1)], matters: [matter(1)] });
     expect(listLeads).toHaveBeenCalledTimes(1);
     expect(listMatters).toHaveBeenCalledTimes(1);
   });

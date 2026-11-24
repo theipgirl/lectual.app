@@ -1,4 +1,5 @@
 import { PREP_SOURCE } from "@/lib/agents/consult-prep/constants";
+import { PREP_SEND_SOURCE } from "@/lib/consult-prep/keys";
 import { FOLLOW_UP_SOURCE } from "@/lib/agents/morning-brief/constants";
 import { CONSULT_PROPOSAL_SOURCE } from "@/lib/consult-proposal/source";
 import { AGENT_ACTOR, REVIEW_SOURCE, SUGGESTION_SOURCE, isAgentMoveRow, parseAgentMove, parseSuggestion, undoStateFor, type ActivityRow, type UndoState } from "@/lib/stage-keeper/moves";
@@ -56,7 +57,17 @@ const NOT_A_PERSON = new Set(["ai", "system", "automation"]);
 
 function draftText(payload: Record<string, unknown>): string {
   const source = payload.source;
-  if (source === PREP_SOURCE) return payload.kind === "client_prep" ? LEAD_STEP_DID_PREP_EMAIL : LEAD_STEP_DID_PREP_BRIEF;
+  // Consult prep's markers: the client email draft, or the brief (`brief`, and `heads_up` from before the automatic prep).
+  if (source === PREP_SOURCE) {
+    switch (payload.kind) {
+      case "client_prep":
+        return LEAD_STEP_DID_PREP_EMAIL;
+      case "brief":
+      case "heads_up":
+      default:
+        return LEAD_STEP_DID_PREP_BRIEF;
+    }
+  }
   if (source === FOLLOW_UP_SOURCE) return LEAD_STEP_DID_FOLLOW_UP;
   if (source === CONSULT_PROPOSAL_SOURCE) return LEAD_STEP_DID_PROPOSAL;
   if (source === "post-consult") return LEAD_STEP_DID_POST_CONSULT;
@@ -82,6 +93,8 @@ export function didLine(row: ActivityRow): Omit<DidRow, "undo"> | null {
       }
       if (p.source === "intake-triage") return { id: row.id, at: row.created_at, text: LEAD_STEP_DID_FIRST_READ, source: "insight" };
       if (p.source === "email-intel") return { id: row.id, at: row.created_at, text: LEAD_STEP_DID_FROM_EMAILS, source: "insight" };
+      // Consult prep's send records (booked, 24h, 1h) are bookkeeping for the prep card, not a line in "What Lectual did".
+      if (p.source === PREP_SEND_SOURCE) return null;
       return null;
     }
     case "email_received":

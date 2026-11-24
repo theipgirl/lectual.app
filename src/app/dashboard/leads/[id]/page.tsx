@@ -22,7 +22,11 @@ import { needsAttention } from "@/lib/leads/needs-attention";
 import { LANE_LABEL } from "@/lib/leads/lane";
 import { temperaturePill } from "@/lib/intake/temperature-pill";
 import { AssignSelect, EditLeadForm, NoteComposer, ProposalCard, StageSelect } from "@/components/leads/LeadForms";
-import { LeadTags, PrepConsult } from "@/components/leads/LeadExtras";
+import { LeadTags } from "@/components/leads/LeadExtras";
+import { ConsultPrepCard } from "@/components/leads/ConsultPrepCard";
+import { loadConsultPrepCard } from "@/lib/consult-prep/card-load";
+import { canRerunConsultPrep } from "@/lib/consult-prep/roles";
+import { canSeeSetup } from "@/lib/setup/roles";
 import { LeadMattersLine } from "@/components/leads/LeadMatters";
 import { loadMattersForLead } from "@/lib/matters/for-lead";
 import { AnswersCard } from "@/components/answers/AnswersCard";
@@ -125,8 +129,7 @@ export default async function LeadPage({
   const mergedSet = await mergedSetFor(supabase, id);
   const mergedIds = mergedSet.ids.filter((x) => x !== id);
   const notice = mergeNotice({ merged: sp.merged, from: sp.from }, mergedIds);
-  const [hasAgentToolkit, hasProposals, hasMailbox, applied, catalog, meetings] = await Promise.all([
-    orgHasModule("agent-toolkit"),
+  const [hasProposals, hasMailbox, applied, catalog, meetings] = await Promise.all([
     orgHasModule("proposals"),
     orgHasModule("mailbox"),
     tagsForLead(id).catch(() => []),
@@ -173,7 +176,7 @@ export default async function LeadPage({
   const voiceUrls = await voiceNotePlaybackUrls(rows);
 
   // Lane + next step (SOP Stage 2) and the lead's sequences (SOP rule 1).
-  const [{ links, failed: linksFailed }, tz, enrollments, stepLoad, factsRead, mattersRead, answersRead, documentsRead, consultRead, mailingRead] = await Promise.all([
+  const [{ links, failed: linksFailed }, tz, enrollments, stepLoad, factsRead, mattersRead, answersRead, documentsRead, consultRead, mailingRead, prepCard] = await Promise.all([
     getLaneLinks(),
     getFirmTimeZone(),
     listLeadEnrollments(id).catch(() => null),
@@ -192,6 +195,8 @@ export default async function LeadPage({
     Promise.all([hasMailbox ? loadBookedConsult(lead.id) : Promise.resolve(null), loadBookedLawmaticsConsult(lead.id).catch(() => ({ status: "unavailable" as const }))]).then(mergeBookedConsults),
     // The address the client gave when they signed their letter: staff roles only (null = not asked). Never throws (three states).
     loadSignedAddress(session.role, { leadId: lead.id }),
+    // The Consult prep card: markers, sends, recipients and the stored brief. Three states each; never throws.
+    getFirmTimeZone().then((zone) => loadConsultPrepCard({ leadIds: mergedSet.ids, adminTier: canSeeSetup(session.role), tz: zone })),
   ]);
   const temperature = effectiveTemperature(lead, stages, new Date(), factsRead.status === "ok" ? factsRead.byLead[lead.id] : undefined);
   const lane = laneView(lead);
@@ -367,14 +372,7 @@ export default async function LeadPage({
             <Timeline rows={rows} mediaUrls={voiceUrls} timeZone={tz} undo={{ leadId: lead.id, canMove, currentStageId: lead.current_stage_id }} />
           </section>
 
-          {canWrite && hasAgentToolkit && (
-            <details id="prep-consult" className="lx-card lx-disclosure" data-tour="lead-prep">
-              <summary>Prep this consult</summary>
-              <div className="lx-disclosure-body">
-                <PrepConsult leadId={lead.id} practiceArea={lead.practice_area} />
-              </div>
-            </details>
-          )}
+          <ConsultPrepCard data={prepCard} leadId={lead.id} canRerun={canRerunConsultPrep(session.role)} adminTier={canSeeSetup(session.role)} />
 
           <ConsultDetailsSection leadId={lead.id} canWrite={canWrite} timeZone={tz} />
 

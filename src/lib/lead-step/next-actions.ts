@@ -6,9 +6,10 @@ import { firstRunAfterImport, nextRunWindow, prepRunFor, type RunWindow } from "
  * "What Lectual will do next, and when": the ONE rule the "Lectual has it" card and the tests share. It promises an
  * action only when a real, switched-on scheduled job will take it:
  *
- *   consult prep      (`src/lib/agents/consult-prep/run.ts`) at the morning run that has the consult inside its next
- *                     24 hours, for a consult on the Outlook calendar linked to this lead with no prep recorded yet.
- *                     Needs the Mailboxes feature. The client prep email only with the Agent toolkit.
+ *   consult prep      (`src/lib/consult-prep/engine.ts`, run by the assistant) when the lead enters the consult stage and at
+ *                     every sweep after, for a consult linked to this lead with no prep recorded for ITS start time.
+ *                     The promised window below is the morning run's (the earliest one certain to cover it); the real
+ *                     prep usually comes sooner. The client prep email only with the Agent toolkit.
  *   post-consult      (`src/lib/agents/post-consult.ts`, `runMeetingProposals`) at the morning run after a recorded call
  *                     linked to this lead is imported: a DRAFT proposal and its email, for a yes. Needs the Proposals
  *                     feature, a named proposal approver, autonomy draft/act and, for a call still to come, an active
@@ -51,9 +52,8 @@ function common(agent: AgentId, jobs: JobsFacts, approvalsOk: boolean, approvals
 }
 
 export function consultPrepGate(jobs: JobsFacts, approvals: Read<unknown>): JobGate {
-  const base = common("consult-prep", jobs, approvals.status === "ok", approvals.status !== "unavailable");
-  if (base.on !== true) return base;
-  return jobs.modules.mailbox ? { on: true } : { on: false, why: "mailbox-off" };
+  // No Mailboxes requirement: a consult from the Lawmatics sync, or a lead in the consult stage, needs no mailbox.
+  return common("consult-prep", jobs, approvals.status === "ok", approvals.status !== "unavailable");
 }
 
 export function postConsultGate(jobs: JobsFacts, approvals: Read<unknown>, opts: { callStillToCome: boolean }): JobGate {
