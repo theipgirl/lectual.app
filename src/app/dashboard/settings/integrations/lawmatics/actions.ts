@@ -19,6 +19,7 @@ import {
   LawmaticsNotConnectedError,
   checkTokenShape,
   disconnectLawmatics,
+  getLawmaticsConnection,
   recordLawmaticsOutcome,
   saveLawmaticsToken,
   verifyLawmaticsToken,
@@ -498,7 +499,11 @@ export const syncLawmaticsAction = previewSafe(async function syncLawmaticsActio
 
   try {
     const s = await runLawmaticsDailySync({ orgId: session.org.id, mode: "full", budgetMs: BUTTON_BUDGET_MS });
-    if (s.connections === 0) return { error: LAWMATICS_SYNC_NOT_CONNECTED };
+    if (s.connections === 0) {
+      // The sync reads active connections only: an `invalid` one (its key refused) says Reconnect, never "isn't connected".
+      const read = await getLawmaticsConnection().catch(() => ({ ok: false as const }));
+      return { error: read.ok && read.connection?.status === "invalid" ? LAWMATICS_SYNC_REAUTH : LAWMATICS_SYNC_NOT_CONNECTED };
+    }
     for (const path of ["/dashboard/intake/", "/dashboard/calendar/", "/dashboard/", "/dashboard/matters/", PAGE]) revalidatePath(path);
     if (s.reauthNeeded > 0) return { error: LAWMATICS_SYNC_REAUTH };
     // The firm's key couldn't be opened: nothing ran, so never "ok" with all-zero counts.

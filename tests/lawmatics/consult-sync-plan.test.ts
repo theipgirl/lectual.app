@@ -156,6 +156,7 @@ describe("reschedule, cancel, complete reads (19, 20)", () => {
   it("a row in the window missing from the read is removed; outside the window kept; a legacy or Outlook row never touched", () => {
     const p = plan({
       events: [],
+      recordsRead: 5, // the read returned other (non-window) records, so it is not an empty read
       ownRows: [
         own("gone"),
         own("old", { starts_at: day(-30) }),
@@ -181,8 +182,41 @@ describe("reschedule, cancel, complete reads (19, 20)", () => {
     const many = plan({ events: Array.from({ length: 520 }, (_, i) => event(String(i))) });
     expect(many.writes).toHaveLength(500);
     expect(many.counts.overWriteCap).toBe(20);
-    const gone = plan({ ownRows: Array.from({ length: 210 }, (_, i) => own(`g${i}`)) });
+    // Positive removals (read as cancelled), so neither vanish guard applies.
+    const gone = plan({ events: Array.from({ length: 210 }, (_, i) => event(`g${i}`, { cancelled: true })), ownRows: Array.from({ length: 210 }, (_, i) => own(`g${i}`)) });
     expect(gone.removeIds).toHaveLength(200);
     expect(gone.counts.overRemoveCap).toBe(10);
+  });
+});
+
+describe("removal guards (evaluation round 2)", () => {
+  it("an unreadable record with an id holds only its own row; a cancelled consult is still removed", () => {
+    const p = plan({ complete: true, heldIds: ["bad"], events: [event("c", { cancelled: true })], ownRows: [own("bad"), own("c")], recordsRead: 2 });
+    expect(p.removeIds).toEqual(["row-c"]);
+    expect(p.removalHold).toBeNull();
+  });
+  it("an incomplete read (a record with no id, cut short) holds vanished rows but still removes rows read as cancelled, not a consult or out of the window", () => {
+    const p = plan({
+      complete: false,
+      events: [event("c", { cancelled: true }), event("n", { title: "Internal meeting" }), event("o", { startsAt: day(70) }), event("k")],
+      ownRows: [own("c"), own("n"), own("o"), own("vanished"), own("k")],
+      recordsRead: 5,
+    });
+    expect(p.removeIds.sort()).toEqual(["row-c", "row-n", "row-o"]);
+    expect(p.removalHold).toBe("incomplete");
+  });
+  it("a read with no records while stored rows exist removes nothing and says why", () => {
+    const p = plan({ events: [], recordsRead: 0, ownRows: [own("a"), own("b")] });
+    expect(p.removeIds).toEqual([]);
+    expect(p.removalHold).toBe("empty-read");
+  });
+  it("more than half of the stored rows vanishing at once is held; a single vanished consult still goes", () => {
+    const many = plan({ events: [event("k")], recordsRead: 1, ownRows: [own("k"), own("v1"), own("v2"), own("v3")] });
+    expect(many.removeIds).toEqual([]);
+    expect(many.removalHold).toBe("too-many-vanished");
+    const one = plan({ events: [event("k")], recordsRead: 1, ownRows: [own("k"), own("v1")] });
+    expect(one.removeIds).toEqual(["row-v1"]);
+    const fewOfMany = plan({ events: [event("a"), event("b"), event("c")], recordsRead: 3, ownRows: [own("a"), own("b"), own("c"), own("v1"), own("v2")] });
+    expect(fewOfMany.removeIds.sort()).toEqual(["row-v1", "row-v2"]);
   });
 });

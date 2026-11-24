@@ -116,11 +116,16 @@ function defaultSleep(ms: number, signal?: AbortSignal): Promise<void> {
  * The status class of a failed Lawmatics call, for counts. Never the message: `LawmaticsApiError.message`
  * carries up to 500 characters of the response body and must never be logged, returned or stored.
  */
-export type LawmaticsFailureClass = "auth" | "rate" | "server" | "timeout" | "shape";
+export type LawmaticsFailureClass = "auth" | "forbidden" | "rate" | "server" | "timeout" | "shape";
 
+/**
+ * `auth` (the firm's key is refused: the connection is marked invalid) is a 401 anywhere, or a 403 on the `/prospects` list
+ * every step needs. A 403 on any other endpoint is `forbidden`: that one step fails, the key is not judged by it.
+ */
 export function lawmaticsFailureClass(err: unknown): LawmaticsFailureClass {
   if (err instanceof LawmaticsApiError) {
-    if (err.status === 401 || err.status === 403) return "auth";
+    if (err.status === 401 || (err.status === 403 && err.path === "/prospects")) return "auth";
+    if (err.status === 403) return "forbidden";
     if (err.status === 429) return "rate";
     if (err.status >= 500) return "server";
     return "shape";

@@ -13,8 +13,14 @@
  *     lead whose email equals an attendee's, followed to the keeper; (3) else, when the event names a prospect
  *     no lead holds, the caller reads that prospect (`needProspects`) and plans again; (4) else unlinked.
  *   - Matter: the one matter whose `lawmatics_id` equals the prospect id, else none.
- *   - Removal only after a COMPLETE read, only this sync's own rows (`lmsync:`), only those starting in the window.
- *     A cancelled event counts as vanished. A row whose stored fields already match is not written again.
+ *   - Removal, only of this sync's own rows (`lmsync:`) starting in the window, comes in two kinds:
+ *       positive  the event was READ and is cancelled, no longer a consult, or now outside the window: removed whenever it
+ *                 is seen (the read itself says so), even on a read that is otherwise incomplete;
+ *       vanished  the event is missing from the read: removed only after a COMPLETE read, and held (counted) when the read
+ *                 looks wrong: it returned no records while stored rows exist, or it would remove more than half of the
+ *                 stored rows (at least `VANISH_GUARD_MIN` of them).
+ *     A record the normaliser couldn't read but whose id is known holds its own `lmsync:<id>` row only (`heldIds`).
+ *     A row whose stored fields already match is not written again.
  *   - Never stored: location, attendee addresses, organizer, contact name, description. They are null here.
  */
 import { isConsultTitle } from "@/lib/calendar/outlook-parse";
@@ -25,6 +31,11 @@ export const CONSULT_LOOKBACK_DAYS = 7;
 export const CONSULT_LOOKAHEAD_DAYS = 60;
 export const CONSULT_WRITE_CAP = 500;
 export const CONSULT_REMOVE_CAP = 200;
+/** The "more than half vanished" guard applies only from this many vanished rows, so one deleted consult can still go. */
+export const VANISH_GUARD_MIN = 3;
+
+/** Why vanished rows were not removed this run (counted, never silent). */
+export type RemovalHold = "incomplete" | "empty-read" | "too-many-vanished";
 const DAY_MS = 86_400_000;
 
 export type ConsultLead = MergePointer & { email: string | null; lawmatics_id: string | null };
@@ -81,6 +92,8 @@ export type ConsultPlan = {
     overWriteCap: number;
     overRemoveCap: number;
   };
+  /** Set when vanished rows were held this run. Positive removals are not affected. */
+  removalHold: RemovalHold | null;
 };
 
 export const lmsyncExternalId = (eventId: string) => `${LMSYNC_PREFIX}${eventId}`;
@@ -151,8 +164,15 @@ export function planConsults(input: {
   matters: readonly ConsultMatter[];
   ownRows: readonly OwnConsultRow[];
   nowMs: number;
-  /** True only when every page was read, nothing was cut short, the shape was recognised and the step was in time. */
+  /**
+   * True only when every page was read, nothing was cut short, the shape was recognised, every record had an id and the step
+   * was in time. False holds vanished removals only; positive ones still happen.
+   */
   complete: boolean;
+  /** Ids of records the normaliser couldn't read: their own rows are kept untouched. */
+  heldIds?: readonly string[];
+  /** How many records the read returned (usable or not), for the empty-read guard. Defaults to the events given. */
+  recordsRead?: number;
 }): ConsultPlan {
   const { from, to } = consultWindow(input.nowMs);
   const index = consultLeadIndex(input.leads);
@@ -162,7 +182,9 @@ export function planConsults(input: {
 
   const counts: ConsultPlan["counts"] = { read: input.events.length, consults: 0, notConsult: 0, outsideWindow: 0, cancelled: 0, unchanged: 0, unlinked: 0, overWriteCap: 0, overRemoveCap: 0 };
   const writes: ConsultRowWrite[] = [];
-  const keep = new Set<string>();
+  const keep = new Set<string>((input.heldIds ?? []).map(lmsyncExternalId));
+  /** Rows whose event this read saw as cancelled, not a consult, or out of the window: removed on that evidence. */
+  const positive = new Set<string>();
   const needProspects = new Set<string>();
   const seen = new Set<string>();
 
@@ -174,14 +196,17 @@ export function planConsults(input: {
       // Ignored. A stored row still inside the window for an event that moved out of it is then removed
       // (a complete read only), so the calendar never shows the old date.
       counts.outsideWindow += 1;
+      positive.add(lmsyncExternalId(e.id));
       continue;
     }
     if (e.cancelled) {
       counts.cancelled += 1;
+      positive.add(lmsyncExternalId(e.id));
       continue;
     }
     if (!isLawmaticsConsult(e)) {
       counts.notConsult += 1;
+      positive.add(lmsyncExternalId(e.id));
       continue;
     }
     counts.consults += 1;
@@ -225,19 +250,27 @@ export function planConsults(input: {
     writes.push(row);
   }
 
+  const inWindow = [...own.values()].filter((r) => {
+    const start = Date.parse(r.starts_at);
+    return Number.isFinite(start) && start >= from && start <= to;
+  });
+  const positiveRows = inWindow.filter((r) => !keep.has(r.external_id) && positive.has(r.external_id));
+  const vanishedRows = inWindow.filter((r) => !keep.has(r.external_id) && !positive.has(r.external_id));
+  const recordsRead = input.recordsRead ?? input.events.length;
+  let removalHold: RemovalHold | null = null;
+  if (vanishedRows.length > 0) {
+    if (!input.complete) removalHold = "incomplete";
+    else if (recordsRead === 0) removalHold = "empty-read";
+    else if (vanishedRows.length >= VANISH_GUARD_MIN && vanishedRows.length * 2 > inWindow.length) removalHold = "too-many-vanished";
+  }
   const removeIds: string[] = [];
-  if (input.complete) {
-    for (const r of own.values()) {
-      if (keep.has(r.external_id)) continue;
-      const start = Date.parse(r.starts_at);
-      if (!Number.isFinite(start) || start < from || start > to) continue;
-      if (removeIds.length >= CONSULT_REMOVE_CAP) {
-        counts.overRemoveCap += 1;
-        continue;
-      }
-      removeIds.push(r.id);
+  for (const r of [...positiveRows, ...(removalHold ? [] : vanishedRows)]) {
+    if (removeIds.length >= CONSULT_REMOVE_CAP) {
+      counts.overRemoveCap += 1;
+      continue;
     }
+    removeIds.push(r.id);
   }
 
-  return { writes, removeIds, needProspects: [...needProspects], counts };
+  return { writes, removeIds, needProspects: [...needProspects], counts, removalHold };
 }

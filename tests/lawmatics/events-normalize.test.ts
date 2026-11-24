@@ -10,8 +10,8 @@ describe("times (17)", () => {
     expect(n).toMatchObject({ ok: true, event: { startsAt: "2026-11-25T19:00:00.000Z", endsAt: "2026-11-25T19:30:00.000Z", allDay: false } });
   });
   it("no offset is refused: never guessed", () => {
-    expect(normalizeLawmaticsEvent(ev({ start_time: "2026-11-25T14:00:00" }))).toEqual({ ok: false, reason: "no-offset" });
-    expect(normalizeLawmaticsEvent(ev({ start_time: "2026-11-25T14:00:00Z", end_time: "2026-11-25 14:30" }))).toEqual({ ok: false, reason: "no-offset" });
+    expect(normalizeLawmaticsEvent(ev({ start_time: "2026-11-25T14:00:00" }))).toEqual({ ok: false, reason: "no-offset", id: "e1" });
+    expect(normalizeLawmaticsEvent(ev({ start_time: "2026-11-25T14:00:00Z", end_time: "2026-11-25 14:30" }))).toEqual({ ok: false, reason: "no-offset", id: "e1" });
     expect(parseLawmaticsTime("2026-11-25 14:00").kind).toBe("no-offset");
   });
   it("all-day: UTC midnight of its civil date, all_day true", () => {
@@ -21,7 +21,7 @@ describe("times (17)", () => {
     expect(dateOnly).toMatchObject({ ok: true, event: { startsAt: "2026-11-26T00:00:00.000Z", allDay: true } });
   });
   it("an end before the start is dropped", () => {
-    expect(normalizeLawmaticsEvent(ev({ start_time: "2026-11-25T14:00:00Z", end_time: "2026-11-25T13:00:00Z" }))).toEqual({ ok: false, reason: "end-before-start" });
+    expect(normalizeLawmaticsEvent(ev({ start_time: "2026-11-25T14:00:00Z", end_time: "2026-11-25T13:00:00Z" }))).toEqual({ ok: false, reason: "end-before-start", id: "e1" });
   });
 });
 
@@ -61,7 +61,7 @@ describe("stored fields (18) and unusable shapes (21)", () => {
   });
   it("no id or no start is unusable, never guessed; an id too long for external_id too", () => {
     expect(normalizeLawmaticsEvent({ attributes: { name: "Consult", start_time: "2026-11-25T14:00:00Z" } })).toEqual({ ok: false, reason: "no-id" });
-    expect(normalizeLawmaticsEvent(ev({}))).toEqual({ ok: false, reason: "no-start" });
+    expect(normalizeLawmaticsEvent(ev({}))).toEqual({ ok: false, reason: "no-start", id: "e1" }); // the id is kept so its row can be held
     expect(normalizeLawmaticsEvent({ id: "x".repeat(250), attributes: { start_time: "2026-11-25T14:00:00Z" } })).toEqual({ ok: false, reason: "id-too-long" });
   });
 });

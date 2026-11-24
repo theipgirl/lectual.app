@@ -41,7 +41,8 @@ export type LawmaticsEvent = {
 
 export type UnusableReason = "no-id" | "id-too-long" | "no-start" | "no-offset" | "end-before-start";
 
-export type NormalisedLawmaticsEvent = { ok: true; event: LawmaticsEvent } | { ok: false; reason: UnusableReason };
+/** On failure `id` is the record's id when it had a usable one, so its own stored row can be held (never removed on a guess). */
+export type NormalisedLawmaticsEvent = { ok: true; event: LawmaticsEvent } | { ok: false; reason: UnusableReason; id?: string };
 
 function isRaw(v: unknown): v is Raw {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -152,19 +153,20 @@ export function normalizeLawmaticsEvent(rec: Raw, included: Map<string, Raw> = n
   const id = cleanText(idOf(rec), 1000);
   if (!id) return { ok: false, reason: "no-id" };
   if (LMSYNC_PREFIX.length + id.length > EXTERNAL_ID_MAX) return { ok: false, reason: "id-too-long" };
+  const fail = (reason: UnusableReason): NormalisedLawmaticsEvent => ({ ok: false, reason, id });
 
   const start = parseLawmaticsTime(field(rec, "start_time", "starts_at", "start_at", "start", "start_date", "start_datetime"));
   const end = parseLawmaticsTime(field(rec, "end_time", "ends_at", "end_at", "end", "end_date", "end_datetime"));
   const flaggedAllDay = bool(rec, "all_day", "is_all_day", "allDay") === true;
-  if (start.kind === "none") return { ok: false, reason: "no-start" };
-  if (start.kind === "no-offset" || end.kind === "no-offset") return { ok: false, reason: "no-offset" };
+  if (start.kind === "none") return fail("no-start");
+  if (start.kind === "no-offset" || end.kind === "no-offset") return fail("no-offset");
 
   // A date-only start is a civil date: all-day. A flagged all-day event keeps only its civil date.
   const allDay = flaggedAllDay || start.kind === "date";
   const startsAt = allDay ? `${start.date}T00:00:00.000Z` : (start as { iso: string }).iso;
   let endsAt: string | null = null;
   if (end.kind === "instant" || end.kind === "date") endsAt = allDay ? `${end.date}T00:00:00.000Z` : end.kind === "instant" ? end.iso : `${end.date}T00:00:00.000Z`;
-  if (endsAt !== null && Date.parse(endsAt) < Date.parse(startsAt)) return { ok: false, reason: "end-before-start" };
+  if (endsAt !== null && Date.parse(endsAt) < Date.parse(startsAt)) return fail("end-before-start");
 
   const status = (field(rec, "status", "state") ?? "").trim().toLowerCase();
   const cancelled =

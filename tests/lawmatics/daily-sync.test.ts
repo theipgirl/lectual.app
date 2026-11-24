@@ -223,12 +223,13 @@ describe("the reads (23, 24)", () => {
     }
   });
 
-  it("truncated /events: no calendar write or delete", async () => {
+  it("(4) a truncated /events read still upserts the in-window consults it has, and holds only the removals (counted)", async () => {
     const w = world({ crm_calendar_event: [{ id: "r1", org_id: ORG, source: "lawmatics", external_id: "lmsync:gone", lawmatics_id: "gone", starts_at: day(1), is_consult: true }] });
     const s = await run(w, lawmatics({ events: list([consult("e1")], { truncated: true }) }));
-    expect(s.consults.failed).toBe(1);
-    expect(w.db.tables.crm_calendar_event.map((r) => r.id)).toEqual(["r1"]);
-    expect(w.log.some((q) => q.table === "crm_calendar_event" && q.action !== "select")).toBe(false);
+    expect(s.consults.failed).toBe(0);
+    expect(s.consults.eventsTruncated).toBe(1);
+    expect(s.consults.removalsHeld).toBe(1);
+    expect(w.db.tables.crm_calendar_event.map((r) => r.external_id).sort()).toEqual(["lmsync:e1", "lmsync:gone"]);
   });
 });
 
@@ -510,13 +511,109 @@ describe("last successful run", () => {
 describe("evaluation fixes", () => {
   const withProspect = (id: string, attrs: Row = {}) => consult(id, attrs, { prospect: { data: { type: "prospect", id: `p-${id}` } } });
 
-  it("(1) an unreadable event means no removal that run: the stored row for it survives, and it is counted", async () => {
+  it("(1) an unreadable event with an id holds its own stored row only", async () => {
     const w = world({ crm_calendar_event: [{ id: "keep-me", org_id: ORG, source: "lawmatics", external_id: "lmsync:e2", lawmatics_id: "e2", starts_at: day(1), is_consult: true, title: "Consultation" }] });
     const s = await run(w, lawmatics({ events: list([consult("e1"), consult("e2", { start_time: "2026-11-25T14:00:00" })]) }));
     expect(s.consults.unusable).toBe(1);
-    expect(s.consults.removalsHeld).toBe(1);
     expect(w.db.tables.crm_calendar_event.map((r) => r.id)).toContain("keep-me");
     expect(w.db.tables.crm_calendar_event.some((r) => r.external_id === "lmsync:e1")).toBe(true);
+  });
+
+  it("(R2-1) an old malformed event no longer stops a cancelled consult from being removed", async () => {
+    const w = world({
+      crm_calendar_event: [
+        { id: "cancel-me", org_id: ORG, source: "lawmatics", external_id: "lmsync:c1", lawmatics_id: "c1", starts_at: day(2), is_consult: true },
+        { id: "old-bad", org_id: ORG, source: "lawmatics", external_id: "lmsync:bad", lawmatics_id: "bad", starts_at: day(1), is_consult: true },
+      ],
+    });
+    const s = await run(w, lawmatics({ events: list([consult("c1", { status: "cancelled" }), consult("bad", { start_time: "2026-11-24T10:00:00" })]) }));
+    expect(s.consults.removed).toBe(1);
+    expect(w.db.tables.crm_calendar_event.map((r) => r.id)).toEqual(["old-bad"]);
+  });
+
+  it("(R2-1) a record with NO id holds every vanished row (it could be any of them)", async () => {
+    const w = world({ crm_calendar_event: [{ id: "maybe", org_id: ORG, source: "lawmatics", external_id: "lmsync:m", lawmatics_id: "m", starts_at: day(1), is_consult: true }] });
+    const s = await run(w, lawmatics({ events: list([consult("e1"), { type: "event", attributes: { name: "Consult", start_time: day(1) } }]) }));
+    expect(s.consults.removalsHeld).toBe(1);
+    expect(w.db.tables.crm_calendar_event.map((r) => r.id)).toContain("maybe");
+  });
+
+  it("(R2-2) the lookups stop with a margin left and the consult writes still happen; a hired id is never looked up", async () => {
+    let t = 0;
+    const w = world({ crm_matter: [{ id: "m1", org_id: ORG, lawmatics_id: "p-hired" }] });
+    const lm: LawmaticsClient = {
+      async listAll(path) {
+        return path === "/events" ? list(["a", "b", "c"].map((x) => consult(x, {}, { prospect: { data: { type: "prospect", id: `p-${x}` } } })).concat([consult("h", {}, { prospect: { data: { type: "prospect", id: "p-hired" } } })])) : list([]);
+      },
+      async get(path) {
+        gets.push(path);
+        t += 20_000; // each lookup is slow
+        return { data: prospect(path.split("/").pop()!, { status: "open", created_at: "2025-01-01T00:00:00Z", email: `${path.split("/").pop()}@example.test` }) };
+      },
+    };
+    const gets: string[] = [];
+    const s = await runLawmaticsDailySync({ admin: w.admin, client: () => lm, getToken: async () => "tok", now: () => NOW, clock: () => t, mode: "daytime" });
+    expect(gets).not.toContain("/prospects/p-hired");
+    expect(s.consults.hiredSkipped).toBe(1);
+    expect(gets.length).toBeLessThan(3);
+    expect(s.consults.lookupsDeferred).toBeGreaterThan(0);
+    expect(s.consults.written).toBe(4); // the plan made before the lookups is written
+  });
+
+  it("(R2-4) the reads ask for 100 a page with a deliberate cap, and /events carries a window filter (a hint only)", async () => {
+    const lm = lawmatics();
+    await run(world(), lm);
+    const opts = (p: string) => lm.calls.find((c) => c.path === p)!.opts as { pageSize: number; maxRecords: number; params?: Record<string, string> };
+    for (const p of ["/prospects", "/contacts", "/events"]) {
+      expect(opts(p).pageSize).toBe(100);
+      expect(opts(p).maxRecords).toBeGreaterThan(0);
+    }
+    expect(Object.keys(opts("/events").params ?? {}).some((k) => k.startsWith("filter["))).toBe(true);
+  });
+
+  it("(R2-4) a 400 for the /events filter is retried once without it", async () => {
+    const calls: unknown[] = [];
+    const lm: LawmaticsClient = {
+      async listAll(path, o) {
+        if (path === "/events") {
+          calls.push(o?.params);
+          if (o?.params) throw new LawmaticsApiError(400, "/events", "bad filter");
+          return list([consult("e1")]);
+        }
+        return list([]);
+      },
+      async get() {
+        return {};
+      },
+    };
+    const w = world();
+    const s = await runLawmaticsDailySync({ admin: w.admin, client: () => lm, getToken: async () => "tok", now: () => NOW, mode: "daytime" });
+    expect(calls).toHaveLength(2);
+    expect(s.consults.written).toBe(1);
+  });
+
+  it("(nit) a 403 outside /prospects fails that step only; a 403 on /prospects marks the key refused", async () => {
+    const w = world();
+    const s = await run(w, lawmatics({ events: new LawmaticsApiError(403, "/events", "no") }));
+    expect(s.reauthNeeded).toBe(0);
+    expect(s.consults.failed).toBe(1);
+    expect(s.failures.forbidden).toBe(1);
+    const w2 = world();
+    const s2 = await run(w2, lawmatics({ prospects: new LawmaticsApiError(403, "/prospects", "no") }));
+    expect(s2.reauthNeeded).toBe(1);
+  });
+
+  it("(nit) a step that times out is counted as out of time, not as a failed step", async () => {
+    const w = world();
+    const s = await run(w, lawmatics({ events: new DOMException("t", "TimeoutError") as unknown as Error }));
+    expect(s.consults.failed).toBe(0);
+    expect(s.failedFirms).toBe(0);
+    expect(s.outOfTime).toBeGreaterThan(0);
+  });
+
+  it("(nit) prospects with no created date are counted", async () => {
+    const s = await run(world(), lawmatics({ prospects: list([prospect("1", { created_at: null })]) }));
+    expect(s.prospects.noCreatedDate).toBe(1);
   });
 
   it("(2) two targeted prospects with the same email make ONE lead", async () => {

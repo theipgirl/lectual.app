@@ -1273,12 +1273,20 @@ a grep test holds the new files to that), no automation rule fires, no matter ha
   steps (what the hired step read before; `/contacts` is read by the prospect step only, inside its own slice), `/events` (`include=event_type`), and for a
   consult whose prospect no lead holds, `GET /prospects/<id>` with the same include and `fields=all` (the answer must name that id and carry `status`, else
   it is unusable and counted). The targeted reads stop once the 50-create cap is used; all the candidates are planned in ONE `planProspectSync` call, so
-  two with one email make one lead. Fail closed per step and per firm: a truncated, failed or unrecognised read writes nothing for that step; `includeDropped` on `/prospects`
+  two with one email make one lead. The targeted reads stop with `LOOKUP_MARGIN_MS` (15 s) of the consult step left, so the consult plan made before them
+  is always written (`lookupsDeferred`), and a prospect id a `crm_matter.lawmatics_id` already holds (hired) is never looked up (`hiredSkipped`).
+  Every list is read 100 a page with a deliberate cap (`PROSPECTS_MAX_RECORDS` / `CONTACTS_MAX_RECORDS` 6,000, `EVENTS_MAX_RECORDS` 3,000). `/events` SENDS
+  the window as `filter[start_time][gte|lte]` (a hint only, NOT verified; a 400/422 for it is retried once without it) and the window is applied again on our
+  side. Fail closed per step and per firm: a failed or unrecognised read writes nothing for that step (a cut-short `/events` read is the exception: it still
+  writes the in-window consults it has and holds only the removals, `eventsTruncated`); `includeDropped` on `/prospects`
   or a cut-short / failed `/contacts` writes no leads for that firm; the consult step still runs. Lawmatics' error text is never logged, returned or stored:
-  only the status class (`lawmaticsFailureClass`: auth / rate / server / timeout / shape).
+  only the status class (`lawmaticsFailureClass`: auth / forbidden / rate / server / timeout / shape). A step that runs out of time counts in `outOfTime`,
+  never as a failed step. Prospects with no created date are counted (`noCreatedDate`).
 - **Client:** every request has a 20 s deadline merged with the step's `AbortSignal`; a 429 waits for `Retry-After` (capped at 10 s, else 2 s then 5 s), at
-  most 2 retries, only when the wait fits the step's time left. A 401/403 sets the connection `invalid` (fenced on id, org and `active`) with the fixed
-  `LAWMATICS_SYNC_KEY_REFUSED` and stops that firm; the cron then skips it until someone reconnects (`reauthNeeded`).
+  most 2 retries, only when the wait fits the step's time left. A 401 anywhere, or a 403 on `/prospects`, sets the connection `invalid` (a 403 on any other
+  endpoint fails that step only, `forbidden`) (fenced on id, org and `active`) with the fixed
+  `LAWMATICS_SYNC_KEY_REFUSED` and stops that firm; the cron then skips it until someone reconnects (`reauthNeeded`). An `invalid` connection says
+  Reconnect everywhere it is shown (the button reads the connection when the sync found no active one; Today's card; Settings' pill).
 - **Budget and order:** wall 270 s (button 240 s; the settings page exports `maxDuration = 300`). Two passes: on the full run, the hired step (60 s) for EVERY
   firm first; then prospects (45 s) and consults (45 s) firm by firm in `fairOrder` (rotated by the hour, so a slow firm can't starve the same one every run),
   at most 150 s a firm, none started with under 60 s left. A step whose slice is under 10 s is skipped, a step out of time writes nothing more and doesn't
@@ -1302,8 +1310,11 @@ a grep test holds the new files to that), no automation rule fires, no matter ha
   description, `lead_id`, `matter_id` (exactly one matter with that prospect id), `is_consult`. NEVER location, description, attendees, organizer or contact
   name (attendee addresses are used in memory to find the lead, then dropped). A start or end with no UTC offset is refused; all-day = UTC midnight of the
   date. Upsert on `org_id,source,external_id` with `external_id = 'lmsync:' + id`; an unchanged row is not written; a 23505 (an older row holds the Lawmatics
-  id) is counted and that row left alone. Removal only after a complete read (and none at all in a run where any event record couldn't be read:
-  it could be any stored consult; `removalsHeld`), only `lmsync:` rows in the window, in chunks: a `source = 'lawmatics'` row
+  id) is counted and that row left alone. Removal, only of `lmsync:` rows in the window, in chunks, comes in two kinds (`planConsults`): a row whose
+  event was READ as cancelled, no longer a consult, or out of the window is removed on that evidence, every run; a row whose event VANISHED is removed only
+  after a complete read (nothing cut short, types kept, every record with an id), and is held (`removalHold`, counted in `removalsHeld`) when the read
+  returned no records while stored rows exist, or when at least `VANISH_GUARD_MIN` (3) and more than half of the stored rows would go. A record the
+  normaliser couldn't read but whose id is known holds only its own row; only a record with NO id holds every vanished row. In chunks: a `source = 'lawmatics'` row
   without the prefix is never updated or removed. Caps: 500 writes, 200 removals.
 - **Readers widened (three states kept):** Today's Consults card (both layouts) has a third source, `lawmatics` (`ConsultDeps.lawmaticsGate` / `.lawmatics`,
   optional; one row per call: a shared join key or the same lead within 15 minutes, kept in the order Outlook, Lawmatics, Zoom); the lead page's "Consult

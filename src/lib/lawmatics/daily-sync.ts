@@ -11,6 +11,7 @@ import { LAWMATICS_SYNC_KEY_REFUSED } from "@/lib/ui/words";
 import { CAME_BACK_SOURCE } from "@/lib/today/came-back-rules";
 
 import {
+  LawmaticsApiError,
   createLawmaticsClient,
   lawmaticsFailureClass,
   type FetchLike,
@@ -18,7 +19,7 @@ import {
   type LawmaticsFailureClass,
   type ListResult,
 } from "./client";
-import { planConsults, type ConsultLead, type ConsultMatter, type ConsultRowWrite, type OwnConsultRow } from "./consult-sync-plan";
+import { consultWindow, planConsults, type ConsultLead, type ConsultMatter, type ConsultRowWrite, type OwnConsultRow } from "./consult-sync-plan";
 import { normalizeLawmaticsEvent, type LawmaticsEvent } from "./events-normalize";
 import { syncFirm, type FirmResult } from "./hired-sync";
 import type { PlanStage, PlannedCreate } from "./import-plan";
@@ -70,6 +71,15 @@ export const CONSULT_STEP_MS = 45_000;
 export const MIN_FIRM_START_MS = 60_000;
 /** A step is not started when its slice would be shorter than this. */
 export const MIN_STEP_MS = 10_000;
+/** The consult step stops its targeted prospect reads with this much of its slice left, so its own writes always land. */
+export const LOOKUP_MARGIN_MS = 15_000;
+/** Read sizes: 100 records a page (Lawmatics' bracket pagination), and a deliberate ceiling per list. */
+export const PAGE_SIZE = 100;
+export const PROSPECTS_MAX_RECORDS = 6_000;
+export const CONTACTS_MAX_RECORDS = 6_000;
+/** /events: a firm can hold years of history. Past this the read is cut short: in-window consults are still written, removals held. */
+export const EVENTS_MAX_RECORDS = 3_000;
+const pagesFor = (max: number) => Math.ceil(max / PAGE_SIZE);
 const PAGE = 1000;
 const MAX_ROWS = 30_000;
 const UPSERT_CHUNK = 100;
@@ -99,6 +109,8 @@ export type DailySyncSummary = {
     needALook: number;
     leftForHired: number;
     beforeCutoff: number;
+    /** Prospects with no readable created date: left out (counted). */
+    noCreatedDate: number;
     overCap: number;
     failedWrites: number;
     flagsNotWritten: number;
@@ -125,8 +137,15 @@ export type DailySyncSummary = {
     prospectReadsFailed: number;
     /** The calendar columns aren't there yet (lectual 0098). */
     notReady: number;
-    /** Runs where a record couldn't be read, so nothing was removed (it could have been any stored consult). */
+    /** Runs whose VANISHED rows were held: an incomplete read (a record with no id, cut short, types dropped), an empty read,
+     * or more than half the stored rows gone. Rows read as cancelled, not a consult or out of the window are still removed. */
     removalsHeld: number;
+    /** /events reads cut short at the cap: in-window consults were still written. */
+    eventsTruncated: number;
+    /** Consult prospects not looked up because a matter already holds that Lawmatics id (hired). */
+    hiredSkipped: number;
+    /** Consult prospects not looked up this run because the step kept its margin for its own writes. */
+    lookupsDeferred: number;
   };
   /** Firms whose Lawmatics key couldn't be opened: nothing synced for them. */
   tokenUnreadable: number;
@@ -155,7 +174,7 @@ export function emptySummary(mode: SyncMode): DailySyncSummary {
     failedFirms: 0,
     reauthNeeded: 0,
     outOfTime: 0,
-    failures: { auth: 0, rate: 0, server: 0, timeout: 0, shape: 0 },
+    failures: { auth: 0, forbidden: 0, rate: 0, server: 0, timeout: 0, shape: 0 },
     hired: { ran: 0, failed: 0, created: 0, linked: 0, skipped: 0, failedWrites: 0, leadsMoved: 0, leadMovesFailed: 0 },
     prospects: {
       ran: 0,
@@ -167,6 +186,7 @@ export function emptySummary(mode: SyncMode): DailySyncSummary {
       needALook: 0,
       leftForHired: 0,
       beforeCutoff: 0,
+      noCreatedDate: 0,
       overCap: 0,
       failedWrites: 0,
       flagsNotWritten: 0,
@@ -176,7 +196,7 @@ export function emptySummary(mode: SyncMode): DailySyncSummary {
       lastSyncNotReady: 0,
       lastSyncWriteFailed: 0,
     },
-    consults: { ran: 0, failed: 0, written: 0, removed: 0, unchanged: 0, unlinked: 0, unusable: 0, overCap: 0, failedWrites: 0, heldByOlderRow: 0, prospectReadsFailed: 0, notReady: 0, removalsHeld: 0 },
+    consults: { ran: 0, failed: 0, written: 0, removed: 0, unchanged: 0, unlinked: 0, unusable: 0, overCap: 0, failedWrites: 0, heldByOlderRow: 0, prospectReadsFailed: 0, notReady: 0, removalsHeld: 0, eventsTruncated: 0, hiredSkipped: 0, lookupsDeferred: 0 },
     tokenUnreadable: 0,
   };
 }
@@ -212,7 +232,7 @@ type SharedRead = { prospects: ListResult; lookups: OriginLookups };
 
 /** One `/prospects` request (the importer's include plus the hired sync's `fields=all`) and the origin names. */
 async function readShared(client: LawmaticsClient): Promise<SharedRead> {
-  const prospects = await client.listAll("/prospects", { include: PROSPECT_INCLUDE, params: { fields: "all" } });
+  const prospects = await client.listAll("/prospects", { include: PROSPECT_INCLUDE, params: { fields: "all" }, pageSize: PAGE_SIZE, maxRecords: PROSPECTS_MAX_RECORDS, maxPages: pagesFor(PROSPECTS_MAX_RECORDS) });
   const lookups = await readOriginLookups(client);
   return { prospects, lookups };
 }
@@ -221,7 +241,7 @@ async function readShared(client: LawmaticsClient): Promise<SharedRead> {
 async function readContacts(client: LawmaticsClient): Promise<Map<string, LawmaticsSourceContact> | null> {
   let contacts: Map<string, LawmaticsSourceContact> | null = null;
   try {
-    const c = await client.listAll("/contacts");
+    const c = await client.listAll("/contacts", { pageSize: PAGE_SIZE, maxRecords: CONTACTS_MAX_RECORDS, maxPages: pagesFor(CONTACTS_MAX_RECORDS) });
     if (!c.truncated && !c.unrecognisedShape) {
       contacts = new Map(
         c.records
@@ -458,7 +478,7 @@ async function markInvalid(admin: Admin, connId: string, orgId: string): Promise
 
 // ── the steps ────────────────────────────────────────────────────────────────
 
-type StepCtx = { client: LawmaticsClient; inTime: () => boolean };
+type StepCtx = { client: LawmaticsClient; inTime: () => boolean; timeLeftMs: () => number };
 
 function failureOf(err: unknown): LawmaticsFailureClass | null {
   if (err instanceof StepFailure) return err.cls;
@@ -507,6 +527,7 @@ async function prospectStep(
   s.prospects.needALook += plan.counts.needALook;
   s.prospects.leftForHired += plan.counts.leftForHired;
   s.prospects.beforeCutoff += plan.counts.beforeCutoff;
+  s.prospects.noCreatedDate += plan.counts.noCreatedDate;
   s.prospects.overCap += plan.counts.overCap;
   if (w.stoppedForTime) s.outOfTime += 1;
 
@@ -564,6 +585,25 @@ export async function readOneProspect(client: LawmaticsClient, id: string, looku
   return candidate;
 }
 
+/**
+ * `/events`, 100 a page, capped. The window is SENT as a filter, but it is a hint only (NOT verified that Lawmatics
+ * honours it, and it ignores unknown parameters silently): the planner applies the window again. A 400/422 for the
+ * filter is retried once without it, so an unknown parameter can never fail every run.
+ */
+async function readEvents(client: LawmaticsClient, nowMs: number): Promise<ListResult> {
+  const { from, to } = consultWindow(nowMs);
+  const base = { include: "event_type", pageSize: PAGE_SIZE, maxRecords: EVENTS_MAX_RECORDS, maxPages: pagesFor(EVENTS_MAX_RECORDS) };
+  try {
+    return await client.listAll("/events", {
+      ...base,
+      params: { "filter[start_time][gte]": new Date(from).toISOString(), "filter[start_time][lte]": new Date(to).toISOString() },
+    });
+  } catch (err) {
+    if (err instanceof LawmaticsApiError && (err.status === 400 || err.status === 422)) return client.listAll("/events", base);
+    throw err;
+  }
+}
+
 async function consultStep(
   admin: Admin,
   conn: { id: string; org_id: string },
@@ -574,14 +614,24 @@ async function consultStep(
   s: DailySyncSummary,
 ): Promise<void> {
   const orgId = conn.org_id;
-  const list = await ctx.client.listAll("/events", { include: "event_type" });
-  if (list.truncated || list.unrecognisedShape) throw new StepFailure("shape");
+  const list = await readEvents(ctx.client, run.nowMs);
+  // A cut-short read (more history than the cap) still writes the in-window consults it has; only removals wait.
+  if (list.unrecognisedShape) throw new StepFailure("shape");
+  if (list.truncated) s.consults.eventsTruncated += 1;
   const events: LawmaticsEvent[] = [];
   let unusable = 0;
+  let unusableNoId = 0;
+  const heldIds: string[] = [];
   for (const raw of list.records) {
     const n = normalizeLawmaticsEvent(raw, list.included);
-    if (n.ok) events.push(n.event);
-    else unusable += 1;
+    if (n.ok) {
+      events.push(n.event);
+      continue;
+    }
+    unusable += 1;
+    // A record we couldn't read holds its own row; one with no id at all could be any stored consult.
+    if (n.reason === "no-id") unusableNoId += 1;
+    else if (n.id) heldIds.push(n.id);
   }
   s.consults.unusable += unusable;
   const own = await readOwnRows(admin, orgId);
@@ -591,22 +641,28 @@ async function consultStep(
   }
   const [stages, matters] = await Promise.all([readStages(admin, orgId), readMatters(admin, orgId)]);
   let leads = await readLeads(admin, orgId);
-  // Removal needs a COMPLETE read: no page failed, nothing cut short, the shape recognised, the event types kept, and
-  // EVERY record understood. One record we couldn't read (a renamed field, a time with no offset) could be any stored
-  // consult, so that run removes nothing and says why.
-  const complete = !list.includeDropped && unusable === 0;
-  if (unusable > 0) s.consults.removalsHeld += 1;
-  const planOf = () => planConsults({ events, leads: leads as ConsultLead[], matters, ownRows: own, nowMs: run.nowMs, complete: complete && ctx.inTime() });
+  // Vanished rows are removed only after a COMPLETE read: nothing cut short, the event types kept, every record with an id.
+  const complete = !list.truncated && !list.includeDropped && unusableNoId === 0;
+  const planOf = () =>
+    planConsults({ events, leads: leads as ConsultLead[], matters, ownRows: own, nowMs: run.nowMs, complete: complete && ctx.inTime(), heldIds, recordsRead: list.records.length });
   let plan = planOf();
+  // Prospects a matter already holds (hired) are the hired sync's: never looked up here, every run.
+  const hiredIds = new Set(matters.map((m) => m.lawmatics_id).filter((x): x is string => !!x));
+  const toLookUp = plan.needProspects.filter((id) => !hiredIds.has(id));
+  s.consults.hiredSkipped += plan.needProspects.length - toLookUp.length;
 
   // A consult whose prospect is not a lead yet: one targeted read each, then ALL of them planned together through the
   // prospect step's own rules (one plan, so two prospects with one email make one lead). No read once the create cap is used.
-  if (plan.needProspects.length > 0) {
+  // The lookups stop with LOOKUP_MARGIN_MS of the slice left, so the plan below is always written.
+  if (toLookUp.length > 0) {
     const candidates: ProspectCandidate[] = [];
-    for (const [i, id] of plan.needProspects.entries()) {
-      if (!ctx.inTime()) break;
+    for (const [i, id] of toLookUp.entries()) {
+      if (!ctx.inTime() || ctx.timeLeftMs() < LOOKUP_MARGIN_MS) {
+        s.consults.lookupsDeferred += toLookUp.length - i; // they wait for the next run
+        break;
+      }
       if (budget.createsUsed >= LEAD_CREATE_CAP) {
-        s.prospects.overCap += plan.needProspects.length - i; // they wait for the next run
+        s.prospects.overCap += toLookUp.length - i; // they wait for the next run
         break;
       }
       let candidate: ProspectCandidate | null = null;
@@ -619,7 +675,7 @@ async function consultStep(
       if (!candidate) s.consults.prospectReadsFailed += 1;
       else candidates.push(candidate);
     }
-    if (candidates.length > 0 && ctx.inTime()) {
+    if (candidates.length > 0 && ctx.inTime() && ctx.timeLeftMs() >= LOOKUP_MARGIN_MS) {
       const p = planProspectSync({ prospects: candidates, stages, leads, cutoff: run.iso, ignoreCutoff: true, createsUsed: budget.createsUsed, linksUsed: budget.linksUsed });
       budget.createsUsed += p.creates.length;
       budget.linksUsed += p.links.length + p.cameBack.filter((c) => c.writeId).length;
@@ -644,6 +700,7 @@ async function consultStep(
     s.outOfTime += 1;
     return; // a step that runs out of time writes nothing (no upserts, no removals)
   }
+  if (plan.removalHold) s.consults.removalsHeld += 1;
   s.consults.unchanged += plan.counts.unchanged;
   s.consults.unlinked += plan.counts.unlinked;
   s.consults.overCap += plan.counts.overWriteCap + plan.counts.overRemoveCap;
@@ -749,14 +806,17 @@ export async function runLawmaticsDailySync(deps: DailySyncDeps = {}): Promise<D
     return true;
   };
 
-  /** Runs one step inside its slice (capped by `limitAt`). Returns false when the step didn't run or failed. */
-  const step = async (f: FirmState, maxMs: number, limitAt: number, body: (ctx: StepCtx) => Promise<void>): Promise<boolean> => {
-    if (f.refused || !f.token) return false;
+  /**
+   * Runs one step inside its slice (capped by `limitAt`). "time" (skipped for lack of time, or cut off by its deadline) is
+   * counted in `outOfTime`, never as a failed step.
+   */
+  const step = async (f: FirmState, maxMs: number, limitAt: number, body: (ctx: StepCtx) => Promise<void>): Promise<"ok" | "failed" | "time"> => {
+    if (f.refused || !f.token) return "failed";
     const start = clock();
     const slice = Math.min(maxMs, limitAt - start);
     if (slice < MIN_STEP_MS) {
       s.outOfTime += 1;
-      return false;
+      return "time";
     }
     const deadline = start + slice;
     const ac = new AbortController();
@@ -764,13 +824,16 @@ export async function runLawmaticsDailySync(deps: DailySyncDeps = {}): Promise<D
     const inTime = () => !ac.signal.aborted && clock() < deadline;
     const client = makeClient(f.token, { signal: ac.signal, timeLeftMs: () => deadline - clock() });
     try {
-      await body({ client, inTime });
-      return true;
+      await body({ client, inTime, timeLeftMs: () => deadline - clock() });
+      return "ok";
     } catch (err) {
       const cls = failureOf(err);
       note(f, cls);
-      if (cls === "timeout") s.outOfTime += 1;
-      return false;
+      if (cls === "timeout") {
+        s.outOfTime += 1;
+        return "time";
+      }
+      return "failed";
     } finally {
       clearTimeout(timer);
     }
@@ -793,7 +856,7 @@ export async function runLawmaticsDailySync(deps: DailySyncDeps = {}): Promise<D
       if (!(await ensureToken(f))) continue;
       s.hired.ran += 1;
       let result: FirmResult | null = null;
-      const ok = await step(f, HIRED_STEP_MS, wallDeadline, async (ctx) => {
+      const outcome = await step(f, HIRED_STEP_MS, wallDeadline, async (ctx) => {
         const sh = await ensureShared(f, ctx);
         result = await syncFirm(admin, f.conn.org_id, ctx.client, now(), sh);
       });
@@ -807,7 +870,11 @@ export async function runLawmaticsDailySync(deps: DailySyncDeps = {}): Promise<D
         s.hired.leadsMoved += r.leadsMoved;
         s.hired.leadMovesFailed += r.leadMovesFailed;
       }
-      if (!ok || !r || !r.ok) {
+      // A time-out (the step's, or a Lawmatics request's inside syncFirm) is counted as out of time, not as a failure.
+      const timedOut = outcome === "time" || (outcome === "ok" && r?.failure === "timeout");
+      if (timedOut) {
+        if (outcome === "ok") s.outOfTime += 1;
+      } else if (outcome !== "ok" || !r || !r.ok) {
         s.hired.failed += 1;
         f.failed = true;
       }
@@ -831,7 +898,7 @@ export async function runLawmaticsDailySync(deps: DailySyncDeps = {}): Promise<D
       if (!sh) throw new StepFailure(null);
       await prospectStep(admin, f.conn, ctx, sh, run, f.budget, s);
     });
-    if (!okP) {
+    if (okP === "failed") {
       s.prospects.failed += 1;
       f.failed = true;
     }
@@ -842,7 +909,7 @@ export async function runLawmaticsDailySync(deps: DailySyncDeps = {}): Promise<D
       const okC = await step(f, CONSULT_STEP_MS, firmDeadline, async (ctx) => {
         await consultStep(admin, f.conn, ctx, f.shared ? f.shared.lookups : null, run, f.budget, s);
       });
-      if (!okC) {
+      if (okC === "failed") {
         s.consults.failed += 1;
         f.failed = true;
       }

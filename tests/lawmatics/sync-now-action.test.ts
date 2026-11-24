@@ -8,6 +8,7 @@ const state = vi.hoisted(() => ({
   runs: [] as unknown[],
   result: null as unknown,
   throws: false,
+  connStatus: null as string | null,
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
@@ -27,6 +28,10 @@ vi.mock("@/lib/lawmatics/daily-sync", async (orig) => ({
   },
 }));
 vi.mock("@/lib/db/admin", () => ({ getAdminClient: () => ({}) }));
+vi.mock("@/lib/lawmatics/connection", async (orig) => ({
+  ...(await orig<typeof import("@/lib/lawmatics/connection")>()),
+  getLawmaticsConnection: async () => ({ ok: true, connection: state.connStatus ? { status: state.connStatus } : null }),
+}));
 
 const { syncLawmaticsAction } = await import("@/app/dashboard/settings/integrations/lawmatics/actions");
 
@@ -53,6 +58,7 @@ beforeEach(() => {
   state.runs = [];
   state.result = summary();
   state.throws = false;
+  state.connStatus = null;
 });
 
 describe("Sync from Lawmatics now (35, 36)", () => {
@@ -97,6 +103,10 @@ describe("Sync from Lawmatics now (35, 36)", () => {
     expect(key.error).toBe("We couldn't open your firm's Lawmatics key, so nothing was synced. Reconnect it above, or try again shortly.");
     state.result = summary((s) => void (s.connections = 0));
     expect((await syncLawmaticsAction({}, new FormData())).error).toBe("Lawmatics isn't connected for your firm.");
+    // An `invalid` connection (key refused) is skipped by the sync: it says Reconnect, never "isn't connected".
+    state.connStatus = "invalid";
+    expect((await syncLawmaticsAction({}, new FormData())).error).toBe("Lawmatics no longer accepts your firm's key. Reconnect it above.");
+    state.connStatus = null;
     state.throws = true;
     expect((await syncLawmaticsAction({}, new FormData())).error).toBe("We couldn't sync from Lawmatics just now. Try again shortly.");
   });

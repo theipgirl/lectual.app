@@ -2,11 +2,9 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { getAdminClient } from "@/lib/db/admin";
 import type { Database, Json } from "@/lib/db/types";
-import { firmToken } from "@/lib/intake-forms/lawmatics-sync";
 
-import { createLawmaticsClient, lawmaticsFailureClass, type FetchLike, type LawmaticsClient, type LawmaticsFailureClass, type ListResult } from "./client";
+import { lawmaticsFailureClass, type LawmaticsClient, type LawmaticsFailureClass, type ListResult } from "./client";
 import { normalizeHiredProspect } from "./hired-sync-normalize";
 import {
   LEAD_MOVE_REASON,
@@ -23,7 +21,8 @@ import { readOriginLookups, type OriginLookups } from "./lead-origin-read";
 import { leadRead } from "@/lib/leads/live";
 
 /**
- * Hired-matter sync runner (Lawmatics -> Lectual). Runs as the SERVICE ROLE, per ACTIVE
+ * Hired-matter sync, one firm (Lawmatics -> Lectual). The Lawmatics daily sync (./daily-sync.ts) calls `syncFirm` per
+ * firm on its full run; there is no runner of its own any more. Runs as the SERVICE ROLE, per ACTIVE
  * `lawmatics_connection` row, using THAT firm's own token. Every read is filtered on, and every
  * insert stamped with, the `org_id` of the connection row (a database value, never request data).
  * Reads Lawmatics only; never writes to it. Logs nothing about people: the result is counts.
@@ -50,27 +49,6 @@ export type FirmResult = {
   leadMovesFailed: number;
   /** When a Lawmatics call threw: its status class only (never the message). */
   failure?: LawmaticsFailureClass;
-};
-
-export type HiredSyncSummary = {
-  connections: number;
-  created: number;
-  linked: number;
-  skipped: number;
-  failedFirms: number;
-  failedWrites: number;
-  leadsMoved: number;
-  leadMovesFailed: number;
-};
-
-export type HiredSyncDeps = {
-  admin?: Admin;
-  /** Restrict to one firm (the manual button). The org comes from the session, never a form. */
-  orgId?: string;
-  getToken?: (admin: Admin, orgId: string) => Promise<string | null>;
-  fetchImpl?: FetchLike;
-  client?: (token: string) => LawmaticsClient;
-  now?: () => Date;
 };
 
 const FAILED: FirmResult = { ok: false, created: 0, linked: 0, skipped: 0, failedWrites: 0, leadsMoved: 0, leadMovesFailed: 0 };
@@ -283,35 +261,4 @@ async function logRow(admin: Admin, orgId: string, matterId: string, type: "matt
   } catch {
     /* counts only */
   }
-}
-
-export async function runHiredSync(deps: HiredSyncDeps = {}): Promise<HiredSyncSummary> {
-  const admin = deps.admin ?? getAdminClient();
-  const getToken = deps.getToken ?? ((a, o) => firmToken(a, o));
-  const makeClient = deps.client ?? ((token: string) => createLawmaticsClient({ token, fetchImpl: deps.fetchImpl }));
-  const now = deps.now ?? (() => new Date());
-
-  let q = admin.from("lawmatics_connection").select("id, org_id").eq("status", "active");
-  if (deps.orgId) q = q.eq("org_id", deps.orgId);
-  const { data: conns, error } = await q;
-  if (error) throw new Error("connection read failed");
-
-  const summary: HiredSyncSummary = { connections: conns?.length ?? 0, created: 0, linked: 0, skipped: 0, failedFirms: 0, failedWrites: 0, leadsMoved: 0, leadMovesFailed: 0 };
-  for (const conn of conns ?? []) {
-    let result: FirmResult;
-    try {
-      const token = await getToken(admin, conn.org_id);
-      result = token ? await syncFirm(admin, conn.org_id, makeClient(token), now()) : { ...FAILED };
-    } catch {
-      result = { ...FAILED };
-    }
-    if (!result.ok) summary.failedFirms += 1;
-    summary.created += result.created;
-    summary.linked += result.linked;
-    summary.skipped += result.skipped;
-    summary.failedWrites += result.failedWrites;
-    summary.leadsMoved += result.leadsMoved;
-    summary.leadMovesFailed += result.leadMovesFailed;
-  }
-  return summary;
 }
