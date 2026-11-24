@@ -17,8 +17,9 @@ import { PREVIEW_OFF, VIEW_AS_COOKIE, flagOf, isRealOwner, stateFromRpc, type Pr
  *   on        an open preview for this owner, this sign-in and this firm
  *   off       not a real owner, signed out, or no open preview
  *   not-set-up 0117 (or 0116's guard) is not on the database: nothing is offered
- *   unknown   writes are refused until a refresh: a real owner whose state couldn't be read, ANY errored read behind the
- *             session (membership, firm, platform admin), and, while the hint cookie is present, an auth-server failure or a
+ *   unknown   writes are refused until a refresh: a real owner whose state couldn't be read, an errored read for someone
+ *             who could be a real owner (the membership read failed, or an owner row with a failed firm or platform-admin
+ *             read; a non-owner row read fine is never blocked by such a hiccup), and, while the hint cookie is present, an auth-server failure or a
  *             session that couldn't be resolved at all (without the cookie those read as off, so an auth outage doesn't lock
  *             every person out)
  */
@@ -42,9 +43,9 @@ async function readStateOnce(): Promise<PreviewState> {
     return hinted ? { kind: "unknown" } : PREVIEW_OFF;
   }
   if (core.kind === "signed-out") return core.authFailed && hinted ? { kind: "unknown" } : PREVIEW_OFF;
-  // Any errored read behind the session (membership, firm, platform admin): we can't tell who this is, so we can't tell
-  // whether a preview is open. A platform admin who is a real owner reads as staff with no row when the membership read
-  // fails, which must not read as "off".
+  // An errored read for someone who could be a real owner (the membership read failed, or an owner row with a failed firm
+  // or platform-admin read): we can't tell whether a preview is open. A platform admin who is a real owner reads as staff
+  // with no row when the membership read fails, which must not read as "off". A non-owner row read fine is "off".
   if (core.kind === "no-access") return core.memberReadFailed ? { kind: "unknown" } : PREVIEW_OFF;
   if (core.readFailed) return { kind: "unknown" };
   if (!isRealOwner({ userId: core.user.id, orgId: core.org.id, member: core.member })) return PREVIEW_OFF;

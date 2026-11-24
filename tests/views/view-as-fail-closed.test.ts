@@ -91,16 +91,25 @@ describe("(a) the auth server fails (a 5xx or a timeout), not a signed-out perso
 });
 
 describe("(b) a firm or platform-admin read that errored", () => {
-  it("an org read error: unknown", async () => {
+  it("an owner with a failed org read: unknown", async () => {
     org = { data: orgRow.data, error: { code: "08006", message: "" } };
     expect(await readPreviewState()).toEqual({ kind: "unknown" });
     expect(stateRpc).not.toHaveBeenCalled();
   });
-  it("an is_platform_admin error: unknown", async () => {
+  it("an owner with an is_platform_admin error: unknown", async () => {
     isAdmin = { data: null, error: { code: "08006", message: "" } };
     expect(await readPreviewState()).toEqual({ kind: "unknown" });
   });
-  it("a membership read error for a plain member: unknown", async () => {
+  it("a non-owner row read fine is never locked out by another read's hiccup", async () => {
+    member = { data: { role: "paralegal", org_id: ORG }, error: null };
+    isAdmin = { data: null, error: { code: "08006", message: "" } };
+    expect(await previewFlag()).toBe("off");
+    isAdmin = { data: false, error: null };
+    org = { data: null, error: { code: "08006", message: "" } };
+    expect(await previewFlag()).toBe("off");
+    expect(stateRpc).not.toHaveBeenCalled();
+  });
+  it("a failed membership read (the row is unknown, so it could be an owner's): unknown", async () => {
     member = { data: null, error: { code: "08006", message: "" } };
     expect(await readPreviewState()).toEqual({ kind: "unknown" });
   });

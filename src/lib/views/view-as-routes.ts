@@ -125,11 +125,12 @@ export async function exitViewAs(req: NextRequest, deps: ViewAsRouteDeps = liveV
 /**
  * POST /auth/sign-out/ (replaces signOutAction). Ends any preview first, best effort (a failure never blocks signing out:
  * the row's sign-in is gone, so the next state read closes it as session_ended), then signs out everywhere, as before.
- * No origin check: signing out is low-risk and must never be blocked (a proxy that rewrites the host must not keep
- * someone signed in).
+ * The same origin check as Enter and Exit, but signing out is never blocked by it (low-risk, and a proxy that rewrites the
+ * host must not keep someone signed in): a request that fails it only skips writing the view-as log (the next state read
+ * closes the row as session_ended), and still signs out and clears the cookie.
  */
 export async function signOutRoute(req: NextRequest, deps: ViewAsRouteDeps = liveViewAsDeps): Promise<NextResponse> {
-  await deps.rpc("owner_view_as_end", { p_reason: "sign_out" }).catch(() => null);
+  if (!notSameSite(req)) await deps.rpc("owner_view_as_end", { p_reason: "sign_out" }).catch(() => null);
   await deps.signOut().catch(() => null);
   const res = to(req, "/sign-in/?next=/dashboard");
   res.cookies.set(VIEW_AS_COOKIE, "", { ...cookieOptions, maxAge: 0 });

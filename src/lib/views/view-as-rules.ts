@@ -143,27 +143,30 @@ export function enterNotice(reason: EnterRefusal | ViewAsDbRefusal): ViewAsNotic
 export const VIEW_AS_RPCS = ["owner_view_as_state", "owner_view_as_end", "owner_view_as_start"] as const;
 
 /**
- * Whether the net must ask the preview flag before sending this request. Reads (GET / HEAD), minting a signed DOWNLOAD
- * link, the three log functions and auth's own refresh / logout pass without asking. Every other call to the REST API or
- * storage, and `PUT /auth/v1/user` (updateUser), asks. Pure: method and path only.
+ * Whether the net must ask the preview flag before sending this request. Fail closed: EVERY method other than GET / HEAD /
+ * OPTIONS asks, whatever the path (the REST API, storage, /functions/v1, /graphql/v1, a path-prefixed Supabase URL...),
+ * unless it is one of the named exemptions: minting a signed DOWNLOAD link, the three view-as log functions, and auth's own
+ * calls (refresh, logout) other than `PUT /auth/v1/user` (updateUser). Pure: method and path only.
  */
 export function netMustAsk(method: string, pathname: string): boolean {
   const m = method.toUpperCase();
   if (m === "GET" || m === "HEAD" || m === "OPTIONS") return false;
-  if (pathname.startsWith("/rest/v1/")) {
-    const rpc = /^\/rest\/v1\/rpc\/([A-Za-z0-9_]+)\/?$/.exec(pathname);
-    if (rpc && (VIEW_AS_RPCS as readonly string[]).includes(rpc[1])) return false;
-    return true;
+  // Anchored on the service segment wherever it sits, so a Supabase URL with a path prefix is read the same way.
+  const from = (seg: string): string | null => {
+    const i = pathname.indexOf(seg);
+    return i >= 0 ? pathname.slice(i) : null;
+  };
+  const auth = from("/auth/v1/");
+  if (auth !== null) return m === "PUT" && /^\/auth\/v1\/user\/?$/.test(auth);
+  const rest = from("/rest/v1/");
+  if (rest !== null) {
+    const rpc = /^\/rest\/v1\/rpc\/([A-Za-z0-9_]+)\/?$/.exec(rest);
+    return !(rpc && (VIEW_AS_RPCS as readonly string[]).includes(rpc[1]));
   }
-  if (pathname.startsWith("/storage/v1/")) {
-    // createSignedUrl(s): POST /storage/v1/object/sign/<bucket>/... is a read. The UPLOAD sign (/object/upload/sign/) is not.
-    if (pathname.startsWith("/storage/v1/object/sign/")) return false;
-    return true;
-  }
-  if (pathname.startsWith("/auth/v1/")) {
-    return m === "PUT" && /^\/auth\/v1\/user\/?$/.test(pathname);
-  }
-  return false;
+  const storage = from("/storage/v1/");
+  // createSignedUrl(s): POST /storage/v1/object/sign/<bucket>/... is a read. The UPLOAD sign (/object/upload/sign/) is not.
+  if (storage !== null && storage.startsWith("/storage/v1/object/sign/")) return false;
+  return true;
 }
 
 // ── Layer c: the proxy (a quick refusal only) ─────────────────────────────────────────────────────────────────────

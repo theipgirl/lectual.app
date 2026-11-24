@@ -176,12 +176,14 @@ describe("same-site checks behind a proxy", () => {
     expect((await enterViewAs(behindProxy(null), d)).status).toBe(403);
   });
 
-  it("sign-out is never blocked by the origin check", async () => {
+  it("sign-out is never blocked by the origin check: a failed check skips only the log write, then signs out and clears the cookie", async () => {
     const signOut = vi.fn(async () => undefined);
-    const { d } = deps({ signOut });
+    const { d, calls } = deps({ signOut });
     const r = await signOutRoute(post("/auth/sign-out/", {}, "https://evil.example"), d);
     expect(r.status).toBe(303);
     expect(signOut).toHaveBeenCalledTimes(1);
+    expect(calls).toEqual([]);
+    expect(r.headers.get("set-cookie") ?? "").toContain(`${VIEW_AS_COOKIE}=;`);
     const r2 = await signOutRoute(behindProxy("null"), d);
     expect(r2.status).toBe(303);
   });

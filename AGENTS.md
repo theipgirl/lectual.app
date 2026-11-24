@@ -2673,8 +2673,9 @@ dashboard code, RLS runs as the owner; only "whose view" changes. This is NOT a 
 - **The database is the sole authority** (0117 `owner_view_as_event`, proposal file `docs/pge/2026-11-17-agentic-ip-os/0117-proposed.sql.txt`).
   `owner_view_as_state()` is read ONCE per request for a real owner (`readPreviewState` in `src/lib/views/view-as-flag.ts`, memoized per request on
   the request's headers object by `src/lib/views/request-memo.ts`, because React `cache` does not memoize in actions or route handlers); non-owners
-  make no read. **Fail closed** (fix of 9a209c0): any errored read behind the session (`readFailed` / `memberReadFailed` on
-  `loadFirmSessionCore`: membership, firm, `is_platform_admin`) is "unknown"; an auth-server error other than "no session" (`authFailed`) and
+  make no read. **Fail closed** (fix of 9a209c0, narrowed Nov 24): an errored read for someone who COULD be a real owner (`readFailed` /
+  `memberReadFailed` on `loadFirmSessionCore`: the membership read itself failed, or an owner row with a failed firm or `is_platform_admin`
+  read) is "unknown"; a non-owner row read fine is never locked out by another read's hiccup; an auth-server error other than "no session" (`authFailed`) and
   a session that can't be resolved at all are "unknown" while the hint cookie is present and "off" without it. Answers: on / off / not-set-up (42883, PGRST202, 42P01, PGRST205 by CODE, or 0116's guard missing: nothing offered, the Team page and
   Enter say `notReadyYet("Viewing as a teammate")`) / unknown (a real owner's failed read: the "Couldn't check" banner, writes refused). The hint
   cookie `lx_view_as` never turns a preview on; clearing it never ends one. A STALE cookie (present, state off or not set up) draws
@@ -2683,8 +2684,8 @@ dashboard code, RLS runs as the owner; only "whose view" changes. This is NOT a 
   2 hours from Enter on the database clock (D1).
 - **Enter, Exit, sign-out are route handlers at fixed paths** (`/dashboard/view-as/enter/`, `/dashboard/view-as/exit/`, `/auth/sign-out/`; logic in
   `src/lib/views/view-as-routes.ts`, deps injected): same-site POST (Origin, or the Referer when it is missing or "null", against the request
-  URL, Host / X-Forwarded-Host with X-Forwarded-Proto, and `SITE_URL`: `requestOrigins`), session re-read, 303. Sign-out is NEVER blocked by
-  the origin check. `signOutAction` is gone: every sign-out form posts to
+  URL, Host / X-Forwarded-Host with X-Forwarded-Proto, and `SITE_URL`: `requestOrigins`), session re-read, 303. Sign-out runs the same check
+  but is NEVER blocked by it: a failed check only skips the `owner_view_as_end` log write; it still signs out and clears the cookie. `signOutAction` is gone: every sign-out form posts to
   `/auth/sign-out/`, which calls `owner_view_as_end('sign_out')` first (best effort), then signs out everywhere. Exit that can't be written keeps the
   preview and the cookie and says `VIEW_AS_EXIT_FAILED`.
 - **The seam:** `resolveViewer()` (`src/lib/views/view-as.ts`, server-only, memoized) = `{ session, viewAs, viewer, previewState }`. Pages and server
@@ -2703,9 +2704,10 @@ dashboard code, RLS runs as the owner; only "whose view" changes. This is NOT a 
   session) and the public proposal page's two letter downloads (anonymous, token-bound, service-role reads). Entry files are found through the AST
   (a leading comment can't hide `"use server"`), and a nested inline `"use server"` anywhere under src/ fails; `previewReconcileAction` stays refused (it refreshes mailbox tokens). The AST test
   `tests/views/view-as-actions-guarded.test.ts` fails CI on an unwrapped action, a re-export, a factory, or an unclassified route.ts.
-  (b) **The database net inside `getScopedClient()`** (`previewNetFetch`, per client instance, never process-wide): while previewing (or unknown), any
-  non-GET to `/rest/v1/*` or `/storage/v1/*` and `PUT /auth/v1/user` answers 409 without being sent. GET reads, signed DOWNLOAD links, auth refresh /
-  logout and the three `owner_view_as_*` log functions pass. **Read RPCs are called as GET** (`rpc(fn, undefined, { get: true })`: `current_org_id`,
+  (b) **The database net inside `getScopedClient()`** (`previewNetFetch`, per client instance, never process-wide): while previewing (or unknown),
+  EVERY method other than GET / HEAD / OPTIONS answers 409 without being sent, whatever the path (`/rest/v1`, `/storage/v1`, `/functions/v1`,
+  `/graphql/v1`, a path-prefixed Supabase URL), except the named exemptions: signed DOWNLOAD links, the three `owner_view_as_*` log functions, and
+  auth's own calls other than `PUT /auth/v1/user`. **Read RPCs are called as GET** (`rpc(fn, undefined, { get: true })`: `current_org_id`,
   `current_org_role`, `is_platform_admin`, `platform_admin_orgs`, `org_member_directory` via `callMemberRpc`, `mailbox_connections_for_owner`; all
   STABLE in lectual's migrations; `tests/views/view-as-read-rpcs.test.ts`). A read RPC left as POST fails closed in a preview.
   (c) **The proxy** answers 409 to non-GET signed-in paths (and the OAuth connect / callback GETs) while the hint cookie is present: a quick refusal
@@ -2713,11 +2715,17 @@ dashboard code, RLS runs as the owner; only "whose view" changes. This is NOT a 
   `consultPreview`, not only when a teammate is named): Today's Zoom consults (`VIEW_AS_ZOOM`), My Mail's live Inbox
   and reading pane (`VIEW_AS_LIVE_MAIL`), so no token is refreshed. (e) `ReadOnlyPreview` cancels form submits in the browser (courtesy).
   Render-time writes are skipped too: the Forms page's first-draft create (`mayCreate: false`) and the Leads page's stale-timer nudge.
+- **Personal mailboxes:** every render path that lists mailbox connections goes through `listConnectionsForViewer()` (shared mailboxes only while
+  the flag is on or unknown): Integrations (the personal block shows `VIEW_AS_PRIVATE_MAIL` and no Connect), the Assistants readiness check, Settings ->
+  Features' count, Setup, Getting started and Reconcile; My Mail and Today's consults filter themselves (`tests/views/view-as-personal-mailboxes.test.ts`).
 - **Private places** show fixed sentences (`words.ts` `VIEW_AS_*`) and never the owner's own items: the bell (muted, `PreviewBell`) and the
   notifications page, Copilot (page sentence, launcher hidden, the chat route refused), My Mail (firm SHARED mailboxes only, from stored rows), Today's
   consults (source notes from firm connections only; the teammate's own Outlook is `VIEW_AS_PRIVATE_OUTLOOK`), the drafter's own Outlook on the
   approval page and Settings -> Approvals. The tour, welcome deal, Getting started runner and card, and the name / deal-times / feedback dialogs do not
   open; the account menu holds only "Viewing as <name>", Exit and Sign out. A teammate's own settings (deal times, tips) can't be read: firm defaults (D10).
 - **Tests:** the default for every suite is "not previewing" (`tests/setup-view-as.ts` mocks the flag off; the View as suites unmock it).
-  `tests/views/view-as-*.test.ts(x)`. **Not verified:** a real browser (desktop or 375px), 0117 on any database, PostgREST GET for the read RPCs on a
+  `tests/views/view-as-*.test.ts(x)`; the 0117 proposal is text-pinned (with an MD5) in `tests/views/view-as-0117-proposal.test.ts`.
+  **Known cost (perf note, not fixed):** every dashboard request by a real owner makes one `owner_view_as_state()` POST, which also takes a
+  per-(firm, owner) advisory lock and scans that owner's open entries; firms have one to three owners, so this is accepted, but a future change could
+  skip it when the hint cookie has been absent for a while. **Not verified:** a real browser (desktop or 375px), 0117 on any database, PostgREST GET for the read RPCs on a
   live project (they are STABLE in lectual's migration text), and Next's real memo behaviour of `headers()` across a server action plus its re-render.

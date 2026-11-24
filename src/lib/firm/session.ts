@@ -31,8 +31,9 @@ export type FirmSession =
       switchableFirms: SwitchableFirmRef[];
       displayName: string;
       /**
-       * A read behind this session errored (membership, firm or platform-admin): the session is still drawn, but View as's
-       * write block cannot tell whether a preview is open, so it treats the request as "couldn't check" and refuses writes.
+       * The caller COULD be a real owner but a read behind this session errored: the membership read itself failed, or the
+       * row says owner and the firm or platform-admin read failed. View as can't tell whether a preview is open, so it treats
+       * the request as "couldn't check" and refuses writes. A successfully read non-owner row never sets it.
        */
       readFailed?: boolean;
     };
@@ -41,6 +42,7 @@ export type FirmSession =
 type FirmSessionCore =
   /** `authFailed`: the auth server answered with an error (not "no session"): a 5xx or a timeout, not a signed-out person. */
   | { kind: "signed-out"; authFailed?: boolean }
+  /** `memberReadFailed`: could be a real owner but a read errored (see `readFailed` on the ok session). */
   | { kind: "no-access"; user: User; memberReadFailed: boolean }
   | Extract<FirmSession, { kind: "ok" }>;
 
@@ -120,7 +122,10 @@ async function readFirmSessionCore(): Promise<FirmSessionCore> {
   // closed with an explanation rather than a redirect loop back to sign-in
   // (they ARE signed in; they just have no firm workspace).
   // Any errored read (not "no row"): View as reads this request as "couldn't check" (src/lib/views/view-as-flag.ts).
-  const readFailed = Boolean(memberError || orgError || adminError);
+  // Only for someone who could be a real owner: a member read that errored (we don't know the row), or an owner row with
+  // another read that errored. A non-owner row read successfully is never "couldn't check": their writes aren't blocked by a
+  // hiccup in the firm or platform-admin read.
+  const readFailed = Boolean(memberError) || (member?.role === "owner" && Boolean(orgError || adminError));
   if ((!member && !actingAsStaff) || !org) {
     return { kind: "no-access", user, memberReadFailed: readFailed };
   }

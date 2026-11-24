@@ -2,7 +2,7 @@ import Link from "next/link";
 import { activeOrgModules } from "@/lib/org/modules";
 import { MODULES } from "@/lib/settings/modules-copy";
 import { FeedbackLink } from "@/components/feedback/SendFeedbackButton";
-import { listConnections } from "@/lib/mailbox/connections";
+import { listConnectionsForViewer } from "@/lib/views/view-as";
 import type { Metadata } from "next";
 import { PageHeader, Pill } from "@/components/ui";
 import { pageTitle } from "@/lib/ui/page-title";
@@ -27,7 +27,7 @@ type ModuleStatus = { label: string; tone: "ok" | "warn" | "risk" | "mute" };
  */
 async function mailboxStatus(enabled: boolean): Promise<ModuleStatus & { connected: number | null }> {
   if (!enabled) return { label: "Off", tone: "mute", connected: null };
-  const result = await listConnections().catch(() => ({ ok: false as const, error: "unreadable" }));
+  const result = await listConnectionsForViewer().catch(() => ({ ok: false as const, error: "unreadable" }));
   if (!result.ok) return { label: "On · couldn't check connections", tone: "risk", connected: null };
   const connected = result.connections.filter((c) => c.status === "active").length;
   return connected > 0

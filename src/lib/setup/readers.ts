@@ -3,7 +3,8 @@ import { getScopedClient } from "@/lib/db/scoped-client";
 import { aiConfigured } from "@/lib/ai/claude";
 import { getOrgProfile } from "@/lib/org/profile";
 import { listMemberDirectory } from "@/lib/members/directory";
-import { listConnections } from "@/lib/mailbox/connections";
+// View as: the shared mailboxes only while previewing (the owner's personal ones never reach a teammate's view).
+import { listConnectionsForViewer } from "@/lib/views/view-as";
 import { getLawmaticsConnection } from "@/lib/lawmatics/connection";
 import { listMeetingConnections } from "@/lib/meetings/connection";
 import { getLawPayConnection } from "@/lib/payments/lawpay-connection";
@@ -29,7 +30,7 @@ export const liveReaders: SetupReaders = {
     if (error || !data) return { ok: false };
     return { ok: true, modules: data.modules ?? [] };
   },
-  listConnections,
+  listConnections: listConnectionsForViewer,
   getLawmaticsConnection,
   listMeetingConnections,
   getLawPayConnection,

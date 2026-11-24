@@ -159,6 +159,15 @@ grant select on public.owner_view_as_event to authenticated;
 -- The service role reads; its default write grants go (the triggers refuse them anyway). The cascade runs as the table owner.
 revoke insert, update, delete, truncate, references, trigger on public.owner_view_as_event from service_role;
 grant select on public.owner_view_as_event to service_role;
+-- PostgreSQL 17 adds MAINTAIN (VACUUM, ANALYZE, REINDEX, REFRESH, CLUSTER, LOCK); no API role needs it. The version guard keeps
+-- this file applying on PostgreSQL 16 (0115 / 0116's form).
+do $$
+begin
+  if pg_catalog.current_setting('server_version_num')::int >= 170000 then
+    execute 'revoke maintain on public.owner_view_as_event from anon, authenticated, service_role';
+  end if;
+end
+$$;
 
 do $$
 begin
@@ -446,6 +455,7 @@ comment on function public.owner_view_as_end(text) is
 --   T4. The SELECT policy contains `owner_view_as_event.org_id = public.current_org_id()` and `m.org_id = owner_view_as_event.org_id`
 --       and does not contain current_org_role.
 --   T5. owner_view_as_state's body calls owner_view_as_require_member_guard and owner_view_as_close_stale.
+--   T7. On PostgreSQL 17, has_table_privilege('authenticated' / 'service_role', 'public.owner_view_as_event', 'MAINTAIN') is false.
 --   T6. owner_view_as_require_member_guard names crm_org_member_owner_guard_trg, requires tgenabled in ('O','A') and tgfoid =
 --       crm_org_member_owner_guard(); start and end call it too.
 

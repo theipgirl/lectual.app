@@ -5,6 +5,7 @@ import { getProposalSettings, isCurrentUserApprover } from "@/lib/proposals/stor
 import { currentRole } from "@/lib/auth/current-role";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { resolveQueueRole } from "@/lib/queue/roles";
+import { listConnections } from "@/lib/mailbox/connections";
 import { hasRole, type Role } from "@/lib/auth/roles";
 import { perRequest } from "@/lib/views/request-memo";
 import { readPreviewState } from "@/lib/views/view-as-flag";
@@ -142,4 +143,15 @@ export async function consultPreview(): Promise<{ name: string | null; sharedOnl
   const v = await resolveViewer().catch(() => null);
   if (!v || v.previewState === "off") return null;
   return { name: v.viewAs?.targetName ?? null, sharedOnly: Boolean(v.viewAs) };
+}
+
+/**
+ * The mailbox connections to DRAW: `listConnections()` (the caller's own personal ones plus the firm's), except while
+ * View as's flag is on or couldn't be checked, when only the firm's SHARED mailboxes are listed: the owner's personal
+ * mailboxes are never shown in a teammate's view (D2). `hidPersonal` says personal rows were left out.
+ */
+export async function listConnectionsForViewer(): Promise<Awaited<ReturnType<typeof listConnections>> & { hidPersonal?: boolean }> {
+  const [res, preview] = await Promise.all([listConnections(), inPreview()]);
+  if (!preview || !res.ok) return res;
+  return { ...res, connections: res.connections.filter((c) => c.scope === "firm"), hidPersonal: true };
 }

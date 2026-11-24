@@ -1676,6 +1676,8 @@ export const VIEW_AS_EXIT = "Exit";
 export const VIEW_AS_READ_ONLY = "This is a read-only preview. Nothing was changed.";
 export const VIEW_AS_EXIT_FAILED = "Couldn't leave the preview. Try again, or sign out to end it.";
 export const VIEW_AS_PRIVATE_MAIL = (name: string) => `${name}'s own mailbox is private to them and isn't shown in a preview.`;
+/** A preview whose teammate couldn't be named: personal mailboxes are left out all the same. */
+export const VIEW_AS_PERSONAL_HIDDEN = "Personal mailboxes aren't shown in a preview.";
 export const VIEW_AS_LIVE_MAIL = "Live mail isn't read in a preview. Stored messages are shown.";
 export const VIEW_AS_PRIVATE_OUTLOOK = (name: string) => `${name}'s own Outlook isn't checked in a preview.`;
 export const VIEW_AS_PRIVATE_COPILOT = (name: string) => `${name}'s Copilot chats are private to them and aren't shown in a preview.`;

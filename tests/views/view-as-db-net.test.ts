@@ -71,6 +71,26 @@ describe("with the preview flag on", () => {
     ]);
   });
 
+  it("fails closed for every other non-read: edge functions, GraphQL, unknown paths and a path-prefixed Supabase URL", () => {
+    for (const m of ["POST", "PUT", "PATCH", "DELETE"]) {
+      expect(netMustAsk(m, "/functions/v1/send-mail"), m).toBe(true);
+      expect(netMustAsk(m, "/graphql/v1"), m).toBe(true);
+      expect(netMustAsk(m, "/something/else"), m).toBe(true);
+      expect(netMustAsk(m, "/proxy/supabase/rest/v1/crm_lead"), m).toBe(true);
+    }
+    expect(netMustAsk("POST", "/proxy/supabase/rest/v1/rpc/owner_view_as_state")).toBe(false);
+    expect(netMustAsk("POST", "/proxy/supabase/storage/v1/object/sign/b/x")).toBe(false);
+    expect(netMustAsk("PUT", "/proxy/supabase/auth/v1/user")).toBe(true);
+    expect(netMustAsk("POST", "/proxy/supabase/auth/v1/token")).toBe(false);
+    for (const m of ["GET", "HEAD", "OPTIONS"]) expect(netMustAsk(m, "/functions/v1/x")).toBe(false);
+  });
+
+  it("an edge function POST never reaches the network in a preview", async () => {
+    const r = await client().functions.invoke("send-mail", { body: { a: 1 } });
+    expect(r.error).not.toBeNull();
+    expect(sent).toEqual([]);
+  });
+
   it("an UPLOAD sign (a write precursor) is refused; auth refresh and logout pass", () => {
     expect(netMustAsk("POST", "/storage/v1/object/upload/sign/client-files/x")).toBe(true);
     expect(netMustAsk("POST", "/auth/v1/token")).toBe(false);
