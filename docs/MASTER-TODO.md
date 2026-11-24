@@ -3,6 +3,25 @@
 One list across sessions. Each session adds its action items here and checks them against Omi.
 Newest section first. Tick an item when it is done; don't delete it.
 
+## 2026-11-24: Annick Charles proposal (Black Friday), next proposal-maker build list
+
+### Done for Annick (lectual-prod, draft c4f59d2f)
+- [x] "Black Friday Bundle" added to RPB's package list (Settings, Proposals, Packages): $3,997 per brand name, word + logo mark, up to 2 classes
+      each, USPTO fees separate, with the offer's "what's included" rows. REMOVE IT FROM SETTINGS ON DEC 1.
+- [x] Annick's three brand names offer Black Friday Bundle (starts selected), Enhanced or Concierge. Engagement letter removed from her draft.
+
+### Taylor
+- [ ] Annick: set the regular pay link, decide the last day (bundle ends Nov 30, proposal says Dec 4), check the preview, Save and create link.
+- [ ] Dec 1: delete "Black Friday Bundle" from Settings, Proposals, Packages.
+
+### Next proposal-maker build (tabled)
+- [ ] A pay link per package (e.g. the Black Friday Lawmatics form beside the regular pay link); the client page shows the link for what they chose,
+      and both when brand names are on different packages.
+- [ ] A package that expires on a date (offer ends Nov 30) and drops off the client page after it.
+- [ ] Bundle pricing shown as one price for word + logo (today the logo mark shows $0 under the bundle).
+- [ ] Meetings import more often than once a day (Zoom transcripts arrive after the call).
+- [ ] Approved client emails: choose which mailbox each kind is drafted in (Settings, Approvals).
+
 ## 2026-11-16: Anthony Harris proposal without the letter; Adobe Sign question
 
 ### Taylor
