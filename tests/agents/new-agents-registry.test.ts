@@ -27,10 +27,11 @@ describe("the registry (F18)", () => {
   it("has seven agents, the three new ones last, each fully defined", () => {
     expect(AGENT_IDS).toEqual(["email-intel", "intake-triage", "post-consult", "stage-keeper", "morning-brief", "consult-prep", "inbox-summary"]);
     expect(AGENT_DEFS["morning-brief"]).toMatchObject({ name: "Morning brief", reads: "Leads, matters, consults and Approvals", defaultAutonomy: "draft" });
-    expect(AGENT_DEFS["consult-prep"]).toMatchObject({ name: "Consult prep", reads: "Outlook consults and the lead record", defaultAutonomy: "draft" });
+    expect(AGENT_DEFS["consult-prep"]).toMatchObject({ name: "Consult prep", reads: "Consults, the lead record and Lawmatics", defaultAutonomy: "draft" });
     expect(AGENT_DEFS["inbox-summary"]).toMatchObject({ name: "Inbox summary", reads: "Connected mailboxes", defaultAutonomy: "draft" });
     for (const id of NEW_AGENTS) {
-      expect(AGENT_DEFS[id].description).toMatch(/only drafts/i);
+      // Consult prep now also emails the brief to the firm's own team (never a client): its description says so in its own words.
+      expect(AGENT_DEFS[id].description).toMatch(id === "consult-prep" ? /sends nothing to a client/i : /only drafts/i);
       expect(AGENT_DEFS[id].description).toMatch(/an attorney reviews/);
       expect(agentNeedsAi(id)).toBe(true);
     }
@@ -44,7 +45,7 @@ describe("the registry (F18)", () => {
       }
       expect(autonomyHint(id, "draft")).toBe(autonomyHint(id, "act")); // draft and act behave the same
       expect(autonomyHint(id, "suggest")).toMatch(/only/i);
-      expect(autonomyHint(id, "draft")).toMatch(/nothing is sent/i);
+      expect(autonomyHint(id, "draft")).toMatch(id === "consult-prep" ? /nothing goes to a client/i : /nothing is sent/i);
     }
   });
 });
@@ -166,13 +167,11 @@ describe("readiness for the three (D3)", () => {
     expect(r({ mailbox: "unavailable" })).toMatchObject({ label: "On · couldn't check mailboxes", tone: "warn" });
   });
 
-  it("consult-prep needs calendar events: the module, readable events, and a readable calendar", () => {
+  it("consult-prep needs neither the Mailboxes feature nor Outlook events: a Lawmatics consult or the consult stage is enough", () => {
     const c = (over: Partial<AgentReadinessInput>) => r({ agent: "consult-prep", ...over });
-    expect(c({ hasMailboxModule: false })).toMatchObject({ label: "Needs the Mailboxes feature" });
-    expect(c({ calendar: "none" })).toMatchObject({ label: "On · waiting for calendar events", tone: "warn" });
-    expect(c({ calendar: "unavailable" })).toMatchObject({ label: "On · couldn't check the calendar", tone: "warn" });
-    // a mailbox alone is not enough for consult prep
-    expect(c({ calendar: "none", mailbox: "ok" }).tone).toBe("warn");
+    expect(c({ hasMailboxModule: false })).toMatchObject({ label: "On", tone: "ok" });
+    expect(c({ calendar: "none" })).toMatchObject({ label: "On", tone: "ok" });
+    expect(c({ calendar: "unavailable" })).toMatchObject({ label: "On", tone: "ok" });
   });
 
   it("morning-brief needs the queue, and does not need the Mailboxes module", () => {
