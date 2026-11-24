@@ -65,3 +65,42 @@ describe("stored fields (18) and unusable shapes (21)", () => {
     expect(normalizeLawmaticsEvent({ id: "x".repeat(250), attributes: { start_time: "2026-11-25T14:00:00Z" } })).toEqual({ ok: false, reason: "id-too-long" });
   });
 });
+
+describe("the event's person through relationships.eventable (live shape)", () => {
+  const live = (data: Record<string, unknown>) => ev({ start_time: "2026-11-25T14:00:00Z" }, { relationships: { eventable: { data } } });
+
+  it("a prospect eventable (id only, no name) is the prospect id, whatever the type's spelling", () => {
+    for (const type of ["prospect", "Prospect", "prospects", "matter", "Matters"]) {
+      const n = normalizeLawmaticsEvent(live({ type, id: "4417" }));
+      expect(n.ok && n.event.prospectId).toBe("4417");
+    }
+  });
+
+  it("the older relationships and the flat ids still win in their order", () => {
+    const n = normalizeLawmaticsEvent(ev({ start_time: "2026-11-25T14:00:00Z" }, { relationships: { prospect: { data: { type: "prospect", id: "p1" } }, eventable: { data: { type: "prospect", id: "p2" } } } }));
+    expect(n.ok && n.event.prospectId).toBe("p1");
+    const flat = normalizeLawmaticsEvent(ev({ start_time: "2026-11-25T14:00:00Z", prospect_id: "p3" }));
+    expect(flat.ok && flat.event.prospectId).toBe("p3");
+  });
+
+  it("a contact eventable is not a prospect id; its email comes from the sideload, else the run's contacts", () => {
+    const rec = live({ type: "contact", id: "c9" });
+    const bare = normalizeLawmaticsEvent(rec);
+    expect(bare.ok && bare.event.prospectId).toBeNull();
+    expect(bare.ok && bare.event.attendeeEmails).toEqual([]);
+    const side = normalizeLawmaticsEvent(rec, new Map([["contacts:c9", { id: "c9", type: "contacts", attributes: { email: "Ola@Example.test" } }]]));
+    expect(side.ok && side.event.attendeeEmails).toEqual(["ola@example.test"]);
+    const fromRun = normalizeLawmaticsEvent(rec, new Map(), new Map([["c9", { email: "ola@example.test" }]]));
+    expect(fromRun.ok && fromRun.event.attendeeEmails).toEqual(["ola@example.test"]);
+    const other = normalizeLawmaticsEvent(rec, new Map(), new Map([["c8", { email: "x@example.test" }]]));
+    expect(other.ok && other.event.attendeeEmails).toEqual([]);
+  });
+
+  it("an eventable of another type, or with no id, links nothing", () => {
+    for (const data of [{ type: "user", id: "u1" }, { type: "prospect" }, { id: "4417" }]) {
+      const n = normalizeLawmaticsEvent(live(data));
+      expect(n.ok && n.event.prospectId).toBeNull();
+      expect(n.ok && n.event.attendeeEmails).toEqual([]);
+    }
+  });
+});
