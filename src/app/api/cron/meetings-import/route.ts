@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     return new NextResponse(null, { status: 401 });
   }
   // Two vercel.json entries per job (EST and EDT); only the tick in this job's New York hour works.
-  if (!shouldRunNow("meetings-import", new Date())) return NextResponse.json(NOT_THIS_HOUR);
+  if (shouldRunNow("meetings-import", new Date()) === null) return NextResponse.json(NOT_THIS_HOUR);
   const root = rootKeyOrNull();
   if (!root) return NextResponse.json({ ok: false, reason: "MAILBOX_TOKEN_KEY is not configured" }, { status: 503 });
   try {

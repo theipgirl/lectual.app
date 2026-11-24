@@ -1605,3 +1605,65 @@ export const STAFF_GUIDE_TOUR_BODY = "Choose Show tips again in this menu for a 
 export const OWNER_ROW_NEEDS_OWNER = "Only an owner of this firm can change or remove an owner.";
 /** Refused when the caller's own membership row couldn't be read: nothing was changed and nobody was signed out. */
 export const OWNER_ROW_CHECK_FAILED = "Couldn't confirm you're an owner of this firm, so nothing was changed. Refresh and try again.";
+
+// Lawmatics daily sync (new prospects and booked consults). Counts only; never a name, email, title or link.
+export const LAWMATICS_SYNC_NOW = "Sync from Lawmatics now";
+export const LAWMATICS_SYNC_READING = "Reading Lawmatics…";
+export const LAWMATICS_SYNC_HELP =
+  "Three times a day Lectual reads your Lawmatics: new enquiries become leads, booked consults go on the calendar, and people marked Hired get a matter (early morning only). This button does it now for your firm. It only reads from Lawmatics and never moves a lead's stage.";
+export const LAWMATICS_SYNC_NOT_ALLOWED = (who: string) => `${who} can sync from Lawmatics.`;
+export const LAWMATICS_SYNC_SIGN_IN = "Sign in again to sync from Lawmatics.";
+export const LAWMATICS_SYNC_REAUTH = "Lawmatics no longer accepts your firm's key. Reconnect it above.";
+export const LAWMATICS_SYNC_OUT_OF_TIME = "Lawmatics took too long. Try again shortly.";
+export const LAWMATICS_SYNC_NOT_CONNECTED = "Lawmatics isn't connected for your firm.";
+export const LAWMATICS_SYNC_FAILED = "We couldn't sync from Lawmatics just now. Try again shortly.";
+export const LAWMATICS_SYNC_KEY_UNREADABLE = "We couldn't open your firm's Lawmatics key, so nothing was synced. Reconnect it above, or try again shortly.";
+/** A step that couldn't read Lawmatics: named by what it does, never with raw text. */
+export const LAWMATICS_SYNC_STEP_NAMES = { hired: "hired matters", prospects: "new leads", consults: "consults" } as const;
+export const lawmaticsSyncStepsFailed = (steps: readonly string[]) =>
+  `We couldn't read Lawmatics for ${steps.join(" and ")}, so nothing was changed there. Try again shortly.`;
+const lmCount = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
+/** "Added 3 leads, linked 1, 1 came back, 2 need a look. 4 consults updated, 1 removed. Added 0 matters, linked 0." */
+export function lawmaticsSyncResult(s: {
+  leadsAdded: number;
+  leadsLinked: number;
+  cameBack: number;
+  needALook: number;
+  consultsUpdated: number;
+  consultsRemoved: number;
+  mattersAdded: number | null;
+  mattersLinked: number | null;
+  waiting: number;
+}): string {
+  const parts = [
+    `Added ${lmCount(s.leadsAdded, "lead", "leads")}, linked ${s.leadsLinked}, ${s.cameBack} came back, ${s.needALook} need a look.`,
+    `${lmCount(s.consultsUpdated, "consult", "consults")} updated, ${s.consultsRemoved} removed.`,
+  ];
+  if (s.mattersAdded !== null) parts.push(`Added ${lmCount(s.mattersAdded, "matter", "matters")}, linked ${s.mattersLinked ?? 0}.`);
+  if (s.waiting > 0) parts.push(`${s.waiting} more wait for the next run.`);
+  return parts.join(" ");
+}
+/** Fixed sentence stored as `lawmatics_connection.last_error` when Lawmatics refuses the firm's key during the sync. */
+export const LAWMATICS_SYNC_KEY_REFUSED = "Lawmatics stopped accepting your firm's token during the daily sync.";
+export const LAWMATICS_LAST_SYNC_NOT_READY = notReadyYet("Showing the last daily sync");
+export const lawmaticsLastSync = (when: string | null) => (when ? `Last complete daily sync ${when}.` : "The daily sync hasn't finished a complete run yet.");
+
+/** "Came back": a Lost, Won or Nurture lead who made a new enquiry in Lawmatics. Ids only on the timeline row. */
+export const CAME_BACK_LABEL = "Came back";
+export const CAME_BACK_UNAVAILABLE = "Can't show returning clients right now. Refresh to try again.";
+export type CameBackCategory = "won" | "lost" | "nurture";
+export function cameBackLine(name: string, category: CameBackCategory): string {
+  if (category === "won") return `${name} is an existing client with a new enquiry in Lawmatics (possibly a new trademark).`;
+  if (category === "lost") return `${name} came back with a new enquiry in Lawmatics. They were marked Lost.`;
+  return `${name} came back with a new enquiry in Lawmatics. They were in Nurture.`;
+}
+export const CAME_BACK_TIMELINE = "Came back: new enquiry in Lawmatics";
+export const CAME_BACK_OPEN = "Open lead";
+
+/** Consults from Lawmatics on Today, the lead page and the calendar. */
+export const LAWMATICS_CONSULTS_NOT_CONNECTED = "Consults from Lawmatics aren't shown: Lawmatics isn't connected.";
+export const LAWMATICS_CONSULTS_UNAVAILABLE = "Lawmatics consults couldn't be read just now.";
+export const LAWMATICS_CONSULTS_RECONNECT = "Lawmatics no longer accepts your firm's key, so new consults won't come over until you reconnect.";
+export const LAWMATICS_CONSULTS_NOT_READY = notReadyYet("Consults from Lawmatics");
+/** Stage suggestion reason for a consult booked in Lawmatics (it may have been booked by the client). */
+export const WHY_LAWMATICS_CONSULT = "This consult was booked in Lawmatics, possibly by the client, so a person decides.";

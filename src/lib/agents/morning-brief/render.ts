@@ -74,9 +74,10 @@ function block<T>(title: string, section: Section<T>, line: (item: T) => string)
   const problem = notOk(section as { state: string; reason?: string });
   if (problem) return [...out, problem];
   if (section.state !== "ok") return out;
-  if (section.items.length === 0) return [...out, NOTHING];
+  const note = section.note ? [section.note] : [];
+  if (section.items.length === 0) return [...out, ...(note.length ? note : [NOTHING])];
   const extra = section.items.length - LIST_CAP;
-  return [...out, ...section.items.slice(0, LIST_CAP).map((item) => `- ${line(item)}`), ...(extra > 0 ? [`and ${extra} more`] : [])];
+  return [...out, ...section.items.slice(0, LIST_CAP).map((item) => `- ${line(item)}`), ...(extra > 0 ? [`and ${extra} more`] : []), ...note];
 }
 
 export function dayLabel(nowMs: number, tz: string): string {

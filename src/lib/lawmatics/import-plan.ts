@@ -269,7 +269,7 @@ function normalizedEmail(value: string | null | undefined): string | null {
  * insensitive, so "O'Brien" / "OBrien" and "Jane  Doe" / "jane doe" match.
  * Null when there is no name to compare.
  */
-function nameKey(value: string | null | undefined): string | null {
+export function nameKey(value: string | null | undefined): string | null {
   const v = value
     ?.toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")

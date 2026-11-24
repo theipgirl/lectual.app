@@ -82,7 +82,11 @@ export async function runMorningBrief(ctx: AgentContext): Promise<AgentResult> {
   const [consults, suggestions, deadlines, pending] = await Promise.all([
     gate === "on"
       ? readTodaysConsults(admin, orgId, nowMs, tz)
-      : Promise.resolve<BriefSections["consults"]>({ state: "blocked", reason: MAILBOX_GATE_REASON[gate] }),
+      : // Mailboxes off or unreadable: Outlook isn't read. Lawmatics consults (not behind Mailboxes) still are; when
+        // there are none, or that read failed, the section says why Outlook wasn't read, as before.
+        readTodaysConsults(admin, orgId, nowMs, tz, { outlook: false }).then(
+          (r): BriefSections["consults"] => (r.state === "ok" && r.items.length > 0 ? r : { state: "blocked", reason: MAILBOX_GATE_REASON[gate] }),
+        ),
     readPendingSuggestions(admin, orgId),
     readUpcomingDeadlines(admin, orgId, nowMs, tz),
     readPending(ctx.listPending),
@@ -170,7 +174,9 @@ export async function runMorningBrief(ctx: AgentContext): Promise<AgentResult> {
   // A firm with the Mailboxes module deliberately off has not "failed to read" its consults; an unreadable module list still has.
   const consultsDeliberatelyOff = gate === "off";
   const unread = [
-    consults.state !== "ok" && !consultsDeliberatelyOff ? "consults" : null,
+    // An unreadable module list left the Outlook half unread even when Lawmatics consults were listed.
+    // One consult source of two unreadable (`note`) is a read that failed too.
+    (consults.state !== "ok" && !consultsDeliberatelyOff) || gate === "unreadable" || (consults.state === "ok" && consults.note) ? "consults" : null,
     waiting.state !== "ok" ? "waiting" : null,
     suggestions.state !== "ok" ? "suggestions" : null,
     stalled.state !== "ok" ? "stalled" : null,

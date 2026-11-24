@@ -288,7 +288,8 @@ describe("morning-brief: the consults section and the Mailboxes module (F21 iii,
     const body = briefOf(createDraft).draftBody;
     expect(body).toContain("Today's consults (not read)");
     expect(section(body, "Today's consults")).toContain("Not read: Mailboxes isn't switched on for your firm.");
-    expect(log.some((q) => q.table === "crm_calendar_event")).toBe(false);
+    // Only the Lawmatics daily sync's own rows are read (not behind Mailboxes); never an Outlook statement.
+    expect(log.some((q) => q.table === "crm_calendar_event" && q.filters.some((f) => f.column === "source" && f.value === "outlook"))).toBe(false);
     expect(body).toContain("Leads waiting on a reply (1)");
     expect(body).toContain("The queue (1)");
     // three different states, three different strings
@@ -306,8 +307,18 @@ describe("morning-brief: the consults section and the Mailboxes module (F21 iii,
       ctx.orgModules = modules;
       await runMorningBrief(ctx);
       expect(section(briefOf(createDraft).draftBody, "Today's consults")).toContain("Not read: couldn't check whether Mailboxes is switched on.");
-      expect(log.some((q) => q.table === "crm_calendar_event")).toBe(false);
+      expect(log.some((q) => q.table === "crm_calendar_event" && q.filters.some((f) => f.column === "source" && f.value === "outlook"))).toBe(false);
     }
+  });
+
+  it("the two consult sources are independent: a failed Lawmatics read keeps Outlook's consult and names the failed half", async () => {
+    const isLawmatics = (q: Recorded) => q.table === "crm_calendar_event" && q.filters.some((f) => f.column === "source" && f.value === "lawmatics");
+    const { ctx, createDraft } = setup({ tables: consultTables(), modules: ["mailbox"], failures: (q) => (isLawmatics(q) ? { message: "x" } : undefined) });
+    const result = await runMorningBrief(ctx);
+    const sec = section(briefOf(createDraft).draftBody, "Today's consults");
+    expect(sec).toContain("Today's consults (1)");
+    expect(sec).toContain("Lawmatics consults couldn't be read.");
+    expect(result.summary).toMatch(/Not read: consults/);
   });
 
   it("module on: today's consult is read and listed", async () => {

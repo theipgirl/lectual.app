@@ -2,24 +2,22 @@ import Link from "next/link";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { TODAY_CONSULT_DAYS } from "@/lib/calendar/outlook-read";
 import { formatEventWhen, joinHref } from "@/lib/calendar/outlook-format";
-import { loadTodayConsults, sourceNote, type TodayConsultsResult } from "@/lib/calendar/consult-sources";
+import { consultSources, loadTodayConsults, sourceNote, type TodayConsultsResult } from "@/lib/calendar/consult-sources";
+import { LAWMATICS_NAME } from "@/lib/ui/words";
 import { liveConsultDeps } from "@/lib/calendar/consult-sources-live";
 import "./calendar.css";
 
-const SOURCE_LABEL = { outlook: "Outlook", zoom: "Zoom" } as const;
+const SOURCE_LABEL = { outlook: "Outlook", lawmatics: LAWMATICS_NAME, zoom: "Zoom" } as const;
 
 /**
- * Today's "Consults" card: consults on the firm's connected Outlook calendars (the daily sync) and its
- * connected Zoom (a live read of upcoming meetings), starting today or in the next 7 days. It always
+ * Today's "Consults" card: consults on the firm's connected Outlook calendars (the daily sync), the consults the
+ * Lawmatics daily sync stored, and its connected Zoom (a live read of upcoming meetings), starting today or in the next 7 days. It always
  * draws something. A list is shown when there are consults; "No consults" only when every source was
  * read; a source that was not connected, not allowed or failed is named with its next step, and the
  * other source's consults still show. Read-only: nothing is sent or booked.
  */
 export function TodayConsultsView({ result, timeZone }: { result: TodayConsultsResult; timeZone: string }) {
-  const sources = [
-    { source: "outlook" as const, state: result.outlook },
-    { source: "zoom" as const, state: result.zoom },
-  ];
+  const sources = consultSources(result);
   const notes = sources.map((s) => sourceNote(s.source, s.state)).filter((n): n is NonNullable<typeof n> => n !== null);
   const allRead = notes.length === 0;
   const readOk = sources.filter((s) => s.state === "ok").map((s) => SOURCE_LABEL[s.source]);
@@ -67,7 +65,7 @@ export function TodayConsultsView({ result, timeZone }: { result: TodayConsultsR
         </p>
       ) : readOk.length > 0 ? (
         <p className="lx-note">
-          No consults found in {readOk.join(" and ")} in the next {TODAY_CONSULT_DAYS} days.
+          No consults found in {readOk.join(", ").replace(/, ([^,]*)$/, " and $1")} in the next {TODAY_CONSULT_DAYS} days.
         </p>
       ) : null}
       {notes.map((n) => (

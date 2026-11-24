@@ -2,11 +2,9 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { getAdminClient } from "@/lib/db/admin";
 import type { Database, Json } from "@/lib/db/types";
-import { firmToken } from "@/lib/intake-forms/lawmatics-sync";
 
-import { createLawmaticsClient, type FetchLike, type LawmaticsClient } from "./client";
+import { lawmaticsFailureClass, type LawmaticsClient, type LawmaticsFailureClass, type ListResult } from "./client";
 import { normalizeHiredProspect } from "./hired-sync-normalize";
 import {
   LEAD_MOVE_REASON,
@@ -19,11 +17,12 @@ import {
   type PlanStage,
 } from "./hired-sync-plan";
 import { field, idOf } from "./jsonapi";
-import { readOriginLookups } from "./lead-origin-read";
+import { readOriginLookups, type OriginLookups } from "./lead-origin-read";
 import { leadRead } from "@/lib/leads/live";
 
 /**
- * Hired-matter sync runner (Lawmatics -> Lectual). Runs as the SERVICE ROLE, per ACTIVE
+ * Hired-matter sync, one firm (Lawmatics -> Lectual). The Lawmatics daily sync (./daily-sync.ts) calls `syncFirm` per
+ * firm on its full run; there is no runner of its own any more. Runs as the SERVICE ROLE, per ACTIVE
  * `lawmatics_connection` row, using THAT firm's own token. Every read is filtered on, and every
  * insert stamped with, the `org_id` of the connection row (a database value, never request data).
  * Reads Lawmatics only; never writes to it. Logs nothing about people: the result is counts.
@@ -48,27 +47,8 @@ export type FirmResult = {
   leadsMoved: number;
   /** Lead moves that errored. The matter is untouched and the run goes on. */
   leadMovesFailed: number;
-};
-
-export type HiredSyncSummary = {
-  connections: number;
-  created: number;
-  linked: number;
-  skipped: number;
-  failedFirms: number;
-  failedWrites: number;
-  leadsMoved: number;
-  leadMovesFailed: number;
-};
-
-export type HiredSyncDeps = {
-  admin?: Admin;
-  /** Restrict to one firm (the manual button). The org comes from the session, never a form. */
-  orgId?: string;
-  getToken?: (admin: Admin, orgId: string) => Promise<string | null>;
-  fetchImpl?: FetchLike;
-  client?: (token: string) => LawmaticsClient;
-  now?: () => Date;
+  /** When a Lawmatics call threw: its status class only (never the message). */
+  failure?: LawmaticsFailureClass;
 };
 
 const FAILED: FirmResult = { ok: false, created: 0, linked: 0, skipped: 0, failedWrites: 0, leadsMoved: 0, leadMovesFailed: 0 };
@@ -85,7 +65,15 @@ async function pageAll<T>(read: (from: number, to: number) => PromiseLike<{ data
   return null; // more than `max` rows: not a complete read
 }
 
-async function readProspects(client: LawmaticsClient): Promise<HiredProspect[] | null> {
+/**
+ * The `/prospects` read the Lawmatics daily sync shares between its steps (one request for the hired step and
+ * the prospect step), with the origin lookups. `null` means that read failed: the hired step then writes nothing.
+ * Its rules are unchanged: a truncated or unrecognised list is not a read the hired step trusts.
+ */
+export type SharedProspectRead = { prospects: ListResult; lookups: OriginLookups } | null;
+
+async function readProspects(client: LawmaticsClient, shared?: SharedProspectRead): Promise<HiredProspect[] | null> {
+  if (shared === null) return null;
   const areas = await client.listAll("/practice_areas", { params: { fields: "all" } });
   if (areas.truncated || areas.unrecognisedShape) return null;
   const names = new Map<string, string>();
@@ -94,10 +82,10 @@ async function readProspects(client: LawmaticsClient): Promise<HiredProspect[] |
     const name = field(a, "name", "title", "label");
     if (id && name) names.set(id, name);
   }
-  const pulled = await client.listAll("/prospects", { params: { fields: "all" } });
+  const pulled = shared ? shared.prospects : await client.listAll("/prospects", { params: { fields: "all" } });
   if (pulled.truncated || pulled.unrecognisedShape) return null;
   // Optional: tag and custom-field names for the lead origin. A failed read only skips those rules.
-  const lookups = await readOriginLookups(client);
+  const lookups = shared ? shared.lookups : await readOriginLookups(client);
   const out: HiredProspect[] = [];
   for (const raw of pulled.records) {
     const n = normalizeHiredProspect(raw, names, lookups);
@@ -106,9 +94,9 @@ async function readProspects(client: LawmaticsClient): Promise<HiredProspect[] |
   return out;
 }
 
-export async function syncFirm(admin: Admin, orgId: string, client: LawmaticsClient, now: Date): Promise<FirmResult> {
+export async function syncFirm(admin: Admin, orgId: string, client: LawmaticsClient, now: Date, shared?: SharedProspectRead): Promise<FirmResult> {
   try {
-    const prospects = await readProspects(client);
+    const prospects = await readProspects(client, shared);
     if (!prospects) return { ...FAILED };
 
     const [matters, leads, stages, leadStageRows] = await Promise.all([
@@ -206,8 +194,8 @@ export async function syncFirm(admin: Admin, orgId: string, client: LawmaticsCli
     }
 
     return { ok: true, created, linked, skipped: plan.skipped.length, failedWrites, leadsMoved, leadMovesFailed };
-  } catch {
-    return { ...FAILED };
+  } catch (err) {
+    return { ...FAILED, failure: lawmaticsFailureClass(err) };
   }
 }
 
@@ -273,35 +261,4 @@ async function logRow(admin: Admin, orgId: string, matterId: string, type: "matt
   } catch {
     /* counts only */
   }
-}
-
-export async function runHiredSync(deps: HiredSyncDeps = {}): Promise<HiredSyncSummary> {
-  const admin = deps.admin ?? getAdminClient();
-  const getToken = deps.getToken ?? ((a, o) => firmToken(a, o));
-  const makeClient = deps.client ?? ((token: string) => createLawmaticsClient({ token, fetchImpl: deps.fetchImpl }));
-  const now = deps.now ?? (() => new Date());
-
-  let q = admin.from("lawmatics_connection").select("id, org_id").eq("status", "active");
-  if (deps.orgId) q = q.eq("org_id", deps.orgId);
-  const { data: conns, error } = await q;
-  if (error) throw new Error("connection read failed");
-
-  const summary: HiredSyncSummary = { connections: conns?.length ?? 0, created: 0, linked: 0, skipped: 0, failedFirms: 0, failedWrites: 0, leadsMoved: 0, leadMovesFailed: 0 };
-  for (const conn of conns ?? []) {
-    let result: FirmResult;
-    try {
-      const token = await getToken(admin, conn.org_id);
-      result = token ? await syncFirm(admin, conn.org_id, makeClient(token), now()) : { ...FAILED };
-    } catch {
-      result = { ...FAILED };
-    }
-    if (!result.ok) summary.failedFirms += 1;
-    summary.created += result.created;
-    summary.linked += result.linked;
-    summary.skipped += result.skipped;
-    summary.failedWrites += result.failedWrites;
-    summary.leadsMoved += result.leadsMoved;
-    summary.leadMovesFailed += result.leadMovesFailed;
-  }
-  return summary;
 }

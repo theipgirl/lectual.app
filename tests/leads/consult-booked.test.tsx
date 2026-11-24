@@ -85,9 +85,13 @@ const lead = {
 };
 
 const loadBookedConsult = vi.fn();
+const loadBookedLawmaticsConsult = vi.fn();
 
-function mockPage(opts: { mailbox: boolean; read?: Read | "throws" }) {
+/** `lawmatics`: the Lawmatics daily sync's read (null = Lawmatics isn't connected, the default). */
+function mockPage(opts: { mailbox: boolean; read?: Read | "throws"; lawmatics?: Read | null }) {
   loadBookedConsult.mockReset();
+  loadBookedLawmaticsConsult.mockReset();
+  loadBookedLawmaticsConsult.mockImplementation(async () => opts.lawmatics ?? null);
   loadBookedConsult.mockImplementation(async () => {
     if (opts.read === "throws") throw new Error("must not escape");
     return opts.read ?? { status: "ok", event: null };
@@ -127,6 +131,7 @@ function mockPage(opts: { mailbox: boolean; read?: Read | "throws" }) {
   vi.doMock("@/lib/answers/load-answers", () => ({ loadLeadAnswers: vi.fn(async () => ({ submissions: { status: "skipped" }, booth: { status: "skipped" }, requests: { status: "skipped" } })) }));
   vi.doMock("@/lib/files/read", () => ({ loadDocumentsRead: vi.fn(async () => ({ files: { status: "ok", files: [] }, letters: { status: "skipped" } })) }));
   vi.doMock("@/lib/calendar/outlook-read", () => ({ loadBookedConsult }));
+  vi.doMock("@/lib/calendar/lawmatics-read", () => ({ loadBookedLawmaticsConsult }));
   for (const [path, names] of Object.entries({
     "@/components/leads/LeadForms": ["AssignSelect", "EditLeadForm", "NoteComposer", "ProposalCard", "StageSelect"],
     "@/components/leads/LeadExtras": ["LeadTags", "PrepConsult"],
@@ -200,5 +205,21 @@ describe("lead page: Consult booked", () => {
     expect(html).not.toContain("switched on for your firm yet");
     expect(html).not.toContain("consult is booked");
     expect(html).toContain("Timeline");
+  });
+
+  it("(38) a Lawmatics consult shows for a firm WITHOUT the Mailboxes feature (not behind it), and no Outlook read runs", async () => {
+    mockPage({ mailbox: false, read: { status: "ok", event: storedConsult() }, lawmatics: { status: "ok", event: storedConsult({ id: "lm-1", source: "lawmatics" } as never) } });
+    const html = await render();
+    expect(loadBookedConsult).not.toHaveBeenCalled();
+    expect(loadBookedLawmaticsConsult).toHaveBeenCalledWith("lead-amara");
+    expect(html).toContain("Consult booked");
+    expect(html).toContain(WHEN);
+  });
+
+  it("the earliest of the two is shown, and a failed Lawmatics read never hides an Outlook booking", async () => {
+    mockPage({ mailbox: true, read: { status: "ok", event: storedConsult() }, lawmatics: { status: "unavailable" } });
+    const html = await render();
+    expect(html).toContain("Consult booked");
+    expect(html).toContain(WHEN);
   });
 });

@@ -45,6 +45,27 @@ export async function getLawmaticsConnection(): Promise<ConnectionRead> {
   return { ok: true, connection: (data as LawmaticsConnection | null) ?? null };
 }
 
+/**
+ * The daily sync's "last complete run" (proposed lectual 0118, `last_sync_at`), through RLS. Three states: the value
+ * (null = no complete run yet), not set up (the column isn't there: 42703 / PGRST204, judged on the code), or
+ * couldn't be read.
+ */
+export type LastSyncView = { status: "ok"; value: string | null } | { status: "not-set-up" } | { status: "unavailable" };
+
+export async function getLawmaticsLastSync(): Promise<LastSyncView> {
+  try {
+    const supabase = await getScopedClient();
+    const { data, error } = await supabase.from("lawmatics_connection").select("last_sync_at").maybeSingle();
+    if (error) {
+      const code = (error as { code?: string }).code;
+      return code === "42703" || code === "PGRST204" ? { status: "not-set-up" } : { status: "unavailable" };
+    }
+    return { status: "ok", value: typeof data?.last_sync_at === "string" ? data.last_sync_at : null };
+  } catch {
+    return { status: "unavailable" };
+  }
+}
+
 export class LawmaticsNotConnectedError extends Error {
   constructor(message = "Lawmatics isn't connected for your firm. Connect it in Settings → Integrations.") {
     super(message);

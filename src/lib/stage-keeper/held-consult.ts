@@ -3,7 +3,7 @@ import { isDatabaseUpdateNeeded } from "@/lib/calendar/outlook-errors";
 import { leadRead } from "@/lib/leads/live";
 
 /**
- * A consult that took place is real contact: it moves the lead's last touch forward to the end
+ * A consult that took place (Outlook, or one the Lawmatics daily sync stored) is real contact: it moves the lead's last touch forward to the end
  * of the call, so the Intake list's "last thing that happened" sort sees it.
  *
  * Runs right after the calendar sync for every firm with the mailbox module, whether or not the
@@ -15,7 +15,13 @@ import { leadRead } from "@/lib/leads/live";
  * `database-update-needed`, not as "no consults held".
  */
 
-export type HeldConsultResult = { orgId: string; state: "ok" | "database-update-needed" | "error"; bumped: number };
+export type HeldConsultResult = {
+  orgId: string;
+  state: "ok" | "database-update-needed" | "error";
+  bumped: number;
+  /** Set when one of the two sources (Outlook, Lawmatics) couldn't be read; the other was still used. */
+  partial?: "outlook" | "lawmatics";
+};
 
 const DAY_MS = 86_400_000;
 /** The calendar sync keeps seven days of the past, so that is as far back as this looks. */
@@ -27,18 +33,25 @@ type EventRow = { id: string; lead_id: string | null; starts_at: string; ends_at
 export async function bumpHeldConsults(admin: SupabaseClient, orgId: string, nowMs: number = Date.now()): Promise<HeldConsultResult> {
   try {
     const nowIso = new Date(nowMs).toISOString();
-    const { data, error } = await admin
-      .from("crm_calendar_event")
-      .select("id, lead_id, starts_at, ends_at")
-      .eq("org_id", orgId)
-      .eq("source", "outlook")
-      .eq("is_consult", true)
-      .not("lead_id", "is", null)
-      .gte("starts_at", new Date(nowMs - (LOOKBACK_DAYS + 1) * DAY_MS).toISOString())
-      .lt("starts_at", nowIso)
-      .order("starts_at", { ascending: true })
-      .limit(500);
-    if (error) return { orgId, state: isDatabaseUpdateNeeded(error) ? "database-update-needed" : "error", bumped: 0 };
+    // Outlook's consults, and the Lawmatics daily sync's OWN rows (`lmsync:`); a legacy Lawmatics row is never read.
+    const read = (source: "outlook" | "lawmatics") => {
+      const q = admin.from("crm_calendar_event").select("id, lead_id, starts_at, ends_at").eq("org_id", orgId).eq("source", source);
+      return (source === "lawmatics" ? q.like("external_id", "lmsync:%") : q)
+        .eq("is_consult", true)
+        .not("lead_id", "is", null)
+        .gte("starts_at", new Date(nowMs - (LOOKBACK_DAYS + 1) * DAY_MS).toISOString())
+        .lt("starts_at", nowIso)
+        .order("starts_at", { ascending: true })
+        .limit(500);
+    };
+    const [outlook, lawmatics] = await Promise.all([read("outlook"), read("lawmatics")]);
+    // Each source on its own: a failed Lawmatics read never drops Outlook's held consults, nor the other way round.
+    // Both failing is the old answer; one failing still bumps from the other and reports the failure.
+    if (outlook.error && lawmatics.error) {
+      return { orgId, state: isDatabaseUpdateNeeded(outlook.error) ? "database-update-needed" : "error", bumped: 0 };
+    }
+    const partial: Pick<HeldConsultResult, "partial"> = outlook.error ? { partial: "outlook" } : lawmatics.error ? { partial: "lawmatics" } : {};
+    const data = [...(outlook.error ? [] : (outlook.data ?? [])), ...(lawmatics.error ? [] : (lawmatics.data ?? []))];
 
     // The newest end per lead, for events that have actually ended.
     const endByLead = new Map<string, number>();
@@ -48,7 +61,7 @@ export async function bumpHeldConsults(admin: SupabaseClient, orgId: string, now
       if (!Number.isFinite(end) || end > nowMs) continue;
       if (end > (endByLead.get(row.lead_id) ?? Number.NEGATIVE_INFINITY)) endByLead.set(row.lead_id, end);
     }
-    if (endByLead.size === 0) return { orgId, state: "ok", bumped: 0 };
+    if (endByLead.size === 0) return { orgId, state: "ok", bumped: 0, ...partial };
 
     const ids = [...endByLead.keys()];
     const touched = new Map<string, number | null>();
@@ -79,7 +92,7 @@ export async function bumpHeldConsults(admin: SupabaseClient, orgId: string, now
       if (upErr) return { orgId, state: "error", bumped };
       bumped += 1;
     }
-    return { orgId, state: "ok", bumped };
+    return { orgId, state: "ok", bumped, ...partial };
   } catch {
     return { orgId, state: "error", bumped: 0 };
   }

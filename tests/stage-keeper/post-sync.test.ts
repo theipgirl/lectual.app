@@ -207,10 +207,10 @@ describe("the mailbox-sync route", () => {
     expect(runMailboxSync).not.toHaveBeenCalled();
   });
 
-  it("vercel.json names the same four crons (each twice, EST and EDT), no new one", () => {
+  it("vercel.json names the same four crons (each an EST/EDT pair per hour; the Lawmatics sync has three hours), no new one", () => {
     const crons = JSON.parse(readFileSync("vercel.json", "utf8")).crons as { path: string; schedule: string }[];
     expect([...new Set(crons.map((c) => c.path))].sort()).toEqual(["/api/cron/agents/", "/api/cron/lawmatics-matters/", "/api/cron/mailbox-sync/", "/api/cron/meetings-import/"]);
-    expect(crons).toHaveLength(8);
+    expect(crons).toHaveLength(12);
   });
 
   it("the route adds no admin client of its own: the step reaches the runner only through productionRunnerDeps", () => {

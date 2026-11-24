@@ -3,7 +3,7 @@ import { PREP_WINDOW_HOURS } from "@/lib/agents/consult-prep/constants";
 
 /**
  * WHEN the scheduled jobs run, read from the code that schedules them, never written down a second time:
- * `INTENDED_NY_HOUR` (`src/lib/cron/ny-hour.ts`) is the New York hour each daily job is let through in (the
+ * `INTENDED_NY_HOUR` (`src/lib/cron/ny-hour.ts`) lists the New York hours each job is let through in (the
  * two vercel.json entries per job and the hour guard make it that hour all year). A job may fire anywhere in
  * its hour (Vercel moves the minute), so a promise names the WHOLE hour, never a minute.
  *
@@ -23,9 +23,9 @@ export function nextRunWindow(job: CronJob, after: Date): RunWindow | null {
   if (!Number.isFinite(t0)) return null;
   let t = Math.floor(t0 / HOUR_MS) * HOUR_MS;
   if (t <= t0) t += HOUR_MS;
-  const hour = INTENDED_NY_HOUR[job];
+  const hours = INTENDED_NY_HOUR[job];
   for (let i = 0; i < SEARCH_HOURS; i += 1, t += HOUR_MS) {
-    if (newYorkHour(new Date(t)) === hour) return { job, start: new Date(t).toISOString(), end: new Date(t + HOUR_MS).toISOString() };
+    if (hours.includes(newYorkHour(new Date(t)))) return { job, start: new Date(t).toISOString(), end: new Date(t + HOUR_MS).toISOString() };
   }
   return null;
 }
