@@ -1,23 +1,21 @@
 # Lectual audits: one picture (Nov 23, 2026)
 
-This page brings together your published audit pages, the repository's own record of reviews, and what was said in the recorded meetings that could be read. Section 10 lists what could not be read. Nothing was built or changed to write it.
+This page brings together your published audit pages, the repository's own record of reviews, and what was said in the recorded meetings that could be read. Section 11 lists what could not be read. Nothing was built or changed to write it.
 Sources are in brackets. "Page" means one of your published pages; "repository" means the product's own record; "meeting" means a recorded call; "SOPs" means the firm's written procedures.
 
 ## 1. The short answer
 
 **Read this first.** Nearly every comment on record about Lectual being confusing comes from Taylor and Caitlyn, the two people building it and setting it up. Rayn, Dawn and Amor have barely used it, so nobody yet knows what confuses the people Lectual is for (meeting notes, Oct 16 to Nov 23).
 
-In short: Lectual was built faster than the firm settled how it works. The team has barely used it. It also shows the same things in several places and under several names.
+The seven causes, most important first (evidence in brackets; details in section 3):
 
-The seven causes, most important first:
-
-1. **It covers only half of how the firm works.** The spreadsheet and Lawmatics are still in use, and some things are entered twice. 88 of the 257 steps in the SOPs still happen only in Lawmatics, Outlook or at the USPTO. In Lawmatics today, 19 of 71 automations are on, the welcome email is sent by hand, and engagement letters are still signed there (95 completed, 38 expired unsigned). The firm has 40 open decisions; a few have answers given in meetings that have not yet been written into the SOPs. *Evidence: the team in meetings, the SOP comparison page, the Lawmatics inventory, the repository.*
-2. **It is hardly used, and nobody has been trained.** Taylor is the only daily user. The reviews since Oct 19 looked at the code and at pictures of the screens filled with made-up data; none watched a person at the firm use the product. *Evidence: the meetings, the audit pages, the repository.*
-3. **The same job is in several places.** Caitlyn and Taylor (both building it) found approvals spread across boards and every table and board drawn differently. The owner and the team see two different versions of the main screens, and different roles see different menus. *Evidence: the builders, the audit pages, the repository.*
-4. **One thing has several names**, such as Copilot, agent and assistant, and the names change again between Lectual and Lawmatics. *Evidence: the builders, one remark probably Rebecca's, the audit pages, the repository.*
-5. **Much is built but nobody can see it.** 27 built things are waiting to be switched on, and about 47 have never been tried by a person in the real product. Caitlyn could not edit and Amor had no access, so people could not have seen them anyway. *Evidence: the repository, the audit pages, the team's access problems.*
-6. **Numbers people do not trust.** Taylor told Rebecca that nobody understands the $26,000 "proposals out" figure. Items waiting on the client showed as the law clerk's to do. The message "isn't switched on" appears for several reasons, and the screen does not say which. *Evidence: the meetings, the Oct 19 audit, the repository.*
-7. **The plan kept changing.** Six designs have been drawn since Sep 9, and they do not agree. The product's rule book keeps old rules beside the ones that replaced them. This mostly confuses the people building Lectual; the team has not seen the design pages. *Evidence: the builders and the pages only.*
+1. **It covers only half of how the firm works:** the spreadsheet and Lawmatics still do much of the work, and 46 firm decisions are open. *(team, SOP page, Lawmatics inventory, repository)*
+2. **It is hardly used, and nobody has been trained:** Taylor is the only daily user. *(meetings, audit pages, repository)*
+3. **The same job is in several places**, and different people see different versions of the screens. *(builders, audit pages, repository)*
+4. **One thing has several names**, in Lectual and again between Lectual and Lawmatics. *(builders, audit pages, repository, Lawmatics inventory)*
+5. **Much is built but nobody can see it:** 27 things wait to be switched on, and about 47 were never tried by a person. *(repository, audit pages)*
+6. **Numbers people do not trust**, such as the $26,000 "proposals out" figure Taylor said nobody understands. *(meetings, Oct 19 audit, repository)*
+7. **The plan kept changing:** six designs since Sep 9. This mostly confuses the builders. *(builders and pages only)*
 
 **Done well:** the audits found the screen problems in detail, and most of them were changed in the code. **Not done by any audit:** watching the firm's people use Lectual for real work, from a new lead through to a filed mark.
 
@@ -39,11 +37,11 @@ The seven causes, most important first:
 | Design Inconsistency Checklist | Nov 17 | Every screen, both versions | 43 (5 broken) | 5 decided, 4 need your pick, none marked done | Page |
 | Visual review and checker rounds | Nov 17 | Every screen area, pictures of the screens | Not counted | Look-only fixes in code | Repository |
 | SOPs compared with Lectual | Nov 17 | 257 SOP steps | 21 differences, 5 fix-now, 36 questions | Fix-now: 3 fixed, 1 partly (wording waits on the attorney), 1 open; the rest open | Page |
-| Review rounds on Leads, merging, the lead page (Sprint 10) | Nov 17 | Leads page, merge, lead page | Not counted | Fixed in code; not checked on a real screen | Repository |
+| Review rounds on Intake (then called Leads), merging, the lead page (Sprint 10) | Nov 17 | Intake page, merge, lead page | Not counted | Fixed in code; not checked on a real screen | Repository |
 | Deadline safety review | Nov 20 to 23 | Closing matters, deadline alerts | Not counted | Extended to registered marks; database update not applied | Repository |
 | Approvals routing review (Sprint 4) | Nov 20 | Passing drafts to a drafter | 10+ | Fixed in code; one blocker and one decision still open | Repository |
 | Strict review of the Adobe signing plan | Nov 22 | A plan on paper | about 21 decisions | Nothing built; on hold | Repository |
-| Client lifecycle review | Nov 23 | The client journey, in 30 steps | 31, plus 10 gaps | Applied to the document; the 40 decisions are open | Repository, docs/rpb |
+| Client lifecycle review | Nov 23 | The client journey, in 30 steps | 31, plus 10 gaps | Applied to the document; 46 decisions, nearly all open | Repository, docs/rpb |
 | Lawmatics phase-out read | Nov 23 | 4 SOPs and the Lawmatics guide | about 5 | Open | Repository |
 
 Six different designs have been drawn since Sep 9, from the Screen Spec to the Agentic IP OS concept. Section 7 lists where they disagree (pages, Sep 9 to Nov 17).
@@ -61,11 +59,13 @@ Labels used: MA = Master Audit (Oct 19); FIL = Fix & Integration List (Oct 19); 
 - An approved email becomes a draft in the approver's own Outlook, with no copies. Approvals. SOP B4; mtg Oct 27. **Open**
 - Nothing reads USPTO notices; deadlines are typed in by hand. Matters. SOP T3; LC; repo. **Open**
 - Deadline safety nets were added: a flag when there is no open deadline, alerts at 7 and 30 days, and a block on closing a matter with a deadline open. Matters, Today. SOP T3; repo. **Changed, not checked on a real screen**
-- Intake forms add Lawmatics tags that start client emails nobody approved. Forms. SOP B3. **Open**
-- The assistant that moves leads between stages does it on its own; the agents SOP says it should only suggest. Leads. SOP B2. **Open**
-- The same person shows up twice, from two sources or in two stages. Intake. mtg Nov 12; FIL; repo. **Fixed** (merging duplicates is live; Taylor, Nov 24)
+- Intake forms add Lawmatics tags, and one kind, the source tag (such as "UGW 2026"), starts a client email nobody approved; the Hot, Warm and Cold Lead tags start nothing (Lawmatics inventory, Nov 24). Forms. SOP B3. **Open**
+- The assistant that moves leads between stages does it on its own; the agents SOP says it should only suggest. Intake. SOP B2. **Open**
+- The same person shows up twice, from two sources or in two stages. Intake. mtg Nov 12; FIL; repo. **Changed, not checked on a real screen** (merging duplicate leads is live, Taylor, Nov 24; duplicates still arrive from two sources and are merged by hand)
 - Proposals Rebecca missed were on the spreadsheet, not in Lectual. Proposals. mtg Nov 9. **Not known**
-- A no-show can be logged on the lead's timeline, but there is no no-show stage and no follow-ups. Leads. mtg Oct 16; SOP T11. **Open**
+- A no-show can be logged on the lead's timeline, but there is no no-show stage and no follow-ups. Intake. mtg Oct 16; SOP T11. **Open**
+- No-shows get no automatic follow-up in Lawmatics either: its two no-show automations are on but show 0 runs, so they reach nobody (Lawmatics inventory, Nov 24). Lawmatics. **Open**
+- Much of the work still runs in Lawmatics: 19 of 71 automations are on, the welcome email has been sent 53 times by hand, and Hired is set by hand (Lawmatics inventory, Nov 24). Lawmatics. **Open**
 - The Weekly review filed an unpaid office-action invoice as waiting on the USPTO. Weekly review. SOP C1; repo. **Fixed** (the repository says this was checked on the live system; no matter was in that stage, so it has not been seen working on a real one)
 
 **Cause 2: hardly used**
@@ -83,12 +83,12 @@ Labels used: MA = Master Audit (Oct 19); FIL = Fix & Integration List (Oct 19); 
 - The lead page did not say what the Weekly review said. Lead page. mtg Nov 17; repo. **Changed, not checked on a real screen**
 - There are two proposals pages. The older one is hidden when the Proposals feature is on, and it has the same name. Proposals. MA; CL 22; repo. **Open**
 - The proposal maker confuses everyone but Taylor: ten forms and seven Save buttons. Proposals. mtg Nov 10; repo; Proposal Flow Mockup. **Changed, not checked on a real screen**
-- The Leads list showed about 280 import rows, with no paging and chips that did nothing. Leads. DvB; MA. **Changed, not checked on a real screen**
+- The Intake list (then called Leads) showed about 280 import rows, with no paging and chips that did nothing. Intake. DvB; MA. **Changed, not checked on a real screen**
 - Main menu headings opened reports instead of the work. Menu. MA; repo. **Changed, not checked on a real screen**
 - Home, Today and Calendar answer the same question. Today. pages: Design Decisions; Screen Spec. **Not known**
 
 **Cause 4: several names**
-- Leads vs Intake. Menu, Intake. mtg Nov 12; CL 22; DvB M2; repo. **Fixed** (the screen is now called Intake; Taylor, Nov 24)
+- Leads vs Intake. Menu, Intake. mtg Nov 12; CL 22; DvB M2; repo. **Fixed** (the screen is now called Intake; Taylor, Nov 24; whether every menu and phone-bar label says Intake was not checked)
 - Proposals and Quotes; Mail and My Mail; Approvals, Your deal and Needs you. Menu. CL 22. **Open**
 - Column names: Owner or Whose court; Last touch or Last contact; Our turn or Us. Lists. CL 23 (needs your pick). **Open**
 - Six or more phrases mean "someone must act". Several screens. repo. **Open**
@@ -121,7 +121,7 @@ Labels used: MA = Master Audit (Oct 19); FIL = Fix & Integration List (Oct 19); 
 - Some dates use the wrong time zone. Meetings, Matters, Mail. CL 21. **Open**
 - Colours turn dark on a computer set to dark mode. Account menu, owner pages. CL 11. **Open**
 
-Counts in this section (53 lines): Fixed 5, Changed, not checked on a real screen 14, Open 28, Not known 6.
+Counts in this section (55 lines): Fixed 4, Changed, not checked on a real screen 15, Open 30, Not known 6.
 
 **Left out:** about 30 smaller look items (chips, pills, buttons, corners, pop-ups, empty states) on the Design Inconsistency Checklist. The rest of the SOP differences (B1 to B21, D1 to D14) are on the SOPs compared page. Lower-priority polish is on the Master Audit.
 
@@ -158,7 +158,7 @@ Counts in this section (53 lines): Fixed 5, Changed, not checked on a real scree
 20. Copilot, which is hidden without the AI key.
 
 **Waiting on the firm:**
-21. Signing the engagement letter. Its database update is on the live database; the notes give two dates, Nov 12 and Nov 17. Signing stays off until Rebecca approves a version of the letter (repository). Meanwhile letters are signed in Lawmatics (Lawmatics inventory, Nov 24).
+21. Signing the engagement letter on the proposal page. It is built, its database update is on the live system, and the firm's letter was approved on Nov 12; no meeting on record shows a client signing this way yet (client lifecycle). Meanwhile letters are signed in Lawmatics (Lawmatics inventory, Nov 24).
 22. The welcome email, until its text is pasted in (repository, "not built").
 23. The meeting assistant, until the Monday call's title is given (same).
 24. Deadline alerts, until someone chooses who receives them (repository).
@@ -169,7 +169,7 @@ Counts in this section (53 lines): Fixed 5, Changed, not checked on a real scree
 27. The Outlook mailbox connection, which needs Dawn's Microsoft approval (meeting, Nov 17).
 
 **Separately**, about 47 built items have never been tried by a person in the real product or against the live service (repository, "Marked never verified"):
-- 11 on proposals, 6 on the letter, 6 on Lawmatics (never tried on a live account), 5 on the shell, 5 on the Weekly review, 4 on Leads, 4 on Approvals, and 6 elsewhere.
+- 11 on proposals, 6 on the letter, 6 on Lawmatics (never tried on a live account), 5 on the shell, 5 on the Weekly review, 4 on Intake, 4 on Approvals, and 6 elsewhere.
 - Some of these are also among the 27 above.
 
 ### Not built yet
@@ -200,28 +200,29 @@ The repository lists 38 things not built: 31 by choice or still pending, and 7 h
 
 Other renames (Shortcuts, Firm notes, AI tools, Features, Temperature) survive only in web addresses and code (repository, "Same thing, two names").
 
-**Between Lectual and Lawmatics** (Lawmatics inventory, Nov 24):
+**Inside Lawmatics, and between it and Lectual** (Lawmatics inventory, Nov 24):
 - Lawmatics has two intake pipelines with different stage names: one says "Consult Scheduled" and "Post Consultation Email Sent"; the other says "Discovery Call Scheduled", "Legal Strat Session Scheduled" and "Hired Client".
 - Lawmatics has three "how did you hear" fields; Lectual reads the one called "How did you hear about us?".
 - The master class tag is spelled two ways: "Masterclass Nov 2026" and "Master Class Nov 2026".
 - Hired is a status and also a separate stage ("Hired Client").
-- Lawmatics automations name stages that do not exist, such as "Long Term Nurture (BL)".
+- Lawmatics automations name stages that do not exist, such as "Long Term Nurture (BL)". That includes the switched-on no-show automation, which ends by moving a matter to "Long Term Nurture (BL)".
 - Two package questions give two prices for Essential ($1,950 and $1,650).
 
 ## 6. The same job in more than one place
 
 - **See what needs me today:** team Today; owner Today (behind the switch); "Mine" on Approvals; the "Waiting on you" strip on the Weekly review; the top card on each lead page; the bell; the morning brief. Owner Today is for the owner once the owner view is on. For everyone else, no source says which to use (repository).
-- **See all leads:** the Intake page (trademark leads only; Taylor, Nov 24); Pipeline (view only, every practice area); the Weekly review (leads past first contact); Reconcile; the Intake report. No source says which one each person should use (repository; SOPs compared, Nov 17, B15).
+- **See all leads:** the Intake page (Taylor, Nov 24), with trademark leads only (SOPs compared, Nov 17, B15); Pipeline (view only, every practice area); the Weekly review (leads past first contact); Reconcile; the Intake report. No source says which one each person should use (repository; SOPs compared, Nov 17, B15).
 - **See all matters:** Matters; Pipeline; the Weekly review; the Active matters report. Which to use is not decided. On Nov 17 Matters was narrowed to matters past the signed letter (repository).
 - **Run the Monday meeting:** the spreadsheet (today); the Weekly review Board (the default); the owner's editable List; the plain List; the Cards deck. The plan is the Weekly review from the week of Nov 23 (meeting, Nov 12). Rebecca appears to chair it. The SOPs put the meeting on a Wednesday; the recorded meetings are on Mondays (client lifecycle).
 - **Approve what goes to a client:** the team Approvals list; the owner deck (behind the switch); a single approval page; Yes on the lead page; email, text and Zoom (meeting, Nov 6). The owner is meant to use the deck; for the others this is not decided (repository).
 - **Make a proposal:** the three ways in on New proposal (from a consult, Ask Copilot, from scratch); the card on a lead; the card on a matter; the meeting's "Create proposal"; the Copilot drawer; the older Quotes page. Only Taylor makes proposals (meeting, Nov 17).
 - **Also done in Lawmatics today** (Lawmatics inventory, Nov 24):
   - **Pipeline:** 72 stages across five pipelines, two of them for intake.
-  - **Booking:** consults are booked in Lawmatics only, across 13 appointment types.
-  - **Signing:** engagement letters are signed in Lawmatics; Lectual's signing is built but off.
+  - **Booking:** consults are booked in Lawmatics (13 appointment types, three of them consults).
+  - **Signing:** letters are signed in Lawmatics (95 completed, 38 expired unsigned). Lectual's signing is built, but no client is on record using it yet.
+  - **Welcome:** the welcome email has been sent by hand from Lawmatics, 53 times.
   - **Invoices:** about 135 invoices are in Lawmatics; Lectual only has Mark paid.
-  - **Reminders:** form, letter, appointment and invoice reminders go out from Lawmatics; Lectual only drafts.
+  - **Reminders:** form, letter, appointment and invoice reminders are set to send from Lawmatics. Their templates show 0 sends, so whether any go out is to check. Lectual only drafts.
 - **Get set up:** the first sign-in tour; Getting started; Setup under Settings; the Today card. No source says which one each person should use (repository).
 
 ## 7. Where the audits disagree with each other
@@ -233,9 +234,9 @@ Other renames (Shortcuts, Firm notes, AI tools, Features, Temperature) survive o
 | Home and Calendar | Merge Calendar into Home (page: Screen Spec, Sep 9) | Keep Home, Today and Calendar separate (page: Design Decisions, Sep 11) |
 | Intake's new look | Already live (page: Design Inconsistency Checklist, item 2) | On its own line of work, not released (page: Design vs build, L2). **Settled:** Intake has the new look (Taylor, Nov 24) |
 | Look fixes | 15 of 17 fixed (page: Design before and after) | 43 items still listed, and "not recounted" (same page; Checklist) |
-| Merging duplicate leads | The database part is live (SOPs compared, "Already in progress") | Only on the test database (same page, T12); not checked on a real database (repository). **Settled:** it is live (Taylor, Nov 24) |
+| Merging duplicate leads | The database part is live (SOPs compared, "Already in progress") | One part of the same page says it was only on the test database (T12). **Settled:** it is live (Taylor, Nov 24) |
 | Engagement letter on the live database | Applied Nov 12 (repository, to-do list) | Verified on the live database Nov 17 (repository). It is on the live database; only the date differs |
-| How long a proposal stays open | SOP: 14 days, though its own note says 7 or 5 are used in practice. Firm notes: 14 days, but the consult credit expires after 1 week (page: Fix & Integration List) | Lectual: 10 days when drafted from a call, no default when made by hand (SOPs compared, B6). Meeting, Nov 10: 7 days plus two weeks' grace. **Settled:** 7 days, and it can be set longer on a proposal (Taylor, Nov 24). The other figures still appear in older documents |
+| How long a proposal stays open | SOP: 14 days, though its own note says 7 or 5 are used in practice. Firm notes: 14 days, but the consult credit expires after 1 week (page: Fix & Integration List) | Lectual: 10 days when drafted from a call, no default when made by hand (SOPs compared, B6). Meeting, Nov 10: 7 days plus two weeks' grace. Lectual now keeps a proposal open 7 days, and that can be set longer on a proposal (Taylor, Nov 24). **Not settled for the firm:** the SOP still says 14 days and has not been changed |
 | Patents | Out of scope (page: Positioning, Jul 24) | Listed as a practice area (pages: Lectual Gate, Docket, Agentic IP OS concept, Nov 17) |
 
 ## 8. What no audit has looked at
@@ -252,10 +253,13 @@ Other renames (Shortcuts, Firm notes, AI tools, Features, Temperature) survive o
 
 These are outside the audits, but they are the most urgent things found this week (Lawmatics inventory, Nov 24).
 - **The two Nov 17 master class texts are still on.** Anyone who registers now is texted "starts TODAY" and "has begun".
-- **The old intake form was renamed into the Black Friday checkout.** It still starts two active automations on every fill, past clients included.
-- **The secrets of seven developer apps can be read by every user, and all six users are Admins.** Three of those apps are named for Lectual or Claude.
+- **Trademark Form reminders are set to keep going after a client fills the form.** They stop on a stage a person must move, not on the form. Whether any have gone out is to check.
+- **A test automation is on in the live account.** "TEST LOE Automation" sends a real signature request when a tag is added. Test records and test invoices sit in live data.
+- **The old intake form was renamed into the Black Friday checkout.** It still starts two active automations on every fill, past clients included. They email nobody, but they can change an old matter's practice area.
+- **The secrets of seven developer apps can be read by every user, and all six users are Admins.** Three of the apps are named for Lectual or Claude, so check with Taylor before renewing any secret.
 - **The tag "UGW 2026" starts an active client email.** It is a source tag of the kind Lectual adds to Lawmatics.
-- **The no-show automations are on but have never run.**
+
+Not urgent: the no-show automations are broken (0 runs), but they reach nobody.
 
 ## 10. What to do next
 
