@@ -104,8 +104,8 @@ describe("a promise only from a job that is switched on", () => {
     expect(consultPrepGate(jobsOn(), unavailable())).toEqual({ on: "unknown" });
   });
 
-  it("Mailboxes off: consult prep is never promised", () => {
-    expect(consultPrepGate(jobsOn({ modules: { mailbox: false, proposals: true, agentToolkit: true } }), { status: "ok", value: [] })).toEqual({ on: false, why: "mailbox-off" });
+  it("Mailboxes off: consult prep is still promised (a Lawmatics consult or the consult stage needs no mailbox)", () => {
+    expect(consultPrepGate(jobsOn({ modules: { mailbox: false, proposals: true, agentToolkit: true } }), { status: "ok", value: [] })).toEqual({ on: true });
   });
 
   it("a recorder or approvers read that failed: unknown, never promised", () => {

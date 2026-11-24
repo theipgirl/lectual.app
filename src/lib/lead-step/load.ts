@@ -19,6 +19,7 @@ import { currentHolder, eventTrust, linkGateFlags, needsCloserLook, trustedCardS
 import { loadCardState } from "@/lib/queue/card-state";
 import { shownBodySha256 } from "@/lib/queue/shown-text";
 import { PREP_SOURCE } from "@/lib/agents/consult-prep/constants";
+import { normalizedStart } from "@/lib/consult-prep/keys";
 import { CONSULT_PROPOSAL_SOURCE } from "@/lib/consult-proposal/source";
 import type { Role } from "@/lib/auth/roles";
 import { leadCloserLook, type LeadCloserLook } from "./closer-look";
@@ -283,11 +284,11 @@ async function readActivity(db: Scoped, leadIds: readonly string[]): Promise<Rea
  * The assistants' markers, by targeted queries (never inferred from the capped timeline): consult prep's marker for
  * the booked event, the consult drafter's markers for the recorded calls, and a consult outcome a person logged.
  */
-export async function readMarkers(db: Scoped, leadIds: readonly string[], eventId: string | null, meetingIds: readonly string[]): Promise<Read<MarkersFact>> {
+export async function readMarkers(db: Scoped, leadIds: readonly string[], eventId: string | null, meetingIds: readonly string[], startsAt: string | null = null): Promise<Read<MarkersFact>> {
   const onLeads = <Q extends { in: (c: string, v: string[]) => Q; eq: (c: string, v: string) => Q }>(q: Q): Q => (leadIds.length > 1 ? q.in("lead_id", [...leadIds]) : q.eq("lead_id", leadIds[0]));
   const [prep, drafted, outcome] = await Promise.all([
     eventId
-      ? onLeads(db.from("crm_activity").select("payload").eq("type", "queue_drafted").eq("payload->>source", PREP_SOURCE).eq("payload->>event_id", eventId)).limit(1)
+      ? onLeads(db.from("crm_activity").select("payload").eq("type", "queue_drafted").eq("payload->>source", PREP_SOURCE).eq("payload->>event_id", eventId)).limit(20)
       : Promise.resolve({ data: [], error: null }),
     meetingIds.length > 0
       ? db
@@ -306,7 +307,15 @@ export async function readMarkers(db: Scoped, leadIds: readonly string[], eventI
     const id = (r.payload as Record<string, unknown> | null)?.meeting_id;
     if (typeof id === "string") handled.add(id);
   }
-  return ok({ preppedEventIds: eventId && (prep.data ?? []).length > 0 ? [eventId] : [], handledMeetingIds: [...handled], outcomeLogged: (outcome.data ?? []).length > 0 });
+  // Prepped = a marker for THIS consult. A prep keys on the event AND its start time (a reschedule gets a fresh prep), so a marker for the
+  // same event at another start does not count; a marker from before the keys existed has no start and counts as the event's.
+  const wanted = normalizedStart(startsAt);
+  const prepped = eventId !== null && (prep.data ?? []).some((r: { payload: unknown }) => {
+    const p = (r.payload ?? {}) as Record<string, unknown>;
+    if (typeof p.prep_key !== "string") return true;
+    return wanted === null || normalizedStart(typeof p.start_at === "string" ? p.start_at : null) === wanted;
+  });
+  return ok({ preppedEventIds: eventId && prepped ? [eventId] : [], handledMeetingIds: [...handled], outcomeLogged: (outcome.data ?? []).length > 0 });
 }
 
 /**
@@ -422,6 +431,7 @@ export async function loadLeadStepFacts(leadId: string, now: Date = new Date()):
               ids,
               consult.status === "ok" && consult.value ? consult.value.eventId : null,
               meetings.status === "ok" ? meetings.value.map((m) => m.id) : [],
+              consult.status === "ok" && consult.value ? consult.value.startsAt : null,
             ),
           );
 

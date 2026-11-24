@@ -185,7 +185,7 @@ describe("styling and sources", () => {
     const pages: Record<string, string> = {
       "lead-head": "src/app/dashboard/leads/[id]/page.tsx",
       "lead-timeline": "src/app/dashboard/leads/[id]/page.tsx",
-      "lead-prep": "src/app/dashboard/leads/[id]/page.tsx",
+      "lead-prep": "src/components/leads/ConsultPrepCard.tsx", // moved with the Consult prep card
       "matter-head": "src/app/dashboard/matters/[id]/page.tsx",
       "matter-deadlines": "src/app/dashboard/matters/[id]/page.tsx",
       "matter-aside": "src/app/dashboard/matters/[id]/page.tsx",

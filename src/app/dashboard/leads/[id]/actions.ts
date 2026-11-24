@@ -1,17 +1,14 @@
 "use server";
 
 // Ported from lectual src/app/(firm)/dashboard/leads/[id]/actions.ts: role gate,
-// assign, move stage, edit, note, tags, prep-consult and voice notes are
+// assign, move stage, edit, note, tags and voice notes are
 // unchanged. Not ported: the founder link. New: reviewProposalAction.
 
 import { revalidatePath } from "next/cache";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { ROLES, type Role } from "@/lib/auth/roles";
 import { addLeadNote, applyTag, assignLead, removeTag, updateLead } from "@/lib/pipeline";
-import { orgHasModule } from "@/lib/org/modules";
 import { addVoiceNote, VOICE_NOTE_MAX_BYTES } from "@/lib/voice/notes";
-import { queuePrepConsultDrafts } from "@/lib/prep-consult/generate";
-import { PrepConsultFlowError } from "@/lib/prep-consult/errors";
 import { validateLeadEdit, validateNote } from "@/lib/pipeline/lead-input";
 import { LeadWriteError } from "@/lib/pipeline/errors";
 import { logActivity } from "@/lib/matters/activity";
@@ -293,56 +290,6 @@ export async function removeTagAction(
 
   revalidatePath(`/dashboard/leads/${leadId}/`);
   return {};
-}
-
-export type PrepConsultActionState = {
-  error?: string;
-  headsUpQueueItemId?: string;
-  clientPrepQueueItemId?: string;
-};
-
-/**
- * "Prep this consult" trigger — the `prep-consult` skill's booking-triggered
- * drafts (HEADS-UP + CLIENT-PREP EMAIL), staff-invoked from the lead detail
- * page. See @/lib/prep-consult/generate.ts for the full orchestration and the
- * judgment-boundary discipline (never a Nice class, risk tier, package name,
- * or price). Like every other queue-writing action in this app, nothing here
- * sends anything — both drafts land in the approval queue for review.
- */
-export async function prepConsultAction(
-  _prev: PrepConsultActionState,
-  formData: FormData,
-): Promise<PrepConsultActionState> {
-  const leadId = String(formData.get("leadId") ?? "");
-  if (!leadId) return { error: "Missing lead." };
-
-  // The action is its own entry point — gating the card does not gate this.
-  // It drafts client-facing copy in one firm's attorney voice, so a firm
-  // without the toolkit must not be able to invoke it by posting directly.
-  if (!(await orgHasModule("agent-toolkit"))) {
-    return { error: "This isn't available for your firm." };
-  }
-
-  try {
-    const result = await queuePrepConsultDrafts({
-      leadId,
-      practiceArea: String(formData.get("practiceArea") ?? ""),
-      inquiryDescription: String(formData.get("inquiryDescription") ?? ""),
-      sessionWhen: String(formData.get("sessionWhen") ?? ""),
-      zoomLink: String(formData.get("zoomLink") ?? ""),
-    });
-    return {
-      headsUpQueueItemId: result.headsUpQueueItemId,
-      clientPrepQueueItemId: result.clientPrepQueueItemId,
-    };
-  } catch (err) {
-    return {
-      error:
-        err instanceof PrepConsultFlowError
-          ? err.message
-          : "Something went wrong drafting the consult prep emails. Try again in a minute. If it keeps happening, use Send feedback.",
-    };
-  }
 }
 
 /**

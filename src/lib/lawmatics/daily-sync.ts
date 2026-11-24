@@ -149,6 +149,12 @@ export type DailySyncSummary = {
   };
   /** Firms whose Lawmatics key couldn't be opened: nothing synced for them. */
   tokenUnreadable: number;
+  /**
+   * The consult prep run after a firm's consult step (counts only). `ran`: it ran (its own summary is in the Assistants log);
+   * `notOn`: the firm hasn't switched the assistant on (or Autopilot is paused); `skippedForTime`: too little of the wall budget was
+   * left, so it was left to the next sweep; `failed`: it could not start or threw. Never changes the sync's other counts.
+   */
+  consultPrep: { ran: number; notOn: number; skippedForTime: number; failed: number };
 };
 
 export type StepClientOptions = { signal: AbortSignal; timeLeftMs: () => number };
@@ -165,7 +171,17 @@ export type DailySyncDeps = {
   /** Monotonic-ish milliseconds for the budget. Defaults to Date.now. */
   clock?: () => number;
   budgetMs?: number;
+  /**
+   * Runs after a firm's consult step finished (not failed): the consult prep sweep for that firm. It is wrapped, so a throw
+   * is counted and never changes the sync's result. Absent = no prep (tests, the button).
+   */
+  afterConsults?: (orgId: string, info: { timeLeftMs: number }) => Promise<"ran" | "not-on">;
 };
+
+/** The consult prep sweep is not started with less than this left of the wall budget (counted, left to the next sweep). */
+export const MIN_PREP_START_MS = 30_000;
+/** One firm's prep gets at most this much of the wall budget that is left. */
+export const PREP_FIRM_CAP_MS = 60_000;
 
 export function emptySummary(mode: SyncMode): DailySyncSummary {
   return {
@@ -198,6 +214,7 @@ export function emptySummary(mode: SyncMode): DailySyncSummary {
     },
     consults: { ran: 0, failed: 0, written: 0, removed: 0, unchanged: 0, unlinked: 0, unusable: 0, overCap: 0, failedWrites: 0, heldByOlderRow: 0, prospectReadsFailed: 0, notReady: 0, removalsHeld: 0, eventsTruncated: 0, hiredSkipped: 0, lookupsDeferred: 0 },
     tokenUnreadable: 0,
+    consultPrep: { ran: 0, notOn: 0, skippedForTime: 0, failed: 0 },
   };
 }
 
@@ -750,6 +767,8 @@ type FirmState = {
   /** undefined: not read yet; null: the read failed. */
   shared: SharedRead | null | undefined;
   budget: { createsUsed: number; linksUsed: number };
+  /** The consult step ended `ok` (not failed, not out of time): only then is the firm's consult prep started, after every firm has synced. */
+  consultsOk?: boolean;
 };
 
 /** The order the prospect and consult steps visit firms: rotated by the hour, so a slow firm can't starve the same one every run. */
@@ -916,6 +935,28 @@ export async function runLawmaticsDailySync(deps: DailySyncDeps = {}): Promise<D
       if (okC === "failed") {
         s.consults.failed += 1;
         f.failed = true;
+      }
+      f.consultsOk = okC === "ok";
+    }
+  }
+
+  // ── pass 3: consult prep, AFTER every firm's sync steps. Prep never takes the wall budget a later firm's sync needed. ──
+  // Only a firm whose consult step ended ok (a timeout or a failure leaves its calendar rows unsure), each with its own cap, and
+  // none started with under MIN_PREP_START_MS left (counted, left to the next sweep). It can never change the sync's result.
+  if (deps.afterConsults) {
+    for (const f of fairOrder(firms, run.nowMs)) {
+      if (f.refused || !f.consultsOk) continue;
+      const left = wallDeadline - clock();
+      if (left < MIN_PREP_START_MS) {
+        s.consultPrep.skippedForTime += 1;
+        continue;
+      }
+      try {
+        const r = await deps.afterConsults(f.conn.org_id, { timeLeftMs: Math.min(left, PREP_FIRM_CAP_MS) });
+        if (r === "ran") s.consultPrep.ran += 1;
+        else s.consultPrep.notOn += 1;
+      } catch {
+        s.consultPrep.failed += 1;
       }
     }
   }
