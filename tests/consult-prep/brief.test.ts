@@ -139,3 +139,46 @@ describe("the consult brief", () => {
     expect(sessionText("nonsense", "America/New_York")).toBe("a time that could not be read");
   });
 });
+
+describe("review fixes: the emailed copy, the html order, never 'null'", () => {
+  it("the emailed copy has no 'Prepared' line (prepared: false); the default copy still does", () => {
+    expect(renderConsultBrief(facts()).text).toContain("Prepared:");
+    const emailed = renderConsultBrief(facts(), { prepared: false });
+    expect(emailed.text).not.toContain("Prepared:");
+    expect(emailed.html).not.toContain("Prepared:");
+    // a pure function of the facts: another preparedAt, the same email
+    expect(renderConsultBrief(facts({ preparedAt: "2026-11-24T21:00:00.000Z" }), { prepared: false })).toEqual(emailed);
+  });
+
+  it("the html keeps the line order of the text: a list stays where it is, so 'Meetings' keeps its own items", () => {
+    const b = renderConsultBrief(
+      facts({
+        mail: { state: "ok", summary: { received: 1, sent: 1, newestReceived: "2026-11-20T15:00:00.000Z", subjects: ["Hello there"], withheld: 0 } },
+        meetings: { state: "ok", meetings: [{ title: "Intro call", at: "2026-11-01T15:00:00.000Z", source: "zoom" }] },
+      }),
+    );
+    const html = b.html;
+    const at = (needle: string) => html.indexOf(needle);
+    expect(at("Mail: 1 message received")).toBeLessThan(at("Newest received"));
+    expect(at("Newest received")).toBeLessThan(at("Subject: Hello there"));
+    expect(at("Subject: Hello there")).toBeLessThan(at("<p>Meetings:</p>"));
+    expect(at("<p>Meetings:</p>")).toBeLessThan(at("Intro call"));
+    // the lines of Meetings are not above "Meetings:" in a list of their own
+    expect(html).toMatch(/<p>Meetings:<\/p><ul><li>Intro call/);
+  });
+
+  it("an empty value reads 'not recorded', never 'null'", () => {
+    const b = renderConsultBrief(
+      facts({
+        lawmatics: { state: "ok", intake: { practiceArea: null, inquiry: null, mark: null, productsServices: null, competitors: null, goals: null, consultFeePaid: null, website: null, useInCommerce: null, referralSource: null, company: null } as never, other: [{ label: "Budget", value: "   " }], submittedAt: null, contactEmail: null },
+        files: { state: "ok", files: [{ name: "  ", type: "pdf", at: "" }], more: 0 },
+        mail: { state: "ok", summary: { received: 1, sent: 0, newestReceived: null, subjects: ["   "], withheld: 0 } },
+        meetings: { state: "ok", meetings: [{ title: " ", at: null, source: "zoom" }] },
+      }),
+    );
+    expect(b.text).not.toMatch(/\bnull\b/);
+    expect(b.html).not.toMatch(/\bnull\b/);
+    expect(b.text).toContain("- Budget: not recorded");
+    expect(b.text).toContain("- Subject: not recorded");
+  });
+});

@@ -159,3 +159,35 @@ describe("send records", () => {
     expect(folded.size).toBe(2);
   });
 });
+
+describe("review fixes: folding and planning", () => {
+  const T = (h: number) => new Date(NOW + h * HOUR_MS).toISOString();
+  it("a later failed row never hides an earlier row that holds a Resend id (sent or scheduled)", () => {
+    for (const status of ["sent", "scheduled"] as const) {
+      const folded = foldSendRecords([rec({ kind: "24h", status, resendId: "re_9", at: T(0) }), rec({ kind: "24h", status: "failed", resendId: null, at: T(1) })]);
+      expect(folded.get(recordSlot(KEY, "24h"))).toMatchObject({ status, resendId: "re_9" });
+    }
+  });
+  it("a later duplicate row never hides it either, and a later cancelled row does win", () => {
+    const scheduled = rec({ kind: "24h", status: "scheduled", resendId: "re_9", at: T(0) });
+    expect(foldSendRecords([scheduled, rec({ kind: "24h", status: "duplicate", resendId: null, at: T(1) })]).get(recordSlot(KEY, "24h"))?.status).toBe("scheduled");
+    expect(foldSendRecords([scheduled, rec({ kind: "24h", status: "cancelled", at: T(1) })]).get(recordSlot(KEY, "24h"))?.status).toBe("cancelled");
+  });
+  it("a failed row after nothing (or after a failed one) still reads as failed, so a retry happens", () => {
+    expect(foldSendRecords([rec({ kind: "booked", status: "failed", resendId: null, at: T(0) })]).get(recordSlot(KEY, "booked"))?.status).toBe("failed");
+  });
+  it("a duplicate counts as done: nothing is planned for it", () => {
+    const existing = foldSendRecords([rec({ kind: "booked", status: "duplicate", resendId: null }), rec({ kind: "24h", status: "duplicate", resendId: null }), rec({ kind: "1h", status: "duplicate", resendId: null })]);
+    expect(plan(50, { existing, madeNow: true }).actions).toEqual([]);
+  });
+  it("bookedOnly (a re-run) plans the booked email and never a reminder", () => {
+    expect(plan(50, { bookedOnly: true }).actions).toEqual([{ kind: "booked", mode: "now" }]);
+    expect(plan(50, { bookedOnly: true }).owedLater).toEqual([]);
+  });
+  it("shouldCancel: a vanished event id is kept while a twin of the same call stands", () => {
+    const r = rec({ kind: "24h", status: "scheduled" });
+    expect(shouldCancel(r, null)).toBe(true);
+    expect(shouldCancel(r, null, { twinExists: true })).toBe(false);
+    expect(shouldCancel(r, { startsAt: new Date(at(52)).toISOString(), leadId: LEAD, isConsult: true }, { twinExists: true })).toBe(true);
+  });
+});

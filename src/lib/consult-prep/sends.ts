@@ -13,7 +13,8 @@ import { parsePrepKey, normalizedStart } from "./keys";
 
 export type SendKind = "booked" | "24h" | "1h";
 export const SEND_KINDS: readonly SendKind[] = ["booked", "24h", "1h"];
-export type SendStatus = "sent" | "scheduled" | "cancelled" | "failed";
+/** `duplicate`: Resend answered 409 (the same key is already handled by another run). It counts as done and never as a failure. */
+export type SendStatus = "sent" | "scheduled" | "cancelled" | "failed" | "duplicate";
 
 export const HOUR_MS = 3_600_000;
 /** Only a send inside this window is handed to Resend with a time; a later one waits for a later run. */
@@ -30,6 +31,8 @@ export type SendRecord = {
   resendId: string | null;
   scheduledFor: string | null;
   status: SendStatus;
+  /** sha256 of the sorted, lower-cased final To + Cc list this send went to (no address is stored); null on an older row. */
+  recipientsSha256?: string | null;
   /** When the record was written. */
   at: string;
 };
@@ -37,7 +40,7 @@ export type SendRecord = {
 export const recordSlot = (prepKey: string, kind: SendKind): string => `${prepKey}|${kind}`;
 
 const isKind = (v: unknown): v is SendKind => v === "booked" || v === "24h" || v === "1h";
-const isStatus = (v: unknown): v is SendStatus => v === "sent" || v === "scheduled" || v === "cancelled" || v === "failed";
+const isStatus = (v: unknown): v is SendStatus => v === "sent" || v === "scheduled" || v === "cancelled" || v === "failed" || v === "duplicate";
 
 /** A `crm_activity` row that may be a send record. Anything that is not exactly one is null. */
 export function parseSendRecord(row: { lead_id?: string | null; created_at?: string | null; payload?: unknown }): SendRecord | null {
@@ -50,13 +53,22 @@ export function parseSendRecord(row: { lead_id?: string | null; created_at?: str
     resendId: typeof p.resend_id === "string" ? p.resend_id : null,
     scheduledFor: typeof p.scheduled_for === "string" ? p.scheduled_for : null,
     status: p.status,
+    recipientsSha256: typeof p.recipients_sha256 === "string" && /^[0-9a-f]{64}$/.test(p.recipients_sha256) ? p.recipients_sha256 : null,
     at: typeof row.created_at === "string" ? row.created_at : "",
   };
 }
 
 /** The payload of a send record. Ids and times only. */
 export function sendRecordPayload(r: Omit<SendRecord, "at" | "leadId">): Record<string, unknown> {
-  return { source: "consult-prep-send", prep_key: r.prepKey, kind: r.kind, resend_id: r.resendId, scheduled_for: r.scheduledFor, status: r.status };
+  return {
+    source: "consult-prep-send",
+    prep_key: r.prepKey,
+    kind: r.kind,
+    resend_id: r.resendId,
+    scheduled_for: r.scheduledFor,
+    status: r.status,
+    ...(r.recipientsSha256 ? { recipients_sha256: r.recipientsSha256 } : {}),
+  };
 }
 
 /**
@@ -68,12 +80,15 @@ export function foldSendRecords(records: readonly SendRecord[]): Map<string, Sen
   for (const r of records) {
     const slot = recordSlot(r.prepKey, r.kind);
     const have = out.get(slot);
+    // A later `failed` or `duplicate` row (a retry that did not land, a 409) never hides an earlier row that holds a Resend id: that
+    // email exists and may still need cancelling. A later `cancelled` row does win.
+    if (have && (r.status === "failed" || r.status === "duplicate") && have.resendId && (have.status === "sent" || have.status === "scheduled")) continue;
     if (!have || Date.parse(r.at) >= Date.parse(have.at) || !Number.isFinite(Date.parse(have.at))) out.set(slot, r);
   }
   return out;
 }
 
-const done = (r: SendRecord | undefined): boolean => !!r && (r.status === "sent" || r.status === "scheduled");
+const done = (r: SendRecord | undefined): boolean => !!r && (r.status === "sent" || r.status === "scheduled" || r.status === "duplicate");
 
 export type SendAction = { kind: SendKind; mode: "now" } | { kind: SendKind; mode: "schedule"; at: string };
 export type SendPlan = { actions: SendAction[]; owedLater: SendKind[] };
@@ -89,6 +104,8 @@ export type PlanInput = {
   madeNow: boolean;
   /** A stage-keyed booked email went out in the last 7 days: this consult's booking does not send another. */
   suppressBooked: boolean;
+  /** A person's re-run sends ONLY a fresh booked email; reminders belong to the base key and are never planned under a re-run key. */
+  bookedOnly?: boolean;
   existing: ReadonlyMap<string, SendRecord>;
 };
 
@@ -100,7 +117,7 @@ export function planSends(input: PlanInput): SendPlan {
   const booked = get("booked");
   if (!done(booked) && !input.suppressBooked && (input.madeNow || booked?.status === "failed")) actions.push({ kind: "booked", mode: "now" });
 
-  if (input.startsAtMs === null) return { actions, owedLater };
+  if (input.startsAtMs === null || input.bookedOnly) return { actions, owedLater };
   const start = input.startsAtMs;
   const reminders: Array<[SendKind, number, boolean]> = [
     ["24h", start - 24 * HOUR_MS, start - input.preppedAtMs > 24 * HOUR_MS],
@@ -118,7 +135,7 @@ export function planSends(input: PlanInput): SendPlan {
 /** True when a stage-keyed prep of this lead sent (or scheduled) its booked email in the last 7 days. */
 export function stageBookedRecently(records: readonly SendRecord[], leadId: string, nowMs: number): boolean {
   return records.some((r) => {
-    if (r.kind !== "booked" || (r.status !== "sent" && r.status !== "scheduled")) return false;
+    if (r.kind !== "booked" || (r.status !== "sent" && r.status !== "scheduled" && r.status !== "duplicate")) return false;
     const parsed = parsePrepKey(r.prepKey);
     if (!parsed || parsed.kind !== "stage" || parsed.leadId !== leadId) return false;
     const at = Date.parse(r.at);
@@ -133,11 +150,13 @@ export type EventNow = { startsAt: string | null; leadId: string | null; isConsu
  * A scheduled send is cancelled when the event is gone, its start changed, it is no longer a consult, or its lead
  * changed. A stage-keyed send is never scheduled, so it never reaches here (it is simply not cancelled).
  */
-export function shouldCancel(record: SendRecord, event: EventNow): boolean {
+export function shouldCancel(record: SendRecord, event: EventNow, opts: { twinExists?: boolean } = {}): boolean {
   if (record.status !== "scheduled") return false;
   const parsed = parsePrepKey(record.prepKey);
   if (!parsed || parsed.kind !== "event") return false;
-  if (!event) return true;
+  // The event id vanished, but the same call is still on the calendar under another id (the Lawmatics row and the Outlook row
+  // of one consult): the reminder is still right.
+  if (!event) return !opts.twinExists;
   if (event.isConsult !== true) return true;
   if (event.leadId !== parsed.leadId) return true;
   return normalizedStart(event.startsAt) !== normalizedStart(parsed.startsAt);

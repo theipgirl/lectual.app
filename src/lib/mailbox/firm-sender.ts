@@ -30,6 +30,9 @@ const PUBLIC_MAIL_DOMAINS: ReadonlySet<string> = new Set([
   "zoho.com",
 ]);
 
+/** True for a public webmail domain (gmail.com and the like): its domain says nothing about who is on it. The ONE list. */
+export const isPublicMailDomain = (domain: string): boolean => PUBLIC_MAIL_DOMAINS.has(domain.trim().toLowerCase());
+
 export type FirmSenders = { addresses: ReadonlySet<string>; domains: ReadonlySet<string> };
 
 export const NO_FIRM_SENDERS: FirmSenders = { addresses: new Set(), domains: new Set() };

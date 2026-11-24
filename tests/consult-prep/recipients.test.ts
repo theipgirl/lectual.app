@@ -70,3 +70,26 @@ describe("the check when the setting is saved", () => {
     expect(splitTypedAddresses("a@x.example, b@x.example;c@x.example\n d@x.example")).toEqual(["a@x.example", "b@x.example", "c@x.example", "d@x.example"]);
   });
 });
+
+describe("a Cc on a public webmail domain (F10)", () => {
+  const to = ["attorney@firm.example", "partner@gmail.com"];
+  it("send time: a gmail.com Cc is dropped unless it IS a member's address; a firm-domain Cc still passes", () => {
+    const g = guardRecipients({ to, cc: ["someone@gmail.com", "partner@gmail.com", "info@firm.example"], clientAddresses: [] });
+    expect(g.cc).toEqual(["info@firm.example"]); // partner@gmail.com is a To member: no second copy
+    expect(g.refusedCc).toBe(2);
+  });
+  it("send time: a member who is on gmail does not make every Gmail address a Cc", () => {
+    expect(guardRecipients({ to: ["partner@gmail.com"], cc: ["stranger@gmail.com"], clientAddresses: [] }).cc).toEqual([]);
+  });
+  it("save time uses the same rule: a Cc on gmail.com is refused unless it equals a chosen member exactly", () => {
+    expect(validateCcForSave(["stranger@gmail.com"], ["partner@gmail.com"])).toEqual({ ok: false, reason: "domain" });
+    expect(validateCcForSave(["Partner@Gmail.com"], ["partner@gmail.com"])).toEqual({ ok: true, cc: ["partner@gmail.com"] });
+    expect(validateCcForSave(["info@firm.example"], ["attorney@firm.example"])).toEqual({ ok: true, cc: ["info@firm.example"] });
+  });
+  it("the list of public domains is the mailbox module's, not a second one", async () => {
+    const fs = await import("node:fs");
+    expect(fs.readFileSync("src/lib/consult-prep/recipients.ts", "utf8")).not.toMatch(/gmail\.com/);
+    const { isPublicMailDomain } = await import("@/lib/mailbox/firm-sender");
+    expect(isPublicMailDomain("Gmail.com")).toBe(true);
+  });
+});

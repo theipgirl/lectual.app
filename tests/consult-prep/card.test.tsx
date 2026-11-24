@@ -30,7 +30,7 @@ const inputs = (over: Partial<CardInputs> = {}): CardInputs => ({
 const prepared = { status: "ok" as const, value: [{ prepKey: KEY, queueItemId: "q-1", at: "2026-11-24T19:10:00.000Z" }] };
 
 describe("the Consult prep card's status line", () => {
-  it("prepared, emailed to the recipient with the cc, and the reminders that are scheduled", () => {
+  it("prepared, emailed (the card does not claim who received it), the current recipients shown as current, and the reminders that are scheduled", () => {
     const v = consultPrepCardView(
       inputs({
         markers: prepared,
@@ -41,7 +41,9 @@ describe("the Consult prep card's status line", () => {
       }),
     );
     expect(v).toMatchObject({ kind: "prepared", queueItemId: "q-1" });
-    expect((v as { lines: string[] }).lines[0]).toBe("Prepared Nov 24, 2:10 PM · emailed to Rebecca, cc info@firm.example · reminders: a day before, Nov 24, 2:00 PM; an hour before, Nov 25, 1:00 PM");
+    expect((v as { lines: string[] }).lines[0]).toBe("Prepared Nov 24, 2:10 PM · emailed · reminders: a day before, Nov 24, 2:00 PM; an hour before, Nov 25, 1:00 PM");
+    expect((v as { lines: string[] }).lines[1]).toBe("Emails now go to the people set in Settings → Team: Rebecca, cc info@firm.example.");
+    expect((v as { lines: string[] }).lines[0]).not.toMatch(/emailed to/);
   });
 
   it("not prepared yet, when nothing has run and nothing is wrong", () => {

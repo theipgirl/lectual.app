@@ -36,6 +36,9 @@ export type BriefFacts = {
   send?: SendKind;
 };
 
+/** `prepared: false` leaves the "Prepared:" time out: the EMAILED copy must be a pure function of the facts, so a re-posted send carries the same payload. */
+export type BriefOptions = { prepared?: boolean };
+
 export type Brief = { subject: string; text: string; html: string };
 
 type Section = { heading: string; lines: string[] };
@@ -45,6 +48,8 @@ const flat = (v: string | null | undefined): string | null => {
   const s = (v ?? "").replace(/\s+/g, " ").trim();
   return s ? scrubJudgmentContent(s) : null;
 };
+/** A recorded value as text; an empty one (or one the scrub emptied) reads "not recorded", never "null". */
+const orNot = (v: string | null | undefined): string => flat(v) ?? NOT_RECORDED;
 const clip = (v: string, max: number) => (v.length > max ? `${v.slice(0, max - 1)}…` : v);
 
 /** "Wed Nov 25, 2:00 PM EST" in the firm's zone. */
@@ -63,7 +68,7 @@ export function briefSubject(facts: Pick<BriefFacts, "lead" | "startsAt" | "tz" 
   return `${SUBJECT_PREFIX[facts.send ?? "booked"]}Consult prep: ${name} · ${when}`;
 }
 
-function sections(f: BriefFacts): { own: Section[]; words: Section; afterWords: Section[] } {
+function sections(f: BriefFacts, opts: BriefOptions = {}): { own: Section[]; words: Section; afterWords: Section[] } {
   const { lead, tz } = f;
   const name = flat(cardName(lead)) ?? "the client";
   const lm = f.lawmatics.state === "ok" ? f.lawmatics.intake : null;
@@ -72,7 +77,7 @@ function sections(f: BriefFacts): { own: Section[]; words: Section; afterWords: 
     heading: `Consult prep for ${name}`,
     lines: [
       f.startsAt ? `Session: ${sessionText(f.startsAt, tz)}${f.joinUrl ? `, join: ${f.joinUrl}` : ", join link: not recorded"}` : "Session: not recorded yet",
-      `Prepared: ${sessionText(f.preparedAt, tz)}`,
+      ...(opts.prepared === false ? [] : [`Prepared: ${sessionText(f.preparedAt, tz)}`]),
     ],
   };
 
@@ -124,7 +129,7 @@ function sections(f: BriefFacts): { own: Section[]; words: Section; afterWords: 
         row("Website", flat(lm?.website)),
         row("How they heard of the firm", flat(lm?.referralSource)),
       );
-      for (const p of f.lawmatics.other) lawLines.push(`- ${flat(p.label)}: ${flat(p.value)}`);
+      for (const p of f.lawmatics.other) lawLines.push(`- ${orNot(p.label)}: ${orNot(p.value)}`);
       break;
     case "not-linked":
       lawLines.push("Not linked to Lawmatics, so there are no Lawmatics answers.");
@@ -155,7 +160,7 @@ function sections(f: BriefFacts): { own: Section[]; words: Section; afterWords: 
   else if (f.files.state === "unavailable") files.lines.push("Couldn't be read: the file list did not answer.");
   else if (f.files.files.length === 0) files.lines.push("No files uploaded yet.");
   else {
-    for (const file of f.files.files) files.lines.push(`- ${flat(file.name)} (${flat(file.type) ?? "file"}), uploaded ${file.at ? civilDay(new Date(file.at), tz) : "date not recorded"}`);
+    for (const file of f.files.files) files.lines.push(`- ${orNot(file.name)} (${flat(file.type) ?? "file"}), uploaded ${file.at ? civilDay(new Date(file.at), tz) : "date not recorded"}`);
     if (f.files.more > 0) files.lines.push(`and ${plural(f.files.more, "more file", "more files")}`);
   }
 
@@ -168,7 +173,7 @@ function sections(f: BriefFacts): { own: Section[]; words: Section; afterWords: 
     else {
       prior.lines.push(`Mail: ${plural(m.received, "message", "messages")} received and ${plural(m.sent, "message", "messages")} sent`);
       if (m.newestReceived) prior.lines.push(`- Newest received: ${civilDay(new Date(m.newestReceived), tz)}`);
-      for (const subject of m.subjects) prior.lines.push(`- Subject: ${flat(subject)}`);
+      for (const subject of m.subjects) prior.lines.push(`- Subject: ${orNot(subject)}`);
       if (m.withheld > 0) prior.lines.push(`- ${plural(m.withheld, "message", "messages")} not shown because the subject reads as sensitive`);
     }
   }
@@ -176,7 +181,7 @@ function sections(f: BriefFacts): { own: Section[]; words: Section; afterWords: 
   else if (f.meetings.meetings.length === 0) prior.lines.push("Meetings: no earlier meetings on file.");
   else {
     prior.lines.push("Meetings:");
-    for (const m of f.meetings.meetings) prior.lines.push(`- ${flat(m.title)}, ${m.at ? civilDay(new Date(m.at), tz) : "date not recorded"}, ${m.source}`);
+    for (const m of f.meetings.meetings) prior.lines.push(`- ${orNot(m.title)}, ${m.at ? civilDay(new Date(m.at), tz) : "date not recorded"}, ${m.source}`);
   }
 
   const questions: Section = { heading: "Questions to cover", lines: ["Not drafted yet.", NEXT_UPDATE_LINE] };
@@ -193,17 +198,29 @@ function htmlOf(all: Section[], footer: string): string {
   const body = all
     .map((s, i) => {
       const tag = i === 0 ? "h2" : "h3";
-      const items = s.lines.filter((l) => l.startsWith("- "));
-      const rest = s.lines.filter((l) => !l.startsWith("- "));
-      return `<${tag}>${esc(s.heading)}</${tag}>${rest.map((l) => `<p>${esc(l)}</p>`).join("")}${items.length ? `<ul>${items.map((l) => `<li>${esc(l.slice(2))}</li>`).join("")}</ul>` : ""}`;
+      // The lines keep the order of the text version: a run of "- " lines is one list, where it appears.
+      let out = `<${tag}>${esc(s.heading)}</${tag}>`;
+      let open = false;
+      for (const l of s.lines) {
+        const item = l.startsWith("- ");
+        if (item && !open) {
+          out += "<ul>";
+          open = true;
+        } else if (!item && open) {
+          out += "</ul>";
+          open = false;
+        }
+        out += item ? `<li>${esc(l.slice(2))}</li>` : `<p>${esc(l)}</p>`;
+      }
+      return open ? `${out}</ul>` : out;
     })
     .join("");
   return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#1a1a1a">${body}<hr><p style="color:#555">${esc(footer)}</p></div>`;
 }
 
 /** The brief. Facts only: the same renderer for the email, the stored copy and the lead page. */
-export function renderConsultBrief(facts: BriefFacts): Brief {
-  const { own, words, afterWords } = sections(facts);
+export function renderConsultBrief(facts: BriefFacts, opts: BriefOptions = {}): Brief {
+  const { own, words, afterWords } = sections(facts, opts);
   const all = [...own, words, ...afterWords];
   return {
     subject: briefSubject(facts),

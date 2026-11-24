@@ -7,6 +7,7 @@ import {
   CONSULT_PREP_NOT_YET,
   CONSULT_PREP_NO_RECIPIENTS,
   CONSULT_PREP_OFF,
+  CONSULT_PREP_RECIPIENTS_NOW,
   CONSULT_PREP_RECIPIENTS_UNREAD,
   CONSULT_PREP_SET_IN_TEAM,
 } from "@/lib/ui/words";
@@ -67,10 +68,10 @@ export function consultPrepCardView(input: CardInputs): CardView {
     for (const r of [...mine].sort((a, b) => Date.parse(a.at) - Date.parse(b.at))) latest.set(r.kind, r);
     const booked = latest.get("booked");
     let mail: string;
-    if (booked && (booked.status === "sent" || booked.status === "scheduled")) {
-      const to = input.recipients.status === "ok" ? list(input.recipients.value.names) : "";
-      const cc = input.recipients.status === "ok" ? input.recipients.value.cc : [];
-      mail = `emailed${to ? ` to ${to}` : ""}${cc.length > 0 ? `, cc ${cc.join(", ")}` : ""}`;
+    if (booked && (booked.status === "sent" || booked.status === "scheduled" || booked.status === "duplicate")) {
+      // Who received a PAST email is not known from today's setting (it may have changed since), so the card says "emailed" and
+      // shows the setting as what it is: the current one.
+      mail = "emailed";
     } else if (booked?.status === "failed") {
       mail = "the email couldn't be sent and will be tried again";
     } else if (!input.emailOn) {
@@ -86,6 +87,11 @@ export function consultPrepCardView(input: CardInputs): CardView {
     }
     const head = [`Prepared ${when(newest.at, input.tz)}`, mail, ...(reminders.length > 0 ? [`reminders: ${reminders.join("; ")}`] : [])].join(" · ");
     const lines = [head];
+    if (mail === "emailed" && input.recipients.status === "ok" && input.recipients.value.names.length > 0) {
+      const to = list(input.recipients.value.names);
+      const cc = input.recipients.value.cc;
+      lines.push(`${CONSULT_PREP_RECIPIENTS_NOW}: ${to}${cc.length > 0 ? `, cc ${cc.join(", ")}` : ""}.`);
+    }
     if (recipientsEmpty) lines.push(...noRecipientsLines(input.adminTier));
     if (input.recipients.status === "unavailable") lines.push(CONSULT_PREP_RECIPIENTS_UNREAD);
     return { kind: "prepared", prepKey: newest.prepKey, queueItemId: newest.queueItemId, lines };

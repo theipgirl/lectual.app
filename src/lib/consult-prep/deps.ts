@@ -37,9 +37,12 @@ export function defaultPrepDeps(ctx: Pick<AgentContext, "admin" | "orgId" | "sig
       const current = ((data ?? []) as Array<{ user_id: string; role: string }>).filter((m) => canReceiveDeadlineAlerts(m.role));
       const out: string[] = [];
       for (const m of current) {
+        // `getUserById` does NOT throw on a failure: it answers `{ data: { user: null }, error }`. A lookup that failed, or a
+        // current member the directory has no user for, is "couldn't read who gets this", never "no recipient".
         try {
           const res = await admin.auth.admin.getUserById(m.user_id);
-          const email = res.data?.user?.email;
+          if (res.error || !res.data?.user) return null;
+          const email = res.data.user.email;
           if (email) out.push(email);
         } catch {
           return null;
