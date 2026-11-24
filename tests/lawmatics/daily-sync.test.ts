@@ -356,6 +356,46 @@ describe("consults through the runner (19, 20, 15)", () => {
   });
 });
 
+describe("consults linked through relationships.eventable (live shape)", () => {
+  const eventable = (type: string, id: string) => ({ eventable: { data: { type, id } } });
+
+  it("a prospect eventable links the consult to the lead holding that lawmatics_id", async () => {
+    const w = world({ crm_lead: [{ id: "L1", org_id: ORG, email: "ola@example.test", first_name: "Ola", last_name: "Placeholder", current_stage_id: "s-new", lawmatics_id: "4417" }] });
+    const s = await run(w, lawmatics({ events: list([consult("e1", {}, eventable("prospect", "4417"))]) }));
+    expect(w.db.tables.crm_calendar_event[0]).toMatchObject({ external_id: "lmsync:e1", lead_id: "L1", attendee_emails: null });
+    expect(s.consults.unlinked).toBe(0);
+  });
+
+  it("an existing unlinked lmsync row is healed: the upsert writes lead_id on the stored row (no second row)", async () => {
+    const stored = { id: "cal-old", org_id: ORG, source: "lawmatics", external_id: "lmsync:e1", lawmatics_id: "e1", title: "30 Minute Consultation - Wren Testere1", starts_at: day(2), ends_at: day(2.02), all_day: false, event_type: null, lead_id: null, matter_id: null, join_url: "https://us02web.zoom.us/j/81234567890", is_consult: true };
+    const w = world({
+      crm_lead: [{ id: "L1", org_id: ORG, email: "ola@example.test", first_name: "Ola", last_name: "Placeholder", current_stage_id: "s-new", lawmatics_id: "4417" }],
+      crm_calendar_event: [stored],
+    });
+    await run(w, lawmatics({ events: list([consult("e1", {}, eventable("prospect", "4417"))]) }));
+    expect(w.db.tables.crm_calendar_event).toHaveLength(1);
+    expect(w.db.tables.crm_calendar_event[0]).toMatchObject({ id: "cal-old", lead_id: "L1" });
+    const ups = w.log.filter((q) => q.table === "crm_calendar_event" && q.upsert);
+    expect(ups.length).toBeGreaterThan(0);
+    expect(([] as Row[]).concat(ups[0].values as Row | Row[])[0]).toMatchObject({ external_id: "lmsync:e1", lead_id: "L1" });
+  });
+
+  it("a contact eventable links through the email of the contact the run read", async () => {
+    const w = world({ crm_lead: [{ id: "L2", org_id: ORG, email: "ola@example.test", first_name: "Ola", last_name: "Placeholder", current_stage_id: "s-new", lawmatics_id: null }] });
+    const contacts = list([{ id: "c9", type: "contact", attributes: { first_name: "Ola", last_name: "Placeholder", email: "Ola@example.test" } }]);
+    await run(w, lawmatics({ contacts, events: list([consult("e1", {}, eventable("contact", "c9"))]) }));
+    const row = w.db.tables.crm_calendar_event[0];
+    expect(row).toMatchObject({ lead_id: "L2", attendee_emails: null });
+    expect(JSON.stringify(row)).not.toContain("ola@example");
+  });
+
+  it("no name matching: a contact eventable the run did not read stays unlinked", async () => {
+    const w = world({ crm_lead: [{ id: "L2", org_id: ORG, email: "ola@example.test", first_name: "Wren", last_name: "Testere1", current_stage_id: "s-new", lawmatics_id: null }] });
+    await run(w, lawmatics({ events: list([consult("e1", {}, eventable("contact", "c9"))]) }));
+    expect(w.db.tables.crm_calendar_event[0].lead_id).toBeNull();
+  });
+});
+
 describe("order (25)", () => {
   it("a daytime tick runs no hired step; the full run runs hired, prospects, consults in that order", async () => {
     const w = world();

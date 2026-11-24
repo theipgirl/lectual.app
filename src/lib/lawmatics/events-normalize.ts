@@ -13,6 +13,11 @@
  *   - `attendeeEmails`: lowercased, at most 50, used only to find the lead, then dropped by the caller.
  * The location is never read.
  *
+ * Who the event is for: a live Lawmatics event links its person through `relationships.eventable` (type prospect, id
+ * only, no name; lawmatics-mcp `src/consult.ts` documents the same). A prospect or matter eventable is the prospect id; a
+ * contact eventable adds that contact's email (from the sideload, else the contacts the run already read) to the attendee
+ * emails. The person is never matched by name.
+ *
  * Times: a start or end with no UTC offset is refused (the event is unusable). Nothing is assumed about a zone.
  * An all-day event is UTC midnight of its civil date with `allDay = true`, the form the calendar readers expect.
  */
@@ -130,7 +135,37 @@ function emailsFrom(value: unknown, included: Map<string, Raw>, out: Set<string>
   }
 }
 
-function attendeesOf(rec: Raw, included: Map<string, Raw>): string[] {
+/** A relationship type, case and plural folded: "Prospect", "prospects" and "prospect" are one. */
+export function relType(type: unknown): string | null {
+  if (typeof type !== "string") return null;
+  const t = type.trim().toLowerCase();
+  if (!t) return null;
+  return t.endsWith("s") ? t.slice(0, -1) : t;
+}
+
+/** `relationships.eventable.data` as a folded type and an id, or null. */
+export function eventableOf(rec: Raw): { type: string; id: string } | null {
+  if (!isRaw(rec.relationships)) return null;
+  const rel = rec.relationships.eventable;
+  if (!isRaw(rel) || !isRaw(rel.data)) return null;
+  const type = relType(rel.data.type);
+  const id = idOf(rel.data);
+  return type && id ? { type, id } : null;
+}
+
+/** A sideloaded record by folded type and id (the sideload may spell the type either way). */
+function sideloaded(included: Map<string, Raw>, type: string, id: string): Raw | undefined {
+  for (const [key, value] of included) {
+    const at = key.lastIndexOf(":");
+    if (at > 0 && key.slice(at + 1) === id && relType(key.slice(0, at)) === type) return value;
+  }
+  return undefined;
+}
+
+/** Emails of contacts the run already read, by Lawmatics contact id. Only the email is used. */
+export type ContactEmails = ReadonlyMap<string, { email: string | null }>;
+
+function attendeesOf(rec: Raw, included: Map<string, Raw>, contacts: ContactEmails | null): string[] {
   const out = new Set<string>();
   const attrs = bag(rec);
   for (const key of ["invitees", "attendees", "participants", "guests"]) emailsFrom(attrs[key] ?? rec[key], included, out);
@@ -144,12 +179,19 @@ function attendeesOf(rec: Raw, included: Map<string, Raw>): string[] {
   const prospect = related(rec, "prospect", included);
   const pe = prospect ? cleanEmail(field(prospect, "email", "email_address", "primary_email")) : null;
   if (pe && out.size < EVENT_ATTENDEES_MAX) out.add(pe);
+  // A contact the event is for: its email from the sideload, else from the contacts already read this run.
+  const ev = eventableOf(rec);
+  if (ev && ev.type === "contact" && out.size < EVENT_ATTENDEES_MAX) {
+    const full = sideloaded(included, "contact", ev.id);
+    const ce = (full ? cleanEmail(field(full, "email", "email_address", "primary_email")) : null) ?? cleanEmail(contacts?.get(ev.id)?.email ?? null);
+    if (ce) out.add(ce);
+  }
   return [...out];
 }
 
 // ── the record ───────────────────────────────────────────────────────────────
 
-export function normalizeLawmaticsEvent(rec: Raw, included: Map<string, Raw> = new Map()): NormalisedLawmaticsEvent {
+export function normalizeLawmaticsEvent(rec: Raw, included: Map<string, Raw> = new Map(), contacts: ContactEmails | null = null): NormalisedLawmaticsEvent {
   const id = cleanText(idOf(rec), 1000);
   if (!id) return { ok: false, reason: "no-id" };
   if (LMSYNC_PREFIX.length + id.length > EXTERNAL_ID_MAX) return { ok: false, reason: "id-too-long" };
@@ -179,8 +221,10 @@ export function normalizeLawmaticsEvent(rec: Raw, included: Map<string, Raw> = n
     relatedName(rec, "event_type", included) ?? relatedName(rec, "appointment_type", included) ?? field(rec, "event_type_name", "type_name"),
     200,
   );
+  const ev = eventableOf(rec);
+  const eventableProspect = ev && (ev.type === "prospect" || ev.type === "matter") ? ev.id : null;
   const prospectId = cleanText(
-    relatedId(rec, "prospect") ?? relatedId(rec, "matter") ?? field(rec, "prospect_id", "matter_id"),
+    relatedId(rec, "prospect") ?? relatedId(rec, "matter") ?? eventableProspect ?? field(rec, "prospect_id", "matter_id"),
     128,
   );
   const description = field(rec, "description", "notes", "body", "details");
@@ -197,7 +241,7 @@ export function normalizeLawmaticsEvent(rec: Raw, included: Map<string, Raw> = n
       cancelled,
       prospectId,
       joinUrl: joinUrlIn(description),
-      attendeeEmails: attendeesOf(rec, included),
+      attendeeEmails: attendeesOf(rec, included, contacts),
     },
   };
 }

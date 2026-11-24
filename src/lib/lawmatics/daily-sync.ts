@@ -493,6 +493,7 @@ async function prospectStep(
   run: { iso: string; nowMs: number },
   budget: { createsUsed: number; linksUsed: number },
   s: DailySyncSummary,
+  keep: { contacts: Map<string, LawmaticsSourceContact> | null },
 ): Promise<void> {
   const orgId = conn.org_id;
   const p = shared.prospects;
@@ -503,6 +504,7 @@ async function prospectStep(
     throw new StepFailure(null);
   }
   const contacts = await readContacts(ctx.client);
+  keep.contacts = contacts; // the consult step finds a contact-linked event's email in it
   if (!contacts) throw new StepFailure(null); // /contacts cut short or failed: stricter than the manual importer
 
   const prospects = p.records.map((raw) => candidateOf(raw, p.included, shared.lookups, contacts)).filter((x): x is ProspectCandidate => x !== null);
@@ -612,6 +614,7 @@ async function consultStep(
   run: { iso: string; nowMs: number },
   budget: { createsUsed: number; linksUsed: number },
   s: DailySyncSummary,
+  contacts: Map<string, LawmaticsSourceContact> | null = null,
 ): Promise<void> {
   const orgId = conn.org_id;
   const list = await readEvents(ctx.client, run.nowMs);
@@ -623,7 +626,7 @@ async function consultStep(
   let unusableNoId = 0;
   const heldIds: string[] = [];
   for (const raw of list.records) {
-    const n = normalizeLawmaticsEvent(raw, list.included);
+    const n = normalizeLawmaticsEvent(raw, list.included, contacts);
     if (n.ok) {
       events.push(n.event);
       continue;
@@ -893,10 +896,11 @@ export async function runLawmaticsDailySync(deps: DailySyncDeps = {}): Promise<D
     const firmDeadline = Math.min(firmStart + FIRM_BUDGET_MS, wallDeadline);
 
     s.prospects.ran += 1;
+    const keep: { contacts: Map<string, LawmaticsSourceContact> | null } = { contacts: null };
     const okP = await step(f, PROSPECT_STEP_MS, firmDeadline, async (ctx) => {
       const sh = await ensureShared(f, ctx);
       if (!sh) throw new StepFailure(null);
-      await prospectStep(admin, f.conn, ctx, sh, run, f.budget, s);
+      await prospectStep(admin, f.conn, ctx, sh, run, f.budget, s, keep);
     });
     if (okP === "failed") {
       s.prospects.failed += 1;
@@ -907,7 +911,7 @@ export async function runLawmaticsDailySync(deps: DailySyncDeps = {}): Promise<D
     if (!f.refused) {
       s.consults.ran += 1;
       const okC = await step(f, CONSULT_STEP_MS, firmDeadline, async (ctx) => {
-        await consultStep(admin, f.conn, ctx, f.shared ? f.shared.lookups : null, run, f.budget, s);
+        await consultStep(admin, f.conn, ctx, f.shared ? f.shared.lookups : null, run, f.budget, s, keep.contacts);
       });
       if (okC === "failed") {
         s.consults.failed += 1;
