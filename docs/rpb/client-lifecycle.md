@@ -674,7 +674,7 @@ Lectual's Weekly review page shows open matters and leads by person, with overdu
 | Trademark Form reminder days (Settled for Lawmatics by the inventory) | Days 3, 7 and 14, proposed; whether automatic to confirm | SOP pre-filing (D1) |
 | | No send days given | templates |
 | | To send automatically | meeting, Oct 27 |
-| | On, at days 3 and 5, by email and text, stopping on the stage "+ Trademark Form Completed", not on submission | Lawmatics inventory, Nov 24 |
+| | Set to send at days 3 and 5, by email and text, stopping on the stage "+ Trademark Form Completed", not on submission; the templates show 0 sends | Lawmatics inventory, Nov 24 |
 | Statement of use automation (Settled for Lawmatics by the inventory) | The notice of allowance email and form 91241 go out through "TM-08", started by hand | SOP post-filing |
 | | No "TM-08" as such; two later versions, both switched off and never run; form 91241 has no file-upload field | Lawmatics inventory, Nov 24 |
 | Search time told to the client | Up to two weeks; one to two weeks | templates |
@@ -990,7 +990,7 @@ Webinar work (events, attendance, offers on the night) is left out: Lawmatics' h
 
 | Step | Today | What Lawmatics could do | Already there? | Relieves | Catches | Verdict |
 |---|---|---|---|---|---|---|
-| B1 Letter signed | Dawn sends a Word letter through Lawmatics; a form signature is not a valid e-signature (meeting, Aug 28, Nov 13); Lectual signing is built, not yet seen in use (Lectual) | Built-in e-signature; reminders that go only to people who have not signed; a "signed a document" trigger (Lawmatics help, [sending documents](https://help.lawmatics.com/en/articles/10699869-sending-documents), [signature reminders](https://help.lawmatics.com/en/articles/10699878-managing-e-signature-requests-deadlines)) | In use: 164 signature requests so far; reminders at days 3, 7 and 10, stopping at the stage "LOE Signed/ Invoice Paid"; an audit trail that records location (GPS) and IP address (Lawmatics inventory, Nov 24) | 5 signature | Two places: Lectual signing (Lectual). Rule not decided: signing tool (decision 23), order (decision 22). The plan's signature limit was not shown (Lawmatics inventory, Nov 24). Thrown away later | **Skip** |
+| B1 Letter signed | Dawn sends a Word letter through Lawmatics; a form signature is not a valid e-signature (meeting, Aug 28, Nov 13); Lectual signing is built, not yet seen in use (Lectual) | Built-in e-signature; reminders that go only to people who have not signed; a "signed a document" trigger (Lawmatics help, [sending documents](https://help.lawmatics.com/en/articles/10699869-sending-documents), [signature reminders](https://help.lawmatics.com/en/articles/10699878-managing-e-signature-requests-deadlines)) | In use: 164 signature requests so far; reminders set to go at days 3, 7 and 10 (templates at 0 sends), stopping at the stage "LOE Signed/ Invoice Paid"; an audit trail that records location (GPS) and IP address (Lawmatics inventory, Nov 24) | 5 signature | Two places: Lectual signing (Lectual). Rule not decided: signing tool (decision 23), order (decision 22). The plan's signature limit was not shown (Lawmatics inventory, Nov 24). Thrown away later | **Skip** |
 | B1 Unsigned letters | Not on record before the read; 38 letters expired unsigned (30 of them the "Trademark LOE"), 16 sit sent and 10 viewed but unsigned, and "Engagement Confirmed" has never been sent (Lawmatics inventory, Nov 24) | A signature list with each request's status, and reminders to those who have not signed (Lawmatics help, [signature reminders](https://help.lawmatics.com/en/articles/10699878-managing-e-signature-requests-deadlines)) | In use, partly: the list and letter reminders exist; nobody is on record working the list (Lawmatics inventory, Nov 24) | 5 signature | Nothing goes to the client by itself: a person follows up. Expiry settings were not found (Lawmatics inventory, Nov 24). Two places: letters signed in Lectual are tracked there (Lectual). It is a person's chore, not a Lawmatics set-up | **Skip as a Lawmatics change.** Do it as "Act on these first", item 7: a person works the list |
 | B1 Letter figures copied by hand | Dawn pastes the chart and copies every figure from the proposal (meeting, Aug 28, Sep 22, Nov 9); the second most frequent hand step in the meetings (meeting, Aug 28 to Nov 10) | Document templates with merge fields and show-or-hide logic (Lawmatics help, [custom documents](https://help.lawmatics.com/en/articles/10699860-custom-documents-start-fresh)); Lectual can fill six LOE fields for such a template, off by default (Lectual) | In use, partly: the letters are Lawmatics document templates with e-signature; fields such as "Legal Services Fee 1–5", "Goods/Services 1–5" and "Legal Fee Total" exist; a test letter template ("TEST LOE Template") and a switched-on test automation exist, and a test fee field was made on Nov 23 (Lawmatics inventory, Nov 24) | 5 signature | Two places: the Lectual proposal page builds the letter from the accepted proposal (Lectual). Two package fields carry different Essential prices (Lawmatics inventory, Nov 24). Rule not decided: signing tool (decision 23). Thrown away later | **Skip** |
 | B2 Hired and converted date | Lectual opens matters from Hired with a converted date (Lectual); Hired is set by hand and no automation reads or sets it (Lawmatics inventory, Nov 24) | "Convert" sets Hired and stamps the date, as an automation's last step (Lawmatics help, [actions](https://help.lawmatics.com/en/articles/10699906-automation-actions), [statuses](https://help.lawmatics.com/en/articles/10699805-matter-statuses)) | In use, partly: Hired status, set by hand; no conversion-date custom field on the settings screens; the built-in converted date Lectual reads was not visible to the read, and whether it is filled when Hired is set by hand is to check (Lawmatics inventory, Nov 24; Lectual) | None on record | Rule not decided: when a lead becomes a matter (decision 9), order (decision 22). A letter signed in Lectual starts nothing in Lawmatics (Lectual). Thrown away later | **Skip.** Opening the matter in Lectual is the lasting route |
@@ -1029,19 +1029,19 @@ Webinar work (events, attendance, offers on the night) is left out: Lawmatics' h
 
 ### If the firm does only five
 
-Four are about stall 1, the client's information (about 20 mentions), and one about stall 2 and stall 5, letters nobody signed; none needs a new system. They are in that order. (The sixth quick win, the pre-filled form in B3, waits on checking which link the welcome carries.)
-1. **Form reminders stop when the form is filled (B4).** They are on, at days 3 and 5, but stop on a stage, not on the form (Lawmatics inventory, Nov 24). Make the filled form stop them, or move the stage, and set the days with Rebecca using the three existing templates. Test the stop first (meeting, Aug 25).
-2. **The Trademark Form asks for what Rayn needs (C8).** Add first-use date, entity details and social links, and decide whether "Evidence Uploads" should be required, from the list Caitlyn and Rayn made (meeting, Nov 6; Lawmatics inventory, Nov 24). Check first that the changes save to the right matter fields, and leave Name of Trademark and Practice Area as they are.
+All five are about stall 1, the client's information (about 20 mentions); none needs a new system. The unsigned letters are in "Act on these first".
+1. **Form reminders stop when the form is filled (B4).** They are set to send at days 3 and 5, but stop on a stage, not on the form (Lawmatics inventory, Nov 24). Make the filled form stop them, or move the stage, and set the days with Rebecca, using the reminder texts in the handbook (three; Lawmatics holds two form-reminder templates). Test the stop first (meeting, Aug 25).
+2. **The Trademark Form asks for what Rayn needs (C8).** Add a first-use-anywhere date and the entity details Rayn needs, and make the website and social questions and "Evidence Uploads" required if Rebecca agrees, from the list Caitlyn and Rayn made (meeting, Nov 6; Lawmatics inventory, Nov 24). Check first that the changes save to the right matter fields, and leave Name of Trademark and Practice Area as they are.
 3. **Ask for specimens with the "Specimen" file request (C11).** It already exists; send it from the matter instead of an email (Lawmatics inventory, Nov 24).
-4. **Give the statement of use form a file upload (D20).** Form 91241 asks for an upload in its heading but has no field for one (Lawmatics inventory, Nov 24).
-5. **Go through the unsigned letters (B1).** 38 expired and 26 sent or viewed but unsigned; a person follows up or closes each one (Lawmatics inventory, Nov 24).
+4. **Give the statement of use form a file upload (D20).** Form 91241 asks for an upload in its heading but has no field for one (Lawmatics inventory, Nov 24). First check how the form reaches clients today, since TM-08 is off, and that no one else is editing it.
+5. **Send the Trademark Form from the matter, pre-filled (B3).** First check which link the welcome carries (one look at the template); if it is the generic link, change it to the matter's own form link, so the client sees what is already on record and their answers land on the same matter (Lawmatics help, [sending forms](https://help.lawmatics.com/en/articles/10699859-sending-and-submitting-forms)).
 
 ### Answered by the inventory
 - Which automations are on, and which reach a client? 19 of 71 are on; 10 can message a client (see "Worth doing before Lawmatics is left", item 3) (Lawmatics inventory, Nov 24).
 - Does any tag Lectual pushes start a client email? Yes, a source tag such as "UGW 2026"; Hot, Warm and Cold Lead start nothing; no "UTM:" or "Campaign:" tags exist (Lawmatics inventory, Nov 24).
-- Do the Trademark Form reminders run by themselves? Yes, at days 3 and 5, email and text, stopping on a stage (Lawmatics inventory, Nov 24).
-- Do 48- and 96-hour proposal follow-ups run? No; nothing starts from a proposal stage (Lawmatics inventory, Nov 24).
-- Does a nurture sequence run? No; two exist, switched off, pointing at stages that do not exist (Lawmatics inventory, Nov 24).
+- Are the Trademark Form reminders automatic? They are set to send at days 3 and 5, email and text, stopping on a stage; their templates show 0 sends (Lawmatics inventory, Nov 24).
+- Do 48- and 96-hour proposal follow-ups run? No; no switched-on automation starts from a proposal stage (Lawmatics inventory, Nov 24).
+- Does a nurture sequence run? No; two exist, switched off and never run; one points at a stage that does not exist (Lawmatics inventory, Nov 24).
 - Does a matter move to "Invoice Paid" by itself? No; nothing acts on a paid invoice (Lawmatics inventory, Nov 24).
 - Who sends the welcome? Not an automation: it was sent by hand 53 times; which person sends it was not shown (Lawmatics inventory, Nov 24).
 - Which booking tool? Lawmatics appointments, 13 types; Taylor's calendar syncs two ways with Exchange; Zoom is connected for Rebecca and Taylor (Lawmatics inventory, Nov 24).
@@ -1052,7 +1052,7 @@ Four are about stall 1, the client's information (about 20 mentions), and one ab
 - Is OneDrive linked? Yes, with "sync all new records" on (Lawmatics inventory, Nov 24).
 - Can a form field be made required? Yes; the firm's forms already have required fields (Lawmatics inventory, Nov 24).
 - Is the source field named as Lectual reads it? Yes, "How did you hear about us?", beside two other versions (Lawmatics inventory, Nov 24).
-- How is Hired set? By hand; no automation reads or sets it (Lawmatics inventory, Nov 24).
+- How is Hired set? By hand; no automation reads or sets it. The settings screens show no conversion-date custom field; Lectual reads a built-in converted date instead (Lawmatics inventory, Nov 24; Lectual).
 
 ### Still to check
 - Plan limits on automations, contacts, signatures and emails; whether two-way texts, picture texts, Event Management or the AI features are included (Lawmatics inventory, Nov 24).
@@ -1061,7 +1061,8 @@ Four are about stall 1, the client's information (about 20 mentions), and one ab
 - Whether each tag sits on the person or the matter, and whether any automation branch checks a tag (Lawmatics inventory, Nov 24).
 - Whether new matters get a OneDrive folder, and how it is named; whether it is what made the CLIENTS tree in SharePoint (Lawmatics inventory, Nov 24; firm SharePoint, seen Nov 23).
 - Whether mail sync is on for Dawn, Rebecca and Rayn; the icons were not labelled (Lawmatics inventory, Nov 24).
-- Whether setting Hired by hand stamps the converted date Lectual reads (L4) (Lectual; Lawmatics inventory, Nov 24).
+- Whether the built-in converted date Lectual reads from Lawmatics' data feed is filled when a person sets Hired by hand (L4); the inventory could not see it (Lectual; Lawmatics inventory, Nov 24).
+- Why no "UTM:" or "Campaign:" tag exists: Lectual pushes them only for an intake that arrives with those details in its link, so either none has arrived or the push does not work. Fill one test intake through a link with campaign details and look for the tags (Lawmatics inventory, Nov 24; Lectual).
 - Which link the welcome email carries, and who sends it (B3) (Lawmatics inventory, Nov 24).
 - Signing order and expiry on letters, and where signed copies are filed (Lawmatics inventory, Nov 24).
 - Time-in-stage on the other 71 stages; matter counts outside the first intake pipeline; QuickBooks sync rules; Invoice Settings, which would not open (Lawmatics inventory, Nov 24).
@@ -1072,13 +1073,13 @@ Four are about stall 1, the client's information (about 20 mentions), and one ab
 
 From "Decisions the firm needs to make", the ones these tables wait on:
 - **1** (the phase-out itself, and in what order jobs leave Lawmatics) and **25** (which reminders stay as Lawmatics automations, and whether anything may send by itself): every row marked "Sends by itself". The Trademark Form reminders in B4 are the exception taken here, because the SOPs and the Oct 27 meeting already treat them as automatic and they are already on (SOP pre-filing; meeting, Oct 27; Lawmatics inventory, Nov 24); Rebecca still decides.
-- **31** and **46** (whether the emails Lectual's tags start are approved firm emails; the UGW welcome): no row now, since no tag starts a nurture email (Lawmatics inventory, Nov 24); they bear on "Act on these first", item 4.
-- **4** (form uploads and the Lectual matter): B2 folder, C8 form, C11, D20 form.
+- **31** and **46** (whether the emails Lectual's tags start are approved firm emails; the UGW welcome): no row now, since no tag starts a nurture email (Lawmatics inventory, Nov 24); they bear on "Act on these first", item 5.
+- **4** (form uploads and the Lectual matter): B2 folder, C8 form, C11, D20 form, B3 form.
 - **6** and **12** (stage numbers, stall times): C8 to C16.
 - **8** (lost and nurture): A8, D24, D25.
 - **9** and **22** (when a lead becomes a matter; order of pay and sign): B1, B2.
 - **14** (session fee and credit): A3.
-- **27** (follow-ups and replies): A6. Proposal validity (decision 15) is decided (Taylor, Nov 24).
+- **15** and **27** (proposal validity; follow-ups and replies): A6. Lectual keeps proposals open 7 days (Taylor, Nov 24); the SOP still says 14.
 - **44** (which "how did you hear" field to keep): A1 to A7 conversion numbers. **45** (which package price is right): B1 letter figures.
 - **17**, **18**, **19** and **20** (remaining balance, payment plans, Dawn's billing view and "paid" versus cleared, post-filing fees): A7, C14, C15, D20.
 - **21** (monitoring), **29** (filed-matter schedule), **38** (deadline source): D18, D19, D24.
@@ -1088,15 +1089,15 @@ From "Decisions the firm needs to make", the ones these tables wait on:
 
 ### Count
 
-40 items: 6 quick wins, 6 stopgaps, 28 skips. Revision 4 added three rows from the Lawmatics inventory (A3 confirmation for the 15-minute consult, B1 unsigned letters, D20 the specimen file on the statement of use form) and changed three verdicts: C8 "Rayn told" from quick win to skip (already in place), C15 payment reminders from stopgap to skip (already on), and D20 and D21 statement of use reminders from quick win to stopgap (the automation is off and has never run) (Lawmatics inventory, Nov 24).
+40 items: 5 quick wins, 4 stopgaps, 31 skips. Revision 4 added three rows from the Lawmatics inventory: A3 confirmation for the 15-minute consult, B1 unsigned letters, and D20 the specimen file on the statement of use form. It also changed three verdicts: C8 "Rayn told" from quick win to skip (already in place), C15 payment reminders from stopgap to skip (already set to send), and D20 and D21 statement of use reminders from quick win to skip (the automation is off and has never run, the send days and the fee are open, and Lectual now alerts on the deadline) (Lawmatics inventory, Nov 24).
 
 | Stretch | Items | Quick win now | Stopgap until Lectual does it | Skip |
 |---|---|---|---|---|
-| A. Lead to paid | 14 | 0 | 3 | 11 |
-| B. Onboarding | 9 | 3 | 1 | 5 |
+| A. Lead to paid | 14 | 0 | 2 | 12 |
+| B. Onboarding | 9 | 2 | 1 | 6 |
 | C. Pre-filing | 10 | 2 | 1 | 7 |
-| D. Post-filing | 7 | 1 | 1 | 5 |
-| All | 40 | 6 | 6 | 28 |
+| D. Post-filing | 7 | 1 | 0 | 6 |
+| All | 40 | 5 | 4 | 31 |
 
 ---
 
@@ -1116,7 +1117,7 @@ Gathered from every source, with the comparison's 36 questions (cited by number)
 7. Whether registered matters stay open in a "27. Maintenance" stage and "23. Abandoned" stays open for the revival window; whether 20D waits on the USPTO or a "SOU Filed" stage is added; whether the remaining-balance wait is in 14 or 15. Caitlyn; Dawn for 14 or 15 (SOP pre-filing, D4; SOPs compared, Nov 17, questions 25, 29, 33). Partly overtaken since: a registered mark with no maintenance deadline is now flagged (Lectual).
 8. When Lost is the right stage, and the definitions of lost, nurture and no longer moving forward, used the same way in every stretch. Caitlyn, Rebecca (SOP post-filing, D7; SOPs compared, Nov 17, question 12).
 9. When a lead becomes a matter: at signed LOE and deposit, or at a signed application. Rebecca, with Caitlyn and Taylor (meeting, Nov 3, Nov 17).
-10. Whether other practice areas appear on the Intake list, and whether a merge always keeps the older lead. Caitlyn, Taylor (SOPs compared, Nov 17, questions 13, 16, build item 4). Partly settled: merging duplicate leads is live in Lectual (Taylor, Nov 24); which lead a merge keeps is still open.
+10. Whether other practice areas appear on the Intake list, and whether a merge always keeps the older lead. Caitlyn, Taylor (SOPs compared, Nov 17, questions 13, 16, build item 4). Partly settled: merging duplicate leads is live (Taylor, Nov 24); Lectual suggests which lead to keep and the person chooses (Lectual); whether the older one must always be kept is open.
 11. Where intake SOP sections 5 and 17 and Appendix A are. Caitlyn (SOPs compared, Nov 17, question 20).
 
 ### Time targets, stalls and the weekly meeting
@@ -1125,7 +1126,7 @@ Gathered from every source, with the comparison's 36 questions (cited by number)
 
 ### Money and invoices
 14. Package prices; the session fee and whether and how it is credited (amount and window); whether the $200 credit is standard on every proposal. Rebecca (SOP intake; Lawmatics Implementation Guide, plan; meeting, Nov 13; SOPs compared, Nov 17, question 17).
-15. **Decided.** How long a proposal stays open. Rebecca, Caitlyn (SOP intake, Q4; SOPs compared, Nov 17, question 8). On record: 7 days with two weeks of grace (meeting, Nov 10); Lectual's call-drafted proposals used 10 on Nov 17 (SOPs compared, Nov 17). Decided: proposals stay open 7 days, and that can be set longer on a proposal (Taylor, Nov 24). The SOP still says 14 (SOP intake).
+15. **Settled in Lectual; SOP to update.** How long a proposal stays open. Rebecca, Caitlyn (SOP intake, Q4; SOPs compared, Nov 17, question 8). On record: 7 days with two weeks of grace (meeting, Nov 10); Lectual's call-drafted proposals used 10 on Nov 17 (SOPs compared, Nov 17). Since then: Taylor's answer is that proposals stay open 7 days in Lectual, and that can be set longer on a proposal (Taylor, Nov 24). The SOP still says 14 and has not been changed (SOP intake).
 16. The additional-class fee, $825 or $850; and whether the government fee is $350 per class or per class per mark. Rebecca (SOP intake, Q13; SOPs compared, Nov 17, question 17, D13).
 17. What "remaining balance" covers. Rebecca, Dawn (SOP pre-filing, D2).
 18. Payment plans: offered or not, and to whom. Rebecca (meeting, Nov 6).
