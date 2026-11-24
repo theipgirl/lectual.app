@@ -23,7 +23,6 @@ const ALLOW: Allow[] = [
   },
   { file: /^src\/app\/dashboard\/matters\/\[id\]\/(actions|intake-request-actions)\.ts$/, reason: "DocumentFlowError / IntakeRequestError messages are fixed sentences written for a person" },
   { file: /^src\/app\/dashboard\/documents\/new\/\[matterId\]\/(loe|opinion-letter|trademark-clearance)\/actions\.ts$/, reason: "only a DocumentFlowError's own sentence passes; anything else is a fixed sentence" },
-  { file: /^src\/app\/dashboard\/leads\/\[id\]\/actions\.ts$/, reason: "only a PrepConsultFlowError's own sentence passes; anything else is a fixed sentence" },
   { file: /^src\/app\/dashboard\/forms\/actions\.ts$/, reason: "only an IntakeFormError's own sentence passes" },
   { file: /^src\/app\/dashboard\/settings\/integrations\/lawmatics\/actions\.ts$/, reason: "LawmaticsNotConnectedError / PlanChangedError carry sentences written for a person" },
   { file: /^src\/app\/dashboard\/queue\/actions\.ts$/, reason: "only a ReviewerRefusal (the sign-in / role sentence) passes; anything else is a fixed sentence" },

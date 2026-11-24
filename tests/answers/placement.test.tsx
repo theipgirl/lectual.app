@@ -120,7 +120,7 @@ async function leadPage(db: FakeDb, mattersRead: unknown = { status: "none" }) {
   vi.doMock("@/lib/matters/for-lead", () => ({ loadMattersForLead: vi.fn(async () => mattersRead) }));
   for (const [path, names] of Object.entries({
     "@/components/leads/LeadForms": ["AssignSelect", "EditLeadForm", "NoteComposer", "ProposalCard", "StageSelect"],
-    "@/components/leads/LeadExtras": ["LeadTags", "PrepConsult"],
+    "@/components/leads/LeadExtras": ["LeadTags"],
     "@/components/leads/ConsultOutcomeForm": ["ConsultOutcomeForm"],
     "@/components/leads/LeadProposalsCard": ["LeadProposalsCard"],
     "@/components/leads/ConsultDetailsSection": ["ConsultDetailsSection"],

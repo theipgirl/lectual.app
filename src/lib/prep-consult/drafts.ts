@@ -112,7 +112,7 @@ async function runDraftPrompt(system: string, prompt: string, where: string, gen
   return text;
 }
 
-/** Builds the internal booking heads-up (queued as type = BRIEFING — see generate.ts). */
+/** Builds the internal booking heads-up (queued as type = BRIEFING). */
 export async function buildHeadsUpDraft(facts: PrepConsultFacts, generate?: DraftTextGenerator): Promise<PrepConsultDraft> {
   const draftBody = await runDraftPrompt(
     HEADS_UP_SYSTEM_PROMPT,
