@@ -9,7 +9,7 @@ import { runStageKeeper } from "./stage-keeper/run";
 import { runMorningBrief } from "./morning-brief/run";
 import { runConsultPrep } from "./consult-prep/run";
 import { runInboxSummary } from "./inbox-summary/run";
-import { AGENT_DEFS, AGENT_IDS, type AgentContext, type AgentId, type AgentResult, type AgentTrigger, type Autonomy } from "./types";
+import { AGENT_DEFS, AGENT_IDS, type AgentContext, type AgentId, type AgentResult, type AgentTrigger, type Autonomy, type RunScope } from "./types";
 import { alertConfigFromEnv, deploymentInfo, readFirmName, sendFailureAlert } from "./failure-alert";
 import { DID_NOT_FINISH_ERROR } from "./run-status";
 import { AGENT_RUN_BUDGET_MS, CRON_AGENT_CAP_MS, CRON_TRACKS, CRON_WALL_BUDGET_MS, MIN_AGENT_START_MS } from "./budget";
@@ -139,6 +139,8 @@ export async function runOneAgent(
     triggeredBy?: string | null;
     /** How long the agent may take. Default AGENT_RUN_BUDGET_MS. */
     budgetMs?: number;
+    /** Narrows the run to some leads. Every gate above and below still applies. */
+    scope?: RunScope;
   },
 ): Promise<RunOutcome> {
   const { admin } = deps;
@@ -220,6 +222,7 @@ export async function runOneAgent(
     mailbox: deps.mailbox,
     timeLeftMs: () => deadline - clock(),
     signal: controller.signal,
+    scope: args.scope,
   };
 
   // The agent races its budget. `work` never rejects, so a result (or a failure) that arrives after the

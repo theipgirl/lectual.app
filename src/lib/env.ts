@@ -33,6 +33,9 @@ const fieldSchemas = {
   // "Send feedback" (src/lib/feedback/submit.ts). Unset TO = "Feedback isn't set up yet." and nothing is sent.
   FEEDBACK_TO: z.string().optional(),
   FEEDBACK_FROM: z.string().optional(),
+  // Automatic consult prep (src/lib/consult-prep/). The sender of the internal brief emails: an address on a domain verified on
+  // RESEND_API_KEY's account. Unset (or no RESEND_API_KEY) = no email; the brief is still kept in Lectual.
+  CONSULT_PREP_FROM: z.string().optional(),
   // Model for the matters copilot (src/lib/ai/claude.ts copilotModel()). Unset = claude-sonnet-5.
   COPILOT_MODEL: z.string().optional(),
   // Mailbox OAuth (step 3). Optional until that step lands.
