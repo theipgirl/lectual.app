@@ -149,6 +149,12 @@ export type DailySyncSummary = {
   };
   /** Firms whose Lawmatics key couldn't be opened: nothing synced for them. */
   tokenUnreadable: number;
+  /**
+   * The consult prep run after a firm's consult step (counts only). `ran`: it ran (its own summary is in the Assistants log);
+   * `notOn`: the firm hasn't switched the assistant on (or Autopilot is paused); `skippedForTime`: too little of the wall budget was
+   * left, so it was left to the next sweep; `failed`: it could not start or threw. Never changes the sync's other counts.
+   */
+  consultPrep: { ran: number; notOn: number; skippedForTime: number; failed: number };
 };
 
 export type StepClientOptions = { signal: AbortSignal; timeLeftMs: () => number };
@@ -165,7 +171,15 @@ export type DailySyncDeps = {
   /** Monotonic-ish milliseconds for the budget. Defaults to Date.now. */
   clock?: () => number;
   budgetMs?: number;
+  /**
+   * Runs after a firm's consult step finished (not failed): the consult prep sweep for that firm. It is wrapped, so a throw
+   * is counted and never changes the sync's result. Absent = no prep (tests, the button).
+   */
+  afterConsults?: (orgId: string, info: { timeLeftMs: number }) => Promise<"ran" | "not-on">;
 };
+
+/** The consult prep sweep is not started with less than this left of the wall budget (counted, left to the next sweep). */
+export const MIN_PREP_START_MS = 30_000;
 
 export function emptySummary(mode: SyncMode): DailySyncSummary {
   return {
@@ -198,6 +212,7 @@ export function emptySummary(mode: SyncMode): DailySyncSummary {
     },
     consults: { ran: 0, failed: 0, written: 0, removed: 0, unchanged: 0, unlinked: 0, unusable: 0, overCap: 0, failedWrites: 0, heldByOlderRow: 0, prospectReadsFailed: 0, notReady: 0, removalsHeld: 0, eventsTruncated: 0, hiredSkipped: 0, lookupsDeferred: 0 },
     tokenUnreadable: 0,
+    consultPrep: { ran: 0, notOn: 0, skippedForTime: 0, failed: 0 },
   };
 }
 
@@ -912,6 +927,20 @@ export async function runLawmaticsDailySync(deps: DailySyncDeps = {}): Promise<D
       if (okC === "failed") {
         s.consults.failed += 1;
         f.failed = true;
+      }
+      if (okC !== "failed" && deps.afterConsults) {
+        // The consult prep sweep for this firm, with whatever the wall budget has left. It can never change the sync's result.
+        const left = wallDeadline - clock();
+        if (left < MIN_PREP_START_MS) s.consultPrep.skippedForTime += 1;
+        else {
+          try {
+            const r = await deps.afterConsults(f.conn.org_id, { timeLeftMs: left });
+            if (r === "ran") s.consultPrep.ran += 1;
+            else s.consultPrep.notOn += 1;
+          } catch {
+            s.consultPrep.failed += 1;
+          }
+        }
       }
     }
   }

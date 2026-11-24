@@ -4,6 +4,7 @@ import type { MoveEvidence, SignalId } from "@/lib/stage-keeper/signals";
 import { usableEvidenceDate } from "./evidence-date";
 import type { Lead } from "./leads";
 import { leadRead } from "@/lib/leads/live";
+import { scheduleConsultPrepOnEntry } from "@/lib/consult-prep/hook";
 
 /**
  * The one shared place a lead's stage changes, for a person and for the Stage Keeper.
@@ -159,5 +160,11 @@ async function moveAsAgent(actor: AgentActor, move: AgentMove): Promise<AgentMov
     return { ok: false, reason: "error" };
   }
   const row = (Array.isArray(inserted) ? inserted[0] : inserted) as { id?: string } | null;
+  // Automatic consult prep: the same hook the person's move calls. It never throws into or changes the move.
+  try {
+    scheduleConsultPrepOnEntry({ leadId: move.leadId, toStageId: move.toStageId });
+  } catch {
+    // swallow: the move already succeeded.
+  }
   return { ok: true, activityId: row?.id ?? null, stageEnteredAt: enteredAt, previousStageEnteredAt };
 }
