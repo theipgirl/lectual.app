@@ -3,13 +3,50 @@
 One list across sessions. Each session adds its action items here and checks them against Omi.
 Newest section first. Tick an item when it is done; don't delete it.
 
+## 2026-11-24: the Lawmatics inventory is in; roundup visual; inventory tab
+
+Recap: `docs/recaps/2026-11-24-lawmatics-inventory-and-roundup-visual.md`. Inventory: `docs/rpb/lawmatics-inventory-2026-11-24.md`.
+Visuals (private until shared): Lectual Audit Roundup https://claude.ai/artifact/G4bob4Ro1nmn578fCBB33M and RPB Client Lifecycle
+https://claude.ai/artifact/9CEapkxwyePAdAPDZ2WhS1 (now three tabs). Nothing was changed in any system from the session.
+
+### Taylor: do in Lawmatics first
+- [ ] Switch off "Nov 17 - Masterclass Tonight Text" and "Nov 17 - Masterclass Has Begun Text". They text anyone who registers now.
+- [ ] Decide what to do with form 78941 (the old intake form, renamed the Black Friday checkout). It still starts TM-02 and OT-2 on every fill.
+- [ ] Switch off "TEST LOE Automation" and clear the test records from the live data.
+- [ ] Developer apps: remove the unused ones and renew the secrets of the live ones. Three connect Lectual and Claude to Lawmatics, so
+      update Lectual's side at the same time. Consider whether all six users need to be Admins.
+- [ ] Confirm the "UGW 2026" welcome email should keep sending (146 runs).
+- [ ] Check whether any Trademark Form reminder has gone to a client who had already filled the form (they stop on a stage, not on submission).
+- [ ] Go through the 38 engagement letters that expired unsigned.
+
+### Taylor: the five quick wins in Lawmatics (if you want them before Lectual takes these over)
+- [ ] Make the Trademark Form reminders stop when the form is filled.
+- [ ] Have the Trademark Form ask for what Rayn needs.
+- [ ] Send the existing "Specimen" file request.
+- [ ] Add a file upload to the statement of use form (91241).
+- [ ] Send the Trademark Form pre-filled from the welcome email.
+
+### Taylor: to check
+- [ ] Why no "UTM:" or "Campaign:" tags exist in Lawmatics (no intake has carried them, or the push does not work).
+- [ ] Whether Lawmatics fills its conversion date when Hired is set by hand. Lectual's matter sync reads it.
+- [ ] Why duplicate matters were reported on Oct 16 when matching by email is on.
+- [ ] Update the SOP to say proposals stay open 7 days (your Nov 24 answer), or change Lectual.
+- [ ] Share both visual pages with the people who need them.
+- [ ] Copy the recap into the Obsidian second brain. This cloud session can't reach the vault.
+
+### Done since the last section
+- [x] Run the Lawmatics inventory with Claude in Chrome (Taylor, Nov 23 and 24).
+
+### Omi cross-check (2026-11-24)
+- Not re-run. The checks on Nov 23 found no Omi action item about Lawmatics, the SOPs or the client lifecycle.
+
 ## 2026-11-23 (third part): Lawmatics inventory prompt, Lectual audit roundup
 
 Recap: `docs/recaps/2026-11-23-audit-roundup-and-chrome-prompt.md`. Prompt: `docs/rpb/lawmatics-inventory-chrome-prompt.md`.
 Roundup: `docs/audits/2026-11-23-lectual-audit-roundup.md`. Nothing was changed in any system.
 
 ### Taylor
-- [ ] Run the Lawmatics inventory: sign in to Lawmatics in Chrome, paste the prompt into Claude in Chrome, type `next` between the 13
+- [x] Run the Lawmatics inventory: sign in to Lawmatics in Chrome, paste the prompt into Claude in Chrome, type `next` between the 13
       sections, stay and watch (about 1.5 to 3 hours). Paste the outputs back to Claude Code. If the account's client names being
       on screen needs Rebecca's OK, get it first.
 - [ ] Give everyone working access to Lectual and connect the mailbox (Caitlyn's editing; Dawn's Microsoft approval).
