@@ -1192,3 +1192,68 @@ describe("N1, N4: the client's addresses, and a future consult beyond the window
     expect(result.itemsIn).toBe(0);
   });
 });
+
+// ── round 3 ──────────────────────────────────────────────────────────────────
+
+describe("R3.1: a re-run before any sweep does not leave the base key unprepped", () => {
+  it("event-keyed: re-run first, then a sweep: no new BRIEFING, no second booked email, and the reminders are scheduled under the BASE key", async () => {
+    const tables = FIFTY_H();
+    const rerun = setup({ tables, scope: { leadIds: ["lead-1"], reason: "rerun" } });
+    await rerun.run();
+    expect(briefs(rerun.createDraft)).toHaveLength(1);
+    expect(rerun.sent.map(kindOf)).toEqual(["booked"]);
+    const sweep = setup({ tables: { ...tables, crm_activity: rerun.db.tables.crm_activity } });
+    const result = await sweep.run();
+    expect(sweep.createDraft).not.toHaveBeenCalled();
+    expect(result.itemsIn).toBe(0);
+    expect(sweep.sent.map(kindOf)).toEqual(["24h", "1h"]); // never a second booked
+    for (const m of sweep.sent) expect(m.idempotencyKey).toBe(`consult-prep:${ORG}:lead-1:e1:${hours(50)}:${kindOf(m)}`);
+    expect(sweep.sent.map((m) => m.scheduledAt)).toEqual([hours(26), hours(49)]);
+    expect(markers(sweep.db).filter((r) => !(r.payload as { prep_key: string }).prep_key.includes(":rerun:"))).toHaveLength(0);
+  });
+
+  it("stage-keyed: re-run first, then a sweep: nothing is prepped or sent again", async () => {
+    const tables: Tables = { crm_calendar_event: [], crm_lead: [leadRow("lead-1", { current_stage_id: "s-consult", stage_entered_at: hours(-1) })] };
+    const rerun = setup({ tables, scope: { leadIds: ["lead-1"], reason: "rerun" } });
+    await rerun.run();
+    expect(briefs(rerun.createDraft)).toHaveLength(1);
+    expect(rerun.sent.map(kindOf)).toEqual(["booked"]);
+    const sweep = setup({ tables: { ...tables, crm_activity: rerun.db.tables.crm_activity } });
+    const result = await sweep.run();
+    expect(sweep.createDraft).not.toHaveBeenCalled();
+    expect(sweep.sent).toHaveLength(0);
+    expect(result.itemsIn).toBe(0);
+  });
+});
+
+describe("R3.5 and R3.6: the batch overflow is said, and the future-consult read fails closed", () => {
+  it("a stage-scoped run that was handed an overflow count says so in its summary", async () => {
+    const { run } = setup({ tables: { crm_calendar_event: [], crm_lead: [] }, scope: { leadIds: ["lead-1"], reason: "stage", over: 2 } });
+    expect((await run()).summary).toMatch(/2 more leads entered the stage in the same request and are left for the next sweep/);
+  });
+
+  it("1,000 future consult rows for the stage leads fail the check closed: no stage prep, and it is said", async () => {
+    const future: Row[] = Array.from({ length: 1000 }, (_, i) => event(`f${i}`, { starts_at: hours(24 * 40 + i) }));
+    const s = setup({ tables: { crm_calendar_event: future, crm_lead: [leadRow("lead-1", { current_stage_id: "s-consult", stage_entered_at: hours(-1) })] } });
+    const result = await s.run();
+    expect(s.createDraft).not.toHaveBeenCalled();
+    expect(result.summary).toMatch(/consult stage could not be read/);
+  });
+});
+
+describe("R3.7: switching the assistant off cancels what is still scheduled", () => {
+  it("cancelAllScheduled cancels every scheduled send of the firm, records it, and makes no prep and no send", async () => {
+    const first = setup({ tables: FIFTY_H() });
+    await first.run();
+    const off = setup({ tables: { ...FIFTY_H(), crm_activity: first.db.tables.crm_activity } });
+    const { cancelAllScheduled } = await import("@/lib/consult-prep/engine");
+    const r = await cancelAllScheduled({ admin: off.ctx.admin, orgId: ORG }, off.deps, NOW);
+    expect(r).toEqual({ cancelled: 2, notCancelled: 0 });
+    expect(off.cancelled.map((c) => c.id).sort()).toEqual(["re_2", "re_3"]);
+    expect(sendPayloads(off.db).filter((p) => p.status === "cancelled")).toHaveLength(2);
+    expect(off.sent).toHaveLength(0);
+    expect(off.createDraft).not.toHaveBeenCalled();
+    // and a second call has nothing left to cancel
+    expect(await cancelAllScheduled({ admin: off.ctx.admin, orgId: ORG }, off.deps, NOW)).toEqual({ cancelled: 0, notCancelled: 0 });
+  });
+});

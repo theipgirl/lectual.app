@@ -124,6 +124,7 @@ type Counts = {
   nothingToDeliver: number;
   mergedSkipped: number;
   duplicate: number;
+  leadsOver: number;
   leftSkipped: number;
   twins: number;
   alreadyPrepped: number;
@@ -136,7 +137,7 @@ type Counts = {
 
 const emptyCounts = (): Counts => ({
   prepped: 0, drafts: 0, noAddress: 0, noTemplate: 0, refused: 0, failed: 0, partial: 0, unrecorded: 0, sent: 0, scheduled: 0, cancelled: 0,
-  cancelUnchecked: 0, noRecipients: 0, emailOff: 0, recipientsUnread: 0, sendFailed: 0, nothingToDeliver: 0, mergedSkipped: 0, duplicate: 0, leftSkipped: 0, twins: 0, alreadyPrepped: 0, leftCancelled: 0, recipientsChanged: 0, over: 0, deferred: 0,
+  cancelUnchecked: 0, noRecipients: 0, emailOff: 0, recipientsUnread: 0, sendFailed: 0, nothingToDeliver: 0, mergedSkipped: 0, duplicate: 0, leadsOver: 0, leftSkipped: 0, twins: 0, alreadyPrepped: 0, leftCancelled: 0, recipientsChanged: 0, over: 0, deferred: 0,
   unreadSections: { answers: 0, mail: 0, meetings: 0, files: 0, lawmatics: 0 },
 });
 
@@ -263,8 +264,12 @@ async function readMarkers(admin: SupabaseClient, orgId: string, eventIds: reado
     for (const row of (res.data ?? []) as Array<{ created_at: string; payload: Record<string, unknown> | null }>) {
       const key = row.payload?.prep_key;
       if (typeof key === "string") {
-        const have = out.byKey.get(key);
-        if (!have || Date.parse(row.created_at) < Date.parse(have)) out.byKey.set(key, row.created_at);
+        // A person's re-run marker (`<base>:rerun:<ms>`) is also the base key's prep: the base is built (BRIEFING, client draft, booked
+        // email) already, and only its reminders, which a re-run never plans, are still owed. Reminders are planned for it as for any prep.
+        for (const k of new Set([key, key.replace(/:rerun:\d+$/, "")])) {
+          const have = out.byKey.get(k);
+          if (!have || Date.parse(row.created_at) < Date.parse(have)) out.byKey.set(k, row.created_at);
+        }
       } else if (typeof row.payload?.event_id === "string") out.legacyEvents.add(row.payload.event_id);
     }
   }
@@ -325,6 +330,7 @@ async function leadsWithFutureConsult(admin: SupabaseClient, orgId: string, lead
       .gt("starts_at", new Date(nowMs).toISOString())
       .limit(MARKER_ROWS);
     if (res.error) throw new Error("The calendar could not be read for the stage check.");
+    if ((res.data ?? []).length >= MARKER_ROWS) throw new Error(CUT_SHORT);
     for (const r of (res.data ?? []) as Array<{ lead_id: string | null }>) if (r.lead_id) out.add(r.lead_id);
   }
   return out;
@@ -532,7 +538,7 @@ function scheduledIn(state: RunState, nowMs: number): SendRecord[] {
 const leadOfRecord = (r: SendRecord): string | null => r.leadId ?? parsePrepKey(r.prepKey)?.leadId ?? null;
 
 /** Cancels one scheduled send with Resend, then records it. True when it was cancelled. */
-async function cancelOne(ctx: AgentContext, deps: PrepDeps, counts: Counts, state: RunState, record: SendRecord, nowMs: number): Promise<boolean> {
+async function cancelOne(ctx: Pick<AgentContext, "admin" | "orgId">, deps: PrepDeps, counts: Counts, state: RunState, record: SendRecord, nowMs: number): Promise<boolean> {
   if (!record.resendId || !deps.mail.apiKey) {
     counts.cancelUnchecked += 1;
     return false;
@@ -553,6 +559,18 @@ async function cancelOne(ctx: AgentContext, deps: PrepDeps, counts: Counts, stat
     : false;
   if (!ok) counts.unrecorded += 1;
   return true;
+}
+
+/**
+ * Cancels EVERY still-scheduled send of a firm (the consult-prep setting is off: nothing more should go out). No prep is made.
+ * An unreadable or cut-short send history throws; a cancel Resend refuses is counted, not hidden.
+ */
+export async function cancelAllScheduled(ctx: Pick<AgentContext, "admin" | "orgId">, deps: PrepDeps, nowMs: number): Promise<{ cancelled: number; notCancelled: number }> {
+  const counts = emptyCounts();
+  const records = await readSendRecords(ctx.admin, ctx.orgId, nowMs);
+  const state: RunState = { folded: foldSendRecords(records), gens: generationsOf(records), scopedIds: undefined, tz: "UTC" };
+  for (const r of scheduledIn(state, nowMs)) await cancelOne(ctx, deps, counts, state, r, nowMs);
+  return { cancelled: counts.cancelled, notCancelled: counts.cancelUnchecked + counts.sendFailed };
 }
 
 /** The event a scheduled send was made for changed or went (unless the same call is still on the calendar under another id). */
@@ -700,6 +718,7 @@ export async function runPrep(ctx: AgentContext, deps: PrepDeps, generate: Draft
   const rerunRun = scope?.reason === "rerun";
   const outlook = mailboxModuleState(ctx) === "on";
   const counts = emptyCounts();
+  counts.leadsOver = scope?.reason === "stage" ? (scope.over ?? 0) : 0;
 
   // Candidates: consults on the calendar, then leads that entered the consult stage.
   let calendar: Awaited<ReturnType<typeof readCalendar>>;
@@ -784,6 +803,7 @@ export async function runPrep(ctx: AgentContext, deps: PrepDeps, generate: Draft
 
   if (standing.length === 0) {
     const parts = ["No consults need prep."];
+    if (counts.leadsOver > 0) parts.push(`${plural(counts.leadsOver, "more lead", "more leads")} entered the stage in the same request and ${counts.leadsOver === 1 ? "is" : "are"} left for the next sweep.`);
     if (counts.cancelled > 0) parts.push(`${plural(counts.cancelled, "reminder", "reminders")} cancelled.`);
     if (counts.leftCancelled > 0) parts.push(`${plural(counts.leftCancelled, "reminder", "reminders")} cancelled because the lead left the pipeline.`);
     if (counts.recipientsChanged > 0) parts.push(`${plural(counts.recipientsChanged, "reminder", "reminders")} cancelled because who gets consult prep changed.`);
@@ -1030,6 +1050,7 @@ function summaryOf(c: Counts, stageUnread: boolean, outlookNotReady: boolean, ou
   // Outlook consults are read only with the Mailboxes feature; a feature list that could not be read is said, never "none".
   if (outlookGate === "unreadable") parts.push(`Outlook consults were not read: ${MAILBOX_GATE_REASON.unreadable}.`);
   if (c.over > 0) parts.push(`${plural(c.over, "consult", "consults")} left for the next run (limit ${PREP_BATCH}).`);
+  if (c.leadsOver > 0) parts.push(`${plural(c.leadsOver, "more lead", "more leads")} entered the stage in the same request and ${c.leadsOver === 1 ? "is" : "are"} left for the next sweep.`);
   if (c.deferred > 0) parts.push(`${plural(c.deferred, "consult", "consults")} left for the next run: this run ran out of time.`);
   return parts.join(" ");
 }

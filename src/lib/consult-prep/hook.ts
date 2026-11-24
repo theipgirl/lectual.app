@@ -22,17 +22,25 @@ let chain: Promise<unknown> = Promise.resolve();
  */
 let pending = new Map<string, string>();
 let armed = false;
+let armedAt = 0;
+/** An armed hook whose `after()` callback never ran (the request was dropped) is re-armed after this long, so one lost callback cannot silence every later move. */
+const STALE_ARMED_MS = 60_000;
 
 export function scheduleConsultPrepOnEntry(move: { leadId: string; toStageId: string }): void {
-  const first = !armed;
+  const first = !armed || Date.now() - armedAt > STALE_ARMED_MS;
   try {
     pending.set(move.leadId, move.toStageId);
     if (!first) return;
     armed = true;
+    armedAt = Date.now();
     after(() => {
-      const moves = [...pending].map(([leadId, toStageId]) => ({ leadId, toStageId }));
-      pending = new Map();
-      armed = false;
+      let moves: Array<{ leadId: string; toStageId: string }> = [];
+      try {
+        moves = [...pending].map(([leadId, toStageId]) => ({ leadId, toStageId }));
+      } finally {
+        pending = new Map();
+        armed = false;
+      }
       chain = chain
         .catch(() => undefined)
         .then(async () => {
@@ -47,7 +55,7 @@ export function scheduleConsultPrepOnEntry(move: { leadId: string; toStageId: st
       return chain;
     });
   } catch {
-    // No request scope: nothing is started.
+    // No request scope (or `after()` refused): nothing is started, and nothing stays armed.
     if (first) {
       pending = new Map();
       armed = false;

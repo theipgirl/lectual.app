@@ -141,6 +141,7 @@ describe("one request's moves are one small scoped run (F7, F8)", () => {
     expect(r.outcomes).toHaveLength(1);
     expect(r.over).toBe(2);
     expect(w.createDraft).toHaveBeenCalledTimes(5);
+    expect(String(w.db.tables.agent_run[0].summary ?? "")).toMatch(/2 more leads entered the stage in the same request/);
     expect(new Set(w.db.tables.crm_activity.filter((x) => x.type === "queue_drafted").map((x) => x.lead_id)).size).toBe(5);
   });
 
@@ -162,5 +163,18 @@ describe("one request's moves are one small scoped run (F7, F8)", () => {
   it("never throws", async () => {
     const broken = { ...world().deps, admin: { from: () => { throw new Error("boom"); } } as never };
     await expect(startPrepOnStageEntries(broken, [{ leadId: "lead-1", toStageId: "s-consult" }])).resolves.toEqual({ outcomes: [], over: 0 });
+  });
+});
+
+describe("the 5 AM sweep and a firm that switched consult prep off (R3.7)", () => {
+  it("calls the cancel step for a firm whose setting is off or missing, never for one that is on, and a throw is swallowed", async () => {
+    const { runAllAgents } = await import("@/lib/agents/runner");
+    for (const [setting, expected] of [[false, 1], [null, 1], [true, 0]] as const) {
+      const w = world({ setting });
+      const spy = vi.fn(async () => { throw new Error("boom"); });
+      await expect(runAllAgents({ ...w.deps, cancelScheduledWhenOff: spy } as never)).resolves.toBeDefined();
+      expect(spy, String(setting)).toHaveBeenCalledTimes(expected);
+      if (expected) expect(spy).toHaveBeenCalledWith(ORG);
+    }
   });
 });

@@ -82,6 +82,9 @@ export function foldSendRecords(records: readonly SendRecord[]): Map<string, Sen
     const have = out.get(slot);
     // A later `failed` or `duplicate` row (a retry that did not land, a 409) never hides an earlier row that holds a Resend id: that
     // email exists and may still need cancelling. A later `cancelled` row does win.
+    // A `duplicate` (another run holds the key) never covers a failure of ours: with a `failed` row and no Resend id behind it, the
+    // slot is still owed and is retried. Only a sent or scheduled row with an id is protected from a later failure.
+    if (have && r.status === "duplicate" && have.status === "failed") continue;
     if (have && (r.status === "failed" || r.status === "duplicate") && have.resendId && (have.status === "sent" || have.status === "scheduled")) continue;
     if (!have || Date.parse(r.at) >= Date.parse(have.at) || !Number.isFinite(Date.parse(have.at))) out.set(slot, r);
   }

@@ -128,7 +128,7 @@ export async function buildHeadsUpDraft(facts: PrepConsultFacts, generate?: Draf
   };
 }
 
-/** Builds the client-facing prep email (queued as type = CLIENT_EMAIL — see generate.ts). */
+/** Builds the client-facing prep email (queued as type = CLIENT_EMAIL). */
 export async function buildClientPrepDraft(facts: PrepConsultFacts, generate?: DraftTextGenerator): Promise<PrepConsultDraft> {
   const draftBody = await runDraftPrompt(
     CLIENT_PREP_SYSTEM_PROMPT,

@@ -2645,6 +2645,14 @@ pull and packages PDF are S2 and are NOT built (the brief says "come in the next
     (stage leads: the stage part is not used and the summary says the stage could not be read).
   - **Candidates, again.** A lead in the consult stage with ANY future consult event (any source, however far off) is prepped by that consult, never by its stage. The client-address exclusion covers the old emails of merged leads and any
     email-shaped text in the intake answers or Lawmatics fields. An empty or scrubbed-away value in the brief reads "not recorded", never "null". The html keeps the text's line order (a list stays where it appears).
+  - **Round 3.** (1) A person's re-run marker (`<base>:rerun:<ms>`) also marks its BASE key as prepped (`readMarkers`), so a sweep after a re-run builds no second BRIEFING, client draft or booked email; the base still gets its
+    24h and 1h reminders planned under the base key, which a re-run never schedules (works for event and stage keys). (2) In the fold a `duplicate` never covers a `failed` row of ours: `failed` then `duplicate` with no Resend id is
+    retried (a persistent 409 is therefore re-posted each sweep; the slot stays owed until a send lands). (4) The hook's `armed` flag resets in a `finally` inside the callback and when `after()` throws, and an armed hook whose
+    callback never ran is re-armed after 60 s. (5) The overflow of a batch (`over`) rides on the scope (`RunScope.over`) into the run's summary ("N more leads entered the stage in the same request and are left for the next sweep"), and is
+    still returned by `startPrepOnStageEntries`. (6) `leadsWithFutureConsult` fails closed on a cut-short read (stage part unused, said). (7) **Assistant switched OFF:** the 5 AM sweep (`runAllAgents`) calls
+    `RunnerDeps.cancelScheduledWhenOff(orgId)` for a firm that holds the Assistants feature, is not paused, and whose `consult-prep` setting is off or has no row; production wires it to `cancelPrepSendsWhenOff` (`off.ts`), which
+    cancels EVERY still-scheduled consult prep send of the firm (`cancelAllScheduled`) and makes no prep. Limits: it runs only in that sweep (not the Lawmatics ticks), a firm with Autopilot paused or without the Assistants feature is skipped
+    like every other agent, and an unreadable or cut-short send history or a refused cancel is retried by the next sweep. The scheduled email already sent is not recalled.
   - **Existing assertions changed on purpose:** the send payload's key list (now with `recipients_sha256`), the card's status line (no "emailed to <names>"), and `hook-schedule.test.ts` (the hook starts `startPrepOnStageEntries` with a batch). Tests: the "review fixes" blocks of
     `tests/agents/consult-prep.test.ts`, `tests/consult-prep/{sends,recipients,brief,deps,sync-hook,trigger,hook-schedule,card}.test.*`.
 

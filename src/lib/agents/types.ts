@@ -12,7 +12,7 @@ export type AgentTrigger = "cron" | "manual" | "webhook" | "event";
  * consult stage. `sync`: a firm's Lawmatics sync just finished. `rerun`: a person asked for a fresh prep of this lead.
  * Every gate of an ordinary run (the Assistants feature, the setting, Autopilot, the run row, the budget) still applies.
  */
-export type RunScope = { leadIds: readonly string[]; reason: "stage" | "rerun" } | { leadIds?: undefined; reason: "sync" };
+export type RunScope = { leadIds: readonly string[]; reason: "stage" | "rerun"; /** Leads that entered the stage in the same request but did not fit the batch: the run says so. */ over?: number } | { leadIds?: undefined; reason: "sync" };
 
 export const AGENT_IDS: readonly AgentId[] = [
   "email-intel",

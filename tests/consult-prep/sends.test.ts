@@ -190,4 +190,15 @@ describe("review fixes: folding and planning", () => {
     expect(shouldCancel(r, null, { twinExists: true })).toBe(false);
     expect(shouldCancel(r, { startsAt: new Date(at(52)).toISOString(), leadId: LEAD, isConsult: true }, { twinExists: true })).toBe(true);
   });
+  it("a duplicate never covers a failure of ours: failed then duplicate (no Resend id) is still owed", () => {
+    const slot = recordSlot(KEY, "booked");
+    const folded = foldSendRecords([rec({ status: "failed", resendId: null, at: T(0) }), rec({ status: "duplicate", resendId: null, at: T(1) })]);
+    expect(folded.get(slot)?.status).toBe("failed");
+    expect(plan(50, { existing: folded, madeNow: false }).actions[0]).toEqual({ kind: "booked", mode: "now" });
+    // a duplicate with no failure is done, and a failure after a duplicate is owed again
+    expect(foldSendRecords([rec({ status: "duplicate", resendId: null, at: T(0) })]).get(slot)?.status).toBe("duplicate");
+    expect(foldSendRecords([rec({ status: "duplicate", resendId: null, at: T(0) }), rec({ status: "failed", resendId: null, at: T(1) })]).get(slot)?.status).toBe("failed");
+    // but a real sent row with an id keeps covering a later failed and duplicate
+    expect(foldSendRecords([rec({ status: "sent", resendId: "re_1", at: T(0) }), rec({ status: "failed", resendId: null, at: T(1) }), rec({ status: "duplicate", resendId: null, at: T(2) })]).get(slot)?.status).toBe("sent");
+  });
 });

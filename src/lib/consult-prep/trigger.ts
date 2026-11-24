@@ -97,7 +97,7 @@ export async function startPrepOnStageEntries(deps: RunnerDeps, moves: ReadonlyA
       if (wanted.length === 0) continue;
       const take = wanted.slice(0, STAGE_BATCH_MAX);
       result.over += wanted.length - take.length;
-      const outcome = await runConsultPrepScoped(deps, { orgId, scope: { leadIds: take.map((l) => l.id), reason: "stage" } });
+      const outcome = await runConsultPrepScoped(deps, { orgId, scope: { leadIds: take.map((l) => l.id), reason: "stage", over: wanted.length - take.length } });
       if (outcome) result.outcomes.push(outcome);
     }
   } catch {

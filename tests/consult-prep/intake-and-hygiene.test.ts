@@ -82,6 +82,12 @@ describe("the read's states", () => {
   });
 });
 
+describe("no dangling reference to the removed prep-consult generator", () => {
+  it("nothing under src/lib/prep-consult points at generate.ts", () => {
+    for (const n of fs.readdirSync("src/lib/prep-consult")) expect(fs.readFileSync(path.join("src/lib/prep-consult", n), "utf8"), n).not.toMatch(/generate\.ts/);
+  });
+});
+
 describe("hygiene of the consult prep sources", () => {
   const read = (f: string) => fs.readFileSync(f, "utf8");
   const walk = (dir: string): string[] => fs.readdirSync(dir).flatMap((n) => (fs.statSync(path.join(dir, n)).isDirectory() ? walk(path.join(dir, n)) : /\.(ts|tsx)$/.test(n) ? [path.join(dir, n)] : []));

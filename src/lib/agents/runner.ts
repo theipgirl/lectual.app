@@ -85,6 +85,11 @@ export type RunnerDeps = {
   /** The cron's wall budget, for tests. Default CRON_WALL_BUDGET_MS. */
   cronBudgetMs?: number;
   siteOrigin?: () => Promise<string | null>;
+  /**
+   * The 5 AM sweep calls this for a firm whose consult-prep setting is OFF (or has no row): it cancels the firm's remaining scheduled
+   * consult prep emails and makes no prep. Absent in tests that do not need it. A throw is swallowed.
+   */
+  cancelScheduledWhenOff?: (orgId: string) => Promise<void>;
 };
 
 export type RunOutcome = {
@@ -352,6 +357,13 @@ export async function runAllAgents(deps: RunnerDeps): Promise<RunOutcome[]> {
       }
     };
     await Promise.all(CRON_TRACKS.map(runTrack));
+    if (!settings.get("consult-prep")?.enabled && deps.cancelScheduledWhenOff) {
+      try {
+        await deps.cancelScheduledWhenOff(orgId);
+      } catch {
+        // Counted nowhere: the next sweep tries again.
+      }
+    }
     for (const agent of AGENT_IDS) {
       const o = byAgent.get(agent);
       if (o) outcomes.push(o);

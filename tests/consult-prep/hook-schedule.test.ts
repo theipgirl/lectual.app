@@ -66,4 +66,30 @@ describe("scheduleConsultPrepOnEntry", () => {
     await state.after[1]();
     expect(state.started).toEqual([[{ leadId: "l1", toStageId: "s1" }], [{ leadId: "l2", toStageId: "s1" }]]);
   });
+
+  it("an after() registration that throws leaves nothing armed: the next request registers again", async () => {
+    const { scheduleConsultPrepOnEntry } = await import("@/lib/consult-prep/hook");
+    state.afterThrows = true;
+    scheduleConsultPrepOnEntry({ leadId: "l1", toStageId: "s1" });
+    state.afterThrows = false;
+    scheduleConsultPrepOnEntry({ leadId: "l2", toStageId: "s1" });
+    expect(state.after).toHaveLength(1);
+    await state.after[0]();
+    expect(state.started).toEqual([[{ leadId: "l2", toStageId: "s1" }]]); // l1 was not carried into the next batch
+  });
+
+  it("a callback that ran resets the flag even when the start throws; a callback that NEVER ran does not silence later moves for good", async () => {
+    vi.useFakeTimers();
+    try {
+      const { scheduleConsultPrepOnEntry } = await import("@/lib/consult-prep/hook");
+      scheduleConsultPrepOnEntry({ leadId: "l1", toStageId: "s1" });
+      scheduleConsultPrepOnEntry({ leadId: "l2", toStageId: "s1" });
+      expect(state.after).toHaveLength(1); // armed: the second move joins the first batch
+      vi.advanceTimersByTime(61_000); // the registered callback never runs (a dropped request)
+      scheduleConsultPrepOnEntry({ leadId: "l3", toStageId: "s1" });
+      expect(state.after).toHaveLength(2); // re-armed
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
