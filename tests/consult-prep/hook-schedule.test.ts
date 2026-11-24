@@ -15,10 +15,10 @@ vi.mock("next/server", () => ({
   },
 }));
 vi.mock("@/lib/consult-prep/trigger", () => ({
-  startPrepOnStageEntry: async (_deps: unknown, move: unknown) => {
-    state.started.push(move);
+  startPrepOnStageEntries: async (_deps: unknown, moves: unknown) => {
+    state.started.push(moves);
     if (state.startThrows) throw new Error("boom");
-    return null;
+    return { outcomes: [], over: 0 };
   },
 }));
 vi.mock("@/lib/agents/deps", () => ({ productionRunnerDeps: () => ({}) }));
@@ -38,7 +38,7 @@ describe("scheduleConsultPrepOnEntry", () => {
     expect(state.after).toHaveLength(1);
     expect(state.started).toHaveLength(0);
     await state.after[0]();
-    expect(state.started).toEqual([{ leadId: "l1", toStageId: "s1" }]);
+    expect(state.started).toEqual([[{ leadId: "l1", toStageId: "s1" }]]);
   });
 
   it("outside a request there is no after(): nothing is started and nothing throws", async () => {
@@ -48,12 +48,22 @@ describe("scheduleConsultPrepOnEntry", () => {
     expect(state.started).toHaveLength(0);
   });
 
-  it("a prep that throws is swallowed, and the next one still runs (one at a time)", async () => {
+  it("moves made in ONE request are started together: one after(), one run for all the leads", async () => {
+    const { scheduleConsultPrepOnEntry } = await import("@/lib/consult-prep/hook");
+    for (const id of ["l1", "l2", "l3", "l4", "l5", "l6", "l7"]) scheduleConsultPrepOnEntry({ leadId: id, toStageId: "s1" });
+    expect(state.after).toHaveLength(1);
+    await state.after[0]();
+    expect(state.started).toHaveLength(1);
+    expect((state.started[0] as unknown[]).length).toBe(7); // trigger.ts caps one scoped run at five and counts the rest
+  });
+
+  it("a prep that throws is swallowed, and the next request's still runs (one at a time)", async () => {
     const { scheduleConsultPrepOnEntry } = await import("@/lib/consult-prep/hook");
     state.startThrows = true;
     scheduleConsultPrepOnEntry({ leadId: "l1", toStageId: "s1" });
+    await state.after[0]();
     scheduleConsultPrepOnEntry({ leadId: "l2", toStageId: "s1" });
-    await Promise.all(state.after.map((f) => f()));
-    expect(state.started).toEqual([{ leadId: "l1", toStageId: "s1" }, { leadId: "l2", toStageId: "s1" }]);
+    await state.after[1]();
+    expect(state.started).toEqual([[{ leadId: "l1", toStageId: "s1" }], [{ leadId: "l2", toStageId: "s1" }]]);
   });
 });

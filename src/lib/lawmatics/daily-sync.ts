@@ -180,6 +180,8 @@ export type DailySyncDeps = {
 
 /** The consult prep sweep is not started with less than this left of the wall budget (counted, left to the next sweep). */
 export const MIN_PREP_START_MS = 30_000;
+/** One firm's prep gets at most this much of the wall budget that is left. */
+export const PREP_FIRM_CAP_MS = 60_000;
 
 export function emptySummary(mode: SyncMode): DailySyncSummary {
   return {
@@ -762,6 +764,8 @@ type FirmState = {
   /** undefined: not read yet; null: the read failed. */
   shared: SharedRead | null | undefined;
   budget: { createsUsed: number; linksUsed: number };
+  /** The consult step ended `ok` (not failed, not out of time): only then is the firm's consult prep started, after every firm has synced. */
+  consultsOk?: boolean;
 };
 
 /** The order the prospect and consult steps visit firms: rotated by the hour, so a slow firm can't starve the same one every run. */
@@ -928,19 +932,27 @@ export async function runLawmaticsDailySync(deps: DailySyncDeps = {}): Promise<D
         s.consults.failed += 1;
         f.failed = true;
       }
-      if (okC !== "failed" && deps.afterConsults) {
-        // The consult prep sweep for this firm, with whatever the wall budget has left. It can never change the sync's result.
-        const left = wallDeadline - clock();
-        if (left < MIN_PREP_START_MS) s.consultPrep.skippedForTime += 1;
-        else {
-          try {
-            const r = await deps.afterConsults(f.conn.org_id, { timeLeftMs: left });
-            if (r === "ran") s.consultPrep.ran += 1;
-            else s.consultPrep.notOn += 1;
-          } catch {
-            s.consultPrep.failed += 1;
-          }
-        }
+      f.consultsOk = okC === "ok";
+    }
+  }
+
+  // ── pass 3: consult prep, AFTER every firm's sync steps. Prep never takes the wall budget a later firm's sync needed. ──
+  // Only a firm whose consult step ended ok (a timeout or a failure leaves its calendar rows unsure), each with its own cap, and
+  // none started with under MIN_PREP_START_MS left (counted, left to the next sweep). It can never change the sync's result.
+  if (deps.afterConsults) {
+    for (const f of fairOrder(firms, run.nowMs)) {
+      if (f.refused || !f.consultsOk) continue;
+      const left = wallDeadline - clock();
+      if (left < MIN_PREP_START_MS) {
+        s.consultPrep.skippedForTime += 1;
+        continue;
+      }
+      try {
+        const r = await deps.afterConsults(f.conn.org_id, { timeLeftMs: Math.min(left, PREP_FIRM_CAP_MS) });
+        if (r === "ran") s.consultPrep.ran += 1;
+        else s.consultPrep.notOn += 1;
+      } catch {
+        s.consultPrep.failed += 1;
       }
     }
   }

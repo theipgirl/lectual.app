@@ -8,7 +8,7 @@ import { fakeAdmin, type Recorded } from "../mailbox/fake-db";
 import { resetLeadMergeSupport } from "@/lib/leads/live";
 import type { LawmaticsClient, ListResult } from "@/lib/lawmatics/client";
 
-const { runLawmaticsDailySync, MIN_PREP_START_MS } = await import("@/lib/lawmatics/daily-sync");
+const { runLawmaticsDailySync, MIN_PREP_START_MS, PREP_FIRM_CAP_MS } = await import("@/lib/lawmatics/daily-sync");
 
 type Row = Record<string, unknown>;
 const NOW = new Date("2026-11-23T14:00:00Z");
@@ -91,5 +91,63 @@ describe("the Lawmatics sync starts consult prep for each firm after its consult
   it("no hook given (the button, other tests): no prep, counts at zero", async () => {
     const s = await run(world([{ id: "c1", org_id: "A", status: "active" }]));
     expect(s.consultPrep).toEqual({ ran: 0, notOn: 0, skippedForTime: 0, failed: 0 });
+  });
+});
+
+describe("consult prep runs AFTER every firm's sync steps (F5)", () => {
+  it("no prep starts until both firms' prospect and consult steps have finished", async () => {
+    const order: string[] = [];
+    const tracing: LawmaticsClient = {
+      listAll: async (path) => {
+        if (path === "/events") order.push("events");
+        return list();
+      },
+      get: async () => ({}),
+    };
+    const w = world([{ id: "c1", org_id: "A", status: "active" }, { id: "c2", org_id: "B", status: "active" }]);
+    await runLawmaticsDailySync({ admin: w.admin, client: () => tracing, getToken: async () => "tok", now: () => NOW, mode: "daytime", afterConsults: async (orgId: string) => (order.push(`prep:${orgId}`), "ran" as const) });
+    expect(order.filter((o) => o === "events")).toHaveLength(2);
+    expect(order.indexOf("prep:A")).toBeGreaterThan(order.lastIndexOf("events"));
+    expect(order.indexOf("prep:B")).toBeGreaterThan(order.lastIndexOf("events"));
+  });
+
+  it("a firm whose consult step did not end ok (a failed read) gets no prep", async () => {
+    const failing: LawmaticsClient = {
+      listAll: async (path) => {
+        if (path === "/events") throw new Error("down");
+        return list();
+      },
+      get: async () => ({}),
+    };
+    const hook = vi.fn(async () => "ran" as const);
+    const w = world([{ id: "c1", org_id: "A", status: "active" }]);
+    const s = await runLawmaticsDailySync({ admin: w.admin, client: () => failing, getToken: async () => "tok", now: () => NOW, mode: "daytime", afterConsults: hook });
+    expect(s.consults.failed).toBe(1);
+    expect(hook).not.toHaveBeenCalled();
+  });
+
+  it("each firm is capped, and the cap never exceeds what the wall budget has left", async () => {
+    const seen: number[] = [];
+    const w = world([{ id: "c1", org_id: "A", status: "active" }]);
+    await runLawmaticsDailySync({ admin: w.admin, client: () => client, getToken: async () => "tok", now: () => NOW, mode: "daytime", budgetMs: 100_000_000, afterConsults: async (_o, info) => (seen.push(info.timeLeftMs), "ran" as const) });
+    expect(seen[0]).toBeLessThanOrEqual(PREP_FIRM_CAP_MS);
+    expect(PREP_FIRM_CAP_MS).toBeLessThan(270_000);
+  });
+
+  it("with the wall budget spent by the syncs, the prep is skipped and counted for every firm", async () => {
+    let t = 0;
+    const slow: LawmaticsClient = {
+      listAll: async (path) => {
+        if (path === "/events") t += 40_000;
+        return list();
+      },
+      get: async () => ({}),
+    };
+    const hook = vi.fn(async () => "ran" as const);
+    const w = world([{ id: "c1", org_id: "A", status: "active" }, { id: "c2", org_id: "B", status: "active" }]);
+    const s = await runLawmaticsDailySync({ admin: w.admin, client: () => slow, getToken: async () => "tok", now: () => NOW, mode: "daytime", budgetMs: 100_000, clock: () => t, afterConsults: hook });
+    expect(hook).not.toHaveBeenCalled();
+    expect(s.consultPrep.skippedForTime).toBe(2);
+    expect(s.consults.ran).toBe(2); // the second firm's sync was not starved by the first firm's prep
   });
 });

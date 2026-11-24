@@ -15,16 +15,31 @@ import { after } from "next/server";
 
 let chain: Promise<unknown> = Promise.resolve();
 
+/**
+ * Leads moved during ONE request are collected and started together, once the response has gone: ONE scoped run of at most five
+ * leads (see trigger.ts), so a Stage Keeper run or a bulk move that puts many leads into the stage never starts many runs. The rest
+ * are left to the next sweep. A move into a lost or nurture stage rides the same hook (the run cancels that lead's reminders).
+ */
+let pending = new Map<string, string>();
+let armed = false;
+
 export function scheduleConsultPrepOnEntry(move: { leadId: string; toStageId: string }): void {
+  const first = !armed;
   try {
+    pending.set(move.leadId, move.toStageId);
+    if (!first) return;
+    armed = true;
     after(() => {
+      const moves = [...pending].map(([leadId, toStageId]) => ({ leadId, toStageId }));
+      pending = new Map();
+      armed = false;
       chain = chain
         .catch(() => undefined)
         .then(async () => {
           try {
-            const { startPrepOnStageEntry } = await import("./trigger");
+            const { startPrepOnStageEntries } = await import("./trigger");
             const { productionRunnerDeps } = await import("@/lib/agents/deps");
-            await startPrepOnStageEntry(productionRunnerDeps(), move);
+            await startPrepOnStageEntries(productionRunnerDeps(), moves);
           } catch {
             // Never into the move.
           }
@@ -33,5 +48,9 @@ export function scheduleConsultPrepOnEntry(move: { leadId: string; toStageId: st
     });
   } catch {
     // No request scope: nothing is started.
+    if (first) {
+      pending = new Map();
+      armed = false;
+    }
   }
 }

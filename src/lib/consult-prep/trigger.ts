@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { leadRead } from "@/lib/leads/live";
 import { parseStageMapping, type StageMapping } from "@/lib/agents/stage-keeper/mapping";
+import { IN_CHUNK, chunk } from "@/lib/agents/shared";
 import { AGENT_RUN_BUDGET_MS, CRON_AGENT_CAP_MS } from "@/lib/agents/budget";
 import { productionRunnerDeps } from "@/lib/agents/deps";
 import { loadAgentSettings, runOneAgent, type RunnerDeps, type RunOutcome } from "@/lib/agents/runner";
@@ -64,23 +65,51 @@ async function readStagesAndMapping(admin: Admin, orgId: string): Promise<{ stag
   };
 }
 
+/** The most leads one scoped run takes. A request that moves more leads into the stage leaves the rest to the next sweep (counted). */
+export const STAGE_BATCH_MAX = 5;
+
+export type EntriesResult = { outcomes: RunOutcome[]; /** leads left for the next sweep because the batch was full */ over: number };
+
 /**
- * A lead was just moved to `toStageId` (by a person or by the Stage Keeper). When that is the firm's consult stage, prep
- * THIS lead. The org is the lead row's own. A lead that has already moved on (the stage on the row is not `toStageId`
- * any more) starts nothing, and a merged lead is never read.
+ * Leads were just moved (by a person or by the Stage Keeper), all in ONE request. For each firm, the ones now in the consult stage
+ * (to be prepped) and the ones now in a lost or nurture stage (their scheduled reminders are cancelled) go to ONE scoped run of at
+ * most STAGE_BATCH_MAX leads. The org is the lead row's own. A lead that has already moved on (the stage on the row is not the one
+ * it was moved to) starts nothing, and a merged lead is never read. Anything beyond the batch is left to the next sweep and counted.
  */
-export async function startPrepOnStageEntry(deps: RunnerDeps, move: { leadId: string; toStageId: string }): Promise<RunOutcome | null> {
+export async function startPrepOnStageEntries(deps: RunnerDeps, moves: ReadonlyArray<{ leadId: string; toStageId: string }>): Promise<EntriesResult> {
+  const result: EntriesResult = { outcomes: [], over: 0 };
   try {
     const { admin } = deps;
-    const lead = await leadRead(({ live }) => live(admin.from("crm_lead").select("id, org_id, current_stage_id")).eq("id", move.leadId).maybeSingle());
-    const row = lead.error ? null : (lead.data as { id: string; org_id: string; current_stage_id: string } | null);
-    if (!row || row.current_stage_id !== move.toStageId) return null;
-    const ctx = await readStagesAndMapping(admin, row.org_id);
-    if (!ctx || !isConsultScheduledStage(move.toStageId, ctx.stages, ctx.mapping)) return null;
-    return await runConsultPrepScoped(deps, { orgId: row.org_id, scope: { leadIds: [row.id], reason: "stage" } });
+    const toStage = new Map(moves.map((m) => [m.leadId, m.toStageId]));
+    const rows: Array<{ id: string; org_id: string; current_stage_id: string }> = [];
+    for (const batch of chunk([...toStage.keys()], IN_CHUNK)) {
+      const lead = await leadRead(({ live }) => live(admin.from("crm_lead").select("id, org_id, current_stage_id")).in("id", batch));
+      if (lead.error) return result;
+      rows.push(...((lead.data ?? []) as typeof rows));
+    }
+    const byOrg = new Map<string, typeof rows>();
+    for (const r of rows) if (r.current_stage_id === toStage.get(r.id)) byOrg.set(r.org_id, [...(byOrg.get(r.org_id) ?? []), r]);
+    for (const [orgId, leads] of byOrg) {
+      const ctx = await readStagesAndMapping(admin, orgId);
+      if (!ctx) continue;
+      const category = new Map(ctx.stages.map((s) => [s.id, s.category]));
+      const wanted = leads.filter((l) => isConsultScheduledStage(l.current_stage_id, ctx.stages, ctx.mapping) || ["lost", "nurture"].includes(category.get(l.current_stage_id) ?? ""));
+      if (wanted.length === 0) continue;
+      const take = wanted.slice(0, STAGE_BATCH_MAX);
+      result.over += wanted.length - take.length;
+      const outcome = await runConsultPrepScoped(deps, { orgId, scope: { leadIds: take.map((l) => l.id), reason: "stage" } });
+      if (outcome) result.outcomes.push(outcome);
+    }
   } catch {
-    return null;
+    // Never into the move.
   }
+  return result;
+}
+
+/** One lead moved. The same path as a batch of one; kept for callers (and tests) that move a single lead. */
+export async function startPrepOnStageEntry(deps: RunnerDeps, move: { leadId: string; toStageId: string }): Promise<RunOutcome | null> {
+  const r = await startPrepOnStageEntries(deps, [move]);
+  return r.outcomes[0] ?? null;
 }
 
 /** The Lawmatics sync's hook: prep the firm's candidates with the wall budget that is left (never more than one agent's cap). */

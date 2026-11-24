@@ -8,7 +8,7 @@ import { fakeAdmin } from "../mailbox/fake-db";
 import { memDb, type Row, type Tables } from "../agents/mem-db";
 import { fakeLlm, NOW, ORG } from "../agents/helpers";
 import { resetLeadMergeSupport } from "@/lib/leads/live";
-import { runConsultPrepScoped, startPrepOnStageEntry } from "@/lib/consult-prep/trigger";
+import { STAGE_BATCH_MAX, runConsultPrepScoped, startPrepOnStageEntries, startPrepOnStageEntry } from "@/lib/consult-prep/trigger";
 
 const OTHER = "22222222-2222-2222-2222-222222222222";
 const ago = (days: number) => new Date(NOW - days * 86_400_000).toISOString();
@@ -126,5 +126,41 @@ describe("a run scoped to the sync or a re-run", () => {
     const w = world({ setting: false });
     expect(await runConsultPrepScoped(w.deps, { orgId: ORG, scope: { reason: "sync" } })).toBeNull();
     expect(w.db.tables.agent_run).toHaveLength(0);
+  });
+});
+
+describe("one request's moves are one small scoped run (F7, F8)", () => {
+  const ids = (n: number) => Array.from({ length: n }, (_, i) => `lead-${i + 1}`);
+  const leadsIn = (n: number, stage = "s-consult") => ids(n).map((id) => lead(id, { email: `${id}@client.example`, current_stage_id: stage }));
+
+  it("seven leads moved into the stage in one request start ONE run for five of them and count the other two", async () => {
+    const w = world({ tables: { crm_lead: leadsIn(7) } });
+    const r = await startPrepOnStageEntries(w.deps, ids(7).map((leadId) => ({ leadId, toStageId: "s-consult" })));
+    expect(STAGE_BATCH_MAX).toBe(5);
+    expect(w.db.tables.agent_run).toHaveLength(1);
+    expect(r.outcomes).toHaveLength(1);
+    expect(r.over).toBe(2);
+    expect(w.createDraft).toHaveBeenCalledTimes(5);
+    expect(new Set(w.db.tables.crm_activity.filter((x) => x.type === "queue_drafted").map((x) => x.lead_id)).size).toBe(5);
+  });
+
+  it("a lead moved into a lost stage starts a scoped run too (it cancels that lead's reminders), and a plain open stage starts nothing", async () => {
+    const stages = [
+      { id: "s-open", org_id: ORG, name: "Discovery", category: "open", order_index: 1 },
+      { id: "s-consult", org_id: ORG, name: "Consultation Scheduled", category: "open", order_index: 2 },
+      { id: "s-lost", org_id: ORG, name: "Lost", category: "lost", order_index: 9 },
+    ];
+    const lost = world({ tables: { crm_stage: stages, crm_lead: [lead("lead-1", { current_stage_id: "s-lost" })] } });
+    const r = await startPrepOnStageEntries(lost.deps, [{ leadId: "lead-1", toStageId: "s-lost" }]);
+    expect(r.outcomes).toHaveLength(1);
+    expect(lost.db.tables.agent_run).toHaveLength(1);
+    const plain = world({ tables: { crm_stage: stages, crm_lead: [lead("lead-1", { current_stage_id: "s-open" })] } });
+    expect((await startPrepOnStageEntries(plain.deps, [{ leadId: "lead-1", toStageId: "s-open" }])).outcomes).toHaveLength(0);
+    expect(plain.db.tables.agent_run).toHaveLength(0);
+  });
+
+  it("never throws", async () => {
+    const broken = { ...world().deps, admin: { from: () => { throw new Error("boom"); } } as never };
+    await expect(startPrepOnStageEntries(broken, [{ leadId: "lead-1", toStageId: "s-consult" }])).resolves.toEqual({ outcomes: [], over: 0 });
   });
 });
