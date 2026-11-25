@@ -3,6 +3,22 @@
 One list across sessions. Each session adds its action items here and checks them against Omi.
 Newest section first. Tick an item when it is done; don't delete it.
 
+## 2026-11-25: marketing site, a fourth mockup modeled on demi.ai
+
+Recap: `docs/recaps/2026-11-17-marketing-site-redesign-mockups.md` (round three). Omi cross-check: still the open item "Review the new website".
+
+### Taylor
+- [ ] Review Lectual Horizon on a laptop and a phone: https://claude.ai/artifact/1X2fXmvjbUpDJdHnrqwMPg
+- [ ] Choose the direction to build: Horizon (the demi.ai structure), Overnight (First light + Gate), or parts of each.
+- [ ] Confirm the overnight queue rows: Horizon uses only work the product does today. Overnight still shows the office action, patent and
+      copyright examples until you say which you want.
+- [ ] Read the new lines in Horizon: "A legal CRM remembers. Lectual acts.", the three "What makes Lectual different?" titles, the short
+      lists on the three model cards, and the small labels on the Outlook / Zoom / Fathom / Lawmatics / LawPay chips.
+- [ ] Confirm "Log in" as the top-bar button on the real site (Horizon and Overnight both use it now).
+
+### Claude, after the pick
+- [ ] Check the chosen mockup in Safari and on a real phone, then write the short design and build it in `theipgirl/lectual` on a branch.
+
 ## 2026-11-17: marketing site redesign, three mockups to choose from
 
 Recap: `docs/recaps/2026-11-17-marketing-site-redesign-mockups.md`. Omi cross-check: this is the open Omi item "Review the new website"

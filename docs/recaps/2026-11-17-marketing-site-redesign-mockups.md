@@ -74,6 +74,39 @@ whether the page shows the right features.
   Attorney gate on "Awaiting approval", turns "Approved ✓", then reaches Sent); one comment was
   unreadable ("jown our firms we wojrws") and is waiting for Taylor to restate it.
 
+## Round three (Nov 17 to 25): comments, and a mockup modeled on demi.ai
+
+- **Comments on the mockups, handled in their threads.** Gate: the queue window now grows from
+  smaller to full size as you scroll (the comment was pinned to the whole page, so that target
+  was a guess). Overnight: the top-bar button is now "Log in"; "Apply for private beta" stays in
+  the hero and the closing section.
+- **Taylor (Nov 25): "make a new mockup. I want a clone of this site", https://www.demi.ai/ .**
+  Built **"Lectual Horizon"**: https://claude.ai/artifact/1X2fXmvjbUpDJdHnrqwMPg . It follows that
+  site's structure, layout and motion section for section, and uses none of its name, logo, orb
+  character, wording, photos, customer quotes, prices or code. The translation: light tight serif
+  headline with a "Draft ready" pill and a self-drawing check ("Agents draft. An attorney
+  approves"); a tabbed workspace window (Approvals, Leads, Proposals) on a band of sky; a pinned
+  dark "What makes Lectual different?" with three points and a changing window; a text marquee
+  of the five connections in place of customer logos; "A legal CRM remembers. Lectual acts.";
+  a sideways snap carousel of the six real features; a circle of sky that grows to fill the
+  screen in place of their orb; the four rules as cards in place of testimonials; "Watch one
+  night in the queue", a looping 20-second animation in place of their film; five trust badges
+  with no certification names; three model cards in place of pricing (no prices); six questions
+  answered from existing copy; a sky closing band and a giant wordmark footer.
+- **Choices made in it (Taylor can overrule):** every queue on the page uses work the product
+  does overnight today (inquiry scored, follow-up email and proposal drafted from a recorded
+  consult, consult prep, stalled-lead follow-up, morning brief, a legal question routed to an
+  attorney) and no office action, patent or copyright-deposit drafting; the nav button is
+  "Log in"; a short logo loader is kept; type is Newsreader (light, tight) with Geist.
+- **How it was made:** the reference was screenshotted across its full scroll; one builder agent
+  worked from a written section-by-section brief; the orchestrator reviewed the screenshots,
+  published a first pass, sent six fixes back (queue rows, the Approved button, the night
+  panel's overlaps, an empty stretch after the circle, card padding, small text) and republished.
+- **Not checked:** Safari and Firefox, real touch scrolling, keyboard order through the two
+  pinned sections, a failed animation-library load, and behaviour inside the artifact viewer.
+  A few lines are new wording: "A legal CRM remembers. Lectual acts.", the three "different"
+  titles, the short lists on the model cards, and the sub-labels on the connection chips.
+
 ## Recommendation on Astro (not decided)
 
 Stay on Next.js for this redesign. The loader, pin scrolling and micro-animations are the same
