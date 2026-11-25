@@ -244,6 +244,14 @@ function parsePage(body: unknown): Page {
 }
 
 async function searchPage(doFetch: FetchFn, query: string, from: number, timeoutMs: number): Promise<Page> {
+  return postPage(
+    doFetch,
+    { query: { bool: { must: [{ query_string: { query, default_operator: 'AND' } }] } }, size: PAGE_SIZE, from, track_total_hits: true },
+    timeoutMs,
+  );
+}
+
+async function postPage(doFetch: FetchFn, requestBody: Obj, timeoutMs: number): Promise<Page> {
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   // The abort stays armed through the body read, and the race makes the
@@ -264,12 +272,7 @@ async function searchPage(doFetch: FetchFn, query: string, from: number, timeout
           Origin: 'https://tmsearch.uspto.gov',
           'User-Agent': 'Mozilla/5.0',
         },
-        body: JSON.stringify({
-          query: { bool: { must: [{ query_string: { query, default_operator: 'AND' } }] } },
-          size: PAGE_SIZE,
-          from,
-          track_total_hits: true,
-        }),
+        body: JSON.stringify(requestBody),
         signal: controller.signal,
       });
     } catch {
@@ -401,4 +404,116 @@ export async function searchUspto(input: UsptoInput): Promise<UsptoResult> {
       serial: r.serial,
     })),
   };
+}
+
+// ---------------------------------------------------------------------------
+// The site's own basic search, for the exported workbook. The knockout above
+// (`searchUspto`) stays the source of the brief's summary; this is what the
+// site's "Export, First 500 results" lists for a typed term, in relevance order.
+
+export const SITE_PAGE_SIZE = 100;
+export const SITE_LIMIT = 500;
+export const SITE_SOURCE_FIELDS = [
+  'id',
+  'wordmark',
+  'alive',
+  'currentBasis',
+  'filedDate',
+  'goodsAndServices',
+  'internationalClass',
+  'ownerFullText',
+  'ownerName',
+  'priorityDate',
+  'registrationDate',
+  'registrationId',
+  'registrationType',
+  'supplementalRegistrationDate',
+] as const;
+
+/** The exact body the site posts for a typed term (no aggs, no highlight). */
+export function buildSiteQuery(term: string, from: number): Obj {
+  return {
+    query: {
+      bool: {
+        must: [
+          {
+            bool: {
+              should: [
+                { match_phrase: { WM: { query: term, boost: 5 } } },
+                { match: { WM: { query: term, boost: 2 } } },
+                { match_phrase: { PM: { query: term, boost: 2 } } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+    size: SITE_PAGE_SIZE,
+    from,
+    track_total_hits: true,
+    _source: [...SITE_SOURCE_FIELDS],
+  };
+}
+
+export interface UsptoSiteInput {
+  term: string;
+  fetch: FetchFn;
+  timeoutMs?: number;
+  deadline?: number;
+  clock?: () => number;
+}
+
+export interface UsptoSiteOk {
+  status: 'ok';
+  term: string;
+  /** In the order the service returned them (relevance); never re-sorted. */
+  rows: UsptoRow[];
+  written: number;
+  /** The service's own total for the term. */
+  total: number;
+  /** The list is not every match: the total is above what was written, or a later page failed. */
+  truncated: boolean;
+  /** A page after the first failed or ran out of time; the rows are the pages that did arrive. */
+  pageFailed: boolean;
+}
+
+export type UsptoSiteResult = UsptoSiteOk | UsptoUnavailable | UsptoSkipped;
+
+export async function searchUsptoSite(input: UsptoSiteInput): Promise<UsptoSiteResult> {
+  const term = stripQuoting(String(input.term ?? '')).trim();
+  if (!term) return { status: 'skipped', reason: 'no mark' };
+  const perRequestMs = input.timeoutMs && input.timeoutMs > 0 ? input.timeoutMs : DEFAULT_TIMEOUT_MS;
+  const clock = input.clock ?? Date.now;
+  const timeoutMs = (): number => {
+    if (input.deadline === undefined) return perRequestMs;
+    const left = input.deadline - clock();
+    if (left <= 0) throw new UnavailableError('USPTO search ran out of time');
+    return Math.min(perRequestMs, left);
+  };
+
+  const rows: UsptoRow[] = [];
+  const seen = new Set<string>();
+  let total = 0;
+  let pageFailed = false;
+  for (let from = 0; rows.length < SITE_LIMIT; from += SITE_PAGE_SIZE) {
+    let page: Page;
+    try {
+      page = await postPage(input.fetch, buildSiteQuery(term, from), timeoutMs());
+    } catch (err) {
+      if (from === 0) {
+        return { status: 'unavailable', reason: err instanceof UnavailableError ? err.reason : 'USPTO search request failed' };
+      }
+      pageFailed = true; // never presented as complete
+      break;
+    }
+    if (from === 0) total = page.total;
+    for (const { serial, source } of page.sources) {
+      if (!seen.has(serial) && rows.length < SITE_LIMIT) {
+        seen.add(serial);
+        rows.push(toRow('site', serial, source));
+      }
+    }
+    if (page.sources.length === 0 || from + SITE_PAGE_SIZE >= total) break;
+  }
+  return { status: 'ok', term, rows, written: rows.length, total, truncated: pageFailed || total > rows.length, pageFailed };
 }

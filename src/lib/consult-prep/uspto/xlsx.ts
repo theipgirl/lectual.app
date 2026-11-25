@@ -8,7 +8,7 @@
 // A failed or skipped image never fails the file: the row keeps its text link.
 
 import ExcelJS from 'exceljs';
-import type { FetchFn, UsptoOk, UsptoResult, UsptoRow } from './uspto';
+import type { FetchFn, UsptoRow, UsptoSiteOk, UsptoSiteResult } from './uspto';
 
 export const SHEET_NAME = 'tmSearch';
 export const MAX_ROWS = 500;
@@ -55,7 +55,8 @@ export function xlsxFileName(date: string): string {
 }
 
 export interface UsptoXlsxInput {
-  result: UsptoResult;
+  /** The site's own basic search (`searchUsptoSite`), not the knockout. */
+  result: UsptoSiteResult;
   /** The firm's calendar date at build time, `YYYY-MM-DD` (a string so this stays pure). */
   date: string;
   /** Injected transport for the mark images; never an ambient global. */
@@ -140,7 +141,7 @@ export async function buildUsptoXlsx(input: UsptoXlsxInput): Promise<UsptoXlsxRe
   const result = input.result;
   if (result.status !== 'ok') return { ok: false, status: result.status, reason: result.reason };
   const fileName = xlsxFileName(input.date);
-  const ok: UsptoOk = result;
+  const ok: UsptoSiteOk = result;
   const rows = ok.rows.slice(0, MAX_ROWS);
   const truncated = ok.truncated || ok.rows.length > MAX_ROWS;
   const pngs = await fetchImages(rows, input);
@@ -155,7 +156,7 @@ export async function buildUsptoXlsx(input: UsptoXlsxInput): Promise<UsptoXlsxRe
   ws.mergeCells('A1:C1');
   ws.getCell('A2').value = 'Search term';
   ws.mergeCells('A2:B2');
-  ws.getCell('C2').value = ok.mark;
+  ws.getCell('C2').value = ok.term;
   ws.mergeCells('C2:N2');
   for (let c = 3; c <= 14; c++) {
     ws.getCell(2, c).border = { top: MEDIUM_BLACK, left: MEDIUM_BLACK, bottom: MEDIUM_BLACK, right: MEDIUM_BLACK };

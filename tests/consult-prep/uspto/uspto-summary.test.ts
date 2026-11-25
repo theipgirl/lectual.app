@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { searchUspto, type UsptoOk, type UsptoResult } from '@/lib/consult-prep/uspto/uspto';
 import { summarizeUspto } from '@/lib/consult-prep/uspto/uspto-summary';
 import { buildUsptoXlsx } from '@/lib/consult-prep/uspto/xlsx';
+import type { UsptoSiteOk } from '@/lib/consult-prep/uspto/uspto';
+
+const site = (r: UsptoOk): UsptoSiteOk => ({ status: 'ok', term: r.mark, rows: r.rows, written: r.written, total: r.written, truncated: r.truncated, pageFailed: false });
 import { body, fakeFetch, legacyConResponder, LEGACY_T1, pagedHits, source } from './uspto-fixtures';
 
 const LEGACY = { mark: 'LegacyCon', stem: 'legacy', classes: [41, 35], variants: ['legacy con', 'legacy conference'] };
@@ -122,7 +125,7 @@ describe('summarizeUspto', () => {
   it('composes end to end: fixture -> search -> xlsx -> summary with consistent counts', async () => {
     const f = fakeFetch(legacyConResponder);
     const r = (await searchUspto({ ...LEGACY, fetch: f.fetch })) as UsptoOk;
-    const x = await buildUsptoXlsx({ result: r, date: '2026-11-25', fetch: (async () => new Response('', { status: 404 })) as typeof fetch, imageBudgetMs: 1000 });
+    const x = await buildUsptoXlsx({ result: site(r), date: '2026-11-25', fetch: (async () => new Response('', { status: 404 })) as typeof fetch, imageBudgetMs: 1000 });
     if (!x.ok) throw new Error('expected a file');
     expect(x.rows).toBe(r.written);
     expect(x.fileName).toBe('tmSearchResults2026-11-25.xlsx');
@@ -133,7 +136,7 @@ describe('summarizeUspto', () => {
 
   it('composes a truncated list consistently (500 rows everywhere, first 500 attached)', async () => {
     const r = await run((c) => pagedHits('a', 600, 600, c));
-    const x = await buildUsptoXlsx({ result: r, date: '2026-11-25', fetch: (async () => new Response('', { status: 404 })) as typeof fetch, imageBudgetMs: 1000 });
+    const x = await buildUsptoXlsx({ result: site(r), date: '2026-11-25', fetch: (async () => new Response('', { status: 404 })) as typeof fetch, imageBudgetMs: 1000 });
     if (!x.ok) throw new Error('expected a file');
     expect(x.rows).toBe(500);
     expect(summarizeUspto(r)).toContain('First 500 attached');

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { inflateRawSync } from 'node:zlib';
 import ExcelJS from 'exceljs';
-import { sheetGoods, sheetOwner, toRow, type UsptoOk, type UsptoRow } from '@/lib/consult-prep/uspto/uspto';
+import { sheetGoods, sheetOwner, toRow, type UsptoRow, type UsptoSiteOk } from '@/lib/consult-prep/uspto/uspto';
 import { buildUsptoXlsx, COLUMN_WIDTHS, HEADERS, IMAGE_MAX_BYTES, MAX_ROWS } from '@/lib/consult-prep/uspto/xlsx';
 
 // A real 1x1 PNG.
@@ -43,12 +43,8 @@ const SOURCES = [
   },
 ];
 
-function okResult(rows: UsptoRow[], over: Partial<UsptoOk> = {}): UsptoOk {
-  return {
-    status: 'ok', mark: 'lumora', limit: 500, rows, written: rows.length, totals: {}, tier1Total: rows.length,
-    tier2Total: null, tier2Label: null, tier2Stem: null, tier2Classes: [], stemSearch: 'not-run-no-stem',
-    truncated: false, nearIdentical: [], ...over,
-  };
+function okResult(rows: UsptoRow[], over: Partial<UsptoSiteOk> = {}): UsptoSiteOk {
+  return { status: 'ok', term: 'lumora', rows, written: rows.length, total: rows.length, truncated: false, pageFailed: false, ...over };
 }
 const rowsOf = () => SOURCES.map((s) => toRow('1-near-identical', s.id, s));
 
@@ -102,7 +98,7 @@ async function load(bytes: Buffer) {
   await wb.xlsx.load(bytes as unknown as ArrayBuffer);
   return wb.worksheets[0];
 }
-const build = (rows: UsptoRow[], f: ReturnType<typeof imgFetch>, over: Partial<UsptoOk> = {}, extra: Record<string, unknown> = {}) =>
+const build = (rows: UsptoRow[], f: ReturnType<typeof imgFetch>, over: Partial<UsptoSiteOk> = {}, extra: Record<string, unknown> = {}) =>
   buildUsptoXlsx({ result: okResult(rows, over), date: '2026-11-25', fetch: f.fetch, imageBudgetMs: 60_000, ...extra });
 const file = async (p: ReturnType<typeof build>) => {
   const r = await p;
@@ -241,7 +237,7 @@ describe('buildUsptoXlsx', () => {
       await new Promise((r) => setTimeout(r, 1));
       return png();
     });
-    const r = await file(build(many, f, { written: 520 }));
+    const r = await file(build(many, f, { written: 520, total: 520, truncated: true }));
     expect(r.rows).toBe(MAX_ROWS);
     expect(r.truncated).toBe(true);
     expect(f.urls).toHaveLength(500);
@@ -254,7 +250,7 @@ describe('buildUsptoXlsx', () => {
   });
 
   it('a cut-short search says truncated and the title states the real count', async () => {
-    const r = await file(build(rowsOf(), imgFetch(() => png()), { truncated: true, tier1Total: 900 }));
+    const r = await file(build(rowsOf(), imgFetch(() => png()), { truncated: true, total: 900 }));
     expect(r.truncated).toBe(true);
     expect((await load(r.bytes)).getCell('A1').value).toBe('Search results from 1 to 2');
   });
