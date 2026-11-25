@@ -1675,6 +1675,12 @@ export const CONSULT_PREP_ASK_ADMIN = "An owner or admin can set it in Settings 
 export const CONSULT_PREP_COULDNT_LOAD = "Couldn't load consult prep. Refresh to try again.";
 export const CONSULT_PREP_EMAIL_OFF = "Email isn't switched on for your firm yet. Lectual will turn it on.";
 export const CONSULT_PREP_NOT_EMAILED = "not emailed";
+export const CONSULT_PREP_WAITING_FULL = "not emailed yet: waiting for the full prep";
+/** S2c: Lectual sent nothing because the brief from before the switch-over was already scheduled for this consult. */
+/** S2c: Lectual's consult prep emails have not started yet (the switch-over from the old brief is not done). */
+export const CONSULT_PREP_EMAILS_WAIT = "not emailed: emails start when the switch-over is done";
+export const CONSULT_PREP_SUPERSEDED = "not emailed: the old brief was already scheduled for this consult";
+export const CONSULT_PREP_ADOPTED = "The prep already in Approvals was used.";
 export const CONSULT_PREP_RECIPIENTS_NOW = "Emails now go to the people set in Settings → Team";
 export const CONSULT_PREP_RECIPIENTS_UNREAD = "Who gets consult prep couldn't be read.";
 export const CONSULT_PREP_VIEW_BRIEF = "View the brief";
@@ -1682,7 +1688,7 @@ export const CONSULT_PREP_BRIEF_NOT_KEPT = "The brief isn't kept in Lectual beca
 export const CONSULT_PREP_BRIEF_UNAVAILABLE = "The brief couldn't be loaded. Refresh to try again.";
 export const CONSULT_PREP_BRIEF_MISSING = "The brief is no longer in Approvals.";
 export const CONSULT_PREP_RERUN = "Re-run prep";
-export const CONSULT_PREP_RERUN_CONFIRM = "Re-run prep? It prepares this consult again and emails a new brief to your team. Reminders already scheduled are not repeated.";
+export const CONSULT_PREP_RERUN_CONFIRM = "Re-run prep? It builds a fresh prep for this consult. It is emailed to the people set in Settings → Team when the full prep is ready. Reminders already scheduled are not repeated.";
 export const CONSULT_PREP_RERUN_RUNNING = "Preparing…";
 export const CONSULT_PREP_RERUN_DONE = "Prep re-run. Refresh to see it.";
 export const CONSULT_PREP_RERUN_NOT_ALLOWED = "Only an owner, admin or attorney can re-run consult prep.";
@@ -1690,10 +1696,46 @@ export const CONSULT_PREP_RERUN_OFF = "Consult prep isn't switched on for your f
 export const CONSULT_PREP_RERUN_NOTHING = "There is no consult to prepare for this lead yet.";
 export const CONSULT_PREP_RERUN_FAILED = "Couldn't re-run prep. Nothing was changed. Try again in a minute.";
 export const CONSULT_PREP_TIMELINE_PREP = "Consult prep made";
-export const consultPrepTimelineSend = (kind: "booked" | "24h" | "1h", status: "sent" | "scheduled" | "cancelled" | "failed" | "duplicate"): string => {
+/** S2b: a full-brief build attempt (`started`) and a full brief kept in Approvals (`queued`). */
+export const consultPrepTimelineBuild = (status: unknown): string => (status === "queued" ? "Consult prep: full brief ready" : "Consult prep: full brief started");
+export const consultPrepTimelineSend = (kind: "booked" | "24h" | "1h", status: "sent" | "scheduled" | "cancelled" | "failed" | "duplicate" | "withheld" | "superseded"): string => {
   const what = kind === "booked" ? "Consult prep email" : kind === "24h" ? "Consult prep reminder, a day before" : "Consult prep reminder, an hour before";
-  return `${what}: ${status === "failed" ? "couldn't be sent" : status === "duplicate" ? "already sent by another run" : status}`;
+  return `${what}: ${status === "failed" ? "couldn't be sent" : status === "duplicate" ? "already sent by another run" : status === "withheld" ? "waiting for the full prep" : status === "superseded" ? CONSULT_PREP_SUPERSEDED : status}`;
 };
+// S2c: "Send a test brief" on the lead page's Consult prep card (owner only). The engine's run returns exactly one of the sentences
+// below as its summary (counts and fixed words only), and the action shows it.
+export const CONSULT_PREP_TEST_BUTTON = "Send a test brief";
+export const CONSULT_PREP_TEST_CONFIRM = "Send a test brief? It builds a real prep for this lead's next consult and emails it, marked [TEST], only to the people set in Settings → Team. Nothing is saved in Lectual.";
+export const CONSULT_PREP_TEST_SENT = "Test brief sent to the people set in Settings → Team.";
+export const CONSULT_PREP_TEST_OWNER_ONLY = "Only the firm's owner can send a test brief.";
+export const CONSULT_PREP_TEST_LIMIT = "You've sent 5 test briefs in the last hour. Try again later.";
+export const CONSULT_PREP_TEST_OFF = "Consult prep isn't switched on for your firm, so no test brief was sent.";
+export const CONSULT_PREP_TEST_EMAIL_OFF = "Can't send a test brief: email isn't switched on for your firm yet. Lectual will turn it on.";
+export const CONSULT_PREP_TEST_NO_RECIPIENTS = "Can't send a test brief: no one is set to receive consult prep. Set it in Settings → Team.";
+export const CONSULT_PREP_TEST_RECIPIENTS_UNREAD = "Can't send a test brief: who gets consult prep couldn't be read. Try again in a minute.";
+export const CONSULT_PREP_TEST_OFF_DOMAIN = "Can't send a test brief: someone set to receive it isn't on the firm's email domain. Check Settings → Team.";
+export const CONSULT_PREP_TEST_NOT_BUILT = "Can't send a test brief: the full prep couldn't be built. Try again in a few minutes.";
+export const CONSULT_PREP_TEST_FAILED = "Couldn't send the test brief. Nothing was saved. Try again in a minute.";
+/** The first line of a test brief's body. */
+export const CONSULT_PREP_TEST_FIRST_LINE = "TEST: this is a test of the consult prep email. It is not a real prep, and nothing about it was saved in Lectual.";
+export const CONSULT_PREP_TEST_SUBJECT_PREFIX = "[TEST] ";
+/** Every answer the test run can give (the action shows only one of these). */
+export const CONSULT_PREP_TEST_OUTCOMES: readonly string[] = [
+  CONSULT_PREP_TEST_SENT,
+  CONSULT_PREP_TEST_EMAIL_OFF,
+  CONSULT_PREP_TEST_NO_RECIPIENTS,
+  CONSULT_PREP_TEST_RECIPIENTS_UNREAD,
+  CONSULT_PREP_TEST_OFF_DOMAIN,
+  CONSULT_PREP_TEST_NOT_BUILT,
+  CONSULT_PREP_TEST_FAILED,
+];
+/** The answers given before anything was built: the owner's hourly slot is given back. */
+export const CONSULT_PREP_TEST_REFUSED_BEFORE_BUILD: readonly string[] = [
+  CONSULT_PREP_TEST_EMAIL_OFF,
+  CONSULT_PREP_TEST_NO_RECIPIENTS,
+  CONSULT_PREP_TEST_RECIPIENTS_UNREAD,
+  CONSULT_PREP_TEST_OFF_DOMAIN,
+];
 export const CONSULT_PREP_TEAM_HEADING = "Consult prep emails";
 export const CONSULT_PREP_TEAM_HELP = "When a consult is prepared, the brief is emailed to the people chosen here when it is booked, a day before (if it was booked more than a day ahead) and an hour before. It goes only to the firm, never to a client. Cc addresses must be on the same email domain as someone chosen.";
 export const CONSULT_PREP_TEAM_NONE = "Nobody is chosen yet, so no consult prep emails go out.";
@@ -1894,3 +1936,6 @@ export const CONTRACTS_NONE_YET = "No contracts yet";
 export const MATTER_FIRM_COLUMNS_UNAVAILABLE = "Some details couldn't load (your firm's columns). Refresh to try again.";
 export const matterOtherKindHas = (name: string, n: number) => `${name} has ${n}`;
 export const LAYOUT_STAGE_BOARD_HIDE_ONLY = "On this board a column can only be hidden or shown. Rename and move stages from the stage menu.";
+
+// Approvals: an internal briefing has no client recipient to show (the prep-consult skill's address only links the lead).
+export const INTERNAL_BRIEFING_TO = "Internal briefing, not sent to anyone";

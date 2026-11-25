@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ConsultPrepCardData } from "@/lib/consult-prep/card-load";
 import { RerunPrep } from "./RerunPrep";
+import { TestBrief } from "./TestBrief";
 import {
   CONSULT_PREP_BRIEF_MISSING,
   CONSULT_PREP_BRIEF_NOT_KEPT,
@@ -12,9 +13,22 @@ import {
 
 /**
  * The lead page's Consult prep card: a status line, the brief behind a closed "View the brief", and (for the roles that may)
- * "Re-run prep". No inputs: Lectual reads what it needs. The anchor and the tour hook each appear once, here.
+ * "Re-run prep", and for the owner "Send a test brief". No inputs: Lectual reads what it needs. The anchor and the tour hook each appear once, here.
  */
-export function ConsultPrepCard({ data, leadId, canRerun, adminTier }: { data: ConsultPrepCardData; leadId: string; canRerun: boolean; adminTier: boolean }) {
+export function ConsultPrepCard({
+  data,
+  leadId,
+  canRerun,
+  adminTier,
+  canTest = false,
+}: {
+  data: ConsultPrepCardData;
+  leadId: string;
+  canRerun: boolean;
+  adminTier: boolean;
+  /** S2c: the firm's real owner (never Lectual staff acting inside it): "Send a test brief". The action re-checks it. */
+  canTest?: boolean;
+}) {
   const { view, brief } = data;
   if (view.kind === "hidden") return null;
   return (
@@ -54,6 +68,7 @@ export function ConsultPrepCard({ data, leadId, canRerun, adminTier }: { data: C
             </p>
           )}
           {canRerun && <RerunPrep leadId={leadId} />}
+          {canTest && <TestBrief leadId={leadId} />}
         </>
       )}
     </section>

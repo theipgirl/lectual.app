@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { shownRecipient } from "@/lib/queue/shown-recipient";
 import { BackLink, PageHeader } from "@/components/ui/PageHeader";
 import { Notice } from "@/components/ui/Notice";
 import { Pill } from "@/components/ui/Pill";
@@ -274,7 +275,7 @@ export default async function QueueItemPage({
           {/* Client, To, Subject, Send at and Queued as one compact definition list. */}
           <dl className="lx-dl lx-qi-facts" data-queue-details>
             <Meta label="Client" value={item.client_name} />
-            <Meta label="To" value={item.recipient} />
+            <Meta label="To" value={shownRecipient(item)} />
             <Meta label="Subject" value={item.subject} />
             <Meta label="Send at" value={item.proposed_send_at ? fmtWhen(item.proposed_send_at, tz) : null} />
             <Meta label="Attachments" value={item.attachments?.length ? item.attachments.map((a) => a.name).join(", ") : null} />

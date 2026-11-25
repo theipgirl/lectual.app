@@ -61,3 +61,25 @@ describe("cancelInternalMail", () => {
     spy.mockRestore();
   });
 });
+
+describe("sendInternalMail: attachments (S2b)", () => {
+  it("sends each file as a name and base64 content, and nothing when there are none", async () => {
+    const f = okFetch();
+    await sendInternalMail({ ...base, attachments: [{ filename: "a.pdf", content: Buffer.from("PDF!") }, { filename: "b.xlsx", content: "eGxzeA==" }], fetchImpl: f as never });
+    const body = JSON.parse((f.mock.calls[0] as unknown as [string, { body: string }])[1].body);
+    expect(body.attachments).toEqual([
+      { filename: "a.pdf", content: Buffer.from("PDF!").toString("base64") },
+      { filename: "b.xlsx", content: "eGxzeA==" },
+    ]);
+    const none = okFetch();
+    await sendInternalMail({ ...base, attachments: [], fetchImpl: none as never });
+    expect(JSON.parse((none.mock.calls[0] as unknown as [string, { body: string }])[1].body)).not.toHaveProperty("attachments");
+  });
+  it("never logs a file name or its content on a refusal", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const res = await sendInternalMail({ ...base, attachments: [{ filename: "Dana_Packages.pdf", content: Buffer.from("x") }], fetchImpl: (async () => new Response("", { status: 422 })) as never });
+    expect(res).toEqual({ status: "failed", http: 422 });
+    expect(JSON.stringify(spy.mock.calls)).not.toContain("Dana");
+    spy.mockRestore();
+  });
+});

@@ -5,7 +5,12 @@ import { firmToken } from "@/lib/intake-forms/lawmatics-sync";
 import { cancelInternalMail, sendInternalMail } from "@/lib/mail/internal-mail";
 import { canReceiveDeadlineAlerts } from "@/lib/today/deadline-alerts";
 import type { AgentContext } from "@/lib/agents/types";
+import { readFirmStyle } from "@/lib/agents/shared";
 import type { PrepDeps } from "./engine";
+import { buildFullPrep, readFirmForBrief, type FirmForBrief } from "./full";
+import { prepFileStore } from "./save-files";
+import { bareAddress } from "./recipients";
+import { parseCutoverAt } from "./cutover";
 
 /**
  * Production wiring for a consult prep run. Tests hand the engine their own `PrepDeps`.
@@ -14,10 +19,31 @@ import type { PrepDeps } from "./engine";
  * own (`firmToken`, never a deployment-wide one), the member lookup names the firm, and the sender and key are the
  * deployment's Resend settings (unset = email is not switched on).
  */
-export function defaultPrepDeps(ctx: Pick<AgentContext, "admin" | "orgId" | "signal" | "fetchImpl">): PrepDeps {
+export function defaultPrepDeps(ctx: Pick<AgentContext, "admin" | "orgId" | "signal" | "fetchImpl"> & Partial<Pick<AgentContext, "llm" | "now" | "timeLeftMs">>): PrepDeps {
   const { admin, orgId } = ctx;
+  // The firm's name, slug, zone and package list: read once per run, org-fenced, only when a full prep is built.
+  let firm: Promise<FirmForBrief> | null = null;
+  const firmOnce = () => (firm ??= readFirmStyle(admin, orgId).then((style) => readFirmForBrief(admin, orgId, style.timeZone)));
   return {
-    mail: { apiKey: env.RESEND_API_KEY?.trim() || null, from: env.CONSULT_PREP_FROM?.trim() || null },
+    // S2b: the full prep. The model call is the run's own (`ctx.llm`: Sonnet through agentModel, the cost total, the signal); the USPTO
+    // and its images go through the run's fetch; the budget is the run's.
+    // (A caller with no model call, such as cancelling a switched-off firm's sends, builds nothing.)
+    ...(ctx.llm
+      ? {
+          full: async (facts: Parameters<NonNullable<PrepDeps["full"]>>[0]) =>
+            buildFullPrep(facts, await firmOnce(), {
+              llm: ctx.llm!,
+              fetch: ctx.fetchImpl ?? fetch,
+              timeLeftMs: () => (ctx.timeLeftMs ? ctx.timeLeftMs() : Number.POSITIVE_INFINITY),
+              now: ctx.now ?? Date.now,
+              signal: ctx.signal,
+            }),
+        }
+      : {}),
+    files: prepFileStore(admin, orgId),
+    // S2c: the reply-to (a bare address, anything else ignored) and the switch-over instant (a full ISO instant with a zone, else ignored).
+    mail: { apiKey: env.RESEND_API_KEY?.trim() || null, from: env.CONSULT_PREP_FROM?.trim() || null, replyTo: bareAddress(env.CONSULT_PREP_REPLY_TO) },
+    cutoverAtMs: parseCutoverAt(env.CONSULT_PREP_CUTOVER_AT),
     mailOut: (m) => sendInternalMail({ ...m, fetchImpl: ctx.fetchImpl, label: "consult-prep" }),
     mailCancel: (c) => cancelInternalMail({ ...c, fetchImpl: ctx.fetchImpl, label: "consult-prep" }),
     prospects: {

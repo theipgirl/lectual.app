@@ -52,8 +52,12 @@ export type StaleCheck =
   /** The lead was found but its facts couldn't be read: fail closed, confirm required. */
   | { status: "unavailable"; leadIds: string[]; leadName: string | null; linkedBy: StaleLinkedBy };
 
-/** Client-facing = a CLIENT_EMAIL, or any draft addressed to someone. */
+/**
+ * Client-facing = a CLIENT_EMAIL, or any draft addressed to someone. A BRIEFING never is: it is internal, and the prep-consult
+ * skill puts the client's address on its briefings only so they link to the lead (resolveBatch rule 3), never to mail them.
+ */
 export function isClientFacing(item: Pick<QueueItem, "type" | "recipient">): boolean {
+  if (item.type === "BRIEFING") return false;
   return item.type === "CLIENT_EMAIL" || !!item.recipient?.trim();
 }
 

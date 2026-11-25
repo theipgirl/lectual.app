@@ -2660,6 +2660,185 @@ pull and packages PDF are S2 and are NOT built (the brief says "come in the next
   - **Existing assertions changed on purpose:** the send payload's key list (now with `recipients_sha256`), the card's status line (no "emailed to <names>"), and `hook-schedule.test.ts` (the hook starts `startPrepOnStageEntries` with a batch). Tests: the "review fixes" blocks of
     `tests/agents/consult-prep.test.ts`, `tests/consult-prep/{sends,recipients,brief,deps,sync-hook,trigger,hook-schedule,card}.test.*`.
 
+### S2a: picklist labels, reuse of a full prep, emails carry only a full brief (no schema; spec `docs/pge/2026-11-24-auto-consult-prep/sprint-2a.md`, `revision-2026-11-25.md`)
+Nothing here sends to a client, adds a migration or a dependency, or calls Lawmatics, Resend or a model in a test. The sender is still unset, so nothing is emailed to anyone.
+- **Picklist labels.** `src/lib/lawmatics/field-meta.ts` (no `server-only`, read-only) is the ONE `/custom_fields` reader: `readFieldMeta(client)` keeps each field's name, type and
+  option labels (option id -> label), read ONCE per client (a `WeakMap`), and the engine keeps ONE client for the whole run (`memoProspects`), so a run reads the list once however many leads it preps.
+  `lead-origin-read.ts` (`readOriginLookups`) takes its field NAMES from the same read and exposes it as `fieldMeta` (so the importers' lookups are unchanged and there is no second reader).
+  `parseFieldMeta` is tolerant of shape: options under `options`, `picklist_options`, `values`, `choices`, `option_values`, `picklist_values`, `select_options` (arrays of `{id|value|key, name|label|value}`, or an
+  `{ id: label }` map) or sideloaded through `included`; the type from `field_type`, `data_type`, `input_type`, `kind` or `type`. **The real `/custom_fields` shape is NOT verified against a live account.**
+- **One resolver, `resolveValue`** (pure), used for every Lawmatics value the brief prints (`customFieldPairs`, so the intake facts and the "other answers" alike): (1) `formatted_value` when present and not a bare id (digits, or
+  a comma list of them); (2) else the option label(s) of a select/picklist/dropdown/radio/multi-select field, comma-joined; (3) else a bare number of 3+ digits on a select field (or one with options) is "not recorded";
+  (4) otherwise the value. A value that cannot be put into words keeps its pair with the value "not recorded" (never dropped silently, never a number) and never takes an intake fact's place (`mapIntake` skips it).
+  **Choices where the spec left room (the safe side each time):** a field the successful list does NOT name, with a 3+ digit value, is "not recorded"; a field list that FAILED makes every bare 3+ digit value (even on a text field)
+  "not recorded", and the Lawmatics section says `LABELS_UNREAD_LINE` and the run counts `labels` among the unread sections; a field is found by id first, then by name; a select with an unlisted 1 or 2 digit value keeps it (not an id).
+  Lectual's own `referral_source` and the stage name are already labels and are printed as they were. `LawmaticsRead.labels` is optional so older fixtures hold.
+- **Reuse of a full prep (never for a person's re-run).** `src/lib/consult-prep/adopt.ts` (pure). Before a NEW prep is built for a key the run reads Approvals once (`ctx.listPending` + `ctx.listApproved`, three states: a
+  rejection is "couldn't read", an absent reader or no queue is "nothing there", which is how tests without a queue behave) and looks for a BRIEFING from agent `prep-consult` or `consult-prep`, pending or approved, created
+  since the consult's booking or the start of the firm's day today, whichever is EARLIER (booking = the calendar row's `created_at`, else the lead's `stage_entered_at`; unknown = the day's start), that `isFullBrief` calls full,
+  and that the queue's own `resolveBatch` (through `orgFencedReader`) links to EXACTLY this one lead. The newest wins. `isFullBrief`: the text has heading-like lines (short, markdown/numbering ignored, any case) for "likely classes",
+  "risk read" or "preliminary risk", and "package recommendation"; a text carrying `NEXT_UPDATE_LINE` (Lectual's own S1 facts brief) is never full. A heads-up is not.
+  A failed read of either list, or of the resolver, means NO adoption and NO build for that key this run (`adoptionUnread`, "left for the next run"), never "none found".
+- **Adoption writes** no new BRIEFING and **no client-prep draft** (decision: the prep that was found brings its own drafts, and a second client email in Approvals could be approved twice). The marker is the usual `queue_drafted` row with
+  `queueItemId` = the item's id and `adopted: true`. A prep that was made earlier with the facts brief and finds a full one later (a person drafted it since) gets a SECOND marker for the same key; the card shows the newest one's item and
+  the earliest one's time (`madeAt`), so "Prepared ..." keeps its time. The prep's later emails read the adopted item by id from the pending and approved lists (an approver's edit, `final_body`, wins) and stop being full if that item is
+  gone or rejected. The lead's files are **not** searched: `crm_file` holds PDFs and Word files whose contents this app never reads, so a prep that lives only there is not found. **Known limit:** a BRIEFING queued by a tool that leaves no
+  `queue_drafted` row for the lead (and has no matter or recipient) cannot be linked and is not adopted. The lead page's Documents card is where such a file still is. **The prep-consult skill links its own** (lectual-plugin, Nov 25, Taylor): its heads-up and full brief are BRIEFINGs with `recipient` = the client's email on record, which `resolveBatch`'s rule 3 matches to the lead (an address on two leads adopts for neither). A BRIEFING is never drafted or sent on approval (only CLIENT_EMAIL is), so that recipient only links. `isFullBrief` reads the skill's inline labels ("Likely classes — preliminary — ..."): a leading "preliminary" is not content, and a placeholder on the label's own line makes that section empty (`tests/consult-prep/skill-brief-adoption.test.ts`).
+- **Emails carry only a full brief.** A prep's brief is `full` (adopted; S2b's build later) or `facts` (S1). `planSends` takes `brief`: with `facts`, `booked` and `24h` are WITHHELD, the `1h` is still planned. A withheld email is a
+  new send status `withheld` (an append-only `ai_insight` send row, written once per slot, never hiding a sent, scheduled, duplicate or failed row; no Resend call behind it) and stays OWED: a later run that finds a full brief sends it while it
+  is still due, never late: `booked` not once the 24 h time has passed (a stage-keyed one: not 3 days after the prep), `24h` not within 2 hours of the start (`REMINDER_24H_CUTOFF_MS`) and, being past its time, goes NOW. A `withheld` slot is not
+  done, so cancel-on-change, recipients and every S1 key rule are untouched. A person's re-run has no full brief (it never adopts), so its booked email is withheld and NEVER written as owed or sent (S2b changes that); the confirm text of the
+  Re-run button ("emails a new brief") is therefore not true until S2b: a decision for Taylor, left as it was.
+- **The marked 1 h.** With no full brief the `1h` email goes (scheduled with Resend as before), subject `Facts only: In 1 hour: Consult prep: ...`, the first line of the body `Facts only: the full prep couldn't be built in time.` (html first
+  too), the send record carries `quality: "facts"` (written only when `facts`; absent means full). A facts-only `1h` that is still waiting at Resend when a full brief turns up is CANCELLED (the existing `cancelOne`, its slot gets a new
+  `:g<n>` idempotency key) and planned again with the full text; one whose time has passed is already sent and is never touched ("adoption after a facts-only 1 h changes nothing already sent"). An email of an adopted prep is that item's
+  text unchanged, then `BRIEF_FOOTER` (internal only), the html the escaped text in a pre-wrapped block (`renderAdoptedBrief`, a pure function of its inputs). It is not run through the judgment guard (it is the firm's own prep).
+- **Counts, never content:** `adopted`, `adoptionUnread`, `withheld`, `factsOnly`, `upgraded` in the summary; no text, name or id of an item reaches a log, `agent_run` or an error.
+- **Card and timeline:** the card says "The prep already in Approvals was used." for an adopted prep and "not emailed yet: waiting for the full prep" while the booked email is withheld; the timeline line for a withheld row is
+  "...: waiting for the full prep". The lead's "What Lectual did" may list an adopted prep's second marker as a second "prep" line (not deduplicated).
+- **Existing assertions changed on purpose** (all forced by "an email carries a full brief" or by the marker rows): `tests/agents/consult-prep.test.ts` got a `full` fixture (a full BRIEFING in Approvals linked to the lead by its own
+  marker) and the send-mechanics tests (booked/24h/1h, retries, 409, cancel on change, re-plan on a recipient change, twins, scope, left leads, the R3.1/R3.7 blocks) now run with it, so they hold the same properties on the adopted text; where
+  they asserted a queued BRIEFING or `<h2>` html they now assert no BRIEFING and the adopted block; the stage-keyed test now expects the booked email withheld (and has a full-prep twin); "no recipients" / "email not switched on" filter
+  `withheld` rows out of their "no send rows" check; every re-run test now expects no email from a re-run and still checks the base key's reminders; the `markers` helper leaves out the fixture's own marker; R3.1's last line allows the
+  base-key marker that records an adoption. `tests/agents/new-agents-hygiene.test.ts`'s `resolveBatch` importer list gains `src/lib/consult-prep/engine.ts`. `tests/agents/helpers.ts` gained an optional `listApproved`.
+  New tests: `tests/lawmatics/field-meta.test.ts`, `tests/consult-prep/adopt.test.ts`, the S2a blocks of `tests/consult-prep/{sends,brief,card}.test.*` and `tests/agents/consult-prep.test.ts`.
+- **S2a review fixes.**
+  - **D2:** a failed Approvals read on an already-prepped consult no longer skips it: it is counted, nothing is adopted and NOTHING is cancelled, and the plan runs as with a facts brief, so the facts-only 1 h is still planned/scheduled (booked and 24h stay withheld; a full prep later replaces the 1 h). A NEW consult still waits for the next run on a failed read (no build on a guess).
+  - **D3:** `withoutBareIds` (`field-meta.ts`) is applied to the lead's `referral_source`, `referral_detail` and `practice_area` in the brief: a value, or comma part, that is a 3+ digit number prints "not recorded" (that part only). The mark, business and names are not touched (a mark may be a number).
+  - **D4:** `planSends` applies both cutoffs whatever the slot's status: an owed `booked` (withheld OR failed, on a non-first run) is dropped after start - 24 h (stage-keyed: 3 days after the prep); an owed `24h` (withheld OR failed) is sent now while inside its window and never within 2 h of the start. This changes S1's "a failed booked is retried without limit".
+  - **D5:** `isFullBrief` needs, per section, a real HEADING line (starts with the heading words after markdown, a number or a bullet; a sentence that merely begins with them has no separator and is not one) and real content (inline after `:`/`-`, or a following non-empty line before the next section), not a placeholder (n/a, tbd, none, pending, unknown, "not available/recorded/...").
+  - **D6:** an adopted item that is rejected, edited into something that is no longer full, or gone (Approvals READ fine) has the prep's still-scheduled sends cancelled with `cancelOne` and planned again (the 1 h as facts only, the rest withheld; or from a different full prep found). Counted as `adoptedGone`. A failed read cancels nothing.
+  - **D7:** `cancelOne` returns false, and leaves the slot and generation count alone, when the `cancelled` row can't be written (counted unrecorded); nothing is planned again under the cancelled email's key. Known cost: the next run tries the cancel again and Resend refuses it (counted as a failed send) until the row can be written.
+  - **D8:** `withheld` is counted only when a new row is written; the card says "waiting for the full prep" only while the owed booked email is still due (`nowMs`, same cutoff as the plan) and otherwise "not emailed". The Re-run confirm text now says it builds a fresh prep and that it is emailed to the people set in Settings when the full prep is ready.
+  - **Assertions changed on purpose:** `tests/agents/consult-prep.test.ts` "Approvals unreadable on a later run" (was: nothing sent, whole prep skipped) is replaced by the D2 tests above; `tests/consult-prep/adopt.test.ts` "is true when all three headings are there" now has content under each heading (bare headings are no longer full). Words: `CONSULT_PREP_RERUN_CONFIRM`.
+- **Not verified / not done:** a live Lawmatics (`/custom_fields` shape, option labels), a real Approvals queue (the linking of a skill's BRIEFING to a lead), a real browser, a real Resend. The Re-run button's confirm text is not changed.
+  S2b's full build is now wired (see "S2b" below); S2c (cutover, sender, switching lawmatics-mcp off) is not built.
+
+### S2b: the full brief, its two files, saved to Documents & files (no schema; spec `docs/pge/2026-11-24-auto-consult-prep/sprint-2b.md`)
+P1 (USPTO, `uspto/`), P2 (judgment, `judge/`) and P3 (packages PDF, `pdf/`) are the parts; P4 wires them. Nothing goes to a client; the emails are
+still only to the firm's own people through the recipients guard, and the sender is still unset, so nothing is emailed to anyone until S2c.
+- **One builder** (`full.ts`, `buildFullPrep(facts, firm, deps)`, never throws): the firm's package list (`client_proposal_setting.pricing` through
+  `normalisePackages`, read org-fenced by `readFirmForBrief`; a firm that never saved a setting gets NO list, never `normalisePackages`' made-up default)
+  -> call 1 (route + USPTO plan) -> the USPTO knockout (`searchUspto`, trademark path with a confirmed mark) -> call 2 (judgment) -> `finalizeJudgment`
+  (every model string scrubbed, the package lines from the firm's list) -> `composeFullSections` (`compose.ts`) -> the two files. At most TWO model calls,
+  both through the run's `ctx.llm` with `agent: "consult-prep"` (Sonnet through `agentModel`; a third is refused in code, `MAX_MODEL_CALLS`). The budget is
+  checked before each call (`ctx.timeLeftMs`, `BUILD_RESERVE_MS` kept back; call 1 only with `MIN_START_MS` left for the whole build, call 2 only with
+  `MIN_JUDGE_MS`). `AGENT_POLICY` leads both prompts and record data is inert (P2). Failure codes: the model's (`timeout`, `error`, `invalid`, `refused`,
+  `truncated`), `budget`, `uspto`, `packages`, `unexpected`.
+- **Decision: a USPTO outage alone blocks "full"** on the trademark path (lawmatics-mcp sent its judgment with a "USPTO unavailable" line). A risk read made
+  without the knockout it reads is thinner than the full prep, and the rule is that booked and 24 h carry the full prep or wait for it (the 1 h still goes,
+  marked "facts only"). The judgment call is not spent when the pull failed. "Nothing to search" (no confirmed mark) is NOT an outage: that is the full prep.
+- **The brief** (`brief.ts`, `BriefFacts.full`): the facts brief's sections with the judgment placed in the skill's order: header, Heads-up (nature,
+  flags), Client snapshot (+ the model's summary line), What they need, Mark(s) (+ "As submitted"), Lawmatics answers, the client's words, files, prior
+  contact, then Likely classes — preliminary, USPTO knockout, Preliminary risk read — preliminary, Package recommendation (settled: the firm's prices in a
+  box; else Held with no amount) on the trademark path, or Scope and engagement (and Dispute snapshot) on the general path, then "Questions for the attorney".
+  The "next update" line is gone from a full brief. Every price printed comes from the firm's list; a price the model wrote is "[amount removed]".
+- **Full, honestly.** The trademark-path full brief passes `isFullBrief` (each of the three sections has a heading and content). **Decision (general path):**
+  `isFullBrief` is unchanged, so a general brief found in Approvals is still not adopted (the skill-adoption test's rule stands) and Lectual builds its own;
+  a general brief THIS assistant built is read as full only through its own marker (`full: true`) with `isFullGeneralBrief` (a "Scope and engagement"
+  section and a "Questions for ..." section, each with content), in `stillAdoptable(..., { built: true })`.
+- **Status.** A new prep that adopted nothing, and every person's re-run, builds the full brief. Built: the BRIEFING queued is the full text, the plan is
+  `full` (booked now, 24 h and 1 h as S2a plans them), and the marker carries `full: true`, `queueItemId` and `attach` (the files' CODES). A failure: the
+  facts brief is queued as before, booked and 24 h are withheld, the 1 h is facts only, and it is counted by reason. **Retry:** a later run, for a prep with
+  no full brief whose booked / 24 h is still owed or whose facts-only 1 h is still waiting at Resend, and only with a queue and Approvals read, builds the
+  full prep again; built, it queues a second BRIEFING, writes a `full` marker for the same key (the card shows the newest item), sends what is owed with the
+  files, and the facts 1 h is cancelled and planned again (S2a's upgrade). Reminders of a built prep read the full text back from Approvals.
+- **No queue = no build.** The full text lives in Approvals, where every later email reads it, so a firm with no approval queue is not built for at
+  all (no model call): its prep is S2a's facts prep (booked and 24 h withheld, 1 h facts only) and the summary says so. A BRIEFING that can't be queued
+  marks nothing and sends nothing (as before); a build whose BRIEFING did not land is never counted as full.
+- **Build records, the attempt cap and the marker repair** (`ai_insight` rows `source: consult-prep-build`, ids and codes only; timeline line from
+  `consultPrepTimelineBuild`, left out of "What Lectual did"). Before any build a `started` row is written (it can't be written = no build), and a queued
+  full brief writes a `queued` row with its item id and file codes. A prep key gets at most `MAX_BUILD_ATTEMPTS` (3) builds, whatever fails (the model,
+  USPTO, a marker that will not write). A full brief that was queued but whose marker did not land is found again from its `queued` row: the next run
+  writes the marker (or, on the retry path, uses that item) and builds nothing and queues nothing again. An unreadable build history builds nothing.
+- **The two files** (`attachments.ts`), each optional (a failure never holds the brief or an email back): the USPTO site's own export workbook
+  (`searchUsptoSite` on the mark, then `buildUsptoXlsx` with the firm's calendar date and an image budget clipped to the run's time left) and the packages
+  PDF (`buildPackagesSpec` with the grounded, capped, class-number-free marks from `capPdfMarks`, the firm's name, zone, list and slug, then
+  `renderPackagesPdf`). General path: none. Their codes go on the marker (`built`, `none`, `skipped`, `unavailable`, `failed`, `budget`, a PDF error code).
+- **Email attachments** (`internal-mail.ts`, still the only file that names Resend, gains `attachments` as name + base64): every email of a built prep
+  carries the files, and its body ends with "Attachments" lines saying what this email carries or why a file is missing (fixed sentences, `missingLine`;
+  the stored brief never claims a file). A file over 15 MB, or past 25 MB in all, is not attached and is said to be too large (Resend's limit is 40 MB with
+  base64). A later run's email reads the saved copies back (`files.load`); a copy that can't be read is named. **Refused with files** (only 400, 413 or
+  422; a 401 / 403 is the key or the sender, 408 a timeout, 409 a duplicate, 429 a rate limit, each a plain failure): posted ONCE more without them under `<key>:noatt`, and the body names each file as refused. Whether Resend keeps the key of a refused request
+  is NOT verified, so the re-post never reuses it; a refused request was not accepted, so the re-post cannot double a delivered email. An adopted prep
+  (a person's or the skill's) carries no files and no Attachments lines (decision: default no; its files would belong to another build).
+- **Concurrency and crashes (known, not fixed):** two runs that pick up the same consult at the same instant (S1's known race) can BOTH pay for the two
+  model calls and both queue a BRIEFING; their files share one id per kind, so only one copy is saved. A crash after the emails and before the marker
+  rebuilds on the next run with DIFFERENT text under the same idempotency keys: Resend answers 409 (counted as `duplicate`), so nothing is sent twice,
+  but S1's "a re-post carries the same payload" no longer holds for a full prep (the build record caps how often that can happen).
+- **Saved to Documents & files** (`save-files.ts`, `prepFileStore(ctx.admin, orgId)`: the ONE service-role `crm_file` write and storage upload; the client
+  is the run's own, nothing imported for it). The org is the LEAD ROW's (re-read live and org-fenced; a merged or foreign lead saves nothing); the path is
+  `buildStoragePath` (`{org}/lead/{lead}/{file}.{ext}`), the type `checkFileName`'s, the size the real byte count, the row exactly the scoped flow's
+  columns; object first, then the row (a refused row removes the object), then a `file_uploaded` activity carrying `source: consult-prep`, `prep_key` and
+  `kind`. **Once per prep key:** the file's id is derived from (org, prep key, kind) (`prepFileId`), so "saved" is the `crm_file` row itself (a timeline
+  entry that did not land is only counted as `unlogged`), a duplicate id is "already", and an object left by a half-finished save is reused. Reminders
+  never save; a re-run's key saves its own. No bucket or no table is `skipped`; an unreadable done-check saves nothing. Never throws into the run.
+  A saved copy whose row or object can't be read back is named in the email as "the saved copy couldn't be read", never "could not be built".
+- **Counts only** in the summary (`full preps built`, failures by reason in words, emails re-sent without attachments, files saved / skipped / not saved),
+  `agent_run`, logs and errors: never a name, mark, file name or brief text. `next.config.ts` traces the PDF fonts for `/dashboard/**` and `/api/cron/**`
+  (Run now, the stage hook's `after()` in any page that moves a lead, the mail sync's Stage Keeper).
+- **Tests:** `tests/consult-prep/{full-build,save-files,attachments}.test.ts`, `tests/agents/consult-prep-full.test.ts`, the attachments block of
+  `tests/consult-prep/internal-mail.test.ts`. Engine tests without a `full` dep run exactly as S2a (the builder is a dependency; production wires it in
+  `deps.ts`). Review fixes add: no queue, a queue failure, the attempt cap, the marker repair, a saved copy that can't be read, which refusals re-post,
+  and `saved` judged from the row. **Existing assertion changed:** `tests/ui/no-build-words.test.ts` gains an allow-list entry for `compose.ts` ("scope" is the legal term).
+- **NOT verified:** a live Resend with attachments (the `attachments` body shape, a `scheduled_at` email with attachments, what Resend does with a
+  refused request's idempotency key), a live model (Sonnet on the two structured calls), a live USPTO (both endpoints and the mark images), a real
+  `client-files` bucket upload and download from the service role, Vercel's tracing of the fonts for the new route globs, a real browser.
+
+### S2c: the switch-over from lawmatics-mcp, the reply-to, and the owner's test brief (no schema; runbook `docs/pge/2026-11-24-auto-consult-prep/s2c-runbook.md`)
+Nothing goes to a client; no migration, no dependency. Three env vars, all read in `deps.ts` and validated there (anything invalid is ignored).
+- **Emails wait for the switch-over (fail closed).** A real consult prep email (booked, 24h, 1h) goes only when `CONSULT_PREP_CUTOVER_AT` is set,
+  is a full ISO instant WITH a zone (`parseCutoverAt`; a date alone or a time with no zone is ignored), and now >= it (`emailsStarted`,
+  `cutover.ts`). Unset, invalid or ahead: no email and NOTHING recorded (no send, withheld or superseded row), counted as `awaitingCutover`
+  ("N emails not sent: consult prep emails start when the switch-over is done."). Builds, queue items, markers and saved files go on as before.
+  No backlog when it opens: a prep made earlier gets only what is still due (a booked email is owed only to the run that made the prep), and a
+  prep that already existed skips the whole owed-email path (no Approvals read, no retry build) until then. The card reads
+  "not emailed: emails start when the switch-over is done" (`CONSULT_PREP_EMAILS_WAIT`, `CardInputs.emailsStarted`).
+- **No doubles with lawmatics-mcp** (`lawmaticsReach`, `supersededByCutover`, `cutover.ts`, pure). lawmatics-mcp schedules its 24 h / 1 h briefs
+  with Resend ahead and never cancels. From its own `slots.ts` rules (7:30 AM and 8:00 PM America/New_York, a run acts for a slot up to 1 h
+  early, schedules send times in [S, N), plus 1 h briefs in [N, N + 3 h) after a MORNING slot), its reach is N (24 h briefs) and N or N + 3 h
+  (1 h briefs) of the latest slot at or before cutover + 1 h, worked out under BOTH weekday settings (its `BRIEF_WEEKDAYS_ONLY` is unknown here)
+  and the later kept: at most about 16.5 h after a weekday cutover, up to Monday 7:30 AM from Friday evening. Per slot, by its nominal time: a 24h email is
+  superseded when start - 24 h < reach.day, a 1h when start - 1 h < reach.hour, the booked one when either (it goes only when lawmatics-mcp sent
+  nothing). **Decision:** a per-slot horizon from its schedule, not the plan's flat "start < cutover + 48 h": the flat window would leave consults
+  with no 1 h brief from either system (lawmatics-mcp reaches about 16 h, not 48 h), and 48 h is too short for a weekday-only weekend (about 61.5 h).
+  **Only a consult lawmatics-mcp can have seen** (`cutoverFor`): the rule applies to a Lawmatics consult (the sync's `lmsync:` row, or an Outlook
+  event with such a twin; an Outlook-only consult is never left to it) and only when Lectual's copy of the row at its current start (the later of
+  `created_at` and `synced_at`, so a reschedule counts as new) was written by `reach.seenBy`, the earliest moment lawmatics-mcp's last run can have
+  fired (its slot - 1 h, the earlier of the two weekday settings). A consult known later is Lectual's: a possible duplicate beats no brief. An
+  unknown time keeps the time-only rule. **Rows from before the switch-over are not owed** (`dropPreCutoverOwed`): a `withheld` or `failed` send
+  record written before `CONSULT_PREP_CUTOVER_AT` (S2b wrote them with no sender set) is left out of every plan, so no late booked email and no
+  retry build starts from one; a reminder is planned only by the ordinary rules. The card stops calling such a row pending.
+  A covered slot gets an append-only send record `status: "superseded"` (once per slot, `recordSuperseded`, no Resend call), which `planSends` treats
+  as done, so no later run sends it whatever the clock or env says; it never hides a sent / scheduled / duplicate row. Stage-keyed preps (no consult
+  time; lawmatics-mcp briefs only booked events) and a person's re-run (they asked for it; lawmatics-mcp has no booked email to double) are exempt. A
+  reschedule is a new key, judged by its new start. Card and timeline: "not emailed: the old brief was already scheduled for this consult"
+  (`CONSULT_PREP_SUPERSEDED`).
+- **Reply-to** (`CONSULT_PREP_REPLY_TO`, `bareAddress` at read): on every email only when `guardReplyTo` (recipients.ts) allows it for that email:
+  not any client address, and on the SENDER's own domain (not a public webmail one) or passing the Cc rule against this email's To list. Refused =
+  sent without it, counted (`replyToRefused`). **Decision:** enforced at send time, since brief@ may not be a real mailbox and replies must reach the firm.
+- **Who receives (checked, unchanged):** To = the Settings -> Team firm note's `user_ids` (`crm_firm_brain_entry` key `consult_prep_recipients`, read
+  org-fenced) resolved by `memberAddresses` (this firm's `crm_org_member` rows in the eight staff roles, `auth.admin.getUserById`; any failed lookup =
+  unreadable, nothing sent); Cc = the note's list; then `guardRecipients` on EVERY send drops every client address (the lead's, the Lawmatics contact's,
+  merged leads', any email in the intake answers or Lawmatics fields) and every Cc off a To member's domain (public webmail: exact member only).
+- **"Send a test brief"** (lead page, Consult prep card, `TestBrief.tsx`; owner only: `canSendTestBrief` = role `owner` AND `actingAsStaff === false`,
+  so Lectual staff in a firm are refused). Lead page, not Settings: the lead is the consult being prepared, already chosen. `sendTestBriefAction`
+  re-resolves the session, reads the lead through the scoped client (must be in the session's firm, not merged), limits 5 an hour per owner in
+  memory (a courtesy limit; the slot is taken before any await and given back when the press is refused before a build,
+  `CONSULT_PREP_TEST_REFUSED_BEFORE_BUILD`), and runs consult prep through the runner with scope `{ reason: "test", leadIds: [lead] }` (the assistant must be on;
+  an `agent_run` row records the run, counts only). `runTestBrief` (engine.ts) builds a REAL full prep for the lead's next consult (else its stage
+  path) through `deps.full` (two model calls at most, the firm's packages, the USPTO pull, both files) and sends ONE email to the same recipients
+  (`guardRecipients`, then `testRecipientsOnFirmDomains`: a To, and every To and Cc on a FIRM domain, i.e. the sender's (`CONSULT_PREP_FROM`)
+  or a connected `mailbox_connection` address's, never a public webmail one, or exactly a firm mailbox; otherwise `CONSULT_PREP_TEST_OFF_DOMAIN`
+  and nothing is built),
+  subject `[TEST] ...`, first line `CONSULT_PREP_TEST_FIRST_LINE`, a fresh idempotency key per press. It ignores the switch-over and writes NOTHING
+  (no queue item, marker, send or build record, file). Its answer is one of `CONSULT_PREP_TEST_OUTCOMES` (fixed sentences).
+- The lead page exports `maxDuration = 300`: Re-run prep and the test brief build a full prep inside its server actions.
+- Tests: `tests/consult-prep/{cutover,reply-to,test-brief-action,deps}.test.ts`, the S2c blocks of `tests/agents/consult-prep.test.ts` and
+  `tests/agents/consult-prep-full.test.ts`. **Harness change:** both engine harnesses now pass `cutoverAtMs` 60 days before NOW, since emails are
+  shut without one. **Not verified:** a live Resend reply-to and attachments on a scheduled email, that `rpblawfirm.com` is verified on lectual-app's
+  Resend account, and lawmatics-mcp's prod `BRIEF_*` hours (the defaults are assumed).
+
 ## Rail: Forms and Proposals for the admin tier only (no schema)
 **Superseded (Taylor, Nov 2026):** intake is shown them too, through one predicate; see "Forms and Proposals: shown to the admin tier and intake" below.
 The Forms, Proposals and older Quotes rows carry `minRole: ADMIN_TIER_MIN_ROLE` (`senior_admin`, ranked, so owner / admin / senior_admin) in

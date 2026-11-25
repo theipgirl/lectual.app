@@ -36,6 +36,14 @@ const fieldSchemas = {
   // Automatic consult prep (src/lib/consult-prep/). The sender of the internal brief emails: an address on a domain verified on
   // RESEND_API_KEY's account. Unset (or no RESEND_API_KEY) = no email; the brief is still kept in Lectual.
   CONSULT_PREP_FROM: z.string().optional(),
+  // S2c. Where replies to a consult prep email go (a bare firm address, e.g. info@yourfirm.com; the sender may not be a real mailbox).
+  // Anything that is not a bare address is ignored, and it is put on an email only when it is on the sender's domain or a recipient's
+  // (src/lib/consult-prep/recipients.ts guardReplyTo). Unset = no reply-to.
+  CONSULT_PREP_REPLY_TO: z.string().optional(),
+  // S2c. The moment lawmatics-mcp's own pre-consult brief was switched off: a full ISO instant WITH a zone (2026-12-01T15:30:00-05:00).
+  // Lectual then sends nothing for a consult lawmatics-mcp may already have scheduled a brief for (src/lib/consult-prep/cutover.ts).
+  // Unset or anything else = no cutover rule.
+  CONSULT_PREP_CUTOVER_AT: z.string().optional(),
   // Model for the matters copilot (src/lib/ai/claude.ts copilotModel()). Unset = claude-sonnet-5.
   COPILOT_MODEL: z.string().optional(),
   // Mailbox OAuth (step 3). Optional until that step lands.

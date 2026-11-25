@@ -2,7 +2,9 @@ import { scrubJudgmentContent } from "@/lib/prep-consult/prep-consult";
 import type { AnswersRead, FilesRead, LeadFacts, MailRead, MeetingsRead } from "@/lib/agents/consult-prep/facts";
 import { ANSWER_PAIR_CAP, cardName } from "@/lib/agents/consult-prep/facts";
 import { civilDay } from "@/lib/agents/shared";
+import { withoutBareIds } from "@/lib/lawmatics/field-meta";
 import type { LawmaticsRead } from "./lawmatics-intake";
+import type { BriefSection, FullSections } from "./compose";
 import type { SendKind } from "./sends";
 
 /**
@@ -14,10 +16,17 @@ import type { SendKind } from "./sends";
 
 export const BRIEF_FOOTER = "Internal. Prepared by Lectual for the firm. Not legal advice. Never forward to the client.";
 export const NOT_RECORDED = "not recorded";
+/** S2b: the heading of the lines an email adds about its files. */
+export const ATTACHMENTS_HEADING = "Attachments";
 /** The marker line that opens the client's own words. */
 export const CLIENT_WORDS_HEADING = "In the client's words";
 export const FILES_HEADING = "Files on file";
 /** One line saying what comes later. It avoids the words the judgment guard refuses, because it is the system's own wording. */
+/** The first line of a facts-only email (the 1 h email when no full brief could be had). */
+export const FACTS_ONLY_LINE = "Facts only: the full prep couldn't be built in time.";
+export const FACTS_ONLY_PREFIX = "Facts only: ";
+/** Said in the Lawmatics section when the account's field list (names, types, option labels) could not be read. */
+export const LABELS_UNREAD_LINE = "Some Lawmatics answers are shown as not recorded: the answer labels couldn't be read.";
 export const NEXT_UPDATE_LINE = "The likely classes, a first look at conflicts and a package suggestion come in the next update.";
 
 export type BriefFacts = {
@@ -34,6 +43,13 @@ export type BriefFacts = {
   meetings: MeetingsRead;
   /** Which email this is; `booked` and a preview carry no prefix. */
   send?: SendKind;
+  /** The facts-only mark: the subject and the first line of the body say so. Used only for the 1 h email when no full brief exists. */
+  factsOnly?: boolean;
+  /**
+   * S2b: the judgment half (heads-up, likely classes, USPTO knockout, risk, package or scope, questions), from `composeFullSections`.
+   * Present = the FULL brief; absent = S1's facts brief, which says the rest comes in the next update.
+   */
+  full?: FullSections;
 };
 
 /** `prepared: false` leaves the "Prepared:" time out: the EMAILED copy must be a pure function of the facts, so a re-posted send carries the same payload. */
@@ -41,7 +57,7 @@ export type BriefOptions = { prepared?: boolean };
 
 export type Brief = { subject: string; text: string; html: string };
 
-type Section = { heading: string; lines: string[] };
+type Section = BriefSection;
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 const flat = (v: string | null | undefined): string | null => {
@@ -62,10 +78,10 @@ export function sessionText(iso: string, tz: string): string {
 
 const SUBJECT_PREFIX: Record<SendKind, string> = { booked: "", "24h": "Tomorrow: ", "1h": "In 1 hour: " };
 
-export function briefSubject(facts: Pick<BriefFacts, "lead" | "startsAt" | "tz" | "send">): string {
+export function briefSubject(facts: Pick<BriefFacts, "lead" | "startsAt" | "tz" | "send" | "factsOnly">): string {
   const name = flat(cardName(facts.lead)) ?? "the client";
   const when = facts.startsAt ? sessionText(facts.startsAt, facts.tz) : "time not set";
-  return `${SUBJECT_PREFIX[facts.send ?? "booked"]}Consult prep: ${name} · ${when}`;
+  return `${facts.factsOnly ? FACTS_ONLY_PREFIX : ""}${SUBJECT_PREFIX[facts.send ?? "booked"]}Consult prep: ${name} · ${when}`;
 }
 
 function sections(f: BriefFacts, opts: BriefOptions = {}): { own: Section[]; words: Section; afterWords: Section[] } {
@@ -90,7 +106,8 @@ function sections(f: BriefFacts, opts: BriefOptions = {}): { own: Section[]; wor
       row("Email", flat(lead.email)),
       row("Phone", flat(lead.phone)),
       row("Stage", flat(lead.stage)),
-      row("Source", flat([lead.referralSource, lead.referralDetail].filter(Boolean).join(", "))),
+      // The source and its detail can come from Lawmatics, where a picklist answer may have been stored as its option id: a bare number never prints.
+      row("Source", flat([withoutBareIds(lead.referralSource), withoutBareIds(lead.referralDetail)].filter(Boolean).join(", "))),
     ],
   };
 
@@ -104,7 +121,7 @@ function sections(f: BriefFacts, opts: BriefOptions = {}): { own: Section[]; wor
   const need: Section = {
     heading: "What they need",
     lines: [
-      row("Practice area", flat(lead.practiceArea) ?? flat(lm?.practiceArea)),
+      row("Practice area", flat(withoutBareIds(lead.practiceArea)) ?? flat(lm?.practiceArea)),
       ...(fromIntake.length > 0
         ? fromIntake.map((l) => `- ${l}`)
         : [row("Their inquiry", flat(lm ? clip(lm.inquiry ?? "", 600) : null))]),
@@ -130,6 +147,7 @@ function sections(f: BriefFacts, opts: BriefOptions = {}): { own: Section[]; wor
         row("How they heard of the firm", flat(lm?.referralSource)),
       );
       for (const p of f.lawmatics.other) lawLines.push(`- ${orNot(p.label)}: ${orNot(p.value)}`);
+      if (f.lawmatics.labels === "failed") lawLines.push(LABELS_UNREAD_LINE);
       break;
     case "not-linked":
       lawLines.push("Not linked to Lawmatics, so there are no Lawmatics answers.");
@@ -184,6 +202,12 @@ function sections(f: BriefFacts, opts: BriefOptions = {}): { own: Section[]; wor
     for (const m of f.meetings.meetings) prior.lines.push(`- ${orNot(m.title)}, ${m.at ? civilDay(new Date(m.at), tz) : "date not recorded"}, ${m.source}`);
   }
 
+  if (f.full) {
+    // The full brief (S2b): the model's summary beside the record's facts, then the judgment sections and the questions, in the skill's order.
+    if (f.full.snapshotLine) snapshot.lines.push(`- Summary: ${f.full.snapshotLine}`);
+    if (f.full.marksLine) mark.lines.push(`- As submitted: ${f.full.marksLine}`);
+    return { own: [header, f.full.headsUp, snapshot, need, mark, law], words, afterWords: [files, prior, ...f.full.judgment, f.full.questions] };
+  }
   const questions: Section = { heading: "Questions to cover", lines: ["Not drafted yet.", NEXT_UPDATE_LINE] };
   return { own: [header, snapshot, need, mark, law], words, afterWords: [files, prior, questions] };
 }
@@ -194,7 +218,7 @@ function textOf(sec: Section[]): string {
   return sec.map((s) => [s.heading, ...s.lines].join("\n")).join("\n\n");
 }
 
-function htmlOf(all: Section[], footer: string): string {
+function htmlOf(all: Section[], footer: string, lead?: string): string {
   const body = all
     .map((s, i) => {
       const tag = i === 0 ? "h2" : "h3";
@@ -215,17 +239,36 @@ function htmlOf(all: Section[], footer: string): string {
       return open ? `${out}</ul>` : out;
     })
     .join("");
-  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#1a1a1a">${body}<hr><p style="color:#555">${esc(footer)}</p></div>`;
+  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#1a1a1a">${lead ? `<p><strong>${esc(lead)}</strong></p>` : ""}${body}<hr><p style="color:#555">${esc(footer)}</p></div>`;
 }
 
-/** The brief. Facts only: the same renderer for the email, the stored copy and the lead page. */
+/** The brief (facts only, or full with `facts.full`): the same renderer for the email, the stored copy and the lead page. */
 export function renderConsultBrief(facts: BriefFacts, opts: BriefOptions = {}): Brief {
   const { own, words, afterWords } = sections(facts, opts);
   const all = [...own, words, ...afterWords];
+  const lead = facts.factsOnly ? FACTS_ONLY_LINE : undefined;
   return {
     subject: briefSubject(facts),
-    text: `${textOf(all)}\n\n${BRIEF_FOOTER}`,
-    html: htmlOf(all, BRIEF_FOOTER),
+    text: `${lead ? `${lead}\n\n` : ""}${textOf(all)}\n\n${BRIEF_FOOTER}`,
+    html: htmlOf(all, BRIEF_FOOTER, lead),
+  };
+}
+
+/**
+ * The email for a prep that ADOPTED a full brief already in Approvals: that item's text, exactly as it stands, with the system's
+ * fixed internal-only footer beneath it. The text is not re-written, scrubbed or checked: it is the firm's own prep. The html is the
+ * text escaped inside a pre-wrapped block (so a tag-shaped word in it is shown, never run). A pure function of (text, facts).
+ */
+export function renderAdoptedBrief(adoptedText: string, facts: Pick<BriefFacts, "lead" | "startsAt" | "tz" | "send">, attachmentLines?: readonly string[]): Brief {
+  // A brief this assistant built (S2b) is stored with the footer already under it: it is not printed twice.
+  let body = adoptedText.trim();
+  if (body.endsWith(BRIEF_FOOTER)) body = body.slice(0, -BRIEF_FOOTER.length).trim();
+  // S2b: what THIS email carries (or why a file is not on it), added at send time, so the stored text never claims a file a later email lacks.
+  if (attachmentLines && attachmentLines.length > 0) body = `${body}\n\n${ATTACHMENTS_HEADING}\n${attachmentLines.join("\n")}`;
+  return {
+    subject: briefSubject({ ...facts, factsOnly: false }),
+    text: `${body}\n\n${BRIEF_FOOTER}`,
+    html: `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#1a1a1a"><div style="white-space:pre-wrap">${esc(body)}</div><hr><p style="color:#555">${esc(BRIEF_FOOTER)}</p></div>`,
   };
 }
 
