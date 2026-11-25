@@ -4,6 +4,7 @@ import {
   CONSULT_PREP_ADOPTED,
   CONSULT_PREP_ASK_ADMIN,
   CONSULT_PREP_EMAIL_OFF,
+  CONSULT_PREP_EMAILS_WAIT,
   CONSULT_PREP_NOT_EMAILED,
   CONSULT_PREP_NOT_YET,
   CONSULT_PREP_NO_RECIPIENTS,
@@ -11,6 +12,7 @@ import {
   CONSULT_PREP_RECIPIENTS_NOW,
   CONSULT_PREP_RECIPIENTS_UNREAD,
   CONSULT_PREP_SET_IN_TEAM,
+  CONSULT_PREP_SUPERSEDED,
   CONSULT_PREP_WAITING_FULL,
 } from "@/lib/ui/words";
 
@@ -34,6 +36,10 @@ export type CardInputs = {
   recipients: Read3<RecipientsView>;
   /** The deployment can send email (a key and a sender). */
   emailOn: boolean;
+  /** S2c: the switch-over has happened, so real emails go (`emailsStarted`). Absent = started (the rules before S2c). */
+  emailsStarted?: boolean;
+  /** S2c: the switch-over instant. A withheld or failed row from before it is not owed any more (the engine's `dropPreCutoverOwed`). */
+  cutoverAtMs?: number | null;
   adminTier: boolean;
   tz: string;
   /** The clock, for "is the owed booked email still due?". Absent: it is taken as still due. */
@@ -84,18 +90,27 @@ export function consultPrepCardView(input: CardInputs): CardView {
     // Append-only rows: the newest per kind is the truth.
     const latest = new Map<string, SendRecord>();
     for (const r of [...mine].sort((a, b) => Date.parse(a.at) - Date.parse(b.at))) latest.set(r.kind, r);
-    const booked = latest.get("booked");
+    // A withheld or failed row from before the switch-over is not owed (the engine never acts on it), so it is not described as pending.
+    const preCutover = (r: SendRecord | undefined) =>
+      !!r && (r.status === "withheld" || r.status === "failed") && typeof input.cutoverAtMs === "number" && !(Date.parse(r.at) >= input.cutoverAtMs);
+    const bookedRow = latest.get("booked");
+    const booked = preCutover(bookedRow) ? undefined : bookedRow;
     let mail: string;
     if (booked && (booked.status === "sent" || booked.status === "scheduled" || booked.status === "duplicate")) {
       // Who received a PAST email is not known from today's setting (it may have changed since), so the card says "emailed" and
       // shows the setting as what it is: the current one.
       mail = "emailed";
+    } else if (booked?.status === "superseded") {
+      // S2c: lawmatics-mcp's own brief was already scheduled for this consult before the switch-over; Lectual sends none of its emails.
+      mail = CONSULT_PREP_SUPERSEDED;
     } else if (booked?.status === "failed") {
       mail = "the email couldn't be sent and will be tried again";
     } else if (booked?.status === "withheld" && bookedStillOwed({ ...newest, at: madeAt ?? newest.at }, input.nowMs)) {
       mail = CONSULT_PREP_WAITING_FULL;
     } else if (!input.emailOn) {
       mail = `${CONSULT_PREP_NOT_EMAILED} (${CONSULT_PREP_EMAIL_OFF})`;
+    } else if (input.emailsStarted === false) {
+      mail = CONSULT_PREP_EMAILS_WAIT;
     } else {
       mail = CONSULT_PREP_NOT_EMAILED;
     }

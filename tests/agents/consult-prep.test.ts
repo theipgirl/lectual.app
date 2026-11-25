@@ -100,6 +100,8 @@ type Setup = {
   listApproved?: () => Promise<import("@/lib/queue/api").QueueItem[]>;
 };
 
+/** A switch-over 60 days before NOW: emails are on, and lawmatics-mcp's reach is long past. */
+const LONG_AGO_CUTOVER = NOW - 60 * 86_400_000;
 const FULL_ITEM_ID = "full-1";
 const FULL_TEXT = "Consult prep for Dana Ruiz\n\nLikely classes\nClass 25 clothing, Class 32 beer\n\nRisk read\nPreliminary: one close mark found\n\nPackage recommendation\nEnhanced";
 /** The BRIEFING a person or the prep-consult skill left in Approvals, as the queue returns it. */
@@ -154,6 +156,8 @@ function setup(s: Setup = {}) {
   const cancelled: CancelMail[] = [];
   const deps: PrepDeps = {
     mail: { apiKey: "re_key", from: "prep@lectual.example" },
+    // S2c: real emails go only after the switch-over. The tests that are not about it run long after one (nothing is in its window).
+    cutoverAtMs: LONG_AGO_CUTOVER,
     mailOut: async (m) => {
       sent.push(m);
       return { status: "sent", id: `re_${sent.length}` };
@@ -1729,5 +1733,211 @@ describe("S2a: Lawmatics picklist values print as their labels", () => {
     const { run, createDraft } = setup({ tables: linked, deps: { prospects: reader(prospect([]), async () => list(fields)) } });
     await run();
     expect(briefs(createDraft)[0].draftBody as string).toContain("- Source: Booth, UGW 2026");
+  });
+});
+
+describe("S2c: the switch-over from lawmatics-mcp's brief (CONSULT_PREP_CUTOVER_AT)", () => {
+  // NOW is Fri Sep 25 2026, 8:00 AM EDT. Cut over then, lawmatics-mcp's last run is the 7:30 AM one: it can have scheduled 24 h briefs
+  // until 8:00 PM (NOW + 12 h) and 1 h briefs until 11:00 PM (NOW + 15 h).
+  const CUTOVER = { cutoverAtMs: NOW };
+  const at = (h: number): Tables => ({ crm_calendar_event: [event("e1", { starts_at: hours(h) })] });
+  const statuses = (db: { tables: Tables }) => sendPayloads(db).map((p) => [p.kind, p.status]);
+
+  it("outside the window (the consult in 50 h): every email goes as before", async () => {
+    const s = setup({ full: true, tables: at(50), deps: CUTOVER });
+    await s.run();
+    expect(s.sent.map(kindOf)).toEqual(["booked", "24h", "1h"]);
+    expect(sendPayloads(s.db).some((p) => p.status === "superseded")).toBe(false);
+  });
+
+  it("partly inside (the consult in 30 h): lawmatics-mcp had its 24 h brief, so no booked and no 24 h; the 1 h at 29 h still goes", async () => {
+    const s = setup({ full: true, tables: at(30), deps: CUTOVER });
+    const result = await s.run();
+    expect(s.sent.map(kindOf)).toEqual(["1h"]);
+    expect(statuses(s.db)).toEqual([
+      ["booked", "superseded"],
+      ["24h", "superseded"],
+      ["1h", "scheduled"],
+    ]);
+    expect(result.summary).toMatch(/2 emails not sent: the old brief was already scheduled for those consults before the switch-over\./);
+    for (const row of sendRows(s.db).filter((r) => (r.payload as { status: string }).status === "superseded")) {
+      expect(Object.keys(row.payload as object).sort()).toEqual(["kind", "prep_key", "resend_id", "scheduled_for", "source", "status"]);
+    }
+  });
+
+  it("wholly inside (the consult in 10 h): no Lectual email at all, but the prep is still built, queued and marked", async () => {
+    const s = setup({ tables: at(10), deps: CUTOVER });
+    const result = await s.run();
+    expect(s.sent).toHaveLength(0);
+    expect(briefs(s.createDraft)).toHaveLength(1);
+    expect(markers(s.db)).toHaveLength(2); // the brief and the client-prep draft
+    expect(statuses(s.db)).toEqual([
+      ["booked", "superseded"],
+      ["1h", "superseded"],
+    ]);
+    expect(result.itemsIn).toBe(1);
+  });
+
+  it("the boundary is exclusive: a consult whose 24 h time is exactly the reach gets its 24 h email", async () => {
+    const s = setup({ full: true, tables: at(36), deps: CUTOVER });
+    await s.run();
+    expect(s.sent.map(kindOf)).toEqual(["booked", "24h", "1h"]);
+    const just = setup({ full: true, tables: { crm_calendar_event: [event("e1", { starts_at: new Date(NOW + 36 * 3_600_000 - 1000).toISOString() })] }, deps: CUTOVER });
+    await just.run();
+    expect(just.sent.map(kindOf)).toEqual(["1h"]);
+  });
+
+  it("is recorded once and never sent later: not on the next run, nor after the window has passed, nor with the setting removed", async () => {
+    const first = setup({ full: true, tables: at(30), deps: CUTOVER });
+    await first.run();
+    const rows = sendRows(first.db).length;
+    for (const [now, deps] of [
+      [NOW + 2 * 3_600_000, CUTOVER],
+      [NOW + 20 * 3_600_000, CUTOVER],
+      [NOW + 3 * 3_600_000, { cutoverAtMs: NOW - 60 * 86_400_000 }], // an earlier cutover: the rows still say it is done
+    ] as const) {
+      const again = setup({ full: true, tables: { ...at(30), crm_activity: first.db.tables.crm_activity }, deps, now });
+      await again.run();
+      expect(again.sent).toHaveLength(0);
+      expect(sendRows(again.db)).toHaveLength(rows);
+    }
+  });
+
+  it("unset or invalid (null): no real email at all, and nothing recorded (fail closed); the prep is still made", async () => {
+    for (const cutoverAtMs of [null, undefined]) {
+      const s = setup({ full: true, tables: at(50), deps: { cutoverAtMs } });
+      const result = await s.run();
+      expect(s.sent).toHaveLength(0);
+      expect(sendRows(s.db)).toHaveLength(0);
+      expect(markers(s.db).length).toBeGreaterThan(0);
+      expect(result.summary).toMatch(/3 emails not sent: consult prep emails start when the switch-over is done\./);
+    }
+  });
+
+  it("before, at and after the switch-over: nothing before; at and after, only what is still due goes, and no backlog", async () => {
+    // The prep is made 6 h before the switch-over (cutover at NOW + 6 h, the consult at NOW + 50 h).
+    const cutover = { cutoverAtMs: NOW + 6 * 3_600_000 };
+    const before = setup({ full: true, tables: at(50), deps: cutover });
+    await before.run();
+    expect(before.sent).toHaveLength(0);
+    expect(sendRows(before.db)).toHaveLength(0);
+    expect(markers(before.db).length).toBeGreaterThan(0);
+    // At the switch-over: the booked email belonged to the run that made the prep, so it is not sent late; the reminders still due go.
+    const atIt = setup({ full: true, tables: { ...at(50), crm_activity: before.db.tables.crm_activity }, deps: cutover, now: NOW + 6 * 3_600_000 });
+    await atIt.run();
+    expect(atIt.sent.map(kindOf)).toEqual(["24h", "1h"]);
+    // After it: nothing twice.
+    const after = setup({ full: true, tables: { ...at(50), crm_activity: atIt.db.tables.crm_activity }, deps: cutover, now: NOW + 8 * 3_600_000 });
+    await after.run();
+    expect(after.sent).toHaveLength(0);
+  });
+
+  it("a new prep after the switch-over sends as usual", async () => {
+    const s = setup({ full: true, tables: at(50), deps: { cutoverAtMs: NOW - 1 } });
+    await s.run();
+    expect(s.sent.map(kindOf)).toEqual(["booked", "24h", "1h"]);
+  });
+
+  it("a reschedule INTO the window: the old reminders are cancelled and the new time's are covered by lawmatics-mcp", async () => {
+    const first = setup({ full: true, tables: at(50), deps: CUTOVER });
+    await first.run();
+    const again = setup({ full: true, tables: { ...at(30), crm_activity: first.db.tables.crm_activity }, deps: CUTOVER, now: NOW + 60_000 });
+    await again.run();
+    expect(again.cancelled.map((c) => c.id).sort()).toEqual(["re_2", "re_3"]);
+    expect(again.sent.map(kindOf)).toEqual(["1h"]);
+  });
+
+  it("a reschedule OUT of the window: the new time is a new key, and gets every email", async () => {
+    const first = setup({ full: true, tables: at(10), deps: CUTOVER });
+    await first.run();
+    expect(first.sent).toHaveLength(0);
+    const again = setup({ full: true, tables: { ...at(50), crm_activity: first.db.tables.crm_activity }, deps: CUTOVER, now: NOW + 60_000 });
+    await again.run();
+    expect(again.sent.map(kindOf)).toEqual(["booked", "24h", "1h"]);
+  });
+
+  it("a stage-keyed prep (no consult time, nothing lawmatics-mcp briefs) is unaffected", async () => {
+    const stageLead = leadRow("lead-1", { current_stage_id: "s-consult", stage_entered_at: ago(1) });
+    const s = setup({ full: true, tables: { crm_calendar_event: [], crm_lead: [stageLead], crm_activity: [{ id: "chg", org_id: ORG, lead_id: "lead-1", type: "stage_changed", created_at: ago(1), payload: { to_stage_id: "s-consult" } }] }, deps: CUTOVER });
+    await s.run();
+    expect(s.sent.map(kindOf)).toEqual(["booked"]);
+    expect(sendPayloads(s.db).map((p) => p.status)).toEqual(["sent"]);
+  });
+});
+
+describe("S2c: the reply-to (CONSULT_PREP_REPLY_TO)", () => {
+  it("every email carries it when it is a firm address", async () => {
+    const s = setup({ full: true, tables: { crm_calendar_event: [event("e1", { starts_at: hours(50) })] }, deps: { mail: { apiKey: "re_key", from: "prep@lectual.example", replyTo: "info@firm.example" } } });
+    await s.run();
+    expect(s.sent).toHaveLength(3);
+    for (const m of s.sent) expect(m.replyTo).toBe("info@firm.example");
+  });
+
+  it("an address that isn't the firm's, or is the client's, is left off and counted; the email still goes", async () => {
+    for (const replyTo of ["someone@elsewhere.example", "dana@client.example"]) {
+      const s = setup({ full: true, tables: { crm_calendar_event: [event("e1", { starts_at: hours(50) })] }, deps: { mail: { apiKey: "re_key", from: "prep@lectual.example", replyTo } } });
+      const result = await s.run();
+      expect(s.sent).toHaveLength(3);
+      for (const m of s.sent) expect(m.replyTo).toBeUndefined();
+      expect(result.summary).toMatch(/without the reply-to address/);
+    }
+  });
+
+  it("unset: no reply-to, and nothing said", async () => {
+    const s = setup({ full: true, tables: { crm_calendar_event: [event("e1", { starts_at: hours(50) })] } });
+    const result = await s.run();
+    for (const m of s.sent) expect(m.replyTo).toBeUndefined();
+    expect(result.summary).not.toMatch(/reply-to/);
+  });
+});
+
+describe("S2c review fixes: who lawmatics-mcp really covered", () => {
+  // Cut over at NOW (Fri 8:00 AM EDT): lawmatics-mcp's last run was for 7:30 AM and fired no earlier than 6:30 AM (NOW - 1.5 h).
+  const CUTOVER = { cutoverAtMs: NOW };
+
+  it("a consult Lectual first knew of after that run gets every email (lawmatics-mcp may never have seen it)", async () => {
+    const s = setup({ full: true, tables: { crm_calendar_event: [event("e1", { starts_at: hours(30), created_at: hours(-1), synced_at: hours(-1) })] }, deps: CUTOVER });
+    await s.run();
+    expect(s.sent.map(kindOf)).toEqual(["booked", "24h", "1h"]);
+  });
+
+  it("one known before it stays covered", async () => {
+    const s = setup({ full: true, tables: { crm_calendar_event: [event("e1", { starts_at: hours(30), created_at: hours(-3), synced_at: hours(-3) })] }, deps: CUTOVER });
+    await s.run();
+    expect(s.sent.map(kindOf)).toEqual(["1h"]);
+  });
+
+  it("a consult rescheduled into the window after that run (its row re-synced) gets every email", async () => {
+    const s = setup({ full: true, tables: { crm_calendar_event: [event("e1", { starts_at: hours(30), created_at: hours(-48), synced_at: hours(-1) })] }, deps: CUTOVER });
+    await s.run();
+    expect(s.sent.map(kindOf)).toEqual(["booked", "24h", "1h"]);
+  });
+
+  it("an Outlook-only consult is never left to lawmatics-mcp", async () => {
+    const s = setup({ full: true, tables: { crm_calendar_event: [event("e1", { source: "outlook", external_id: "AAMk-1", starts_at: hours(30) })] }, deps: CUTOVER });
+    await s.run();
+    expect(s.sent.map(kindOf)).toEqual(["booked", "24h", "1h"]);
+    // the same call also in Lawmatics: the Lawmatics row is the one prepped, and it is covered
+    const both = setup({ full: true, tables: { crm_calendar_event: [event("o1", { source: "outlook", external_id: "AAMk-1", starts_at: hours(30) }), event("e1", { starts_at: hours(30) })] }, deps: CUTOVER });
+    await both.run();
+    expect(both.sent.map(kindOf)).toEqual(["1h"]);
+  });
+
+  it("withheld rows written before the switch-over send nothing late: no booked email when it opens", async () => {
+    // Before S2c these rows were written whether or not a sender was set: a facts prep with its booked email withheld.
+    const first = setup({ tables: { crm_calendar_event: [event("e1", { starts_at: hours(50) })] } });
+    await first.run();
+    expect(sendPayloads(first.db).find((p) => p.kind === "booked")?.status).toBe("withheld");
+    const tables = { crm_calendar_event: [event("e1", { starts_at: hours(50) })], crm_activity: first.db.tables.crm_activity };
+    // The switch-over is an hour later; the next run (with a full prep now in Approvals) does not send that booked email.
+    const after = setup({ full: true, tables, deps: { cutoverAtMs: NOW + 3_600_000 }, now: NOW + 2 * 3_600_000 });
+    await after.run();
+    expect(after.sent.map(kindOf)).not.toContain("booked");
+    // its reminders still follow the ordinary rules (their own times are after the switch-over)
+    expect(after.sent.map(kindOf)).toEqual(expect.arrayContaining(["24h", "1h"]));
+    // Control: the same rows written AFTER an earlier switch-over are still owed, and it goes.
+    const control = setup({ full: true, tables, deps: { cutoverAtMs: NOW - 3_600_000 }, now: NOW + 2 * 3_600_000 });
+    await control.run();
+    expect(control.sent.map(kindOf)).toContain("booked");
   });
 });

@@ -48,10 +48,14 @@ function model(...outputs: Array<unknown>) {
   return { llm, calls };
 }
 
-type Run = { now?: number; llm?: unknown[]; queue?: boolean; scope?: import("@/lib/agents/types").RunScope; mailOut?: (m: InternalMail) => Promise<InternalMailResult>; full?: boolean; withBuilder?: boolean };
+type Run = { now?: number; llm?: unknown[]; queue?: boolean; scope?: import("@/lib/agents/types").RunScope; mailOut?: (m: InternalMail) => Promise<InternalMailResult>; full?: boolean; withBuilder?: boolean; deps?: Partial<PrepDeps> };
 
 /** One firm's world, run as many times as a test likes (the database, the sends and the saved files persist across runs). */
 function world(initial: Tables = tables(), failures?: (q: Recorded) => DbError | undefined) {
+  return worldOf(initial, failures);
+}
+
+function worldOf(initial: Tables = tables(), failures?: (q: Recorded) => DbError | undefined) {
   const db = memDb(initial, { failures });
   const sent: InternalMail[] = [];
   const saved = new Map<string, PrepFile[]>();
@@ -93,6 +97,8 @@ function world(initial: Tables = tables(), failures?: (q: Recorded) => DbError |
     );
     const deps: PrepDeps = {
       mail: { apiKey: "re_key", from: "prep@lectual.example" },
+      // S2c: emails go only after the switch-over; these tests run long after one.
+      cutoverAtMs: NOW - 60 * 86_400_000,
       mailOut:
         r.mailOut ??
         (async (mail) => {
@@ -104,6 +110,7 @@ function world(initial: Tables = tables(), failures?: (q: Recorded) => DbError |
       memberAddresses: async (ids) => ids.map((id) => `${id.replace("u-", "")}@firm.example`),
       ...(r.withBuilder === false ? {} : { full: builder }),
       files,
+      ...r.deps,
     };
     const result = await runConsultPrep(ctx, deps);
     return { result, calls: m.calls, log: made.log, createDraft: made.createDraft, builder };
@@ -345,5 +352,127 @@ describe("consult prep builds the full brief (S2b)", () => {
     expect(oneHour.text).toContain("USPTO search results workbook not attached: the saved copy couldn't be read for this email.");
     expect(oneHour.text).toContain("Packages PDF not attached: the saved copy couldn't be read for this email.");
     expect(oneHour.text).not.toContain("could not be built");
+  });
+});
+
+describe("S2c: the switch-over", () => {
+  it("a consult lawmatics-mcp already briefed is still BUILT, queued, marked and its files saved; only the emails are left out", async () => {
+    // NOW + 30 h: lawmatics-mcp (cut over at NOW, Fri 8 AM EDT) had its 24 h brief; Lectual's 1 h email (29 h) is past its reach.
+    const w = world();
+    const { calls } = await w.run({ deps: { cutoverAtMs: NOW } });
+    expect(calls).toHaveLength(2);
+    expect(w.items).toHaveLength(1);
+    expect(w.markers()[0].payload).toMatchObject({ full: true });
+    expect(w.files.save).toHaveBeenCalledTimes(1);
+    expect(w.sends().map((p) => [p.kind, p.status])).toEqual([
+      ["booked", "superseded"],
+      ["24h", "superseded"],
+      ["1h", "scheduled"],
+    ]);
+  });
+
+  it("a person's re-run is exempt: they asked for that email, and lawmatics-mcp sends no booked email it could double", async () => {
+    const w = world();
+    await w.run({ deps: { cutoverAtMs: NOW } });
+    await w.run({ now: NOW + 60_000, scope: { leadIds: ["lead-1"], reason: "rerun" }, deps: { cutoverAtMs: NOW } });
+    const last = w.sent.at(-1)!;
+    expect(last.idempotencyKey).toMatch(/:rerun:\d+:booked$/);
+    expect(w.sends().filter((p) => String(p.prep_key).includes(":rerun:")).map((p) => p.status)).toEqual(["sent"]);
+  });
+});
+
+describe("S2c: the owner's test brief (a real full prep, emailed marked [TEST], nothing written)", () => {
+  const TEST = { leadIds: ["lead-1"] as [string], reason: "test" as const };
+  // The firm's connected mailbox puts firm.example among the firm's domains (the sender here is on another one).
+  const boxed = (t: Tables = tables()): Tables => ({ ...t, mailbox_connection: [{ id: "mb-1", org_id: ORG, email: "office@firm.example", status: "active" }] });
+  const world = (t?: Tables) => worldOf(boxed(t));
+
+  it("builds through the real builder (two model calls, the firm's packages, both files) and emails it to the firm's recipients only", async () => {
+    const w = world();
+    const before = JSON.stringify(w.db.tables);
+    const { result, calls, createDraft } = await w.run({ scope: TEST });
+    expect(result.summary).toBe("Test brief sent to the people set in Settings → Team.");
+    expect(calls).toHaveLength(2);
+    expect(w.sent).toHaveLength(1);
+    const m = w.sent[0];
+    expect(m.subject.startsWith("[TEST] Consult prep: Dana Ruiz")).toBe(true);
+    expect(m.text.split("\n")[0]).toMatch(/^TEST: this is a test of the consult prep email/);
+    expect(m.html).toContain("TEST: this is a test");
+    expect(m.text).toContain("Likely classes — preliminary");
+    expect(m.attachments?.map((a) => a.filename).sort()).toEqual(["Dana_Ruiz_Packages_SANKOFA.pdf", "tmSearchResults2026-09-25.xlsx"]);
+    expect(m.to).toEqual(["attorney@firm.example"]);
+    expect(m.cc).toBeUndefined();
+    expect(m.idempotencyKey).toMatch(/^consult-prep-test:/);
+    // Nothing that counts as the real prep: no queue item, no marker, no send or build record, no file, no timeline row.
+    expect(createDraft).not.toHaveBeenCalled();
+    expect(w.items).toHaveLength(0);
+    expect(w.files.save).not.toHaveBeenCalled();
+    expect(JSON.stringify(w.db.tables)).toBe(before);
+  });
+
+  it("each press is a new email (its own idempotency key), and a real run afterwards is untouched by it", async () => {
+    const w = world();
+    await w.run({ scope: TEST });
+    await w.run({ scope: TEST, now: NOW + 1000 });
+    expect(new Set(w.sent.map((s) => s.idempotencyKey)).size).toBe(2);
+    await w.run(); // the real sweep: a fresh prep with its booked email, as if no test had been sent
+    expect(w.markers()).toHaveLength(1);
+    expect(w.sent.at(-3)?.subject.startsWith("[TEST]")).toBe(false);
+  });
+
+  it("a switch-over still ahead (or none set) does not stop it", async () => {
+    for (const cutoverAtMs of [NOW + 86_400_000, null]) {
+      const w = world();
+      await w.run({ scope: TEST, deps: { cutoverAtMs } });
+      expect(w.sent).toHaveLength(1);
+    }
+  });
+
+  it("a lead with no consult uses its stage path", async () => {
+    const w = world({ ...tables(), crm_calendar_event: [] });
+    await w.run({ scope: TEST });
+    expect(w.sent).toHaveLength(1);
+    expect(w.sent[0].subject).toMatch(/time not set/);
+  });
+
+  it("never to the client: the lead's own address is dropped from the list, and a list with only the client on it sends nothing", async () => {
+    const w = world();
+    const r = await w.run({ scope: TEST, deps: { memberAddresses: async () => ["dana@client.example"] } });
+    expect(r.result.summary).toBe("Can't send a test brief: no one is set to receive consult prep. Set it in Settings → Team.");
+    expect(w.sent).toHaveLength(0);
+    expect(r.calls).toHaveLength(0);
+  });
+
+  it("a chosen member on an address off the firm's domains fails the explicit check: nothing is built or sent", async () => {
+    const w = world();
+    const r = await w.run({ scope: TEST, deps: { memberAddresses: async () => ["attorney@firm.example", "other@elsewhere.example"] } });
+    expect(r.result.summary).toBe("Can't send a test brief: someone set to receive it isn't on the firm's email domain. Check Settings → Team.");
+    expect(w.sent).toHaveLength(0);
+    expect(r.calls).toHaveLength(0);
+    // without the firm's mailbox to vouch for firm.example (the sender is on lectual.example), even the attorney is refused
+    const bare = worldOf(tables());
+    const b = await bare.run({ scope: TEST });
+    expect(b.result.summary).toMatch(/isn't on the firm's email domain/);
+  });
+
+  it("email not switched on, no one set, or the setting unreadable: a fixed sentence, no model call, nothing sent", async () => {
+    const off = world();
+    const a = await off.run({ scope: TEST, deps: { mail: { apiKey: null, from: null } } });
+    expect(a.result.summary).toBe("Can't send a test brief: email isn't switched on for your firm yet. Lectual will turn it on.");
+    const none = world({ ...tables(), crm_firm_brain_entry: [] });
+    const b = await none.run({ scope: TEST });
+    expect(b.result.summary).toBe("Can't send a test brief: no one is set to receive consult prep. Set it in Settings → Team.");
+    const unread = world();
+    const c = await unread.run({ scope: TEST, deps: { memberAddresses: async () => null } });
+    expect(c.result.summary).toBe("Can't send a test brief: who gets consult prep couldn't be read. Try again in a minute.");
+    for (const r of [a, b, c]) expect(r.calls).toHaveLength(0);
+    expect([...off.sent, ...none.sent, ...unread.sent]).toHaveLength(0);
+  });
+
+  it("a build that fails sends nothing and says so", async () => {
+    const w = world();
+    const r = await w.run({ scope: TEST, llm: [new Error("down")] });
+    expect(r.result.summary).toBe("Can't send a test brief: the full prep couldn't be built. Try again in a few minutes.");
+    expect(w.sent).toHaveLength(0);
   });
 });
