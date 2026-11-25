@@ -1,6 +1,6 @@
 // The packages PDF's colours, in one place.
 //
-// PALETTE is the RPB pre-2026-10-16 brand palette the product spec names for
+// PALETTE is the packages PDF's one brand palette (burgundy and cream), named by the product spec for
 // this document (lectual-plugin firm/brand/README.md). TINTS are the extra
 // shades `render_package_proposal.py`'s CSS uses for text on burgundy, the
 // alternate table row, cell dashes and the priority card's border. The renderer

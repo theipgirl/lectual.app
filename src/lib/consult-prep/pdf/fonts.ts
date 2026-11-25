@@ -35,15 +35,15 @@ export const FACE_KEYS = Object.keys(FONT_FILES) as FaceKey[];
  * rather than letting pdf-lib add a random suffix keeps renders byte-stable.
  */
 export const EMBED_NAMES: Readonly<Record<FaceKey, string>> = Object.freeze({
-  playfair600: 'RPBPFA+PlayfairDisplay-SemiBold',
-  playfair700: 'RPBPFB+PlayfairDisplay-Bold',
-  playfair500Italic: 'RPBPFC+PlayfairDisplay-MediumItalic',
-  serif400: 'RPBSSA+SourceSerif4-Regular',
-  serif600: 'RPBSSB+SourceSerif4-SemiBold',
-  serif700: 'RPBSSC+SourceSerif4-Bold',
-  serif400Italic: 'RPBSSD+SourceSerif4-Italic',
-  serif600Italic: 'RPBSSE+SourceSerif4-SemiBoldItalic',
-  serif700Italic: 'RPBSSF+SourceSerif4-BoldItalic',
+  playfair600: 'LCTPFA+PlayfairDisplay-SemiBold',
+  playfair700: 'LCTPFB+PlayfairDisplay-Bold',
+  playfair500Italic: 'LCTPFC+PlayfairDisplay-MediumItalic',
+  serif400: 'LCTSSA+SourceSerif4-Regular',
+  serif600: 'LCTSSB+SourceSerif4-SemiBold',
+  serif700: 'LCTSSC+SourceSerif4-Bold',
+  serif400Italic: 'LCTSSD+SourceSerif4-Italic',
+  serif600Italic: 'LCTSSE+SourceSerif4-SemiBoldItalic',
+  serif700Italic: 'LCTSSF+SourceSerif4-BoldItalic',
 });
 
 /** Path segments of the font directory, relative to the project root. */
