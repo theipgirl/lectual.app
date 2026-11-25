@@ -53,7 +53,7 @@ export async function resolveQueueRole(
   supabase: ScopedClient,
   allowed: Role[],
 ): Promise<Role | null> {
-  const { data, error } = await supabase.rpc("current_org_role");
+  const { data, error } = await supabase.rpc("current_org_role", undefined, { get: true });
   if (error) throw error;
   if (!isRole(data) || !allowed.includes(data)) return null;
   return data;

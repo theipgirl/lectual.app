@@ -67,8 +67,10 @@ describe("every table uses the sheet table kit", () => {
     }
   });
 
-  it("finds the two tables that are already on the kit", () => {
+  it("finds the two tables that are already on the kit (the shared List draws the Weekly review's)", () => {
     const sheetUsers = files.filter((f) => fs.readFileSync(path.join(ROOT, f), "utf8").includes("<SheetTable"));
-    expect(sheetUsers).toEqual(expect.arrayContaining(["src/components/review/SheetEditTable.tsx", "src/app/dashboard/intake/_components/IntakeTable.tsx"]));
+    // The Leads List is on the shared List too (build step 6), so ViewTable is the one place that names SheetTable for both.
+    expect(sheetUsers).toEqual(expect.arrayContaining(["src/components/views/table/ViewTable.tsx"]));
+    expect(fs.readFileSync(path.join(ROOT, "src/app/dashboard/intake/_components/IntakeTable.tsx"), "utf8")).toContain("<ViewTable");
   });
 });

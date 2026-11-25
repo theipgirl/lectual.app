@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
 import { createTemplate } from "@/lib/automation/drips";
 import { friendlyCampaignError, type ActionState } from "../errors";
@@ -10,7 +11,7 @@ import { friendlyCampaignError, type ActionState } from "../errors";
  * Error into a readable ActionState, same split as every other campaign
  * action.
  */
-export async function createTemplateAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const createTemplateAction = previewSafe(async function createTemplateAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const name = String(formData.get("name") ?? "").trim();
   const subject = String(formData.get("subject") ?? "").trim();
   const bodyHtml = String(formData.get("bodyHtml") ?? "").trim();
@@ -34,4 +35,4 @@ export async function createTemplateAction(_prev: ActionState, formData: FormDat
 
   revalidatePath("/dashboard/campaigns/templates/");
   return {};
-}
+}, "state");

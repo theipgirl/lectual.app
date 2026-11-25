@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { isViewerApprover, resolveViewSession } from "@/lib/views/view-as";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { listMemberDirectory, type MemberIdentity } from "@/lib/members/directory";
 import { clientLinkOrigin, clientLinkUrl } from "@/lib/proposals/client-link-origin";
@@ -8,7 +8,7 @@ import { firmCivilDate } from "@/lib/quotes/firm-time";
 import { formatMoney } from "@/lib/ui/format";
 import { formatFirmStamp, formatShortFirmDate } from "@/lib/quotes/labels";
 import { ProposalError } from "@/lib/proposals/errors";
-import { getProposal, getProposalSettings, isCurrentUserApprover, listProposalOpens, listProposalStepEvents, type ProposalDetail } from "@/lib/proposals/store";
+import { getProposal, getProposalSettings, listProposalOpens, listProposalStepEvents, type ProposalDetail } from "@/lib/proposals/store";
 import { PROPOSAL_PAID_ROLES, paidStateFromEvents } from "@/lib/proposals/paid";
 import { canResetAcceptance } from "@/lib/proposal-editor/reset-acceptance";
 import { buildPaidPanelView } from "@/lib/proposals/paid-view";
@@ -115,7 +115,7 @@ export const dynamic = "force-dynamic";
 export default async function ProposalEditorPage({ params }: { params: Promise<{ id: string }> }) {
   await requireProposalsModule();
   const { id } = await params;
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   if (session.kind !== "ok") notFound();
   const canWrite = PROPOSAL_STAFF_WRITE_ROLES.includes(session.role);
   // Who may read a client's signature record (the one list, `signature-roles.ts`): the staff roles. Decides whether the read is attempted.
@@ -140,7 +140,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
     getFirmTimeZone(),
     listMemberDirectory().catch((): MemberIdentity[] => []),
     getProposalSettings().catch(() => null),
-    isCurrentUserApprover(),
+    isViewerApprover(),
     clientLinkOrigin(proposal.org_id),
     proposal.lead_id ? loadConsultStrip(proposal.lead_id) : Promise.resolve(null),
     // Only an accepted version has a payment panel. A failed read is `{ ok: false }`, never "not paid".

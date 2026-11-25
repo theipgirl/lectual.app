@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { previewSafe } from "@/lib/views/preview-safe";
 import { currentRole } from "@/lib/auth/current-role";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { ADMIN_TIER_PHRASE, canSeeSetup } from "@/lib/setup/roles";
@@ -17,7 +18,7 @@ export type ConsultPrepEmailsState = { error?: string; saved?: boolean };
  * Cc is checked with the SAME guard the send uses (a bare address on a chosen member's domain). Nothing else is written. Fixed
  * sentences only.
  */
-export async function saveConsultPrepEmailsAction(_prev: ConsultPrepEmailsState, formData: FormData): Promise<ConsultPrepEmailsState> {
+export const saveConsultPrepEmailsAction = previewSafe(async function saveConsultPrepEmailsAction(_prev: ConsultPrepEmailsState, formData: FormData): Promise<ConsultPrepEmailsState> {
   if (!canSeeSetup(await currentRole())) return { error: `${ADMIN_TIER_PHRASE} can choose who gets consult prep emails.` };
   const picked = formData.getAll("userId");
   const typed = formData.get("cc");
@@ -43,4 +44,4 @@ export async function saveConsultPrepEmailsAction(_prev: ConsultPrepEmailsState,
   }
   revalidatePath("/dashboard/settings/team/");
   return { saved: true };
-}
+}, "state")

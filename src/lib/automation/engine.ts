@@ -264,7 +264,7 @@ export async function runRules(trigger: AutomationTrigger, ctx: RunRulesContext)
   try {
     const supabase = await getScopedClient();
 
-    const { data: orgId, error: orgError } = await supabase.rpc("current_org_id");
+    const { data: orgId, error: orgError } = await supabase.rpc("current_org_id", undefined, { get: true });
     if (orgError || !orgId) return;
 
     const { data: rules, error: rulesError } = await supabase

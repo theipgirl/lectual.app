@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { loadSetupState } from "@/lib/setup/load";
 import { setupChecklist } from "@/lib/setup/checklist";
 import { canSeeSetup } from "@/lib/setup/roles";
@@ -23,7 +23,7 @@ export const dynamic = "force-dynamic";
  * that already exist and do their own role checks.
  */
 export default async function SetupPage() {
-  const session = await resolveFirmSession({ signInNext: SETUP_PATH });
+  const session = await resolveViewSession({ signInNext: SETUP_PATH });
   if (session.kind !== "ok" || !canSeeSetup(session.role)) notFound();
 
   const [state, accounts] = await Promise.all([loadSetupState(), loadFirstUsers({ id: session.user.id, role: session.role, actingAsStaff: session.actingAsStaff }, session.org.modules)]);

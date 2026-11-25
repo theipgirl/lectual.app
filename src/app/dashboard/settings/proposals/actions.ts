@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { getProposalSettings, saveProposalSettings } from "@/lib/proposals/store";
@@ -22,7 +23,7 @@ import { gateAdminAction } from "../../proposals/gate";
  * not on it is refused here: the database holds a bare uuid[] with no
  * foreign key, so nothing else would stop a stray id being named an approver.
  */
-export async function saveProposalSettingsAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const saveProposalSettingsAction = previewSafe(async function saveProposalSettingsAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const refused = await gateAdminAction();
   if (refused) return refused;
 
@@ -73,7 +74,7 @@ export async function saveProposalSettingsAction(_prev: ActionState, formData: F
   }
   revalidatePath("/dashboard/settings/proposals/");
   return { saved: true };
-}
+}, "state");
 
 /**
  * Save the firm's package prices alone. The settings page no longer uses it (its one form saves
@@ -87,7 +88,7 @@ export async function saveProposalSettingsAction(_prev: ActionState, formData: F
  * Same gates as the settings form: the module, then owner / admin / senior_admin,
  * re-checked by `saveProposalSettings`; RLS is the boundary underneath.
  */
-export async function savePackagesAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const savePackagesAction = previewSafe(async function savePackagesAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const refused = await gateAdminAction();
   if (refused) return refused;
 
@@ -110,4 +111,4 @@ export async function savePackagesAction(_prev: ActionState, formData: FormData)
   revalidatePath("/dashboard/settings/proposals/");
   revalidatePath("/dashboard/proposals/new/");
   return { saved: true, notice: "Saved. New proposals can now start from these packages." };
-}
+}, "state");

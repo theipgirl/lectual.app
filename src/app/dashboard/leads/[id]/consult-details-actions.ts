@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
 import { MERGE_POINTER_UNREADABLE } from "@/lib/ui/words";
 import { getScopedClient } from "@/lib/db/scoped-client";
@@ -25,7 +26,7 @@ export type ConsultActionState = { ok?: boolean; error?: string; notice?: string
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export async function saveConsultDetailsAction(_prev: ConsultActionState, formData: FormData): Promise<ConsultActionState> {
+export const saveConsultDetailsAction = previewSafe(async function saveConsultDetailsAction(_prev: ConsultActionState, formData: FormData): Promise<ConsultActionState> {
   const session = await resolveFirmSession();
   if (session.kind !== "ok") return { error: "Sign in again to save this." };
   if (!CAN_WRITE_LEAD.includes(session.role)) return { error: "Your role can view consult details but not change them." };
@@ -80,4 +81,4 @@ export async function saveConsultDetailsAction(_prev: ConsultActionState, formDa
 
   revalidatePath(`/dashboard/leads/${leadId}/`);
   return { ok: true, notice: "Saved and marked reviewed. It will carry onto the matter when one is opened for this lead." };
-}
+}, "state");

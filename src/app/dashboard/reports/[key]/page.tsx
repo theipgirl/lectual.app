@@ -6,7 +6,7 @@ import { REPORT_RANGES, parseReportRange, reportPeriod } from "@/lib/reports/per
 import { loadCommunicationReport } from "@/lib/reports/communication";
 import { loadIntakeReport } from "@/lib/reports/intake";
 import { canSeeFormsAndProposals } from "@/lib/auth/forms-proposals";
-import { currentRole } from "@/lib/auth/current-role";
+import { viewerRole } from "@/lib/views/view-as";
 import { loadMattersReport } from "@/lib/reports/matters";
 import { loadIposReport } from "@/lib/reports/ipos";
 import { KpiTile } from "@/components/reports/KpiTile";
@@ -98,7 +98,7 @@ export default async function ReportPage({
       data = await loadCommunicationReport(period, { hasMailbox, hasAgents });
       break;
     case "intake":
-      data = await loadIntakeReport(period, { canOpenForms: canSeeFormsAndProposals(await currentRole()) });
+      data = await loadIntakeReport(period, { canOpenForms: canSeeFormsAndProposals(await viewerRole()) });
       break;
     case "matters":
       data = await loadMattersReport(period);

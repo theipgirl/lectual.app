@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { previewSafe } from "@/lib/views/preview-safe";
 import { currentRole } from "@/lib/auth/current-role";
 import { productionRunnerDeps } from "@/lib/agents/deps";
 import { getLead } from "@/lib/pipeline";
@@ -34,7 +35,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * prepares this lead with a fresh key (a new brief and a new booked email); reminders already scheduled are not repeated.
  * Fixed sentences only.
  */
-export async function rerunConsultPrepAction(leadId: string): Promise<RerunPrepState> {
+export const rerunConsultPrepAction = previewSafe(async function rerunConsultPrepAction(leadId: string): Promise<RerunPrepState> {
   try {
     if (!canRerunConsultPrep(await currentRole())) return { message: CONSULT_PREP_RERUN_NOT_ALLOWED };
     if (typeof leadId !== "string" || !UUID.test(leadId)) return { message: CONSULT_PREP_RERUN_FAILED };
@@ -49,7 +50,7 @@ export async function rerunConsultPrepAction(leadId: string): Promise<RerunPrepS
   } catch {
     return { message: CONSULT_PREP_RERUN_FAILED };
   }
-}
+}, (message) => ({ ok: false, message }))
 
 /** S2c: at most 5 test briefs an hour per owner. In memory per server instance (like the feedback limit): a courtesy limit, not a hard cap. */
 const TEST_BRIEF_LIMIT = 5;
@@ -62,7 +63,7 @@ const testBriefLimiter = createRateLimiter({ max: TEST_BRIEF_LIMIT, windowMs: 60
  * `test` scope: the engine builds a real full prep and emails it, marked [TEST], to the firm's consult prep recipients only, and writes
  * nothing. Fixed sentences only.
  */
-export async function sendTestBriefAction(leadId: string): Promise<RerunPrepState> {
+export const sendTestBriefAction = previewSafe(async function sendTestBriefAction(leadId: string): Promise<RerunPrepState> {
   try {
     const session = await resolveFirmSession();
     if (session.kind !== "ok" || !canSendTestBrief(session.role, session.actingAsStaff)) return { message: CONSULT_PREP_TEST_OWNER_ONLY };
@@ -88,4 +89,4 @@ export async function sendTestBriefAction(leadId: string): Promise<RerunPrepStat
   } catch {
     return { message: CONSULT_PREP_TEST_FAILED };
   }
-}
+}, (message) => ({ ok: false, message }));

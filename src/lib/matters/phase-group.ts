@@ -15,7 +15,7 @@
  */
 
 import { compareStageOrder } from "@/lib/pipeline/stage-order";
-import { isHiredStage } from "./hired-stage";
+import { hiredStageOf } from "./hired-stage";
 
 export const PHASE_GROUPS = ["intake", "pre", "post", "other"] as const;
 export type PhaseGroup = (typeof PHASE_GROUPS)[number];
@@ -36,11 +36,12 @@ export const INTAKE_PHASE = "pipeline";
  * ("Signed LOE / Deposit Received", `isHiredStage`, the one rule the hired sync files every new TM matter on). That stage
  * is itself in the `pipeline` phase in every firm's data we know of, so it and anything after it stays visible: a matter is
  * drawn from Signed LOE on. A firm with no such stage has nothing to measure from, so every pipeline-phase stage is intake
- * (as before). A stage that carries no phase, or any other phase, is never intake. Never reads any other stage name.
+ * (as before: the stored `phase` decides, and the Matters page says so). A stage that carries no phase, or any other phase, is never intake. Never reads any other stage name.
  */
-export function intakeStageIds<T extends { id: string; label: string; order_index: number | null; phase?: string | null }>(stages: readonly T[]): Set<string> {
+export function intakeStageIds<T extends { id: string; label: string; order_index: number | null; phase?: string | null; role?: string | null; is_open?: boolean | null }>(stages: readonly T[]): Set<string> {
   const pipeline = stages.filter((s) => s.phase === INTAKE_PHASE);
-  const hired = stages.find((s) => isHiredStage(s));
+  // Role first (lectual 0119): the stage holding the matter `signed_loe` role, else the exact label.
+  const hired = hiredStageOf(stages);
   if (!hired) return new Set(pipeline.map((s) => s.id));
   const key = (s: T) => ({ id: s.id, name: s.label, order_index: s.order_index });
   return new Set(pipeline.filter((s) => s.id !== hired.id && compareStageOrder(key(s), key(hired)) < 0).map((s) => s.id));

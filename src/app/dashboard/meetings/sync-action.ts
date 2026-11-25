@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { listMeetingConnections } from "@/lib/meetings/connection";
 import { canSyncMeetings } from "@/lib/meetings/sync-access";
@@ -15,7 +16,7 @@ import { importNowAction } from "@/app/dashboard/settings/integrations/meetings/
 
 export type SyncMeetingsState = { summary?: SyncSummary };
 
-export async function syncNewMeetingsAction(): Promise<SyncMeetingsState> {
+export const syncNewMeetingsAction = previewSafe(async function syncNewMeetingsAction(): Promise<SyncMeetingsState> {
   const session = await resolveFirmSession();
   if (session.kind !== "ok" || !canSyncMeetings(session.role)) return { summary: mergeSyncResults([{ provider: "fathom", outcome: { kind: "refused" } }]) };
 
@@ -41,4 +42,4 @@ export async function syncNewMeetingsAction(): Promise<SyncMeetingsState> {
     }
   }
   return { summary: mergeSyncResults(results) };
-}
+}, (message) => ({ summary: { tone: "error" as const, text: message, reconnect: false, inserted: 0 } }));

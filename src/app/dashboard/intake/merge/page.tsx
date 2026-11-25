@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getScopedClient } from "@/lib/db/scoped-client";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { listStages } from "@/lib/pipeline";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -64,7 +64,7 @@ type Loose = {
  * notFound(), and so does a database without 0107 (Merge is hidden there). The action re-checks the role.
  */
 export default async function MergeLeadsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   if (session.kind !== "ok" || !canMergeLeads(session.role)) notFound();
   const db = await getScopedClient();
   if (!(await mergeAvailable(db))) notFound();

@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { completePublicRequest, readPublicRequest } from "@/lib/intake-forms/public";
 import { validateAnswers } from "@/lib/intake-forms/public-submit";
 
@@ -11,7 +12,7 @@ import { validateAnswers } from "@/lib/intake-forms/public-submit";
  */
 export type SubmitRequestResult = { ok: true } | { ok: false; error: string; fields?: string[] };
 
-export async function submitIntakeRequestAction(token: string, answers: unknown): Promise<SubmitRequestResult> {
+export const submitIntakeRequestAction = previewSafe(async function submitIntakeRequestAction(token: string, answers: unknown): Promise<SubmitRequestResult> {
   if (typeof token !== "string") return { ok: false, error: "This link isn't available." };
   const read = await readPublicRequest(token);
   if (read.status === "not_found") return { ok: false, error: "This link is no longer taking answers. Ask the firm for a new one." };
@@ -25,4 +26,4 @@ export async function submitIntakeRequestAction(token: string, answers: unknown)
   if (result === "gone") return { ok: false, error: "These answers were already sent, or the firm withdrew this link." };
   if (result === "failed") return { ok: false, error: "We couldn't send your answers just now. Please try again in a minute." };
   return { ok: true };
-}
+}, "state");

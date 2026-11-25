@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { currentRole } from "@/lib/auth/current-role";
+import { viewerRole } from "@/lib/views/view-as";
 import { AUTOMATION_ADMIN_ROLES, listEnrollments, listSequences, type DripSequence } from "@/lib/automation";
 import { loadActiveQueue } from "@/lib/queue/load";
 import { sequenceStatusLabel, sequenceStatusTone } from "@/lib/campaigns/steps";
@@ -39,7 +39,7 @@ export const dynamic = "force-dynamic";
  * the gate (AGENTS.md).
  */
 export default async function CampaignsPage() {
-  const role = await currentRole();
+  const role = await viewerRole();
   const canManage = role !== null && AUTOMATION_ADMIN_ROLES.includes(role);
 
   let sequences: DripSequence[] = [];

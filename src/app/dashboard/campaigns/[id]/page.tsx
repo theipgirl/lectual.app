@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Notice } from "@/components/ui/Notice";
 import { notFound } from "next/navigation";
-import { currentRole } from "@/lib/auth/current-role";
+import { viewerRole } from "@/lib/views/view-as";
 import {
   AUTOMATION_ADMIN_ROLES,
   AUTOMATION_STAFF_ROLES,
@@ -78,7 +78,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  */
 export default async function CampaignPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const role = await currentRole();
+  const role = await viewerRole();
   const canManage = role !== null && AUTOMATION_ADMIN_ROLES.includes(role);
   const canOperate = role !== null && AUTOMATION_STAFF_ROLES.includes(role);
 

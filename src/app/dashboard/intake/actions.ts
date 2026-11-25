@@ -1,5 +1,6 @@
 "use server";
 
+import { previewReadOnly, previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { assignLead, moveLeadStage } from "@/lib/pipeline";
@@ -59,7 +60,7 @@ async function requireIntakeWriteRole(): Promise<void> {
  * the top bar's copy says "Drag a card to reassign" rather than claiming the
  * person is told. (A notification centre is §13.3, unbuilt.)
  */
-export async function assignLeadAction(
+export const assignLeadAction = previewSafe(async function assignLeadAction(
   leadId: string,
   userId: string | null,
 ): Promise<IntakeActionResult> {
@@ -88,7 +89,7 @@ export async function assignLeadAction(
   revalidatePath("/dashboard/intake/");
   revalidatePath(`/dashboard/leads/${leadId}`);
   return { ok: true };
-}
+}, "state");
 
 /**
  * Moves a lead to another stage — the board-by-stage drop, and the stage menu
@@ -96,7 +97,7 @@ export async function assignLeadAction(
  * moveLeadStage the pipeline board uses (CAN_MOVE_STAGE is narrower than
  * CAN_WRITE_LEAD — a paralegal is refused here and that is intended).
  */
-export async function moveStageAction(
+export const moveStageAction = previewSafe(async function moveStageAction(
   leadId: string,
   stageId: string,
 ): Promise<IntakeActionResult> {
@@ -125,7 +126,7 @@ export async function moveStageAction(
   revalidatePath("/dashboard/intake/");
   revalidatePath(`/dashboard/leads/${leadId}`);
   return { ok: true };
-}
+}, "state");
 
 /**
  * "Move to..." for the cards selected on the board: up to 200 leads to one non-`won` stage, each through the same
@@ -133,7 +134,7 @@ export async function moveStageAction(
  * `runBulkMove`; this only wires the real reads. Everything is through the caller's scoped client (RLS is the tenant
  * boundary) and the role is re-resolved on this call.
  */
-export async function bulkMoveStageAction(leadIds: string[], stageId: string): Promise<BulkMoveResult> {
+export const bulkMoveStageAction = previewSafe(async function bulkMoveStageAction(leadIds: string[], stageId: string): Promise<BulkMoveResult> {
   const result = await runBulkMove(
     { leadIds, stageId },
     {
@@ -165,7 +166,7 @@ export async function bulkMoveStageAction(leadIds: string[], stageId: string): P
     for (const leadId of result.moved) revalidatePath(`/dashboard/leads/${leadId}`);
   }
   return result;
-}
+}, "state");
 
 /**
  * Sets or clears a lead's temperature, which is the routing lane — the
@@ -173,7 +174,7 @@ export async function bulkMoveStageAction(leadIds: string[], stageId: string): P
  * Stage 2). It is the only temperature write on this surface. The data layer
  * re-checks the role, and the database stamps who and when from the session.
  */
-export async function setLaneAction(leadId: string, lane: Lane | null): Promise<IntakeActionResult> {
+export const setLaneAction = previewSafe(async function setLaneAction(leadId: string, lane: Lane | null): Promise<IntakeActionResult> {
   if (!leadId) return { ok: false, error: "Missing lead." };
   if (lane !== null && !isLane(lane)) return { ok: false, error: "That isn't a temperature." };
 
@@ -188,7 +189,7 @@ export async function setLaneAction(leadId: string, lane: Lane | null): Promise<
   // The Weekly review opens the same card; its rows read these fields too.
   revalidatePath("/dashboard/review/");
   return { ok: true };
-}
+}, "state");
 
 /**
  * Sets or clears a lead's referral source from the card or the table row. The
@@ -196,7 +197,7 @@ export async function setLaneAction(leadId: string, lane: Lane | null): Promise<
  * string over the action boundary) and again in the data layer, which also
  * re-checks the caller's role and writes the timeline row.
  */
-export async function setSourceAction(
+export const setSourceAction = previewSafe(async function setSourceAction(
   leadId: string,
   source: ReferralSource | null,
 ): Promise<IntakeActionResult> {
@@ -216,7 +217,7 @@ export async function setSourceAction(
   // The Weekly review opens the same card; its rows read these fields too.
   revalidatePath("/dashboard/review/");
   return { ok: true };
-}
+}, "state");
 
 /**
  * The "Possible duplicate" compare panel: two leads side by side, with what is on file for each. READ ONLY: nothing is
@@ -224,7 +225,7 @@ export async function setSourceAction(
  * firm's id reads as "gone"); each count is its own read and a failed one says so. Proposals are counted only for a firm that
  * has the Proposals feature (the module list that can't be read counts as off).
  */
-export async function loadCompareAction(leadId: string, otherId: string): Promise<CompareResult> {
+export const loadCompareAction = previewReadOnly(async function loadCompareAction(leadId: string, otherId: string): Promise<CompareResult> {
   try {
     const db = await getScopedClient();
     // The role is resolved first: a caller with no resolvable role reads nothing and gets the one fixed sentence.
@@ -268,4 +269,4 @@ export async function loadCompareAction(leadId: string, otherId: string): Promis
   } catch {
     return { ok: false, error: LEADS_COMPARE_FAILED };
   }
-}
+}, "The leads compare panel: reads two leads and their counts, writes nothing");

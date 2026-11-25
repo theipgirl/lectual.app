@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { callerHasRole } from "@/lib/auth/current-role";
@@ -23,7 +24,7 @@ import { friendlyQuoteError, NOT_ENTITLED, type ActionState } from "./errors";
  * mirrors 0068's RLS (it still admits intake, paralegals, clerks). It is not
  * this gate and does not stand in for it.
  */
-export async function createQuoteAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const createQuoteAction = previewSafe(async function createQuoteAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   if (!(await callerHasRole("attorney"))) return NOT_ENTITLED;
 
   const title = String(formData.get("title") ?? "").trim();
@@ -55,4 +56,4 @@ export async function createQuoteAction(_prev: ActionState, formData: FormData):
 
   revalidatePath("/dashboard/quotes/");
   redirect(`/dashboard/quotes/${quote.id}/`);
-}
+}, "state");

@@ -60,7 +60,7 @@ describe("notification actions (F5)", () => {
     const src = readFileSync("src/app/dashboard/notifications/actions.ts", "utf8");
     expect(src).not.toMatch(/db\/admin|getAdminClient/);
     expect(src).not.toMatch(/user_?id|org_?id|orgId|userId/i);
-    expect(src).toMatch(/export async function markNotificationRead\(id: string\)/);
-    expect(src).toMatch(/export async function markAllNotificationsRead\(\)/);
+    expect(src).toMatch(/async function markNotificationRead\(id: string\)/);
+    expect(src).toMatch(/async function markAllNotificationsRead\(\)/);
   });
 });

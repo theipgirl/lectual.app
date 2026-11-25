@@ -37,6 +37,7 @@ import {
   type ProspectPlan,
   type SyncLead,
 } from "./prospect-sync-plan";
+import { withRoleFallback } from "@/lib/stages/roles";
 
 /**
  * The Lawmatics daily sync (contract docs/pge/2026-11-17-agentic-ip-os/spec-lawmatics-daily-sync.md). Three steps per
@@ -301,9 +302,17 @@ async function readLeads(admin: Admin, orgId: string): Promise<SyncLead[]> {
 }
 
 async function readStages(admin: Admin, orgId: string): Promise<PlanStage[]> {
-  const { data, error } = await admin.from("crm_stage").select("id,name,category,order_index").eq("org_id", orgId).order("order_index", { ascending: true });
+  const { data, error } = await withRoleFallback((r) =>
+    admin.from("crm_stage").select(r ? "id,name,category,order_index,role" : "id,name,category,order_index").eq("org_id", orgId).order("order_index", { ascending: true }),
+  );
   if (error || !data) throw new StepFailure(null);
-  return data.map((s) => ({ id: s.id, name: s.name, category: s.category === null || s.category === undefined ? undefined : String(s.category), orderIndex: s.order_index ?? undefined }));
+  return (data as unknown as Array<{ id: string; name: string; category?: string | null; order_index?: number | null; role?: string | null }>).map((s) => ({
+    id: s.id,
+    name: s.name,
+    category: s.category === null || s.category === undefined ? undefined : String(s.category),
+    orderIndex: s.order_index ?? undefined,
+    ...(s.role !== undefined ? { role: s.role } : {}),
+  }));
 }
 
 /** "Last complete run" for this connection: ok, not set up (before lectual 0118), or couldn't be read. */

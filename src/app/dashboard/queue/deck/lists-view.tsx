@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { loadActiveQueue } from "@/lib/queue/load";
 import { loadApprovalRouting } from "@/lib/queue/routing-load";
 import { loadCardState } from "@/lib/queue/card-state";
@@ -20,7 +20,7 @@ import { decidableIds, decidedSource, eventSources, handedRows, laterBackPill, l
  */
 export async function DeckListsView({ list }: { list: ListParam }) {
   if (list === "need") redirect(DECK_BASE);
-  const session = await resolveFirmSession().catch(() => null);
+  const session = await resolveViewSession().catch(() => null);
   if (!session || session.kind !== "ok") return null;
   // The person's own two deal times from their own account (as the deck itself does), so "Needs your yes" counts the same cards.
   const myTimes = parseDealTimes(session.user.user_metadata);

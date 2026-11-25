@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import { notFound } from "next/navigation";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { CAN_WRITE_LEAD, listLeads } from "@/lib/pipeline";
 import { listMatters } from "@/lib/matters";
 import { matterLabel } from "@/lib/matters/docket-summary";
@@ -47,7 +47,7 @@ export default async function MeetingPage({
   const { id } = await params;
   // Only the exact value `proposals` shows the way back; nothing else in the query is ever turned into a link.
   const backToProposals = meetingBackHref((await searchParams)?.from);
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   if (session.kind !== "ok") notFound();
 
   const read = await getMeeting(id);

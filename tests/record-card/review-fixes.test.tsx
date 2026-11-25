@@ -288,11 +288,12 @@ describe("small things", () => {
   it("the 'Open a matter' picker never repeats an email that is already the name", () => {
     expect(src("src/app/dashboard/matters/page.tsx")).toMatch(/l\.email !== leadLabel\(l\)\.name \? l\.email : null/);
   });
-  it("the Matters list needs no more width than before (800, narrower columns, owner as an avatar)", () => {
-    const m = src("src/app/dashboard/matters/page.tsx");
-    expect(m).toMatch(/<SheetTable fixed minWidth=\{800\}>/);
-    const widths = [...m.slice(m.indexOf("<colgroup>"), m.indexOf("</colgroup>")).matchAll(/width: "(\d+)%"/g)].map((x) => Number(x[1]));
-    expect(widths.reduce((a, b) => a + b, 0)).toBe(100);
+  it("the Matters list needs no more width than before (800); column widths are the firm's layout now, not fixed percentages", () => {
+    const t = src("src/components/matters/MatterListTable.tsx");
+    expect(t).toMatch(/minWidth=\{800\}/);
+    // no hand-set colgroup any more: the shared ViewTable draws one only for widths a layout carries
+    expect(t).not.toMatch(/<colgroup>/);
+    expect(src("src/app/dashboard/matters/page.tsx")).not.toMatch(/<colgroup>/);
   });
   it("Intake and Matters fall back to the same shared time zone, and next steps are read in parallel", () => {
     expect(src("src/app/dashboard/intake/page.tsx")).toMatch(/catch\(\(\) => DEFAULT_TIME_ZONE\)/);

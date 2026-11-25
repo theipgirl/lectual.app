@@ -150,7 +150,7 @@ function isRole(value: unknown): value is Role {
  * Mirrors `requireMatterWriteRole` exactly. Re-checked on every call.
  */
 export async function requireQuoteWriteRole(supabase: ScopedClient): Promise<Role> {
-  const { data, error } = await supabase.rpc("current_org_role");
+  const { data, error } = await supabase.rpc("current_org_role", undefined, { get: true });
   if (error) throw error;
   if (!isRole(data) || !QUOTE_STAFF_WRITE_ROLES.includes(data)) {
     throw new ReadableError("You don't have permission to write quotes.");
@@ -395,7 +395,7 @@ export async function createQuote(input: CreateQuoteInput): Promise<QuoteRow> {
   await requireQuoteWriteRole(supabase);
   const db = quotesDb(supabase);
 
-  const { data: orgId, error: orgError } = await supabase.rpc("current_org_id");
+  const { data: orgId, error: orgError } = await supabase.rpc("current_org_id", undefined, { get: true });
   if (orgError) throw orgError;
   if (!orgId) throw new ReadableError("No active organization for the current session.");
 

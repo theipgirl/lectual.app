@@ -38,7 +38,7 @@ function isRole(value: unknown): value is Role {
  * Re-checked on every call — never cache a prior result across actions.
  */
 export async function requireSettingsAdminRole(supabase: ScopedClient): Promise<Role> {
-  const { data, error } = await supabase.rpc("current_org_role");
+  const { data, error } = await supabase.rpc("current_org_role", undefined, { get: true });
   if (error) throw error;
   if (!isRole(data) || !SETTINGS_ADMIN_ROLES.includes(data)) {
     throw new ReadableError("You don't have permission to change firm settings.");
@@ -68,7 +68,7 @@ export async function assertCallerIsOwnerMember(supabase: ScopedClient, callerUs
 
 /** Resolves the caller's active org id via the `current_org_id()` RPC. */
 export async function currentOrgId(supabase: ScopedClient): Promise<string> {
-  const { data, error } = await supabase.rpc("current_org_id");
+  const { data, error } = await supabase.rpc("current_org_id", undefined, { get: true });
   if (error) throw error;
   if (!data) throw new ReadableError("No active organization for the current session.");
   return data;

@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 // Ported from lectual src/app/(firm)/dashboard/import/actions.ts. The preview →
 // confirm flow, the fingerprint check and the view models are unchanged.
 // Changed: the gate. lectual needs the `lawmatics-import` module because its
@@ -75,7 +76,7 @@ const REQUIRED_ROLE: Role = "senior_admin";
 
 async function requireImportAdmin(): Promise<void> {
   const supabase = await getScopedClient();
-  const { data, error } = await supabase.rpc("current_org_role");
+  const { data, error } = await supabase.rpc("current_org_role", undefined, { get: true });
   if (error) throw new Error("Forbidden: could not resolve your role for this firm.");
   const role: Role | null =
     typeof data === "string" && (ROLES as readonly string[]).includes(data) ? (data as Role) : null;
@@ -102,7 +103,7 @@ async function failure(err: unknown): Promise<string> {
 
 export type ConnectState = { ok?: boolean; error?: string };
 
-export async function connectLawmaticsAction(_prev: ConnectState, formData: FormData): Promise<ConnectState> {
+export const connectLawmaticsAction = previewSafe(async function connectLawmaticsAction(_prev: ConnectState, formData: FormData): Promise<ConnectState> {
   try {
     await requireImportAdmin();
   } catch {
@@ -124,10 +125,10 @@ export async function connectLawmaticsAction(_prev: ConnectState, formData: Form
   revalidatePath(PAGE);
   revalidatePath("/dashboard/settings/integrations/");
   return { ok: true };
-}
+}, "state");
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function disconnectLawmaticsAction(_prev: ConnectState, _formData: FormData): Promise<ConnectState> {
+export const disconnectLawmaticsAction = previewSafe(async function disconnectLawmaticsAction(_prev: ConnectState, _formData: FormData): Promise<ConnectState> {
   try {
     await requireImportAdmin();
   } catch {
@@ -138,7 +139,7 @@ export async function disconnectLawmaticsAction(_prev: ConnectState, _formData: 
   revalidatePath(PAGE);
   revalidatePath("/dashboard/settings/integrations/");
   return { ok: true };
-}
+}, "state");
 
 // ── View models ──────────────────────────────────────────────────────────────
 // The full plan can run to thousands of rows. The browser gets a capped copy
@@ -274,7 +275,7 @@ function readOptions(formData: FormData): PlanOptions {
  * than an explicit `confirm` with a matching fingerprint and a ticked
  * acknowledgement is a dry run.
  */
-export async function importAction(
+export const importAction = previewSafe(async function importAction(
   _prev: ImportState,
   formData: FormData,
 ): Promise<ImportState> {
@@ -339,7 +340,7 @@ export async function importAction(
   } catch (err) {
     return { phase: "error", error: await failure(err) };
   }
-}
+}, (message) => ({ phase: "error" as const, error: message }));
 
 // ── Matters (update-existing-only) importer ─────────────────────────────────
 // Same two-step preview/confirm shape as the lead importer above, but as two
@@ -408,7 +409,7 @@ function toMattersReportView(report: MattersImportReport): MattersReportView {
 }
 
 /* eslint-disable @typescript-eslint/no-unused-vars */
-export async function previewMattersImportAction(
+export const previewMattersImportAction = previewSafe(async function previewMattersImportAction(
   _prev: MattersImportState,
   _formData: FormData,
 )
@@ -424,9 +425,9 @@ export async function previewMattersImportAction(
   } catch (err) {
     return { phase: "error", error: await failure(err) };
   }
-}
+}, (message) => ({ phase: "error" as const, error: message }));
 
-export async function applyMattersImportAction(
+export const applyMattersImportAction = previewSafe(async function applyMattersImportAction(
   _prev: MattersImportState,
   formData: FormData,
 ): Promise<MattersImportState> {
@@ -478,7 +479,7 @@ export async function applyMattersImportAction(
     }
     return { phase: "error", error: await failure(err) };
   }
-}
+}, (message) => ({ phase: "error" as const, error: message }));
 
 // ── Sync from Lawmatics now ──────────────────────────────────────────────────
 // Every step a 4 AM run does (hired matters, new leads, consults), for the CALLER'S org only: the org comes from
@@ -487,7 +488,7 @@ export async function applyMattersImportAction(
 export type LawmaticsSyncState = { ok?: boolean; notice?: string; error?: string };
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function syncLawmaticsAction(_prev: LawmaticsSyncState, _formData: FormData): Promise<LawmaticsSyncState> {
+export const syncLawmaticsAction = previewSafe(async function syncLawmaticsAction(_prev: LawmaticsSyncState, _formData: FormData): Promise<LawmaticsSyncState> {
   try {
     await requireImportAdmin();
   } catch {
@@ -529,4 +530,4 @@ export async function syncLawmaticsAction(_prev: LawmaticsSyncState, _formData: 
   } catch {
     return { error: LAWMATICS_SYNC_FAILED };
   }
-}
+}, "state");

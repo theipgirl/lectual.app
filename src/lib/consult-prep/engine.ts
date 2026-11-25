@@ -66,6 +66,7 @@ import { consultScheduledStage } from "./stage";
 import { recipientsSha256 } from "./recipient-hash";
 import { collapseTwins, hasTwinMarker } from "./twins";
 import { sameLeadSameTime } from "@/lib/calendar/booked-merge";
+import { withRoleFallback } from "@/lib/stages/roles";
 
 /**
  * Automatic consult prep (S1): the run behind the `consult-prep` assistant.
@@ -287,9 +288,15 @@ async function readCalendar(admin: SupabaseClient, orgId: string, nowMs: number,
 class DatabaseNotReady extends Error {}
 
 async function readStages(admin: SupabaseClient, orgId: string): Promise<StageOpt[]> {
-  const { data, error } = await admin.from("crm_stage").select("id, name, category, order_index").eq("org_id", orgId);
+  const { data, error } = await withRoleFallback((r) => admin.from("crm_stage").select(r ? "id, name, category, order_index, role" : "id, name, category, order_index").eq("org_id", orgId));
   if (error) throw new Error("stage read failed");
-  return ((data ?? []) as Array<{ id: string; name: string; category: string; order_index: number }>).map((s) => ({ id: s.id, name: s.name, category: String(s.category), orderIndex: s.order_index }));
+  return ((data ?? []) as unknown as Array<{ id: string; name: string; category: string; order_index: number; role?: string | null }>).map((s) => ({
+    id: s.id,
+    name: s.name,
+    category: String(s.category),
+    orderIndex: s.order_index,
+    ...(s.role !== undefined ? { role: s.role } : {}),
+  }));
 }
 
 async function readMapping(admin: SupabaseClient, orgId: string): Promise<StageMapping> {

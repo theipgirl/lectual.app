@@ -1,10 +1,10 @@
 import { activeOrgModules } from "@/lib/org/modules";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { loadSetupState } from "@/lib/setup/load";
 import { setupChecklist } from "@/lib/setup/checklist";
 import { ADMIN_TIER_PHRASE, canSeeSetup } from "@/lib/setup/roles";
 import { SETUP_PATH } from "@/lib/setup/routes";
-import { APPROVAL_SETTINGS_NAME, ASSISTANTS_NAME, COLUMNS_SETTINGS_NAME, FEATURES_NAME, PROPOSAL_SETTINGS_NAME, SETUP_NAME, TEAM_NAME } from "@/lib/ui/words";
+import { APPROVAL_SETTINGS_NAME, ASSISTANTS_NAME, FEATURES_NAME, PROPOSAL_SETTINGS_NAME, SETUP_NAME, TEAM_NAME } from "@/lib/ui/words";
 import { SettingsNav, type SettingsTab } from "@/components/settings/SettingsNav";
 
 type Tab = SettingsTab & { module?: string; adminOnly?: boolean };
@@ -17,7 +17,6 @@ const TABS: Tab[] = [
   { label: "Firm profile", href: "/dashboard/settings/firm/" },
   { label: "Service library", href: "/dashboard/settings/services/" },
   { label: APPROVAL_SETTINGS_NAME, href: "/dashboard/settings/approvals/", adminOnly: true },
-  { label: COLUMNS_SETTINGS_NAME, href: "/dashboard/settings/columns/", adminOnly: true },
   { label: PROPOSAL_SETTINGS_NAME, href: "/dashboard/settings/proposals/", module: "proposals" },
   { label: FEATURES_NAME, href: "/dashboard/settings/modules/" },
 ];
@@ -28,7 +27,7 @@ const TABS: Tab[] = [
  * be read leaves the tab without a number rather than inventing one.
  */
 async function setupTab(): Promise<Tab[]> {
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   if (session.kind !== "ok" || !canSeeSetup(session.role)) return [];
   try {
     const checklist = setupChecklist(await loadSetupState());

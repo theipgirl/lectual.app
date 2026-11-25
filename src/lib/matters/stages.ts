@@ -52,6 +52,8 @@ export type MatterStage = {
    * `phase` column yet: every read falls back to the old columns. Read only by phase-group.ts.
    */
   phase?: string | null;
+  /** The stage's role (lectual 0119): ABSENT when the database has no `role` column. Read before the label by the rules. */
+  role?: string | null;
 };
 
 /** The columns selected wherever a MatterStage is built, embed included. */
@@ -85,24 +87,42 @@ export type MatterStageRead =
   | { status: "not-set-up"; stages: MatterStage[] }
   | { status: "unavailable"; error: unknown };
 
-export async function loadMatterStages(): Promise<MatterStageRead> {
-  const supabase = await getScopedClient();
-  const withPhase = await supabase.from("crm_matter_stage").select(MATTER_STAGE_COLUMNS).order("order_index", { ascending: true });
-  if (!withPhase.error) return { status: "ok", stages: (withPhase.data ?? []) as MatterStage[] };
-  if (!isMissingColumnError(withPhase.error)) return { status: "unavailable", error: withPhase.error };
-  const plain = await supabase.from("crm_matter_stage").select(MATTER_STAGE_COLUMNS_NO_PHASE).order("order_index", { ascending: true });
-  if (plain.error) return { status: "unavailable", error: plain.error };
-  return { status: "not-set-up", stages: (plain.data ?? []) as MatterStage[] };
+/** The four selects a stage read tries, newest database first: `role` (lectual 0119) and `phase` each fall away on their own. */
+const READ_ATTEMPTS: ReadonlyArray<{ cols: string; phase: boolean }> = [
+  { cols: `${MATTER_STAGE_COLUMNS}, role`, phase: true },
+  { cols: `${MATTER_STAGE_COLUMNS_NO_PHASE}, role`, phase: false },
+  { cols: MATTER_STAGE_COLUMNS, phase: true },
+  { cols: MATTER_STAGE_COLUMNS_NO_PHASE, phase: false },
+];
+
+/**
+ * Runs `read` over the attempts in order, moving on ONLY when the database says a column is missing (by CODE). Any other error
+ * stops at once. A read with `role` that fails for a missing column is followed by one without it, so a database without 0119
+ * reads exactly as before.
+ */
+async function readWithFallback<R extends { error: unknown }>(read: (cols: string) => PromiseLike<R>): Promise<{ result: R; phase: boolean }> {
+  let last: { result: R; phase: boolean } | null = null;
+  for (const attempt of READ_ATTEMPTS) {
+    const result = await read(attempt.cols);
+    last = { result, phase: attempt.phase };
+    if (!result.error || !isMissingColumnError(result.error as { code?: string | null })) return last;
+  }
+  return last as { result: R; phase: boolean };
 }
 
-/** One stage by id, with the same fall-back to the old columns when `phase` isn't there. */
+export async function loadMatterStages(): Promise<MatterStageRead> {
+  const supabase = await getScopedClient();
+  const { result, phase } = await readWithFallback((cols) => supabase.from("crm_matter_stage").select(cols).order("order_index", { ascending: true }));
+  if (result.error) return { status: "unavailable", error: result.error };
+  const stages = (result.data ?? []) as unknown as MatterStage[];
+  return phase ? { status: "ok", stages } : { status: "not-set-up", stages };
+}
+
+/** One stage by id, with the same fall-back to the old columns when `phase` or `role` isn't there. */
 async function readStageById(supabase: Awaited<ReturnType<typeof getScopedClient>>, id: string): Promise<MatterStage | null> {
-  const withPhase = await supabase.from("crm_matter_stage").select(MATTER_STAGE_COLUMNS).eq("id", id).maybeSingle();
-  if (!withPhase.error) return (withPhase.data as MatterStage | null) ?? null;
-  if (!isMissingColumnError(withPhase.error)) throw withPhase.error;
-  const plain = await supabase.from("crm_matter_stage").select(MATTER_STAGE_COLUMNS_NO_PHASE).eq("id", id).maybeSingle();
-  if (plain.error) throw plain.error;
-  return (plain.data as MatterStage | null) ?? null;
+  const { result } = await readWithFallback((cols) => supabase.from("crm_matter_stage").select(cols).eq("id", id).maybeSingle());
+  if (result.error) throw result.error;
+  return (result.data as unknown as MatterStage | null) ?? null;
 }
 
 // The pure rules live in ./stage-rules so the board can import them from a

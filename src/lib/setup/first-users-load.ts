@@ -1,6 +1,7 @@
 import "server-only";
 import { listMemberDirectory } from "@/lib/members/directory";
-import { listConnections } from "@/lib/mailbox/connections";
+// View as: the shared mailboxes only while previewing (the owner's personal ones never reach a teammate's view).
+import { listConnectionsForViewer } from "@/lib/views/view-as";
 import { loadColleagueMailboxes } from "@/lib/mailbox/colleague-connections";
 import { hasDraftScope } from "@/lib/mailbox/providers";
 import type { ColleagueMailboxes } from "@/lib/mailbox/colleague-rows";
@@ -32,7 +33,7 @@ export const liveFirstUsersReaders: FirstUsersReaders = {
     return rows.map((m) => ({ userId: m.userId, name: m.displayName || null, role: m.role }));
   },
   async listOwn() {
-    const r = await listConnections();
+    const r = await listConnectionsForViewer();
     if (!r.ok) return null;
     return r.connections.map((c) => ({
       id: c.id,

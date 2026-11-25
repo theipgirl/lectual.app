@@ -1,3 +1,4 @@
+import { previewSafeRoute } from "@/lib/views/preview-safe";
 import { NextResponse, type NextRequest } from "next/server";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { orgHasModule } from "@/lib/org/modules";
@@ -13,7 +14,7 @@ import { MAILBOXES_PATH } from "@/lib/mailbox/outcome";
  * kind of mailbox, remember who they are in a signed cookie, and send them to
  * the provider's consent screen.
  */
-export async function GET(req: NextRequest, { params }: { params: Promise<{ provider: string }> }) {
+export const GET = previewSafeRoute(async function GET(req: NextRequest, { params }: { params: Promise<{ provider: string }> }) {
   const { provider } = await params;
   if (!isProvider(provider)) return new NextResponse(null, { status: 404 });
 
@@ -59,4 +60,4 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
     maxAge: Math.floor(STATE_TTL_MS / 1000),
   });
   return res;
-}
+});

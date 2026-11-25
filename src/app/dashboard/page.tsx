@@ -1,6 +1,6 @@
 import { canSeeFormsAndProposals } from "@/lib/auth/forms-proposals";
 import Link from "next/link";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { previewingAs, resolveViewSession } from "@/lib/views/view-as";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { loadActiveQueue, type QueueLoad } from "@/lib/queue/load";
 import { mineQueue } from "@/lib/queue/mine-load";
@@ -79,7 +79,7 @@ function Kpi({ label, value, sub, href, failed }: { label: string; value: number
  * unreachable queue rendering "all caught up".
  */
 export default async function TodayPage() {
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   if (session.kind !== "ok") return null; // the layout already handled this
   // The owner's Today is its own page. It is chosen BEFORE any technician read runs, so with the switch off nothing below changes.
   const view = viewFor({
@@ -230,7 +230,7 @@ export default async function TodayPage() {
             {greetingSuffix(firstName)}.
           </>
         }
-        sub={!firstName ? <AddNameLink /> : undefined}
+        sub={!firstName && !(await previewingAs()) ? <AddNameLink /> : undefined}
       />
 
       <div className="lx-kpis">

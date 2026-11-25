@@ -4,13 +4,8 @@ import {
   MONEY_COLUMNS,
   NOT_TRACKED,
   SHEET_SECTION_COLUMNS,
-  applyColumnPrefs,
   columnsFor,
-  parseColumnPrefs,
-  parseStoredDocument,
-  prefsReducer,
   sheetColumn,
-  type ColumnId,
 } from "@/lib/review/sheet-columns";
 import * as W from "@/lib/ui/words";
 
@@ -96,99 +91,10 @@ describe("NOT_TRACKED equals words.ts", () => {
 });
 
 describe("client pinned", () => {
-  it("is first in every default order and has no way to be hidden or moved", () => {
-    const allowed = ids("trademarks", { canSeeMoney: true, hasNotes: false });
-    expect(allowed[0]).toBe("client");
-    const base = { order: allowed, hidden: [] as ColumnId[] };
-    expect(prefsReducer(base, { type: "toggle", id: "client" }, allowed).hidden).toEqual([]);
-    expect(prefsReducer(base, { type: "move", id: "client", dir: 1 }, allowed).order).toEqual(allowed);
-    expect(prefsReducer(base, { type: "move", id: "mark", dir: -1 }, allowed).order).toEqual(allowed);
-  });
-});
-
-describe("parseColumnPrefs", () => {
-  const allowed = ids("trademarks", { canSeeMoney: false, hasNotes: false });
-  it("a stored money id never shows for a non-owner", () => {
-    const p = parseColumnPrefs({ order: ["client", "legalFee", "mark", "govFeeDue"], hidden: ["legalFee"] }, allowed);
-    expect(p.order).not.toContain("legalFee");
-    expect(p.order).not.toContain("govFeeDue");
-    expect(p.hidden).toEqual([]);
-  });
-  it("drops unknown ids and duplicates, and never hides client", () => {
-    const p = parseColumnPrefs({ order: ["mark", "nope", "mark", 7, "client"], hidden: ["client", "mark", "mark", "zzz"] }, allowed);
-    expect(p.order.filter((x) => x === "mark")).toHaveLength(1);
-    expect(p.order[0]).toBe("client");
-    expect(p.hidden).toEqual(["mark"]);
-    expect(new Set(p.order).size).toBe(p.order.length);
-    expect(p.order.sort()).toEqual([...allowed].sort());
-  });
-  it("cuts an over-long list instead of trusting it", () => {
-    const huge = Array.from({ length: 5000 }, () => "mark");
-    const p = parseColumnPrefs({ order: huge, hidden: huge }, allowed);
-    expect(p.order).toHaveLength(allowed.length);
-    expect(p.hidden).toEqual(["mark"]);
-  });
-  it("appends allowed ids missing from the stored order at their default position", () => {
-    const p = parseColumnPrefs({ order: ["client", "status", "next"], hidden: [] }, allowed);
-    // serial follows mark's default place: after client (its default predecessor `mark` is missing too, so after `client`).
-    expect(p.order.indexOf("mark")).toBe(1);
-    expect(p.order.indexOf("serial")).toBe(2);
-    expect(p.order.indexOf("status")).toBeGreaterThan(p.order.indexOf("serial"));
-    expect(p.order.indexOf("source")).toBe(p.order.indexOf("status") + 1);
-    expect(p.order).toHaveLength(allowed.length);
-  });
-  it("malformed values give the default order", () => {
-    for (const bad of [null, undefined, 5, "x", [], { order: "x", hidden: 3 }]) {
-      expect(parseColumnPrefs(bad, allowed)).toEqual({ order: [...allowed], hidden: [] });
-    }
-  });
-  it("parseStoredDocument: malformed JSON, a non-object and another version read as nothing stored", () => {
-    expect(parseStoredDocument("{not json")).toBeNull();
-    expect(parseStoredDocument("[]")).toBeNull();
-    expect(parseStoredDocument("null")).toBeNull();
-    expect(parseStoredDocument(JSON.stringify({ v: 2, trademarks: {} }))).toBeNull();
-    expect(parseStoredDocument(null)).toBeNull();
-    expect(parseStoredDocument(JSON.stringify({ v: 1, trademarks: { order: ["client"] } }))).toEqual({ trademarks: { order: ["client"] }, contracts: undefined });
-  });
-});
-
-describe("applyColumnPrefs", () => {
-  const allowed = columnsFor("trademarks", { canSeeMoney: false, hasNotes: false });
-  it("no prefs = the server's list, untouched", () => {
-    expect(applyColumnPrefs(allowed, null).map((c) => c.id)).toEqual(allowed.map((c) => c.id));
-  });
-  it("hides and reorders, and can only ever draw allowed columns", () => {
-    const rest = allowed.map((c) => c.id).filter((id) => !["client", "status", "mark"].includes(id));
-    const drawn = applyColumnPrefs(allowed, { order: ["client", "status", "mark", "legalFee", ...rest], hidden: ["serial", "legalFee"] }).map((c) => c.id);
-    expect(drawn.slice(0, 3)).toEqual(["client", "status", "mark"]);
-    expect(drawn).not.toContain("serial");
-    expect(drawn).not.toContain("legalFee");
-  });
-  it("a hidden client is ignored", () => {
-    expect(applyColumnPrefs(allowed, { order: [], hidden: ["client"] })[0].id).toBe("client");
-  });
-});
-
-describe("prefsReducer", () => {
-  const allowed = ids("contracts", { canSeeMoney: false, hasNotes: false });
-  it("hides, shows, moves and resets", () => {
-    let p = parseColumnPrefs(null, allowed);
-    p = prefsReducer(p, { type: "toggle", id: "owner" }, allowed);
-    expect(p.hidden).toEqual(["owner"]);
-    p = prefsReducer(p, { type: "toggle", id: "owner" }, allowed);
-    expect(p.hidden).toEqual([]);
-    p = prefsReducer(p, { type: "move", id: "status", dir: -1 }, allowed);
-    expect(p.order.slice(0, 4)).toEqual(["client", "practiceArea", "status", "mark"]);
-    p = prefsReducer(p, { type: "move", id: "status", dir: 1 }, allowed);
-    expect(p.order.slice(0, 4)).toEqual(["client", "practiceArea", "mark", "status"]);
-    p = prefsReducer(p, { type: "toggle", id: "mark" }, allowed);
-    p = prefsReducer(p, { type: "reset" }, allowed);
-    expect(p).toEqual({ order: allowed, hidden: [] });
-  });
-  it("cannot move past either end, or touch an id that is not allowed", () => {
-    const base = parseColumnPrefs(null, allowed);
-    expect(prefsReducer(base, { type: "move", id: "contact", dir: 1 }, allowed).order).toEqual(allowed);
-    expect(prefsReducer(base, { type: "toggle", id: "legalFee" }, allowed)).toEqual(base);
+  it("is first in every default order and is the only pinned column", () => {
+    const cols = columnsFor("trademarks", { canSeeMoney: true, hasNotes: false });
+    expect(cols[0].id).toBe("client");
+    expect(cols.filter((c) => c.pinned).map((c) => c.id)).toEqual(["client"]);
   });
 });
 

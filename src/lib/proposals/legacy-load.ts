@@ -6,7 +6,7 @@ import { legacyProposalsFor, type LegacyProposal } from "./legacy";
 export async function loadLegacyProposals(): Promise<LegacyProposal[]> {
   try {
     const supabase = await getScopedClient();
-    const { data, error } = await supabase.rpc("current_org_id");
+    const { data, error } = await supabase.rpc("current_org_id", undefined, { get: true });
     if (error || typeof data !== "string") return [];
     return legacyProposalsFor(data);
   } catch {

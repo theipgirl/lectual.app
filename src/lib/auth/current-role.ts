@@ -6,7 +6,7 @@ import { ROLES, hasRole, type Role } from "./roles";
  * The caller's role in their ACTIVE org, read through their own scoped client.
  *
  * ── WHY THIS EXISTS ──────────────────────────────────────────────────────────
- * This exact read — `rpc("current_org_role")`, then narrow the `unknown` it
+ * This exact read — `rpc("current_org_role", undefined, { get: true })`, then narrow the `unknown` it
  * returns against ROLES — was already copy-pasted into the Settings page and
  * the service-library page, and two more surfaces needed it the day Quotes and
  * the Copilot tabs got role gates. Four hand-rolled copies of an authorization
@@ -31,7 +31,7 @@ import { ROLES, hasRole, type Role } from "./roles";
 export async function currentRole(): Promise<Role | null> {
   try {
     const supabase = await getScopedClient();
-    const { data } = await supabase.rpc("current_org_role");
+    const { data } = await supabase.rpc("current_org_role", undefined, { get: true });
     return typeof data === "string" && (ROLES as readonly string[]).includes(data)
       ? (data as Role)
       : null;

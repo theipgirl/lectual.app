@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
 import { currentRole } from "@/lib/auth/current-role";
 import { listMemberDirectory } from "@/lib/members/directory";
@@ -15,7 +16,7 @@ export type DeadlineAlertState = { error?: string; saved?: boolean };
  * and RLS on the firm note again), the member list is re-read here, and an id that is not a current member is
  * refused. Nothing else is written. Fixed sentences only.
  */
-export async function saveDeadlineAlertRecipientsAction(_prev: DeadlineAlertState, formData: FormData): Promise<DeadlineAlertState> {
+export const saveDeadlineAlertRecipientsAction = previewSafe(async function saveDeadlineAlertRecipientsAction(_prev: DeadlineAlertState, formData: FormData): Promise<DeadlineAlertState> {
   if (!canSeeSetup(await currentRole())) return { error: `${ADMIN_TIER_PHRASE} can choose who gets deadline alerts.` };
   const picked = formData.getAll("userId");
   if (picked.some((v) => typeof v !== "string")) return { error: "That didn't go through. Refresh the page and try again." };
@@ -41,4 +42,4 @@ export async function saveDeadlineAlertRecipientsAction(_prev: DeadlineAlertStat
   revalidatePath("/dashboard/settings/team/");
   revalidatePath("/dashboard/");
   return { saved: true };
-}
+}, "state");

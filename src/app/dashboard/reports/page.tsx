@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { REPORTS, REPORT_BLURB, visibleNav, visibleReports } from "@/lib/nav";
 import { activeOrgModules } from "@/lib/org/modules";
-import { currentRole } from "@/lib/auth/current-role";
+import { viewerRole } from "@/lib/views/view-as";
 import { pageTitle } from "@/lib/ui/page-title";
 import { PageHeader } from "@/components/ui";
 
@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
  * role can see are listed; an unreadable role or module list lists none (fails closed).
  */
 export default async function ReportsIndexPage() {
-  const role = await currentRole();
+  const role = await viewerRole();
   if (!role) notFound();
   const keys = visibleReports(visibleNav(await activeOrgModules(), role));
   if (keys.length === 0) notFound();

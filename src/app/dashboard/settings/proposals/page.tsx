@@ -1,4 +1,4 @@
-import { currentRole } from "@/lib/auth/current-role";
+import { viewerRole } from "@/lib/views/view-as";
 import { listMemberDirectory, type MemberIdentity } from "@/lib/members/directory";
 import { getProposalSettings } from "@/lib/proposals/store";
 import { PROPOSAL_ADMIN_ROLES, standardProposalPricing } from "@/lib/proposals/types";
@@ -32,7 +32,7 @@ export const dynamic = "force-dynamic";
  */
 export default async function ProposalSettingsPage() {
   await requireProposalsModule();
-  const role = await currentRole();
+  const role = await viewerRole();
   const isAdmin = !!role && PROPOSAL_ADMIN_ROLES.includes(role);
 
   const head = (

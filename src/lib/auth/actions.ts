@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { redirect } from "next/navigation";
 import { refresh } from "next/cache";
 import { getScopedClient } from "@/lib/db/scoped-client";
@@ -12,16 +13,8 @@ import { getScopedClient } from "@/lib/db/scoped-client";
  * yet" card in (firm)/layout.tsx — spans routes.
  */
 
-/**
- * Ends the session and returns to sign-in. `scope: "global"` on purpose: the
- * firm dashboard is a privileged surface and "sign out" on a shared or
- * borrowed machine has to mean everywhere, not just this tab.
- */
-export async function signOutAction(): Promise<void> {
-  const supabase = await getScopedClient();
-  await supabase.auth.signOut({ scope: "global" });
-  redirect("/sign-in/?next=/dashboard");
-}
+// Signing out is the route handler POST /auth/sign-out/ (src/app/auth/sign-out/route.ts), not a server action: it ends any
+// View as preview first, and the proxy can let it through by path (spec "View as", Scope item 2).
 
 export type SwitchFirmState = { error?: string };
 
@@ -45,7 +38,7 @@ export type SwitchFirmState = { error?: string };
  *     every RLS policy still evaluates against the OLD org and the dashboard
  *     renders the firm they just tried to leave.
  */
-export async function switchFirmAction(
+export const switchFirmAction = previewSafe(async function switchFirmAction(
   _prev: SwitchFirmState,
   formData: FormData,
 ): Promise<SwitchFirmState> {
@@ -77,7 +70,7 @@ export async function switchFirmAction(
   }
 
   redirect("/dashboard");
-}
+}, "state");
 
 export type RefreshAccessState = { ok?: boolean; error?: string };
 
@@ -94,7 +87,7 @@ export type RefreshAccessState = { ok?: boolean; error?: string };
 // Takes no arguments on purpose: there is nothing to read off the form, and
 // useActionState happily calls a narrower function than its (prev, formData)
 // signature.
-export async function refreshAccessAction(): Promise<RefreshAccessState> {
+export const refreshAccessAction = previewSafe(async function refreshAccessAction(): Promise<RefreshAccessState> {
   const supabase = await getScopedClient();
   const { data, error } = await supabase.auth.refreshSession();
 
@@ -109,4 +102,4 @@ export async function refreshAccessAction(): Promise<RefreshAccessState> {
   // written by the scoped client during refreshSession).
   refresh();
   return { ok: true };
-}
+}, "state");

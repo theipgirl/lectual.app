@@ -93,22 +93,22 @@ describe("a call logged from the review's card", () => {
 describe("every other card action refreshes the review page too", () => {
   const REVIEW = 'revalidatePath("/dashboard/review/")';
   it.each([
-    ["src/app/dashboard/intake/actions.ts", "export async function setLaneAction"],
-    ["src/app/dashboard/intake/actions.ts", "export async function setSourceAction("],
+    ["src/app/dashboard/intake/actions.ts", "async function setLaneAction"],
+    ["src/app/dashboard/intake/actions.ts", "async function setSourceAction("],
     ["src/lib/record-card/actions.ts", "function refresh(leadId"],
-    ["src/app/dashboard/leads/[id]/outcome-actions.ts", "export async function logConsultOutcomeAction("],
-    ["src/app/dashboard/leads/[id]/actions.ts", "export async function addVoiceNoteAction("],
-    ["src/app/dashboard/leads/[id]/actions.ts", "export async function addNoteAction("],
-    ["src/app/dashboard/matters/[id]/actions.ts", "export async function addVoiceNoteAction("],
-    ["src/app/dashboard/matters/[id]/actions.ts", "export async function addMatterNoteAction("],
+    ["src/app/dashboard/leads/[id]/outcome-actions.ts", "async function logConsultOutcomeAction("],
+    ["src/app/dashboard/leads/[id]/actions.ts", "async function addVoiceNoteAction("],
+    ["src/app/dashboard/leads/[id]/actions.ts", "async function addNoteAction("],
+    ["src/app/dashboard/matters/[id]/actions.ts", "async function addVoiceNoteAction("],
+    ["src/app/dashboard/matters/[id]/actions.ts", "async function addMatterNoteAction("],
     ["src/app/dashboard/matters/[id]/actions.ts", "function revalidateMatter("],
   ])("%s %s", (file, name) => {
     expect(body(file, name)).toContain(REVIEW);
   });
   it("rename and tags both refresh through the shared helper, and the matter title through revalidateMatter", () => {
-    expect(body("src/lib/record-card/actions.ts", "export async function renameLeadAction(")).toMatch(/refresh\(/);
-    expect(body("src/lib/record-card/actions.ts", "export async function cardTagAction(")).toMatch(/refresh\(/);
-    expect(body("src/app/dashboard/matters/[id]/actions.ts", "export async function updateMatterHeaderAction(")).toContain("revalidateMatter(");
+    expect(body("src/lib/record-card/actions.ts", "async function renameLeadAction(")).toMatch(/refresh\(/);
+    expect(body("src/lib/record-card/actions.ts", "async function cardTagAction(")).toMatch(/refresh\(/);
+    expect(body("src/app/dashboard/matters/[id]/actions.ts", "async function updateMatterHeaderAction(")).toContain("revalidateMatter(");
   });
 });
 
@@ -232,13 +232,13 @@ describe("a lead's USPTO deadline on the review's card", () => {
 describe("Stage Keeper and files actions refresh the review", () => {
   it.each([
     ["src/app/dashboard/leads/[id]/stage-keeper-actions.ts", "function refresh(leadId"],
-    ["src/app/dashboard/files/actions.ts", "export async function deleteFileAction("],
-    ["src/app/dashboard/files/actions.ts", "export async function confirmUploadAction("],
+    ["src/app/dashboard/files/actions.ts", "async function deleteFileAction("],
+    ["src/app/dashboard/files/actions.ts", "async function confirmUploadAction("],
   ])("%s %s", (file, name) => {
     expect(body(file, name)).toContain('revalidatePath("/dashboard/review/")');
   });
   it("undo, accept and dismiss all go through that refresh", () => {
-    for (const name of ["export async function undoAgentMoveAction(", "export async function acceptStageSuggestionAction(", "export async function dismissStageSuggestionAction("]) {
+    for (const name of ["async function undoAgentMoveAction(", "async function acceptStageSuggestionAction(", "async function dismissStageSuggestionAction("]) {
       expect(body("src/app/dashboard/leads/[id]/stage-keeper-actions.ts", name)).toMatch(/refresh\(target\.leadId\)/);
     }
   });

@@ -55,10 +55,10 @@ describe("requestUploadAction: a signed upload for a lead or matter", () => {
 
   it("has no org parameter in its signature", () => {
     const src = readFileSync(path.resolve(__dirname, "../../src/app/dashboard/files/actions.ts"), "utf8");
-    const sig = src.slice(src.indexOf("export async function requestUploadAction("), src.indexOf("): Promise<RequestUploadResult>"));
+    const sig = src.slice(src.indexOf("async function requestUploadAction("), src.indexOf("): Promise<RequestUploadResult>"));
     expect(sig).toMatch(/parent: FileParentInput/);
     expect(sig).not.toMatch(/org/i);
-    const confirm = src.slice(src.indexOf("export async function confirmUploadAction("), src.indexOf("Promise<ConfirmUploadResult>"));
+    const confirm = src.slice(src.indexOf("async function confirmUploadAction("), src.indexOf("Promise<ConfirmUploadResult>"));
     expect(confirm).not.toMatch(/org/i);
   });
 });

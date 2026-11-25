@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { COL_ORDER, DEFAULT_COL_WIDTHS, MENU_COL_WIDTH, NEXT_MIN_WIDTH, tableMinWidth, type ColKey } from "@/lib/intake/col-widths";
-import { LEADS_ASSISTANT_COLUMN, LEADS_CONTACT_COLUMN, NEXT_STEP, OWNER_COLUMN } from "@/lib/ui/words";
+import { LEADS_LIST_BUILTIN } from "@/lib/leads/views";
 
 /**
  * Guard: no column header on the Leads list is cut at its default width. PURE (no browser): the width of a header word is
@@ -37,14 +37,8 @@ const fontSize = Number(
   tokenName ? new RegExp(`${tokenName}:\\s*(\\d+)px`).exec(globalsCss)![1] : /^(\d+)px$/.exec(fontSizeRaw)![1],
 );
 
-/** The labels, read from the table's own COLUMNS map (two come from the words file). */
-const tableSrc = read("src/app/dashboard/intake/_components/IntakeTable.tsx");
-const labels: Record<string, string> = {};
-for (const m of tableSrc.matchAll(/^\s+(\w+): \{ key: [^,]+, label: ([^}]+?) \},?$/gm)) {
-  const raw = m[2].trim();
-  const named: Record<string, string> = { LEADS_ASSISTANT_COLUMN, LEADS_CONTACT_COLUMN, OWNER_COLUMN, NEXT_STEP };
-  labels[m[1]] = named[raw] ?? JSON.parse(raw);
-}
+/** The labels: the Leads List's own columns (`LEADS_LIST_BUILTIN`, the layout's defaults the table draws its headers from). */
+const labels: Record<string, string> = Object.fromEntries(LEADS_LIST_BUILTIN.map((c) => [c.key, c.label]));
 
 const wordWidth = (w: string) => [...w.toUpperCase()].reduce((n, ch) => n + (ADVANCE_EM[ch] ?? 0.75) * fontSize + letterSpacing, 0);
 

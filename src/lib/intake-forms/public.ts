@@ -27,6 +27,7 @@ import { isMissingTableError } from "./store";
 import type { IntakeAnswer } from "./submission";
 import type { Stage } from "@/lib/pipeline/stages";
 import { leadRead } from "@/lib/leads/live";
+import { withRoleFallback } from "@/lib/stages/roles";
 
 /**
  * The `/i/<slug>` and `/r/<token>` read and write path — the only
@@ -403,12 +404,15 @@ async function createIntakeLead(
   stage: "started" | "complete",
   utm?: Utm,
 ): Promise<string | null> {
-  const { data: stages, error: stageErr } = await admin
-    .from("crm_stage")
-    .select("id, org_id, name, category, order_index, aging_threshold_days, created_at")
-    .eq("org_id", handle.orgId);
+  // `role` (lectual 0119) when the database has it: the `new_enquiry` stage wins over the names.
+  const { data: stages, error: stageErr } = await withRoleFallback((r) =>
+    admin
+      .from("crm_stage")
+      .select(r ? "id, org_id, name, category, order_index, aging_threshold_days, created_at, role" : "id, org_id, name, category, order_index, aging_threshold_days, created_at")
+      .eq("org_id", handle.orgId),
+  );
   if (stageErr) throw stageErr;
-  const stageId = firstOpenIntakeStageId((stages ?? []) as Stage[]);
+  const stageId = firstOpenIntakeStageId((stages ?? []) as unknown as Stage[]);
   if (!stageId) return null;
 
   const source = leadSourceLabel(handle.name, handle.sourceTag);

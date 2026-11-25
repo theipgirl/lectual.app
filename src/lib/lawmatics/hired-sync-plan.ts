@@ -23,7 +23,8 @@
  * ./hired-sync.ts writes, conditional on the lead still being in its from-stage.
  */
 import { compareStageOrder } from "@/lib/pipeline/stage-order";
-import { isHiredStage, TM_HIRED_STAGE_LABEL } from "@/lib/matters/hired-stage";
+import { hiredStageOf, TM_HIRED_STAGE_LABEL } from "@/lib/matters/hired-stage";
+import { leadStageWithRole } from "@/lib/stages/roles";
 import { originAsMatterSource, type LeadOrigin } from "./lead-origin";
 import { keeperIn } from "@/lib/leads/live";
 
@@ -69,9 +70,9 @@ export type PlanMatter = {
  * merged lead holds is FOLLOWED to its keeper (src/lib/leads/live.ts `keeperIn`), so a matter links to the live lead.
  */
 export type PlanLead = { id: string; email: string | null; lawmatics_id: string | null; current_stage_id?: string | null; merged_into_id?: string | null };
-export type PlanStage = { id: string; label: string };
+export type PlanStage = { id: string; label: string; role?: string | null; is_open?: boolean | null };
 /** A lead-pipeline stage (`crm_stage`), as the lead move needs it. */
-export type LeadStageRef = { id: string; name: string; category: string; order_index: number | null };
+export type LeadStageRef = { id: string; name: string; category: string; order_index: number | null; role?: string | null };
 
 export const LEAD_MOVE_REASON = "Hired in Lawmatics; matter opened";
 
@@ -214,6 +215,9 @@ export type PlanInput = {
 
 /** The won stage a hired lead goes to: the "Signed LOE / Deposit Received" one, else the lowest-ordered won stage. */
 export function wonTargetStage(stages: readonly LeadStageRef[]): LeadStageRef | null {
+  // Role first (lectual 0119): the WON stage holding `signed_loe` (a role on any other category is ignored), then today's name match.
+  const byRole = leadStageWithRole(stages, "signed_loe");
+  if (byRole) return byRole;
   const won = stages.filter((s) => s.category === "won").sort(compareStageOrder);
   const signed = won.find((s) => /signed loe|deposit received/i.test(s.name));
   return signed ?? won[0] ?? null;
@@ -261,7 +265,7 @@ export function planHiredSync(input: PlanInput): HiredSyncPlan {
     owner: normalizeOwner(m.owner_name),
     titles: [normalizeTitle(m.title), normalizeTitle(m.mark_text)].filter(Boolean),
   }));
-  const stage = input.stages.find((s) => isHiredStage(s)) ?? null;
+  const stage = hiredStageOf(input.stages);
   const stageId = stage?.id ?? null;
 
   const leadFor = (p: HiredProspect): string | null => {

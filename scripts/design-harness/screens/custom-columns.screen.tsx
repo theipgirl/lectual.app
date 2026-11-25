@@ -1,51 +1,23 @@
 import ReviewPage from "@/app/dashboard/review/page";
-import { ColumnsSettings } from "@/components/settings/ColumnsSettings";
 import { ReviewCardAside } from "@/components/review/ReviewCardExtras";
-import { PageHeader } from "@/components/ui/PageHeader";
 import { sheetStatusStore } from "@/components/review/sheet-status-store";
 import type { SheetEditInitial } from "@/components/review/SheetEditTable";
 import type { ReviewRow } from "@/lib/review/buckets";
 import type { StageChoice } from "@/lib/review/sheet-edit";
-import type { ColumnsSettingsState, SettingsField } from "@/lib/custom-columns/settings-load";
 import { firmColumnsBlock, type CustomColumnsState, type CustomValue } from "@/lib/custom-columns/rules";
-import { COLUMNS_SETTINGS_NAME, COLUMNS_SETTINGS_SUB } from "@/lib/ui/words";
 import { state } from "../state";
 import { OWNER_ID, resetState, review } from "../fixtures";
 import { OwnerShell } from "../shell";
 import type { Screen } from "../registry";
 
 /**
- * Sprint 3: Settings -> Columns (desktop and phone), the owner Sheet with custom-cell editors open beside the Sprint 1 Source and Next
- * step editors (for the computed-style comparison), and the opened card's editable Firm columns. Not a design board: checked by
+ * Sprint 3: the owner Sheet with custom-cell editors open beside the Sprint 1 Source and Next step editors (for the computed-style
+ * comparison), and the opened card's editable Firm columns. (Settings -> Columns is gone: columns are changed from the List's own menu.) Not a design board: checked by
  * `columns-check.mjs`. Invented names only.
  */
 
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
-const F = { fee: id(7101), priority: id(7102), review: id(7103), old: id(7104) };
-const STAMP = "2026-11-20T10:00:00.123456+00:00";
-
-/* ── Settings -> Columns ── */
-const sf = (over: Partial<SettingsField> & { id: string; label: string }): SettingsField => ({ section: "trademarks", kind: "text", options: [], position: 0, archived: false, updatedAt: STAMP, ...over });
-const SETTINGS: ColumnsSettingsState = {
-  status: "ok",
-  live: [
-    sf({ id: F.fee, label: "Quoted fee", section: "both", kind: "money", position: 1 }),
-    sf({ id: F.priority, label: "Priority", section: "trademarks", kind: "choice", options: ["High", "Medium", "Low"], position: 2 }),
-    sf({ id: F.review, label: "Review date", section: "contracts", kind: "date", position: 3 }),
-  ],
-  archived: [sf({ id: F.old, label: "Old flag", archived: true, position: 4 })],
-  dropped: 0,
-  use: { status: "ok", counts: { [F.priority]: { High: 2, Low: 1 } } },
-};
-const settings = () => (
-  <OwnerShell>
-    <div className="lx-col">
-      <PageHeader title={COLUMNS_SETTINGS_NAME} sub={COLUMNS_SETTINGS_SUB} />
-      <ColumnsSettings state={SETTINGS} initialConfirm={F.priority} />
-    </div>
-  </OwnerShell>
-);
-const openArchived = (html: string) => html.replace('<details class="lx-card cs-card cs-archived">', '<details class="lx-card cs-card cs-archived" open="">');
+const F = { fee: id(7101), priority: id(7102) };
 
 /* ── The owner Sheet with custom editors open ── */
 const contact = (date: string) => ({ date, type: "email_sent" }) as ReviewRow["lastContact"];
@@ -99,8 +71,6 @@ const card = () => {
 };
 
 export const screens: Screen[] = [
-  { id: "settings-columns", title: "Settings -> Columns (one list, archived open, the Archive question on Priority)", designBoard: "none", viewport: "desktop", pathname: "/dashboard/settings/", prepare: () => resetState(), render: settings, shell: "none", transformHtml: openArchived },
-  { id: "settings-columns-phone", title: "Settings -> Columns at 375px", designBoard: "none", viewport: "phone", pathname: "/dashboard/settings/", prepare: () => resetState(), render: settings, shell: "none", transformHtml: openArchived },
   {
     id: "review-sheet-edit-custom",
     title: "Owner Sheet: Priority (choice) and Quoted fee (money) editors open, beside Source and Next step",

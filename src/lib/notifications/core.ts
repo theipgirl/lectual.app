@@ -39,7 +39,7 @@ export type NotifyInput = {
 async function currentOrgId(
   supabase: Awaited<ReturnType<typeof getScopedClient>>,
 ): Promise<string | null> {
-  const { data, error } = await supabase.rpc("current_org_id");
+  const { data, error } = await supabase.rpc("current_org_id", undefined, { get: true });
   if (error) return null;
   return data ?? null;
 }

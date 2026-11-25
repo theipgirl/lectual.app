@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import type { StopDb } from "@/lib/campaigns/stop-db";
@@ -76,19 +77,19 @@ const deps: LeadStepActionDeps = {
   },
 };
 
-export async function leadStepYesAction(leadId: unknown, itemId: unknown, shownSha256: unknown): Promise<YesResult> {
+export const leadStepYesAction = previewSafe(async function leadStepYesAction(leadId: unknown, itemId: unknown, shownSha256: unknown): Promise<YesResult> {
   return runLeadStepYes(deps, leadId, itemId, shownSha256);
-}
+}, "state");
 
-export async function leadStepNotThisAction(leadId: unknown, itemId: unknown, reason: unknown): Promise<NotThisResult> {
+export const leadStepNotThisAction = previewSafe(async function leadStepNotThisAction(leadId: unknown, itemId: unknown, reason: unknown): Promise<NotThisResult> {
   return runLeadStepNotThis(deps, leadId, itemId, reason);
-}
+}, "state");
 
-export async function leadStepEditAction(leadId: unknown, itemId: unknown, body: unknown): Promise<EditResult> {
+export const leadStepEditAction = previewSafe(async function leadStepEditAction(leadId: unknown, itemId: unknown, body: unknown): Promise<EditResult> {
   return runLeadStepEdit(deps, leadId, itemId, body);
-}
+}, "state");
 
 /** Send a card handed to you back to whoever handed it (the deck's own `sendCardBack`). */
-export async function leadStepSendBackAction(leadId: unknown, itemId: unknown, note: unknown): Promise<SendBackResult> {
+export const leadStepSendBackAction = previewSafe(async function leadStepSendBackAction(leadId: unknown, itemId: unknown, note: unknown): Promise<SendBackResult> {
   return runLeadStepSendBack(deps, leadId, itemId, note);
-}
+}, "state");

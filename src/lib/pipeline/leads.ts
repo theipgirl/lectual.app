@@ -18,6 +18,7 @@ import { newEnquiryStage } from "./new-enquiry";
 import { notifyAssigned } from "@/lib/notifications/producers";
 import { leadRead } from "@/lib/leads/live";
 import { scheduleConsultPrepOnEntry } from "@/lib/consult-prep/hook";
+import { withRoleFallback } from "@/lib/stages/roles";
 
 export type Lead = Database["public"]["Tables"]["crm_lead"]["Row"];
 
@@ -80,7 +81,7 @@ type ScopedClient = Awaited<ReturnType<typeof getScopedClient>>;
  * revoked between two requests must take effect on the very next one.
  */
 export async function resolveCurrentRole(supabase: ScopedClient): Promise<Role> {
-  const { data, error } = await supabase.rpc("current_org_role");
+  const { data, error } = await supabase.rpc("current_org_role", undefined, { get: true });
   if (error) throw error;
   if (!isRole(data)) {
     throw new LeadWriteError("Forbidden: no resolvable role for the active org", {
@@ -182,7 +183,7 @@ export async function createLead(input: CreateLeadInput): Promise<Lead> {
   // org_id is the caller's active org, never taken from the input. RLS's
   // WITH CHECK requires it to equal current_org_id() anyway, so this is the
   // single source of truth for the new lead's tenant.
-  const { data: orgId, error: orgError } = await supabase.rpc("current_org_id");
+  const { data: orgId, error: orgError } = await supabase.rpc("current_org_id", undefined, { get: true });
   if (orgError) throw orgError;
   if (!orgId) throw new LeadWriteError("No active organization for the current session.");
 
@@ -191,12 +192,15 @@ export async function createLead(input: CreateLeadInput): Promise<Lead> {
     // RLS already scopes crm_stage to the active org. A lead with no stage given goes to the firm's new-enquiry
     // stage ("Potential New Client" and friends, else the first open stage in pipeline order), never to
     // whichever stage happens to sort first: that was "Follow-Up" for RPB.
-    const { data: stageRows, error: stageError } = await supabase
-      .from("crm_stage")
-      .select("id, name, category, order_index")
-      .order("order_index", { ascending: true });
+    // `role` (lectual 0119) is read when the database has it: the stage holding `new_enquiry` wins over the names.
+    const { data: stageRows, error: stageError } = await withRoleFallback((r) =>
+      supabase
+        .from("crm_stage")
+        .select(r ? "id, name, category, order_index, role" : "id, name, category, order_index")
+        .order("order_index", { ascending: true }),
+    );
     if (stageError) throw stageError;
-    const enquiry = newEnquiryStage(Array.isArray(stageRows) ? stageRows : []);
+    const enquiry = newEnquiryStage(Array.isArray(stageRows) ? (stageRows as unknown as Array<{ id: string; name: string; category: string; order_index: number; role?: string | null }>) : []);
     if (!enquiry) {
       throw new LeadWriteError(
         "This firm has no pipeline stages yet — an owner or admin needs to set them up in Settings first.",

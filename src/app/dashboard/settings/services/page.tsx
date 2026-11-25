@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { hasRole } from "@/lib/auth/roles";
 import { listServiceItems } from "@/lib/quotes/service-library";
 import type { ServiceItemRow } from "@/lib/quotes/types";
@@ -31,7 +31,7 @@ export const dynamic = "force-dynamic";
  * drop out of the builder's picker, which reads active items only.
  */
 export default async function ServiceLibraryPage() {
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   if (session.kind !== "ok") notFound();
   const canEdit = hasRole(session.role, "senior_admin");
   const canRead = hasRole(session.role, "attorney");

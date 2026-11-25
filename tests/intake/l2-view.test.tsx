@@ -33,7 +33,7 @@ describe("source guards", () => {
   const read = (f: string) => readFileSync(f, "utf8");
   it("the compare action resolves the role before any read, and counts proposals only for the proposals roles", () => {
     const src = read("src/app/dashboard/intake/actions.ts");
-    const body = src.slice(src.indexOf("export async function loadCompareAction"));
+    const body = src.slice(src.indexOf("async function loadCompareAction"));
     expect(body.indexOf("resolveCurrentRole(db)")).toBeGreaterThan(-1);
     expect(body.indexOf("resolveCurrentRole(db)")).toBeLessThan(body.indexOf("loadCompare("));
     expect(body).toContain("rules.mayCountProposals");
@@ -67,7 +67,8 @@ describe("css rules", () => {
     const table = readFileSync("src/app/dashboard/intake/_components/IntakeTable.tsx", "utf8");
     expect(table).toContain("useState(true)");
     const globals = readFileSync("src/app/globals.css", "utf8");
-    expect(table).toContain("scroll={needsScroll}");
+    // The scroller is the shared List's: the table hands it `scroll: needsScroll` through `scrollProps`.
+    expect(table).toContain("scroll: needsScroll");
     expect(globals).toContain('.sheet-scroll[data-scroll="false"] { overflow: visible; }');
     expect(globals).not.toMatch(/\n\.sheet-scroll\s*\{[^}]*overflow:\s*visible/);
   });

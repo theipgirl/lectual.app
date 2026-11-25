@@ -2,7 +2,7 @@ import { MEETINGS_INTEGRATION_NAME, integrationErrorLine } from "@/lib/ui/words"
 import { LoadFailedCard, Notice, PageHeader } from "@/components/ui";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { notFound } from "next/navigation";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { hasRole } from "@/lib/auth/roles";
 import { listMeetingConnections, type MeetingConnection } from "@/lib/meetings/connection";
 import { fathomReady, zoomSetup } from "@/lib/meetings/config";
@@ -43,7 +43,7 @@ function statusLine(c: MeetingConnection, tz: string): string {
  * (owner/admin/senior_admin) is here for the controls and again in every action.
  */
 export default async function MeetingsIntegrationPage({ searchParams }: { searchParams: Promise<{ connected?: string; reconnected?: string; error?: string }> }) {
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   if (session.kind !== "ok") notFound();
   const canManage = hasRole(session.role, "senior_admin");
   const { connected, reconnected, error } = await searchParams;

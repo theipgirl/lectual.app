@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 // The three things a person can do about the Stage Keeper's work on a lead: undo a move, accept a
 // suggestion, dismiss a suggestion. Each is its own POST entry point, so each re-resolves the role
 // and re-reads what it acts on through the caller's own scoped client (RLS): another firm's lead,
@@ -64,7 +65,7 @@ function evidenceDateOfStored(evidence: MoveEvidence | null): string | null {
  * stands), or when this move was already undone. The move stays on the timeline and its signal
  * stays used, so the agent never re-moves the lead on it.
  */
-export async function undoAgentMoveAction(_prev: StageKeeperActionState, formData: FormData): Promise<StageKeeperActionState> {
+export const undoAgentMoveAction = previewSafe(async function undoAgentMoveAction(_prev: StageKeeperActionState, formData: FormData): Promise<StageKeeperActionState> {
   const target = ids(formData);
   if (!target) return { error: NOT_FOUND };
   try {
@@ -108,7 +109,7 @@ export async function undoAgentMoveAction(_prev: StageKeeperActionState, formDat
   }
   refresh(target.leadId);
   return { ok: true };
-}
+}, "state");
 
 // ── Suggestions ──────────────────────────────────────────────────────────────
 
@@ -133,7 +134,7 @@ async function findPendingSuggestion(supabase: ScopedClient, leadId: string, act
  * refused: the lead must still be in the stage it was suggested from, and the destination must still
  * be a stage further along.
  */
-export async function acceptStageSuggestionAction(_prev: StageKeeperActionState, formData: FormData): Promise<StageKeeperActionState> {
+export const acceptStageSuggestionAction = previewSafe(async function acceptStageSuggestionAction(_prev: StageKeeperActionState, formData: FormData): Promise<StageKeeperActionState> {
   const target = ids(formData);
   if (!target) return { error: NOT_FOUND };
   try {
@@ -187,13 +188,13 @@ export async function acceptStageSuggestionAction(_prev: StageKeeperActionState,
   }
   refresh(target.leadId);
   return { ok: true };
-}
+}, "state");
 
 /**
  * Dismisses a suggestion: logs the decision and changes nothing else. A dismissal is not contact
  * with the lead, so it does not move the lead's last touch. The signal stays used.
  */
-export async function dismissStageSuggestionAction(_prev: StageKeeperActionState, formData: FormData): Promise<StageKeeperActionState> {
+export const dismissStageSuggestionAction = previewSafe(async function dismissStageSuggestionAction(_prev: StageKeeperActionState, formData: FormData): Promise<StageKeeperActionState> {
   const target = ids(formData);
   if (!target) return { error: NOT_FOUND };
   try {
@@ -213,4 +214,4 @@ export async function dismissStageSuggestionAction(_prev: StageKeeperActionState
   }
   refresh(target.leadId);
   return { ok: true };
-}
+}, "state");

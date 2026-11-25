@@ -40,10 +40,17 @@ import { ListHeader } from "@/components/list-page/ListHeader";
 import { ListToolbar } from "@/components/list-page/ListToolbar";
 import { MoreMenu } from "@/components/list-page/MoreMenu";
 import { leadsMoreItems } from "@/lib/intake/more-items";
+import { AddRow, type StartStage } from "@/components/review/AddRow";
+import { HiddenColumnsMenu, type HiddenGroup } from "@/components/views/layout/HiddenColumnsMenu";
+import { LEADS_LIST_BUILTIN, hideStageColumns, leadsBoardBase, type LeadListColumn } from "@/lib/leads/views";
+import type { Layout, ViewKey } from "@/lib/views/layout/types";
+import type { FactCell } from "@/lib/review/sheet-cells";
 import "@/components/list-page/list-page.css";
 import "../leads.css";
 import {
   LEADS_ASSIGNED_TO,
+  LEADS_BOARD_HIDDEN_NOTE,
+  LEADS_FIRM_COLUMNS_UNAVAILABLE,
   LEADS_LOST_CUT,
   LEADS_LOST_UNAVAILABLE,
   LEADS_MOVED_TO,
@@ -63,9 +70,13 @@ import type { Lane } from "@/lib/leads/lane";
 import AddLeadDialog from "./AddLeadDialog";
 import BulkMoveBar from "./BulkMoveBar";
 import IntakeBoard from "./IntakeBoard";
+import type { MenuStage } from "@/lib/stages/menu-model";
 import IntakeControls from "./IntakeControls";
 import IntakeTable from "./IntakeTable";
 import CompareDialog, { type CompareTarget } from "./CompareDialog";
+
+const DEFAULT_LIST_VIEW = { columns: [...LEADS_LIST_BUILTIN] as LeadListColumn[], layout: null, edit: null, fieldMeta: {}, firmCells: {}, hidden: null, note: null, firmUnavailable: false };
+const DEFAULT_BOARD_VIEW = { layout: null, edit: null, hidden: null, note: null };
 
 /** How long the URL lags the controls, so typing in Search isn't one push per key. */
 const URL_SYNC_DELAY_MS = 300;
@@ -106,7 +117,36 @@ export default function IntakeWorkspace({
   now: nowIso,
   timeZone,
   showFormsLink = false,
+  stageAdmin = null,
+  listView = DEFAULT_LIST_VIEW,
+  boardView = DEFAULT_BOARD_VIEW,
+  addRow = null,
 }: {
+  /**
+   * The List's firm layout (`leads_list`, build step 6): every column this viewer may have, the saved layout, the owner's edit rev (null
+   * = not an owner / not read), the firm columns' kinds and cells, the owner's "Hidden columns" and the two quiet notes. Absent: the standard columns.
+   */
+  listView?: {
+    columns: LeadListColumn[];
+    layout: Layout | null;
+    edit: { view: ViewKey; rev: number | null } | null;
+    fieldMeta: Record<string, { kind: string; options: readonly string[] }>;
+    firmCells: Record<string, Record<string, FactCell>>;
+    hidden: HiddenGroup[] | null;
+    /** The saved layout couldn't be read (the standard columns are drawn). */
+    note: string | null;
+    /** The firm's own columns couldn't be read. */
+    firmUnavailable: boolean;
+  };
+  /** The stage board's firm layout (`leads_board`): which stage columns are hidden. It hides and shows only; order and names are the stages'. */
+  boardView?: { layout: Layout | null; edit: { view: ViewKey; rev: number | null } | null; hidden: HiddenGroup | null; note: string | null };
+  /** "Add a lead" under the List (a role that can create a lead, not in a preview): the open stages to start in. Absent: no row. */
+  addRow?: { stages: readonly StartStage[] | null; defaultStageId: string | null } | null;
+  /**
+   * The owner's stage menu on the stage board (spec-editable-views.md 3b): every lead stage the firm has (role included) and what
+   * each holds (null = couldn't be read). Absent for everyone but an owner membership row, and in a preview.
+   */
+  stageAdmin?: { all: MenuStage[]; holdings: Record<string, string[]> | null; merged?: Record<string, number> | null } | null;
   /** `canSeeFormsAndProposals(role)`: offer "Open your intake form" in the empty state. Absent = not offered. */
   showFormsLink?: boolean;
   /** The rows of the server's set: the intake list, or the lost leads when `lostView`. */
@@ -269,10 +309,17 @@ export default function IntakeWorkspace({
   // Lost stages are offered as a destination ONLY while the Lost set is shown (so a lead can be moved back out). Elsewhere,
   // moving a lead to Lost happens on the lead page or the weekly review, as before.
   const moveStages = useMemo(() => moveTargetStages(intakeStages, lostStages, lostView, nurtureStages), [intakeStages, lostStages, lostView, nurtureStages]);
-  const model = useMemo(
+  const fullModel = useMemo(
     () => boardModel({ rows: sorted, stages: columnStages, members, group: viewState.group, pinned, extra: colExtra, showEmpty, nurture: nurtureColumn }),
     [sorted, columnStages, members, viewState.group, pinned, colExtra, showEmpty, nurtureColumn],
   );
+  // The firm's `leads_board` layout hides stage columns, and ONLY that: the stage board, never the owner board, never the Lost set (its
+  // columns are lost stages the layout doesn't name). A hidden column's leads are counted in one line, never silently gone, and
+  // `renderedIds` follows what is drawn so a bulk move can't name a card that isn't on screen.
+  const stageBoardLayout = viewState.group === "stage" && !lostView ? boardView.layout : null;
+  // Only a stage the layout write knows (an intake stage) can be hidden: the menu is drawn for no other (a stage past the first won one has none).
+  const hideableKeys = useMemo(() => leadsBoardBase(stages).map((b) => b.key), [stages]);
+  const { model, hidden: hiddenStageColumns } = useMemo(() => hideStageColumns(fullModel, stageBoardLayout, pinned), [fullModel, stageBoardLayout, pinned]);
   const renderedIds = useMemo(() => (board ? model.renderedIds : page.shown.map((r) => r.lead.id)), [board, model, page]);
   const ownerColumn = ownerColumnShown(sorted);
 
@@ -477,7 +524,12 @@ export default function IntakeWorkspace({
             )}
           </>
         }
-        more={<MoreMenu items={moreItems} />}
+        more={
+          <>
+            {!board && listView.hidden && <HiddenColumnsMenu groups={listView.hidden} />}
+            <MoreMenu items={moreItems} />
+          </>
+        }
         primary={<AddLeadDialog stages={intakeStages} members={members} />}
       />
 
@@ -510,6 +562,27 @@ export default function IntakeWorkspace({
         <div data-details-note>
           <Notice tone="warn" role="status" action={<RefreshButton />}>
             {note.text}
+          </Notice>
+        </div>
+      )}
+      {!board && listView.note && (
+        <div data-layout-note>
+          <Notice tone="warn" role="status">
+            {listView.note}
+          </Notice>
+        </div>
+      )}
+      {!board && listView.firmUnavailable && (
+        <div data-firm-columns-unavailable>
+          <Notice tone="warn" role="status">
+            {LEADS_FIRM_COLUMNS_UNAVAILABLE}
+          </Notice>
+        </div>
+      )}
+      {board && boardView.note && viewState.group === "stage" && (
+        <div data-layout-note>
+          <Notice tone="warn" role="status">
+            {boardView.note}
           </Notice>
         </div>
       )}
@@ -568,7 +641,20 @@ export default function IntakeWorkspace({
             )}
           </div>
         ) : (
+          <>
+          {viewState.group === "stage" && !lostView && (hiddenStageColumns.length > 0 || (boardView.edit && boardView.hidden && boardView.hidden.items.length > 0)) && (
+            <div className="lx-board-hidden" data-board-hidden>
+              {hiddenStageColumns.length > 0 && (
+                <p role="status" className="lx-note lx-state-line">
+                  {LEADS_BOARD_HIDDEN_NOTE(hiddenStageColumns.length, hiddenStageColumns.reduce((n, c) => n + c.leads, 0))}
+                </p>
+              )}
+              {boardView.edit && boardView.hidden && <HiddenColumnsMenu groups={[boardView.hidden]} />}
+            </div>
+          )}
           <IntakeBoard
+            layoutEdit={viewState.group === "stage" && !lostView ? boardView.edit : null}
+            hideableKeys={hideableKeys}
             group={viewState.group}
             model={model}
             moveStages={moveStages}
@@ -596,7 +682,9 @@ export default function IntakeWorkspace({
             movedOut={movedOut}
             timeZone={timeZone}
             onCompare={openCompare}
+            stageAdmin={lostView ? null : stageAdmin}
           />
+          </>
         )
       ) : (
         <IntakeTable
@@ -631,8 +719,15 @@ export default function IntakeWorkspace({
           emptyAction={emptyContent}
           anyLeads={anyLeads}
           onCompare={openCompare}
+          columns={listView.columns}
+          layout={listView.layout}
+          layoutEdit={listView.edit}
+          fieldMeta={listView.fieldMeta}
+          firmCells={listView.firmCells}
         />
       )}
+
+      {!board && !lostView && addRow && <AddRow canAddLead canOpenMatter={false} stages={addRow.stages} defaultStageId={addRow.defaultStageId} onLeads />}
 
       <CompareDialog target={compare} onClose={closeCompare} />
     </div>

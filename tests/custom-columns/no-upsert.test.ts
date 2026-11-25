@@ -11,8 +11,9 @@ const walk = (dir: string): string[] =>
   });
 const PATHS = [
   ...walk("src/lib/custom-columns"),
-  ...walk("src/components/settings").filter((f) => /ColumnsSettings[^/]*\.tsx$/.test(f)),
-  ...walk("src/app/dashboard/settings/columns"),
+  // The layout write (editable views): read, then insert or update fenced on rev. Never an upsert.
+  ...walk("src/lib/views/layout"),
+  "src/components/views/layout/ColumnMenu.tsx",
   "src/components/review/FirmColumnsEdit.tsx",
   "src/components/review/CustomValueInput.tsx",
   "src/lib/review/sheet-edit.ts",
@@ -22,8 +23,8 @@ const PATHS = [
 describe("C1: no upsert, no onConflict", () => {
   it("covers the R8 paths", () => {
     expect(PATHS).toContain("src/lib/custom-columns/store.ts");
-    expect(PATHS).toContain("src/components/settings/ColumnsSettingsForms.tsx");
-    expect(PATHS).toContain("src/app/dashboard/settings/columns/page.tsx");
+    expect(PATHS).toContain("src/lib/views/layout/store.ts");
+    expect(PATHS).toContain("src/components/views/layout/ColumnMenu.tsx");
   });
   for (const f of PATHS)
     it(f, () => {

@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { randomBytes } from "node:crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -41,7 +42,7 @@ function field(form: FormData, key: string): string {
  * The settings read failing falls back to the standard defaults rather than losing the draft. The lead and
  * matter ids are re-checked by 0089's composite foreign keys, so another firm's cannot be linked.
  */
-export async function createProposalAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const createProposalAction = previewSafe(async function createProposalAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const refused = await gateStaffAction();
   if (refused) return refused;
 
@@ -140,4 +141,4 @@ export async function createProposalAction(_prev: ActionState, formData: FormDat
 
   revalidatePath("/dashboard/proposals/");
   redirect(`/dashboard/proposals/${id}/`);
-}
+}, "state");

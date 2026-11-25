@@ -368,7 +368,7 @@ export function nextEditableCell(
   from: { rowKey: string; col: TabStop },
   perms: SheetPerms,
   dir: 1 | -1 = 1,
-  /** The columns a row DRAWS, in drawn order (its section's columns after the chooser). Default: the four built-in typed columns in the fixed order. */
+  /** The columns a row DRAWS, in drawn order (its section's columns after the firm's layout). Default: the four built-in typed columns in the fixed order. */
   columnsFor?: (row: Pick<SheetEditRow, "key" | "kind">) => readonly SizedColumn[],
   /** The render's own `fit`: a custom cell is a stop only where the render draws an editor for it. Absent = no custom cell is a stop. */
   fit?: CustomFit,
@@ -426,6 +426,14 @@ export const NEXT_MIN_WIDTH = 200;
 /** The width a column is drawn at: this viewer's stored width, else the default; null = flexible (Next step). */
 export function colWidth(sizes: Pick<SheetSizes, "cols">, col: SizedColumn): number | null {
   return sizes.cols[col] ?? (isCustomColumnId(col) ? CUSTOM_COL_WIDTH : DEFAULT_COL_WIDTHS[col]);
+}
+
+/**
+ * The width a column is DRAWN at: this viewer's own resize, else the firm's saved layout width, else the default (null = flexible).
+ * The header's grip and the table's column group both start from this, so an arrow-key resize begins where the column is.
+ */
+export function drawnWidth(sizes: Pick<SheetSizes, "cols">, col: SizedColumn, layoutWidth?: number | null): number | null {
+  return sizes.cols[col] ?? layoutWidth ?? colWidth(NO_SIZES, col);
 }
 
 /** The narrowest the table may get before it scrolls sideways inside its card (flexible Next step counted at its minimum). */

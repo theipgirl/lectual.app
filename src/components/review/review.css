@@ -82,6 +82,7 @@
   .lp-root:not(.rv-owner) .rv-sheet thead th { position: sticky; top: 0; z-index: 2; }
 }
 .rv-owner .rv-sheet-note { margin: 0; font-size: var(--fs-1); line-height: 1.45; color: var(--muted); }
+/* The layout's colgroup widths (a firm's saved width) win over these th widths once an owner's read-only List exists. */
 /* Sheet column widths (match the editable Sheet's defaults, by column id): Client never squeezes; a table wider than its card scrolls sideways inside it. */
 @media (min-width: 641px) {
   .rv-owner .sheet-tbl.rv-sheet { table-layout: fixed; }
@@ -106,15 +107,6 @@
 /* The section note above each table, and the overdue office action date (--ox, the risk colour). */
 .rv-sheet-note { margin: 0; padding: 8px 12px; font-size: var(--fs-1); line-height: 1.45; color: var(--muted); }
 .rv-sheet .rv-oa-overdue, .rse-tbl .rv-oa-overdue { color: var(--ox); font-weight: 500; }
-/* The Columns chooser's panel. Tokens only. */
-.rv-cols-panel { display: grid; gap: 12px; padding: 10px 12px; max-height: 70vh; overflow: auto; }
-.rv-cols-sec { display: grid; gap: 6px; margin: 0; padding: 0; border: 0; min-width: 0; }
-.rv-cols-legend { padding: 0; font-size: var(--fs-2); font-weight: 600; color: var(--ink); }
-.rv-cols-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
-.rv-cols-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: var(--ctl-h); }
-.rv-cols-name { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-2); color: var(--ink); min-width: 0; }
-.rv-cols-moves { display: inline-flex; gap: 4px; flex: none; }
-.rv-cols-note { margin: 0; }
 
 /* The collapsed USPTO / on-track lists under the board */
 .rv-rest { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
@@ -225,3 +217,17 @@ td.rv-fact-failed > span { white-space: nowrap; text-wrap: nowrap; }
   .rv-notes, .rv-note-btn, .rv-note-ro { white-space: normal; }
   .rv-note-text { white-space: normal; }
 }
+
+/* The owner's "Hidden columns" control above the Board. */
+.rv-board-tools { display: flex; justify-content: flex-end; margin: 0 0 8px; }
+
+/* Add a lead or open a matter, at the bottom of the List. */
+.rv-addrow { margin-top: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
+.rv-addrow-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.rv-addrow-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; align-items: end; }
+.rv-addrow-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.rv-addrow-hint, .rv-addrow-error, .rv-addrow-acts { grid-column: 1 / -1; margin: 0; }
+.rv-addrow-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.rv-addrow-error { color: var(--wine); }
+.rv-addrow-error:empty { display: none; }
+.rv-addrow-done { display: flex; flex-direction: column; gap: 6px; }

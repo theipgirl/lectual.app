@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
 import {
   createIntakeForm,
@@ -31,7 +32,7 @@ function friendly(err: unknown, fallback: string): string {
 }
 
 /** The editor's Save. Status (draft/live) is decided by the server's checklist, not sent. */
-export async function saveIntakeFormAction(payload: {
+export const saveIntakeFormAction = previewSafe(async function saveIntakeFormAction(payload: {
   id: unknown;
   config: unknown;
   allowedDomains: unknown;
@@ -48,12 +49,12 @@ export async function saveIntakeFormAction(payload: {
   } catch (err) {
     return { ok: false, error: friendly(err, "Couldn't save the intake. Nothing was changed — try again shortly.") };
   }
-}
+}, "state");
 
 export type IntakeListResult = { ok: true; id: string } | { ok: false; error: string };
 
 /** "New intake": a draft from the defaults, chat/form or assessment. */
-export async function createIntakeFormAction(name: unknown, kind: unknown = "intake"): Promise<IntakeListResult> {
+export const createIntakeFormAction = previewSafe(async function createIntakeFormAction(name: unknown, kind: unknown = "intake"): Promise<IntakeListResult> {
   try {
     const form = await createIntakeForm(name, kind);
     revalidatePath("/dashboard/forms/");
@@ -61,10 +62,10 @@ export async function createIntakeFormAction(name: unknown, kind: unknown = "int
   } catch (err) {
     return { ok: false, error: friendly(err, "Couldn't create the intake. Try again shortly.") };
   }
-}
+}, "state");
 
 /** "Duplicate": the same setup under a new link, as a draft. */
-export async function duplicateIntakeFormAction(id: unknown): Promise<IntakeListResult> {
+export const duplicateIntakeFormAction = previewSafe(async function duplicateIntakeFormAction(id: unknown): Promise<IntakeListResult> {
   try {
     const form = await duplicateIntakeForm(String(id ?? ""));
     revalidatePath("/dashboard/forms/");
@@ -72,10 +73,10 @@ export async function duplicateIntakeFormAction(id: unknown): Promise<IntakeList
   } catch (err) {
     return { ok: false, error: friendly(err, "Couldn't duplicate the intake. Nothing was copied; try again shortly.") };
   }
-}
+}, "state");
 
 /** "Archive" / "Restore". */
-export async function setIntakeArchivedAction(id: unknown, archived: unknown): Promise<IntakeListResult> {
+export const setIntakeArchivedAction = previewSafe(async function setIntakeArchivedAction(id: unknown, archived: unknown): Promise<IntakeListResult> {
   try {
     const form = await setIntakeFormArchived(String(id ?? ""), archived === true);
     revalidatePath("/dashboard/forms/");
@@ -83,12 +84,12 @@ export async function setIntakeArchivedAction(id: unknown, archived: unknown): P
   } catch (err) {
     return { ok: false, error: friendly(err, "Couldn't change the intake. Try again shortly.") };
   }
-}
+}, "state");
 
 export type StatusState = { error?: string; saved?: boolean };
 
 /** The drawer's status control. */
-export async function setIntakeStatusAction(_prev: StatusState, formData: FormData): Promise<StatusState> {
+export const setIntakeStatusAction = previewSafe(async function setIntakeStatusAction(_prev: StatusState, formData: FormData): Promise<StatusState> {
   try {
     await setIntakeSubmissionStatus(String(formData.get("id") ?? ""), String(formData.get("status") ?? ""));
   } catch (err) {
@@ -96,4 +97,4 @@ export async function setIntakeStatusAction(_prev: StatusState, formData: FormDa
   }
   revalidatePath("/dashboard/forms/");
   return { saved: true };
-}
+}, "state");

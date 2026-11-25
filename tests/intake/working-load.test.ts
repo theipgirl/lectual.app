@@ -82,7 +82,8 @@ describe("readRealActivityLeadIds", () => {
     expect([...got].sort()).toEqual(["lead-1", "lead-3"]);
     expect(calls).toHaveLength(1);
     expect(calls[0]).toMatchObject({ table: "crm_activity", select: ACTIVITY_SELECT, or: REAL_ACTIVITY_FILTER });
-    expect(ACTIVITY_SELECT).toBe("lead_id, type, to_stage_id:payload->>to_stage_id");
+    // Changed on purpose (lectual 0119): the read also carries `stage_deleted`, so a stage-delete move is never work.
+    expect(ACTIVITY_SELECT).toBe("lead_id, type, to_stage_id:payload->>to_stage_id, stage_deleted:payload->>stage_deleted");
   });
 
   it("the filter names every real type, mail for any actor, the rest only for a person, and no importer/agent/system shape", () => {
@@ -111,7 +112,7 @@ describe("readRealActivityLeadIds", () => {
     if (clause.startsWith("and(")) return splitTop(clause.slice(4, -1)).every((c) => evalClause(c, row));
     const m = /^(.+?)\.(in|eq|is)\.(.*)$/.exec(clause)!;
     const [, col, op, val] = m;
-    const v = col === "payload->>actor" ? (row.payload as Record<string, unknown>)?.actor ?? null : row[col];
+    const v = col.startsWith("payload->>") ? (row.payload as Record<string, unknown>)?.[col.slice("payload->>".length)] ?? null : row[col];
     if (op === "in") return val.slice(1, -1).split(",").includes(String(v));
     if (op === "eq") return v === val;
     return val === "null" ? v === null || v === undefined : false;
@@ -138,6 +139,19 @@ describe("readRealActivityLeadIds", () => {
     const { db } = fakeDb(() => ({ data: rows, error: null }));
     const got = await readRealActivityLeadIds(db, ids(2), (to) => isPastFirstContact(to, stages));
     expect([...got].sort()).toEqual(["mail", "past"]);
+  });
+
+  it("a move written by an owner deleting a stage is never work (lectual 0119 stage_deleted)", async () => {
+    expect(counts(R("stage_changed", "user", { reason: "stage deleted", stage_deleted: true }))).toBe(false);
+    expect(counts(R("stage_changed", "user", { to_stage_id: "cs" }))).toBe(true);
+    // And if such a row is read anyway, the JS skips it.
+    const rows = [
+      { lead_id: "deleted", type: "stage_changed", to_stage_id: "cs", stage_deleted: "true" },
+      { lead_id: "person", type: "stage_changed", to_stage_id: "cs", stage_deleted: null },
+    ];
+    const { db } = fakeDb(() => ({ data: rows, error: null }));
+    const got = await readRealActivityLeadIds(db, ids(2), () => true);
+    expect([...got]).toEqual(["person"]);
   });
 
   it("a cleanup-script move (and every other stamped or system move) is excluded by the filter itself", () => {

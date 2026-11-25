@@ -110,14 +110,15 @@ describe("one sign-out and avatar block (F4)", () => {
   it("the rail has no me block and no sign-out", () => {
     const src = read("src/components/shell/Rail.tsx");
     expect(src).not.toContain("signOutAction");
+    expect(src).not.toContain("SIGN_OUT_PATH");
     expect(src).not.toContain("lx-rail-me");
     expect(src).not.toContain("lx-rail-avatar");
     expect(read("src/app/globals.css")).not.toContain("lx-rail-me");
   });
 
-  it("signOutAction is used by exactly one shell component, the account menu", () => {
+  it("sign-out (now the fixed route /auth/sign-out/, View as) is used by exactly one shell component, the account menu", () => {
     // NoFirmAccess is the screen for a signed-in person with no firm: there is no account menu there, so it keeps its own button.
     const files = ["Rail", "MobileBar", "AccountMenu", "SectionLabel", "NavProgress"].map((n) => [n, read(`src/components/shell/${n}.tsx`)] as const);
-    expect(files.filter(([, s]) => s.includes("signOutAction")).map(([n]) => n)).toEqual(["AccountMenu"]);
+    expect(files.filter(([, s]) => s.includes("SIGN_OUT_PATH")).map(([n]) => n)).toEqual(["AccountMenu"]);
   });
 });

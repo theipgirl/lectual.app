@@ -71,6 +71,8 @@ export type BoardColumn = {
   load?: string;
   /** The Long-Term Nurture column at the end of the stage board: drawn a little quieter. */
   quiet?: boolean;
+  /** The firm's layout hides this stage, but a card moved this session is in it, so it is still drawn (marked). */
+  hiddenByLayout?: true;
   drop: { kind: "stage"; stageId: string } | { kind: "owner"; key: string | null; stray: boolean };
 };
 

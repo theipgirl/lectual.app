@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
 import {
   addStep,
@@ -72,7 +73,7 @@ function isStepType(value: unknown): value is DripStepType {
 
 // ── Sequence details ─────────────────────────────────────────────────────
 
-export async function updateSequenceDetailsAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const updateSequenceDetailsAction = previewSafe(async function updateSequenceDetailsAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const sequenceId = String(formData.get("sequenceId") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
@@ -86,9 +87,9 @@ export async function updateSequenceDetailsAction(_prev: ActionState, formData: 
   }
   revalidateCampaign(sequenceId);
   return { saved: true };
-}
+}, "state");
 
-export async function toggleSequenceAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const toggleSequenceAction = previewSafe(async function toggleSequenceAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const sequenceId = String(formData.get("sequenceId") ?? "");
   const nextActive = formData.get("nextActive") === "true";
   if (!sequenceId) return { error: "Missing campaign." };
@@ -110,7 +111,7 @@ export async function toggleSequenceAction(_prev: ActionState, formData: FormDat
   }
   revalidateCampaign(sequenceId);
   return {};
-}
+}, "state");
 
 // ── Steps ────────────────────────────────────────────────────────────────
 
@@ -121,7 +122,7 @@ export async function toggleSequenceAction(_prev: ActionState, formData: FormDat
  * removing a middle step leaves a gap, and count would then collide with the
  * last step's index.
  */
-export async function addStepAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const addStepAction = previewSafe(async function addStepAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const sequenceId = String(formData.get("sequenceId") ?? "");
   const typeRaw = String(formData.get("type") ?? "");
   const delayRaw = String(formData.get("delayHours") ?? "0").trim();
@@ -150,7 +151,7 @@ export async function addStepAction(_prev: ActionState, formData: FormData): Pro
   }
   revalidateCampaign(sequenceId);
   return {};
-}
+}, "state");
 
 /** The one append path: next order_index from a fresh read, then the admin-gated `addStep`. */
 async function appendStep(
@@ -167,7 +168,7 @@ async function appendStep(
  * append path. Everything is validated before the first insert. Nothing is enrolled, started,
  * drafted into the queue or sent.
  */
-export async function addStarterStepsAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const addStarterStepsAction = previewSafe(async function addStarterStepsAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const sequenceId = String(formData.get("sequenceId") ?? "");
   const thankYou = String(formData.get("templateThankYou") ?? "").trim();
   const followUp = String(formData.get("templateFollowUp") ?? "").trim();
@@ -203,9 +204,9 @@ export async function addStarterStepsAction(_prev: ActionState, formData: FormDa
   }
   revalidateCampaign(sequenceId);
   return { saved: true, message: "Steps added. Start the campaign when you are ready." };
-}
+}, "state");
 
-export async function deleteStepAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const deleteStepAction = previewSafe(async function deleteStepAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const sequenceId = String(formData.get("sequenceId") ?? "");
   const stepId = String(formData.get("stepId") ?? "");
   if (!sequenceId || !stepId) return { error: "Missing step." };
@@ -217,11 +218,11 @@ export async function deleteStepAction(_prev: ActionState, formData: FormData): 
   }
   revalidateCampaign(sequenceId);
   return {};
-}
+}, "state");
 
 // ── Enrollments ──────────────────────────────────────────────────────────
 
-export async function enrollLeadAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const enrollLeadAction = previewSafe(async function enrollLeadAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const sequenceId = String(formData.get("sequenceId") ?? "");
   const leadId = String(formData.get("leadId") ?? "");
   if (!sequenceId) return { error: "Missing campaign." };
@@ -235,15 +236,15 @@ export async function enrollLeadAction(_prev: ActionState, formData: FormData): 
   }
   revalidateCampaign(sequenceId);
   return {};
-}
+}, "state");
 
-export async function pauseEnrollmentAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const pauseEnrollmentAction = previewSafe(async function pauseEnrollmentAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   return setStatusAction(formData, "paused");
-}
+}, "state");
 
-export async function resumeEnrollmentAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const resumeEnrollmentAction = previewSafe(async function resumeEnrollmentAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   return setStatusAction(formData, "active");
-}
+}, "state");
 
 /**
  * "Stop" — ends an active or paused enrollment by hand, RECORDED: status
@@ -251,7 +252,7 @@ export async function resumeEnrollmentAction(_prev: ActionState, formData: FormD
  * Replaces the old unrecorded "Cancel" (SOP rule 1: "the stop is a recorded
  * event — not someone remembering").
  */
-export async function stopEnrollmentAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const stopEnrollmentAction = previewSafe(async function stopEnrollmentAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const sequenceId = String(formData.get("sequenceId") ?? "");
   const enrollmentId = String(formData.get("enrollmentId") ?? "");
   if (!sequenceId || !enrollmentId) return { error: "Missing enrollment." };
@@ -265,7 +266,7 @@ export async function stopEnrollmentAction(_prev: ActionState, formData: FormDat
   }
   revalidateCampaign(sequenceId);
   return { saved: true, message: "Campaign stopped." };
-}
+}, "state");
 
 async function setStatusAction(formData: FormData, status: "active" | "paused"): Promise<ActionState> {
   const sequenceId = String(formData.get("sequenceId") ?? "");
@@ -297,7 +298,7 @@ async function setStatusAction(formData: FormData, status: "active" | "paused"):
  * result names whether it drafted something, so the page can say "Drafted —
  * open the queue to review it" rather than a bare "done".
  */
-export async function advanceEnrollmentAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const advanceEnrollmentAction = previewSafe(async function advanceEnrollmentAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const sequenceId = String(formData.get("sequenceId") ?? "");
   const enrollmentId = String(formData.get("enrollmentId") ?? "");
   if (!sequenceId || !enrollmentId) return { error: "Missing enrollment." };
@@ -321,4 +322,4 @@ export async function advanceEnrollmentAction(_prev: ActionState, formData: Form
   } catch (err) {
     return errorState(err, "Couldn't run this step.");
   }
-}
+}, "state");

@@ -1,13 +1,15 @@
 import { resolveStage } from "@/lib/lawmatics/stage-map";
 import type { StageOpt } from "@/lib/reconcile/types";
 import { isSignalId, type SignalId } from "@/lib/stage-keeper/signals";
+import { leadStageWithRole, type LeadStageRole } from "@/lib/stages/roles";
 
 /**
  * Which of the firm's stages each signal names.
  *
- * Two sources, in this order. First the firm brain: an entry of category `stage_mapping`
+ * Three sources, in this order. First the firm brain: an entry of category `stage_mapping`
  * whose key is the signal id (`consult-scheduled`, `loe-invoice-sent`, ...) and which says the
- * stage's name in `data.stage`, else in its body. Then, for a signal with NO entry, the
+ * stage's name in `data.stage`, else in its body. Then, for a signal with NO entry, the stage
+ * holding the signal's ROLE (lectual 0119, `SIGNAL_ROLES`), so a renamed stage keeps working. Then the
  * default names below, resolved against the firm's own stages with `resolveStage`
  * (case, punctuation, "&" / "and" and a leading list number do not matter).
  *
@@ -26,6 +28,17 @@ export const DEFAULT_STAGE_NAMES: Record<SignalId, readonly string[]> = {
   "loe-invoice-sent": ["LOE & Invoice Sent", "Pending LOE + Payment", "Engagement Letter Sent"],
   "welcome-sent": ["Welcome Email Sent", "Welcome Sent"],
   "payment-received": ["Signed LOE / Deposit Received", "Deposit Received"],
+};
+
+/** The stage role (lectual 0119) each signal reads before the default names. */
+export const SIGNAL_ROLES: Record<SignalId, LeadStageRole> = {
+  "consult-scheduled": "consult_scheduled",
+  "consult-held": "consult_held",
+  "questionnaire-sent": "questionnaire_sent",
+  "post-consult-sent": "proposal_sent",
+  "loe-invoice-sent": "loe_sent",
+  "welcome-sent": "welcome_sent",
+  "payment-received": "signed_loe",
 };
 
 /** signal id -> the stage name the firm brain says it means. */
@@ -56,6 +69,8 @@ export function stageForSignal(signal: SignalId, stages: readonly StageOpt[], ma
     const hit = resolveStage(named, stages);
     return hit.ok ? (byId.get(hit.stage.id) ?? null) : null;
   }
+  const byRole = leadStageWithRole(stages, SIGNAL_ROLES[signal]);
+  if (byRole) return byRole;
   for (const candidate of DEFAULT_STAGE_NAMES[signal]) {
     const hit = resolveStage(candidate, stages);
     if (hit.ok) return byId.get(hit.stage.id) ?? null;

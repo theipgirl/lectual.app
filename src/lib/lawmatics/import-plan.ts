@@ -34,11 +34,11 @@ import { isHiredStageName, type StageRef } from "./stage-map";
  */
 
 /** A stage row as the planner needs it. Category and order are optional: without them no "first open stage" exists. */
-export type PlanStage = StageRef & { category?: string; orderIndex?: number };
+export type PlanStage = StageRef & { category?: string; orderIndex?: number; role?: string | null };
 
 /** The firm's new-enquiry stage (see `newEnquiryStage`): where a person with no evidence about their stage is filed. */
 export function newEnquiryPlanStage(stages: readonly PlanStage[]): PlanStage | null {
-  const hit = newEnquiryStage(stages.map((s) => ({ id: s.id, name: s.name, category: s.category ?? null, order_index: s.orderIndex ?? null })));
+  const hit = newEnquiryStage(stages.map((s) => ({ id: s.id, name: s.name, category: s.category ?? null, order_index: s.orderIndex ?? null, role: s.role ?? null })));
   return hit ? (stages.find((s) => s.id === hit.id) ?? null) : null;
 }
 

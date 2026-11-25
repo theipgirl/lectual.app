@@ -23,6 +23,7 @@ import type { AgentContext, AgentResult } from "../types";
 import { parseStageMapping, type StageMapping } from "./mapping";
 import { targetStageFromSignals } from "./target";
 import { leadRead } from "@/lib/leads/live";
+import { withRoleFallback } from "@/lib/stages/roles";
 
 /**
  * Stage Keeper: places each lead on the board from facts the firm already recorded.
@@ -86,9 +87,10 @@ export function isSensitiveTitle(title: string | null): boolean {
 // ── reads ────────────────────────────────────────────────────────────────────
 
 async function readStages(admin: SupabaseClient, orgId: string): Promise<StageOpt[]> {
-  const { data, error } = await admin.from("crm_stage").select("id, name, category, order_index").eq("org_id", orgId);
-  if (error) throw new Error(`stage read failed: ${error.message}`);
-  return ((data ?? []) as StageRow[]).map((s) => ({ id: s.id, name: s.name, category: String(s.category), orderIndex: s.order_index }));
+  // `role` (lectual 0119) when the database has it; without the column the old select, exactly as before.
+  const { data, error } = await withRoleFallback((r) => admin.from("crm_stage").select(r ? "id, name, category, order_index, role" : "id, name, category, order_index").eq("org_id", orgId));
+  if (error) throw new Error(`stage read failed: ${(error as { message?: string }).message ?? "unknown"}`);
+  return ((data ?? []) as unknown as Array<StageRow & { role?: string | null }>).map((s) => ({ id: s.id, name: s.name, category: String(s.category), orderIndex: s.order_index, ...(s.role !== undefined ? { role: s.role } : {}) }));
 }
 
 async function readMapping(admin: SupabaseClient, orgId: string): Promise<StageMapping> {
@@ -375,6 +377,16 @@ async function readLeads(admin: SupabaseClient, orgId: string, ids: readonly str
   return out;
 }
 
+/**
+ * Does this timeline row say a PERSON chose the lead's stage? A signed-in actor's `stage_changed`, except the agent's own row and a
+ * move written by an owner deleting a stage (lectual 0119, `stage_deleted: true`: nobody chose that stage for this lead).
+ */
+export function countsAsPersonMove(type: unknown, actorType: unknown, payload: Record<string, unknown>): boolean {
+  if (type !== "stage_changed" || actorType !== "user") return false;
+  if (payload.actor === AGENT_ACTOR) return false;
+  return payload.stage_deleted === undefined || payload.stage_deleted === null || payload.stage_deleted === false;
+}
+
 type History = {
   consumed: Map<string, Set<string>>;
   /** Newest stage change a person made, per lead. */
@@ -425,8 +437,8 @@ async function readHistory(admin: SupabaseClient, orgId: string, ids: readonly s
       consumed.set(leadId, consumedSignalKeys(leadRows));
       for (const row of leadRows) {
         const p = (row.payload ?? {}) as Record<string, unknown>;
-        // A stage change a person made: signed-in actor, and not the agent's own row.
-        if (row.type === "stage_changed" && row.actor_type === "user" && p.actor !== AGENT_ACTOR) {
+        // A stage change a person made: signed-in actor, not the agent's own row, and not a move an owner's stage delete wrote.
+        if (countsAsPersonMove(row.type, row.actor_type, p)) {
           const at = Date.parse(row.created_at);
           if (Number.isFinite(at) && at > (personMovedAt.get(leadId) ?? Number.NEGATIVE_INFINITY)) personMovedAt.set(leadId, at);
         }

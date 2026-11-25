@@ -6,8 +6,9 @@ import { Pill } from "@/components/ui/Pill";
 import { notFound } from "next/navigation";
 import { getQueueItem, type QueueItem } from "@/lib/queue/api";
 import { activeQueueOrgKey } from "@/lib/queue/org";
-import { getScopedClient } from "@/lib/db/scoped-client";
-import { QUEUE_EDIT_ROLES, resolveQueueRole } from "@/lib/queue/roles";
+import { QUEUE_EDIT_ROLES } from "@/lib/queue/roles";
+import { previewingAs, viewerQueueRole } from "@/lib/views/view-as";
+import { VIEW_AS_PRIVATE_OUTLOOK } from "@/lib/ui/words";
 import { QueueUnavailable } from "@/components/queue/QueueUnavailable";
 import { ReviewPanel } from "@/components/queue/ReviewPanel";
 import { getFirmTimeZone } from "@/lib/org/profile";
@@ -97,9 +98,9 @@ export default async function QueueItemPage({
     loadError = err;
   }
 
-  const supabase = await getScopedClient();
+  // Drawn for the VIEWER (View as: the teammate's role while previewing); the actions re-check with the session.
   const [editRole, tz, view] = await Promise.all([
-    resolveQueueRole(supabase, QUEUE_EDIT_ROLES),
+    viewerQueueRole(QUEUE_EDIT_ROLES),
     getFirmTimeZone(),
     loadQueueViewContext(),
   ]);
@@ -145,6 +146,7 @@ export default async function QueueItemPage({
   // Read only while the firm has a drafter set, so a firm without one renders exactly as before.
   let makeDraft: { intro: string; view: MakeDraftView } | null = null;
   let retryPass: { drafterName: string } | null = null;
+  const previewing = await previewingAs();
   if (view.drafter && resolved && item.status === "approved" && item.type === "CLIENT_EMAIL" && view.viewer && editRole) {
     const trust = viewEventTrust(view);
     const events = trustedCardState(await loadCardState([item.id]), [item], trust);
@@ -163,7 +165,10 @@ export default async function QueueItemPage({
         if (a.progress.kind === "drafted") makeDraft = { intro, view: { kind: "drafted" } };
         else if (a.progress.kind === "drafting") makeDraft = { intro, view: { kind: "check-drafts", sentence: MAKE_DRAFT_CHECK_DRAFTS, text: item.final_body ?? item.draft_body } };
         else if (!approvedTextMatches(item, a.sha)) makeDraft = { intro, view: { kind: "blocked", sentence: MAKE_DRAFT_CHANGED, connect: null } };
-        else {
+        else if (previewing) {
+          // View as: the teammate's own Outlook isn't checked (the owner's own connection would answer).
+          makeDraft = { intro, view: { kind: "blocked", sentence: VIEW_AS_PRIVATE_OUTLOOK(previewing.name), connect: null } };
+        } else {
           const access = await myOutlookDraftAccess();
           const blocked: Record<Exclude<typeof access, "ready">, MakeDraftView> = {
             "no-mailbox": { kind: "blocked", sentence: MAKE_DRAFT_NO_OUTLOOK, connect: INTEGRATIONS_PATH },

@@ -1692,7 +1692,8 @@ A second shell for the managing attorney, beside today's (the TECHNICIAN view, u
   sheet with the old calls). The deck page and every deck action answer `notFound()` without it.
 - **`src/lib/views/` (pure):** view ids technician, owner, attorney, matters-team, intake, office, marketing, read-only; `LIVE_VIEWS =
   ["owner"]` (every other role keeps today's shell). `viewFor({ role, preview, firmHasRoleViews, actingAsStaff })`: switch off -> technician.
-  **Firm members (owner and every other role) have NO view switch** (founder, 2026-11-10): their view is their role's alone (owner -> owner
+  **Firm members (owner and every other role) have NO view switch** (founder, 2026-11-10; View as below is a READ-ONLY look at a teammate,
+  not a switch of one's own view): their view is their role's alone (owner -> owner
   view, everyone else technician while only the owner view is live), and a stored preference is never read for them (the old account-wide
   `user_metadata.lectual_view` is ignored everywhere). **Only Lectual staff acting inside a firm** (`actingAsStaff`, which
   `resolveFirmSession` asks the database via `is_platform_admin`) get the switch (`canSwitchView`), and only when THAT firm has `role-views`:
@@ -2893,9 +2894,9 @@ says "Not saved yet. Press Enter to save." (`SHEET_NOTE_NOT_SAVED_YET`; a failed
 cancels. `noteCommitter` keeps one post per Enter (a second Enter while saving is ignored); after a failure the next Enter retries.
 
 ## Weekly review List: the Notes cell sits in the column registry's slot (merge of the Notes cell into the columns work, no schema)
-The List's columns come from ONE registry (`src/lib/review/sheet-columns.ts`; `columnsFor`, the per-person chooser) and `NOTES_PRESENT` is now
+The List's columns come from ONE registry (`src/lib/review/sheet-columns.ts`; `columnsFor`; the firm's layout then orders and hides them, there is no per-person chooser) and `NOTES_PRESENT` is now
 `true`: both tables (the read-only `SheetView` and the owner's `SheetEditTable`) draw the merged `NotesCell` at the registry's `notes` slot,
-Trademarks after Source, Contracts after Next step, not last. The chooser hides or moves Notes like any other column. The Trademarks section note
+Trademarks after Source, Contracts after Next step, not last. The firm's layout hides or moves Notes like any other column. The Trademarks section note
 says "Description and Notes are one column in Lectual: Notes." again. Nothing about the cell changed: it saves on Enter only, leaving it never posts,
 and its words are the same.
 - **Read:** `loadReview(now, { withFees, withCustom, notes, customMoney })`, asked together for the List only, in the one parallel read
@@ -2919,7 +2920,7 @@ Money field only (a throw counts as staff). Nothing is hidden only in the browse
   value that still carried an amount is dropped. Callers: the Weekly review List (`loadReview({ customMoney })`, from the page's re-resolved role) and the
   opened card's own read (`loadCardCustomColumns(record, { canSeeMoney })`, the card's re-resolved role AND the page's). The page also cleans what it
   draws with `withoutMoney` (List tables, the owner Sheet's editors, the card's Firm columns). `columnsFor` drops a Money field unless `canSeeMoney`
-  (`customColumn(...).money` is now true for one), so the column chooser never lists it and a stored pref naming it is dropped. No other path reads
+  (`customColumn(...).money` is now true for one), so no column list offers it to anyone else. No other path reads
   `crm_custom_value` (Settings -> Columns reads `value_choice` counts only; no CSV, Matters/Leads list or Copilot reads custom values).
 - **Writes closed:** `setCustomValue` refuses a Money field for every non-owner with `CUSTOM_MONEY_OWNER_ONLY` before the record or the existing value
   is read (decision: owner-only writes too, clears included). Field DEFINITIONS are still the admin tier's (Settings -> Columns says
@@ -2949,6 +2950,219 @@ BEFORE `revoke_member_sessions` (whose order before the delete is kept for 0031'
 the database would refuse. Every other removal and re-role is unchanged. Tests: `tests/settings/owner-row-guard.test.ts`. lectual's ported
 copies need the same fix (`PORTED_FROM.md`).
 
+
+## View as: an owner's read-only preview of a teammate (spec `docs/pge/2026-11-17-agentic-ip-os/spec-owner-view-as.md`, defaults D1-D15; needs lectual 0117 (PROPOSAL, NOT applied) after 0116 (applied to dev and prod))
+A real owner presses "View as" on a teammate's row in Settings -> Team (or "View as a teammate" in the account menu) and every dashboard page draws
+as that teammate would see it, under "Viewing as <name> (read-only)" with Exit. **The session stays the owner's**: no new token, no service role in
+dashboard code, RLS runs as the owner; only "whose view" changes. This is NOT a view switch of one's own (D15) and never "act as".
+- **Who:** only a REAL owner: an owner `crm_org_member` row in THIS firm (`isRealOwner`, `session.member?.role === "owner"`), never the claim and never
+  `!actingAsStaff` alone. A platform admin who is a real owner of the firm may (there only); staff with no row, or a non-owner row, may not. Not
+  yourself; the target must be a current member of the firm; owners may preview owners and admins. Rules: `src/lib/views/view-as-rules.ts` (pure).
+- **The database is the sole authority** (0117 `owner_view_as_event`, proposal file `docs/pge/2026-11-17-agentic-ip-os/0117-proposed.sql.txt`).
+  `owner_view_as_state()` is read ONCE per request for a real owner (`readPreviewState` in `src/lib/views/view-as-flag.ts`, memoized per request on
+  the request's headers object by `src/lib/views/request-memo.ts`, because React `cache` does not memoize in actions or route handlers); non-owners
+  make no read. **Fail closed** (fix of 9a209c0, narrowed Nov 24): an errored read for someone who COULD be a real owner (`readFailed` /
+  `memberReadFailed` on `loadFirmSessionCore`: the membership read itself failed, or an owner row with a failed firm or `is_platform_admin`
+  read) is "unknown"; a non-owner row read fine is never locked out by another read's hiccup; an auth-server error other than "no session" (`authFailed`) and
+  a session that can't be resolved at all are "unknown" while the hint cookie is present and "off" without it. Answers: on / off / not-set-up (42883, PGRST202, 42P01, PGRST205 by CODE, or 0116's guard missing: nothing offered, the Team page and
+  Enter say `notReadyYet("Viewing as a teammate")`) / unknown (a real owner's failed read: the "Couldn't check" banner, writes refused). The hint
+  cookie `lx_view_as` never turns a preview on; clearing it never ends one. A STALE cookie (present, state off or not set up) draws
+  `StalePreviewCookie` ("Your earlier preview has ended." + "Leave preview"), which also posts to Exit once in the background, so the proxy's 409s
+  stop. The per-request memo is forgotten after every wrapped action body (`forgetRequestMemo`), so a same-request re-render reads afresh.
+  2 hours from Enter on the database clock (D1).
+- **Enter, Exit, sign-out are route handlers at fixed paths** (`/dashboard/view-as/enter/`, `/dashboard/view-as/exit/`, `/auth/sign-out/`; logic in
+  `src/lib/views/view-as-routes.ts`, deps injected): same-site POST (Origin, or the Referer when it is missing or "null", against the request
+  URL, Host / X-Forwarded-Host with X-Forwarded-Proto, and `SITE_URL`: `requestOrigins`), session re-read, 303. Sign-out runs the same check
+  but is NEVER blocked by it: a failed check only skips the `owner_view_as_end` log write; it still signs out and clears the cookie. `signOutAction` is gone: every sign-out form posts to
+  `/auth/sign-out/`, which calls `owner_view_as_end('sign_out')` first (best effort), then signs out everywhere. Exit that can't be written keeps the
+  preview and the cookie and says `VIEW_AS_EXIT_FAILED`.
+- **The seam:** `resolveViewer()` (`src/lib/views/view-as.ts`, server-only, memoized) = `{ session, viewAs, viewer, previewState }`. Pages and server
+  components draw from the VIEWER: `resolveViewSession()` (resolveFirmSession as the viewer sees it: role, name, `user.id` and `member` are the
+  teammate's, `user_metadata` empty), and the twins `viewerRole()`, `viewerHasRole()`, `viewerQueueRole()`, `isViewerApprover()`, which outside a
+  preview ARE their session helpers. **No "use server" file and no route.ts imports `@/lib/views/view-as`** (`tests/views/view-as-no-viewer-in-actions`);
+  actions keep deciding with the session and are refused in a preview before deciding anything. Every session role read outside an entry point is
+  pinned and classified in `tests/views/view-as-role-reads.test.ts`; every `auth.getUser()` in `tests/views/view-as-getuser.test.ts`. A new one fails until classified.
+- **The write block, in layers** (a guard against accident, not a hostile owner):
+  (a) **every exported server action is `export const X = previewSafe(async function X(...) {...}, refusal)`** (`src/lib/views/preview-safe.ts`;
+  refusal `"state"` = `{ ok: false, error: VIEW_AS_READ_ONLY }`, `"redirect"` = back with `?notice=preview`, or a function for any other shape, checked
+  by TypeScript), and every mutating route handler `previewSafeRoute(...)` (409). The wrapper reads only the flag. The named read-only allowlist
+  (`previewReadOnly(fn, reason)`: contact search, the leads compare panel, Getting started's record picker, the staff signed-letter download)
+  writes nothing at all and is pinned with its reasons (tested on realistic rows, a found signed proposal included). **Left unwrapped on purpose**
+  (`UNWRAPPED` in the AST test): signing in (`sendMagicLink`, `verifySignInCode`, `confirmSignIn`, the `auth/callback` route: they only create a
+  session) and the public proposal page's two letter downloads (anonymous, token-bound, service-role reads). Entry files are found through the AST
+  (a leading comment can't hide `"use server"`), and a nested inline `"use server"` anywhere under src/ fails; `previewReconcileAction` stays refused (it refreshes mailbox tokens). The AST test
+  `tests/views/view-as-actions-guarded.test.ts` fails CI on an unwrapped action, a re-export, a factory, or an unclassified route.ts.
+  (b) **The database net inside `getScopedClient()`** (`previewNetFetch`, per client instance, never process-wide): while previewing (or unknown),
+  EVERY method other than GET / HEAD / OPTIONS answers 409 without being sent, whatever the path (`/rest/v1`, `/storage/v1`, `/functions/v1`,
+  `/graphql/v1`, a path-prefixed Supabase URL), except the named exemptions: signed DOWNLOAD links, the three `owner_view_as_*` log functions, and
+  auth's own calls other than `PUT /auth/v1/user`. **Read RPCs are called as GET** (`rpc(fn, undefined, { get: true })`: `current_org_id`,
+  `current_org_role`, `is_platform_admin`, `platform_admin_orgs`, `org_member_directory` via `callMemberRpc`, `mailbox_connections_for_owner`; all
+  STABLE in lectual's migrations; `tests/views/view-as-read-rpcs.test.ts`). A read RPC left as POST fails closed in a preview.
+  (c) **The proxy** answers 409 to non-GET signed-in paths (and the OAuth connect / callback GETs) while the hint cookie is present: a quick refusal
+  only; it reads no state. (d) **Render-time provider reads are skipped** whenever the FLAG is on or unknown (`inPreview` /
+  `consultPreview`, not only when a teammate is named): Today's Zoom consults (`VIEW_AS_ZOOM`), My Mail's live Inbox
+  and reading pane (`VIEW_AS_LIVE_MAIL`), so no token is refreshed. (e) `ReadOnlyPreview` cancels form submits in the browser (courtesy).
+  Render-time writes are skipped too: the Forms page's first-draft create (`mayCreate: false`) and the Leads page's stale-timer nudge.
+- **Personal mailboxes:** every render path that lists mailbox connections goes through `listConnectionsForViewer()` (shared mailboxes only while
+  the flag is on or unknown): Integrations (the personal block shows `VIEW_AS_PRIVATE_MAIL` and no Connect), the Assistants readiness check, Settings ->
+  Features' count, Setup, Getting started and Reconcile; My Mail and Today's consults filter themselves (`tests/views/view-as-personal-mailboxes.test.ts`).
+- **Private places** show fixed sentences (`words.ts` `VIEW_AS_*`) and never the owner's own items: the bell (muted, `PreviewBell`) and the
+  notifications page, Copilot (page sentence, launcher hidden, the chat route refused), My Mail (firm SHARED mailboxes only, from stored rows), Today's
+  consults (source notes from firm connections only; the teammate's own Outlook is `VIEW_AS_PRIVATE_OUTLOOK`), the drafter's own Outlook on the
+  approval page and Settings -> Approvals. The tour, welcome deal, Getting started runner and card, and the name / deal-times / feedback dialogs do not
+  open; the account menu holds only "Viewing as <name>", Exit and Sign out. A teammate's own settings (deal times, tips) can't be read: firm defaults (D10).
+- **Tests:** the default for every suite is "not previewing" (`tests/setup-view-as.ts` mocks the flag off; the View as suites unmock it).
+  `tests/views/view-as-*.test.ts(x)`; the 0117 proposal is text-pinned (with an MD5) in `tests/views/view-as-0117-proposal.test.ts`.
+  **Known cost (perf note, not fixed):** every dashboard request by a real owner makes one `owner_view_as_state()` POST, which also takes a
+  per-(firm, owner) advisory lock and scans that owner's open entries; firms have one to three owners, so this is accepted, but a future change could
+  skip it when the hint cookie has been absent for a while. **Not verified:** a real browser (desktop or 375px), 0117 on any database, PostgREST GET for the read RPCs on a
+  live project (they are STABLE in lectual's migration text), and Next's real memo behaviour of `headers()` across a server action plus its re-render.
+
+## Editable views, step 3: the owner's column menu, Add a lead, and no Settings -> Columns (needs lectual 0119, NOT applied anywhere)
+Spec `docs/pge/2026-11-17-agentic-ip-os/spec-editable-views.md` (build step 3 and 7); the DB proposal is `0119-proposed.sql.txt`. Weekly review List and Board only.
+- **Who:** an owner by the caller's own `crm_org_member` ROW (`loadOwnerState`, step 2), never the role claim; Lectual staff acting in a firm are not owners. The page draws the
+  menu only for an owner, not while previewing a teammate, and only when the saved layout was READ (its `rev` is what a change is fenced on). Every action asks the row again first.
+- **Layout write** (`src/lib/views/layout/save.ts`, deps injected; `actions.ts` is the thin `"use server"` pair, both `previewSafe`): the browser sends a view key, an OPERATION
+  (`rename | hide | show | move | moveTo | moveBeside | width | insert`) and the `rev` it drew, never a layout. The server re-reads the saved layout, builds the next one from the step-2 `next.ts`
+  helpers over the columns the viewer has (`layout-base.ts`: the List's base is both sections' columns merged, the Board's is every member's lane), validates it (`parseLayout`) and
+  writes through `store.ts`: INSERT when there is no row (23505 = another owner got there first: re-read, apply the same operation to THEIR layout, update, once), else UPDATE of
+  `columns` alone fenced on `rev` (0 rows = "Someone else changed this view. Refresh to see their change."). Never an upsert. Every answer is a fixed sentence (`writeFailure` maps by
+  error CODE only); a missing table is `notReadyYet("Changing columns")`, RLS 42501 is "Only an owner can change this view."
+- **Add a column** (`add-column.ts`): creates the firm field (`createFieldWithId`) and inserts its lowercase `cf:` key beside the chosen column in one action. If the field was made but
+  the layout write failed, the column still shows (a layout draws any column it doesn't name at the end) and the answer says its place couldn't be saved. The kinds are the existing
+  create's (Text, Date, Money, Choice, Person; there is no Checkbox kind in 0115); Money stays owner-only.
+- **Firm column create/rename/choices/move/archive are owner-only** (`FieldDeps.owner`, from the membership row; `field-deps.ts` builds the deps for both action files). The refusal is
+  "Only an owner can change columns."; 0119 makes it a DB rule too. There is no screen for Edit choices, Archive or Restore any more (the actions remain; the menu offers Rename,
+  Hide, Move and Add).
+- **UI:** `ColumnMenu` (List header and a Board lane) draws a fixed-position panel (the List scrolls sideways inside its card and would cut an absolute one off), closes on Esc (focus back),
+  an outside press and scroll/resize; `HiddenColumnsMenu` shows a hidden column or lane again. `menuItems` (pure) says what a pinned column or a lane is offered.
+  Not verified in a real browser: placement of the fixed panel, focus order, phone width.
+- **Add row** (`AddRow.tsx`, `addLeadFromReviewAction`): "Add a lead" creates a REAL lead through `createLead` (first and last name, email (required: `crm_lead.email` is NOT NULL), business
+  optional). **"Start in"** (Taylor): a select of the firm's OPEN lead stages in pipeline order (`add-lead-stage.ts`), defaulting to the new-enquiry stage; won, lost and nurture are never offered. The
+  server never trusts the posted `stageId`: it re-reads the firm's stage list through the scoped client (a foreign id isn't in it), refuses anything that isn't an open stage of this firm with a fixed
+  sentence, and passes it to `createLead` as `currentStageId` (which stamps `stage_entered_at` and the `lead_created` row with that stage). No stage posted = the new-enquiry stage. If the stage list
+  can't be read there is no select and one quiet sentence. The Weekly review leaves out the new-enquiry and Follow-Up stages (`reviewLeadStageIds`), so a lead started past first contact shows in the
+  List at once; otherwise the success says it joins the List once it moves past first contact, with links to the lead and Leads. "Open a matter" is a plain link to
+  `/dashboard/matters/#open-matter`. Neither is drawn for a role that can't create the record.
+- **Removed:** Settings -> Columns (page, `ColumnsSettings*`, its CSS, `settings-load.ts`, the tab, the section note's "Add a column" link, its words and the design-harness screens). The
+  card's `FirmColumnsEdit` (typing values) stays. 
+- **Also removed (step 7, Nov 25: the firm layouts decide, nobody chooses their own):** the per-person Columns chooser on the Weekly review List
+  (`ColumnChooser`, `use-column-prefs`, `column-prefs-storage`, `applyColumnPrefs` / `parseColumnPrefs` / `prefsReducer` / `parseStoredDocument`, its words
+  and `.rv-cols-*` CSS). Columns drawn = the firm's layout applied to the viewer's allowed columns (`columnsFor` -> `applyReviewLayout`); money rules unchanged.
+  **A stored old choice is never read.** It lived in `localStorage` under `lx-review-sheet-columns`; `LegacyColumnPrefsCleaner` (mounted on the List,
+  draws nothing) deletes that one key after mount, inside try/catch (`removeLegacyColumnPrefs`, `src/lib/review/legacy-column-prefs.ts`), and a present,
+  malformed or huge value changes nothing drawn and throws nothing (`tests/review/legacy-column-prefs.test.tsx`). **Column widths a person dragged are
+  kept:** they live under their own key (`SHEET_SIZES_KEY`, `lx-review-sheet-sizes`), a per-viewer convenience, and are not touched.
+- **One List layout per section (step 3 review):** view keys `review_list_trademarks` and `review_list_contracts` (no `review_list`): the sections head `client` and `mark` differently, so a rename
+  in one must not relabel the other. The page reads both, each header menu is fenced on its own section's rev. Move left and right are `moveBeside` the VISIBLE neighbour the browser names (the
+  server checks both keys are in the layout), so a move is seen even when the layout holds columns that aren't drawn.
+- **A firm column's menu** (`cf:` keys, `firm-column.ts`, `firmColumnAction`, owner-gated): Rename renames the FIELD itself (and clears any view label for it, so the record card and the name rules
+  agree); Edit choices (Choice kind); Archive, with a confirm saying there is no Restore on screen yet. Add a column is refused for any view but the two List keys, before the field is made.
+- **Databases:** `0119-proposed.sql.txt` is the FINAL 0119 for a fresh prod apply (pure ASCII, characters built with `chr()`); `0119b-proposed.sql.txt` is the dev-only delta from the first copy applied
+  to lectual-dev at c46913f. Neither is applied by this repo; prod needs the owner's OK. `tests/views/layout/sql-proposal-text.test.ts` pins them.
+
+## Editable views, step 4: stage roles and the owner's stage menu (needs lectual 0119, NOT applied to prod; spec `spec-editable-views.md` 3b)
+- **Role first, name as the fallback** (`src/lib/stages/roles.ts`, pure). Order everywhere: firm brain `stage_mapping` entry (where the rule has one) ->
+  the ONE stage holding the role -> today's name rule -> today's fallback. A role is trusted only on a stage its category (lead: `new_enquiry` /
+  `follow_up` open, `signed_loe` won, `lost` lost) or open/closed state (matter: `registered` / `abandoned` closed, the rest open) allows, and only when
+  exactly one stage holds it; otherwise the name rule runs, byte for byte as before. Readers: `newEnquiryStage` (`new_enquiry`), Stage Keeper
+  `stageForSignal` (`SIGNAL_ROLES`), Reconcile `stageForMilestone` (`MILESTONE_ROLES`; `contacted` = `new_enquiry`, `declined` = `lost`, `nurture` =
+  `follow_up`), the hired sync's `wonTargetStage` (lead `signed_loe`, won only) and TM matter stage plus the Matters past-signed-LOE cut (`hiredStageOf`,
+  matter `signed_loe`), the Follow-Up boundary (`followUpStageIds`: the role holder alone, else every open stage NAMED Follow-Up; Working rule and the
+  Weekly review's `reviewLeadStageIds`) and the USPTO compare (`compareStatusToStage(read, label, role)`). Nothing in the app writes a role.
+- **Reads:** `role` is hand-added (optional) on both stage Row types. `listStages` selects `*`; every explicit stage select asks for `role` through
+  `withRoleFallback` and reads again without it on 42703 / PGRST204 (by code). `loadMatterStages` tries `phase + role`, `role`, `phase`, plain, in that
+  order. The Stage Keeper and the hired sync keep their service-role client; only their select changed.
+- **The owner's stage menu** (`StageMenu`, on each stage column of the Leads stage board and each open stage column of the Matters board; "Closed" and "Not on
+  the docket yet" get none): drawn only for an owner MEMBERSHIP ROW (`loadOwnerState`) and never while previewing; the Leads board keeps its own board (not
+  moved onto `ViewBoard`), the menu is the column's `menu` slot. Rename, Move left / right (beside the visible neighbour), Add a stage left / right (lead:
+  name + category with the won warning; matter: label + open/closed + who it waits on, the neighbour's phase), Change type (only while the stage holds
+  nothing AND its holdings were read), Delete. Rules for what is offered: `src/lib/stages/menu-model.ts` (pure).
+- **Delete:** the page reads, for owners only, every stage's record ids (`loadStageHoldings`: live leads, merged left out; matters of any status; paged; a
+  failed read offers no delete and no type change, never "empty"). The dialog shows the count and sends exactly those ids back (`p_expected_ids`); the
+  database refuses when they changed ("Some records moved since you opened this. Refresh and try again."). Destinations: lead open / lost / nurture (from a
+  won stage only another won stage); matter the same open/closed unless "Also change open/closed" is ticked. A role holder asks which stage takes the role
+  ("Drop the role" where 0119 allows: never `new_enquiry`, lead `signed_loe` only on the last won stage, matter `signed_loe` never); the last won stage needs
+  the "No won stage" tick; the last open stage is not offered.
+- **One action** (`changeStageAction`, `src/lib/stages/actions.ts`, `previewSafe`; logic `manage.ts`, deps injected): owner row first (before any read),
+  positions worked out from the firm's stage list read through the scoped client (the browser sends "beside X, on this side", never a position), one call to
+  the 0119 function through the scoped client, ONE retry on 40P01 / 55P03 then `STAGE_BUSY`, every 0119 prefix mapped to a fixed sentence (`errors.ts`),
+  PGRST202 / 42883 = `notReadyYet("Changing stages")`. After a lead-stage delete, the moved leads get the sequence stop a person's move into that destination
+  gets (only a won destination stops them, `stopLeadSequencesAsStaff`, reason `client`); NO `stage_changed` automation rule runs and no matter handoff (a won
+  destination is only reachable from a won stage). A stop that didn't finish is said (`STAGE_DELETED_SEQUENCES_NOTE`); the delete stands.
+- **Working rule and the Stage Keeper:** a `stage_changed` row with `payload.stage_deleted` is never a person's work (`REAL_ACTIVITY_FILTER` and the JS
+  both skip it) and never a person's placement: the Stage Keeper's "a person moved this lead in 7 days" check (`countsAsPersonMove` in `run.ts`) ignores it.
+- **Merged leads (0107) in a stage:** `loadStageHoldings("lead")` reads leads WITHOUT the live filter and reports merged ones only as a COUNT per stage
+  (`merged`); their ids are never sent (0119 moves them itself). A stage holding any lead, live or merged, needs a destination on delete and offers no
+  "Change type". "Change type" is never offered on a stage holding a type-bound role (lead `new_enquiry` / `follow_up` / `signed_loe` / `lost`; every
+  matter role). More than 5,000 ids is refused with `STAGE_TOO_MANY_RECORDS`. The Matters dialog says when its count (every matter, closed and filtered-out
+  included) differs from the column. The sequence stop runs in chunks of 80 lead ids (`stopInChunks`) and is ok only when every chunk is. A change
+  revalidates the boards, Reconcile, the Weekly review, Pipeline and the lead / matter pages (`/[id]`, "page").
+- **Closed and intake matter stages** (folded into "Closed" / left off the Matters page) are reached from "Manage stages" (step 5, below). The USPTO
+  compare's role argument has no caller yet.
+- **Not verified:** any database (0119's functions and role column were never called from this app), a real browser (fixed panel placement, focus, phone width).
+
+## Editable views, step 5: Matters and Contracts as two views (needs lectual 0119 for saved layouts and stage changes; NOT applied to prod; spec `spec-editable-views.md` item 4)
+`/dashboard/matters/` is two views over one docket, each with a List and a Board drawn through the shared `ViewTable` / `ViewBoard` with the firm's own layout.
+- **URL shape (least disruption):** `?kind=contracts` is Contracts; no `kind` (every old address) is Matters/Trademarks (`parseMatterKind`, `src/lib/matters/views.ts`). A chip row
+  ("Kind of matter": Matters N, Contracts N) switches; switching starts the other view fresh (its phase group and intake line are Matters-only), keeping the status chip, search and view.
+  `view=table` / no `view` keep their meaning. Layout keys `matters_list` / `matters_board` / `contracts_list` / `contracts_board` (already in `VIEW_KEYS`).
+- **The split is the Weekly review's own type rule** (`isTrademarkRow`): TM, CR, PATENT and no type are Matters; every other type is Contracts. One place; a test compares every type.
+- **Matters shows only matters past the signed engagement**: `pastLoeView` / `intakeStageIds` (role `signed_loe` first, then the exact label, `hiredStageOf`). Pre-filing / Post-filing / "Matters" stay the
+  existing phase-group chips on the Matters view. Contracts is never cut and has no phase chips (its board shows stages with no filing phase plus any stage holding a contract, empty ones folded).
+  A firm with no signed-engagement stage keeps today's rule (pipeline-phase stages are intake, with the existing warning): Today and Copilot's counts are untouched by this step.
+- **List:** `MatterListTable` (one per band) over the layout. Built-in keys `matter` (pinned link), `type`, `stage`, `in_stage`, `owner`, `next_step`, `notes`, then the firm's own columns that fit the
+  kind's section (`cf:` keys; Money only for a real owner). The card's menu is the last column and is not in the layout. Cells reuse the record card's `StagePick` / `OwnerPick` / `NextStepLine` (their own
+  role gates) and the Weekly review's `NotesCell` (`MATTER_WRITE_ROLES`, never in a preview); **firm columns are read-only cells** (typed on the matter's card, which already has the editor).
+  Reads (`list-extras.ts`, scoped client, List only): the firm's fields and values for the shown matters (a matter also shows its lead's value, as on the review) and each matter's newest plain note,
+  asked for only while the Notes column is visible. Each is three-state; a failed one is "couldn't load" in the cell, never empty. Layout read three-state: unreadable = standard columns + one note,
+  not set up = silent.
+- **Board layout hides only (agreed; also noted in the spec under Board).** The Board's columns are stages (`st_<id without dashes>`), plus `not_on_docket` and `closed`. A saved `matters_board` / `contracts_board` layout decides which columns are
+  hidden; **order and names are the stages' own** (the stage menu moves and renames the stage itself, for everyone and for every rule), so no second ordering of one pipeline exists. A hidden column's
+  matters are counted in one line for everyone; the owner gets Show. Never every column hidden. The column menu on a stage column is Hide only (`ColumnMenu kind="stage"`). This is narrower than the spec's
+  "hide / move / rename on the Board"; moving and renaming a stage column is the stage menu.
+- **Owner controls** (owner membership row, never the claim; never while previewing; only when the layout was READ; every action asks again): the column menu on each List header (rename, hide, move beside,
+  add a firm column, firm-column Edit choices / Archive: `addColumnAction` / `firmColumnAction` accept the two Matters/Contracts Lists, `changeLayoutAction`'s `baseFor` has the four keys; a layout change
+  revalidates the review and Matters pages), "Hidden columns" in the toolbar, and on the Board the Hide menu plus the step-4 `StageMenu` on each open stage column.
+- **Manage stages** (`ManageStages`, a closed `<details>` above the Board, owners only, never in a preview, Matters and Contracts boards alike): EVERY matter stage in pipeline order, the closed ones and the intake
+  stages the Matters view leaves out included, each with its state ("Open stage" / "Closed stage" / "Left out of Matters"), its matter count (holdings; unread = "Count couldn't be read", never 0) and the
+  SAME `StageMenu` (rename, move, add, change open/closed, delete with a move) over the same `changeStageAction`.
+- **Add row:** "Open a matter" under the List (a second `OpenMatterButton`, only for `MATTER_WRITE_ROLES`, hidden in a preview) opens the existing open-a-matter panel. No new form.
+- **Review fixes:** Today's and Copilot's links land on Matters, so each view shows one line for the OTHER view's matches under the same status chip and search ("Contracts has N" / "Matters has N", a link; counts elsewhere are
+  unchanged). Firm columns that couldn't be read say so once ("Some details couldn't load (your firm's columns)"); not set up is silent. Firm columns are ordered by `fieldsForSection` (the same function the layout write's base uses) and keyed one way
+  (lowercased `cfKey`). The page strips Money again for anyone but a real owner. The List is fixed-layout with default widths until a layout sets one. `changeLayout` refuses every op but hide / show on `matters_board` / `contracts_board`
+  (`LAYOUT_STAGE_BOARD_HIDE_ONLY`). The Board with empty stages is sent ONCE (empty columns last, `data-empty-stage`, hidden by CSS until Show).
+- **Kept:** the four chips, search, `MovedCardScroller`, the move menus, deadlines tags, Review pills, the record card.
+- **Existing assertions changed on purpose:** `phase-page` (the sample now has a signed-engagement stage and contracts live on the Contracts view), the list-page / review-fixes / list-cleanups source and markup pins (the List's row, width and header markup moved into `MatterListTable` / `ViewTable`),
+  the board-default and matters-links allow-lists (`layout/actions.ts` revalidates the Matters path), `menu-model` (the page joins the owner row and preview flag it reads once), `add-column` and `store-and-actions`
+  (the two Lists now take columns; the Boards save hides only).
+- **Not verified:** a real browser (the Hide menu and Manage stages panels use fixed placement; the stacked cards under 640px with a firm's own columns; the unified List header menus repeated on each band),
+  any database (0119's layout table and stage functions were never called from this app), and a firm with firm columns on Contracts end to end. A firm's own columns are not typed in the List cells.
+
+## Editable views, step 6: Leads as a List and a Board with the firm's layout (needs lectual 0119 for saved layouts; NOT applied to prod; spec `spec-editable-views.md`)
+`/dashboard/intake/` keeps everything Item L built (sets, the Working rule, Lost, paging, select mode, owner board, Long-Term Nurture column, empty-stages row, possible duplicates, notes, time chip, drag). Only the structure
+controls are new. Pure rules in `src/lib/leads/views.ts`; reads in `list-extras.ts` (scoped client) and `firm-cells.ts` (pure).
+- **List = the shared `ViewTable`, not a copy.** `IntakeTable` draws through `ViewTable` with the `leads_list` layout. To keep Item L's look without a regression, `ViewTable` gained four optional slots and nothing else:
+  `headProps` (the `data-col` / `aria-sort` hooks the CSS and tests use), `rowProps` (the row's `data-lead-row`, click-to-open and the pending opacity), `afterRow` (the one-line error row) and `scrollProps`
+  (the `ix-scroll` class and the ref the fit-measurement needs). The row is still `ix-row` (even height), the foot is still `ShowingCount` ("Showing N of M", 25 at a time, `?show=`), sort buttons, the
+  personal drag-resize grips (browser storage), duplicate markers, the notes line, the time chip and the trailing "..." menu column (not in the layout, like Matters' actions column) are all as before.
+  Widths: this person's dragged width, else the layout's width, else the default (Next step stays the one flexible column).
+- **Columns:** built-in keys are Item L's own (`lead` pinned, `stage`, `temp`, `source`, `owner`, `assistant`, `touch`, `next`); then the firm's own columns of the Trademarks section (a lead is a trademark lead, as on the
+  Weekly review), Money only for a real owner (`canSeeCustomMoney` on the re-resolved session; the page strips it again). **Owner and Assistant activity keep Item L's rule** (drawn only while somebody in view has an owner / something to show)
+  whatever the layout says: `drawnLeadColumns` applies the layout, then that rule. A rename is a label only (sort, filters and the Last contact rule keep reading the key). Firm columns are **read-only cells** (typed on the lead's card).
+  Three-state: layout read (unreadable = standard columns + one note; not set up = silent), firm columns (a failed read says so once, never "no columns").
+- **Owner controls** (owner membership row, never in a preview, only when the layout was READ): the column menu on each header (rename, hide, move beside, add a firm column, firm-column Edit choices / Archive), "Hidden columns" in the toolbar
+  beside More. `baseFor` has `leads_list` (built-ins + firm fields) and `leads_board`; `addColumnAction` accepts `leads_list`; `firmColumnAction` clears a renamed firm column's label in `leads_list` too; a layout change revalidates `/dashboard/intake/`.
+- **Board: layout hides only, and IntakeBoard stays as it is (not migrated onto `ViewBoard`).** Migrating would have put frozen set membership, pinned moved cards, select mode, the owner board, the Long-Term Nurture column, the empty-stages row and drag
+  at risk for no gain: the layout only needs to hide stage columns. `leads_board` columns are the firm's intake stages (`st_<id without dashes>`, `stageColumnKey`, now in `src/lib/views/layout/stage-columns.ts` with `splitHiddenColumns` and `isStageBoardView`, shared with Matters).
+  `hideStageColumns` takes the finished board model and removes hidden stage columns (the Nurture column and the named empty stages too); **order and names stay the stages' own** (the step-4 `StageMenu` moves and renames the stage), `changeLayout` refuses every op but hide / show on
+  `leads_board`. A hidden column's leads are counted in one line ("N columns are hidden in your firm's view (M leads)"), `renderedIds` follows what is drawn so a bulk move can't name a hidden card, and a board is never left with no column. The owner board and the Lost set are not touched.
+  Owners get `ColumnMenu kind="stage"` (Hide only) beside the `StageMenu` on each stage column, and Show in "Hidden columns".
+- **Add row:** "Add a lead" under the List (`AddRow` with `onLeads`, the Weekly review's own `AddLeadForm` and `addLeadFromReviewAction`, with the "Start in" picker over the open stages; the server re-checks the role and the stage). Only a role in `CAN_WRITE_LEAD`, never in a preview, List only, not in the Lost set.
+  The action revalidates `/dashboard/intake/`, so the lead appears in whichever set the Working rule puts it in. The toolbar's existing "Add a lead" dialog is unchanged.
+- **Existing assertions changed on purpose:** `col-header-fit` (labels come from `LEADS_LIST_BUILTIN`, the layout's defaults), `l2-view` / `list-page` / `stacked-cards-css` / `sheet-table-guard` (the table's markup pins now name `ViewTable`: `scroll: needsScroll`, `rowClass={() => "ix-row"}`,
+  `data-label={c.label}`), `menu-model` (the page joins the owner row and preview flag it reads once), `leads-cleanup` (the note read names `leadIds`), `add-column` and `store-and-actions` (`leads_list` takes columns, `leads_board` saves hides only).
+- **Not verified:** a real browser (the header menus beside the sort buttons and resize grips, the Hide menu on a stage column, the Add a lead row at 375px, the stacked cards with a firm's own columns), any database (0119's layout table was never called from this app), and a firm with firm columns on Leads end to end.
 
 ## Due today, work-item bullets, four package options (no schema)
 Display and data only: no migration, no dependency, nothing sends. `src/lib/proposals/pricing.ts` has NO diff; every figure below is formatted from

@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { deckSeenStamp, withDeckSeen } from "@/lib/deal/nudge";
 import { parseDealTimes } from "@/lib/deal/person-times";
@@ -17,7 +18,7 @@ export type MarkDeckSeenResult = { wrote: boolean };
  * only when the current deal opened after the stored stamp. Fails quietly: any problem is `wrote: false`, nothing shown.
  * Refused for Lectual staff acting inside a firm and for a firm without `role-views`.
  */
-export async function markDeckSeenAction(): Promise<MarkDeckSeenResult> {
+export const markDeckSeenAction = previewSafe(async function markDeckSeenAction(): Promise<MarkDeckSeenResult> {
   try {
     // Refused on the server, not only by what the page mounts: an ok firm session, never Lectual staff acting inside a firm,
     // and only a firm with the `role-views` rollout switch (the deck, and so the dot, exist only there).
@@ -33,4 +34,4 @@ export async function markDeckSeenAction(): Promise<MarkDeckSeenResult> {
   } catch {
     return { wrote: false };
   }
-}
+}, () => ({ wrote: false }));

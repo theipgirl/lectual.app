@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { headers } from "next/headers";
 import { acceptPublicQuote, declinePublicQuote, type AcceptRefusal, type DeclineRefusal } from "@/lib/quotes/public";
 import { readClientChoice } from "@/lib/quotes/packages";
@@ -47,7 +48,7 @@ export type AcceptActionResult = { ok: boolean; reason?: AcceptRefusal; message?
  * charged here: payment is a separate step on the receipt (payQuoteAction), so
  * a declined card can never cost a signature.
  */
-export async function acceptQuoteAction(input: {
+export const acceptQuoteAction = previewSafe(async function acceptQuoteAction(input: {
   token: string;
   name: string;
   email?: string;
@@ -71,16 +72,16 @@ export async function acceptQuoteAction(input: {
   // from the stored record, so the one thing the client sees afterwards is the
   // one in the database.
   return result.ok ? { ok: true } : { ok: false, reason: result.reason, message: result.message };
-}
+}, "state");
 
 export type DeclineActionResult = { ok: boolean; reason?: DeclineRefusal };
 
 /** Decline the proposal. Takes the token and nothing else — no reason text is
  * stored from an anonymous caller. */
-export async function declineQuoteAction(token: string): Promise<DeclineActionResult> {
+export const declineQuoteAction = previewSafe(async function declineQuoteAction(token: string): Promise<DeclineActionResult> {
   const result = await declinePublicQuote(String(token ?? ""), new Date());
   return result.ok ? { ok: true } : { ok: false, reason: result.reason };
-}
+}, "state");
 
 export type PayActionResult = { ok: boolean; reason?: PayRefusal; message?: string };
 
@@ -93,7 +94,7 @@ export type PayActionResult = { ok: boolean; reason?: PayRefusal; message?: stri
  * snapshot (src/lib/quotes/public-payment.ts). No card number ever reaches this
  * server: the browser sends an opaque token from AffiniPay's own iframes.
  */
-export async function payQuoteAction(input: { token: string; methodToken: string }): Promise<PayActionResult> {
+export const payQuoteAction = previewSafe(async function payQuoteAction(input: { token: string; methodToken: string }): Promise<PayActionResult> {
   try {
     const result = await payAcceptedQuote(
       { token: String(input?.token ?? ""), methodToken: String(input?.methodToken ?? "") },
@@ -106,4 +107,4 @@ export async function payQuoteAction(input: { token: string; methodToken: string
     console.error("[payments] payQuoteAction threw", err instanceof Error ? err.message : err);
     return { ok: false, reason: "indeterminate" };
   }
-}
+}, "state");

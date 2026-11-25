@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
 import { currentRole } from "@/lib/auth/current-role";
 import { listMemberDirectory } from "@/lib/members/directory";
@@ -18,7 +19,7 @@ const ROUTING_FIELD_PREFIX = "kind.";
  * re-read here, and a person or kind the browser invented is refused. "Usual approvers" (empty) removes the entry.
  * Storage is the proposals settings row, so a firm without that feature has nowhere to save (fail closed).
  */
-export async function saveApprovalRoutingAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const saveApprovalRoutingAction = previewSafe(async function saveApprovalRoutingAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   if (!canSeeSetup(await currentRole())) return { error: `${ADMIN_TIER_PHRASE} can change who approvals go to.` };
   if (!(await orgHasModule("proposals"))) return { error: notReadyYet("Approval assignments") };
 
@@ -64,4 +65,4 @@ export async function saveApprovalRoutingAction(_prev: ActionState, formData: Fo
   revalidatePath("/dashboard/settings/approvals/");
   revalidatePath("/dashboard/queue/");
   return { saved: true };
-}
+}, "state");
