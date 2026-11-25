@@ -333,8 +333,8 @@ describe("the page", () => {
     expect(page).toContain("const boardEdit = ownerNow && boardLayoutRead.status === \"ok\"");
     expect(page).toContain("const canAddLead = !previewing && session?.kind === \"ok\" && CAN_WRITE_LEAD.includes(session.role);");
   });
-  it("reads the firm's columns only for the List, never for the Board or the Lost set", () => {
-    expect(page).toContain('viewState.view === "table" && !lostView ? await loadLeadListExtras');
+  it("reads the firm's columns for the List and the Board (the toggle is client-side), never for the Lost set", () => {
+    expect(page).toContain('!lostView ? await loadLeadListExtras');
   });
   it("Money for the firm's columns comes from the re-resolved session, never from the browser", () => {
     expect(page).toContain("canSeeCustomMoney(session.role, session.actingAsStaff)");
