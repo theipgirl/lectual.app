@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { StructuredCall } from "@/lib/ai/claude";
 import { AGENT_POLICY } from "@/lib/agents/policy";
 import { isFullBrief, isFullGeneralBrief, stillAdoptable } from "@/lib/consult-prep/adopt";
-import { renderConsultBrief, type BriefFacts } from "@/lib/consult-prep/brief";
+import { renderConsultBrief } from "@/lib/consult-prep/brief";
 import { buildFullPrep, MAX_MODEL_CALLS, readFirmForBrief, type FullBuildDeps } from "@/lib/consult-prep/full";
 import type { Judgment, RoutePlan } from "@/lib/consult-prep/judge/schemas";
 import { GENERAL_JUDGMENT, GENERAL_PLAN, PACKAGES } from "./judge/fixtures";
