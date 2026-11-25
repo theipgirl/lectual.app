@@ -29,6 +29,23 @@ export interface UsptoRow {
   owner: string;
   goods_services: string;
   tsdr: string;
+  /** The values the USPTO site's own "Export" sheet shows, derived from the same record (see xlsx.ts). */
+  sheet: SheetFields;
+}
+
+/** What the site's export prints for one mark. Dates are `YYYY-MM-DD`; empty is ''. */
+export interface SheetFields {
+  /** `IC 003: ...; IC 005: ...`, entries ordered by class, status prefix removed, cut at the site's 1,000 characters. */
+  goods: string;
+  /** `1b 44d`: values joined by a space. */
+  basis: string;
+  /** `IC 043 IC 044`: classes joined by a space. */
+  classes: string;
+  /** Owner text without its leading `(APPLICANT)` style label. */
+  owner: string;
+  priority: string;
+  reg_type: string;
+  supplemental: string;
 }
 
 export interface NearIdenticalHit {
@@ -157,6 +174,26 @@ export function tsdrLink(serial: string): string {
   return `https://tsdr.uspto.gov/#caseNumber=${serial}&caseSearchType=US_APPLICATION&caseType=DEFAULT&searchType=statusSearch`;
 }
 
+const SHEET_GOODS_MAX = 1000;
+const icNumber = (g: string): number => {
+  const m = /^IC (\d+)/.exec(g);
+  return m ? parseInt(m[1], 10) : Number.MAX_SAFE_INTEGER;
+};
+
+/** The site's "GoodsAndServicesTruncated": status label dropped, ordered by class, cut at a word near 1,000 characters. */
+export function sheetGoods(entries: string[]): string {
+  const parts = entries.map((g) => g.replace(/^\(.*?\)\s/, ''));
+  const text = [...parts].sort((a, b) => icNumber(a) - icNumber(b)).join('; ');
+  if (text.length <= SHEET_GOODS_MAX) return text;
+  const cut = text.slice(0, SHEET_GOODS_MAX + 1).lastIndexOf(' ');
+  return `${text.slice(0, cut > 0 ? cut : SHEET_GOODS_MAX)}...`;
+}
+
+/** The site's "OwnerFullText": the leading `(LABEL) ` is dropped (greedy, up to the last `) ` as the site does). */
+export function sheetOwner(entries: string[]): string {
+  return entries.map((o) => o.replace(/^\(.*\)\s/, '')).join('; ');
+}
+
 export function toRow(tier: string, serial: string, s: Obj): UsptoRow {
   return {
     tier,
@@ -171,6 +208,15 @@ export function toRow(tier: string, serial: string, s: Obj): UsptoRow {
     owner: strList(s.ownerName).join('; '),
     goods_services: strList(s.goodsAndServices).join(' | ').slice(0, GOODS_MAX),
     tsdr: tsdrLink(serial),
+    sheet: {
+      goods: sheetGoods(strList(s.goodsAndServices)),
+      basis: strList(s.currentBasis).join(' '),
+      classes: strList(s.internationalClass).join(' '),
+      owner: sheetOwner(strList(s.ownerFullText)),
+      priority: str(s.priorityDate).slice(0, 10),
+      reg_type: strList(s.registrationType).join(' '),
+      supplemental: str(s.supplementalRegistrationDate).slice(0, 10),
+    },
   };
 }
 

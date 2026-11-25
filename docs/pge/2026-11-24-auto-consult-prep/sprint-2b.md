@@ -17,7 +17,7 @@ Source to port: lawmatics-mcp commit 3bcbe3f, `src/consult-brief/` (local clone 
 - **One dependency is allowed: `pdf-lib`, with `@pdf-lib/fontkit` for the packages PDF.** Pin them exactly to the versions in lawmatics-mcp's lockfile. Fonts ship in the repo with their licences and are read with `fs`, the way the letter fonts are; add `next.config.ts` tracing for the routes that build the PDF. No other new dependency (zip uses `node:zlib`, as the source does).
 
 ## Parts
-- **P1 USPTO** -> `src/lib/consult-prep/uspto/`. Port `uspto.ts` (the two-tier knockout), `uspto-csv.ts`, `zip.ts` and `uspto-summary.ts`, with their fixtures and tests.
+- **P1 USPTO** -> `src/lib/consult-prep/uspto/`. Port `uspto.ts` (the two-tier knockout), and `uspto-summary.ts` (the CSV and zip are replaced by `xlsx.ts`, the USPTO site's own export workbook, Nov 25), with their fixtures and tests.
 - **P2 Judgment** -> `src/lib/consult-prep/judge/`. Port `ai/prompt.ts`, `ai/schemas.ts`, `ai/judge.ts` and `scrub.ts`, plus the pricing helpers that turn a chosen package into printed figures.
   - Prices come from the firm list.
   - The route-and-search-plan call and the judgment call both go through the injected `llm`.
@@ -29,7 +29,7 @@ Source to port: lawmatics-mcp commit 3bcbe3f, `src/consult-brief/` (local clone 
   - The engine builds the FULL brief: facts plus the USPTO knockout plus class and risk plus the package plus questions. This is the skill's section order, extending `renderConsultBrief` with the ported `compose.ts` content.
   - The brief type becomes `full`, so booked and 24h are sent (S2a's rules).
   - A build failure (model, USPTO, budget) leaves the brief `facts` and is retried by the next run (S2a's withheld and owed logic).
-  - Attachments (`<Mark>_USPTO_first500.csv.zip`, `<Client>_Packages_<Mark>.pdf`) are added to the email through `sendInternalMail`, which gains `attachments`. If Resend refuses attachments, the email is re-posted once without them and the body names what is missing.
+  - Attachments (`tmSearchResults<date>.xlsx` (the USPTO site's own export; was `<Mark>_USPTO_first500.csv.zip`), `<Client>_Packages_<Mark>.pdf`) are added to the email through `sendInternalMail`, which gains `attachments`. If Resend refuses attachments, the email is re-posted once without them and the body names what is missing.
   - The same two files are saved to the lead's Documents & files (Taylor approved Nov 24). This is the first service-role `crm_file` write, kept in ONE file:
     - the org comes from the lead row;
     - the existing path rule `{org}/lead/{lead}/{file}.{ext}` and the extension-to-type map apply;

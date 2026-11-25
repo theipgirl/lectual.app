@@ -1,9 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import * as zlib from 'node:zlib';
 import { searchUspto, type UsptoOk, type UsptoResult } from '@/lib/consult-prep/uspto/uspto';
 import { summarizeUspto } from '@/lib/consult-prep/uspto/uspto-summary';
-import { writeUsptoCsv } from '@/lib/consult-prep/uspto/uspto-csv';
-import { buildUsptoZip } from '@/lib/consult-prep/uspto/zip';
+import { buildUsptoXlsx } from '@/lib/consult-prep/uspto/xlsx';
 import { body, fakeFetch, legacyConResponder, LEGACY_T1, pagedHits, source } from './uspto-fixtures';
 
 const LEGACY = { mark: 'LegacyCon', stem: 'legacy', classes: [41, 35], variants: ['legacy con', 'legacy conference'] };
@@ -121,27 +119,23 @@ describe('summarizeUspto', () => {
     }
   });
 
-  it('composes end to end: fixture -> search -> CSV -> zip -> summary with consistent counts', async () => {
+  it('composes end to end: fixture -> search -> xlsx -> summary with consistent counts', async () => {
     const f = fakeFetch(legacyConResponder);
     const r = (await searchUspto({ ...LEGACY, fetch: f.fetch })) as UsptoOk;
-    const csv = writeUsptoCsv(r.rows);
-    const z = buildUsptoZip(r.mark, csv);
-    const nameLen = z.data.readUInt16LE(26);
-    const inflated = zlib.inflateRawSync(z.data.subarray(30 + nameLen, 30 + nameLen + z.data.readUInt32LE(18))).toString('utf8');
-    const dataRows = (s: string) => s.split('\r\n').filter(Boolean).length - 1;
-    expect(inflated).toBe(csv);
-    expect(dataRows(csv)).toBe(r.written);
-    expect(dataRows(inflated)).toBe(r.written);
+    const x = await buildUsptoXlsx({ result: r, date: '2026-11-25', fetch: (async () => new Response('', { status: 404 })) as typeof fetch, imageBudgetMs: 1000 });
+    if (!x.ok) throw new Error('expected a file');
+    expect(x.rows).toBe(r.written);
+    expect(x.fileName).toBe('tmSearchResults2026-11-25.xlsx');
     const text = summarizeUspto(r);
     expect(text).toContain(`Full list attached: ${r.written} rows.`);
     expect(text).not.toContain('First 500');
-    expect(z.filename).toBe('LegacyCon_USPTO_first500.csv.zip');
   });
 
   it('composes a truncated list consistently (500 rows everywhere, first 500 attached)', async () => {
     const r = await run((c) => pagedHits('a', 600, 600, c));
-    const csv = writeUsptoCsv(r.rows);
-    expect(csv.split('\r\n').filter(Boolean)).toHaveLength(501);
+    const x = await buildUsptoXlsx({ result: r, date: '2026-11-25', fetch: (async () => new Response('', { status: 404 })) as typeof fetch, imageBudgetMs: 1000 });
+    if (!x.ok) throw new Error('expected a file');
+    expect(x.rows).toBe(500);
     expect(summarizeUspto(r)).toContain('First 500 attached');
   });
 

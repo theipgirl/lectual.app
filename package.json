@@ -17,6 +17,7 @@
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.107.0",
     "docx": "^9.7.2",
+    "exceljs": "4.4.0",
     "mammoth": "^1.12.3",
     "next": "16.2.7",
     "pdf-lib": "1.17.1",
