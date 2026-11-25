@@ -7,8 +7,18 @@ Newest section first. Tick an item when it is done; don't delete it.
 
 Recap: `docs/recaps/2026-11-17-marketing-site-redesign-mockups.md` (round three). Omi cross-check: still the open item "Review the new website".
 
+### Taylor, after the 18 comments were worked through (Nov 25, later)
+- [ ] Review Horizon again (same link) and resolve your 18 comment threads on the page; Claude can't close them from the session.
+- [ ] Say whether these three were read correctly: "remove for now" = the moving text strip; "remove since we added it up above" = the
+      looping night panel; "make this section about uspto deadlines" = the rules cards.
+- [ ] Rebecca: read the deadlines section before anything goes public. The six reference periods are copied from the product's own
+      deadline table, with small print that the Office's notice controls and an attorney confirms.
+- [ ] Check each company's brand rules before the Outlook, Zoom, Fathom, Lawmatics and LawPay logos go on the live site.
+- [ ] Read the three new differentiators and the six feature demos; keep, reword or cut.
+- [ ] Try it in Safari and on your phone: none of this has been checked outside automated Chrome.
+
 ### Taylor
-- [ ] Review Lectual Horizon on a laptop and a phone: https://claude.ai/artifact/1X2fXmvjbUpDJdHnrqwMPg
+- [x] Review Lectual Horizon on a laptop and a phone: https://claude.ai/artifact/1X2fXmvjbUpDJdHnrqwMPg (reviewed Nov 25; 18 comments left)
 - [ ] Choose the direction to build: Horizon (the demi.ai structure), Overnight (First light + Gate), or parts of each.
 - [ ] Confirm the overnight queue rows: Horizon uses only work the product does today. Overnight still shows the office action, patent and
       copyright examples until you say which you want.

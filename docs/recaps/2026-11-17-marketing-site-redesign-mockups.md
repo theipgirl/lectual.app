@@ -107,6 +107,59 @@ whether the page shows the right features.
   A few lines are new wording: "A legal CRM remembers. Lectual acts.", the three "different"
   titles, the short lists on the model cards, and the sub-labels on the connection chips.
 
+## Round four (Nov 25): Taylor's 18 comments on Horizon
+
+Taylor left 18 comments on Horizon and said: "resolve all the comments remember you are creative
+director use subs to complete". Same link: https://claude.ai/artifact/1X2fXmvjbUpDJdHnrqwMPg .
+
+- **How it was run.** One agent first split the page into section files with a shared script kit
+  (no visual change, checked pixel by pixel). Five builders then worked in parallel, each owning
+  different section files in its own copy; the orchestrator merged them, reviewed a full walk of
+  the page, and sent an independent reviewer through it (four screen sizes, scroll back up, nav
+  jumps, every interaction, keyboard, reduced motion, no JavaScript, copy rules). The reviewer
+  found two blockers and seven major issues; each went back to the builder who owned the section,
+  and the page was merged, re-checked and republished.
+- **Top of the page.** Overnight's nav (full width, condensing to the dark pill; "Log in"; a
+  Menu button on phones). "Draft ready" pill removed from the headline; check mark spacing
+  fixed. Hero sky is a soft sweep with no hard edge and scrubs forward through the time-lapse on
+  scroll. The hero's product window stays pinned and becomes the window of "What makes Lectual
+  different?", whose three points are now: "Built for IP practice, not adapted to it", "From the
+  consult to the signed letter, in one line", "An attorney is the only send button".
+- **Overnight scene.** The pinned "While the firm sleeps." clock scene from Overnight is added
+  after the differentiators, with rows for work the product does today. The moving text strip
+  and the looping night panel are removed.
+- **Features.** A pinned sideways scroll of the six cards with a calm snap; all six demos are
+  interactive (copy a link, flip the QR tile, open a consult's drafts, pick a package and sign,
+  move a matter between columns, ask Copilot, edit and approve a draft).
+- **Voice.** Sources flow along hairlines through the circle of sky into a draft; the circle
+  opens into the full sky; the five connection chips carry logos fetched from each company's own
+  site (Outlook from Microsoft's Office CDN, Zoom, Fathom, Lawmatics, LawPay); the line is now
+  "Your accounts, your data, your approval."; the sky dissolves forward into the next section.
+- **Deadlines.** The rules cards are replaced by "Every deadline, on the matter it belongs to.":
+  a docket timeline for an example matter (HALYARD) that draws on scroll, six deadline cards
+  whose reference periods are word for word from `src/lib/matters/deadline-rules.ts`, the small
+  print "Reference periods only. The date on the Office's own notice controls, and an attorney
+  confirms every deadline. Lectual tracks deadlines; it does not give legal advice.", a morning
+  brief card and a three-column board.
+- **Trust** is Overnight's section. **The three model cards are removed**; the slot is kept for
+  pricing later.
+- **Three comments needed interpreting** (each pinned to a pinned or whole-page element):
+  "remove for now" was read as the moving text strip, "remove since we added it up above" as the
+  looping night panel, "make this section about uspto deadlines" as the rules cards.
+- **Corrections made during review.** HARBORLINE was shown both as a registered mark nearing its
+  Section 8 date and as an application answering an Office Action; the docket now uses HALYARD.
+  The Section 8 line reads "due in 41 days" everywhere. Two phrases beyond the six approved
+  periods ("Years 5 to 6", "Window opens in year 5"), which came from the orchestrator's own
+  first brief, were removed. A class-name clash between two builders' sections had stretched
+  the Intake demo's switch; a pinned wrapper had made the hero's Apply button unclickable.
+- **Not checked:** Safari and Firefox, real trackpad and touch scrolling, a screen reader, and
+  the page inside the artifact viewer. Three of the features builder's interaction test sizes
+  (1280, 1024, reduced motion) were not re-run after a test-only fix.
+- **Comment threads.** The 18 Horizon threads were not sent to Claude from the comment panel, so
+  they cannot be replied to or resolved from the session; Taylor resolves them on the page.
+  Three older threads were resolved (Log in on Overnight; the growing window and the motion
+  graphic on Gate). The unreadable Gate comment is still open.
+
 ## Recommendation on Astro (not decided)
 
 Stay on Next.js for this redesign. The loader, pin scrolling and micro-animations are the same
