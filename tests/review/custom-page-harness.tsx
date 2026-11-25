@@ -12,12 +12,13 @@ export const spies = {
   cardLoad: vi.fn(),
 };
 
-export function mockPage(opts: { load: unknown; role: string | null; roleViews?: boolean; card?: unknown; cardCustom?: unknown; staff?: boolean }) {
+export function mockPage(opts: { load: unknown; role: string | null; roleViews?: boolean; card?: unknown; cardCustom?: unknown; staff?: boolean; /** The caller's membership row says owner (the column menu is drawn). Default: not. */ owner?: boolean }) {
   spies.loadReview = vi.fn(async () => opts.load);
   spies.cardLoad = vi.fn(async () => opts.card ?? { status: "not-found" });
   spies.cardCustom = vi.fn(async () => opts.cardCustom ?? { status: "ok", fields: [], values: [], mergedInto: {}, leadOfMatter: {} });
   vi.doMock("@/lib/review/load", () => ({ loadReview: spies.loadReview }));
   mockLayoutRead();
+  vi.doMock("@/lib/views/layout/owner-load", () => ({ loadOwnerState: vi.fn(async () => (opts.owner ? "owner" : "not-owner")) }));
   vi.doMock("@/lib/custom-columns/card-load", () => ({ loadCardCustomColumns: spies.cardCustom }));
   vi.doMock("@/lib/firm/session", () => ({
     resolveFirmSession: vi.fn(async () =>
@@ -28,7 +29,7 @@ export function mockPage(opts: { load: unknown; role: string | null; roleViews?:
   }));
   vi.doMock("@/app/dashboard/review/actions", () => ({
     setNextStepAction: vi.fn(), completeNextStepAction: vi.fn(), logWhatHappenedAction: vi.fn(), closeLeadAction: vi.fn(),
-    updateNextStepAction: vi.fn(), snoozeNextStepAction: vi.fn(), moveStageAction: vi.fn(), assignRecordAction: vi.fn(), setSourceAction: vi.fn(),
+    addLeadFromReviewAction: vi.fn(), updateNextStepAction: vi.fn(), snoozeNextStepAction: vi.fn(), moveStageAction: vi.fn(), assignRecordAction: vi.fn(), setSourceAction: vi.fn(),
   }));
   vi.doMock("@/lib/record-card/load", () => ({ loadRecordCard: spies.cardLoad }));
   vi.doMock("@/lib/review/sheet-edit-load", () => ({ loadSheetStages: vi.fn(async () => ({ matter: [], lead: [] })) }));

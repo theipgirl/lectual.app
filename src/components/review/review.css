@@ -226,3 +226,17 @@ td.rv-fact-failed > span { white-space: nowrap; text-wrap: nowrap; }
   .rv-notes, .rv-note-btn, .rv-note-ro { white-space: normal; }
   .rv-note-text { white-space: normal; }
 }
+
+/* The owner's "Hidden columns" control above the Board. */
+.rv-board-tools { display: flex; justify-content: flex-end; margin: 0 0 8px; }
+
+/* Add a lead or open a matter, at the bottom of the List. */
+.rv-addrow { margin-top: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
+.rv-addrow-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.rv-addrow-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; align-items: end; }
+.rv-addrow-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.rv-addrow-hint, .rv-addrow-error, .rv-addrow-acts { grid-column: 1 / -1; margin: 0; }
+.rv-addrow-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.rv-addrow-error { color: var(--wine); }
+.rv-addrow-error:empty { display: none; }
+.rv-addrow-done { display: flex; flex-direction: column; gap: 6px; }

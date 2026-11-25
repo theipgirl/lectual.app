@@ -2,9 +2,11 @@
 
 import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
-import { MERGE_POINTER_UNREADABLE } from "@/lib/ui/words";
+import { ADD_ROW_ADDED, ADD_ROW_FAILED, ADD_ROW_NO_PERMISSION, MERGE_POINTER_UNREADABLE } from "@/lib/ui/words";
 import { getScopedClient } from "@/lib/db/scoped-client";
-import { CAN_MOVE_STAGE, CAN_WRITE_LEAD, addLeadNote, assignLead, moveLeadStage, resolveCurrentRole } from "@/lib/pipeline";
+import { CAN_MOVE_STAGE, CAN_WRITE_LEAD, addLeadNote, assignLead, createLead, moveLeadStage, resolveCurrentRole } from "@/lib/pipeline";
+import { validateNewLead } from "@/lib/pipeline/lead-input";
+import { friendlyLeadWriteError } from "../leads/errors";
 import { MATTER_WRITE_ROLES, assignMatterOwner, updateMatterHeader } from "@/lib/matters/matters";
 import { setReferralSource } from "@/lib/intake/leads";
 import { isReferralSource } from "@/lib/intake/referral-source";
@@ -316,4 +318,38 @@ export const setSourceAction = previewSafe(async function setSourceAction(_prev:
   }
   refresh();
   return { saved: true };
+}, "state");
+
+export type AddLeadState = { saved?: boolean; error?: string; message?: string; leadId?: string };
+
+/**
+ * "Add a lead" at the bottom of the Weekly review List: a REAL lead through the same `createLead` as the Leads page (the firm's new-enquiry
+ * stage, its own role gate, its `lead_created` timeline row and automation rules), never a free-form row. Only the four named fields are
+ * read from the form: never a stage, an owner, an org or a stamp. The role is re-resolved here (and again inside `createLead`), the
+ * input is checked by the same rules the Leads form uses, and every answer is a fixed or authored sentence, never database text.
+ */
+export const addLeadFromReviewAction = previewSafe(async function addLeadFromReviewAction(_prev: AddLeadState, formData: FormData): Promise<AddLeadState> {
+  const values = {
+    firstName: String(formData.get("firstName") ?? ""),
+    lastName: String(formData.get("lastName") ?? ""),
+    email: String(formData.get("email") ?? ""),
+    businessName: String(formData.get("businessName") ?? ""),
+  };
+  try {
+    if (!(await canWrite("lead"))) return { error: ADD_ROW_NO_PERMISSION };
+  } catch {
+    return { error: ADD_ROW_FAILED };
+  }
+  const checked = validateNewLead(values);
+  if (!checked.ok) return { error: Object.values(checked.fieldErrors)[0] ?? ADD_ROW_FAILED };
+  let leadId: string;
+  try {
+    const lead = await createLead({ ...values, source: "dashboard" });
+    leadId = lead.id;
+  } catch (err) {
+    return { error: friendlyLeadWriteError(err, ADD_ROW_FAILED) };
+  }
+  revalidatePath("/dashboard/intake/");
+  refresh();
+  return { saved: true, message: ADD_ROW_ADDED, leadId };
 }, "state");

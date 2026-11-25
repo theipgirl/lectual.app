@@ -18,6 +18,8 @@ import { DocTag, LastChanged, openHref, Tags, type Common } from "./shared";
 import "@/components/list-page/list-page.css";
 import "./review.css";
 import { ViewToggle } from "@/components/ViewToggle";
+import { ColumnMenu } from "@/components/views/layout/ColumnMenu";
+import { HiddenColumnsMenu } from "@/components/views/layout/HiddenColumnsMenu";
 import type { DeadlineOut } from "@/lib/review/strips";
 import { DEADLINES_COULDNT_LOAD, DEADLINE_UNCONFIRMED, REVIEW_DEADLINES_HEADING, REVIEW_DEADLINES_NONE, REVIEW_DEADLINE_CONFIRMED, deadlineCardMore } from "@/lib/ui/words";
 
@@ -110,11 +112,11 @@ function ReviewCard({ row, bucket, today, members, canWrite, params, waitingOnCl
  * those are overdue or due this week. Drawn by the shared Board (`ViewBoard`); the firm's saved layout (`review_board`) orders and
  * names the people, and says so when it hides one.
  */
-export function ReviewBoard({ lanes, layout = null, ...common }: Common & { lanes: Lane[]; /** The firm's saved Board layout; null = the standard order. */ layout?: Layout | null }) {
+export function ReviewBoard({ lanes, layout = null, layoutEdit = null, ...common }: Common & { lanes: Lane[]; /** The firm's saved Board layout; null = the standard order. */ layout?: Layout | null; /** Given only for an owner: each person's lane gets the column menu (rename, hide, move). `rev` is the Board layout's. */ layoutEdit?: { rev: number | null } | null }) {
   if (lanes.length === 0) {
     return <EmptyState title="Nothing needs attention">No records are waiting on us or on a client for this view.</EmptyState>;
   }
-  const { lanes: drawn, hidden, hiddenUnassigned } = applyBoardLayout(lanes, layout);
+  const { lanes: drawn, hidden, hiddenUnassigned, hiddenLanes } = applyBoardLayout(lanes, layout);
   const columns: BoardColumnSpec<ReviewRow>[] = drawn.map((lane) => {
     const load = laneLoad(lane, common.today);
     const split = laneLoadText(load);
@@ -127,6 +129,7 @@ export function ReviewBoard({ lanes, layout = null, ...common }: Common & { lane
       className: "rv-person",
       attrs: { "data-lane": lane.userId ?? "none" },
       note: split ? <p className="lx-note rv-lane-load" data-lane-load>{split}</p> : undefined,
+      menu: layoutEdit ? <ColumnMenu view="review_board" rev={layoutEdit.rev} columnKey={lane.key} label={lane.title} kind="lane" /> : undefined,
       groups: [
         { key: "our", heading: `${OUR_TURN} · ${lane.our.length}`, empty: LANE_NOTHING_FOR_US, cards: lane.our, attrs: { "data-half": "our" } },
         { key: "client", heading: `${LANE_WAITING_ON_CLIENT} · ${lane.client.length}`, empty: LANE_NOBODY_WAITING, cards: lane.client, attrs: { "data-half": "client" } },
@@ -143,6 +146,11 @@ export function ReviewBoard({ lanes, layout = null, ...common }: Common & { lane
             {BOARD_LANES_HIDDEN_LINK}
           </Link>
         </p>
+      )}
+      {layoutEdit && hiddenLanes.length > 0 && (
+        <div className="rv-board-tools">
+          <HiddenColumnsMenu view="review_board" rev={layoutEdit.rev} items={hiddenLanes} />
+        </div>
       )}
       <ViewBoard
         className="rv-board"

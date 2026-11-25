@@ -102,6 +102,8 @@ import { NotesCell } from "./NotesCell";
 import { sheetStatusStore } from "./sheet-status-store";
 import { SheetCard } from "@/components/ui/SheetTable";
 import { ViewTable } from "@/components/views/table/ViewTable";
+import { ColumnMenu } from "@/components/views/layout/ColumnMenu";
+import { layoutKeyOf } from "@/lib/review/layout";
 import { listColumnOf } from "@/lib/review/list-columns";
 import "./review-sheet-edit.css";
 
@@ -221,6 +223,7 @@ export function SheetEditTable({
   adminTier = false,
   fieldMeta = {},
   cellMembers = null,
+  layoutEdit = null,
 }: {
   sections: SheetSection[];
   people: SheetPerson[];
@@ -234,6 +237,7 @@ export function SheetEditTable({
   /** The admin tier (the page's re-resolved role): the notes' "not switched on" line and "Add a column" link. */ adminTier?: boolean;
   /** The firm's live columns, by `cf:<field id>` (empty unless the custom state is ok). */ fieldMeta?: Record<string, CustomFieldMeta>;
   /** The member directory for person cells as they are drawn while saving; null when it couldn't be read. */ cellMembers?: CustomMember[] | null;
+  /** Given ONLY for an owner (the page's membership-row check, with a saved-layout read that worked): each header gets the column menu. `rev` is the layout's. */ layoutEdit?: { rev: number | null } | null;
 }) {
   // One hook per section, always both: the chooser's choices apply to this table and to the read-only List alike.
   const drawnBy: Record<SheetSectionId, SheetColumn[]> = {
@@ -727,6 +731,7 @@ export function SheetEditTable({
            return (
              <>
                {lc.label}
+               {layoutEdit && <ColumnMenu view="review_list" rev={layoutEdit.rev} columnKey={layoutKeyOf(c.id)} label={lc.label} pinned={c.pinned} allowAdd section={sec.id} />}
                {typed && (
                  <>
                    {" "}

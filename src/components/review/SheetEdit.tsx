@@ -55,7 +55,7 @@ function toSheetRow(r: ReviewRow, href: string, today: string, names: ReadonlyMa
  * are worked out and locked. Every edit goes through an existing review action, which re-resolves the role. A role that can't
  * write gets the same table with no editors. On a phone the rows stack and every edit happens in the record panel.
  */
-export function SheetEdit({ rows, today, members, params, perms, initial, canSeeMoney = false, canSeeCustomMoney = false, initialPrefs, layout = null, custom: customIn = null, customMembers, adminTier = false, notes = null }: Common & {
+export function SheetEdit({ rows, today, members, params, perms, initial, canSeeMoney = false, canSeeCustomMoney = false, initialPrefs, layout = null, layoutEdit = null, custom: customIn = null, customMembers, adminTier = false, notes = null }: Common & {
   rows: ReviewRow[];
   perms: SheetPerms;
   initial?: SheetEditInitial;
@@ -63,6 +63,7 @@ export function SheetEdit({ rows, today, members, params, perms, initial, canSee
   /** A REAL owner only (`canSeeCustomMoney(role, actingAsStaff)`): the firm's own Money columns. Never Lectual staff. */ canSeeCustomMoney?: boolean;
   /** Drawing-only starting column choices (a test or preview). */ initialPrefs?: PrefsDocument;
   /** The firm's saved column layout for this List (order, names, hidden, widths); null = the standard columns. */ layout?: Layout | null;
+  /** Given only for an owner (see the page): the column menu on each header. */ layoutEdit?: { rev: number | null } | null;
   /** The firm's custom columns as the page read them. Typed in place when `perms.writeCustom` and the state is `ok`. */ custom?: CustomColumnsState | null;
   /** The member directory for person cells; null when it couldn't be read. Defaults to `members`. */ customMembers?: CustomMember[] | null;
   /** The admin tier (the page's re-resolved role): the section note's "not switched on" line and "Add a column" link. */ adminTier?: boolean;
@@ -101,7 +102,7 @@ export function SheetEdit({ rows, today, members, params, perms, initial, canSee
           {SHEET_STAGES_UNREADABLE}
         </Notice>
       )}
-      <SheetEditTable sections={sections} people={people} perms={perms} sources={[...REFERRAL_SOURCES]} today={today} initial={initial} columns={columns} initialPrefs={initialPrefs} noteState={noteStateOf(custom)} adminTier={adminTier} fieldMeta={fieldMeta} cellMembers={cellMembers} />
+      <SheetEditTable sections={sections} people={people} perms={perms} sources={[...REFERRAL_SOURCES]} today={today} initial={initial} columns={columns} initialPrefs={initialPrefs} noteState={noteStateOf(custom)} adminTier={adminTier} fieldMeta={fieldMeta} cellMembers={cellMembers} layoutEdit={layoutEdit} />
       {anyEditor && (
         <section className="lx-card rse-legend" aria-label={SHEET_LEGEND_LABEL}>
           <div>

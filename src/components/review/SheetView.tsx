@@ -90,10 +90,11 @@ function SheetSection({ id, title, rows, today, members, params, canWrite, colum
 }
 
 /** The Excel tracker as one table: Trademarks, then Contracts, in pipeline order. Edits happen in the record card the Client link opens. */
-export function SheetView({ rows, sheetEdit, canSeeMoney = false, canSeeCustomMoney = false, initialPrefs, layout = null, custom: customIn = null, customMembers, adminTier = false, notes = null, ...common }: Common & {
+export function SheetView({ rows, sheetEdit, canSeeMoney = false, canSeeCustomMoney = false, initialPrefs, layout = null, layoutEdit = null, custom: customIn = null, customMembers, adminTier = false, notes = null, ...common }: Common & {
   rows: ReviewRow[];
   /** The editable List: given for any role whose own permissions allow an edit (from the page's re-resolved role), in either look. Absent: the read-only List. */ sheetEdit?: { perms: SheetPerms };
   /** The firm's saved column layout for this List (order, names, hidden, widths); null = the standard columns. */ layout?: Layout | null;
+  /** Given only for an owner, with an editable List: the column menu on each header (the page decides; the actions re-check). */ layoutEdit?: { rev: number | null } | null;
   /** From the page's re-resolved role (`canSeeBilling`), never from the browser. */ canSeeMoney?: boolean;
   /** A REAL owner only (`canSeeCustomMoney(role, actingAsStaff)`): the firm's own Money columns. Never Lectual staff. */ canSeeCustomMoney?: boolean;
   /** Drawing-only starting column choices (a test or preview). */ initialPrefs?: PrefsDocument;
@@ -104,7 +105,7 @@ export function SheetView({ rows, sheetEdit, canSeeMoney = false, canSeeCustomMo
 }) {
   // The component enforces its own prop: without canSeeCustomMoney no Money field or amount goes further, whatever a caller handed in.
   const custom = canSeeCustomMoney ? customIn : customIn && withoutMoney(customIn);
-  if (sheetEdit) return <SheetEdit rows={rows} perms={sheetEdit.perms} canSeeMoney={canSeeMoney} canSeeCustomMoney={canSeeCustomMoney} initialPrefs={initialPrefs} layout={layout} custom={custom} customMembers={customMembers} adminTier={adminTier} notes={notes} {...common} />;
+  if (sheetEdit) return <SheetEdit rows={rows} perms={sheetEdit.perms} canSeeMoney={canSeeMoney} canSeeCustomMoney={canSeeCustomMoney} initialPrefs={initialPrefs} layout={layout} layoutEdit={layoutEdit} custom={custom} customMembers={customMembers} adminTier={adminTier} notes={notes} {...common} />;
   const { trademarks, contracts } = sheetSections(rows);
   const fields = custom?.status === "ok" ? custom.fields : [];
   const cells = custom?.status === "ok" ? customCells(rows, fields, custom, customMembers === undefined ? common.members : customMembers, common.today) : {};

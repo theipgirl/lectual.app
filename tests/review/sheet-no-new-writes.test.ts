@@ -81,7 +81,8 @@ describe("C2 (Sprint 3): which review components import an action", () => {
   });
   it("no other review component started importing an action: the importers are Sprint 2's four plus those two", () => {
     // Changed on purpose (merge with the Notes cell, 488dd3d): NotesCell.tsx posts the existing "Log what happened" action itself.
-    expect(importing(/from ["'][^"']*\/(card-)?actions["']/)).toEqual(["ActForm.tsx", "CardsDeck.tsx", "DoneButton.tsx", "FirmColumnsEdit.tsx", "LostNurture.tsx", "NotesCell.tsx", "SheetEditTable.tsx"]);
+    // Changed on purpose (editable views): AddRow.tsx posts "Add a lead" (a real lead through createLead) from the bottom of the List.
+    expect(importing(/from ["'][^"']*\/(card-)?actions["']/)).toEqual(["ActForm.tsx", "AddRow.tsx", "CardsDeck.tsx", "DoneButton.tsx", "FirmColumnsEdit.tsx", "LostNurture.tsx", "NotesCell.tsx", "SheetEditTable.tsx"]);
   });
 });
 

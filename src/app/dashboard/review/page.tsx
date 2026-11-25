@@ -29,6 +29,12 @@ import { ColumnChooser, type ChooserSection } from "@/components/review/ColumnCh
 import { NOTES_PRESENT, columnsFor } from "@/lib/review/sheet-columns";
 import { applyReviewLayout } from "@/lib/review/layout";
 import { loadViewLayout } from "@/lib/views/layout/load";
+import { loadOwnerState } from "@/lib/views/layout/owner-load";
+import { isOwner } from "@/lib/views/layout/owner";
+import { resolveLayout } from "@/lib/views/layout/apply";
+import { reviewListBase } from "@/lib/review/layout-base";
+import { HiddenColumnsMenu } from "@/components/views/layout/HiddenColumnsMenu";
+import { AddRow } from "@/components/review/AddRow";
 import { layoutNote, savedLayoutOf } from "@/lib/views/layout/state";
 import { loadCardCustomColumns } from "@/lib/custom-columns/card-load";
 import { canSeeCustomMoney, canWriteCustomValue, firmColumnsBlock, withoutMoney, type FirmColumnsBlock } from "@/lib/custom-columns/rules";
@@ -75,12 +81,19 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const customMoney = canSeeCustomMoney(role, actingAsStaff);
   // The firm's saved column layout for the view being drawn (the List's or the Board's; Cards has none), read beside the review itself.
   // A layout that is missing or can't be read draws the standard columns (never an empty table); only a failed read says so.
-  const [load, layoutRead] = await Promise.all([
+  // Whether this viewer may CHANGE the view's structure: an owner by their own membership row (Lectual staff acting in a firm never are),
+  // not while previewing a teammate (every action refuses then), and only when the saved layout was read (its rev is what a change is
+  // fenced on). Only the List and the Board have a layout. Every action behind the controls asks the membership row again.
+  const layoutView = params.view === "sheet" ? "review_list" : params.view === "board" ? "review_board" : null;
+  const [load, layoutRead, ownerRead, previewing] = await Promise.all([
     loadReview(new Date(), { withFees, withCustom, notes, customMoney }),
-    params.view === "sheet" ? loadViewLayout("review_list") : params.view === "board" ? loadViewLayout("review_board") : Promise.resolve(null),
+    layoutView ? loadViewLayout(layoutView) : Promise.resolve(null),
+    layoutView ? loadOwnerState() : Promise.resolve("not-owner" as const),
+    layoutView ? inPreview() : Promise.resolve(true),
   ]);
   const layout = savedLayoutOf(layoutRead);
   const layoutSaid = layoutNote(layoutRead);
+  const layoutEdit = isOwner(ownerRead) && !previewing && layoutRead?.status === "ok" ? { rev: layoutRead.rev } : null;
   const userId = session.kind === "ok" ? session.user.id : null;
   const canWrite = !!role && MATTER_WRITE_ROLES.includes(role);
   const canMove = canWrite && CAN_MOVE_STAGE.includes(role);
@@ -125,7 +138,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   // A role that can edit nothing gets the read-only List. The stage lists are read only for a role that can move one.
   let sheetPerms: SheetPerms | null = null;
   // While an owner previews a teammate nothing can be saved (every action refuses), so the List is the read-only one.
-  if (params.view === "sheet" && !(await inPreview())) {
+  if (params.view === "sheet" && !previewing) {
     const writeLead = !!role && CAN_WRITE_LEAD.includes(role);
     const moveLead = writeLead && !!role && CAN_MOVE_STAGE.includes(role);
     if (canWrite || writeLead || writeCustom) {
@@ -143,6 +156,16 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
         ] satisfies ChooserSection[]}
       />
     ) : null;
+  // The owner's "Hidden columns": the List's columns the firm's layout hides, each with Show (drawn only for an owner of an editable List).
+  const hiddenControl =
+    params.view === "sheet" && layoutEdit && sheetPerms
+      ? (() => {
+          const hiddenColumns = resolveLayout(reviewListBase(customFields), layout)
+            .filter((r) => r.hidden)
+            .map((r) => ({ key: r.key, label: r.label }));
+          return <HiddenColumnsMenu view="review_list" rev={layoutEdit.rev} items={hiddenColumns} />;
+        })()
+      : null;
   // The Notes column: read with the review's other reads, only for the List (three-state; a failed read says so in the cells).
   const sheetNotes = load.notes ?? null;
   const approvalsKnown = !load.failed.includes("approvals");
@@ -245,6 +268,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           sheetPerms ? (
             <div className="rse-head-right">
               <SheetSaveStatus />
+              {hiddenControl}
               {chooser}
               <ViewSwitch params={params} />
             </div>
@@ -301,7 +325,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           clearHref: link({ q: "", i: 1 }),
         }}
         toggle={sheetPerms ? <span className="rse-head-right"><SheetSaveStatus /><ViewSwitch params={params} /></span> : <ViewSwitch params={params} />}
-        more={chooser}
+        more={hiddenControl ? <>{hiddenControl}{chooser}</> : chooser}
       />
 
       <KpiStrip kpis={kpis(buckets)} />
@@ -359,12 +383,13 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
       ) : params.view === "sheet" ? (
         <>
           {strips}
-          <SheetView rows={shown} canSeeMoney={canSeeMoney} canSeeCustomMoney={customMoney} custom={custom} customMembers={customMembers} adminTier={adminTier} notes={sheetNotes} layout={layout} {...common} {...(sheetPerms ? { sheetEdit: { perms: sheetPerms } } : {})} />
+          <SheetView rows={shown} canSeeMoney={canSeeMoney} canSeeCustomMoney={customMoney} custom={custom} customMembers={customMembers} adminTier={adminTier} notes={sheetNotes} layout={layout} layoutEdit={sheetPerms ? layoutEdit : null} {...common} {...(sheetPerms ? { sheetEdit: { perms: sheetPerms } } : {})} />
+          {!previewing && <AddRow canAddLead={!!role && CAN_WRITE_LEAD.includes(role)} canOpenMatter={canWrite} />}
         </>
       ) : (
         <>
           {strips}
-          <ReviewBoard lanes={lanes} layout={layout} {...common} />
+          <ReviewBoard lanes={lanes} layout={layout} layoutEdit={layoutEdit} {...common} />
           {owner ? (
             <div className="rv-rest">
               <ReviewSection bucket="uspto" rows={rest.uspto} collapsed {...common} />

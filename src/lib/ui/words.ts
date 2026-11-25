@@ -1772,20 +1772,22 @@ export const COLUMN_ADD_SUBMIT = "Add column";
 export const COLUMN_CHANGES_NOTE = "A change here is the firm's view for everyone.";
 export const HIDDEN_COLUMNS_NAME = "Hidden columns";
 export const hiddenColumnsLabel = (n: number) => `Hidden columns (${n})`;
-export const HIDDEN_COLUMNS_NONE = "No hidden columns.";
 export const HIDDEN_COLUMN_SHOW = "Show";
 export const hiddenColumnShowLabel = (name: string) => `Show ${name}`;
 export const laneMenuLabel = (name: string) => `Column options for ${name}`;
 
 /* ── Add a real lead or matter from the bottom of the Weekly review List ── */
-export const ADD_ROW_LEAD_HINT = "Adds a real lead in your new-enquiry stage. It shows in this list once it's added.";
+export const ADD_ROW_LEAD_HINT = "This adds a real lead in your new-enquiry stage, the same as Leads. It joins this list once it moves past first contact.";
 export const ADD_ROW_FIRST_NAME = "First name";
 export const ADD_ROW_LAST_NAME = "Last name";
-export const ADD_ROW_EMAIL = "Email (optional)";
+export const ADD_ROW_EMAIL = "Email";
 export const ADD_ROW_BUSINESS = "Business (optional)";
 export const ADD_ROW_SUBMIT = "Add lead";
+export const ADD_ROW_LABEL = "Add to the list";
 export const ADD_ROW_OPEN_MATTER = "Open a matter";
 export const ADD_ROW_ADDED = "Lead added.";
+export const ADD_ROW_OPEN_LEAD = "Open the lead";
+export const ADD_ROW_ANOTHER = "Add another";
 export const ADD_ROW_NO_PERMISSION = "You don't have permission to add leads. Ask an attorney or an admin.";
 export const ADD_ROW_FAILED = "Couldn't add this lead. Nothing was added. Try again.";
 

@@ -33,6 +33,8 @@ export type BoardColumnSpec<C> = {
   note?: ReactNode;
   className?: string;
   attrs?: Record<`data-${string}`, string>;
+  /** A small control after the count (the owner's column menu). */
+  menu?: ReactNode;
   groups: readonly BoardGroupSpec<C>[];
 };
 
@@ -65,6 +67,7 @@ export function ViewBoard<C>({
             countTitle={col.countTitle}
             ariaLabel={col.ariaLabel}
             note={col.note}
+            menu={col.menu}
             bare={!plain}
             empty={plain ? col.groups[0].empty : undefined}
           >

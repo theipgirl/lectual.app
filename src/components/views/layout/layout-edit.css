@@ -1,0 +1,18 @@
+/* The owner's column menu and Hidden columns control. Tokens only. */
+.cm-wrap { display: inline-flex; align-items: center; margin-left: 4px; vertical-align: middle; }
+.cm-btn { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; color: var(--muted); cursor: pointer; }
+.cm-btn:hover, .cm-btn[aria-expanded="true"] { background: var(--well); color: var(--ink); border-color: var(--line); }
+.cm-btn:focus-visible { outline: 2px solid var(--ox); outline-offset: 1px; }
+.cm-panel { position: fixed; z-index: 60; box-sizing: border-box; max-width: calc(100vw - 16px); max-height: calc(100vh - 24px); overflow-y: auto; padding: 5px; display: flex; flex-direction: column; gap: 2px; background: var(--card); border: 1px solid var(--line); border-radius: var(--lp-radius, var(--r-md)); box-shadow: var(--shadow-pop); text-align: left; font-weight: 400; text-transform: none; letter-spacing: normal; white-space: normal; }
+.cm-item { width: 100%; }
+.cm-foot { margin: 4px 8px 2px; }
+.cm-form { display: flex; flex-direction: column; gap: 10px; padding: 6px 6px 2px; }
+.cm-field { display: flex; flex-direction: column; gap: 4px; }
+.cm-title { margin: 0; font-weight: 600; color: var(--ink); }
+.cm-acts { display: flex; gap: 8px; flex-wrap: wrap; }
+.cm-textarea { min-height: 72px; height: auto; padding-top: 8px; resize: vertical; }
+.cm-error { margin: 2px 8px 4px; color: var(--wine); }
+.cm-error:empty { display: none; }
+.cm-note { margin-left: 6px; }
+.cm-show { margin-left: auto; padding-left: 12px; color: var(--ox); font-weight: 600; }
+@media (pointer: coarse) { .cm-btn { width: 44px; height: 44px; } }
