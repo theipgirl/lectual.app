@@ -252,7 +252,8 @@ export function renderGeneralProposalEmail(input: {
   firstName: string;
   matterTitle: string;
   summary?: string | null;
-  feeText: string;
+  /** Null = no fee is set yet: the fee sentence is left out (a fee is never made up). */
+  feeText: string | null;
   firmName: string;
   proposalUrl: string;
   signOff: string;
@@ -265,7 +266,7 @@ export function renderGeneralProposalEmail(input: {
   const parts = [
     `Hi ${firstName},`,
     ...(summary ? [summary] : []),
-    `The flat fee for this work is ${input.feeText}.`,
+    ...(input.feeText ? [`The flat fee for this work is ${input.feeText}.`] : []),
     `You can review and accept your proposal here:\n${url}`,
     `Best,\n${signOff}`,
   ];

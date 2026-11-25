@@ -19,6 +19,7 @@ import { readNewOffer, type NewOffer } from "@/lib/proposals/new-offer";
 import { isCivilDate, validateContent } from "@/lib/proposals/validate";
 import { buildReasoningBlock, proposalEmailSubject } from "./email";
 import { choosePackage, type PackageSource } from "./package-choice";
+import { draftGeneralProposalFromConsult } from "./draft-general";
 import type {
   ConsultLead,
   ConsultProposalDraft,
@@ -236,12 +237,12 @@ export type ConsultRecord = {
   label: string;
 };
 
-function oneLine(value: string | null | undefined, max: number): string {
+export function oneLine(value: string | null | undefined, max: number): string {
   return (value ?? "").normalize("NFKC").replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
 }
 
 /** Neutralise anything tag-like so the record cannot close its own tags or open new ones. */
-function neutralise(text: string): string {
+export function neutralise(text: string): string {
   return text.replace(/</g, "‹").replace(/>/g, "›");
 }
 
@@ -403,7 +404,7 @@ function speakerIsClient(speaker: string | null, lead: ConsultLead): boolean {
     .some((n) => n.split(/[^\p{L}\p{N}]+/u).filter(Boolean).every((part) => words.has(part)));
 }
 
-type Attribution = "firm" | "client" | "spans" | "unknown";
+export type Attribution = "firm" | "client" | "spans" | "unknown";
 
 /**
  * Who said the quote:
@@ -412,7 +413,7 @@ type Attribution = "firm" | "client" | "spans" | "unknown";
  *   spans   — the record names speakers but no single line contains the quote;
  *   unknown — the record names no speakers (a summary, an unlabelled paste).
  */
-function attribute(quoteText: string, record: ConsultRecord, lead: ConsultLead): Attribution {
+export function attribute(quoteText: string, record: ConsultRecord, lead: ConsultLead): Attribution {
   const q = trimQuote(normaliseForMatch(quoteText));
   const hasSpeakers = record.segments.some((s) => s.speaker !== null);
   const hits = record.segments.filter(
@@ -480,17 +481,17 @@ export function stripClassNumbers(text: string): { text: string; stripped: boole
   return { text: out, stripped: out !== text.replace(/\s+/g, " ").trim() };
 }
 
-const MONEY_OR_LINK =
+export const MONEY_OR_LINK =
   /\$|\b(?:usd|dollars?)\b|\d+\s*(?:%|percent\b)|https?:\/\/|\bwww\.|[\w.+-]+@[\w-]+\.[\w.]+|\b[a-z0-9-]+\.(?:com|net|org|io|co|app|law|ai|me|us|info|biz)\b/i;
 
 /** Client-facing text the model supplied: one line, no markup brackets, capped. */
-function clientText(value: string | null | undefined, max: number): string {
+export function clientText(value: string | null | undefined, max: number): string {
   return oneLine(value, max * 2).replace(/[<>‹›*_`]/g, "").replace(/\s+/g, " ").trim().slice(0, max).trim();
 }
 
 /* ─────────────────────────── the draft ───────────────────────────────────── */
 
-function addDays(civil: string, days: number): string {
+export function addDays(civil: string, days: number): string {
   const [y, m, d] = civil.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 }
@@ -529,7 +530,7 @@ function fail(reason: "no_recommendation" | "not_trademark" | "ai_failed", messa
   return { ok: false, reason, message, costUsd };
 }
 
-function fmtCents(cents: number): string {
+export function fmtCents(cents: number): string {
   return `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: cents % 100 ? 2 : 0, maximumFractionDigits: 2 })}`;
 }
 
@@ -568,11 +569,11 @@ export async function draftProposalFromConsult(input: DraftConsultProposalInput)
   }
 
   if (!extract.is_trademark_matter) {
-    return fail(
-      "not_trademark",
-      "This call does not look like a trademark matter. General matters use a different proposal (the general-matter template), which this agent does not draft. Nothing was drafted.",
-      costUsd,
-    );
+    // Not a trademark matter: the general (flat-fee) drafter reads the call for other recommended work. Its own
+    // `not_trademark` answer now means no recommended legal work at all. Both calls' costs are counted.
+    const general = await draftGeneralProposalFromConsult(input);
+    const both = costUsd == null && general.costUsd == null ? null : (costUsd ?? 0) + (general.costUsd ?? 0);
+    return { ...general, costUsd: both };
   }
   if (!extract.recommendation_found || extract.brands.length === 0) {
     return fail("no_recommendation", "No trademark recommendation was found in this call, so no proposal was drafted.", costUsd);

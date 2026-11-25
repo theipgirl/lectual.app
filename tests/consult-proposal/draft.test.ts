@@ -15,6 +15,7 @@ import {
 import type { ConsultProposalDraft } from "@/lib/consult-proposal/types";
 import { defaultSelection, quoteProposal } from "@/lib/proposals/pricing";
 import { validateContent } from "@/lib/proposals/validate";
+import { CONSULT_NO_LEGAL_WORK } from "@/lib/ui/words";
 import { fakeLlm } from "../agents/helpers";
 import { CALLUM_TURNS, draftInput, meetingSource, callumOutput } from "./fixture";
 
@@ -373,11 +374,28 @@ describe("ok:false", () => {
     expect(d).toEqual({ ok: false, reason: "no_recommendation", message: expect.stringContaining("No trademark recommendation"), costUsd: 0.01 });
   });
 
-  it("not a trademark matter", async () => {
+  it("not a trademark matter, and the general drafter finds no recommended work either", async () => {
     const out: ConsultProposalExtract = { ...callumOutput(), is_trademark_matter: false };
-    const d = await draftProposalFromConsult(draftInput(fakeLlm(out).llm));
-    expect(d).toMatchObject({ ok: false, reason: "not_trademark" });
-    if (!d.ok) expect(d.message).toContain("general-matter template");
+    const general = {
+      recommendation_found: false,
+      matter_title: null,
+      summary: null,
+      work_items: [],
+      hourly_rate: null,
+      flat_fee: null,
+      fee_cap: null,
+      excludes: [],
+      payment_terms: null,
+      recommendation_summary: "Nothing was recommended.",
+    };
+    const { llm, calls } = fakeLlm(out, general);
+    const d = await draftProposalFromConsult(draftInput(llm));
+    expect(calls).toHaveLength(2);
+    expect(d).toMatchObject({ ok: false, reason: "not_trademark", costUsd: 0.02 });
+    if (!d.ok) {
+      expect(d.message).toBe(CONSULT_NO_LEGAL_WORK);
+      expect(d.message).not.toContain("does not draft");
+    }
   });
 
   it("nothing to read: no model call at all", async () => {

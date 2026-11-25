@@ -3193,3 +3193,37 @@ Display and data only: no migration, no dependency, nothing sends. `src/lib/prop
 - **Up to four packages per choice** (`MAX_PACKAGE_CHOICE_OPTIONS = 4`, a leaf module `src/lib/proposals/package-choice-limit.ts`, re-exported by `types.ts`): a
   brand name's and a mark's `package_choice`, the firm's "New proposals offer", the builder (`draft-spec.ts`), the editor ("tick from 1 to 4 packages"), Copilot's
   `draft_proposal` (schema `maxItems` and its own check) and `consultChoice`. The comparison table already scrolls sideways in `.cp-cmp-wrap`. No pricing change.
+
+## General consult drafter (a non-trademark consult -> a DRAFT flat-fee proposal, no schema)
+RPB's contract work (client service agreements, contractor agreements and SOWs, termination letters, equipment rental
+agreements) used to stop at "not a trademark matter". Now `draftProposalFromConsult` (`src/lib/consult-proposal/draft.ts`) hands a
+call its trademark reading calls `is_trademark_matter: false` to `draftGeneralProposalFromConsult` (`draft-general.ts`, same input,
+same `ConsultProposalDraft`), so the upload, "Draft the proposal", meeting and cron paths (all `runConsultProposal`) gain it. Nothing
+sends: the proposal is a DRAFT (source `agent`), the email waits in Approvals, a named approver approves, a person sends.
+- **One more model call**, schema-constrained, AGENT_POLICY first, the same record (`consultRecord`, wrapped and neutralised). It
+  REPORTS: matter title, a client summary, 1 to 20 pieces of work (label, intro, task bullets with optional hours, optional hours for
+  the piece, a `why_quote` each), hourly rate, flat fee or fee cap, not-included lines, payment terms, a reviewer summary. Costs of both
+  calls are added. `not_trademark` now means NO recommended legal work at all (`CONSULT_NO_LEGAL_WORK`, words.ts); work whose quotes
+  are all missing from the record is `no_recommendation` (`CONSULT_GENERAL_UNCHECKED`).
+- **Money and hours follow the trademark agent's evidence rules** (`attribute`, `quoteInSource`, `looksLikeInjection`,
+  `amountsInQuote`, `percentsInQuote`, exported from draft.ts; `hoursInQuote` here): the rate, every hours figure (a piece's or a
+  bullet's), the fee or cap and the deposit percent are used only with a verbatim quote that holds the number, not spoken only by the
+  client, in a record with nothing that looks like instructions to an AI. Otherwise left out and flagged.
+- **The fee:** a verified flat fee, else a verified cap (used as the flat fee, flagged), else rate x total hours ONLY when the rate and
+  EVERY piece's hours were verified (flagged as computed). Nothing else is computed or inferred. With no fee the draft is still built
+  with `fee_cents` 0 (`GeneralDraftSpec.general.feeToConfirm`, the one error the builder then lets through), carries
+  `CONSULT_GENERAL_NO_FEE_CHECK`, and the editor's checklist blocks the link until a person sets it. `pricing.ts` is untouched.
+- **The model's words** (title, summary, intros, bullets, not-included lines, the balance note) are cleaned like `clientText` and dropped
+  when they carry a price, a percentage, a link or an email address. A bullet ends in "(N hours)" only when code added it from a verified
+  quote (any hours the model wrote into the text are stripped). One combined staff-only check (`CONSULT_GENERAL_WORDING_CHECK`) asks for
+  the wording to be read; capitalised words not in the record (a name the model should not use) are named in the reviewer flags.
+- **Built only through `buildDraftContent`** (`GeneralDraftSpec`, `madeBy: "assistant"`, `consultDate` from the meeting; `DraftWorkItem`
+  gained `intro` / `details`). A verified deposit is set as `content.payment_terms` after the builder, then `validateContent` runs.
+  `letter: null` as ever: `run.ts` reads the firm's approved letter OF THE CONTENT'S KIND (`general` here) after the model and attaches it
+  with `attachFirmLetter`; the letter never reaches a prompt, the email or the queue item.
+- **Email:** `run.ts` renders `renderGeneralProposalEmail` for general content: "The flat fee for this work is $X." from the quote, and no
+  fee sentence at all when no fee was set (`feeText: null`; the reviewer notes say so). Title "Proposal", subject
+  `generalProposalEmailSubject`. Reviewer notes list the matter, each piece of work, the fee, the rate, the deposit, every flag and every
+  quote with found / not found.
+- Tests: `tests/consult-proposal/draft-general.test.ts` (fake model, the $495 x 7 hours = $3,465, 50/50 contract call, client-only and
+  missing quotes, injection, wording, and the run through `run.ts`). Not verified against the real model.
