@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { LawmaticsClient } from "./client";
+import { readFieldMeta, type FieldMetaRead } from "./field-meta";
 import { field, idOf } from "./jsonapi";
 
 export type OriginLookups = {
@@ -8,6 +9,11 @@ export type OriginLookups = {
   tagNames: Map<string, string>;
   /** Custom field id -> name. Empty when it couldn't be read (names on the values, then id hints, decide). */
   fieldNames: Map<string, string>;
+  /**
+   * The same `/custom_fields` read, kept whole (type and option labels), for the callers that print a value (the consult brief). One
+   * read feeds both: `fieldNames` is its names. `failed` when the list couldn't be read.
+   */
+  fieldMeta?: FieldMetaRead;
 };
 
 async function nameMap(client: LawmaticsClient, path: string): Promise<Map<string, string>> {
@@ -28,6 +34,8 @@ async function nameMap(client: LawmaticsClient, path: string): Promise<Map<strin
 
 /** Read once per run, read-only. Never throws. */
 export async function readOriginLookups(client: LawmaticsClient): Promise<OriginLookups> {
-  const [tagNames, fieldNames] = await Promise.all([nameMap(client, "/tags"), nameMap(client, "/custom_fields")]);
-  return { tagNames, fieldNames };
+  const [tagNames, fieldMeta] = await Promise.all([nameMap(client, "/tags"), readFieldMeta(client)]);
+  const fieldNames = new Map<string, string>();
+  if (fieldMeta.state === "ok") for (const [id, m] of fieldMeta.index.byId) if (m.name) fieldNames.set(id, m.name);
+  return { tagNames, fieldNames, fieldMeta };
 }
