@@ -18,6 +18,7 @@ import { newEnquiryStage } from "./new-enquiry";
 import { notifyAssigned } from "@/lib/notifications/producers";
 import { leadRead } from "@/lib/leads/live";
 import { scheduleConsultPrepOnEntry } from "@/lib/consult-prep/hook";
+import { withRoleFallback } from "@/lib/stages/roles";
 
 export type Lead = Database["public"]["Tables"]["crm_lead"]["Row"];
 
@@ -191,12 +192,15 @@ export async function createLead(input: CreateLeadInput): Promise<Lead> {
     // RLS already scopes crm_stage to the active org. A lead with no stage given goes to the firm's new-enquiry
     // stage ("Potential New Client" and friends, else the first open stage in pipeline order), never to
     // whichever stage happens to sort first: that was "Follow-Up" for RPB.
-    const { data: stageRows, error: stageError } = await supabase
-      .from("crm_stage")
-      .select("id, name, category, order_index")
-      .order("order_index", { ascending: true });
+    // `role` (lectual 0119) is read when the database has it: the stage holding `new_enquiry` wins over the names.
+    const { data: stageRows, error: stageError } = await withRoleFallback((r) =>
+      supabase
+        .from("crm_stage")
+        .select(r ? "id, name, category, order_index, role" : "id, name, category, order_index")
+        .order("order_index", { ascending: true }),
+    );
     if (stageError) throw stageError;
-    const enquiry = newEnquiryStage(Array.isArray(stageRows) ? stageRows : []);
+    const enquiry = newEnquiryStage(Array.isArray(stageRows) ? (stageRows as unknown as Array<{ id: string; name: string; category: string; order_index: number; role?: string | null }>) : []);
     if (!enquiry) {
       throw new LeadWriteError(
         "This firm has no pipeline stages yet — an owner or admin needs to set them up in Settings first.",

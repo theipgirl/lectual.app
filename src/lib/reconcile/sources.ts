@@ -12,6 +12,7 @@ import type { ActivityRow } from "@/lib/stage-keeper/moves";
 import { parseMilestoneMapping, type MilestoneMapping } from "./milestones";
 import type { LeadRow, StageOpt } from "./types";
 import { leadRead } from "@/lib/leads/live";
+import { withRoleFallback } from "@/lib/stages/roles";
 
 /**
  * The server-side readers behind the reconciliation screen. Every database read goes through the
@@ -32,12 +33,21 @@ const MAIL_BATCH = 50;
 const MAIL_PAGES = 10;
 
 export async function readStages(supabase: Scoped): Promise<StageOpt[]> {
-  const { data, error } = await supabase
-    .from("crm_stage")
-    .select("id, name, category, order_index")
-    .order("order_index", { ascending: true });
+  // `role` (lectual 0119) when the database has it; without the column the old select.
+  const { data, error } = await withRoleFallback((r) =>
+    supabase
+      .from("crm_stage")
+      .select(r ? "id, name, category, order_index, role" : "id, name, category, order_index")
+      .order("order_index", { ascending: true }),
+  );
   if (error) throw error;
-  return (data ?? []).map((s) => ({ id: s.id, name: s.name, category: String(s.category), orderIndex: s.order_index }));
+  return ((data ?? []) as unknown as Array<{ id: string; name: string; category: string; order_index: number; role?: string | null }>).map((s) => ({
+    id: s.id,
+    name: s.name,
+    category: String(s.category),
+    orderIndex: s.order_index,
+    ...(s.role !== undefined ? { role: s.role } : {}),
+  }));
 }
 
 export type LeadsRead = { leads: LeadRow[]; truncated: boolean };

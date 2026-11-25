@@ -28,6 +28,7 @@ import {
 } from "./normalize";
 import { logActivity } from "@/lib/matters/activity";
 import { leadRead } from "@/lib/leads/live";
+import { withRoleFallback } from "@/lib/stages/roles";
 
 /**
  * One-way Lawmatics → Lectual importer (orchestration layer).
@@ -217,12 +218,16 @@ export async function pullSource(client: LawmaticsClient): Promise<SourcePull> {
 
 /** The active org's stages. RLS scopes the rows; no org filter is applied here. */
 async function loadStages(supabase: Scoped): Promise<PlanStage[]> {
-  const { data, error } = await supabase
-    .from("crm_stage")
-    .select("id,name,category,order_index")
-    .order("order_index", { ascending: true });
+  // `role` (lectual 0119) when the database has it: the new-enquiry stage is found by role before its name.
+  const { data, error } = await withRoleFallback((r) =>
+    supabase
+      .from("crm_stage")
+      .select(r ? "id,name,category,order_index,role" : "id,name,category,order_index")
+      .order("order_index", { ascending: true }),
+  );
   if (error) throw error;
-  return (data ?? []).map((s) => ({
+  return ((data ?? []) as unknown as Array<{ id: string; name: string; category?: string | null; order_index?: number; role?: string | null }>).map((s) => ({
+    ...(s.role !== undefined ? { role: s.role } : {}),
     id: s.id,
     name: s.name,
     ...(s.category !== undefined ? { category: String(s.category) } : {}),

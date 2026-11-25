@@ -2,6 +2,7 @@ import { resolveStage } from "@/lib/lawmatics/stage-map";
 import { SENSITIVE_PHRASES, type EmailType } from "@/lib/intake/email-match";
 import { DEFAULT_STAGE_NAMES } from "@/lib/agents/stage-keeper/mapping";
 import type { StageOpt } from "./types";
+import { leadStageWithRole, type LeadStageRole } from "@/lib/stages/roles";
 
 /**
  * ONE milestone classifier for the three kinds of text that say how far a person got: the intake
@@ -287,6 +288,23 @@ const SIGNAL_ALIASES: Record<string, StageMilestone> = {
   "loe-invoice-sent": "loe_sent",
 };
 
+/**
+ * The stage role (lectual 0119) each milestone reads before its default names. `contacted` is the new-enquiry stage, `declined` the
+ * Lost stage, and `nurture` resolves to the Follow-Up stage first (its name list does), so it reads `follow_up`.
+ */
+export const MILESTONE_ROLES: Record<StageMilestone, LeadStageRole> = {
+  contacted: "new_enquiry",
+  consult_scheduled: "consult_scheduled",
+  consult_held: "consult_held",
+  questionnaire_sent: "questionnaire_sent",
+  opinion_letter_sent: "opinion_letter_sent",
+  proposal_sent: "proposal_sent",
+  follow_up_sent: "follow_up_sent",
+  loe_sent: "loe_sent",
+  declined: "lost",
+  nurture: "follow_up",
+};
+
 export type MilestoneMapping = Partial<Record<StageMilestone, string>>;
 
 type BrainRow = { key?: unknown; body?: unknown; data?: unknown };
@@ -313,8 +331,9 @@ export function parseMilestoneMapping(entries: readonly BrainRow[]): MilestoneMa
 
 /**
  * The firm's stage a milestone names, or null. A brain entry wins, and one naming a stage the firm
- * lacks gives nothing (the firm said what it meant). Otherwise the default names, through the same
- * `resolveStage` the Lawmatics mapper uses.
+ * lacks gives nothing (the firm said what it meant). Otherwise the stage holding the milestone's ROLE
+ * (lectual 0119, `MILESTONE_ROLES`), then the default names, through the same `resolveStage` the
+ * Lawmatics mapper uses.
  */
 export function stageForMilestone(milestone: Milestone, stages: readonly StageOpt[], mapping: MilestoneMapping = {}): StageOpt | null {
   if (!(milestone in MILESTONE_STAGE_NAMES)) return null;
@@ -325,6 +344,8 @@ export function stageForMilestone(milestone: Milestone, stages: readonly StageOp
     const hit = resolveStage(named, stages);
     return hit.ok ? (byId.get(hit.stage.id) ?? null) : null;
   }
+  const byRole = leadStageWithRole(stages, MILESTONE_ROLES[key]);
+  if (byRole) return byRole;
   for (const candidate of MILESTONE_STAGE_NAMES[key]) {
     const hit = resolveStage(candidate, stages);
     if (hit.ok) return byId.get(hit.stage.id) ?? null;

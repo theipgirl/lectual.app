@@ -102,7 +102,7 @@ export function tableLeads(
 
 /** The firm's new-enquiry stage (`newEnquiryStage`): where a person is filed when nothing says better. */
 export function newEnquiryStageOf(stages: readonly StageOpt[]): StageOpt | null {
-  const hit = newEnquiryStage(stages.map((s) => ({ id: s.id, name: s.name, category: s.category, order_index: s.orderIndex })));
+  const hit = newEnquiryStage(stages.map((s) => ({ id: s.id, name: s.name, category: s.category, order_index: s.orderIndex, role: s.role ?? null })));
   return hit ? (stages.find((s) => s.id === hit.id) ?? null) : null;
 }
 

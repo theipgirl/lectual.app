@@ -9,6 +9,8 @@ export type StageOpt = {
   name: string;
   category: string;
   orderIndex: number;
+  /** The stage's role (lectual 0119), when the read had the column. Rules read it before the name. */
+  role?: string | null;
 };
 
 import type { Milestone } from "./milestones";

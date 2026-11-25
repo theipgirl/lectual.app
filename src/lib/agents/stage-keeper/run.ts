@@ -23,6 +23,7 @@ import type { AgentContext, AgentResult } from "../types";
 import { parseStageMapping, type StageMapping } from "./mapping";
 import { targetStageFromSignals } from "./target";
 import { leadRead } from "@/lib/leads/live";
+import { withRoleFallback } from "@/lib/stages/roles";
 
 /**
  * Stage Keeper: places each lead on the board from facts the firm already recorded.
@@ -86,9 +87,10 @@ export function isSensitiveTitle(title: string | null): boolean {
 // ── reads ────────────────────────────────────────────────────────────────────
 
 async function readStages(admin: SupabaseClient, orgId: string): Promise<StageOpt[]> {
-  const { data, error } = await admin.from("crm_stage").select("id, name, category, order_index").eq("org_id", orgId);
-  if (error) throw new Error(`stage read failed: ${error.message}`);
-  return ((data ?? []) as StageRow[]).map((s) => ({ id: s.id, name: s.name, category: String(s.category), orderIndex: s.order_index }));
+  // `role` (lectual 0119) when the database has it; without the column the old select, exactly as before.
+  const { data, error } = await withRoleFallback((r) => admin.from("crm_stage").select(r ? "id, name, category, order_index, role" : "id, name, category, order_index").eq("org_id", orgId));
+  if (error) throw new Error(`stage read failed: ${(error as { message?: string }).message ?? "unknown"}`);
+  return ((data ?? []) as unknown as Array<StageRow & { role?: string | null }>).map((s) => ({ id: s.id, name: s.name, category: String(s.category), orderIndex: s.order_index, ...(s.role !== undefined ? { role: s.role } : {}) }));
 }
 
 async function readMapping(admin: SupabaseClient, orgId: string): Promise<StageMapping> {
