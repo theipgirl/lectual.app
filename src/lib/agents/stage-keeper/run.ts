@@ -377,6 +377,16 @@ async function readLeads(admin: SupabaseClient, orgId: string, ids: readonly str
   return out;
 }
 
+/**
+ * Does this timeline row say a PERSON chose the lead's stage? A signed-in actor's `stage_changed`, except the agent's own row and a
+ * move written by an owner deleting a stage (lectual 0119, `stage_deleted: true`: nobody chose that stage for this lead).
+ */
+export function countsAsPersonMove(type: unknown, actorType: unknown, payload: Record<string, unknown>): boolean {
+  if (type !== "stage_changed" || actorType !== "user") return false;
+  if (payload.actor === AGENT_ACTOR) return false;
+  return payload.stage_deleted === undefined || payload.stage_deleted === null || payload.stage_deleted === false;
+}
+
 type History = {
   consumed: Map<string, Set<string>>;
   /** Newest stage change a person made, per lead. */
@@ -427,8 +437,8 @@ async function readHistory(admin: SupabaseClient, orgId: string, ids: readonly s
       consumed.set(leadId, consumedSignalKeys(leadRows));
       for (const row of leadRows) {
         const p = (row.payload ?? {}) as Record<string, unknown>;
-        // A stage change a person made: signed-in actor, and not the agent's own row.
-        if (row.type === "stage_changed" && row.actor_type === "user" && p.actor !== AGENT_ACTOR) {
+        // A stage change a person made: signed-in actor, not the agent's own row, and not a move an owner's stage delete wrote.
+        if (countsAsPersonMove(row.type, row.actor_type, p)) {
           const at = Date.parse(row.created_at);
           if (Number.isFinite(at) && at > (personMovedAt.get(leadId) ?? Number.NEGATIVE_INFINITY)) personMovedAt.set(leadId, at);
         }

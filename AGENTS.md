@@ -2904,6 +2904,6 @@ Spec `docs/pge/2026-11-17-agentic-ip-os/spec-editable-views.md` (build step 3 an
   PGRST202 / 42883 = `notReadyYet("Changing stages")`. After a lead-stage delete, the moved leads get the sequence stop a person's move into that destination
   gets (only a won destination stops them, `stopLeadSequencesAsStaff`, reason `client`); NO `stage_changed` automation rule runs and no matter handoff (a won
   destination is only reachable from a won stage). A stop that didn't finish is said (`STAGE_DELETED_SEQUENCES_NOTE`); the delete stands.
-- **Working rule:** a `stage_changed` row with `payload.stage_deleted` is never a person's work (`REAL_ACTIVITY_FILTER` and the JS both skip it). The Stage
-  Keeper's "a person moved this lead in 7 days" guard still counts such a row (unchanged on purpose: it only makes the agent suggest instead of move).
+- **Working rule and the Stage Keeper:** a `stage_changed` row with `payload.stage_deleted` is never a person's work (`REAL_ACTIVITY_FILTER` and the JS
+  both skip it) and never a person's placement: the Stage Keeper's "a person moved this lead in 7 days" check (`countsAsPersonMove` in `run.ts`) ignores it.
 - **Not verified:** any database (0119's functions and role column were never called from this app), a real browser (fixed panel placement, focus, phone width).
