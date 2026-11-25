@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cardRecipient } from "@/lib/queue/shown-recipient";
 import { Notice } from "@/components/ui/Notice";
 import { notFound } from "next/navigation";
 import { orgHasModule } from "@/lib/org/modules";
@@ -406,7 +407,7 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
         source={deckSource(agentLabel(card.item.agent))}
         tag={tagText(card)}
         title={card.item.headline}
-        recipient={card.item.recipient}
+        recipient={cardRecipient(card.item)}
         opening={draftOpening(card.item)}
         firstStep={card.firstStep}
         checkFirst={card.checkFirst}

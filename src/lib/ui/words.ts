@@ -1709,3 +1709,6 @@ export const CONSULT_PREP_TEAM_INELIGIBLE = "Viewers and social media members ca
 export const CONSULT_PREP_TEAM_CC_FORMAT = "Each Cc must be a plain email address, like info@yourfirm.com.";
 export const CONSULT_PREP_TEAM_CC_DOMAIN = "A Cc address must be on the same email domain as someone chosen above.";
 export const CONSULT_PREP_TEAM_CC_COUNT = "You can add up to 5 Cc addresses.";
+
+// Approvals: an internal briefing has no client recipient to show (the prep-consult skill's address only links the lead).
+export const INTERNAL_BRIEFING_TO = "Internal briefing, not sent to anyone";
