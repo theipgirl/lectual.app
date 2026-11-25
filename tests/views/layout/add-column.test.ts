@@ -40,13 +40,13 @@ describe("Add a column: the field and its place, in one action", () => {
     const d = deps();
     expect((await addColumn(d, { ...input, view: "nope" })).ok).toBe(false);
     // only a List section takes a new column: the Board and every other view are refused before createField
-    for (const view of ["review_board", "matters_board", "contracts_board", "leads_list", "review_list"]) expect((await addColumn(d, { ...input, view })).ok, view).toBe(false);
+    for (const view of ["review_board", "matters_board", "contracts_board", "leads_board", "review_list"]) expect((await addColumn(d, { ...input, view })).ok, view).toBe(false);
     expect((await addColumn(d, { ...input, side: "up" })).ok).toBe(false);
     expect((await addColumn(d, { ...input, relativeTo: 4 })).ok).toBe(false);
     expect(d.createField).not.toHaveBeenCalled();
   });
-  it("the Matters and Contracts Lists take a new column, placed in their own layout", async () => {
-    for (const view of ["matters_list", "contracts_list"]) {
+  it("the Matters, Contracts and Leads Lists take a new column, placed in their own layout", async () => {
+    for (const view of ["matters_list", "contracts_list", "leads_list"]) {
       const d = deps();
       expect(await addColumn(d, { ...input, view }), view).toEqual({ ok: true, rev: 3, placed: true });
       expect(d.changeLayout).toHaveBeenCalledWith(view, expect.objectContaining({ op: "insert", relativeTo: "mark" }), 2);

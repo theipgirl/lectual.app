@@ -2,6 +2,7 @@ import { LAYOUT_PLACE_NOT_SAVED, CUSTOM_SAVE_FAILED } from "@/lib/ui/words";
 import type { ActionState, CreateInput } from "@/lib/custom-columns/field-actions";
 import { isReviewListView } from "@/lib/review/layout";
 import { isMatterListView } from "@/lib/matters/views";
+import { isLeadsListView } from "@/lib/leads/views";
 import { cfKey } from "./validate";
 import type { LayoutResult } from "./save";
 
@@ -24,9 +25,9 @@ export type AddColumnDeps = {
 };
 
 export async function addColumn(deps: AddColumnDeps, input: AddColumnInput): Promise<AddColumnResult> {
-  // Only a List (a Weekly review section, Matters or Contracts) can take a new column; any other view, a bad side or a missing neighbour is refused before a field is made:
+  // Only a List (a Weekly review section, Matters, Contracts or Leads) can take a new column; any other view, a bad side or a missing neighbour is refused before a field is made:
   // nothing half done for a request that could never be placed.
-  if (!(isReviewListView(input.view) || isMatterListView(input.view)) || (input.side !== "left" && input.side !== "right") || typeof input.relativeTo !== "string") return { ok: false, error: CUSTOM_SAVE_FAILED };
+  if (!(isReviewListView(input.view) || isMatterListView(input.view) || isLeadsListView(input.view)) || (input.side !== "left" && input.side !== "right") || typeof input.relativeTo !== "string") return { ok: false, error: CUSTOM_SAVE_FAILED };
   let made: { state: ActionState; id: string | null };
   try {
     made = await deps.createField({ label: input.label, section: input.section, kind: input.kind, choices: input.choices });

@@ -13,6 +13,8 @@ import { reviewBoardBase, reviewListBase } from "@/lib/review/layout-base";
 import { REVIEW_LIST_VIEWS, isReviewListView, sectionOfListView } from "@/lib/review/layout";
 import { MATTER_LIST_VIEWS, isMatterBoardView, isMatterListView, matterBoardBase, matterListColumns, sectionOfMatterView } from "@/lib/matters/views";
 import { loadMatterStages } from "@/lib/matters/stages";
+import { LEADS_VIEW_KEYS, isLeadsBoardView, isLeadsListView, leadsBoardBase, leadsListColumns } from "@/lib/leads/views";
+import { listStages } from "@/lib/pipeline/stages";
 import { MATTER_BOARD_CLOSED_COLUMN, MATTER_BOARD_UNSTAGED_COLUMN } from "@/lib/ui/words";
 import type { CustomColumnField } from "@/lib/review/sheet-columns";
 import { addColumn, type AddColumnResult } from "./add-column";
@@ -31,14 +33,16 @@ import type { ViewKey } from "./types";
 
 const REVIEW_PATH = "/dashboard/review/";
 const MATTERS_PATH = "/dashboard/matters/";
+const LEADS_PATH = "/dashboard/intake/";
 
 /** A layout change is the firm's view for everyone: both pages that draw layouts are redrawn. */
 const revalidateViews = () => {
   revalidatePath(REVIEW_PATH);
   revalidatePath(MATTERS_PATH);
+  revalidatePath(LEADS_PATH);
 };
 
-/** The columns an owner has for a view: the Weekly review's List and Board, and the Matters and Contracts List and Board. Any other view has none to change yet. */
+/** The columns an owner has for a view: the Weekly review's List and Board, the Matters and Contracts List and Board, and the Leads List and Board. */
 async function baseFor(view: ViewKey): Promise<LayoutBase | null> {
   if (isReviewListView(view)) {
     try {
@@ -56,6 +60,22 @@ async function baseFor(view: ViewKey): Promise<LayoutBase | null> {
       return { defaults: matterListColumns((await fieldStore(db).readLiveFields()) as CustomColumnField[], kind, true) };
     } catch (e) {
       return isMissingTable(e) ? { defaults: matterListColumns([], kind, true) } : null;
+    }
+  }
+  if (isLeadsListView(view)) {
+    try {
+      const db = (await getScopedClient()) as unknown as StoreClient;
+      return { defaults: leadsListColumns((await fieldStore(db).readLiveFields()) as CustomColumnField[], true) };
+    } catch (e) {
+      return isMissingTable(e) ? { defaults: leadsListColumns([], true) } : null;
+    }
+  }
+  if (isLeadsBoardView(view)) {
+    // The Board's columns are the firm's own intake stages. Only "hidden" is ever saved (order and names are the stages', from the stage menu).
+    try {
+      return { defaults: leadsBoardBase(await listStages()) };
+    } catch {
+      return null;
     }
   }
   if (isMatterBoardView(view)) {
@@ -124,7 +144,7 @@ export const firmColumnAction = previewSafe(async function firmColumnAction(inpu
       update: (i) => updateField(fields, i),
       clearLabels: async (key) => {
         let all = true;
-        for (const view of [...Object.values(REVIEW_LIST_VIEWS), ...MATTER_LIST_VIEWS]) {
+        for (const view of [...Object.values(REVIEW_LIST_VIEWS), ...MATTER_LIST_VIEWS, LEADS_VIEW_KEYS.list]) {
           const read = await deps.read(view);
           if (read.status === "not-set-up") continue;
           if (read.status !== "ok") {

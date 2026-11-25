@@ -2,6 +2,7 @@ import { isTrademarkRow } from "@/lib/review/sheet";
 import { fieldsForSection, type CustomColumnField, type SheetSectionId } from "@/lib/review/sheet-columns";
 import { applyLayout } from "@/lib/views/layout/apply";
 import { cfKey } from "@/lib/views/layout/validate";
+import { splitHiddenColumns, stageColumnKey } from "@/lib/views/layout/stage-columns";
 import type { Layout, LayoutDefault, ViewKey } from "@/lib/views/layout/types";
 import { OWNER_COLUMN } from "@/lib/ui/words";
 
@@ -85,11 +86,6 @@ export function drawnMatterColumns(columns: readonly MatterListColumn[], saved: 
 export const UNSTAGED_COLUMN_KEY = "not_on_docket";
 export const CLOSED_COLUMN_KEY = "closed";
 
-/** A stage column's key in a layout: `st_` and the stage id without its dashes (35 characters, inside the 40 a layout key may have). */
-export function stageColumnKey(stageId: string): string {
-  return `st_${stageId.replace(/-/g, "").toLowerCase()}`;
-}
-
 /** Every column an owner may have on a Board, as the layout write sees them: the two fixed ones and one per OPEN stage, in stage order. */
 export function matterBoardBase(stages: readonly { id: string; label: string; is_open: boolean }[], unstagedLabel: string, closedLabel: string): LayoutDefault[] {
   return [
@@ -99,15 +95,4 @@ export function matterBoardBase(stages: readonly { id: string; label: string; is
   ];
 }
 
-/**
- * A Board layout decides ONE thing here: which columns are hidden. The ORDER and the NAMES of stage columns are the stages' own (the
- * owner's stage menu moves and renames the stage itself, for everyone and for every rule), so the saved layout's order and labels are
- * deliberately not applied: two orderings of one pipeline would disagree the day a stage is moved. A column the layout doesn't name is
- * shown. If the layout would hide every column, none is hidden (a Board is never empty because of a layout).
- */
-export function splitHiddenColumns<T extends { key: string }>(columns: readonly T[], saved: Layout | null | undefined): { shown: T[]; hidden: T[] } {
-  const hiddenKeys = new Set((saved ?? []).filter((c) => c.hidden).map((c) => c.key));
-  const hidden = columns.filter((c) => hiddenKeys.has(c.key));
-  if (hidden.length === columns.length) return { shown: [...columns], hidden: [] };
-  return { shown: columns.filter((c) => !hiddenKeys.has(c.key)), hidden };
-}
+export { splitHiddenColumns, stageColumnKey };

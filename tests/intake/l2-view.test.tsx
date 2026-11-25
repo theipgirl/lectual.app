@@ -67,7 +67,8 @@ describe("css rules", () => {
     const table = readFileSync("src/app/dashboard/intake/_components/IntakeTable.tsx", "utf8");
     expect(table).toContain("useState(true)");
     const globals = readFileSync("src/app/globals.css", "utf8");
-    expect(table).toContain("scroll={needsScroll}");
+    // The scroller is the shared List's: the table hands it `scroll: needsScroll` through `scrollProps`.
+    expect(table).toContain("scroll: needsScroll");
     expect(globals).toContain('.sheet-scroll[data-scroll="false"] { overflow: visible; }');
     expect(globals).not.toMatch(/\n\.sheet-scroll\s*\{[^}]*overflow:\s*visible/);
   });

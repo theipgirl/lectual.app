@@ -135,9 +135,42 @@ describe("the actions, wired", () => {
     expect((await changeLayoutAction("matters_board", { op: "hide", key: "closed" }, null)).ok).toBe(false);
     expect(h.inserts).toEqual([]);
   });
-  it("a view with no columns to change yet answers a sentence, writes nothing", async () => {
+  it("the Leads List writes its own layout over the Leads columns (built-ins first); a column it doesn't have is refused, the pinned one can't be hidden", async () => {
     const { changeLayoutAction } = await import("@/lib/views/layout/actions");
-    expect(await changeLayoutAction("leads_list", { op: "hide", key: "x" }, null)).toEqual({ ok: false, error: "Couldn't read this view's saved columns, so nothing was changed. Refresh to try again." });
+    expect(await changeLayoutAction("leads_list", { op: "hide", key: "source" }, null)).toEqual({ ok: true, rev: 1 });
+    const [view, org, cols] = h.inserts[0] as [string, string, { key: string; hidden: boolean }[]];
+    expect([view, org]).toEqual(["leads_list", "org-1"]);
+    expect(cols.map((c) => c.key)).toEqual(["lead", "stage", "temp", "source", "owner", "assistant", "touch", "next"]);
+    expect(cols.find((c) => c.key === "source")!.hidden).toBe(true);
+    h.inserts = [];
+    expect((await changeLayoutAction("leads_list", { op: "hide", key: "x" }, null)).ok).toBe(false);
+    expect((await changeLayoutAction("leads_list", { op: "hide", key: "lead" }, null)).ok).toBe(false);
+    expect(h.inserts).toEqual([]);
+  });
+  it("the Leads Board saves only what its stage columns can have: a hide of a real intake stage column, nothing else", async () => {
+    vi.doMock("@/lib/pipeline/stages", () => ({
+      listStages: async () => [
+        { id: "aaaaaaaa-0000-4000-8000-000000000001", name: "New", category: "open", order_index: 1 },
+        { id: "aaaaaaaa-0000-4000-8000-000000000004", name: "Consult", category: "open", order_index: 2 },
+        { id: "aaaaaaaa-0000-4000-8000-000000000002", name: "Signed LOE", category: "won", order_index: 5 },
+        { id: "aaaaaaaa-0000-4000-8000-000000000003", name: "Lost", category: "lost", order_index: 9 },
+      ],
+    }));
+    const { changeLayoutAction } = await import("@/lib/views/layout/actions");
+    expect(await changeLayoutAction("leads_board", { op: "hide", key: "st_aaaaaaaa000040008000000000000001" }, null)).toEqual({ ok: true, rev: 1 });
+    const cols = (h.inserts[0] as [string, string, { key: string; hidden: boolean }[]])[2];
+    // one per INTAKE stage (open or nurture, before the first won stage); a won or lost stage has no column of its own
+    expect(cols.map((c) => c.key)).toEqual(["st_aaaaaaaa000040008000000000000001", "st_aaaaaaaa000040008000000000000004"]);
+    h.inserts = [];
+    expect((await changeLayoutAction("leads_board", { op: "hide", key: "st_aaaaaaaa000040008000000000000003" }, null)).ok).toBe(false);
+    // the Board's order and names are the stages' own: a rename or a move is refused
+    expect((await changeLayoutAction("leads_board", { op: "rename", key: "st_aaaaaaaa000040008000000000000001", label: "X" }, null)).ok).toBe(false);
+    expect(h.inserts).toEqual([]);
+  });
+  it("a failed stage read refuses a Leads Board change with a sentence and writes nothing", async () => {
+    vi.doMock("@/lib/pipeline/stages", () => ({ listStages: async () => Promise.reject(new Error("down")) }));
+    const { changeLayoutAction } = await import("@/lib/views/layout/actions");
+    expect(await changeLayoutAction("leads_board", { op: "hide", key: "st_aaaaaaaa000040008000000000000001" }, null)).toEqual({ ok: false, error: "Couldn't read this view's saved columns, so nothing was changed. Refresh to try again." });
     expect(h.inserts).toEqual([]);
   });
 });

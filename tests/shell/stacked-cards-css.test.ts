@@ -62,7 +62,6 @@ describe("stacked cards under 640px (V1)", () => {
       ["src/app/dashboard/documents/page.tsx", ["Matter", "Status", "Updated"]],
       ["src/app/dashboard/queue/page.tsx", ["Client", "From", "Status", "Queued"]],
       ["src/components/proposal-list/ProposalsTable.tsx", ["Client", "Status", "Client response", "Fees"]],
-      ["src/app/dashboard/intake/_components/IntakeTable.tsx", ["Stage", "Temperature", "Source"]],
     ];
     // The Matters List draws through the shared ViewTable (its SheetTable carries the stack class); each cell's label is the column's
     // drawn name (the firm's own, when it renamed it), so the stacked card says what the header says.
@@ -71,6 +70,10 @@ describe("stacked cards under 640px (V1)", () => {
     expect(read("src/components/views/table/ViewTable.tsx")).toContain("<SheetTable");
     expect(read("src/components/ui/SheetTable.tsx")).toContain("lx-stack");
     expect(matters.match(/data-label=\{label\}/g)!.length).toBeGreaterThanOrEqual(5);
+    // The Leads List draws through the shared ViewTable too: each built-in cell's label is the column's drawn name (the firm's own, when renamed).
+    const leads = read("src/app/dashboard/intake/_components/IntakeTable.tsx");
+    expect(leads).toContain("<ViewTable");
+    expect(leads.match(/data-label=\{c\.label\}/g)!.length).toBeGreaterThanOrEqual(6);
     for (const [file, labels] of sources) {
       const src = read(file);
       // A table on the sheet table kit gets the stack class from <SheetTable>.
@@ -80,8 +83,6 @@ describe("stacked cards under 640px (V1)", () => {
         if (l === "Owner" && src.includes("data-label={OWNER_COLUMN}")) continue;
         expect(src, `${file} ${l}`).toContain(`data-label="${l}"`);
       }
-      // The Leads columns whose labels come from the glossary (Item L2).
-      if (file.includes("IntakeTable")) for (const word of ["LEADS_CONTACT_COLUMN", "OWNER_COLUMN", "NEXT_STEP"]) expect(src).toContain(`data-label={${word}}`);
     }
   });
 });

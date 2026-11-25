@@ -1,4 +1,4 @@
-import { Fragment, type CSSProperties, type ReactNode } from "react";
+import { Fragment, type CSSProperties, type HTMLAttributes, type ReactNode, type Ref } from "react";
 import { SheetScroll, SheetTable } from "@/components/ui/SheetTable";
 
 /**
@@ -43,6 +43,10 @@ export function ViewTable<R extends ListRowBase>({
   renderHead,
   emptyText,
   rowClass,
+  headProps,
+  rowProps,
+  afterRow,
+  scrollProps,
 }: {
   columns: readonly ListColumn[];
   rows: readonly R[];
@@ -62,13 +66,21 @@ export function ViewTable<R extends ListRowBase>({
   /** One line drawn instead of rows when there are none. Absent: an empty body. */
   emptyText?: string;
   rowClass?: (row: R) => string | undefined;
+  /** Extra attributes on a header cell (`data-col`, `aria-sort`: a page's CSS and screen-reader hooks). */
+  headProps?: (column: ListColumn) => Record<string, string | undefined>;
+  /** Extra attributes on a body row: a data hook, a click handler, an inline style. The row's own height stays unless `style` says otherwise. */
+  rowProps?: (row: R) => HTMLAttributes<HTMLTableRowElement> & Record<`data-${string}`, string | undefined>;
+  /** A row drawn right after a body row (a Leads row's one-line error). Its cells are the caller's own. */
+  afterRow?: (row: R) => ReactNode;
+  /** The scroller around the table: an extra class, a ref for a caller that measures it, and `scroll={false}` once it is known to fit. */
+  scrollProps?: { className?: string; ref?: Ref<HTMLDivElement>; scroll?: boolean };
 }) {
   // A caller's `widthOf` decides alone: its null means flexible (no width), not "fall back to the column's own".
   const width = (c: ListColumn): number | null => (widthOf ? (widthOf(c) ?? null) : (c.width ?? null));
   // A column group only where a width is in force: a table with no widths keeps the plain markup.
   const grouped = fixed || columns.some((c) => width(c) !== null);
   return (
-    <SheetScroll>
+    <SheetScroll {...scrollProps}>
       <SheetTable className={tableClass} fixed={fixed} minWidth={minWidth} data-cells={canEditCells ? "editable" : "read-only"}>
         {grouped && (
           <colgroup>
@@ -81,7 +93,7 @@ export function ViewTable<R extends ListRowBase>({
         <thead>
           <tr>
             {columns.map((c) => (
-              <th key={c.key} scope="col" data-column={c.key} className={c.headClass} title={c.title}>
+              <th key={c.key} scope="col" data-column={c.key} className={c.headClass} title={c.title} {...headProps?.(c)}>
                 {renderHead ? renderHead(c) : c.label}
               </th>
             ))}
@@ -93,13 +105,19 @@ export function ViewTable<R extends ListRowBase>({
               <td colSpan={Math.max(1, columns.length)}>{emptyText}</td>
             </tr>
           ) : (
-            rows.map((r) => (
-              <tr key={r.key} data-row={r.key} className={rowClass?.(r)} style={r.height ? { height: r.height } : undefined}>
-                {columns.map((c) => (
-                  <Fragment key={c.key}>{cell(r, c) ?? null}</Fragment>
-                ))}
-              </tr>
-            ))
+            rows.map((r) => {
+              const extra = rowProps?.(r);
+              return (
+                <Fragment key={r.key}>
+                  <tr data-row={r.key} className={rowClass?.(r)} {...extra} style={r.height || extra?.style ? { ...(r.height ? { height: r.height } : {}), ...extra?.style } : undefined}>
+                    {columns.map((c) => (
+                      <Fragment key={c.key}>{cell(r, c) ?? null}</Fragment>
+                    ))}
+                  </tr>
+                  {afterRow?.(r) ?? null}
+                </Fragment>
+              );
+            })
           )}
         </tbody>
       </SheetTable>

@@ -1888,6 +1888,10 @@ export const MATTER_BOARD_UNSTAGED_COLUMN = "Not on the docket yet";
 export const MATTER_BOARD_CLOSED_COLUMN = "Closed";
 export const MATTERS_BOARD_HIDDEN_NOTE = (columns: number, matters: number) =>
   `${columns} ${columns === 1 ? "column is" : "columns are"} hidden in your firm's view (${matters} ${matters === 1 ? "matter" : "matters"}).`;
+export const LEADS_BOARD_HIDDEN_NOTE = (columns: number, leads: number) =>
+  `${columns} ${columns === 1 ? "column is" : "columns are"} hidden in your firm's view (${leads} ${leads === 1 ? "lead" : "leads"}).`;
+export const LEADS_FIRM_COLUMNS_UNAVAILABLE = "Some details couldn't load (your firm's columns). Refresh to try again.";
+export const LEADS_ADD_ROW_HINT = "This adds a real lead, the same as the Add a lead button above. It shows in the set it belongs in.";
 export const MANAGE_STAGES = "Manage stages";
 export const MANAGE_STAGES_INTRO = "Every matter stage the firm has, including closed stages and the intake stages this page leaves out. A change here is the firm's pipeline for everyone.";
 export const MANAGE_STAGES_CLOSED = "Closed stage";

@@ -134,10 +134,10 @@ describe("Leads and Matters share the pattern", () => {
   });
 
   it("the Leads table row and the Matters table row use the same row class, and the same pill", () => {
-    // Item L2: the Leads rows are the weekly review Sheet's table (SheetTable in a SheetCard) with an ix-row; the Matters row keeps lp-row.
-    expect(read("src/app/dashboard/intake/_components/IntakeTable.tsx")).toContain('className="ix-row"');
+    // Item L2: the Leads rows are the weekly review Sheet's table (a SheetCard around the shared ViewTable) with an ix-row; the Matters row keeps lp-row.
+    expect(read("src/app/dashboard/intake/_components/IntakeTable.tsx")).toContain('rowClass={() => "ix-row"}');
     expect(read("src/app/dashboard/intake/_components/IntakeTable.tsx")).toContain("<SheetCard");
-    expect(read("src/app/dashboard/intake/_components/IntakeTable.tsx")).toContain("<SheetTable");
+    expect(read("src/app/dashboard/intake/_components/IntakeTable.tsx")).toContain("<ViewTable");
     // The Matters List now draws through the shared ViewTable: its row class and pills live in MatterListTable.
     expect(read("src/components/matters/MatterListTable.tsx")).toContain('"lp-row"');
     expect(read("src/components/matters/MatterListTable.tsx")).toContain("<Pill");
