@@ -1,0 +1,1955 @@
+-- =====================================================================================================================
+-- PROPOSAL ONLY. NOT A MIGRATION OF THIS REPO. NOT APPLIED ANYWHERE (not lectual-dev, not lectual-prod).
+-- =====================================================================================================================
+-- 0119_editable_views.sql (proposed): firm-wide view layouts, stage roles, and owner-only stage functions.
+--
+-- This file is a draft for the `lectual` repo (theipgirl/lectual), where migrations live (lectual.app AGENTS.md: "No migrations
+-- in this repo"). To use it: copy it to `lectual/supabase/migrations/0119_editable_views.sql` (first-merged-wins numbering: 0108,
+-- 0110-0118 are spoken for in this plan; renumber if 0119 is taken too), review it there, add the isolation cases at the end of this
+-- file to tests/tenant-isolation.test.ts and the migration-text cases to a new tests/editable-views.test.ts, run the read-only
+-- PRE-APPLY CHECKS below on lectual-dev, apply to lectual-dev, run the cases there, then do the same on lectual-prod ONLY with the
+-- owner's OK. Apply to BOTH projects (lectual AGENTS.md, "Database").
+--
+-- Spec: lectual.app docs/pge/2026-11-17-agentic-ip-os/spec-editable-views.md (decisions Nov 25; build order step 1).
+-- Checked against lectual migrations 0002, 0016, 0017, 0019, 0022, 0042, 0054, 0085, 0105, 0107, the 0115 / 0116 / 0117 proposals in
+-- this folder, and lectual.app's code at this worktree (the name rules listed under STAGE ROLES). NOT against a live database. Run
+-- once on a throwaway local PostgreSQL 16 with MOCKS of the tables it touches (crm_org, crm_org_member, crm_stage, crm_lead with
+-- 0107's columns and real guard, a simplified 0085 lane guard, crm_matter_stage with a text `phase`, crm_matter, crm_activity,
+-- crm_automation_rule, a stub crm_custom_field, Supabase's three API roles): the file applied clean, the back-fill gave the roles
+-- the app's rules give (including "Discovery Call" as consult_scheduled through the alias table), a re-run wrote nothing. After the
+-- review revision (Nov 25: ids instead of a count, open/closed matter roles, role drop, won source/destination, owner-only direct
+-- writes by policy and trigger instead of revoked grants, single-row locking) it was applied and run again on a fresh mock: cases
+-- 8b, 9, 10, 11, 12, 12b, 14, 15, 16 (owner and admin writes, code, role, category, merged-lead marker), 18 (invisible character)
+-- and 19 behaved as written. The mock is not the real schema: re-run everything on lectual-dev. The lectual
+-- checkout used has no tests/ folder, so the existing isolation cases it names were not read.
+--
+-- Depends on: 0002 (current_org_id / current_org_role), 0016 (crm_stage, crm_lead.current_stage_id, crm_stage_category), 0019
+-- (crm_activity, crm_activity_type 'stage_changed', crm_actor_type 'user'), 0022 (crm_automation_rule, read only), 0042
+-- (crm_matter_stage, crm_matter.stage_id ON DELETE RESTRICT, crm_matter_stage_entered_together), 0054 (waiting_on 'court'), 0085
+-- (crm_lead_lane_guard: the moves here never touch lane), 0105 (crm_stage_id_org_uniq, the composite current_stage_id FK, NO
+-- ACTION), 0107 (crm_lead.merged_into_id and crm_lead_merge_guard, which this file REPLACES with one added branch), 0115 (APPLIED
+-- to dev and prod 2026-11-23: crm_custom_field; this file adds two restrictive policies to it and reads it, both guarded so a
+-- database without 0115 still applies), 0116 (APPLIED 2026-11-23: an owner membership row can only be made by a real owner, which is
+-- what makes "an owner membership row" a trustworthy gate here).
+--
+-- ── WHAT IT ADDS ────────────────────────────────────────────────────────────────────────────────────────────────────
+--   crm_view_layout              one row per firm and view key: an ordered jsonb list of columns {key, label, hidden, width}. Members
+--                                read; only a REAL owner (membership row) writes. Firm-wide: no user column, no per-user rows.
+--   crm_stage.role               nullable, fixed list (STAGE ROLES), unique per firm, set only by this file's back-fill and by Lectual
+--   crm_matter_stage.role        (service role). A signed-in caller cannot write it; a stage holding one cannot be deleted.
+--   Stage functions (SECURITY DEFINER, owner membership row, execute for authenticated only):
+--     crm_stage_add, crm_stage_rename, crm_stage_move, crm_stage_set_category, crm_stage_delete (p_expected_ids uuid[])
+--     crm_matter_stage_add, crm_matter_stage_rename, crm_matter_stage_move, crm_matter_stage_set_open, crm_matter_stage_delete
+--   Owner-only structural writes on crm_stage / crm_matter_stage: restrictive insert / delete policies and a structure trigger.
+--   crm_stage_roles_backfill(p_org, p_dry_run)  the one-time back-fill, kept so Lectual can run it for a firm later (service role only).
+--   Helpers: crm_stage_name_key, crm_matter_stage_label_key, crm_view_layout_columns_valid (pure); the rest are internal.
+--
+-- ── WHAT IT CHANGES (each is narrowing, none drops an object or a row) ───────────────────────────────────────────────
+--   1. crm_lead_merge_guard (0107) is REPLACED (create or replace) with 0107's body verbatim plus ONE branch: inside
+--      crm_stage_delete only, a merged lead parked in the stage being deleted may have current_stage_id (and nothing else) moved to
+--      the destination. See MERGED LEADS. PRE-APPLY CHECK 2 compares the live body with 0107's first.
+--   2. Structural writes to the two stage tables are narrowed from the admin tier to OWNERS, as the spec decides ("Who may change a
+--      view's structure? Owners", Nov 25). NO grant is revoked: lectual's own main still writes crm_stage as a signed-in user
+--      (src/app/(firm)/dashboard/settings/actions.ts, _components/NewStageForm.tsx, StageRow.tsx insert, update and delete through
+--      the scoped client), and those screens keep working for an owner. Instead:
+--        * RESTRICTIVE policies `crm_stage_insert_owner_only`, `crm_stage_delete_owner_only`, `crm_matter_stage_insert_owner_only`,
+--          `crm_matter_stage_delete_owner_only` (ANDed with 0016's / 0042's admin-tier policies) need an owner MEMBERSHIP ROW.
+--        * A BEFORE UPDATE trigger (part 4) refuses a signed-in caller who is not an owner row changing a STRUCTURAL column
+--          (crm_stage: name, order_index, category; crm_matter_stage: label, order_index, is_open, code) with stage_owner_only (42501).
+--          A row policy cannot tell columns apart, and the non-structural columns (crm_stage.aging_threshold_days,
+--          crm_matter_stage.waiting_on / updated_at / phase) stay admin-tier as today.
+--        * The same trigger refuses, for every signed-in caller, changing a matter stage's code (stage_code_fixed) and changing a
+--          stage's category / is_open while it holds a record (stage_not_empty): a lead silently becoming won would skip the handoff.
+--        * The role trigger refuses any signed-in write of `role` (stage_role_guarded) and any delete of a role holder.
+--        * The FKs stay the backstop for deletes: crm_lead.current_stage_id is NO ACTION, crm_matter.stage_id is RESTRICT.
+--      What an owner's DIRECT write (lectual's old settings) still skips: last-open / last-won checks, renumbering, name uniqueness,
+--      the timeline rows. The functions in part 8 are the path lectual.app uses; lectual's old settings should move to them later.
+--      Service-role scripts are unaffected (the service role bypasses RLS and the trigger only judges `authenticated` / `anon`):
+--      lectual scripts/seed-intake-stages.ts, seed-matter-stages.ts, default-matter-stages.ts, import-*.ts, and lectual.app's demo seed.
+--      SECURITY DEFINER code (seed_org_defaults, provision_org, the part 8 functions) runs as the table owner, which bypasses RLS on
+--      Supabase (no FORCE ROW LEVEL SECURITY on these tables) and is not `authenticated`, so the trigger lets it through.
+--      Existing isolation cases in which an admin creates, renames, reorders or deletes a stage as a signed-in user must now use an
+--      owner (or expect 42501 / 0 rows).
+--   3. 0115's FIELD DEFINITIONS (crm_custom_field) become owner-only to INSERT and UPDATE, by two RESTRICTIVE policies (additive; the
+--      0115 admin-tier policies stay and are ANDed with them). Decision and reason: the spec (Nov 25) makes "change a view's
+--      structure" an owner act, and adding, renaming, archiving or moving a firm column IS view structure; leaving it admin-tier would
+--      let an admin do through the API what the UI no longer offers them, and Settings -> Columns (the only admin-tier screen) is being
+--      removed. The check is an owner MEMBERSHIP ROW (0115's money rule / 0116), so Lectual staff inside a firm cannot either. VALUES
+--      (crm_custom_value) are NOT touched: staff keep typing in cells, Money stays owner-only as 0115 has it. Consequence for the app:
+--      until Settings -> Columns is removed (build step 7) its gate must become "owner membership row" in the same release, or an admin
+--      there gets "You don't have permission". No firm had firm columns on Nov 25, so nothing existing is stranded. 0115's tables are
+--      otherwise unchanged: no column is added to tie a field to a view. A layout names a firm column by the key `cf:<field uuid>`; the
+--      field's own section (trademarks / contracts / both) already decides which records it applies to, and which views show it is
+--      exactly what the layout says, so a join table would be a second place to say the same thing.
+--
+-- ── VIEW LAYOUTS ────────────────────────────────────────────────────────────────────────────────────────────────────
+--   view_key in: review_list, review_board, matters_list, matters_board, contracts_list, contracts_board, leads_list, leads_board.
+--   columns: a jsonb ARRAY of 1..80 objects, keys exactly from {key, label, hidden, width}:
+--     key     required. A built-in column key, ^[a-z][a-z0-9_]{0,39}$ (the app's fixed keys; the database does not know which keys a
+--             view has: an unknown built-in key is the app's to ignore), or `cf:<uuid>` naming one of THIS firm's crm_custom_field rows
+--             (archived allowed; the trigger refuses another firm's or a missing id, view_layout_unknown_field, 23503). Keys distinct.
+--     label   optional. null or absent = the column's own name; else 1..60 characters, trimmed, no control characters. A rename is the
+--             label only: data, filters and rules keep reading the key.
+--     hidden  required boolean.
+--     width   optional. null or absent = default; else a whole number of pixels 40..800.
+--   rev: 1 on insert, +1 on every update (trigger). The app writes with `.eq("rev", <rev it drew>)` so a second owner's stale form
+--   updates 0 rows instead of silently overwriting (the consult-details `rev` pattern). A missing row = the app's default layout; a
+--   failed read draws the default with one note (three states, never "no columns"). Delete = "reset to default" (owner).
+--   Grants: authenticated SELECT, DELETE, INSERT (org_id, view_key, columns), UPDATE (columns). rev, updated_by, updated_at,
+--   created_at and id have no write grant: the trigger stamps them (updated_by = auth.uid(), null = the system, as 0085).
+--
+-- ── STAGE ROLES ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- A role is a fixed tag a RULE reads instead of a stage's name, so a rename or reorder changes nothing a rule does. Every role below
+-- exists because a rule in lectual.app finds a stage by NAME today (file named). Roles are never typed in the UI.
+--
+-- THE BACK-FILL PRINCIPLE: a role is written on stage S only where EVERY rule that will read the role ALREADY picks S today, and at
+-- least one of them picks it by NAME (never from position alone). So on the day this is applied, "role first, else today's name rule"
+-- gives every rule exactly today's answer. Where the readers disagree, where one finds nothing, or where a candidate name matches two
+-- stages (today's code would take whichever came first: that is a guess), the role stays NULL and the rules keep their name match. A
+-- stage picked for two roles gets neither. Firm brain `stage_mapping` entries (crm firm brain, content) are NOT read: the app keeps
+-- reading a brain entry FIRST (the firm said what it meant), then the role, then the default names.
+-- Name keys mirror the app exactly: crm_stage_name_key = lectual.app normalizeStageName (src/lib/lawmatics/stage-map.ts: lowercase,
+-- strip a leading "4." / "4)" / "4 -" / "4:", "&" -> " and ", every other non [a-z0-9] run -> one space, trim). "resolve" = that
+-- file's resolveStage: the candidate's key against the stages' keys, then the candidate key's ALIASES entry (copied verbatim below),
+-- candidates tried in order, first hit wins.
+--
+-- Lead stages (crm_stage.role). "open" = category open.
+--   new_enquiry        readers: newEnquiryStage (src/lib/pipeline/new-enquiry.ts; used by createLead, the public intake, the importer,
+--                      Reconcile create-lead, the Working rule and the Weekly review): open stages, names "Potential New Client", "New
+--                      Lead", "New Inquiry", "New Enquiry" by key (no aliases), else the first open stage; AND Reconcile's `contacted`
+--                      milestone (src/lib/reconcile/milestones.ts MILESTONE_STAGE_NAMES): resolve "Potential New Client", "New PNC",
+--                      "New Inquiry". Both must give the same open stage. (A seed-default firm's "New PNC" qualifies: Reconcile finds it
+--                      by name and newEnquiryStage's first-open fallback is the same stage.)
+--   follow_up          readers: isFollowUpStage (src/lib/intake/working.ts; the Weekly review's reviewLeadStageIds is the same regex):
+--                      the ONE open stage whose key matches ^follow ?up\b (two = null); AND Reconcile's `nurture` milestone: resolve
+--                      "Follow-Up", "Follow Up", "Nurture". No `nurture` role: that milestone resolves to the Follow-Up stage first, and
+--                      nurture stages are already identified by their category.
+--   consult_scheduled  reader: Stage Keeper consult-scheduled (src/lib/agents/stage-keeper/mapping.ts DEFAULT_STAGE_NAMES; consult-prep
+--                      and Reconcile's consult_scheduled use the same list): resolve "Consultation Scheduled", "Consult Scheduled",
+--                      "Consult Booked", "Strategy Session Scheduled", "Discovery Call Scheduled".
+--   consult_held       readers: Stage Keeper consult-held: resolve "Consult Held – Proposal in Progress", "Consult Held", "Consultation
+--                      Held", "Consult Completed", else (the code's own fallback) the consult_scheduled stage; AND Reconcile's
+--                      consult_held: resolve "Consult Held – Proposal in Progress", "Consultation Held", "Consult Held", "Consultation
+--                      Completed", "Consult Completed", "Consultation Complete". The lists differ in order; both must agree.
+--   questionnaire_sent reader: Stage Keeper questionnaire-sent = Reconcile questionnaire_sent: "Questionnaire Sent", "Intake Questionnaire
+--                      Sent", "Questionnaire".
+--   proposal_sent      readers: Stage Keeper post-consult-sent: "Proposal Sent", "Post Consultation Email Sent", "Post Consult Email
+--                      Sent", "Post Consultation Follow Up"; AND Reconcile proposal_sent: "Proposal Sent", "Proposal Sent to Client",
+--                      then the Stage Keeper list.
+--   follow_up_sent     reader: Reconcile follow_up_sent: "Follow-Up Sent", "Follow Up Sent", "Post Consultation Follow Up". (A firm whose
+--                      only match for both is "Post Consultation Follow Up" gets neither role: one stage, two roles.)
+--   loe_sent           reader: Stage Keeper loe-invoice-sent = Reconcile loe_sent: "LOE & Invoice Sent", "Pending LOE + Payment",
+--                      "Engagement Letter Sent".
+--   welcome_sent       reader: Stage Keeper welcome-sent: "Welcome Email Sent", "Welcome Sent".
+--   opinion_letter_sent reader: Reconcile opinion_letter_sent: "Opinion Letter Sent", "Search Opinion Sent".
+--   signed_loe         readers: Stage Keeper payment-received: resolve "Signed LOE / Deposit Received", "Deposit Received" (its alias
+--                      also reaches "Hired Client" / "Active Matter"); AND the hired-matter sync's wonTargetStage
+--                      (src/lib/lawmatics/hired-sync-plan.ts): the first won stage in order whose RAW name matches /signed loe|deposit
+--                      received/i, else the lowest-ordered won stage. Must be category won. This is the role the hired sync's lead move
+--                      reads first (spec rule 7: role, else today's name match, else the lowest won, else no move).
+--   lost               reader: Reconcile declined: resolve "Lost", "Lost Lead". Must be category lost.
+--   Category rule (trigger, every caller): new_enquiry and follow_up only on an open stage, signed_loe only on won, lost only on lost.
+--   The other roles are not tied to a category (a firm may keep, say, "Welcome Email Sent" as a won stage; the Stage Keeper already
+--   refuses to move into won / lost / nurture whatever the role says).
+--
+-- Matter stages (crm_matter_stage.role). Label keys mirror lectual.app src/lib/uspto/compare.ts normalise (stripStageCode from
+-- src/lib/stages/code.ts: drop a leading "19A." / "17 " code, trim, collapse spaces, lowercase) = crm_matter_stage_label_key.
+--   signed_loe             readers: isHiredStage (src/lib/matters/hired-stage.ts; the hired-matter sync files every new TM matter on it,
+--                          and phase-group.ts intakeStageIds draws the Matters page "from Signed LOE on"): label EXACTLY
+--                          'Signed LOE / Deposit Received' (case-sensitive, untrimmed, as the code compares). One such stage = the role.
+--   application_filed,     reader: the USPTO status compare (src/lib/uspto/stage-map.ts STAGE_MAP + compare.ts): "Application Filed",
+--   oa_issued,             "OA Issued", "Awaiting Trademark Registration", "Publication for Opposition", "Registered", "Abandoned", by label
+--   awaiting_registration, key. One matching stage = the role. Today a rename turns an "agree" into a false "differs"; with the role the
+--   publication,           compare can ask "does my stage hold the role this status suggests".
+--   registered,
+--   abandoned
+--   NOT a role: "USPTO wait". src/lib/review/waiting.ts reads crm_matter_stage.waiting_on first, and that column is NOT NULL (0042), so
+--   its name table is never reached; waiting_on already survives a rename and many stages share it. No `filed` beyond
+--   application_filed: no other rule reads a filed stage by name.
+--
+-- Open / closed rule for matter roles (trigger, every caller, also on set_open and on a role handoff): signed_loe,
+-- application_filed, oa_issued, awaiting_registration and publication sit on OPEN stages only; registered and abandoned on CLOSED
+-- stages only (stage_role_category_mismatch). The back-fill skips a pick that breaks it.
+--
+-- ── STAGE FUNCTIONS: SHARED RULES ───────────────────────────────────────────────────────────────────────────────────
+--   * Caller: an OWNER MEMBERSHIP ROW (crm_org_member: org_id = current_org_id(), user_id = auth.uid(), role = 'owner'). Never the
+--     claim, so a platform admin (0050) inside a firm is refused like a paralegal (stage_not_owner). No session = stage_not_owner.
+--   * The firm is always current_org_id(); there is no org argument. A stage id of another firm reads exactly like a missing one
+--     (stage_not_found / stage_delete_bad_destination, 42501), so a function is no oracle about other firms.
+--   * Positions are 0-based places in the firm's order (order_index, then name, then id: lectual.app compareStageOrder). Every change
+--     renumbers the WHOLE firm list in steps of 10 in two phases (both tables have a non-deferrable unique (org_id, order_index)):
+--     phase 1 moves every row above max(existing max, 10 x count) + 1, phase 2 writes (place x 10). At most 200 stages per firm per
+--     table (stage_limit); an order_index past 1,000,000,000 is stage_order_overflow (also checked before an add's max + 1), so a
+--     lead stage's order_index stays far below the Weekly review's MATTER_ORDER_BASE (100000) in practice.
+--   * Locking: a per-firm advisory lock ('crm_stage:' or 'crm_matter_stage:' || org id) serializes the functions. Only the stage being
+--     changed is locked FOR UPDATE (and, on delete, the records in it); the firm's other stage rows are NOT row-locked up front, so
+--     ordinary lead writes (which take the FK's KEY SHARE on their stage) are not blocked by a rename or an add. A renumber's UPDATE
+--     does take each row's lock for the moment it runs. The app answers 40P01 (deadlock) and 55P03 with a fixed sentence and ONE
+--     retry.
+--   * Names: trimmed, 1..80 characters (lead) / 1..200 (matter, 0042's CHECK), no control characters, no invisible direction or
+--     zero-width marks (U+200B-U+200F, U+202A-U+202E, U+2066-U+2069), and a key that is not empty (stage_bad_name). A new or renamed
+--     stage may not share its key with another stage of the firm (stage_name_taken, 23505): two stages with one key are exactly what
+--     makes today's name rules guess. Existing duplicates are left alone.
+--   * Matter stage codes are generated at add (the label's ASCII letters and digits, uppercased, at most 12, an "S" prefix when it
+--     would start with a digit so it never looks like a tracker code, then "-2", "-3" ... on a collision; "STAGE" when nothing is
+--     left) and NEVER change (stage_code_fixed for a signed-in caller; no function changes it).
+--   * Moves write crm_activity `stage_changed` rows shaped like the app's own (src/lib/pipeline/leads.ts moveLeadStage for leads:
+--     from_stage, to_stage, from_stage_id, to_stage_id; src/lib/matters/stages.ts updateMatterStage for matters: from_code,
+--     from_label, to_code, to_label, plus from_stage_id / to_stage_id), actor_type user, actor_id auth.uid(), plus
+--     reason 'stage deleted' and stage_deleted true. last_activity_at is NOT touched (lists sort on it; the cleanup script's rule).
+--
+-- ── DELETE WITH MOVE ────────────────────────────────────────────────────────────────────────────────────────────────
+--   In ONE transaction: lock the stage, lock every record in it, compare the SET of live record ids (leads: merged_into_id is null;
+--   matters: all, any status) with p_expected_ids (exactly the records the dialog showed; an empty stage takes '{}'). Any difference,
+--   in count or in which records, is stage_delete_records_changed and nothing is written: a count alone cannot see one lead moving
+--   out while another moves in. Then the refusals, the moves (leads: current_stage_id + stage_entered_at = now(); matters: stage_id +
+--   stage_entered_at + updated_at = now()), one stage_changed row per moved live record, the role, and the delete. An empty stage
+--   needs no destination (one given is ignored). Order of checks: ids, role, last open, last won, destination.
+--   Destination: required when the stage holds anything; not the stage itself; this firm's.
+--     Leads: a won destination only FROM a won stage (stage_delete_won_destination otherwise: a person's move into won runs the
+--     matter handoff); and from a won stage ONLY a won destination (stage_delete_won_source: those leads already had their handoff and
+--     must not go back to open, lost or nurture). So the last won stage can be deleted only while it holds no lead.
+--     Matters: any other matter stage of the firm with the SAME is_open (stage_delete_open_mismatch), unless
+--     p_confirm_open_change is true: a delete must not silently reopen or close matters.
+--   Role holder: p_role_to names another stage of the firm, holding no role, that the role's category / open rule allows; or
+--     p_role_to null DROPS the role (the rules fall back to today's name match, safer than forcing the role onto some other stage),
+--     for every role EXCEPT new_enquiry (always needs p_role_to) and signed_loe (lead: needs p_role_to, unless it is the firm's last
+--     won stage and p_confirm_no_won is true; matter: always needs p_role_to): stage_holds_role.
+--   The result: deleted, destination, moved, moved_ids (the live records moved), merged_moved (leads), role_moved_to, role_dropped,
+--   and rules_naming_stage (leads): how many automation rules (crm_automation_rule, 0022) mention the stage id in their config,
+--   conditions or actions. A deleted stage id in a rule's change_stage action makes that action fail (23503), never move anyone.
+--   Nothing here edits a rule. History: earlier stage_changed rows keep the stage's id and name, so timelines still read.
+--   WHAT THE APP MUST DO AFTER A DELETE (the SQL does not do it): a person's move in lectual.app also stops sequences
+--   (stopLeadSequencesAsStaff, for a won destination) and runs `stage_changed` automation rules (runRules). A stage delete does
+--   neither in SQL: enrolments are app state with their own rules (0085), and rules run in the app. After a successful delete the
+--   app runs, for every id in moved_ids, the same sequence-stop handling a person's move to that destination would run, and decides
+--   explicitly whether stage_changed rules fire (recommended: not, since nobody chose a new stage for these leads). The Working
+--   rule and any reader that counts "a person moved this lead" must skip rows whose payload has stage_deleted = true.
+--
+-- ── MERGED LEADS (0107) ─────────────────────────────────────────────────────────────────────────────────────────────
+--   A merged lead keeps its current_stage_id forever and 0107's guard refuses ANY update of it, so a stage holding a merged
+--   duplicate could never be deleted (the FK is NO ACTION) and an owner would be blocked by a record the app does not even show.
+--   Rule chosen: merged leads do not block and are not in p_expected_ids. crm_stage_delete moves them to the destination with
+--   current_stage_id ONLY (no stage_entered_at, no timeline row: a merged lead's timeline is read through its keeper, and a "moved by
+--   stage delete" line there would read as a move of the keeper); the result reports them (`merged_moved`). A stage holding only
+--   merged leads still needs a destination. A stage holding only merged leads can never change category (stage_not_empty counts
+--   them, and the app does not show them): delete it with a destination instead.
+--   How: the replaced guard lets exactly this through: an UPDATE of a merged row where current_user is the owner of
+--   public.crm_stage_delete(uuid,uuid,uuid[],uuid,boolean) (a SECURITY DEFINER function runs as its owner; API callers are
+--   authenticated / anon / service_role and cannot SET ROLE), the transaction-local `lectual.stage_delete` equals
+--   '<old.current_stage_id>><new.current_stage_id>' (set by crm_stage_delete just before, cleared just after), and nothing but
+--   current_stage_id differs (to_jsonb(new) - 'current_stage_id' = to_jsonb(old) - 'current_stage_id'). Every 0107 behaviour is
+--   unchanged. Same limit as 0107: a session running AS the function owner (postgres: dashboard SQL, migrations) can set the marker,
+--   and so could any OTHER postgres-owned SECURITY DEFINER function that calls set_config('lectual.…', <caller's argument>):
+--   PRE-APPLY CHECK 9 looks for one.
+--   Not chosen: refusing the delete (an owner blocked by an invisible row); moving them to the keeper's stage (each merged lead would
+--   land somewhere different, and the keeper's stage might be the one being deleted); a soft-deleted "archived" stage (every stage
+--   read in both apps would have to learn to hide it).
+--
+-- ── PHASE (crm_matter_stage.phase) ──────────────────────────────────────────────────────────────────────────────────
+--   lectual.app reads crm_matter_stage.phase (pipeline, pre_filing, post_filing, maintenance, inactive; phase-group.ts), which is on
+--   lectual-prod (checked Nov 17, AGENTS.md "Matters: only matters past Signed LOE") but is NOT created by any migration in lectual's
+--   main. This file never creates it. crm_matter_stage_add takes an optional p_phase and writes it, cast to the column's own type,
+--   only when the column exists; a phase given on a database without the column is matter_stage_phase_unavailable. The UPDATE grant
+--   on `phase` is kept for authenticated when the column exists (today's admin-tier edit is not narrowed). PRE-APPLY CHECK 4.
+--
+-- ── ERROR PREFIXES ──────────────────────────────────────────────────────────────────────────────────────────────────
+--   42501: stage_not_owner, stage_not_found, stage_delete_bad_destination, stage_role_guarded, stage_owner_only, stage_code_fixed
+--   23505: stage_name_taken
+--   22023: stage_bad_name, stage_bad_position, stage_bad_category, stage_delete_bad_ids, stage_delete_needs_destination,
+--          stage_delete_same_stage, matter_stage_bad_waiting_on, matter_stage_bad_phase
+--   23514: stage_limit, stage_order_overflow, stage_not_empty, stage_last_open, stage_last_won, stage_holds_role, stage_role_taken,
+--          stage_role_category_mismatch, stage_role_delete, stage_delete_records_changed, stage_delete_won_destination,
+--          stage_delete_won_source, stage_delete_open_mismatch, matter_stage_phase_unavailable, view_layout_immutable
+--   23503: view_layout_unknown_field
+--   CHECK constraint names (23514): crm_view_layout_view_key, crm_view_layout_columns, crm_stage_role_valid,
+--          crm_matter_stage_role_valid. 0107's lead_merge_guarded (42501) is unchanged. RLS refusals (restrictive policies) are the
+--          plain 42501 "new row violates row-level security policy" or 0 rows.
+--   The app reads these by prefix and shows fixed sentences, never the database text.
+--
+-- ── PRE-APPLY CHECKS (read-only; run on each project first) ──────────────────────────────────────────────────────────
+--   1. Dependencies present (expect four non-null values and one trigger row):
+--        select to_regprocedure('public.crm_merge_leads(uuid,uuid,jsonb)'), to_regclass('public.crm_custom_field'),
+--               to_regclass('public.crm_view_layout') is null as layout_absent,
+--               (select count(*) from information_schema.columns where table_name = 'crm_stage' and column_name = 'role') = 0 as role_absent;
+--        select tgname from pg_trigger where tgrelid = 'public.crm_org_member'::regclass and tgname = 'crm_org_member_owner_guard_trg';
+--   2. The live merge guard is still 0107's (expect the md5 of 0107's function body text from the lectual repo file; if it differs,
+--      STOP: re-base section 5 on the live body before applying):
+--        select md5(prosrc) from pg_proc where oid = 'public.crm_lead_merge_guard()'::regprocedure;
+--   3. Triggers on the tables this file updates (expect on crm_lead only crm_lead_lane_guard and crm_lead_merge_guard as BEFORE
+--      triggers that can change a row; any other BEFORE UPDATE trigger that sets a column would make the merged-lead move fail closed,
+--      and a trigger on crm_matter that refuses updates (lectual 0110's close guard, if applied) would refuse moving a closed matter):
+--        select tgrelid::regclass, tgname, tgfoid::regprocedure from pg_trigger
+--         where not tgisinternal and tgrelid in ('public.crm_lead'::regclass, 'public.crm_matter'::regclass,
+--               'public.crm_stage'::regclass, 'public.crm_matter_stage'::regclass) order by 1, 2;
+--   4. The phase column (expect one row on prod, maybe none on dev): select format_type(atttypid, atttypmod) from pg_attribute
+--        where attrelid = 'public.crm_matter_stage'::regclass and attname = 'phase' and not attisdropped;
+--   5. Sizes (expect every count <= 200 and max < 1000000000):
+--        select org_id, count(*), max(order_index) from crm_stage group by 1 order by 2 desc limit 5;
+--        select org_id, count(*), max(order_index) from crm_matter_stage group by 1 order by 2 desc limit 5;
+--   6. Who has firm columns today (expect none, or only owner-made ones): select org_id, count(*) from crm_custom_field group by 1;
+--   7. The tables are not FORCE ROW LEVEL SECURITY and are owned by the role that will own the functions (expect f, f and one owner):
+--        select relname, relforcerowsecurity, pg_get_userbyid(relowner) from pg_class
+--         where oid in ('public.crm_stage'::regclass, 'public.crm_matter_stage'::regclass, 'public.crm_lead'::regclass,
+--                       'public.crm_matter'::regclass, 'public.crm_activity'::regclass);
+--      Who writes the stage tables as a signed-in user: lectual main's dashboard settings (actions.ts, NewStageForm.tsx, StageRow.tsx);
+--      after this file only an owner can create, rename, reorder, re-categorise or delete there. lectual.app has no such writer in use.
+--   8. After applying parts 1-8 only, review what the back-fill would write before part 9 (no write):
+--        select o.name, public.crm_stage_roles_backfill(o.id, true) from crm_org o order by 1;
+--   9. No OTHER postgres-owned function can set a `lectual.` marker from its caller's input (expect only crm_merge_leads and, after
+--      apply, crm_stage_delete, each setting it from a value it read itself):
+--        select p.oid::regprocedure, pg_get_userbyid(p.proowner) from pg_proc p
+--         where p.prosrc ilike '%set_config(%lectual.%' order by 1;
+--
+-- ── APPLYING IT ──────────────────────────────────────────────────────────────────────────────────────────────────────
+-- Additive and idempotent (if not exists, create or replace, do $$ blocks that test pg_constraint / pg_trigger / pg_policies first,
+-- 0103's form). No drop of any existing object, no delete of any row, no grant revoked from a signed-in role except TRUNCATE /
+-- REFERENCES / TRIGGER / MAINTAIN; the only row writes are part 9's role back-fill (an UPDATE of crm_stage.role /
+-- crm_matter_stage.role where null). One Supabase MCP apply_migration should be safe; if it hangs (0093: it hangs on statements it
+-- treats as destructive), send the numbered parts as execute_sql chunks IN ORDER, each its own call, plus a
+-- supabase_migrations.schema_migrations row. Likeliest to hang: part 5 (replaces a guard function) and part 7 (REVOKE); send those
+-- alone. Every part is chunk-safe (no temp objects, nothing carried between calls).
+--   Part 1 helpers  2 layout table  3 stage role columns  4 role and structure triggers  5 merge guard (0107 + one branch)
+--   6 internal helpers  7 grants and owner policies  8 stage functions  9 back-fill  10 0115 restrictive policies  11 comments
+-- Dev first; run the cases at the end of this file there; prod only with the owner's OK.
+--
+-- ── APP SIDE (lectual.app, build steps 2-7) ─────────────────────────────────────────────────────────────────────────
+--   * Until applied: crm_view_layout is missing (42P01 / PGRST205: "not set up", the default layout, no structure controls); the stage
+--     functions are missing (42883 / PGRST202: no stage controls); `role` is missing (42703 / PGRST204: every rule keeps its name
+--     match). Read by error CODE only. Every rule reads: brain entry (where it has one) -> role -> today's name rule -> fallback.
+--   * Layout writes: NO PostgREST upsert on crm_view_layout (its conflict-update names columns that have no UPDATE grant). Read first;
+--     with no row, insert; a 23505 on crm_view_layout_one_per_view means another owner created it at the same moment: re-read and
+--     update with `.eq("rev", <rev read>)`; 0 rows updated = "someone else changed this view; reload".
+--   * `cf:` keys are written lowercase (the CHECK accepts only [0-9a-f] in the uuid): lowercase the field id before saving.
+--   * Stage deletes: the dialog sends the ids it showed (p_expected_ids), and after success the app runs the sequence-stop handling
+--     for moved_ids (DELETE WITH MOVE). Errors 40P01 / 55P03: one retry, then a fixed sentence ("Someone else is changing stages; try
+--     again.").
+-- =====================================================================================================================
+
+
+-- ── 1. Pure helpers ─────────────────────────────────────────────────────────────────────────────────────────────────
+-- lectual.app normalizeStageName (src/lib/lawmatics/stage-map.ts), exactly. Pure; execute stays with PUBLIC.
+create or replace function public.crm_stage_name_key(p_name text)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select pg_catalog.btrim(
+    pg_catalog.regexp_replace(
+      pg_catalog.replace(
+        pg_catalog.regexp_replace(pg_catalog.lower(coalesce(p_name, '')), '^\s*\d+\s*[.):-]\s*', ''),
+        '&', ' and '),
+      '[^a-z0-9]+', ' ', 'g'))
+$$;
+
+-- lectual.app src/lib/uspto/compare.ts normalise (stripStageCode, then collapse spaces, trim, lowercase), exactly.
+create or replace function public.crm_matter_stage_label_key(p_label text)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select pg_catalog.lower(pg_catalog.btrim(pg_catalog.regexp_replace(
+    case when x.s = '' then pg_catalog.btrim(coalesce(p_label, '')) else x.s end, '\s+', ' ', 'g')))
+  from (select pg_catalog.btrim(pg_catalog.regexp_replace(coalesce(p_label, ''), '^\s*\d+[A-Za-z]?(\s*[.·:)–-]\s*|\s+)', '')) as s) x
+$$;
+
+-- One layout column. Pure; CASE chains so nothing is cast or expanded before its type is known.
+create or replace function public.crm_view_layout_column_valid(p jsonb)
+returns boolean
+language plpgsql
+immutable
+set search_path = ''
+as $$
+begin
+  if pg_catalog.jsonb_typeof(p) is distinct from 'object' then return false; end if;
+  if exists (select 1 from pg_catalog.jsonb_object_keys(p) k where k not in ('key', 'label', 'hidden', 'width')) then return false; end if;
+  if pg_catalog.jsonb_typeof(p -> 'key') is distinct from 'string' then return false; end if;
+  if not ((p ->> 'key') ~ '^[a-z][a-z0-9_]{0,39}$'
+          or (p ->> 'key') ~ '^cf:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') then
+    return false;
+  end if;
+  if pg_catalog.jsonb_typeof(p -> 'hidden') is distinct from 'boolean' then return false; end if;
+  if p ? 'label' and pg_catalog.jsonb_typeof(p -> 'label') <> 'null' then
+    if pg_catalog.jsonb_typeof(p -> 'label') <> 'string'
+       or pg_catalog.char_length(p ->> 'label') not between 1 and 60
+       or (p ->> 'label') <> pg_catalog.btrim(p ->> 'label')
+       or (p ->> 'label') ~ '[[:cntrl:]]'
+       or (p ->> 'label') ~ '[\u200B-\u200F\u202A-\u202E\u2066-\u2069]' then
+      return false;
+    end if;
+  end if;
+  if p ? 'width' and pg_catalog.jsonb_typeof(p -> 'width') <> 'null' then
+    if pg_catalog.jsonb_typeof(p -> 'width') <> 'number' or (p ->> 'width') !~ '^[0-9]{1,4}$' then return false; end if;
+    if (p ->> 'width')::int not between 40 and 800 then return false; end if;
+  end if;
+  return true;
+end
+$$;
+
+create or replace function public.crm_view_layout_columns_valid(p jsonb)
+returns boolean
+language plpgsql
+immutable
+set search_path = ''
+as $$
+begin
+  if pg_catalog.jsonb_typeof(p) is distinct from 'array' then return false; end if;
+  if pg_catalog.jsonb_array_length(p) not between 1 and 80 then return false; end if;
+  if exists (select 1 from pg_catalog.jsonb_array_elements(p) e(v) where not public.crm_view_layout_column_valid(e.v)) then
+    return false;
+  end if;
+  return (select pg_catalog.count(distinct e.v ->> 'key') from pg_catalog.jsonb_array_elements(p) e(v))
+         = pg_catalog.jsonb_array_length(p);
+end
+$$;
+
+
+-- ── 2. crm_view_layout ─────────────────────────────────────────────────────────────────────────────────────────────
+create table if not exists public.crm_view_layout (
+  id          uuid        primary key default gen_random_uuid(),
+  org_id      uuid        not null references public.crm_org(id) on delete cascade,
+  view_key    text        not null,
+  columns     jsonb       not null,
+  rev         int         not null default 1,
+  -- No write grant: the trigger stamps auth.uid() (null = the system, 0085).
+  updated_by  uuid        default auth.uid() references auth.users(id) on delete set null,
+  updated_at  timestamptz not null default now(),
+  created_at  timestamptz not null default now(),
+  constraint crm_view_layout_view_key check (view_key in (
+    'review_list', 'review_board', 'matters_list', 'matters_board',
+    'contracts_list', 'contracts_board', 'leads_list', 'leads_board')),
+  constraint crm_view_layout_columns check (public.crm_view_layout_columns_valid(columns)),
+  constraint crm_view_layout_rev check (rev >= 1),
+  constraint crm_view_layout_one_per_view unique (org_id, view_key)
+);
+-- For the auth.users ON DELETE SET NULL on updated_by (as 0106 / 0115 do).
+create index if not exists crm_view_layout_updated_by_idx on public.crm_view_layout (updated_by);
+
+create or replace function public.crm_view_layout_rules()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_key text;
+  v_ok boolean;
+begin
+  -- 1. The FK's own ON DELETE SET NULL of updated_by: let exactly that through (0106 / 0115 form), no stamp.
+  if tg_op = 'UPDATE' and pg_trigger_depth() > 1
+     and (to_jsonb(new) - 'updated_by') = (to_jsonb(old) - 'updated_by') and new.updated_by is null then
+    return new;
+  end if;
+
+  -- 2. Immutable, for every caller including the service role (signed-in callers are stopped earlier by the grants: 42501).
+  if tg_op = 'UPDATE' and (new.id is distinct from old.id or new.org_id is distinct from old.org_id
+                           or new.view_key is distinct from old.view_key or new.created_at is distinct from old.created_at) then
+    raise exception 'view_layout_immutable: a layout''s firm and view never change' using errcode = '23514';
+  end if;
+
+  -- 3. A firm column named in the layout must be one of THIS firm's (archived allowed). Another firm's id reads as missing.
+  --    A BEFORE trigger runs before the CHECK, so a malformed list is left for crm_view_layout_columns to refuse (no cast here).
+  if not public.crm_view_layout_columns_valid(new.columns) then
+    return new;
+  end if;
+  for v_key in select e.v ->> 'key' from pg_catalog.jsonb_array_elements(new.columns) e(v) where (e.v ->> 'key') like 'cf:%' loop
+    if pg_catalog.to_regclass('public.crm_custom_field') is null then
+      v_ok := false;
+    else
+      execute 'select exists (select 1 from public.crm_custom_field f where f.id = $1 and f.org_id = $2)'
+        into v_ok using pg_catalog.substr(v_key, 4)::uuid, new.org_id;
+    end if;
+    if not v_ok then
+      raise exception 'view_layout_unknown_field: the layout names a column this firm does not have' using errcode = '23503';
+    end if;
+  end loop;
+
+  -- 4. Stamps, overwriting what was sent.
+  if tg_op = 'INSERT' then
+    new.rev := 1;
+    new.created_at := now();
+  else
+    new.rev := old.rev + 1;
+  end if;
+  new.updated_by := auth.uid();
+  new.updated_at := now();
+  return new;
+end
+$$;
+revoke all on function public.crm_view_layout_rules() from public, anon, authenticated;
+
+do $$
+begin
+  if not exists (select 1 from pg_trigger where tgname = 'crm_view_layout_rules_trg'
+                 and tgrelid = 'public.crm_view_layout'::regclass) then
+    create trigger crm_view_layout_rules_trg
+      before insert or update on public.crm_view_layout
+      for each row execute function public.crm_view_layout_rules();
+  end if;
+end
+$$;
+
+revoke all on public.crm_view_layout from anon;
+revoke insert, update, delete, truncate, references, trigger on public.crm_view_layout from authenticated;
+grant select, delete on public.crm_view_layout to authenticated;
+grant insert (org_id, view_key, columns) on public.crm_view_layout to authenticated;
+grant update (columns) on public.crm_view_layout to authenticated;
+revoke truncate, references, trigger on public.crm_view_layout from anon, authenticated;
+
+alter table public.crm_view_layout enable row level security;
+
+-- Owner = a crm_org_member ROW with role owner in the active firm (0115 money / 0116), evaluated once per statement.
+do $$
+begin
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'crm_view_layout'
+                 and policyname = 'crm_view_layout_select_member') then
+    create policy crm_view_layout_select_member on public.crm_view_layout
+      for select using (org_id = public.current_org_id());
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'crm_view_layout'
+                 and policyname = 'crm_view_layout_insert_owner') then
+    create policy crm_view_layout_insert_owner on public.crm_view_layout
+      for insert with check (
+        org_id = public.current_org_id()
+        and (select exists (select 1 from public.crm_org_member m
+                             where m.org_id = public.current_org_id() and m.user_id = auth.uid() and m.role = 'owner'))
+      );
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'crm_view_layout'
+                 and policyname = 'crm_view_layout_update_owner') then
+    create policy crm_view_layout_update_owner on public.crm_view_layout
+      for update
+      using (
+        org_id = public.current_org_id()
+        and (select exists (select 1 from public.crm_org_member m
+                             where m.org_id = public.current_org_id() and m.user_id = auth.uid() and m.role = 'owner'))
+      )
+      with check (
+        org_id = public.current_org_id()
+        and (select exists (select 1 from public.crm_org_member m
+                             where m.org_id = public.current_org_id() and m.user_id = auth.uid() and m.role = 'owner'))
+      );
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'crm_view_layout'
+                 and policyname = 'crm_view_layout_delete_owner') then
+    create policy crm_view_layout_delete_owner on public.crm_view_layout
+      for delete using (
+        org_id = public.current_org_id()
+        and (select exists (select 1 from public.crm_org_member m
+                             where m.org_id = public.current_org_id() and m.user_id = auth.uid() and m.role = 'owner'))
+      );
+  end if;
+end
+$$;
+
+
+-- ── 3. Stage role columns ───────────────────────────────────────────────────────────────────────────────────────────
+alter table public.crm_stage add column if not exists role text null;
+alter table public.crm_matter_stage add column if not exists role text null;
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'crm_stage_role_valid' and conrelid = 'public.crm_stage'::regclass) then
+    alter table public.crm_stage add constraint crm_stage_role_valid check (role is null or role in (
+      'new_enquiry', 'follow_up', 'consult_scheduled', 'consult_held', 'questionnaire_sent', 'proposal_sent',
+      'follow_up_sent', 'loe_sent', 'welcome_sent', 'opinion_letter_sent', 'signed_loe', 'lost'));
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'crm_matter_stage_role_valid'
+                 and conrelid = 'public.crm_matter_stage'::regclass) then
+    alter table public.crm_matter_stage add constraint crm_matter_stage_role_valid check (role is null or role in (
+      'signed_loe', 'application_filed', 'oa_issued', 'awaiting_registration', 'publication', 'registered', 'abandoned'));
+  end if;
+end
+$$;
+
+-- One holder per firm and role. A partial index, not a constraint: NULL roles are the normal case.
+create unique index if not exists crm_stage_org_role_uniq on public.crm_stage (org_id, role) where role is not null;
+create unique index if not exists crm_matter_stage_org_role_uniq on public.crm_matter_stage (org_id, role) where role is not null;
+
+
+-- ── 4. Role and structure triggers ──────────────────────────────────────────────────────────────────────────────────
+-- Roles: signed-in callers cannot write `role` (stage_role_guarded); every caller obeys the role / category (lead) and role / open
+-- (matter) pairings and "a role holder is not deleted" (clear, drop or move the role first; the delete functions do).
+-- Structure (WHAT IT CHANGES 2): a signed-in caller without an owner membership row cannot change a structural column
+-- (stage_owner_only); nobody signed in changes a matter stage's code (stage_code_fixed) or a stage's category / is_open while it holds
+-- a record (stage_not_empty). Insert and delete by a signed-in non-owner are refused by the restrictive policies in part 7.
+-- `authenticated` / `anon` are the only roles judged here: the service role and the SECURITY DEFINER functions (table owner) pass.
+create or replace function public.crm_stage_is_owner_row(p_org uuid)
+returns boolean
+language sql
+stable
+set search_path = ''
+as $$
+  select exists (select 1 from public.crm_org_member m
+                  where m.org_id = p_org and m.org_id = public.current_org_id() and m.user_id = auth.uid() and m.role = 'owner')
+$$;
+
+create or replace function public.crm_stage_role_rules()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if tg_op = 'DELETE' then
+    -- A firm's own deletion cascades from crm_org (nested); a direct delete of a role holder is refused for everyone.
+    if old.role is not null and pg_trigger_depth() <= 1 then
+      raise exception 'stage_role_delete: this stage holds a role; give the role to another stage first' using errcode = '23514';
+    end if;
+    return old;
+  end if;
+  if (tg_op = 'INSERT' and new.role is not null) or (tg_op = 'UPDATE' and new.role is distinct from old.role) then
+    if current_user in ('authenticated', 'anon') then
+      raise exception 'stage_role_guarded: a stage''s role is set by Lectual' using errcode = '42501';
+    end if;
+  end if;
+  if tg_op = 'UPDATE' and current_user in ('authenticated', 'anon') then
+    if (new.name is distinct from old.name or new.order_index is distinct from old.order_index
+        or new.category is distinct from old.category or new.org_id is distinct from old.org_id)
+       and not public.crm_stage_is_owner_row(old.org_id) then
+      raise exception 'stage_owner_only: only an owner of this firm can change its stages' using errcode = '42501';
+    end if;
+    if new.category is distinct from old.category
+       and exists (select 1 from public.crm_lead l where l.current_stage_id = old.id and l.org_id = old.org_id) then
+      raise exception 'stage_not_empty: move this stage''s leads first' using errcode = '23514';
+    end if;
+  end if;
+  if new.role is not null and not (
+       (new.role in ('new_enquiry', 'follow_up') and new.category = 'open')
+    or (new.role = 'signed_loe' and new.category = 'won')
+    or (new.role = 'lost' and new.category = 'lost')
+    or new.role not in ('new_enquiry', 'follow_up', 'signed_loe', 'lost')) then
+    raise exception 'stage_role_category_mismatch: this role cannot sit on a stage of that category' using errcode = '23514';
+  end if;
+  return new;
+end
+$$;
+
+create or replace function public.crm_matter_stage_role_rules()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if tg_op = 'DELETE' then
+    if old.role is not null and pg_trigger_depth() <= 1 then
+      raise exception 'stage_role_delete: this stage holds a role; give the role to another stage first' using errcode = '23514';
+    end if;
+    return old;
+  end if;
+  if (tg_op = 'INSERT' and new.role is not null) or (tg_op = 'UPDATE' and new.role is distinct from old.role) then
+    if current_user in ('authenticated', 'anon') then
+      raise exception 'stage_role_guarded: a stage''s role is set by Lectual' using errcode = '42501';
+    end if;
+  end if;
+  if tg_op = 'UPDATE' and current_user in ('authenticated', 'anon') then
+    if new.code is distinct from old.code then
+      raise exception 'stage_code_fixed: a stage''s code never changes' using errcode = '42501';
+    end if;
+    if (new.label is distinct from old.label or new.order_index is distinct from old.order_index
+        or new.is_open is distinct from old.is_open or new.org_id is distinct from old.org_id)
+       and not public.crm_stage_is_owner_row(old.org_id) then
+      raise exception 'stage_owner_only: only an owner of this firm can change its stages' using errcode = '42501';
+    end if;
+    if new.is_open is distinct from old.is_open
+       and exists (select 1 from public.crm_matter m where m.stage_id = old.id and m.org_id = old.org_id) then
+      raise exception 'stage_not_empty: move this stage''s matters first' using errcode = '23514';
+    end if;
+  end if;
+  if new.role is not null and not (
+       (new.role in ('signed_loe', 'application_filed', 'oa_issued', 'awaiting_registration', 'publication') and new.is_open)
+    or (new.role in ('registered', 'abandoned') and not new.is_open)) then
+    raise exception 'stage_role_category_mismatch: this role cannot sit on an open (or closed) stage' using errcode = '23514';
+  end if;
+  return new;
+end
+$$;
+
+revoke all on function public.crm_stage_role_rules() from public, anon, authenticated;
+revoke all on function public.crm_matter_stage_role_rules() from public, anon, authenticated;
+
+do $$
+begin
+  if not exists (select 1 from pg_trigger where tgname = 'crm_stage_role_rules_trg' and tgrelid = 'public.crm_stage'::regclass) then
+    create trigger crm_stage_role_rules_trg
+      before insert or update or delete on public.crm_stage
+      for each row execute function public.crm_stage_role_rules();
+  end if;
+  if not exists (select 1 from pg_trigger where tgname = 'crm_matter_stage_role_rules_trg'
+                 and tgrelid = 'public.crm_matter_stage'::regclass) then
+    create trigger crm_matter_stage_role_rules_trg
+      before insert or update or delete on public.crm_matter_stage
+      for each row execute function public.crm_matter_stage_role_rules();
+  end if;
+end
+$$;
+
+
+-- ── 5. crm_lead_merge_guard: 0107's body verbatim, plus the stage-delete branch (marked 0119) ────────────────────────
+create or replace function public.crm_lead_merge_guard()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_owner text;
+  v_row   uuid;
+  v_move  text;                               -- 0119
+begin
+  -- Referential actions (FK SET NULL / cascade) arrive nested.
+  if pg_trigger_depth() > 1 then
+    if tg_op = 'DELETE' then
+      return old;
+    end if;
+    return new;
+  end if;
+
+  if tg_op = 'INSERT' then
+    if new.merged_into_id is not null or new.merged_at is not null or new.merged_by is not null then
+      raise exception 'lead_merge_guarded: a lead is merged only by crm_merge_leads'
+        using errcode = '42501';
+    end if;
+    return new;
+  end if;
+
+  if tg_op = 'UPDATE'
+     and old.merged_into_id is null
+     and new.merged_into_id is null
+     and new.merged_at is not distinct from old.merged_at
+     and new.merged_by is not distinct from old.merged_by then
+    return new;                               -- an ordinary update of a live lead
+  end if;
+
+  if tg_op = 'DELETE' and old.merged_into_id is null then
+    return old;                               -- deleting a live lead: RLS decides
+  end if;
+
+  -- 0119: inside crm_stage_delete only, a merged lead parked in the stage being deleted moves to the destination, and nothing
+  -- else about it changes.
+  if tg_op = 'UPDATE' and old.merged_into_id is not null then
+    select r.rolname into v_owner
+      from pg_catalog.pg_proc p
+      join pg_catalog.pg_roles r on r.oid = p.proowner
+     where p.oid = to_regprocedure('public.crm_stage_delete(uuid,uuid,uuid[],uuid,boolean)');
+    v_move := nullif(current_setting('lectual.stage_delete', true), '');
+    if v_owner is not null
+       and current_user = v_owner
+       and v_move = old.current_stage_id::text || '>' || new.current_stage_id::text
+       and (to_jsonb(new) - 'current_stage_id') = (to_jsonb(old) - 'current_stage_id') then
+      return new;
+    end if;
+  end if;
+
+  -- Only inside crm_merge_leads, and only for the row it is marking.
+  select r.rolname into v_owner
+    from pg_catalog.pg_proc p
+    join pg_catalog.pg_roles r on r.oid = p.proowner
+   where p.oid = to_regprocedure('public.crm_merge_leads(uuid,uuid,jsonb)');
+  v_row := nullif(current_setting('lectual.lead_merge', true), '')::uuid;
+
+  if tg_op = 'UPDATE'
+     and v_owner is not null
+     and current_user = v_owner
+     and v_row = old.id
+     and old.merged_into_id is null then
+    return new;
+  end if;
+
+  if tg_op = 'DELETE' then
+    raise exception 'lead_merge_guarded: a merged lead cannot be deleted; its history is shown on the lead it was merged into'
+      using errcode = '42501';
+  end if;
+  if old.merged_into_id is not null then
+    raise exception 'lead_merge_guarded: this lead was merged into another lead and cannot be changed'
+      using errcode = '42501';
+  end if;
+  raise exception 'lead_merge_guarded: a lead is merged only by crm_merge_leads'
+    using errcode = '42501';
+end
+$$;
+revoke all on function public.crm_lead_merge_guard() from public, anon, authenticated;
+-- The trigger itself (0107: crm_lead_merge_guard, before insert or update or delete) is unchanged and not re-created.
+
+
+-- ── 6. Internal helpers (called only from the functions in part 8; no execute for any API role) ─────────────────────
+create or replace function public.crm_stage_require_owner()
+returns uuid
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_org uuid := public.current_org_id();
+  v_uid uuid := auth.uid();
+begin
+  if v_uid is null or v_org is null or not exists (
+       select 1 from public.crm_org_member m where m.org_id = v_org and m.user_id = v_uid and m.role = 'owner') then
+    raise exception 'stage_not_owner: only an owner of this firm can change its stages' using errcode = '42501';
+  end if;
+  return v_org;
+end
+$$;
+
+create or replace function public.crm_stage_clean_name(p_name text, p_max int)
+returns text
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v text := pg_catalog.btrim(coalesce(p_name, ''));
+begin
+  if pg_catalog.char_length(v) not between 1 and p_max or v ~ '[[:cntrl:]]'
+     or v ~ '[\u200B-\u200F\u202A-\u202E\u2066-\u2069]' then
+    raise exception 'stage_bad_name: a stage name is 1 to % characters with no control or invisible characters', p_max using errcode = '22023';
+  end if;
+  return v;
+end
+$$;
+
+-- Two-phase renumber of a firm's LEAD stages to the order given (every stage of the firm, each once).
+create or replace function public.crm_stage_renumber(p_org uuid, p_ids uuid[])
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_base bigint;
+  v_n int;
+begin
+  select pg_catalog.count(*) into v_n from public.crm_stage where org_id = p_org;
+  if v_n <> pg_catalog.cardinality(p_ids)
+     or v_n <> (select pg_catalog.count(distinct x) from pg_catalog.unnest(p_ids) x)
+     or exists (select 1 from pg_catalog.unnest(p_ids) x where not exists (
+                  select 1 from public.crm_stage s where s.id = x and s.org_id = p_org)) then
+    raise exception 'stage_bad_position: the new order must name every stage of the firm once' using errcode = '22023';
+  end if;
+  select greatest(coalesce(max(order_index), 0)::bigint, v_n::bigint * 10) + 1 into v_base
+    from public.crm_stage where org_id = p_org;
+  if v_base + v_n > 1000000000 then
+    raise exception 'stage_order_overflow: the stage order is out of range; ask Lectual' using errcode = '23514';
+  end if;
+  update public.crm_stage s set order_index = (v_base + o.ord)::int
+    from pg_catalog.unnest(p_ids) with ordinality as o(id, ord)
+   where s.id = o.id and s.org_id = p_org;
+  update public.crm_stage s set order_index = ((o.ord - 1) * 10)::int
+    from pg_catalog.unnest(p_ids) with ordinality as o(id, ord)
+   where s.id = o.id and s.org_id = p_org;
+end
+$$;
+
+create or replace function public.crm_matter_stage_renumber(p_org uuid, p_ids uuid[])
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_base bigint;
+  v_n int;
+begin
+  select pg_catalog.count(*) into v_n from public.crm_matter_stage where org_id = p_org;
+  if v_n <> pg_catalog.cardinality(p_ids)
+     or v_n <> (select pg_catalog.count(distinct x) from pg_catalog.unnest(p_ids) x)
+     or exists (select 1 from pg_catalog.unnest(p_ids) x where not exists (
+                  select 1 from public.crm_matter_stage s where s.id = x and s.org_id = p_org)) then
+    raise exception 'stage_bad_position: the new order must name every stage of the firm once' using errcode = '22023';
+  end if;
+  select greatest(coalesce(max(order_index), 0)::bigint, v_n::bigint * 10) + 1 into v_base
+    from public.crm_matter_stage where org_id = p_org;
+  if v_base + v_n > 1000000000 then
+    raise exception 'stage_order_overflow: the stage order is out of range; ask Lectual' using errcode = '23514';
+  end if;
+  update public.crm_matter_stage s set order_index = (v_base + o.ord)::int, updated_at = now()
+    from pg_catalog.unnest(p_ids) with ordinality as o(id, ord)
+   where s.id = o.id and s.org_id = p_org;
+  update public.crm_matter_stage s set order_index = ((o.ord - 1) * 10)::int
+    from pg_catalog.unnest(p_ids) with ordinality as o(id, ord)
+   where s.id = o.id and s.org_id = p_org;
+end
+$$;
+
+-- The firm's stage ids in pipeline order (lectual.app compareStageOrder: order_index, name, id), minus one id when given.
+create or replace function public.crm_stage_ordered_ids(p_org uuid, p_without uuid)
+returns uuid[]
+language sql
+stable
+set search_path = ''
+as $$
+  select coalesce(array_agg(s.id order by s.order_index, s.name, s.id), '{}')
+    from public.crm_stage s where s.org_id = p_org and s.id is distinct from p_without
+$$;
+
+create or replace function public.crm_matter_stage_ordered_ids(p_org uuid, p_without uuid)
+returns uuid[]
+language sql
+stable
+set search_path = ''
+as $$
+  select coalesce(array_agg(s.id order by s.order_index, s.label, s.id), '{}')
+    from public.crm_matter_stage s where s.org_id = p_org and s.id is distinct from p_without
+$$;
+
+-- lectual.app resolveStage (src/lib/lawmatics/stage-map.ts) over one firm's lead stages, with ambiguity made explicit: candidates
+-- in order; each candidate's key, then (when p_aliases) its ALIASES entry in order; the first key matching ONE stage wins; a key
+-- matching TWO OR MORE stops the search and answers NULL (today's code would take the first: a guess). p_open_only limits the
+-- stages to category open. The alias table is copied verbatim from ALIASES (keys are normalised names).
+create or replace function public.crm_stage_backfill_resolve(p_org uuid, p_candidates text[], p_aliases boolean, p_open_only boolean)
+returns uuid
+language plpgsql
+stable
+set search_path = ''
+as $$
+declare
+  c_aliases constant jsonb := '{
+    "new pnc": ["New PNC", "Potential New Client", "New Inquiry"],
+    "pnc": ["New PNC", "Potential New Client", "New Inquiry"],
+    "potential new client": ["Potential New Client", "New PNC", "New Inquiry"],
+    "new lead": ["Potential New Client", "New PNC", "New Inquiry"],
+    "new inquiry": ["New Inquiry", "Potential New Client", "New PNC"],
+    "discovery call scheduled": ["Discovery Call", "Consultation Scheduled"],
+    "discovery call": ["Discovery Call", "Consultation Scheduled"],
+    "consultation scheduled": ["Consultation Scheduled", "Discovery Call"],
+    "legal strategy session scheduled": ["Strategy Session", "Consultation Scheduled"],
+    "strategy session scheduled": ["Strategy Session", "Consultation Scheduled"],
+    "strategy session": ["Strategy Session", "Consultation Scheduled"],
+    "pending loe payment": ["Pending LOE + Payment", "LOE & Invoice Sent", "Engagement Letter"],
+    "pending loe and payment": ["Pending LOE + Payment", "LOE & Invoice Sent", "Engagement Letter"],
+    "loe and invoice sent": ["LOE & Invoice Sent", "Pending LOE + Payment", "Engagement Letter"],
+    "engagement letter sent": ["LOE & Invoice Sent", "Pending LOE + Payment", "Engagement Letter"],
+    "signed loe deposit received": ["Signed LOE / Deposit Received", "Hired Client", "Active Matter"],
+    "undecided": ["Undecided / Questions", "Undecided"],
+    "undecided questions": ["Undecided / Questions", "Undecided"],
+    "follow up": ["Follow-Up", "Follow Up"],
+    "lost lead": ["Lost", "Lost Lead"],
+    "lost": ["Lost", "Lost Lead"],
+    "nurture": ["Nurture"]
+  }';
+  v_cand text;
+  v_key text;
+  v_try text;
+  v_tries text[];
+  v_n int;
+  v_id uuid;
+begin
+  foreach v_cand in array p_candidates loop
+    v_key := public.crm_stage_name_key(v_cand);
+    v_tries := array[v_key];
+    if p_aliases and c_aliases ? v_key then
+      v_tries := v_tries || array(select public.crm_stage_name_key(a)
+                                    from pg_catalog.jsonb_array_elements_text(c_aliases -> v_key) with ordinality as t(a, i)
+                                   order by i);
+    end if;
+    foreach v_try in array v_tries loop
+      select pg_catalog.count(*), (array_agg(s.id))[1] into v_n, v_id
+        from public.crm_stage s
+       where s.org_id = p_org and (not p_open_only or s.category = 'open')
+         and public.crm_stage_name_key(s.name) = v_try;
+      if v_n = 1 then return v_id; end if;
+      if v_n > 1 then return null; end if;
+    end loop;
+  end loop;
+  return null;
+end
+$$;
+
+revoke all on function public.crm_stage_require_owner() from public, anon, authenticated, service_role;
+revoke all on function public.crm_stage_clean_name(text, int) from public, anon, authenticated, service_role;
+revoke all on function public.crm_stage_renumber(uuid, uuid[]) from public, anon, authenticated, service_role;
+revoke all on function public.crm_matter_stage_renumber(uuid, uuid[]) from public, anon, authenticated, service_role;
+revoke all on function public.crm_stage_ordered_ids(uuid, uuid) from public, anon, authenticated, service_role;
+revoke all on function public.crm_matter_stage_ordered_ids(uuid, uuid) from public, anon, authenticated, service_role;
+revoke all on function public.crm_stage_backfill_resolve(uuid, text[], boolean, boolean) from public, anon, authenticated, service_role;
+
+
+-- ── 7. Grants and owner policies on the two stage tables (WHAT IT CHANGES 2) ────────────────────────────────────────
+-- No INSERT / UPDATE / DELETE grant is revoked (lectual's own settings write these tables as a signed-in owner).
+revoke truncate, references, trigger on public.crm_stage from anon, authenticated;
+revoke truncate, references, trigger on public.crm_matter_stage from anon, authenticated;
+
+do $$
+begin
+  if pg_catalog.current_setting('server_version_num')::int >= 170000 then
+    execute 'revoke maintain on public.crm_view_layout from anon, authenticated';
+    execute 'revoke maintain on public.crm_stage from anon, authenticated';
+    execute 'revoke maintain on public.crm_matter_stage from anon, authenticated';
+  end if;
+
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'crm_stage'
+                 and policyname = 'crm_stage_insert_owner_only') then
+    create policy crm_stage_insert_owner_only on public.crm_stage as restrictive for insert
+      with check ((select public.crm_stage_is_owner_row(public.current_org_id())));
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'crm_stage'
+                 and policyname = 'crm_stage_delete_owner_only') then
+    create policy crm_stage_delete_owner_only on public.crm_stage as restrictive for delete
+      using ((select public.crm_stage_is_owner_row(public.current_org_id())));
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'crm_matter_stage'
+                 and policyname = 'crm_matter_stage_insert_owner_only') then
+    create policy crm_matter_stage_insert_owner_only on public.crm_matter_stage as restrictive for insert
+      with check ((select public.crm_stage_is_owner_row(public.current_org_id())));
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'crm_matter_stage'
+                 and policyname = 'crm_matter_stage_delete_owner_only') then
+    create policy crm_matter_stage_delete_owner_only on public.crm_matter_stage as restrictive for delete
+      using ((select public.crm_stage_is_owner_row(public.current_org_id())));
+  end if;
+end
+$$;
+
+
+-- ── 8. Stage functions ──────────────────────────────────────────────────────────────────────────────────────────────
+-- Locking (header): the per-firm advisory lock serializes these functions; only the stage being changed (and on delete its records)
+-- is row-locked up front. The part 4 trigger does not judge these functions (they run as the table owner, not `authenticated`).
+-- 8a. Lead stages (crm_stage).
+
+create or replace function public.crm_stage_add(p_name text, p_position integer, p_category text default 'open')
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_org uuid := public.crm_stage_require_owner();
+  v_name text := public.crm_stage_clean_name(p_name, 80);
+  v_ids uuid[];
+  v_id uuid;
+  v_max int;
+begin
+  if public.crm_stage_name_key(v_name) = '' then
+    raise exception 'stage_bad_name: a stage name needs at least one letter or digit' using errcode = '22023';
+  end if;
+  if p_category is null or p_category not in ('open', 'won', 'lost', 'nurture') then
+    raise exception 'stage_bad_category: a stage is open, won, lost or nurture' using errcode = '22023';
+  end if;
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('crm_stage:' || v_org::text, 0));
+  v_ids := public.crm_stage_ordered_ids(v_org, null);
+  if pg_catalog.cardinality(v_ids) >= 200 then
+    raise exception 'stage_limit: a firm has at most 200 lead stages' using errcode = '23514';
+  end if;
+  if p_position is null or p_position < 0 or p_position > pg_catalog.cardinality(v_ids) then
+    raise exception 'stage_bad_position: no such place in the stage order' using errcode = '22023';
+  end if;
+  if exists (select 1 from public.crm_stage s where s.org_id = v_org
+             and public.crm_stage_name_key(s.name) = public.crm_stage_name_key(v_name)) then
+    raise exception 'stage_name_taken: another stage of this firm already has this name' using errcode = '23505';
+  end if;
+  select coalesce(max(order_index), 0) into v_max from public.crm_stage where org_id = v_org;
+  if v_max >= 1000000000 then
+    raise exception 'stage_order_overflow: the stage order is out of range; ask Lectual' using errcode = '23514';
+  end if;
+  insert into public.crm_stage (org_id, name, order_index, category)
+  values (v_org, v_name, v_max + 1, p_category::public.crm_stage_category)
+  returning id into v_id;
+  perform public.crm_stage_renumber(v_org, v_ids[1:p_position] || v_id || v_ids[p_position + 1:]);
+  return v_id;
+end
+$$;
+
+create or replace function public.crm_stage_rename(p_stage uuid, p_name text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_org uuid := public.crm_stage_require_owner();
+  v_name text := public.crm_stage_clean_name(p_name, 80);
+begin
+  if public.crm_stage_name_key(v_name) = '' then
+    raise exception 'stage_bad_name: a stage name needs at least one letter or digit' using errcode = '22023';
+  end if;
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('crm_stage:' || v_org::text, 0));
+  perform 1 from public.crm_stage where id = p_stage and org_id = v_org for update;
+  if not found then
+    raise exception 'stage_not_found: no such stage' using errcode = '42501';
+  end if;
+  if exists (select 1 from public.crm_stage s where s.org_id = v_org and s.id <> p_stage
+             and public.crm_stage_name_key(s.name) = public.crm_stage_name_key(v_name)) then
+    raise exception 'stage_name_taken: another stage of this firm already has this name' using errcode = '23505';
+  end if;
+  update public.crm_stage set name = v_name where id = p_stage and org_id = v_org;
+end
+$$;
+
+create or replace function public.crm_stage_move(p_stage uuid, p_position integer)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_org uuid := public.crm_stage_require_owner();
+  v_ids uuid[];
+begin
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('crm_stage:' || v_org::text, 0));
+  perform 1 from public.crm_stage where id = p_stage and org_id = v_org for update;
+  if not found then
+    raise exception 'stage_not_found: no such stage' using errcode = '42501';
+  end if;
+  v_ids := public.crm_stage_ordered_ids(v_org, p_stage);
+  if p_position is null or p_position < 0 or p_position > pg_catalog.cardinality(v_ids) then
+    raise exception 'stage_bad_position: no such place in the stage order' using errcode = '22023';
+  end if;
+  -- Category is never touched: order never changes a category.
+  perform public.crm_stage_renumber(v_org, v_ids[1:p_position] || p_stage || v_ids[p_position + 1:]);
+end
+$$;
+
+create or replace function public.crm_stage_set_category(p_stage uuid, p_category text, p_confirm_no_won boolean default false)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_org uuid := public.crm_stage_require_owner();
+  v_stage public.crm_stage;
+begin
+  if p_category is null or p_category not in ('open', 'won', 'lost', 'nurture') then
+    raise exception 'stage_bad_category: a stage is open, won, lost or nurture' using errcode = '22023';
+  end if;
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('crm_stage:' || v_org::text, 0));
+  select * into v_stage from public.crm_stage where id = p_stage and org_id = v_org for update;
+  if not found then
+    raise exception 'stage_not_found: no such stage' using errcode = '42501';
+  end if;
+  if v_stage.category::text = p_category then
+    return;
+  end if;
+  -- Any lead, merged ones included: a lead must never silently become won (the handoff would be skipped).
+  perform 1 from public.crm_lead where org_id = v_org and current_stage_id = p_stage for update;
+  if found then
+    raise exception 'stage_not_empty: move this stage''s leads first' using errcode = '23514';
+  end if;
+  if v_stage.category = 'open' and not exists (
+       select 1 from public.crm_stage where org_id = v_org and category = 'open' and id <> p_stage) then
+    raise exception 'stage_last_open: a firm keeps at least one open stage' using errcode = '23514';
+  end if;
+  if v_stage.category = 'won' and not coalesce(p_confirm_no_won, false) and not exists (
+       select 1 from public.crm_stage where org_id = v_org and category = 'won' and id <> p_stage) then
+    raise exception 'stage_last_won: with no won stage, hired clients stay where they are; confirm to go ahead' using errcode = '23514';
+  end if;
+  -- The role trigger refuses a role that cannot sit on the new category (stage_role_category_mismatch).
+  update public.crm_stage set category = p_category::public.crm_stage_category where id = p_stage and org_id = v_org;
+end
+$$;
+
+-- The live ids of a stage must equal the ids the dialog showed (as a set; no duplicates).
+create or replace function public.crm_stage_ids_match(p_expected uuid[], p_live uuid[])
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select pg_catalog.cardinality(p_expected) = pg_catalog.cardinality(p_live)
+     and (select coalesce(array_agg(x order by x), '{}') from (select distinct x from pg_catalog.unnest(p_expected) x) d)
+       = (select coalesce(array_agg(x order by x), '{}') from pg_catalog.unnest(p_live) x)
+$$;
+
+create or replace function public.crm_stage_delete(p_stage uuid, p_destination uuid, p_expected_ids uuid[],
+                                                   p_role_to uuid default null, p_confirm_no_won boolean default false)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_org uuid := public.crm_stage_require_owner();
+  v_uid uuid := auth.uid();
+  v_stage public.crm_stage;
+  v_dest public.crm_stage;
+  v_live uuid[];
+  v_merged uuid[];
+  v_rules int;
+  v_role_to uuid := null;
+  v_role_drop boolean := false;
+  v_last_won boolean;
+begin
+  if p_expected_ids is null or exists (select 1 from pg_catalog.unnest(p_expected_ids) x where x is null) then
+    raise exception 'stage_delete_bad_ids: send the ids of the leads the dialog showed (an empty list for an empty stage)' using errcode = '22023';
+  end if;
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('crm_stage:' || v_org::text, 0));
+  select * into v_stage from public.crm_stage where id = p_stage and org_id = v_org for update;
+  if not found then
+    raise exception 'stage_not_found: no such stage' using errcode = '42501';
+  end if;
+
+  -- Lock every lead in the stage, then read who is there. A lead moved out meanwhile is re-checked by the lock and drops out.
+  perform 1 from public.crm_lead where org_id = v_org and current_stage_id = p_stage for update;
+  select coalesce(array_agg(l.id order by l.id) filter (where l.merged_into_id is null), '{}'),
+         coalesce(array_agg(l.id order by l.id) filter (where l.merged_into_id is not null), '{}')
+    into v_live, v_merged
+    from public.crm_lead l where l.org_id = v_org and l.current_stage_id = p_stage;
+
+  if not public.crm_stage_ids_match(p_expected_ids, v_live) then
+    raise exception 'stage_delete_records_changed: the leads in this stage changed since the dialog opened' using errcode = '23514';
+  end if;
+
+  v_last_won := v_stage.category = 'won' and not exists (
+    select 1 from public.crm_stage where org_id = v_org and category = 'won' and id <> p_stage);
+
+  if v_stage.role is not null and p_role_to is null then
+    if v_stage.role = 'new_enquiry'
+       or (v_stage.role = 'signed_loe' and not (v_last_won and coalesce(p_confirm_no_won, false))) then
+      raise exception 'stage_holds_role: choose which stage takes this stage''s role' using errcode = '23514';
+    end if;
+    v_role_drop := true;               -- the rules fall back to today's name match
+  elsif v_stage.role is not null then
+    if p_role_to = p_stage or not exists (select 1 from public.crm_stage where id = p_role_to and org_id = v_org) then
+      raise exception 'stage_delete_bad_destination: no such stage' using errcode = '42501';
+    end if;
+    if exists (select 1 from public.crm_stage where id = p_role_to and org_id = v_org and role is not null) then
+      raise exception 'stage_role_taken: that stage already holds a role' using errcode = '23514';
+    end if;
+    v_role_to := p_role_to;
+  end if;
+
+  if v_stage.category = 'open' and not exists (
+       select 1 from public.crm_stage where org_id = v_org and category = 'open' and id <> p_stage) then
+    raise exception 'stage_last_open: a firm keeps at least one open stage' using errcode = '23514';
+  end if;
+  if v_last_won and not coalesce(p_confirm_no_won, false) then
+    raise exception 'stage_last_won: with no won stage, hired clients stay where they are; confirm to go ahead' using errcode = '23514';
+  end if;
+
+  if pg_catalog.cardinality(v_live) + pg_catalog.cardinality(v_merged) > 0 then
+    if p_destination is null then
+      raise exception 'stage_delete_needs_destination: choose where this stage''s leads go' using errcode = '22023';
+    end if;
+    if p_destination = p_stage then
+      raise exception 'stage_delete_same_stage: the leads cannot move to the stage being deleted' using errcode = '22023';
+    end if;
+    select * into v_dest from public.crm_stage where id = p_destination and org_id = v_org;
+    if not found then
+      raise exception 'stage_delete_bad_destination: no such stage' using errcode = '42501';
+    end if;
+    if v_dest.category = 'won' and v_stage.category <> 'won' then
+      raise exception 'stage_delete_won_destination: leads are never moved into a won stage this way' using errcode = '23514';
+    end if;
+    if v_stage.category = 'won' and v_dest.category <> 'won' then
+      raise exception 'stage_delete_won_source: hired clients move only to another won stage' using errcode = '23514';
+    end if;
+
+    -- Live leads: the stage and its clock; lane, last touch and everything else untouched (0085's guard keeps lane_set_*).
+    update public.crm_lead set current_stage_id = v_dest.id, stage_entered_at = now()
+     where org_id = v_org and id = any (v_live);
+    insert into public.crm_activity (org_id, lead_id, type, actor_id, actor_type, payload)
+    select v_org, l.id, 'stage_changed', v_uid, 'user',
+           pg_catalog.jsonb_build_object(
+             'from_stage', v_stage.name, 'to_stage', v_dest.name,
+             'from_stage_id', v_stage.id, 'to_stage_id', v_dest.id,
+             'reason', 'stage deleted', 'stage_deleted', true)
+      from pg_catalog.unnest(v_live) as l(id);
+
+    -- Merged leads (MERGED LEADS in the header): current_stage_id only, through the guard's 0119 branch; no timeline row.
+    if pg_catalog.cardinality(v_merged) > 0 then
+      perform pg_catalog.set_config('lectual.stage_delete', p_stage::text || '>' || v_dest.id::text, true);
+      update public.crm_lead set current_stage_id = v_dest.id where org_id = v_org and id = any (v_merged);
+      perform pg_catalog.set_config('lectual.stage_delete', '', true);
+    end if;
+  end if;
+
+  if v_role_to is not null or v_role_drop then
+    update public.crm_stage set role = null where id = p_stage and org_id = v_org;
+  end if;
+  if v_role_to is not null then
+    -- The role trigger refuses a target whose category the role does not allow (stage_role_category_mismatch).
+    update public.crm_stage set role = v_stage.role where id = v_role_to and org_id = v_org;
+  end if;
+
+  select pg_catalog.count(*) into v_rules from public.crm_automation_rule r
+   where r.org_id = v_org
+     and pg_catalog.strpos(r.trigger_config::text || r.conditions::text || r.actions::text, p_stage::text) > 0;
+
+  delete from public.crm_stage where id = p_stage and org_id = v_org;
+
+  return pg_catalog.jsonb_build_object(
+    'deleted', p_stage,
+    'destination', v_dest.id,
+    'moved', pg_catalog.cardinality(v_live),
+    'moved_ids', pg_catalog.to_jsonb(v_live),
+    'merged_moved', pg_catalog.cardinality(v_merged),
+    'role_moved_to', v_role_to,
+    'role_dropped', case when v_role_drop then v_stage.role else null end,
+    'rules_naming_stage', v_rules);
+end
+$$;
+
+-- 8b. Matter stages (crm_matter_stage).
+
+create or replace function public.crm_matter_stage_add(p_label text, p_position integer, p_is_open boolean default true,
+                                                       p_waiting_on text default 'firm', p_phase text default null)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_org uuid := public.crm_stage_require_owner();
+  v_label text := public.crm_stage_clean_name(p_label, 200);
+  v_ids uuid[];
+  v_id uuid;
+  v_base text;
+  v_code text;
+  v_n int := 1;
+  v_phase_type text;
+  v_max int;
+begin
+  if public.crm_matter_stage_label_key(v_label) = '' then
+    raise exception 'stage_bad_name: a stage name needs at least one letter or digit' using errcode = '22023';
+  end if;
+  if p_waiting_on is null or not (p_waiting_on = any (pg_catalog.enum_range(null::public.crm_matter_waiting_on)::text[])) then
+    raise exception 'matter_stage_bad_waiting_on: a stage waits on the firm, the client, the USPTO or the court' using errcode = '22023';
+  end if;
+  if p_phase is not null then
+    if p_phase not in ('pipeline', 'pre_filing', 'post_filing', 'maintenance', 'inactive') then
+      raise exception 'matter_stage_bad_phase: not a docket phase' using errcode = '22023';
+    end if;
+    select pg_catalog.format_type(a.atttypid, a.atttypmod) into v_phase_type
+      from pg_catalog.pg_attribute a
+     where a.attrelid = 'public.crm_matter_stage'::regclass and a.attname = 'phase' and not a.attisdropped;
+    if v_phase_type is null then
+      raise exception 'matter_stage_phase_unavailable: docket phases are not switched on for this database' using errcode = '23514';
+    end if;
+  end if;
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('crm_matter_stage:' || v_org::text, 0));
+  v_ids := public.crm_matter_stage_ordered_ids(v_org, null);
+  if pg_catalog.cardinality(v_ids) >= 200 then
+    raise exception 'stage_limit: a firm has at most 200 matter stages' using errcode = '23514';
+  end if;
+  if p_position is null or p_position < 0 or p_position > pg_catalog.cardinality(v_ids) then
+    raise exception 'stage_bad_position: no such place in the stage order' using errcode = '22023';
+  end if;
+  if exists (select 1 from public.crm_matter_stage s where s.org_id = v_org
+             and public.crm_matter_stage_label_key(s.label) = public.crm_matter_stage_label_key(v_label)) then
+    raise exception 'stage_name_taken: another stage of this firm already has this name' using errcode = '23505';
+  end if;
+
+  -- The code: never changes after this (see header).
+  v_base := pg_catalog.upper(pg_catalog.left(pg_catalog.regexp_replace(
+              pg_catalog.regexp_replace(v_label, '^\s*\d+[A-Za-z]?(\s*[.·:)–-]\s*|\s+)', ''), '[^A-Za-z0-9]+', '', 'g'), 12));
+  if v_base = '' then
+    v_base := 'STAGE';
+  elsif v_base ~ '^[0-9]' then
+    v_base := 'S' || pg_catalog.left(v_base, 11);
+  end if;
+  v_code := v_base;
+  while exists (select 1 from public.crm_matter_stage where org_id = v_org and code = v_code) loop
+    v_n := v_n + 1;
+    if v_n > 999 then
+      raise exception 'stage_name_taken: too many stages share this name' using errcode = '23505';
+    end if;
+    v_code := v_base || '-' || v_n::text;
+  end loop;
+
+  select coalesce(max(order_index), 0) into v_max from public.crm_matter_stage where org_id = v_org;
+  if v_max >= 1000000000 then
+    raise exception 'stage_order_overflow: the stage order is out of range; ask Lectual' using errcode = '23514';
+  end if;
+  insert into public.crm_matter_stage (org_id, code, label, order_index, is_open, waiting_on)
+  values (v_org, v_code, v_label, v_max + 1,
+          coalesce(p_is_open, true), p_waiting_on::public.crm_matter_waiting_on)
+  returning id into v_id;
+  if p_phase is not null then
+    execute pg_catalog.format('update public.crm_matter_stage set phase = $1::%s where id = $2', v_phase_type) using p_phase, v_id;
+  end if;
+  perform public.crm_matter_stage_renumber(v_org, v_ids[1:p_position] || v_id || v_ids[p_position + 1:]);
+  return v_id;
+end
+$$;
+
+create or replace function public.crm_matter_stage_rename(p_stage uuid, p_label text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_org uuid := public.crm_stage_require_owner();
+  v_label text := public.crm_stage_clean_name(p_label, 200);
+begin
+  if public.crm_matter_stage_label_key(v_label) = '' then
+    raise exception 'stage_bad_name: a stage name needs at least one letter or digit' using errcode = '22023';
+  end if;
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('crm_matter_stage:' || v_org::text, 0));
+  perform 1 from public.crm_matter_stage where id = p_stage and org_id = v_org for update;
+  if not found then
+    raise exception 'stage_not_found: no such stage' using errcode = '42501';
+  end if;
+  if exists (select 1 from public.crm_matter_stage s where s.org_id = v_org and s.id <> p_stage
+             and public.crm_matter_stage_label_key(s.label) = public.crm_matter_stage_label_key(v_label)) then
+    raise exception 'stage_name_taken: another stage of this firm already has this name' using errcode = '23505';
+  end if;
+  -- The label only: the code never changes.
+  update public.crm_matter_stage set label = v_label, updated_at = now() where id = p_stage and org_id = v_org;
+end
+$$;
+
+create or replace function public.crm_matter_stage_move(p_stage uuid, p_position integer)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_org uuid := public.crm_stage_require_owner();
+  v_ids uuid[];
+begin
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('crm_matter_stage:' || v_org::text, 0));
+  perform 1 from public.crm_matter_stage where id = p_stage and org_id = v_org for update;
+  if not found then
+    raise exception 'stage_not_found: no such stage' using errcode = '42501';
+  end if;
+  v_ids := public.crm_matter_stage_ordered_ids(v_org, p_stage);
+  if p_position is null or p_position < 0 or p_position > pg_catalog.cardinality(v_ids) then
+    raise exception 'stage_bad_position: no such place in the stage order' using errcode = '22023';
+  end if;
+  perform public.crm_matter_stage_renumber(v_org, v_ids[1:p_position] || p_stage || v_ids[p_position + 1:]);
+end
+$$;
+
+create or replace function public.crm_matter_stage_set_open(p_stage uuid, p_is_open boolean)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_org uuid := public.crm_stage_require_owner();
+  v_stage public.crm_matter_stage;
+begin
+  if p_is_open is null then
+    raise exception 'stage_bad_category: a stage is open or closed' using errcode = '22023';
+  end if;
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('crm_matter_stage:' || v_org::text, 0));
+  select * into v_stage from public.crm_matter_stage where id = p_stage and org_id = v_org for update;
+  if not found then
+    raise exception 'stage_not_found: no such stage' using errcode = '42501';
+  end if;
+  if v_stage.is_open = p_is_open then
+    return;
+  end if;
+  perform 1 from public.crm_matter where org_id = v_org and stage_id = p_stage for update;
+  if found then
+    raise exception 'stage_not_empty: move this stage''s matters first' using errcode = '23514';
+  end if;
+  update public.crm_matter_stage set is_open = p_is_open, updated_at = now() where id = p_stage and org_id = v_org;
+end
+$$;
+
+
+create or replace function public.crm_matter_stage_delete(p_stage uuid, p_destination uuid, p_expected_ids uuid[],
+                                                          p_role_to uuid default null, p_confirm_open_change boolean default false)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_org uuid := public.crm_stage_require_owner();
+  v_uid uuid := auth.uid();
+  v_stage public.crm_matter_stage;
+  v_dest public.crm_matter_stage;
+  v_ids uuid[];
+  v_role_to uuid := null;
+  v_role_drop boolean := false;
+begin
+  if p_expected_ids is null or exists (select 1 from pg_catalog.unnest(p_expected_ids) x where x is null) then
+    raise exception 'stage_delete_bad_ids: send the ids of the matters the dialog showed (an empty list for an empty stage)' using errcode = '22023';
+  end if;
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('crm_matter_stage:' || v_org::text, 0));
+  select * into v_stage from public.crm_matter_stage where id = p_stage and org_id = v_org for update;
+  if not found then
+    raise exception 'stage_not_found: no such stage' using errcode = '42501';
+  end if;
+
+  perform 1 from public.crm_matter where org_id = v_org and stage_id = p_stage for update;
+  select coalesce(array_agg(m.id order by m.id), '{}') into v_ids
+    from public.crm_matter m where m.org_id = v_org and m.stage_id = p_stage;
+
+  if not public.crm_stage_ids_match(p_expected_ids, v_ids) then
+    raise exception 'stage_delete_records_changed: the matters in this stage changed since the dialog opened' using errcode = '23514';
+  end if;
+
+  if v_stage.role is not null and p_role_to is null then
+    if v_stage.role = 'signed_loe' then
+      raise exception 'stage_holds_role: choose which stage takes this stage''s role' using errcode = '23514';
+    end if;
+    v_role_drop := true;               -- the rules fall back to today's name match
+  elsif v_stage.role is not null then
+    if p_role_to = p_stage or not exists (select 1 from public.crm_matter_stage where id = p_role_to and org_id = v_org) then
+      raise exception 'stage_delete_bad_destination: no such stage' using errcode = '42501';
+    end if;
+    if exists (select 1 from public.crm_matter_stage where id = p_role_to and org_id = v_org and role is not null) then
+      raise exception 'stage_role_taken: that stage already holds a role' using errcode = '23514';
+    end if;
+    v_role_to := p_role_to;
+  end if;
+
+  if pg_catalog.cardinality(v_ids) > 0 then
+    if p_destination is null then
+      raise exception 'stage_delete_needs_destination: choose where this stage''s matters go' using errcode = '22023';
+    end if;
+    if p_destination = p_stage then
+      raise exception 'stage_delete_same_stage: the matters cannot move to the stage being deleted' using errcode = '22023';
+    end if;
+    select * into v_dest from public.crm_matter_stage where id = p_destination and org_id = v_org;
+    if not found then
+      raise exception 'stage_delete_bad_destination: no such stage' using errcode = '42501';
+    end if;
+    if v_dest.is_open <> v_stage.is_open and not coalesce(p_confirm_open_change, false) then
+      raise exception 'stage_delete_open_mismatch: the destination would reopen or close these matters; confirm to go ahead' using errcode = '23514';
+    end if;
+    update public.crm_matter set stage_id = v_dest.id, stage_entered_at = now(), updated_at = now()
+     where org_id = v_org and id = any (v_ids);
+    insert into public.crm_activity (org_id, matter_id, type, actor_id, actor_type, payload)
+    select v_org, m.id, 'stage_changed', v_uid, 'user',
+           pg_catalog.jsonb_build_object(
+             'from_code', v_stage.code, 'from_label', v_stage.label,
+             'to_code', v_dest.code, 'to_label', v_dest.label,
+             'from_stage_id', v_stage.id, 'to_stage_id', v_dest.id,
+             'reason', 'stage deleted', 'stage_deleted', true)
+      from pg_catalog.unnest(v_ids) as m(id);
+  end if;
+
+  if v_role_to is not null or v_role_drop then
+    update public.crm_matter_stage set role = null, updated_at = now() where id = p_stage and org_id = v_org;
+  end if;
+  if v_role_to is not null then
+    -- The role trigger refuses a target that breaks the open / closed rule (stage_role_category_mismatch).
+    update public.crm_matter_stage set role = v_stage.role, updated_at = now() where id = v_role_to and org_id = v_org;
+  end if;
+
+  -- 0042's ON DELETE RESTRICT stays the backstop: a matter that slipped in would make this fail, never orphan.
+  delete from public.crm_matter_stage where id = p_stage and org_id = v_org;
+
+  return pg_catalog.jsonb_build_object(
+    'deleted', p_stage,
+    'destination', v_dest.id,
+    'moved', pg_catalog.cardinality(v_ids),
+    'moved_ids', pg_catalog.to_jsonb(v_ids),
+    'role_moved_to', v_role_to,
+    'role_dropped', case when v_role_drop then v_stage.role else null end);
+end
+$$;
+
+revoke all on function public.crm_stage_ids_match(uuid[], uuid[]) from public, anon, authenticated, service_role;
+revoke all on function public.crm_stage_add(text, integer, text) from public, anon, service_role;
+revoke all on function public.crm_stage_rename(uuid, text) from public, anon, service_role;
+revoke all on function public.crm_stage_move(uuid, integer) from public, anon, service_role;
+revoke all on function public.crm_stage_set_category(uuid, text, boolean) from public, anon, service_role;
+revoke all on function public.crm_stage_delete(uuid, uuid, uuid[], uuid, boolean) from public, anon, service_role;
+revoke all on function public.crm_matter_stage_add(text, integer, boolean, text, text) from public, anon, service_role;
+revoke all on function public.crm_matter_stage_rename(uuid, text) from public, anon, service_role;
+revoke all on function public.crm_matter_stage_move(uuid, integer) from public, anon, service_role;
+revoke all on function public.crm_matter_stage_set_open(uuid, boolean) from public, anon, service_role;
+revoke all on function public.crm_matter_stage_delete(uuid, uuid, uuid[], uuid, boolean) from public, anon, service_role;
+grant execute on function public.crm_stage_add(text, integer, text) to authenticated;
+grant execute on function public.crm_stage_rename(uuid, text) to authenticated;
+grant execute on function public.crm_stage_move(uuid, integer) to authenticated;
+grant execute on function public.crm_stage_set_category(uuid, text, boolean) to authenticated;
+grant execute on function public.crm_stage_delete(uuid, uuid, uuid[], uuid, boolean) to authenticated;
+grant execute on function public.crm_matter_stage_add(text, integer, boolean, text, text) to authenticated;
+grant execute on function public.crm_matter_stage_rename(uuid, text) to authenticated;
+grant execute on function public.crm_matter_stage_move(uuid, integer) to authenticated;
+grant execute on function public.crm_matter_stage_set_open(uuid, boolean) to authenticated;
+grant execute on function public.crm_matter_stage_delete(uuid, uuid, uuid[], uuid, boolean) to authenticated;
+
+
+-- ── 9. The role back-fill ───────────────────────────────────────────────────────────────────────────────────────────
+-- One firm at a time. Writes a role only where the role is free in the firm AND the stage holds none (never overwrites what
+-- Lectual set). p_dry_run = true writes nothing and returns what it would write. Service role only (Lectual runs it for a new firm).
+create or replace function public.crm_stage_roles_backfill(p_org uuid, p_dry_run boolean default false)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_pick jsonb := '{}';          -- role -> stage id (lead)
+  v_mpick jsonb := '{}';         -- role -> stage id (matter)
+  v_ne_name uuid; v_ne_first uuid; v_ne_c uuid;
+  v_fu uuid; v_fu_n int; v_fu_r uuid;
+  v_cs uuid; v_ch_sk uuid; v_ch_r uuid;
+  v_ps_sk uuid; v_ps_r uuid;
+  v_pay_sk uuid; v_won_named uuid; v_won_low uuid;
+  v_cand text; v_n int; v_id uuid; v_ambiguous boolean := false;
+  v_role text; v_label text;
+  v_written jsonb := '[]';
+  v_skipped jsonb := '[]';
+begin
+  -- new_enquiry: newEnquiryStage (open; names by key, no aliases; a name matching two open stages = null, no fallback) ...
+  foreach v_cand in array array['Potential New Client', 'New Lead', 'New Inquiry', 'New Enquiry'] loop
+    select pg_catalog.count(*), (array_agg(s.id))[1] into v_n, v_id from public.crm_stage s
+     where s.org_id = p_org and s.category = 'open' and public.crm_stage_name_key(s.name) = public.crm_stage_name_key(v_cand);
+    if v_n = 1 then v_ne_name := v_id; exit; end if;
+    if v_n > 1 then v_ambiguous := true; exit; end if;
+  end loop;
+  select s.id into v_ne_first from public.crm_stage s where s.org_id = p_org and s.category = 'open'
+   order by s.order_index, s.name, s.id limit 1;
+  -- ... and Reconcile `contacted`. Same open stage; at least one by name (Reconcile's always is).
+  v_ne_c := public.crm_stage_backfill_resolve(p_org, array['Potential New Client', 'New PNC', 'New Inquiry'], true, false);
+  if not v_ambiguous and v_ne_c is not null and v_ne_c = coalesce(v_ne_name, v_ne_first) then
+    v_pick := v_pick || pg_catalog.jsonb_build_object('new_enquiry', v_ne_c);
+  end if;
+
+  -- follow_up: the ONE open ^follow ?up\b stage, and Reconcile `nurture` agrees.
+  select pg_catalog.count(*), (array_agg(s.id))[1] into v_fu_n, v_fu from public.crm_stage s
+   where s.org_id = p_org and s.category = 'open' and public.crm_stage_name_key(s.name) ~ '^follow ?up( |$)';
+  v_fu_r := public.crm_stage_backfill_resolve(p_org, array['Follow-Up', 'Follow Up', 'Nurture'], true, false);
+  if v_fu_n = 1 and v_fu_r = v_fu then
+    v_pick := v_pick || pg_catalog.jsonb_build_object('follow_up', v_fu);
+  end if;
+
+  -- consult_scheduled (one list, three readers).
+  v_cs := public.crm_stage_backfill_resolve(p_org,
+    array['Consultation Scheduled', 'Consult Scheduled', 'Consult Booked', 'Strategy Session Scheduled', 'Discovery Call Scheduled'],
+    true, false);
+  if v_cs is not null then v_pick := v_pick || pg_catalog.jsonb_build_object('consult_scheduled', v_cs); end if;
+
+  -- consult_held: the Stage Keeper (with its fallback to the scheduled stage) and Reconcile must agree.
+  v_ch_sk := coalesce(public.crm_stage_backfill_resolve(p_org,
+    array['Consult Held – Proposal in Progress', 'Consult Held', 'Consultation Held', 'Consult Completed'], true, false), v_cs);
+  v_ch_r := public.crm_stage_backfill_resolve(p_org,
+    array['Consult Held – Proposal in Progress', 'Consultation Held', 'Consult Held', 'Consultation Completed', 'Consult Completed',
+          'Consultation Complete'], true, false);
+  if v_ch_r is not null and v_ch_r = v_ch_sk then
+    v_pick := v_pick || pg_catalog.jsonb_build_object('consult_held', v_ch_r);
+  end if;
+
+  -- questionnaire_sent (one list).
+  v_id := public.crm_stage_backfill_resolve(p_org, array['Questionnaire Sent', 'Intake Questionnaire Sent', 'Questionnaire'], true, false);
+  if v_id is not null then v_pick := v_pick || pg_catalog.jsonb_build_object('questionnaire_sent', v_id); end if;
+
+  -- proposal_sent: Stage Keeper post-consult-sent and Reconcile proposal_sent agree.
+  v_ps_sk := public.crm_stage_backfill_resolve(p_org,
+    array['Proposal Sent', 'Post Consultation Email Sent', 'Post Consult Email Sent', 'Post Consultation Follow Up'], true, false);
+  v_ps_r := public.crm_stage_backfill_resolve(p_org,
+    array['Proposal Sent', 'Proposal Sent to Client', 'Proposal Sent', 'Post Consultation Email Sent', 'Post Consult Email Sent',
+          'Post Consultation Follow Up'], true, false);
+  if v_ps_sk is not null and v_ps_sk = v_ps_r then
+    v_pick := v_pick || pg_catalog.jsonb_build_object('proposal_sent', v_ps_sk);
+  end if;
+
+  -- follow_up_sent, loe_sent, welcome_sent, opinion_letter_sent (one reader or one shared list each).
+  v_id := public.crm_stage_backfill_resolve(p_org, array['Follow-Up Sent', 'Follow Up Sent', 'Post Consultation Follow Up'], true, false);
+  if v_id is not null then v_pick := v_pick || pg_catalog.jsonb_build_object('follow_up_sent', v_id); end if;
+  v_id := public.crm_stage_backfill_resolve(p_org, array['LOE & Invoice Sent', 'Pending LOE + Payment', 'Engagement Letter Sent'], true, false);
+  if v_id is not null then v_pick := v_pick || pg_catalog.jsonb_build_object('loe_sent', v_id); end if;
+  v_id := public.crm_stage_backfill_resolve(p_org, array['Welcome Email Sent', 'Welcome Sent'], true, false);
+  if v_id is not null then v_pick := v_pick || pg_catalog.jsonb_build_object('welcome_sent', v_id); end if;
+  v_id := public.crm_stage_backfill_resolve(p_org, array['Opinion Letter Sent', 'Search Opinion Sent'], true, false);
+  if v_id is not null then v_pick := v_pick || pg_catalog.jsonb_build_object('opinion_letter_sent', v_id); end if;
+
+  -- signed_loe: Stage Keeper payment-received and the hired sync's wonTargetStage agree, on a won stage.
+  v_pay_sk := public.crm_stage_backfill_resolve(p_org, array['Signed LOE / Deposit Received', 'Deposit Received'], true, false);
+  select s.id into v_won_named from public.crm_stage s
+   where s.org_id = p_org and s.category = 'won' and s.name ~* 'signed loe|deposit received'
+   order by s.order_index, s.name, s.id limit 1;
+  select s.id into v_won_low from public.crm_stage s where s.org_id = p_org and s.category = 'won'
+   order by s.order_index, s.name, s.id limit 1;
+  if v_pay_sk is not null and v_pay_sk = coalesce(v_won_named, v_won_low) then
+    v_pick := v_pick || pg_catalog.jsonb_build_object('signed_loe', v_pay_sk);
+  end if;
+
+  -- lost.
+  v_id := public.crm_stage_backfill_resolve(p_org, array['Lost', 'Lost Lead'], true, false);
+  if v_id is not null then v_pick := v_pick || pg_catalog.jsonb_build_object('lost', v_id); end if;
+
+  -- Matter stages: one stage per label rule, or nothing.
+  select pg_catalog.count(*), (array_agg(s.id))[1] into v_n, v_id from public.crm_matter_stage s
+   where s.org_id = p_org and s.label = 'Signed LOE / Deposit Received';
+  if v_n = 1 then v_mpick := v_mpick || pg_catalog.jsonb_build_object('signed_loe', v_id); end if;
+  foreach v_role in array array['application_filed', 'oa_issued', 'awaiting_registration', 'publication', 'registered', 'abandoned'] loop
+    v_label := case v_role
+      when 'application_filed' then 'Application Filed'
+      when 'oa_issued' then 'OA Issued'
+      when 'awaiting_registration' then 'Awaiting Trademark Registration'
+      when 'publication' then 'Publication for Opposition'
+      when 'registered' then 'Registered'
+      when 'abandoned' then 'Abandoned' end;
+    select pg_catalog.count(*), (array_agg(s.id))[1] into v_n, v_id from public.crm_matter_stage s
+     where s.org_id = p_org and public.crm_matter_stage_label_key(s.label) = public.crm_matter_stage_label_key(v_label);
+    if v_n = 1 then v_mpick := v_mpick || pg_catalog.jsonb_build_object(v_role, v_id); end if;
+  end loop;
+
+  -- One stage, one role: a stage picked by two roles gets neither. Then the category rule, then "never overwrite".
+  for v_role, v_id in select k, (v #>> '{}')::uuid from pg_catalog.jsonb_each(v_pick) as e(k, v) loop
+    if (select pg_catalog.count(*) from pg_catalog.jsonb_each(v_pick) e2(k, v) where (e2.v #>> '{}')::uuid = v_id) > 1 then
+      v_skipped := v_skipped || pg_catalog.jsonb_build_object('table', 'crm_stage', 'role', v_role, 'why', 'stage picked by two roles');
+    elsif not exists (select 1 from public.crm_stage s where s.id = v_id and (
+              (v_role in ('new_enquiry', 'follow_up') and s.category = 'open')
+           or (v_role = 'signed_loe' and s.category = 'won')
+           or (v_role = 'lost' and s.category = 'lost')
+           or v_role not in ('new_enquiry', 'follow_up', 'signed_loe', 'lost'))) then
+      v_skipped := v_skipped || pg_catalog.jsonb_build_object('table', 'crm_stage', 'role', v_role, 'why', 'category');
+    elsif exists (select 1 from public.crm_stage s where s.org_id = p_org and (s.role = v_role or (s.id = v_id and s.role is not null))) then
+      v_skipped := v_skipped || pg_catalog.jsonb_build_object('table', 'crm_stage', 'role', v_role, 'why', 'already set');
+    else
+      v_written := v_written || pg_catalog.jsonb_build_object('table', 'crm_stage', 'role', v_role, 'stage_id', v_id,
+        'name', (select s.name from public.crm_stage s where s.id = v_id));
+      if not p_dry_run then
+        update public.crm_stage set role = v_role where id = v_id and org_id = p_org and role is null;
+      end if;
+    end if;
+  end loop;
+  for v_role, v_id in select k, (v #>> '{}')::uuid from pg_catalog.jsonb_each(v_mpick) as e(k, v) loop
+    if (select pg_catalog.count(*) from pg_catalog.jsonb_each(v_mpick) e2(k, v) where (e2.v #>> '{}')::uuid = v_id) > 1 then
+      v_skipped := v_skipped || pg_catalog.jsonb_build_object('table', 'crm_matter_stage', 'role', v_role, 'why', 'stage picked by two roles');
+    elsif not exists (select 1 from public.crm_matter_stage s where s.id = v_id and (
+              (v_role in ('signed_loe', 'application_filed', 'oa_issued', 'awaiting_registration', 'publication') and s.is_open)
+           or (v_role in ('registered', 'abandoned') and not s.is_open))) then
+      v_skipped := v_skipped || pg_catalog.jsonb_build_object('table', 'crm_matter_stage', 'role', v_role, 'why', 'open / closed');
+    elsif exists (select 1 from public.crm_matter_stage s where s.org_id = p_org and (s.role = v_role or (s.id = v_id and s.role is not null))) then
+      v_skipped := v_skipped || pg_catalog.jsonb_build_object('table', 'crm_matter_stage', 'role', v_role, 'why', 'already set');
+    else
+      v_written := v_written || pg_catalog.jsonb_build_object('table', 'crm_matter_stage', 'role', v_role, 'stage_id', v_id,
+        'name', (select s.label from public.crm_matter_stage s where s.id = v_id));
+      if not p_dry_run then
+        update public.crm_matter_stage set role = v_role where id = v_id and org_id = p_org and role is null;
+      end if;
+    end if;
+  end loop;
+
+  return pg_catalog.jsonb_build_object('org_id', p_org, 'dry_run', p_dry_run, 'written', v_written, 'skipped', v_skipped);
+end
+$$;
+revoke all on function public.crm_stage_roles_backfill(uuid, boolean) from public, anon, authenticated;
+grant execute on function public.crm_stage_roles_backfill(uuid, boolean) to service_role;
+
+-- The one-time run, every firm. (Runs as the migration's role, which owns the tables; the role trigger allows it.)
+do $$
+declare
+  v_org uuid;
+begin
+  for v_org in select id from public.crm_org order by id loop
+    perform public.crm_stage_roles_backfill(v_org, false);
+  end loop;
+end
+$$;
+
+
+-- ── 10. 0115: field definitions become owner-only to create and change (WHAT IT CHANGES 3) ──────────────────────────
+do $$
+begin
+  if pg_catalog.to_regclass('public.crm_custom_field') is null then
+    return;
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'crm_custom_field'
+                 and policyname = 'crm_custom_field_insert_owner_only') then
+    execute $p$
+      create policy crm_custom_field_insert_owner_only on public.crm_custom_field
+        as restrictive for insert
+        with check ((select exists (select 1 from public.crm_org_member m
+                                     where m.org_id = public.current_org_id() and m.user_id = auth.uid() and m.role = 'owner')))
+    $p$;
+  end if;
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'crm_custom_field'
+                 and policyname = 'crm_custom_field_update_owner_only') then
+    execute $p$
+      create policy crm_custom_field_update_owner_only on public.crm_custom_field
+        as restrictive for update
+        using ((select exists (select 1 from public.crm_org_member m
+                                where m.org_id = public.current_org_id() and m.user_id = auth.uid() and m.role = 'owner')))
+        with check ((select exists (select 1 from public.crm_org_member m
+                                     where m.org_id = public.current_org_id() and m.user_id = auth.uid() and m.role = 'owner')))
+    $p$;
+  end if;
+end
+$$;
+
+
+-- ── 11. Comments ────────────────────────────────────────────────────────────────────────────────────────────────────
+comment on table public.crm_view_layout is
+  '0119: a firm''s layout of one List or Board: ordered columns {key, label, hidden, width}. Firm-wide. Members read; only an owner membership row writes. rev guards against a stale form.';
+comment on column public.crm_stage.role is
+  '0119: a fixed tag rules read instead of the name (new_enquiry, follow_up, consult_scheduled, ...). Set by 0119''s back-fill and by Lectual only; unique per firm; a holder cannot be deleted.';
+comment on column public.crm_matter_stage.role is
+  '0119: a fixed tag rules read instead of the label (signed_loe, application_filed, ...). Set by 0119''s back-fill and by Lectual only; unique per firm; a holder cannot be deleted.';
+comment on function public.crm_stage_delete(uuid, uuid, uuid[], uuid, boolean) is
+  '0119: owner only. Moves every lead in the stage to p_destination (won only from won; merged leads move silently), writes one stage_changed row per live lead, moves or drops the role, deletes the stage. Refuses unless p_expected_ids is exactly the live leads. Returns moved_ids.';
+comment on function public.crm_matter_stage_delete(uuid, uuid, uuid[], uuid, boolean) is
+  '0119: owner only. Moves every matter in the stage to p_destination (same open / closed unless confirmed), writes one stage_changed row per matter, moves or drops the role, deletes the stage. Refuses unless p_expected_ids is exactly the matters in it. Returns moved_ids.';
+comment on function public.crm_stage_roles_backfill(uuid, boolean) is
+  '0119: writes stage roles where every rule that reads one already picks that stage by name. Never overwrites. Service role only.';
+
+-- ── KNOWN LIMITS ───────────────────────────────────────────────────────────────────────────────────────────────────
+--   * Deadlocks: a person's lead move into the stage being deleted (row lock on the lead, then the FK's KEY SHARE on the stage) and
+--     crm_stage_delete (the stage FOR UPDATE, then its leads) can deadlock; Postgres aborts one with 40P01 after deadlock_timeout and
+--     the app retries once, then says a fixed sentence. A move that loses to the delete fails with 23503 on the FK (the stage is gone):
+--     never an orphan. A move OUT of the stage that commits first makes the ids differ: stage_delete_records_changed.
+--   * Until a firm's roles are set (or where its names support none), a reorder still changes the positional fallbacks: the
+--     new-enquiry rule's "first open stage" and the hired sync's "lowest-ordered won stage".
+--   * Firm brain stage_mapping entries name stages by NAME. A rename of a stage such an entry names makes that rule find nothing
+--     (the app's documented "the firm said what it meant" behaviour). The app should say so on rename (build step 4).
+--   * Automation rules naming a deleted stage are not edited; the result counts them (rules_naming_stage).
+--   * A stage delete does not stop sequences or run stage_changed automation rules in SQL; the app does what it decides for
+--     moved_ids (DELETE WITH MOVE).
+--   * A stage holding only merged leads can never change category; delete it with a destination instead.
+--   * The last won stage can be deleted only while it holds no lead (its leads may only go to another won stage).
+--   * An owner's DIRECT write (lectual's old settings) is limited to owners and guarded by the trigger and the FKs, but skips the
+--     functions' last-open / last-won checks, renumbering and name uniqueness.
+--   * A new firm gets no roles until Lectual runs crm_stage_roles_backfill for it (or provision_org learns to). Every rule falls back
+--     to its name match meanwhile, as today.
+--   * The layout does not know which built-in keys a view has; the app ignores unknown ones and adds missing ones at the end.
+--   * A platform admin inside a firm has no owner row: no layout writes, no stage functions or structural stage writes, no
+--     firm-column definitions there.
+
+-- ── MIGRATION-TEXT CASES (a new lectual tests/editable-views.test.ts, always run) ─────────────────────────────────────
+--   T1. Every error prefix in the header is raised somewhere in the file, and every one is listed in lectual AGENTS.md's 0119 section.
+--   T2. Part 5's crm_lead_merge_guard body equals 0107's body line for line except the lines marked 0119 (declare v_move, and the
+--       one `if tg_op = 'UPDATE' and old.merged_into_id is not null` block placed before "Only inside crm_merge_leads"), and that
+--       block names to_regprocedure('public.crm_stage_delete(uuid,uuid,uuid[],uuid,boolean)'), the real signature.
+--   T3. Every stage function is SECURITY DEFINER, `set search_path = ''`, calls crm_stage_require_owner() first, and is granted
+--       execute to authenticated and revoked from public, anon and service_role; no stage function takes an org argument.
+--       crm_stage_renumber, crm_matter_stage_renumber, crm_stage_ids_match, crm_stage_backfill_resolve are revoked from authenticated
+--       and anon; crm_stage_roles_backfill is granted only to service_role.
+--   T4. crm_stage_require_owner and crm_stage_is_owner_row read crm_org_member with m.role = 'owner' and never call
+--       current_org_role(). No `revoke insert`, `revoke update` or `revoke delete` on crm_stage / crm_matter_stage.
+--   T5. crm_stage_name_key and crm_matter_stage_label_key: a table of inputs pinned against lectual.app normalizeStageName and
+--       compare.ts normalise ("4. Follow up" -> "follow up", "LOE & Invoice Sent" -> "loe and invoice sent", "Consult Held – Proposal in
+--       Progress" -> "consult held proposal in progress", "19A. OA Issued" -> "oa issued", "17 Application Filed" -> "application
+--       filed", "17." -> "17."). Run on a database in the DB block; the text test checks the regexes match the app's.
+--   T6. The alias jsonb in crm_stage_backfill_resolve equals ALIASES, and the back-fill's candidate lists equal
+--       NEW_ENQUIRY_STAGE_NAMES, DEFAULT_STAGE_NAMES and MILESTONE_STAGE_NAMES, AS THEY ARE ON lectual.app BRANCH s10p2 (the branch
+--       this proposal was written on), NOT lectual.app main 69a35cc, whose lists differ. The pin test lives on that branch and must be
+--       re-checked (and this file updated) if the lists change before the build merges.
+--   T7. No `drop ` statement and no `delete from` outside crm_stage_delete / crm_matter_stage_delete.
+--   T8. crm_view_layout: grants are select, delete, insert (org_id, view_key, columns), update (columns); no policy names
+--       current_org_role.
+
+-- ── CASES FOR lectual tests/tenant-isolation.test.ts (fail until applied) ─────────────────────────────────────────────
+-- Fixtures: firm A (owner OA, admin AD, senior_admin SA, paralegal PA, viewer VA), firm B (owner OB). LS: a platform admin acting in A
+-- (claim owner, no row). A's lead stages: "Potential New Client" (open), "Consult Held" (open), "Follow-Up" (open), "Signed LOE /
+-- Deposit Received" (won), "Lost" (lost); A's matter stages: '7' "Signed LOE / Deposit Received" (open), '17' "17. Application Filed"
+-- (open), '20' "Registered" (closed). B has its own copies. Leads L1, L2 live and LM merged into L1, all in A's "Consult Held";
+-- matters M1, M2 in '17'.
+--   Layouts
+--   1. OB reads 0 of A's layouts; OB's insert with org_id = A: refused (42501 from RLS, or 23503 view_layout_unknown_field when it
+--      names a cf: key; accept either); OB's update / delete of A's layout: 0 rows.
+--   2. AD, SA, PA, VA (active A) insert a layout: 42501; update / delete A's layout: 0 rows; all of them read it. LS: same as AD.
+--   3. OA inserts, updates (rev 1 -> 2) and deletes. A stale update (.eq rev 1 after it is 2) affects 0 rows. A second insert of
+--      the same view: 23505 (crm_view_layout_one_per_view).
+--   4. OA's layout naming `cf:<a field of B>`: view_layout_unknown_field (23503); `cf:<random uuid>` gives the same message.
+--      `cf:<A's archived field>` is accepted; an uppercase `cf:` uuid is refused by the CHECK. (Skipped where 0115 is absent.)
+--   5. CHECKs: 81 columns, a duplicate key, key "Bad Key", a label of 61 characters, with a leading space or with U+200B, width 39 and
+--      801, a missing `hidden`, an extra property: each 23514 crm_view_layout_columns. view_key 'pipeline_board': 23514.
+--   6. OA naming updated_by, rev or id: 42501. Stored updated_by = OA, updated_at the server's. anon reads nothing.
+--   7. Deleting A in one statement removes its layouts.
+--   Stage functions and internals (each with the stated prefix and NOTHING written)
+--   8. Non-owner: AD, SA, PA, VA, LS, and a call with no session each get stage_not_owner from every one of the ten functions.
+--   8b. authenticated (OA, OB) and anon calling crm_stage_renumber(<B org>, ...), crm_matter_stage_renumber(<B org>, ...),
+--      crm_stage_ids_match(...), crm_stage_backfill_resolve(<B org>, ...) and crm_stage_roles_backfill(<B org>): permission denied.
+--   9. Another firm's stage: OB calls crm_stage_rename / _move / _set_category / _delete and crm_matter_stage_rename / _move /
+--      _set_open / _delete on A's stage id: stage_not_found, with the same message as for a random uuid. OA deleting A's lead stage
+--      with p_destination = B's stage, or p_role_to = B's stage: stage_delete_bad_destination; the same for A's matter stage with B's
+--      matter stage as p_destination or p_role_to.
+--  10. Happy path (leads): OA crm_stage_delete("Consult Held", "Follow-Up", {L1, L2}, <free open stage>): L1 and L2 now in Follow-Up
+--      with a new stage_entered_at and unchanged last_activity_at and lane / lane_set_by; LM now in Follow-Up with every other column
+--      unchanged; exactly 2 new stage_changed rows (L1, L2) with actor_id OA, actor_type user, from_stage "Consult Held", to_stage
+--      "Follow-Up", reason "stage deleted", stage_deleted true; none for LM; the stage is gone; result {moved 2, moved_ids [L1, L2],
+--      merged_moved 1}. Happy path (matters): crm_matter_stage_delete('17', '7', {M1, M2}, <open stage for application_filed>) moves
+--      M1, M2, writes 2 stage_changed rows with from_code '17', returns moved_ids.
+--  11. Stale ids: {L1} (missing L2), {L1, L2, X} (X not in the stage), {L1, LM} (LM is merged), {L1, L1}: each
+--      stage_delete_records_changed; NULL or an array holding NULL: stage_delete_bad_ids. With L2 moved out and L3 moved in after
+--      the dialog (same count): stage_delete_records_changed. An empty stage with '{}' deletes; with {L1}: stage_delete_records_changed.
+--  12. Won: a non-won source with a won destination: stage_delete_won_destination; a won source (with leads) with an open, lost or
+--      nurture destination: stage_delete_won_source; a won source into another won stage: succeeds. Same stage as destination:
+--      stage_delete_same_stage. No destination with leads present: stage_delete_needs_destination.
+--  12b. Matters: '17' (open) into '20' (closed) without p_confirm_open_change: stage_delete_open_mismatch; with it: succeeds.
+--  13. Last open: in a firm whose only open stage is S (holding no role), crm_stage_delete(S, ...) and crm_stage_set_category(S,
+--      'nurture'): stage_last_open. Last won (empty) without p_confirm_no_won: stage_last_won; with it: succeeds, signed_loe dropped.
+--  14. Roles on delete: "Potential New Client" (new_enquiry) with p_role_to null: stage_holds_role; with p_role_to = a stage holding
+--      a role: stage_role_taken; with p_role_to = "Lost": stage_role_category_mismatch; with another open stage: succeeds, that stage
+--      holds new_enquiry. "Follow-Up" (follow_up) with p_role_to null: succeeds and result.role_dropped = 'follow_up'. Signed LOE (lead,
+--      not the last won) with p_role_to null: stage_holds_role. Matter '7' (signed_loe) with p_role_to null: stage_holds_role; with
+--      p_role_to = '20' (closed): stage_role_category_mismatch. Matter '20' (registered) with p_role_to null: succeeds, role dropped.
+--  15. Matter open/closed role rule: crm_matter_stage_set_open('20', true) on an EMPTY '20': stage_role_category_mismatch (registered
+--      must be closed); the service role setting application_filed on a closed stage: stage_role_category_mismatch.
+--  16. Direct writes (WHAT IT CHANGES 2), signed in:
+--      * AD inserts or deletes a crm_stage / crm_matter_stage row: refused (RLS 42501 / 0 rows). OA can (an empty, role-less stage).
+--      * AD renames, reorders or re-categorises a stage, or relabels / reorders / opens a matter stage: stage_owner_only. OA can.
+--      * AD updates crm_stage.aging_threshold_days and crm_matter_stage.waiting_on: works (0016 / 0042 policies, unchanged).
+--      * OA changes a matter stage's code: stage_code_fixed. OA changes the category of a stage holding a lead (live or merged), or
+--        is_open of a stage holding a matter: stage_not_empty. OA writes `role`: stage_role_guarded. OA deletes a role holder:
+--        stage_role_delete; a stage holding a lead: 23503 (FK); a matter stage holding a matter: 23503 (RESTRICT).
+--      * OB (owner of B, active B) updating or deleting A's stage: 0 rows. LS (claim owner, no row): stage_owner_only on rename,
+--        and insert / delete refused by the restrictive policies.
+--      * The service role inserts, renames and deletes freely (the seed and import scripts' path); deleting a role holder:
+--        stage_role_delete; setting signed_loe on an open lead stage: stage_role_category_mismatch.
+--  17. Reorder: crm_stage_move(stage, 0) puts it first; every order_index of A is a multiple of 10 and distinct; B's stages unchanged.
+--      crm_stage_move(stage, count): stage_bad_position. Same for the matter table. With a stage's order_index set (service role) to
+--      1000000000, crm_stage_add: stage_order_overflow.
+--  18. Add: crm_stage_add('Consult Held', 1) when "Consult Held" exists: stage_name_taken (also for "consult-held"). A name holding
+--      U+200B or U+202E: stage_bad_name. crm_stage_add('New Stage', 2, 'won') succeeds at place 2. crm_matter_stage_add('3. Filing
+--      Prep', 1) gets a code 'FILINGPREP' (no digit prefix); a second 'filing  PREP' (same label key): stage_name_taken
+--      ('Filing Prep!' is allowed: the USPTO compare's key keeps punctuation, so the database does too). p_phase 'pre_filing' sets
+--      phase where the column exists, else matter_stage_phase_unavailable.
+--  19. Category / open via the functions: crm_stage_set_category on a stage holding a lead (live or merged): stage_not_empty; on an
+--      empty stage: succeeds. crm_matter_stage_set_open on a stage holding a matter: stage_not_empty; on B's stage: stage_not_found.
+--  20. Rename: crm_matter_stage_rename('17', 'Filed with USPTO') keeps code '17' and role application_filed.
+--  21. Merge guard: every 0107 case stays green. New: the service role setting lectual.stage_delete itself and updating a merged
+--      lead's current_stage_id: lead_merge_guarded. A signed-in OWNER (OA) calling set_config('lectual.stage_delete', '<from>><to>',
+--      true) and then updating a merged lead directly: lead_merge_guarded (current_user is authenticated, not the function owner).
+--  22. Back-fill: run twice, the second writes nothing; a firm with two "Follow-Up" stages gets no follow_up; a firm whose
+--      "Post Consultation Follow Up" is its only proposal/follow-up name gets neither proposal_sent nor follow_up_sent; a closed
+--      "Application Filed" stage gets no application_filed.
+--  23. 0115 restrictive policies: AD and SA insert or rename a crm_custom_field: 42501 / 0 rows; OA can; LS cannot; AD's text value
+--      writes still work.
+--  24. Isolation regression: the existing 0016 / 0042 / 0105 / 0107 cases, with a signed-in ADMIN's stage insert / delete /
+--      structural update now refused (use an owner where a case needs the write to succeed).
+
+-- ── SQL TO RUN IN A ROLLED-BACK TRANSACTION ON lectual-dev (after applying) ───────────────────────────────────────────
+-- Uses throwaway rows; nothing survives the rollback. `:x` are psql variables the operator sets to fresh uuids. Each refusal is in
+-- its own savepoint (rolled back). The claims mirror 0002: active_org_id and org_role; sub is the user id.
+--
+-- begin;
+--   insert into auth.users (id, email) values (:oa, 'oa@example.com'), (:ad, 'ad@example.com'), (:ob, 'ob@example.com');
+--   insert into crm_org (id, name, slug) values (:a, 'A test', 'a-test-0119'), (:b, 'B test', 'b-test-0119');
+--   insert into crm_org_member (org_id, user_id, role) values (:a, :oa, 'owner'), (:a, :ad, 'admin'), (:b, :ob, 'owner');
+--   insert into crm_stage (id, org_id, name, order_index, category) values
+--     (:s_new, :a, 'Potential New Client', 10, 'open'), (:s_held, :a, 'Consult Held', 20, 'open'),
+--     (:s_fu, :a, 'Follow-Up', 30, 'open'), (:s_won, :a, 'Signed LOE / Deposit Received', 40, 'won'), (:s_lost, :a, 'Lost', 50, 'lost'),
+--     (:s_free, :a, 'Waiting', 60, 'open'), (:sb, :b, 'Potential New Client', 10, 'open');
+--   insert into crm_lead (id, org_id, first_name, last_name, email, current_stage_id) values
+--     (:l1, :a, 'T', 'One', 'one@example.com', :s_held), (:l2, :a, 'T', 'Two', 'two@example.com', :s_held),
+--     (:lm, :a, 'T', 'Dup', 'one+dup@example.com', :s_held);
+--   select public.crm_stage_roles_backfill(:a, false);   -- expect new_enquiry, consult_held, follow_up, signed_loe, lost
+--   set local role authenticated;
+--   select set_config('request.jwt.claims', json_build_object('sub', :'oa', 'role', 'authenticated', 'active_org_id', :'a', 'org_role', 'owner')::text, true);
+--   select public.crm_merge_leads(:l1, :lm, '{}');                              -- LM merged into L1 (0107), stays in :s_held
+--   savepoint c1; select public.crm_stage_delete(:s_held, :s_fu, array[:'l1']::uuid[], :s_free);        -- stage_delete_records_changed
+--   rollback to savepoint c1;
+--   savepoint c2; select public.crm_stage_delete(:s_held, :s_won, array[:'l1', :'l2']::uuid[], :s_free); -- stage_delete_won_destination
+--   rollback to savepoint c2;
+--   savepoint c3; select public.crm_stage_delete(:s_held, :sb, array[:'l1', :'l2']::uuid[], :s_free);    -- stage_delete_bad_destination
+--   rollback to savepoint c3;
+--   savepoint c4; select public.crm_stage_delete(:s_new, :s_fu, '{}');                                   -- stage_holds_role
+--   rollback to savepoint c4;
+--   savepoint c5; select set_config('lectual.stage_delete', :'s_held' || '>' || :'s_fu', true);
+--     update crm_lead set current_stage_id = :s_fu where id = :lm;                                       -- lead_merge_guarded
+--   rollback to savepoint c5;
+--   savepoint c6; select public.crm_stage_renumber(:b, array[:'sb']::uuid[]);                            -- permission denied
+--   rollback to savepoint c6;
+--   select public.crm_stage_delete(:s_held, :s_fu, array[:'l1', :'l2']::uuid[], :s_free);  -- {moved 2, moved_ids [..], merged_moved 1}
+--   select id, current_stage_id from crm_lead where id in (:l1, :l2, :lm);                              -- all :s_fu
+--   select count(*) from crm_activity where lead_id in (:l1, :l2, :lm) and type = 'stage_changed'
+--      and payload ->> 'reason' = 'stage deleted';                                                       -- 2
+--   select set_config('request.jwt.claims', json_build_object('sub', :'ad', 'role', 'authenticated', 'active_org_id', :'a', 'org_role', 'admin')::text, true);
+--   savepoint c7; select public.crm_stage_move(:s_fu, 0);                       -- stage_not_owner
+--   rollback to savepoint c7;
+--   savepoint c8; update crm_stage set name = 'x' where id = :s_fu;             -- stage_owner_only
+--   rollback to savepoint c8;
+--   update crm_stage set aging_threshold_days = 9 where id = :s_fu;             -- 1 row
+--   savepoint c9; insert into crm_view_layout (org_id, view_key, columns)
+--     values (:a, 'review_list', '[{"key":"client","hidden":false}]');          -- 42501 (RLS)
+--   rollback to savepoint c9;
+--   select set_config('request.jwt.claims', json_build_object('sub', :'ob', 'role', 'authenticated', 'active_org_id', :'b', 'org_role', 'owner')::text, true);
+--   select count(*) from crm_view_layout where org_id = :a;                     -- 0
+--   savepoint c10; select public.crm_stage_set_category(:s_fu, 'nurture');      -- stage_not_found
+--   rollback to savepoint c10;
+-- rollback;
