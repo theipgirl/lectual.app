@@ -7,13 +7,20 @@ Newest section first. Tick an item when it is done; don't delete it.
 
 Recap: `docs/recaps/2026-11-17-marketing-site-redesign-mockups.md` (round three). Omi cross-check: still the open item "Review the new website".
 
+### Taylor, after the seven newest comments (Nov 25, evening)
+- [ ] Review Horizon again (same link) and resolve your comment threads on the page; Claude can't close them from the session.
+- [ ] Before any of this goes live: SharePoint, Google Drive and ChatGPT connections are not in the product, and Gmail is mail only (no calendar). The page and its "What does it connect to?" answer now name all ten. Build them, label them "coming soon", or take them off the live page.
+- [ ] Check each company's brand rules before using the ten logos on the live site (now also Gmail, SharePoint, Google Drive, Claude, ChatGPT).
+- [ ] Say whether "slow release" meant the top blur letting go gradually (built) or the pinned sections releasing more slowly.
+- [ ] Say whether the workspace heading should also sit left of the slider on small laptops (under 1180px wide it sits above, so the cards stay wide enough).
+- [ ] Look at the frosted top bar at night (overnight scene): it had to be brightened for legibility, so it reads as soft grey-white there.
+
 ### Taylor, after the ten further comments (Nov 25, afternoon)
-- [ ] Pick a hero sky with the "Sky" switcher at the left of the hero: 1 time-lapse regraded, 2 cloud sunset, 3 soft colour field, 4 horizon line.
-- [ ] Say whether the product window should stay in neutral ink or use the real app's oxblood.
-- [ ] Say whether "the background should not be doubled" meant the full-screen sky in the firm brain section (fixed there).
-- [ ] Decide on the connectors comment you marked resolved: Gmail could be added truthfully (mail); SharePoint, Drive, Claude and ChatGPT are not built.
+- [x] Pick a hero sky: chose 1, the time-lapse regraded (Nov 25). The switcher is removed.
+- [x] Window colour: neutral ink (Nov 25).
+- [x] "The background should not be doubled": confirmed fixed (Nov 25).
+- [x] Connectors: add Gmail and the others (Nov 25). Done on the page; see the go-live item above.
 - [ ] Read the new copy: the Home tab, "Lectual does the admin, so your time goes to the legal work only you can do.", and the firm brain section.
-- [ ] Resolve your comment threads on the page (Claude can't close them from the session).
 
 ### Taylor, after the 18 comments were worked through (Nov 25, later)
 - [ ] Review Horizon again (same link) and resolve your 18 comment threads on the page; Claude can't close them from the session.

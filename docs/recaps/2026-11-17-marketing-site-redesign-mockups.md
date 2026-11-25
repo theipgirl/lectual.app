@@ -203,6 +203,45 @@ orchestrator; two merge bugs were sent back and fixed before publishing.
 - **Not checked:** the independent reviewer's full pass was not repeated for this round; Safari,
   Firefox, a real phone and a real trackpad are still untested; shader speed on real hardware.
 
+## Round six (Nov 25, evening): four decisions and seven more comments on Horizon
+
+Taylor answered the four open questions (sky 1, neutral window, doubled background fixed,
+"yes and the others" on connectors), left seven new comments, and asked in chat for a blur at
+the top of the screen with a slow release. Same link. Five builders in parallel, merged and
+reviewed by the orchestrator. Nothing needed sending back this round.
+
+- **Sky:** option 1 (the regraded time-lapse) is the only hero sky. The switcher, the other
+  three options and the saved choice are removed.
+- **Lede:** "The agentic IP OS for solo and boutique trademark, patent, and copyright firms."
+- **Nav ("like the names of the tabs remove the extra border"):** tab names kept; the tab
+  group has no ring and the highlight is a plain fill, so the only outline is the pill's own.
+- **"Make this glass":** the hero window's top bar is frosted glass with the sky showing
+  through; the window body and rail stay solid. As the page darkens during the pinned scroll
+  the bar gets whiter so its text stays readable (measured 5.6:1 or better).
+- **Overnight window ("make sure this looks like the one above"):** rebuilt with the hero
+  window's top bar, dark rail (Approvals current), radii, shadows, pills and buttons. Its glass
+  bar is brighter than the hero's because it sits on a night sky.
+- **Workspace heading ("should go on the left of the slider"):** from 1180px wide the heading,
+  the six tabs, a "1 of 6" counter and previous/next buttons sit in a fixed left column and the
+  cards slide to its right. Below 1180px the heading sits above, left-aligned.
+- **Intake card ("should also show the intake form"):** the card now shows the public form
+  (firm name slot, name, email, consent tick, Continue, then a choice question) with the QR,
+  link and scored-assessment switch beside it. Continue and the choices work; nothing is
+  submitted.
+- **Connectors:** Gmail, SharePoint, Google Drive, Claude and ChatGPT chips added with each
+  company's own logo (ten chips in all), and the "What does it connect to?" answer lists all
+  ten. SharePoint, Google Drive and ChatGPT connections were not found in the product, and
+  Gmail is mail only; this is the owner's call for the mockup and is on the to-do before go-live.
+- **Top blur with slow release:** a progressive frost under the nav (strongest at the top
+  edge, no visible end line). Off at the very top of the page and over the overnight scene,
+  soft over the other sky scenes, on over the reading sections. Comes on in 0.6s, lets go in
+  1.1s.
+- **Checks:** no sideways scroll at 1440, 1280, 1024 and 390 wide; hero button clickable; no
+  console errors; every frame of a desktop and phone walk-through reviewed.
+- **Not checked:** Safari and Firefox (the glass and the blur depend on backdrop-filter), a
+  real phone, a real trackpad, the cost of five blurred layers on real hardware, a screen
+  reader.
+
 ## Recommendation on Astro (not decided)
 
 Stay on Next.js for this redesign. The loader, pin scrolling and micro-animations are the same
