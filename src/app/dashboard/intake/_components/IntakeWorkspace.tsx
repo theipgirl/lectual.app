@@ -42,7 +42,7 @@ import { MoreMenu } from "@/components/list-page/MoreMenu";
 import { leadsMoreItems } from "@/lib/intake/more-items";
 import { AddRow, type StartStage } from "@/components/review/AddRow";
 import { HiddenColumnsMenu, type HiddenGroup } from "@/components/views/layout/HiddenColumnsMenu";
-import { LEADS_LIST_BUILTIN, hideStageColumns, type LeadListColumn } from "@/lib/leads/views";
+import { LEADS_LIST_BUILTIN, hideStageColumns, leadsBoardBase, type LeadListColumn } from "@/lib/leads/views";
 import type { Layout, ViewKey } from "@/lib/views/layout/types";
 import type { FactCell } from "@/lib/review/sheet-cells";
 import "@/components/list-page/list-page.css";
@@ -317,7 +317,9 @@ export default function IntakeWorkspace({
   // columns are lost stages the layout doesn't name). A hidden column's leads are counted in one line, never silently gone, and
   // `renderedIds` follows what is drawn so a bulk move can't name a card that isn't on screen.
   const stageBoardLayout = viewState.group === "stage" && !lostView ? boardView.layout : null;
-  const { model, hidden: hiddenStageColumns } = useMemo(() => hideStageColumns(fullModel, stageBoardLayout), [fullModel, stageBoardLayout]);
+  // Only a stage the layout write knows (an intake stage) can be hidden: the menu is drawn for no other (a stage past the first won one has none).
+  const hideableKeys = useMemo(() => leadsBoardBase(stages).map((b) => b.key), [stages]);
+  const { model, hidden: hiddenStageColumns } = useMemo(() => hideStageColumns(fullModel, stageBoardLayout, pinned), [fullModel, stageBoardLayout, pinned]);
   const renderedIds = useMemo(() => (board ? model.renderedIds : page.shown.map((r) => r.lead.id)), [board, model, page]);
   const ownerColumn = ownerColumnShown(sorted);
 
@@ -652,6 +654,7 @@ export default function IntakeWorkspace({
           )}
           <IntakeBoard
             layoutEdit={viewState.group === "stage" && !lostView ? boardView.edit : null}
+            hideableKeys={hideableKeys}
             group={viewState.group}
             model={model}
             moveStages={moveStages}

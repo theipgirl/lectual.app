@@ -177,6 +177,31 @@ describe("the stage board: the layout hides and shows only", () => {
     expect(out.hidden).toMatchObject([{ stageId: S3, leads: 0 }]);
   });
 
+  it("a hidden column that holds a card moved this session stays drawn, marked, and is not counted as hidden", () => {
+    const m = model();
+    const out = hideStageColumns(m, hide(S2, S3), ["l2"]);
+    expect(out.model.columns.map((c) => c.key)).toEqual([S1, S2]);
+    expect(out.model.columns[1].hiddenByLayout).toBe(true);
+    expect(out.hidden.map((h) => h.stageId)).toEqual([S3]);
+    expect(out.model.renderedIds).toContain("l2");
+    // only pinned in a column nothing hides: unchanged
+    expect(hideStageColumns(m, hide(S3), ["l1"]).model.columns.map((c) => c.hiddenByLayout)).toEqual([undefined, undefined]);
+  });
+  it("only a stage the layout write knows gets the Hide menu (the Nurture column of a stage past the first won one has none)", () => {
+    const html = render({ view: "board" }, { boardView: { layout: null, edit: { view: "leads_board", rev: 1 }, hidden: null, note: null } });
+    expect(html.match(/aria-label="Column options for /g)).toHaveLength(3);
+    const src = read("src/app/dashboard/intake/_components/IntakeBoard.tsx");
+    expect(src).toContain("hideableKeys.includes(stageColumnKey(stageId))");
+  });
+  it("ViewTable puts its own attributes last, so a caller's props can't overwrite them", async () => {
+    const { ViewTable } = await import("@/components/views/table/ViewTable");
+    const html = renderToStaticMarkup(
+      <ViewTable columns={[{ key: "a", label: "A" }]} rows={[{ key: "r1" }]} cell={() => <td>x</td>} headProps={() => ({ scope: "row", "data-column": "evil" })} rowProps={() => ({ "data-row": "evil" })} />,
+    );
+    expect(html).toContain('scope="col"');
+    expect(html).toContain('data-column="a"');
+    expect(html).toContain('data-row="r1"');
+  });
   it("rendered: a hidden stage's column is gone, one line says how many columns and leads, and its cards are not drawn", () => {
     const html = render({ view: "board" }, { boardView: { layout: hide(S2), edit: null, hidden: null, note: null } });
     expect(html).toContain("1 column is hidden in your firm&#x27;s view (2 leads).".replace("&#x27;", "'"));
@@ -220,7 +245,7 @@ describe("the List through the shared table", () => {
   it("keeps Item L's row: the ix-row, its data hooks, the standard columns in order and the paging foot", () => {
     const html = render({ view: "table" }, { listView: view() });
     expect(html).toContain("ix-tbl");
-    expect(html).toMatch(/<tr[^>]*class="ix-row"[^>]*data-lead-row="l1"/);
+    expect(html).toMatch(/<tr(?=[^>]*class="ix-row")(?=[^>]*data-lead-row="l1")[^>]*>/);
     const heads = [...html.matchAll(/<th[^>]*data-col="(\w+)"/g)].map((m) => m[1]);
     expect(heads).toEqual(["lead", "stage", "temp", "source", "touch", "next"]);
     // 30 leads: the page still shows 25 at a time, "Showing N of M" over the whole filtered set
@@ -307,6 +332,9 @@ describe("the page", () => {
     expect(page).toContain("const listEdit = ownerNow && listLayoutRead.status === \"ok\"");
     expect(page).toContain("const boardEdit = ownerNow && boardLayoutRead.status === \"ok\"");
     expect(page).toContain("const canAddLead = !previewing && session?.kind === \"ok\" && CAN_WRITE_LEAD.includes(session.role);");
+  });
+  it("reads the firm's columns only for the List, never for the Board or the Lost set", () => {
+    expect(page).toContain('viewState.view === "table" && !lostView ? await loadLeadListExtras');
   });
   it("Money for the firm's columns comes from the re-resolved session, never from the browser", () => {
     expect(page).toContain("canSeeCustomMoney(session.role, session.actingAsStaff)");

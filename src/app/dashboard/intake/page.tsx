@@ -299,7 +299,8 @@ export default async function IntakePage({
   // The firm's own columns (read-only on the List; Money is a real owner's alone, asked again here from the re-resolved session) and the
   // two layouts. An owner by their own membership row, never in a preview, gets the menus; everyone else reads the same view.
   const canMoney = session?.kind === "ok" && canSeeCustomMoney(session.role, session.actingAsStaff);
-  const firmState = await loadLeadListExtras({ leadIds, canSeeMoney: canMoney });
+  // Only the List draws firm columns: not the Board, not the Lost set (its own read).
+  const firmState = viewState.view === "table" && !lostView ? await loadLeadListExtras({ leadIds, canSeeMoney: canMoney }) : null;
   const firm = leadFirmColumns({
     leadIds,
     state: firmState,

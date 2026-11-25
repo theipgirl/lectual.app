@@ -170,6 +170,8 @@ export default function IntakeTable({
   // The width a column is drawn at: this person's own dragged width, else the firm's layout width, else the default; null = flexible.
   const widthOf = (c: ListColumn): number | null => {
     if (c.key === MENU_KEY) return MENU_COL_WIDTH;
+    // Next step stays the one flexible column: a saved layout width is ignored for it (this person's own drag still counts).
+    if (c.key === "next") return sizes.next ?? null;
     if (isBuiltin(c.key)) return sizes[c.key] ?? c.width ?? DEFAULT_COL_WIDTHS[c.key];
     return c.width ?? FIRM_COLUMN_WIDTH;
   };

@@ -93,7 +93,7 @@ export function ViewTable<R extends ListRowBase>({
         <thead>
           <tr>
             {columns.map((c) => (
-              <th key={c.key} scope="col" data-column={c.key} className={c.headClass} title={c.title} {...headProps?.(c)}>
+              <th {...headProps?.(c)} key={c.key} scope="col" data-column={c.key} className={c.headClass} title={c.title}>
                 {renderHead ? renderHead(c) : c.label}
               </th>
             ))}
@@ -109,7 +109,7 @@ export function ViewTable<R extends ListRowBase>({
               const extra = rowProps?.(r);
               return (
                 <Fragment key={r.key}>
-                  <tr data-row={r.key} className={rowClass?.(r)} {...extra} style={r.height || extra?.style ? { ...(r.height ? { height: r.height } : {}), ...extra?.style } : undefined}>
+                  <tr {...extra} data-row={r.key} className={[rowClass?.(r), extra?.className].filter(Boolean).join(" ") || undefined} style={r.height || extra?.style ? { ...(r.height ? { height: r.height } : {}), ...extra?.style } : undefined}>
                     {columns.map((c) => (
                       <Fragment key={c.key}>{cell(r, c) ?? null}</Fragment>
                     ))}

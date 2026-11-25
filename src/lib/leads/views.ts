@@ -74,17 +74,24 @@ export type HiddenStageColumn = { key: string; stageId: string; label: string; l
  * hidden the same way. If the layout would hide every stage column (or every one that is drawn), none is hidden. Pure, and the model is returned unchanged when
  * nothing is hidden. `renderedIds` follows what is drawn, so a bulk move can never name a card that isn't on screen.
  */
-export function hideStageColumns(model: BoardModel, saved: Layout | null | undefined): { model: BoardModel; hidden: HiddenStageColumn[] } {
+export function hideStageColumns(model: BoardModel, saved: Layout | null | undefined, pinned: readonly string[] = []): { model: BoardModel; hidden: HiddenStageColumn[] } {
   if (!saved || !saved.some((c) => c.hidden)) return { model, hidden: [] };
   const slots: { key: string; stageId: string; label: string; leads: number }[] = [];
   for (const c of model.columns) if (c.drop.kind === "stage") slots.push({ key: stageColumnKey(c.drop.stageId), stageId: c.drop.stageId, label: c.label, leads: c.count });
   for (const e of model.empty) slots.push({ key: stageColumnKey(e.stageId), stageId: e.stageId, label: e.label, leads: 0 });
-  const { hidden } = splitHiddenColumns(slots, saved);
-  if (hidden.length === 0) return { model, hidden: [] };
+  // A hidden column that holds a card moved this session stays drawn (marked), so the card never vanishes under the person who moved it.
+  const held = new Set(model.columns.filter((c) => c.drop.kind === "stage" && c.shown.some((r) => pinned.includes(r.lead.id))).map((c) => (c.drop as { stageId: string }).stageId));
+  const { hidden: wanted } = splitHiddenColumns(slots, saved);
+  const hidden = wanted.filter((h) => !held.has(h.stageId));
+  const kept = wanted.filter((h) => held.has(h.stageId));
+  if (hidden.length === 0 && kept.length === 0) return { model, hidden: [] };
+  const keptIds = new Set(kept.map((h) => h.stageId));
   const gone = new Set(hidden.map((h) => h.stageId));
-  const columns = model.columns.filter((c) => !(c.drop.kind === "stage" && gone.has(c.drop.stageId)));
+  const marked = model.columns.map((c) => (c.drop.kind === "stage" && keptIds.has(c.drop.stageId) ? { ...c, hiddenByLayout: true as const } : c));
+  const columns = marked.filter((c) => !(c.drop.kind === "stage" && gone.has(c.drop.stageId)));
   // A board is never left with no column to draw because of a layout.
   if (columns.length === 0) return { model, hidden: [] };
+  if (hidden.length === 0) return { model: { ...model, columns }, hidden: [] };
   return {
     model: { columns, empty: model.empty.filter((e) => !gone.has(e.stageId)), renderedIds: columns.flatMap((c) => c.shown.map((r) => r.lead.id)) },
     hidden: hidden.map((h) => ({ key: h.key, stageId: h.stageId, label: h.label, leads: h.leads })),
