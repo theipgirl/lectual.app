@@ -18,7 +18,7 @@ const COMPONENTS = [
   "src/components/review/SheetView.tsx",
   "src/components/review/SheetViewTable.tsx",
   "src/components/review/SheetEdit.tsx",
-  "src/components/review/ColumnChooser.tsx",
+  "src/components/review/LegacyColumnPrefsCleaner.tsx",
   "src/components/review/CustomValueInput.tsx",
 ];
 /** Every file this sprint adds. */

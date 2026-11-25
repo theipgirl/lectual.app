@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { MONEY_COLUMNS, NOTES_PRESENT, columnsFor, parseColumnPrefs } from "@/lib/review/sheet-columns";
+import { NOTES_PRESENT, columnsFor } from "@/lib/review/sheet-columns";
 import { canSeeCustomMoney, withoutMoney } from "@/lib/custom-columns/rules";
 import { COL_GOV_FEE, COL_GOV_FEE_DUE, COL_LEGAL_FEE, COL_LEGAL_FEE_DUE } from "@/lib/ui/words";
 import { CF, customFields, customFixture, members, rows, TODAY } from "../review/columns-fixtures";
@@ -50,17 +50,6 @@ describe("custom Money columns are owner-only, like the fee columns", () => {
     expect(hasHeader(html, "Quoted fee")).toBe(true);
     for (const h of FEE_HEADERS) expect(hasHeader(html, h), h).toBe(true);
     expect(spies.loadReview.mock.calls[0][1]).toMatchObject({ customMoney: true });
-  });
-
-  it("stored prefs: a forged fee id AND a forged Money cf: id are dropped for a non-owner", () => {
-    const allowed = columnsFor("trademarks", { canSeeMoney: false, hasNotes: NOTES_PRESENT, customFields }).map((c) => c.id);
-    const quote = `cf:${CF.quote}`;
-    const clean = parseColumnPrefs({ order: ["legalFee", quote, "govFee"], hidden: ["legalFeeDue", quote] }, allowed);
-    for (const m of [...MONEY_COLUMNS, quote]) {
-      expect(clean.order).not.toContain(m);
-      expect(clean.hidden).not.toContain(m);
-    }
-    expect(columnsFor("trademarks", { canSeeMoney: true, canSeeCustomMoney: true, hasNotes: NOTES_PRESENT, customFields }).find((c) => c.id === quote)?.money).toBe(true);
   });
 
   it("withoutMoney drops the Money fields and every amount, and passes the other states through", () => {

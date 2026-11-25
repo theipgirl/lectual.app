@@ -25,9 +25,8 @@ import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import { CAN_MOVE_STAGE, CAN_WRITE_LEAD } from "@/lib/pipeline/leads";
 import { loadReview } from "@/lib/review/load";
 import { canSeeBilling } from "@/lib/billing/can-see";
-import { ColumnChooser, type ChooserSection } from "@/components/review/ColumnChooser";
-import { NOTES_PRESENT, columnsFor } from "@/lib/review/sheet-columns";
-import { REVIEW_LIST_VIEWS, applyReviewLayout, type SectionLayouts } from "@/lib/review/layout";
+import { LegacyColumnPrefsCleaner } from "@/components/review/LegacyColumnPrefsCleaner";
+import { REVIEW_LIST_VIEWS, type SectionLayouts } from "@/lib/review/layout";
 import { loadViewLayout } from "@/lib/views/layout/load";
 import { loadOwnerState } from "@/lib/views/layout/owner-load";
 import { isOwner } from "@/lib/views/layout/owner";
@@ -142,7 +141,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   }) === "owner";
   const common = { owner, today: load.today, members: load.members, canWrite, params };
   // Custom columns: the state the List drew from (null when not read), and the directory for person cells (null = it couldn't be read).
-  // Cleaned again here (the loader never read an amount for a non-owner): no Money field or amount reaches any table, card or chooser.
+  // Cleaned again here (the loader never read an amount for a non-owner): no Money field or amount reaches any table or card.
   const custom = load.custom ? (customMoney ? load.custom : withoutMoney(load.custom)) : null;
   const customFields = custom?.status === "ok" ? custom.fields : [];
   const customMembers = load.failed.includes("team names") ? null : load.members;
@@ -159,16 +158,6 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
       sheetPerms = { writeMatter: canWrite, writeLead, moveLead, matterStages: canWrite ? stages.matter : null, leadStages: moveLead ? stages.lead : null, writeCustom };
     }
   }
-  // "Columns" (draw-only, kept in this browser): offered on the List only, over exactly the columns this viewer may have.
-  const chooser =
-    params.view === "sheet" ? (
-      <ColumnChooser
-        sections={[
-          { id: "trademarks", title: "Trademarks", columns: applyReviewLayout(columnsFor("trademarks", { canSeeMoney, canSeeCustomMoney: customMoney, hasNotes: NOTES_PRESENT, customFields }), sectionLayouts?.trademarks) },
-          { id: "contracts", title: "Contracts", columns: applyReviewLayout(columnsFor("contracts", { canSeeMoney, canSeeCustomMoney: customMoney, hasNotes: NOTES_PRESENT, customFields }), sectionLayouts?.contracts) },
-        ] satisfies ChooserSection[]}
-      />
-    ) : null;
   // "Add a lead"'s "Start in": the firm's OPEN lead stages in pipeline order (null = they couldn't be read: no picker, the new-enquiry stage).
   let addStages: { id: string; name: string }[] | null = null;
   let addDefault: string | null = null;
@@ -290,6 +279,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
 
   return (
     <div className={owner ? "lp-root rv-root rv-owner" : "lp-root rv-root"}>
+      {params.view === "sheet" ? <LegacyColumnPrefsCleaner /> : null}
       {owner ? (
         <>
       <PageHeader
@@ -302,12 +292,6 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
             <div className="rse-head-right">
               <SheetSaveStatus />
               {hiddenControl}
-              {chooser}
-              <ViewSwitch params={params} />
-            </div>
-          ) : chooser ? (
-            <div className="rse-head-right">
-              {chooser}
               <ViewSwitch params={params} />
             </div>
           ) : (
@@ -358,7 +342,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           clearHref: link({ q: "", i: 1 }),
         }}
         toggle={sheetPerms ? <span className="rse-head-right"><SheetSaveStatus /><ViewSwitch params={params} /></span> : <ViewSwitch params={params} />}
-        more={hiddenControl ? <>{hiddenControl}{chooser}</> : chooser}
+        more={hiddenControl}
       />
 
       <KpiStrip kpis={kpis(buckets)} />

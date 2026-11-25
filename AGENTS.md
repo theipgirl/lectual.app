@@ -2715,9 +2715,9 @@ says "Not saved yet. Press Enter to save." (`SHEET_NOTE_NOT_SAVED_YET`; a failed
 cancels. `noteCommitter` keeps one post per Enter (a second Enter while saving is ignored); after a failure the next Enter retries.
 
 ## Weekly review List: the Notes cell sits in the column registry's slot (merge of the Notes cell into the columns work, no schema)
-The List's columns come from ONE registry (`src/lib/review/sheet-columns.ts`; `columnsFor`, the per-person chooser) and `NOTES_PRESENT` is now
+The List's columns come from ONE registry (`src/lib/review/sheet-columns.ts`; `columnsFor`; the firm's layout then orders and hides them, there is no per-person chooser) and `NOTES_PRESENT` is now
 `true`: both tables (the read-only `SheetView` and the owner's `SheetEditTable`) draw the merged `NotesCell` at the registry's `notes` slot,
-Trademarks after Source, Contracts after Next step, not last. The chooser hides or moves Notes like any other column. The Trademarks section note
+Trademarks after Source, Contracts after Next step, not last. The firm's layout hides or moves Notes like any other column. The Trademarks section note
 says "Description and Notes are one column in Lectual: Notes." again. Nothing about the cell changed: it saves on Enter only, leaving it never posts,
 and its words are the same.
 - **Read:** `loadReview(now, { withFees, withCustom, notes, customMoney })`, asked together for the List only, in the one parallel read
@@ -2741,7 +2741,7 @@ Money field only (a throw counts as staff). Nothing is hidden only in the browse
   value that still carried an amount is dropped. Callers: the Weekly review List (`loadReview({ customMoney })`, from the page's re-resolved role) and the
   opened card's own read (`loadCardCustomColumns(record, { canSeeMoney })`, the card's re-resolved role AND the page's). The page also cleans what it
   draws with `withoutMoney` (List tables, the owner Sheet's editors, the card's Firm columns). `columnsFor` drops a Money field unless `canSeeMoney`
-  (`customColumn(...).money` is now true for one), so the column chooser never lists it and a stored pref naming it is dropped. No other path reads
+  (`customColumn(...).money` is now true for one), so no column list offers it to anyone else. No other path reads
   `crm_custom_value` (Settings -> Columns reads `value_choice` counts only; no CSV, Matters/Leads list or Copilot reads custom values).
 - **Writes closed:** `setCustomValue` refuses a Money field for every non-owner with `CUSTOM_MONEY_OWNER_ONLY` before the record or the existing value
   is read (decision: owner-only writes too, clears included). Field DEFINITIONS are still the admin tier's (Settings -> Columns says
@@ -2866,7 +2866,14 @@ Spec `docs/pge/2026-11-17-agentic-ip-os/spec-editable-views.md` (build step 3 an
   List at once; otherwise the success says it joins the List once it moves past first contact, with links to the lead and Leads. "Open a matter" is a plain link to
   `/dashboard/matters/#open-matter`. Neither is drawn for a role that can't create the record.
 - **Removed:** Settings -> Columns (page, `ColumnsSettings*`, its CSS, `settings-load.ts`, the tab, the section note's "Add a column" link, its words and the design-harness screens). The
-  card's `FirmColumnsEdit` (typing values) stays. The per-person Columns chooser stays until a later step.
+  card's `FirmColumnsEdit` (typing values) stays. 
+- **Also removed (step 7, Nov 25: the firm layouts decide, nobody chooses their own):** the per-person Columns chooser on the Weekly review List
+  (`ColumnChooser`, `use-column-prefs`, `column-prefs-storage`, `applyColumnPrefs` / `parseColumnPrefs` / `prefsReducer` / `parseStoredDocument`, its words
+  and `.rv-cols-*` CSS). Columns drawn = the firm's layout applied to the viewer's allowed columns (`columnsFor` -> `applyReviewLayout`); money rules unchanged.
+  **A stored old choice is never read.** It lived in `localStorage` under `lx-review-sheet-columns`; `LegacyColumnPrefsCleaner` (mounted on the List,
+  draws nothing) deletes that one key after mount, inside try/catch (`removeLegacyColumnPrefs`, `src/lib/review/legacy-column-prefs.ts`), and a present,
+  malformed or huge value changes nothing drawn and throws nothing (`tests/review/legacy-column-prefs.test.tsx`). **Column widths a person dragged are
+  kept:** they live under their own key (`SHEET_SIZES_KEY`, `lx-review-sheet-sizes`), a per-viewer convenience, and are not touched.
 - **One List layout per section (step 3 review):** view keys `review_list_trademarks` and `review_list_contracts` (no `review_list`): the sections head `client` and `mark` differently, so a rename
   in one must not relabel the other. The page reads both, each header menu is fenced on its own section's rev. Move left and right are `moveBeside` the VISIBLE neighbour the browser names (the
   server checks both keys are in the layout), so a move is seen even when the layout holds columns that aren't drawn.

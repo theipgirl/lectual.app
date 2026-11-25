@@ -139,10 +139,10 @@ describe("page.tsx source", () => {
     // the role comes from the resolved session, never from the request
     expect(src).not.toMatch(/sp\.(fees|canSeeMoney|withFees)|searchParams\.(fees|canSeeMoney)/);
   });
-  it("passes that same canSeeMoney to the chooser and to SheetView", () => {
+  it("passes that same canSeeMoney to SheetView (the per-person chooser that also took it is gone)", () => {
     expect(src).toMatch(/<SheetView rows=\{shown\} canSeeMoney=\{canSeeMoney\}/);
-    // Nov 23 follow-up: the chooser also gets the real-owner custom money flag (changed on purpose).
-    expect(src.match(/canSeeMoney, canSeeCustomMoney: customMoney, hasNotes: NOTES_PRESENT/g)?.length).toBe(2);
+    // Changed on purpose (Nov 25): the page no longer builds the chooser's column lists; SheetView is the only consumer of both flags.
+    expect(src).not.toContain("ColumnChooser");
     expect(src).toMatch(/canSeeCustomMoney=\{customMoney\}/);
   });
 });

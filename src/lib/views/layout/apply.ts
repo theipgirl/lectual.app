@@ -13,7 +13,7 @@ import type { Layout, LayoutColumn, LayoutDefault } from "./types";
 export type ResolvedColumn<C extends LayoutDefault> = { column: C; key: string; label: string; builtinLabel: string; renamed: boolean; hidden: boolean; width: number | null };
 
 /**
- * Every column the viewer may have, in the order to draw them, hidden ones included (a chooser or a menu needs them). Rules:
+ * Every column the viewer may have, in the order to draw them, hidden ones included (a column menu needs them). Rules:
  *  - saved order first; a saved key that no longer exists is dropped; a repeated key counts once;
  *  - a column missing from the saved layout comes after the saved ones, in default order, visible;
  *  - a pinned column is first and never hidden, whatever the layout says.

@@ -368,7 +368,7 @@ export function nextEditableCell(
   from: { rowKey: string; col: TabStop },
   perms: SheetPerms,
   dir: 1 | -1 = 1,
-  /** The columns a row DRAWS, in drawn order (its section's columns after the chooser). Default: the four built-in typed columns in the fixed order. */
+  /** The columns a row DRAWS, in drawn order (its section's columns after the firm's layout). Default: the four built-in typed columns in the fixed order. */
   columnsFor?: (row: Pick<SheetEditRow, "key" | "kind">) => readonly SizedColumn[],
   /** The render's own `fit`: a custom cell is a stop only where the render draws an editor for it. Absent = no custom cell is a stop. */
   fit?: CustomFit,

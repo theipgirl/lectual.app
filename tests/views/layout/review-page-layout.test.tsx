@@ -37,18 +37,15 @@ describe("the Weekly review List draws the firm's saved layout", () => {
     });
   }
 
-  it("the per-person Columns chooser offers the firm's columns under the firm's names, and not the ones the firm hid", async () => {
+  it("there is no per-person Columns chooser, and the page draws exactly the firm's columns under the firm's names", async () => {
     mockPage({ load, role: "attorney" });
     mockLayoutRead(SAVED);
-    // The chooser's panel is a closed popover: capture what the page hands it.
-    vi.doMock("@/components/review/ColumnChooser", () => ({
-      ColumnChooser: ({ sections }: { sections: { id: string; columns: { id: string; header: string }[] }[] }) => <div data-chooser={JSON.stringify(sections.map((s) => [s.id, s.columns.map((c) => c.header)]))} />,
-    }));
-    const html = await renderPage({ view: "sheet" });
-    const chooser = JSON.parse(html.match(/data-chooser="([^"]*)"/)![1].replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/&#x27;/g, "'")) as [string, string[]][];
-    const trademarks = chooser.find(([id]) => id === "trademarks")![1];
-    expect(trademarks.slice(0, 3)).toEqual(["Trademark Owner", "What happened", "Status"]);
-    expect(trademarks).not.toContain("Trademark Name");
+    const html = decode(await renderPage({ view: "sheet" }));
+    expect(html).not.toContain(">Columns<");
+    expect(html).not.toContain("Choose columns");
+    const keys = headers(firstTable(html));
+    expect(keys.slice(0, 3)).toEqual(["client", "notes", "status"]);
+    expect(keys).not.toContain("mark");
   });
 
   it("the owner's fee column takes its saved width in the column group", async () => {

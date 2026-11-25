@@ -1472,25 +1472,13 @@ export const COL_UNCONFIRMED_SUFFIX = " · unconfirmed";
 export const proposalsCount = (n: number) => `${n} proposals`;
 export const FEE_FROM_PROPOSAL = "From the accepted proposal";
 export const FEE_FROM_SPREADSHEET = "From the spreadsheet import";
-/** The column chooser (draw-only, kept in this browser). */
-export const COLUMNS_BUTTON = "Columns";
-export const COLUMNS_MENU_LABEL = "Choose columns";
-export const COLUMNS_RESET = "Reset to the spreadsheet's order";
-export const COLUMNS_MOVE_UP = "Move up";
-export const COLUMNS_MOVE_DOWN = "Move down";
-export const COLUMNS_ALWAYS_SHOWN = "Always shown";
-export const COLUMNS_KEPT_HERE = "Kept in this browser only. It changes what you see, not what you may see.";
-export const columnsShow = (header: string) => `Show ${header}`;
-export const columnsMoveUp = (header: string) => `${COLUMNS_MOVE_UP}: ${header}`;
-export const columnsMoveDown = (header: string) => `${COLUMNS_MOVE_DOWN}: ${header}`;
-export const columnsSectionLabel = (section: string) => `${section} columns`;
 /** Firm-defined custom columns (lectual 0115, proposed). Read only until Settings -> Columns exists. */
 export const CUSTOM_COLUMNS_NOT_ON = "Custom columns aren't switched on for your firm yet.";
 export const CUSTOM_FROM_LEAD = "From the lead";
 export const CUSTOM_FROM_MERGED = "From a merged duplicate";
 export const CUSTOM_NO_LONGER_ON_TEAM = "Someone no longer on the team";
 export const FIRM_COLUMNS_HEADING = "Firm columns";
-/** The five kinds of custom column, as the chooser and a header's hover text name them. */
+/** The five kinds of custom column, as a header's hover text names them. */
 export const CUSTOM_KIND_TEXT = "Text";
 export const CUSTOM_KIND_DATE = "Date";
 export const CUSTOM_KIND_MONEY = "Money";

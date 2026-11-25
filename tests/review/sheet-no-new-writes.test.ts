@@ -7,13 +7,12 @@ const read = (f: string) => readFileSync(path.resolve(__dirname, "../..", f), "u
 const code = (f: string) => read(f).replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 
 const CLIENT_AND_NEW = [
-  "src/components/review/ColumnChooser.tsx",
-  "src/components/review/use-column-prefs.ts",
+  "src/components/review/LegacyColumnPrefsCleaner.tsx",
   "src/components/review/SheetViewTable.tsx",
   "src/components/review/SheetFactTd.tsx",
   "src/components/review/SectionNote.tsx",
   "src/lib/review/sheet-columns.ts",
-  "src/lib/review/column-prefs-storage.ts",
+  "src/lib/review/legacy-column-prefs.ts",
   "src/lib/review/sheet-cells.ts",
   "src/lib/review/fees-cells.ts",
   "src/lib/review/fees-load.ts",
@@ -55,7 +54,7 @@ describe("no new write path", () => {
   });
 
   it("the sheet-cells and fees-cells modules are pure too (no React, no server-only)", () => {
-    for (const f of ["src/lib/review/sheet-cells.ts", "src/lib/review/fees-cells.ts", "src/lib/review/column-prefs-storage.ts"]) {
+    for (const f of ["src/lib/review/sheet-cells.ts", "src/lib/review/fees-cells.ts", "src/lib/review/legacy-column-prefs.ts"]) {
       const src = code(f);
       expect(src, f).not.toMatch(/from ["']react/);
       expect(src, f).not.toMatch(/server-only/);

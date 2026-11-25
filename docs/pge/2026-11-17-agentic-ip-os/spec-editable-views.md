@@ -19,7 +19,7 @@ Sources: the Nov 17 working session with Caitlyn, the Nov 23 team meeting (Caitl
 
 Still open (default chosen; Taylor can overrule before the build):
 - **Each person hiding or reordering columns just for themselves.** Default: not in the first build (firm-wide only, as decided). The existing
-  per-person chooser on the Weekly review List stays until the shared layout replaces it, then is removed.
+  per-person chooser on the Weekly review List stays until the shared layout replaces it, then is removed. **Done (step 7, Nov 25).**
 
 ## What Caitlyn asked for (synthesis)
 
@@ -141,7 +141,7 @@ operation, so the rules below hold whoever calls.
 
 - Settings -> Columns (`settings/columns/`, `ColumnsSettings*`, `FirmColumnsEdit`) and its rail and tab entries. Anything it did moves to the
   column header menu.
-- The per-person column chooser on the Weekly review List, once the firm layout replaces it.
+- The per-person column chooser on the Weekly review List, once the firm layout replaces it. **Done (step 7, Nov 25):** removed with its words, CSS and tests; an old stored choice is deleted once and never read; dragged column widths are kept.
 
 ## Build order
 
@@ -154,7 +154,7 @@ operation, so the rules below hold whoever calls.
 | 4 | Stage management on the Board header; every name-based rule reads the role first | Opus (rules), Sonnet (UI) | step 1 on dev |
 | 5 | Matters and Contracts on the shared components; the Matters stage fix | Sonnet, Opus review | step 2 |
 | 6 | Leads on the shared components | Sonnet, Opus review | step 2 |
-| 7 | Remove Settings -> Columns and the per-person chooser | Haiku/Sonnet | steps 3-6 |
+| 7 | Remove Settings -> Columns and the per-person chooser (**done Nov 25**) | Haiku/Sonnet | steps 3-6 |
 | 8 | Preview walk-through with Caitlyn and Taylor | Taylor, Caitlyn | dev-backed preview |
 
 Merge to main only with Taylor's yes. The migration goes to prod only with Taylor's OK.

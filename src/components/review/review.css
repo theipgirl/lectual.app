@@ -107,15 +107,6 @@
 /* The section note above each table, and the overdue office action date (--ox, the risk colour). */
 .rv-sheet-note { margin: 0; padding: 8px 12px; font-size: var(--fs-1); line-height: 1.45; color: var(--muted); }
 .rv-sheet .rv-oa-overdue, .rse-tbl .rv-oa-overdue { color: var(--ox); font-weight: 500; }
-/* The Columns chooser's panel. Tokens only. */
-.rv-cols-panel { display: grid; gap: 12px; padding: 10px 12px; max-height: 70vh; overflow: auto; }
-.rv-cols-sec { display: grid; gap: 6px; margin: 0; padding: 0; border: 0; min-width: 0; }
-.rv-cols-legend { padding: 0; font-size: var(--fs-2); font-weight: 600; color: var(--ink); }
-.rv-cols-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
-.rv-cols-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: var(--ctl-h); }
-.rv-cols-name { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-2); color: var(--ink); min-width: 0; }
-.rv-cols-moves { display: inline-flex; gap: 4px; flex: none; }
-.rv-cols-note { margin: 0; }
 
 /* The collapsed USPTO / on-track lists under the board */
 .rv-rest { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }

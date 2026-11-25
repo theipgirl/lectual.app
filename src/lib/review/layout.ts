@@ -39,7 +39,7 @@ export function layoutKeyOf(id: ColumnId): string {
  * The columns a viewer may have (`columnsFor`), in the firm's saved order, with its labels and widths, its hidden ones left out. A layout
  * key with no column here (a Money firm column for a non-owner, an archived field, the other section's column) is ignored, so a layout
  * can reorder, rename and hide what a viewer has and never adds what they may not have. No saved layout: the same columns, untouched.
- * The returned columns are the registry's own, with only `header` and `width` changed; every id (what the editors, the chooser and the
+ * The returned columns are the registry's own, with only `header` and `width` changed; every id (what the editors and the
  * cells key on) stays.
  */
 export function applyReviewLayout(columns: readonly SheetColumn[], saved: Layout | null | undefined): SheetColumn[] {

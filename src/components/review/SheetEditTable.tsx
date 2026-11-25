@@ -90,13 +90,11 @@ import {
   fromMergedHint,
   noLongerAChoice,
 } from "@/lib/ui/words";
-import type { PrefsDocument } from "@/lib/review/column-prefs-storage";
 import { fieldFits, isCustomColumnId, type CustomColumnId, type CustomKind, type CustomSection, type ColumnId, type CustomStateLike, type SheetColumn, type SheetSectionId } from "@/lib/review/sheet-columns";
 import type { CustomMember } from "@/lib/custom-columns/rules";
 import { CustomValuePop } from "./CustomValueInput";
 import { SectionNote } from "./SectionNote";
 import { SheetFactTd } from "./SheetFactTd";
-import { useColumnPrefs } from "./use-column-prefs";
 import { usePopPlacement } from "./pop-placement";
 import { NotesCell } from "./NotesCell";
 import { sheetStatusStore } from "./sheet-status-store";
@@ -218,7 +216,6 @@ export function SheetEditTable({
   today,
   initial,
   columns,
-  initialPrefs,
   noteState = null,
   adminTier = false,
   fieldMeta = {},
@@ -231,19 +228,15 @@ export function SheetEditTable({
   sources: string[];
   today: string;
   initial?: SheetEditInitial;
-  /** What `columnsFor` allowed this viewer, per section (the server decides; the chooser only thins and reorders). */ columns: Record<SheetSectionId, SheetColumn[]>;
-  /** Drawing-only starting column choices (a test or preview). */ initialPrefs?: PrefsDocument;
+  /** What `columnsFor` allowed this viewer, per section (the server decides, after the firm's layout). */ columns: Record<SheetSectionId, SheetColumn[]>;
   /** What the section notes need of the custom state (null: not read). */ noteState?: CustomStateLike;
   /** The admin tier (the page's re-resolved role): the notes' "not switched on" line and "Add a column" link. */ adminTier?: boolean;
   /** The firm's live columns, by `cf:<field id>` (empty unless the custom state is ok). */ fieldMeta?: Record<string, CustomFieldMeta>;
   /** The member directory for person cells as they are drawn while saving; null when it couldn't be read. */ cellMembers?: CustomMember[] | null;
   /** Given ONLY for an owner (the page's membership-row check, with saved-layout reads that worked): each header gets the column menu. One rev per section (each section has its own layout). */ layoutEdit?: { revs: Record<SheetSectionId, number | null> } | null;
 }) {
-  // One hook per section, always both: the chooser's choices apply to this table and to the read-only List alike.
-  const drawnBy: Record<SheetSectionId, SheetColumn[]> = {
-    trademarks: useColumnPrefs("trademarks", columns.trademarks, initialPrefs).columns,
-    contracts: useColumnPrefs("contracts", columns.contracts, initialPrefs).columns,
-  };
+  // Exactly the columns the server allowed, in the firm's layout order: the same list the read-only List draws.
+  const drawnBy: Record<SheetSectionId, SheetColumn[]> = { trademarks: columns.trademarks, contracts: columns.contracts };
   const [state, dispatch] = useReducer(sheetReducer, EMPTY_SHEET_STATE);
   const [open, setOpen] = useState<OpenCell[]>(initial?.open ?? []);
   const sizes = useSyncExternalStore(sizeStore.subscribe, sizeStore.get, sizeStore.server);
@@ -304,7 +297,7 @@ export function SheetEditTable({
   };
   const moveFrom = (rowKey: string, col: EditableColumn, dir: 1 | -1) => {
     setOpen([]);
-    // Tab follows what is DRAWN: each row's section columns (after the chooser), in drawn order.
+    // Tab follows what is DRAWN: each row's section columns (after the firm's layout), in drawn order.
     const to = nextEditableCell(allRows, { rowKey, col }, perms, dir, (r) => drawnBy[sectionOfRow.get(r.key) ?? "trademarks"].filter((c) => c.editable || c.id === "notes").map((c) => sizeKeyOf(c.id)), fit);
     if (to) focusCell(to.rowKey, to.col);
   };
