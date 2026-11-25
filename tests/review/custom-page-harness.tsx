@@ -6,18 +6,25 @@ import { renderToStaticMarkup } from "react-dom/server";
  * The page.test.tsx harness, for the custom-column page tests: `loadReview`, the session, the record card and the card's own custom
  * read are mocked; everything else is the real page. Invented names only.
  */
+const STAGES = [
+  { id: "s-new", name: "Potential New Client", category: "open", order_index: 1 },
+  { id: "s-consult", name: "Consult Scheduled", category: "open", order_index: 2 },
+  { id: "s-won", name: "Signed LOE", category: "won", order_index: 3 },
+];
+
 export const spies = {
   loadReview: vi.fn(),
   cardCustom: vi.fn(),
   cardLoad: vi.fn(),
 };
 
-export function mockPage(opts: { load: unknown; role: string | null; roleViews?: boolean; card?: unknown; cardCustom?: unknown; staff?: boolean; /** The caller's membership row says owner (the column menu is drawn). Default: not. */ owner?: boolean }) {
+export function mockPage(opts: { load: unknown; role: string | null; roleViews?: boolean; card?: unknown; cardCustom?: unknown; staff?: boolean; /** The firm's lead stages for "Add a lead" (null: the read fails). */ stages?: unknown[] | null; /** The caller's membership row says owner (the column menu is drawn). Default: not. */ owner?: boolean }) {
   spies.loadReview = vi.fn(async () => opts.load);
   spies.cardLoad = vi.fn(async () => opts.card ?? { status: "not-found" });
   spies.cardCustom = vi.fn(async () => opts.cardCustom ?? { status: "ok", fields: [], values: [], mergedInto: {}, leadOfMatter: {} });
   vi.doMock("@/lib/review/load", () => ({ loadReview: spies.loadReview }));
   mockLayoutRead();
+  vi.doMock("@/lib/pipeline/stages", () => ({ listStages: vi.fn(async () => { if (opts.stages === null) throw new Error("down"); return opts.stages ?? STAGES; }) }));
   vi.doMock("@/lib/views/layout/owner-load", () => ({ loadOwnerState: vi.fn(async () => (opts.owner ? "owner" : "not-owner")) }));
   vi.doMock("@/lib/custom-columns/card-load", () => ({ loadCardCustomColumns: spies.cardCustom }));
   vi.doMock("@/lib/firm/session", () => ({

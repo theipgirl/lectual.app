@@ -2,9 +2,11 @@
 
 import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
-import { ADD_ROW_ADDED, ADD_ROW_FAILED, ADD_ROW_NO_PERMISSION, MERGE_POINTER_UNREADABLE } from "@/lib/ui/words";
+import { ADD_ROW_ADDED, ADD_ROW_FAILED, ADD_ROW_NO_PERMISSION, ADD_ROW_STAGE_REFUSED, MERGE_POINTER_UNREADABLE } from "@/lib/ui/words";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { CAN_MOVE_STAGE, CAN_WRITE_LEAD, addLeadNote, assignLead, createLead, moveLeadStage, resolveCurrentRole } from "@/lib/pipeline";
+import { listStages } from "@/lib/pipeline/stages";
+import { chooseStartStage } from "@/lib/review/add-lead-stage";
 import { validateNewLead } from "@/lib/pipeline/lead-input";
 import { friendlyLeadWriteError } from "../leads/errors";
 import { MATTER_WRITE_ROLES, assignMatterOwner, updateMatterHeader } from "@/lib/matters/matters";
@@ -320,7 +322,7 @@ export const setSourceAction = previewSafe(async function setSourceAction(_prev:
   return { saved: true };
 }, "state");
 
-export type AddLeadState = { saved?: boolean; error?: string; message?: string; leadId?: string };
+export type AddLeadState = { saved?: boolean; error?: string; message?: string; leadId?: string; /** The lead started past first contact, so it shows in the List. */ joinsList?: boolean };
 
 /**
  * "Add a lead" at the bottom of the Weekly review List: a REAL lead through the same `createLead` as the Leads page (the firm's new-enquiry
@@ -342,14 +344,26 @@ export const addLeadFromReviewAction = previewSafe(async function addLeadFromRev
   }
   const checked = validateNewLead(values);
   if (!checked.ok) return { error: Object.values(checked.fieldErrors)[0] ?? ADD_ROW_FAILED };
+  // The stage is the ONE other thing read from the form, and never trusted: it is checked against the firm's own stage list, read here
+  // through the scoped client (another firm's id isn't in it). Only an open stage is accepted; none posted = the new-enquiry stage.
+  let choice;
+  try {
+    choice = chooseStartStage(await listStages(), formData.get("stageId"));
+  } catch {
+    // The stage list can't be read: a posted stage can't be checked, so it is refused; with none posted the lead starts where it always did.
+    const posted = String(formData.get("stageId") ?? "").trim();
+    if (posted !== "") return { error: ADD_ROW_STAGE_REFUSED };
+    choice = { ok: true as const, stageId: null, joinsList: false };
+  }
+  if (!choice.ok) return { error: ADD_ROW_STAGE_REFUSED };
   let leadId: string;
   try {
-    const lead = await createLead({ ...values, source: "dashboard" });
+    const lead = await createLead({ ...values, ...(choice.stageId ? { currentStageId: choice.stageId } : {}), source: "dashboard" });
     leadId = lead.id;
   } catch (err) {
     return { error: friendlyLeadWriteError(err, ADD_ROW_FAILED) };
   }
   revalidatePath("/dashboard/intake/");
   refresh();
-  return { saved: true, message: ADD_ROW_ADDED, leadId };
+  return { saved: true, message: ADD_ROW_ADDED, leadId, joinsList: choice.joinsList };
 }, "state");

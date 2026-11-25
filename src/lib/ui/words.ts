@@ -1762,7 +1762,7 @@ export const COLUMN_ARCHIVE_CONFIRM = "Archive";
 export const FIRM_COLUMN_LABEL_NOT_CLEARED = "Renamed. An older name for this column in the view couldn't be cleared. Refresh to check how it reads.";
 
 /* ── Add a real lead or matter from the bottom of the Weekly review List ── */
-export const ADD_ROW_LEAD_HINT = "This adds a real lead in your new-enquiry stage, the same as Leads. It joins this list once it moves past first contact.";
+export const ADD_ROW_LEAD_HINT = "This adds a real lead, the same as Leads. It shows in this list once it is past first contact.";
 export const ADD_ROW_FIRST_NAME = "First name";
 export const ADD_ROW_LAST_NAME = "Last name";
 export const ADD_ROW_EMAIL = "Email";
@@ -1773,6 +1773,9 @@ export const ADD_ROW_OPEN_MATTER = "Open a matter";
 export const ADD_ROW_ADDED = "Lead added.";
 export const ADD_ROW_OPEN_LEAD = "Open the lead";
 export const ADD_ROW_ANOTHER = "Add another";
+export const ADD_ROW_STAGE_LABEL = "Start in";
+export const ADD_ROW_STAGE_UNREADABLE = "Couldn't load your stages, so the lead will start in your new-enquiry stage.";
+export const ADD_ROW_STAGE_REFUSED = "That isn't an open stage of your firm. Pick one from the list.";
 export const ADD_ROW_AFTER = "It is in your new-enquiry stage, so it joins this list once it moves past first contact.";
 export const ADD_ROW_OPEN_LEADS = "Go to Leads";
 export const ADD_ROW_NO_PERMISSION = "You don't have permission to add leads. Ask an attorney or an admin.";

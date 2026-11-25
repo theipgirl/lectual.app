@@ -35,6 +35,8 @@ import { resolveLayout } from "@/lib/views/layout/apply";
 import { reviewListBase } from "@/lib/review/layout-base";
 import { HiddenColumnsMenu, type HiddenGroup } from "@/components/views/layout/HiddenColumnsMenu";
 import { AddRow } from "@/components/review/AddRow";
+import { listStages } from "@/lib/pipeline/stages";
+import { defaultStartStageId, startStages } from "@/lib/review/add-lead-stage";
 import { layoutNote, savedLayoutOf } from "@/lib/views/layout/state";
 import { loadCardCustomColumns } from "@/lib/custom-columns/card-load";
 import { canSeeCustomMoney, canWriteCustomValue, firmColumnsBlock, withoutMoney, type FirmColumnsBlock } from "@/lib/custom-columns/rules";
@@ -167,6 +169,18 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
         ] satisfies ChooserSection[]}
       />
     ) : null;
+  // "Add a lead"'s "Start in": the firm's OPEN lead stages in pipeline order (null = they couldn't be read: no picker, the new-enquiry stage).
+  let addStages: { id: string; name: string }[] | null = null;
+  let addDefault: string | null = null;
+  if (params.view === "sheet" && !previewing && !!role && CAN_WRITE_LEAD.includes(role)) {
+    try {
+      const all = await listStages();
+      addStages = startStages(all).map((st) => ({ id: st.id, name: st.name }));
+      addDefault = defaultStartStageId(all);
+    } catch {
+      addStages = null;
+    }
+  }
   // The owner's "Hidden columns": the List's columns the firm's layout hides, each with Show (drawn only for an owner of an editable List).
   const hiddenControl =
     params.view === "sheet" && listEdit && sheetPerms && sectionLayouts
@@ -403,7 +417,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
         <>
           {strips}
           <SheetView rows={shown} canSeeMoney={canSeeMoney} canSeeCustomMoney={customMoney} custom={custom} customMembers={customMembers} adminTier={adminTier} notes={sheetNotes} layout={sectionLayouts} layoutEdit={sheetPerms ? listEdit : null} {...common} {...(sheetPerms ? { sheetEdit: { perms: sheetPerms } } : {})} />
-          {!previewing && <AddRow canAddLead={!!role && CAN_WRITE_LEAD.includes(role)} canOpenMatter={canWrite} />}
+          {!previewing && <AddRow canAddLead={!!role && CAN_WRITE_LEAD.includes(role)} canOpenMatter={canWrite} stages={addStages} defaultStageId={addDefault} />}
         </>
       ) : (
         <>

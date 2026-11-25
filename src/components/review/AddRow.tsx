@@ -18,6 +18,8 @@ import {
   ADD_ROW_OPEN_LEAD,
   ADD_ROW_OPEN_LEADS,
   ADD_ROW_OPEN_MATTER,
+  ADD_ROW_STAGE_LABEL,
+  ADD_ROW_STAGE_UNREADABLE,
   ADD_ROW_SUBMIT,
   CANCEL,
   SAVING,
@@ -32,7 +34,10 @@ export const OPEN_MATTER_HREF = "/dashboard/matters/#open-matter";
 
 const EMPTY: AddLeadState = {};
 
-export function AddRow({ canAddLead, canOpenMatter }: { canAddLead: boolean; canOpenMatter: boolean }) {
+export type StartStage = { id: string; name: string };
+
+/** `stages`: the firm's open lead stages in pipeline order (null = they couldn't be read: no picker, the lead starts in the new-enquiry stage). */
+export function AddRow({ canAddLead, canOpenMatter, stages = null, defaultStageId = null }: { canAddLead: boolean; canOpenMatter: boolean; stages?: readonly StartStage[] | null; defaultStageId?: string | null }) {
   const [open, setOpen] = useState(false);
   const [round, setRound] = useState(0);
   if (!canAddLead && !canOpenMatter) return null;
@@ -55,6 +60,8 @@ export function AddRow({ canAddLead, canOpenMatter }: { canAddLead: boolean; can
         <div id="rv-addrow-form">
           <AddLeadForm
             key={round}
+            stages={stages}
+            defaultStageId={defaultStageId}
             onAnother={() => setRound((r) => r + 1)}
             onCancel={() => setOpen(false)}
           />
@@ -64,13 +71,13 @@ export function AddRow({ canAddLead, canOpenMatter }: { canAddLead: boolean; can
   );
 }
 
-export function AddLeadForm({ onAnother, onCancel }: { onAnother: () => void; onCancel: () => void }) {
+export function AddLeadForm({ onAnother, onCancel, stages = null, defaultStageId = null }: { onAnother: () => void; onCancel: () => void; stages?: readonly StartStage[] | null; defaultStageId?: string | null }) {
   const [state, action, pending] = useActionState(addLeadFromReviewAction, EMPTY);
   if (state.saved && state.leadId) {
     return (
       <div className="rv-addrow-done" role="status">
         <p className="lx-note">{state.message ?? ADD_ROW_ADDED}</p>
-        <p className="lx-note">{ADD_ROW_AFTER}</p>
+        {!state.joinsList && <p className="lx-note">{ADD_ROW_AFTER}</p>}
         <p className="rv-addrow-acts">
           <Link href={`/dashboard/leads/${state.leadId}/`} className="lx-link">
             {ADD_ROW_OPEN_LEAD}
@@ -103,6 +110,20 @@ export function AddLeadForm({ onAnother, onCancel }: { onAnother: () => void; on
         <span className="lx-label">{ADD_ROW_BUSINESS}</span>
         <input className="lx-input" name="businessName" type="text" maxLength={200} autoComplete="off" />
       </label>
+      {stages && stages.length > 0 ? (
+        <label className="rv-addrow-field">
+          <span className="lx-label">{ADD_ROW_STAGE_LABEL}</span>
+          <select className="lx-input" name="stageId" defaultValue={defaultStageId ?? stages[0].id}>
+            {stages.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : (
+        <p className="lx-note rv-addrow-hint">{ADD_ROW_STAGE_UNREADABLE}</p>
+      )}
       <p className="lx-note rv-addrow-hint">{ADD_ROW_LEAD_HINT}</p>
       <div className="rv-addrow-acts">
         <button type="submit" className="lx-btn lx-btn-pri" disabled={pending}>

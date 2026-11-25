@@ -2859,8 +2859,11 @@ Spec `docs/pge/2026-11-17-agentic-ip-os/spec-editable-views.md` (build step 3 an
   an outside press and scroll/resize; `HiddenColumnsMenu` shows a hidden column or lane again. `menuItems` (pure) says what a pinned column or a lane is offered.
   Not verified in a real browser: placement of the fixed panel, focus order, phone width.
 - **Add row** (`AddRow.tsx`, `addLeadFromReviewAction`): "Add a lead" creates a REAL lead through `createLead` (first and last name, email (required: `crm_lead.email` is NOT NULL), business
-  optional; never a stage, owner or org from the browser) in the firm's new-enquiry stage. **That stage is not in the Weekly review** (`reviewLeadStageIds` leaves out the new-enquiry
-  and Follow-Up stages), so the new lead joins the List only once it moves past first contact; the form says so and links the lead. "Open a matter" is a plain link to
+  optional). **"Start in"** (Taylor): a select of the firm's OPEN lead stages in pipeline order (`add-lead-stage.ts`), defaulting to the new-enquiry stage; won, lost and nurture are never offered. The
+  server never trusts the posted `stageId`: it re-reads the firm's stage list through the scoped client (a foreign id isn't in it), refuses anything that isn't an open stage of this firm with a fixed
+  sentence, and passes it to `createLead` as `currentStageId` (which stamps `stage_entered_at` and the `lead_created` row with that stage). No stage posted = the new-enquiry stage. If the stage list
+  can't be read there is no select and one quiet sentence. The Weekly review leaves out the new-enquiry and Follow-Up stages (`reviewLeadStageIds`), so a lead started past first contact shows in the
+  List at once; otherwise the success says it joins the List once it moves past first contact, with links to the lead and Leads. "Open a matter" is a plain link to
   `/dashboard/matters/#open-matter`. Neither is drawn for a role that can't create the record.
 - **Removed:** Settings -> Columns (page, `ColumnsSettings*`, its CSS, `settings-load.ts`, the tab, the section note's "Add a column" link, its words and the design-harness screens). The
   card's `FirmColumnsEdit` (typing values) stays. The per-person Columns chooser stays until a later step.
