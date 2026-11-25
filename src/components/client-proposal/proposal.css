@@ -531,7 +531,9 @@ button.cp-step-btn:focus-visible { outline: 3px solid var(--cp-brand); outline-o
 .cp-work-head { margin: 0; }
 .cp-work-head .cp-num { color: var(--cp-soft); white-space: nowrap; }
 .cp-work-intro { margin: 6px 0 0; }
-.cp-work-details { margin: 8px 0 0; padding-left: 22px; }
+/* Tailwind's reset removes list bullets, so the work bullets set theirs back. */
+.cp-work-details { margin: 8px 0 0; padding-left: 22px; list-style: disc outside; }
+.cp-work-details li { display: list-item; }
 .cp-work-details li + li { margin-top: 4px; }
 
 /* The "Legal Fee Summary" table: it scrolls inside its own box, never the page, on a phone. */
