@@ -276,6 +276,23 @@ the deadlines windows' dots, merged and reviewed. Nothing needed sending back.
 - **Not checked:** Safari and Firefox, a real phone, a real trackpad, hover on a real mouse
   (the tiles drift, so the label can move a few pixels under a resting cursor), a screen reader.
 
+## Round eight (Nov 25, late): the statement moves up
+
+One comment sent to Claude from the page, on the statement section: "move this above what
+makes lectual different in dark mode". Same link. One builder (top of page), merged and
+reviewed by the orchestrator; a reply was posted in the comment thread.
+
+- "A legal CRM remembers. Lectual acts." and its sentence now play on the dark ground between
+  the hero and "What makes Lectual different?". In the pinned scroll the sky goes dark, the
+  window steps back, the statement fills in cream and holds, then lifts away as the heading,
+  list and window come in. The pin is longer (540% of a screen, was 360%) so the
+  differentiators kept their pace. On a phone it is a plain dark block.
+- Its old place between the overnight scene and the workspace section is closed; about 270px
+  of plain paper is left there on desktop.
+- Checks: no sideways scroll at 1440, 1280, 1024 and 390 wide; no console errors; the three
+  lines measure 10.7:1 or better at 1440. Not checked: Safari, a real phone, contrast at other
+  widths. The sky's frame timing was not retuned for the longer pin.
+
 ## Recommendation on Astro (not decided)
 
 Stay on Next.js for this redesign. The loader, pin scrolling and micro-animations are the same

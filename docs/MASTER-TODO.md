@@ -7,6 +7,10 @@ Newest section first. Tick an item when it is done; don't delete it.
 
 Recap: `docs/recaps/2026-11-17-marketing-site-redesign-mockups.md` (round three). Omi cross-check: still the open item "Review the new website".
 
+### Taylor, after the statement moved (Nov 25, late)
+- [ ] Scroll the hero into "Lectual acts." and on into "What makes Lectual different?" and say if the hold feels right (it is on screen for about 1,300px of scroll on a laptop).
+- [ ] Say whether the empty paper between the overnight scene and the workspace section (about 270px on desktop) should be tightened now the statement is gone from there.
+
 ### Taylor, after the six newest comments (Nov 25, night)
 - [ ] Review Horizon again (same link) and resolve your comment threads on the page; Claude can't close them from the session.
 - [ ] Say whether "remove outer pill" meant the soft shape around the five tabs (removed) or the whole dark nav bar that appears once you scroll (kept).
