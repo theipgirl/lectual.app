@@ -38,7 +38,8 @@ function headingRest(line: string, heading: RegExp): string | null {
   // Inline content must follow a separator ("Package recommendation: Enhanced"); "Likely classes will be discussed..." is a sentence.
   const sep = /^[:\-–—(]\s*/.exec(rest);
   if (!sep) return null;
-  return rest.slice(sep[0].length).replace(/[*_)]+\s*$/, "").trim();
+  // The prep-consult skill writes "Likely classes — preliminary — <content>": the qualifier is not content.
+  return rest.slice(sep[0].length).replace(/[*_)]+\s*$/, "").trim().replace(/^preliminary\s*(?:[:\-–—]\s*|$)/i, "").trim();
 }
 
 /** The text of a queue item as it stands now: the approver's edit if there is one, else the draft. */
@@ -59,6 +60,9 @@ export function isFullBrief(text: string): boolean {
       const rest = headingRest(lines[i], heading);
       if (rest === null) continue;
       if (rest !== "" && !isPlaceholder(rest)) return true;
+      // Text on the heading's own line that is only a placeholder ("Package recommendation — TBD") says the section is empty: the
+      // next line is another part of the brief, not this section's content.
+      if (rest !== "") continue;
       for (let k = i + 1; k < lines.length; k += 1) {
         const next = lines[k].trim();
         if (!next) continue;
