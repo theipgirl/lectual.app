@@ -84,7 +84,7 @@ Still open (default chosen; Taylor can overrule before the build):
     `contracts_board`, `leads_list`, `leads_board`), a jsonb of columns in order: key, label, hidden, width.
   - The firm's own columns and their values: 0115's field and value tables, kept as they are, now used by every List, not only the Weekly
     review (if a field needs to say which views it belongs to, that is an added column, never a rewrite of 0115).
-  - Stage roles on `crm_stage` and `crm_matter_stage` (section "Stages", rule 4), if Taylor agrees.
+  - Stage roles on `crm_stage` and `crm_matter_stage` (section "Stages", rule 4).
   - One SECURITY DEFINER function per stage operation (section "Stages"), owner membership row required.
 - RLS on `org_id = current_org_id()`; layout writes need an owner membership row. Isolation cases for every new table, in lectual's
   `tests/tenant-isolation.test.ts`.
