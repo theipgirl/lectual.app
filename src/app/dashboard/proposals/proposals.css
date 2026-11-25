@@ -491,4 +491,5 @@
 
 /* A flat-fee piece of work's intro and bullet points on the staff card. */
 .pe-work-intro { display: block; margin: 2px 0 0; }
-.pe-work-details { margin: 2px 0 4px; padding-left: 18px; }
+.pe-work-details { margin: 2px 0 4px; padding-left: 18px; list-style: disc outside; }
+.pe-work-details li { display: list-item; }
