@@ -82,6 +82,7 @@ const BARE_ALLOWED = new Set<string>([
   "src/lib/stage-keeper/moves.ts", // "Moved by agent today" opens the board explicitly
   "src/components/matters/MovedOutNotice.tsx", // links to a group's board explicitly
   "src/lib/onboarding/hub.ts", // the "board" and "move" steps want the Board
+  "src/lib/stages/actions.ts", // the paths revalidated after a stage change (a PATHS table for revalidatePath), never a link
 ]);
 const BARE = /["'`]\/dashboard\/(intake|matters)\/?(\?[^"'`]*)?["'`]/g;
 
