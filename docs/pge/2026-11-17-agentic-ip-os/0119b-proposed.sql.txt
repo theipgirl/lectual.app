@@ -9,13 +9,18 @@
 --   2. The label rule of crm_view_layout_column_valid, and the invisible-character test of crm_stage_clean_name, are built with chr() so
 --      the stored bodies are pure ASCII (on dev the \u escapes of the first copy were turned into literal invisible characters in
 --      transit). The same for the middle dot and en dash in crm_matter_stage_label_key, crm_matter_stage_add and crm_stage_roles_backfill.
--- Idempotent: running it twice is a no-op. Additive, except two guarded constraint swaps (each ONE alter table with drop and add in
+-- Idempotent once chunk 3 has run: running it all twice is a no-op. (Before chunk 3, pg_get_constraintdef adds ' NOT VALID', so
+-- re-running chunk 1 drops and re-adds the constraint once more: harmless.) Additive, except two guarded constraint swaps (each ONE alter table with drop and add in
 -- the same statement, the form that avoided the Supabase MCP hang for 0107) and one delete of rows that are not expected to exist.
 --
 -- HOW TO APPLY (dev only, after the owner's OK): send the numbered chunks below one at a time with the Supabase MCP execute_sql, in order,
 -- then record it: insert into supabase_migrations.schema_migrations (version, name) values ('0119b', '0119b_editable_views_delta')
 -- (use the version format the dev history already uses). The MCP may hang on the delete in chunk 2 (0093): the delete is inside a guarded
 -- do block and only runs when a review_list row exists, which is not expected, so if it hangs run that chunk in the SQL editor.
+--
+-- DEPLOY ORDER: apply 0119b to dev BEFORE (or together with) deploying the step 3 app code (2e226f4 or later) there. Until 0119b is
+-- applied, dev's CHECK refuses review_list_trademarks / review_list_contracts, so every List layout save fails and an old review_list
+-- row is ignored.
 --
 -- THE review_list ROWS: nothing writes view_key 'review_list' yet (the app writes only the per-section keys), so none is expected.
 -- If any exist, chunk 2 converts each to 'review_list_trademarks' (copying its columns, as a new row) unless that org already has a
@@ -413,7 +418,17 @@ $$;
 --    where conrelid = 'public.crm_view_layout'::regclass and conname in ('crm_view_layout_view_key', 'crm_view_layout_columns') order by 1;
 -- V2. No function body of 0119 holds a byte above 0x7F (expect zero rows):
 --   select proname from pg_proc
---    where pronamespace = 'public'::regnamespace and proname like 'crm\_%' and octet_length(prosrc) <> char_length(prosrc);
+--    where pronamespace = 'public'::regnamespace
+--      and proname in ('crm_matter_stage_label_key', 'crm_view_layout_column_valid', 'crm_stage_clean_name', 'crm_matter_stage_add',
+--                      'crm_stage_roles_backfill')
+--      and octet_length(prosrc) <> char_length(prosrc);
+--   (Restricted to 0119's five functions: 0035's crm_matter_deadline_confirmation_guard holds non-ASCII on purpose.)
 -- V3. No 'review_list' row is left (expect 0):
 --   select count(*) from public.crm_view_layout where view_key = 'review_list';
 -- V4. The view_key constraint is validated (expect true): select convalidated from pg_constraint where conname = 'crm_view_layout_view_key';
+-- V5. No saved layout already breaks the final column rule (expect zero rows). A CHECK that calls a function does not re-check rows
+--     already in the table, and the first copy's label rule only trimmed plain spaces:
+--   select id, org_id, view_key from public.crm_view_layout where not public.crm_view_layout_columns_valid(columns);
+--   If any come back: nothing is lost, but the owner's next change to that view would be refused. Tell the owner, then either fix the
+--   label by hand (update ... set columns = <cleaned>, rev = rev + 1) with the owner's OK, or delete that layout row so the view
+--   falls back to the standard columns.

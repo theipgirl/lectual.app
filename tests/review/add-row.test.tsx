@@ -152,6 +152,13 @@ describe("the Start in picker", () => {
     expect(html).not.toContain('name="stageId"');
     expect(html).toContain("Couldn't load your stages, so the lead will start in your new-enquiry stage.");
   });
+  it("a stage list with no open stage: no select, and the sentence says so (not that stages couldn't load)", async () => {
+    const { AddLeadForm } = await import("@/components/review/AddRow");
+    const html = decode(renderToStaticMarkup(<AddLeadForm onAnother={() => {}} onCancel={() => {}} stages={[]} />));
+    expect(html).not.toContain('name="stageId"');
+    expect(html).toContain("Your firm has no open lead stage to start a lead in.");
+    expect(html).not.toContain("Couldn't load your stages");
+  });
   it("the page offers only the open stages, the new-enquiry one first selected; a failed read gives no select", async () => {
     mockPage({ load, role: "owner" });
     const html = decode(await renderPage({ view: "sheet" }));

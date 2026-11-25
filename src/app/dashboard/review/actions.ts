@@ -326,8 +326,9 @@ export type AddLeadState = { saved?: boolean; error?: string; message?: string; 
 
 /**
  * "Add a lead" at the bottom of the Weekly review List: a REAL lead through the same `createLead` as the Leads page (the firm's new-enquiry
- * stage, its own role gate, its `lead_created` timeline row and automation rules), never a free-form row. Only the four named fields are
- * read from the form: never a stage, an owner, an org or a stamp. The role is re-resolved here (and again inside `createLead`), the
+ * stage unless another is chosen, its own role gate, its `lead_created` timeline row and automation rules), never a free-form row. Only the
+ * four named fields and a stage id are read from the form, and the stage id is checked against the firm's own OPEN lead stages, re-read
+ * here through the scoped client; never an owner, an org or a stamp. The role is re-resolved here (and again inside `createLead`), the
  * input is checked by the same rules the Leads form uses, and every answer is a fixed or authored sentence, never database text.
  */
 export const addLeadFromReviewAction = previewSafe(async function addLeadFromReviewAction(_prev: AddLeadState, formData: FormData): Promise<AddLeadState> {

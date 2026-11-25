@@ -1775,6 +1775,8 @@ export const ADD_ROW_OPEN_LEAD = "Open the lead";
 export const ADD_ROW_ANOTHER = "Add another";
 export const ADD_ROW_STAGE_LABEL = "Start in";
 export const ADD_ROW_STAGE_UNREADABLE = "Couldn't load your stages, so the lead will start in your new-enquiry stage.";
+/** The stage list was read but the firm has no open lead stage to start a lead in. */
+export const ADD_ROW_NO_OPEN_STAGE = "Your firm has no open lead stage to start a lead in.";
 export const ADD_ROW_STAGE_REFUSED = "That isn't an open stage of your firm. Pick one from the list.";
 export const ADD_ROW_AFTER = "It is in your new-enquiry stage, so it joins this list once it moves past first contact.";
 export const ADD_ROW_OPEN_LEADS = "Go to Leads";

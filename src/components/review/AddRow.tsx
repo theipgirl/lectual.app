@@ -20,6 +20,7 @@ import {
   ADD_ROW_OPEN_MATTER,
   ADD_ROW_STAGE_LABEL,
   ADD_ROW_STAGE_UNREADABLE,
+  ADD_ROW_NO_OPEN_STAGE,
   ADD_ROW_SUBMIT,
   CANCEL,
   SAVING,
@@ -121,6 +122,8 @@ export function AddLeadForm({ onAnother, onCancel, stages = null, defaultStageId
             ))}
           </select>
         </label>
+      ) : stages ? (
+        <p className="lx-note rv-addrow-hint">{ADD_ROW_NO_OPEN_STAGE}</p>
       ) : (
         <p className="lx-note rv-addrow-hint">{ADD_ROW_STAGE_UNREADABLE}</p>
       )}
