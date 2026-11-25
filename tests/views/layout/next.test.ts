@@ -127,3 +127,19 @@ describe("every layout a helper returns is one the database accepts", () => {
     }
   });
 });
+
+describe("moveColumnTo", () => {
+  it("moves a column to an index among all columns, hidden ones included", async () => {
+    const { moveColumnTo } = await import("@/lib/views/layout/next");
+    expect(keys(ok(moveColumnTo(base(), "notes", 1)))).toEqual(["client", "notes", "mark", "status", "next"]);
+    expect(keys(ok(moveColumnTo(base(), "mark", 99)))).toEqual(["client", "status", "next", "notes", "mark"]);
+  });
+  it("nothing moves into the pinned places; a pinned column or an unknown one doesn't move; no change is no move", async () => {
+    const { moveColumnTo } = await import("@/lib/views/layout/next");
+    expect(keys(ok(moveColumnTo(base(), "notes", 0, ["client"])))).toEqual(["client", "notes", "mark", "status", "next"]);
+    expect(moveColumnTo(base(), "client", 2, ["client"])).toEqual({ ok: false, reason: "pinned" });
+    expect(moveColumnTo(base(), "nope", 2)).toEqual({ ok: false, reason: "unknown-column" });
+    expect(moveColumnTo(base(), "mark", 1)).toEqual({ ok: false, reason: "nothing-to-move" });
+    expect(moveColumnTo(base(), "mark", 1.5)).toEqual({ ok: false, reason: "nothing-to-move" });
+  });
+});

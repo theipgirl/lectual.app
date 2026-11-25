@@ -38,7 +38,8 @@ export function makeStore(initial: FakeField[], opts: { role?: string | null | (
     role = async () => fixed;
   }
   const deps = {
-    role: vi.fn(role),
+    // An owner by the caller's own membership row: the fake's `role` option says what that row holds.
+    owner: vi.fn(async () => (await role()) === "owner"),
     orgId: vi.fn(async () => ORG),
     readField: vi.fn(async (id: string) => {
       rec("readField", [id]);

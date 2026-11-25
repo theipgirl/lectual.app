@@ -55,6 +55,24 @@ export function moveColumn(layout: Layout, key: string, dir: -1 | 1, pinned: rea
   return { ok: true, layout: out };
 }
 
+/**
+ * Move a column to a place in the layout (a 0-based index among ALL columns, hidden ones included). A pinned column doesn't move, and
+ * nothing moves into the pinned places (the index is raised to the first free one).
+ */
+export function moveColumnTo(layout: Layout, key: string, index: number, pinned: readonly string[] = []): Next {
+  const from = indexOf(layout, key);
+  if (from < 0) return refuse("unknown-column");
+  if (pinned.includes(key)) return refuse("pinned");
+  if (!Number.isInteger(index)) return refuse("nothing-to-move");
+  const firstFree = layout.filter((c) => pinned.includes(c.key)).length;
+  const to = Math.min(layout.length - 1, Math.max(firstFree, index));
+  if (to === from) return refuse("nothing-to-move");
+  const out = [...layout];
+  const [moved] = out.splice(from, 1);
+  out.splice(to, 0, moved);
+  return { ok: true, layout: out };
+}
+
 /** Add a column to the left or right of another (a new firm column: the key is its `cf:` key). Left of a pinned column is refused. */
 export function insertColumn(layout: Layout, column: { key: string; label?: string | null; width?: number | null }, relativeTo: string, side: "left" | "right", pinned: readonly string[] = []): Next {
   if (layout.length >= LAYOUT_MAX_COLUMNS) return refuse("too-many");

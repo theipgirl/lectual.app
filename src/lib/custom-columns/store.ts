@@ -78,9 +78,12 @@ export function fieldStore(db: StoreClient) {
       return counts;
     },
 
-    async insertField(row: FieldInsert): Promise<void> {
-      const { error } = await db.from("crm_custom_field").insert({ ...row }).select("id");
+    /** The new field's id, from the insert's own `select("id")` (null when the answer carries none). */
+    async insertField(row: FieldInsert): Promise<string | null> {
+      const { data, error } = await db.from("crm_custom_field").insert({ ...row }).select("id");
       if (error) throw error;
+      const first = Array.isArray(data) ? (data[0] as { id?: unknown } | undefined) : undefined;
+      return first && typeof first.id === "string" ? first.id : null;
     },
 
     async updateField(id: string, patch: FieldPatch, guards: FieldGuard): Promise<number> {

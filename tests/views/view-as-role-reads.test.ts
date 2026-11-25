@@ -67,6 +67,7 @@ const AUTHORIZE: Record<string, { counts: Counts; why: string }> = {
   "src/lib/brain/entries.ts": { counts: { "rpc:current_org_role": 1 }, why: "Firm notes writes" },
   "src/lib/campaigns/advance.ts": { counts: { requireAutomationStaffRole: 1 }, why: "a sequence write" },
   "src/lib/consult-proposal/link.ts": { counts: { isCurrentUserApprover: 1 }, why: "the queue approve gate (an action)" },
+  "src/lib/custom-columns/field-deps.ts": { counts: { resolveFirmSession: 1 }, why: "the firm column writes' org id (an owner-only write, called from server actions)" },
   "src/lib/documents/store.ts": { counts: { requireMatterWriteRole: 1 }, why: "a document write" },
   "src/lib/files/guard.ts": { counts: { "rpc:current_org_role": 1 }, why: "file upload / delete / download gates (actions and the download route)" },
   "src/lib/firm/session.ts": { counts: { "rpc:current_org_role": 1 }, why: "the session itself (staff's claimed role)" },

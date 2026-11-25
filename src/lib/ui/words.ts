@@ -1528,8 +1528,8 @@ export const COLUMNS_AT_LIMIT = "Your firm has 40 columns, the most it can have.
 export const COLUMNS_NONE = "No columns yet. Add one below.";
 export const choiceUse = (option: string, n: number) => `${option}: used on ${n} ${n === 1 ? "record" : "records"}`;
 export const COLUMNS_USE_UNCOUNTED = "Couldn't count which choices are in use. Saving still checks.";
-/** The field actions' role gate (the admin tier). It starts with the phrase, as everywhere else in the app. */
-export const COLUMNS_NO_PERMISSION = `${ADMIN_TIER_PHRASE} can change the firm's columns.`;
+/** The field actions' gate: an owner's membership row (lectual 0119 makes field create and change owner-only). */
+export const COLUMNS_NO_PERMISSION = "Only an owner can change columns.";
 
 /** The fixed sentences the custom-column actions and the error mapper answer with. Never any part of a database message. */
 export const CUSTOM_COLUMNS_NOT_READY = `${CUSTOM_COLUMNS_NOT_ON} Lectual will turn it on.`;
@@ -1541,7 +1541,7 @@ export const CUSTOM_VALUE_IMMUTABLE = "A saved value stays with the column and t
 export const CUSTOM_VALUE_ONE_RECORD = "Each saved value is for a single record.";
 export const CUSTOM_FIELD_GONE = "That column couldn't be found. It may have been archived or removed.";
 export const CUSTOM_VALUE_MERGED = "That lead is now part of another lead. Change the value there.";
-export const CUSTOM_COLUMN_ARCHIVED = `Archived columns can't be changed. ${ADMIN_TIER_PHRASE} can bring it back in Settings.`;
+export const CUSTOM_COLUMN_ARCHIVED = "Archived columns can't be changed.";
 export const CUSTOM_WRONG_SECTION = "Wrong part of the List for that column.";
 export const CUSTOM_VALUE_EMPTY = "Clear the cell to remove a value.";
 export const CUSTOM_WRONG_KIND = "That entry isn't the right type for this column.";
@@ -1741,6 +1741,53 @@ export const CONSULT_PREP_TEAM_CC_COUNT = "You can add up to 5 Cc addresses.";
 
 /** A List or Board's saved column layout couldn't be read: the standard columns are drawn and this is said once. */
 export const VIEW_LAYOUT_UNAVAILABLE = "Saved column layout couldn't load. Showing the standard columns. Refresh to try again.";
+
+/* ── Changing a view's columns (the owner's header menu; every sentence is fixed, never database text) ── */
+export const LAYOUT_OWNER_ONLY = "Only an owner can change this view.";
+export const LAYOUT_CHANGED = "Someone else changed this view. Refresh to see their change.";
+export const LAYOUT_NOT_READY = notReadyYet("Changing columns");
+export const LAYOUT_SAVE_FAILED = "Couldn't change this view. Nothing was changed. Try again.";
+export const LAYOUT_READ_FAILED = "Couldn't read this view's saved columns, so nothing was changed. Refresh to try again.";
+export const LAYOUT_COLUMN_GONE = "That column isn't in this view any more. Refresh to see the current columns.";
+export const LAYOUT_COLUMN_PINNED = "This column stays where it is and always shows.";
+export const LAYOUT_LAST_COLUMN = "A view needs at least one column showing.";
+export const LAYOUT_TOO_MANY = "A view can have up to 80 columns.";
+export const LAYOUT_COLUMN_TAKEN = "That column is already in this view.";
+export const LAYOUT_NAME_EMPTY = "Type a name for the column.";
+export const LAYOUT_NAME_TOO_LONG = "A column name can be up to 60 characters.";
+export const LAYOUT_NAME_CHARACTERS = "A column name can't have tabs, line breaks or hidden characters.";
+export const LAYOUT_CANT_MOVE = "It can't move any further that way.";
+export const LAYOUT_BAD_WIDTH = "That width isn't valid.";
+export const LAYOUT_PLACE_NOT_SAVED = "The column was added, but its place in the view couldn't be saved. It is at the end for now.";
+export const LAYOUT_SAVED_NOTE = "Saved for everyone in the firm.";
+export const columnMenuLabel = (name: string) => `Column options: ${name}`;
+export const COLUMN_MENU_HIDE = "Hide column";
+export const COLUMN_MENU_LEFT = "Move left";
+export const COLUMN_MENU_RIGHT = "Move right";
+export const COLUMN_MENU_ADD_LEFT = "Add a column to the left";
+export const COLUMN_MENU_ADD_RIGHT = "Add a column to the right";
+export const COLUMN_MENU_SAVE = "Save";
+export const COLUMN_NEW_NAME_LABEL = "Column name";
+export const COLUMN_ADD_SUBMIT = "Add column";
+export const COLUMN_CHANGES_NOTE = "A change here is the firm's view for everyone.";
+export const HIDDEN_COLUMNS_NAME = "Hidden columns";
+export const hiddenColumnsLabel = (n: number) => `Hidden columns (${n})`;
+export const HIDDEN_COLUMNS_NONE = "No hidden columns.";
+export const HIDDEN_COLUMN_SHOW = "Show";
+export const hiddenColumnShowLabel = (name: string) => `Show ${name}`;
+export const laneMenuLabel = (name: string) => `Column options for ${name}`;
+
+/* ── Add a real lead or matter from the bottom of the Weekly review List ── */
+export const ADD_ROW_LEAD_HINT = "Adds a real lead in your new-enquiry stage. It shows in this list once it's added.";
+export const ADD_ROW_FIRST_NAME = "First name";
+export const ADD_ROW_LAST_NAME = "Last name";
+export const ADD_ROW_EMAIL = "Email (optional)";
+export const ADD_ROW_BUSINESS = "Business (optional)";
+export const ADD_ROW_SUBMIT = "Add lead";
+export const ADD_ROW_OPEN_MATTER = "Open a matter";
+export const ADD_ROW_ADDED = "Lead added.";
+export const ADD_ROW_NO_PERMISSION = "You don't have permission to add leads. Ask an attorney or an admin.";
+export const ADD_ROW_FAILED = "Couldn't add this lead. Nothing was added. Try again.";
 
 /**
  * The firm's Board layout hides some columns: said once above the Board, with a link to the List where those records still show.

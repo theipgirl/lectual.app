@@ -1,4 +1,3 @@
-import { canSeeSetup } from "@/lib/setup/roles";
 import { builtinHeaders, isFieldId, labelKey, type CustomKind, type CustomSection, type SheetSectionId } from "@/lib/review/sheet-columns";
 import {
   COLUMNS_NO_PERMISSION,
@@ -41,12 +40,14 @@ export type FieldGuard = { updated_at: string } | { archived: boolean } | { posi
 
 /** Each read or write throws the database's error object; the logic decides the words. */
 export type FieldDeps = {
-  role: () => Promise<string | null>;
+  /** Whether the caller is an OWNER by their own membership row (lectual 0119 makes field create and change owner-only). Asked on every call. */
+  owner: () => Promise<boolean>;
   orgId: () => Promise<string>;
   readField: (id: string) => Promise<FieldRow | null>;
   readLiveFields: () => Promise<LiveField[]>;
   readOptionUse: (fieldId: string, options: string[]) => Promise<Record<string, number>>;
-  insertField: (row: FieldInsert) => Promise<void>;
+  /** The new field's id when the database returned it (a placed column needs it), else nothing. */
+  insertField: (row: FieldInsert) => Promise<string | null | void>;
   /** The number of rows the guarded update affected (0 = the guard no longer held). */
   updateField: (id: string, patch: FieldPatch, guards: FieldGuard) => Promise<number>;
   revalidate: () => void;
@@ -89,10 +90,10 @@ export function clashesWith(label: string, section: string, live: readonly LiveF
   return live.some((f) => f.id !== selfId && labelKey(f.label) === key && (f.section === section || f.section === "both" || section === "both"));
 }
 
-/** Rule 1: the admin tier (`SETUP_ROLES`, 0115's field policy list). A throw from `role()` is no role. */
+/** Rule 1: an owner, by the caller's own membership row. A throw (or anything but exactly true) is no. */
 async function admitted(deps: FieldDeps): Promise<boolean> {
   try {
-    return canSeeSetup(await deps.role());
+    return (await deps.owner()) === true;
   } catch {
     return false;
   }
@@ -107,7 +108,7 @@ async function liveOrRefusal(deps: FieldDeps): Promise<LiveField[] | ActionState
   }
 }
 
-async function write(deps: FieldDeps, run: () => Promise<number | void>): Promise<ActionState> {
+async function write(deps: FieldDeps, run: () => Promise<number | string | null | void>): Promise<ActionState> {
   try {
     const rows = await run();
     if (rows === 0) return refuse(CUSTOM_FIELD_CHANGED);
@@ -119,6 +120,19 @@ async function write(deps: FieldDeps, run: () => Promise<number | void>): Promis
 }
 
 export async function createField(deps: FieldDeps, input: CreateInput): Promise<ActionState> {
+  return (await createFieldWithId(deps, input)).state;
+}
+
+/** `createField`, also answering the new field's id (null when the database didn't return one or nothing was created). */
+export async function createFieldWithId(deps: FieldDeps, input: CreateInput): Promise<{ state: ActionState; id: string | null }> {
+  let id: string | null = null;
+  const state = await createFieldInner(deps, input, (v) => {
+    id = v;
+  });
+  return { state, id: state.saved ? id : null };
+}
+
+async function createFieldInner(deps: FieldDeps, input: CreateInput, onId: (id: string | null) => void): Promise<ActionState> {
   if (!(await admitted(deps))) return refuse(COLUMNS_NO_PERMISSION);
   let orgId: string;
   try {
@@ -145,7 +159,10 @@ export async function createField(deps: FieldDeps, input: CreateInput): Promise<
   if (clashesWith(label.value, section.value, live, null)) return refuse(labelTaken(label.value));
   if (live.length >= MAX_LIVE) return refuse(CUSTOM_LIMIT);
   const row: FieldInsert = { org_id: orgId, section: section.value, label: label.value, kind: kind.value, options, position: nextPosition(live) };
-  return write(deps, () => deps.insertField(row));
+  return write(deps, async () => {
+    const made = await deps.insertField(row);
+    onId(typeof made === "string" ? made : null);
+  });
 }
 
 /** Rule 3's read of the field; a refusal, or the row (CO1-valid, with its stamps). */

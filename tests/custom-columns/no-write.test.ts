@@ -35,7 +35,7 @@ const NEW_FILES = [
 describe("the custom-columns library: one write file, read files write-free", () => {
   it("the library holds exactly the read files, the logic, the store and the actions", () => {
     expect(LIB.map((f) => path.basename(f)).sort()).toEqual(
-      ["actions.ts", "card-load.ts", "errors.ts", "field-actions.ts", "input.ts", "load.ts", "rules.ts", "settings-load.ts", "store.ts", "text.ts", "value-actions.ts"].sort(),
+      ["actions.ts", "card-load.ts", "errors.ts", "field-actions.ts", "field-deps.ts", "input.ts", "load.ts", "rules.ts", "settings-load.ts", "store.ts", "text.ts", "value-actions.ts"].sort(),
     );
   });
 
