@@ -45,7 +45,7 @@
 -- only when missing, comments. No drop of anything that exists, no delete, no rewrite of a row. One Supabase MCP `apply_migration`
 -- should be safe (see lectual AGENTS.md 0093 for what hangs it); if it hangs, apply the statements in order with `execute_sql`.
 --
--- ── PRE-APPLY CHECKS (read only; run on lectual-dev, then on lectual-prod) ─────────────────────────────────────────────
+-- -- PRE-APPLY CHECKS (read only; run on lectual-dev, then on lectual-prod) ---------------------------------------------
 --   1. The column is absent, and the table is 0077's:
 --        select column_name, data_type, is_nullable from information_schema.columns
 --         where table_schema = 'public' and table_name = 'lawmatics_connection' order by ordinal_position;
@@ -58,7 +58,7 @@
 --         where table_schema = 'public' and table_name = 'lawmatics_connection' and grantee = 'authenticated' order by 1, 2;
 --   4. Nothing named 0118 in supabase_migrations.schema_migrations on either project, and the highest number there (first-merged-wins).
 --
--- ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+-- -------------------------------------------------------------------------------------------------------------------------
 
 alter table public.lawmatics_connection
   add column if not exists last_sync_at timestamptz null;
@@ -122,7 +122,7 @@ $$;
 comment on function public.lawmatics_connection_last_sync_guard() is
   'lectual 0118: refuses (42501 lawmatics_last_sync_service_only) any signed-in insert that sets, or update that changes, lawmatics_connection.last_sync_at. Trusted: service_role, the table owner, referential actions.';
 
--- ── ISOLATION CASES (add to lectual tests/tenant-isolation.test.ts, in the 0077 block; they fail until this is applied) ────────
+-- -- ISOLATION CASES (add to lectual tests/tenant-isolation.test.ts, in the 0077 block; they fail until this is applied) --------
 --   1. Firm A's owner selects `last_sync_at` from lawmatics_connection: gets firm A's row only (one row), never firm B's; firm B's
 --      member gets firm B's only. A viewer of firm A reads firm A's value (members read the connection, 0077).
 --   2. Firm A's owner, admin and senior_admin each try `update lawmatics_connection set last_sync_at = now()` on their own row:

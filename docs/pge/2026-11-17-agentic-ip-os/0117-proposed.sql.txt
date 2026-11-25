@@ -20,7 +20,7 @@
 -- or disabled refuses every view-as function (view_as_needs_member_guard). Without 0116 an admin could promote their own row to owner
 -- and start a preview (0116's THE GAP).
 --
--- ── WHAT IT ADDS ────────────────────────────────────────────────────────────────────────────────────────────────────
+-- -- WHAT IT ADDS ----------------------------------------------------------------------------------------------------
 --   owner_view_as_event   one row per Enter and per exit: who (actor_id), whom (target_user_id), the auth session id (from the JWT
 --                         `session_id` claim, never sent by the browser), in or out, how it ended, when. No page, record or IP.
 --   owner_view_as_start(p_target uuid) returns timestamptz
@@ -29,7 +29,7 @@
 --   A preview is ON exactly while owner_view_as_state() returns a row for this owner, this auth session and this firm. The app reads
 --   it on every dashboard request of a real owner; nothing else (no cookie) decides.
 --
--- ── RULES ───────────────────────────────────────────────────────────────────────────────────────────────────────────
+-- -- RULES -----------------------------------------------------------------------------------------------------------
 --   * Only a REAL owner: a crm_org_member row (org_id = current_org_id(), user_id = auth.uid(), role = 'owner'). A table lookup,
 --     never current_org_role(), so a platform admin's `owner` claim does not count, and a platform admin who IS a real owner member
 --     of the firm passes there (and nowhere else).
@@ -42,12 +42,12 @@
 --   * An enter is OPEN while no later row of the same (org, actor, auth session) exists. created_at is clock_timestamp(), so the
 --     `switch` exit and the new enter written in one call are ordered. Each function takes a per-(firm, actor) advisory lock.
 --
--- ── ERROR PREFIXES ──────────────────────────────────────────────────────────────────────────────────────────────────
+-- -- ERROR PREFIXES --------------------------------------------------------------------------------------------------
 --   view_as_no_session (42501), view_as_needs_member_guard (42501), view_as_not_owner (42501), view_as_self (23514),
 --   view_as_target_not_member (23514), view_as_bad_reason (23514), view_as_append_only (23514), view_as_no_delete (23514).
 --   view_as_bad_reason is not in the spec's list: owner_view_as_end refuses any reason other than exit / sign_out with it.
 --
--- ── PRE-APPLY CHECKS (read-only; run on each project first, nothing here writes) ─────────────────────────────────────
+-- -- PRE-APPLY CHECKS (read-only; run on each project first, nothing here writes) -------------------------------------
 --   1. 0116 is applied and its guard is on (expect one row, tgenabled 'O' or 'A', function crm_org_member_owner_guard):
 --        select tgname, tgenabled, tgfoid::regprocedure from pg_trigger
 --         where tgrelid = 'public.crm_org_member'::regclass and tgname = 'crm_org_member_owner_guard_trg';
@@ -60,21 +60,21 @@
 --   5. The applying role owns crm_org (the cascade) and can create functions in public: select pg_get_userbyid(relowner) from
 --      pg_class where oid = 'public.crm_org'::regclass;
 --
--- ── APPLYING IT ──────────────────────────────────────────────────────────────────────────────────────────────────────
+-- -- APPLYING IT ------------------------------------------------------------------------------------------------------
 -- Additive and idempotent: create table if not exists, create index if not exists, create or replace function, and do $$ blocks that
 -- test pg_trigger / pg_policies first (0103's form). No existing table, row, policy or grant changes; no drop. One Supabase MCP
 -- apply_migration should be safe; if it hangs (0093), send the numbered parts as execute_sql chunks in order plus a
 -- supabase_migrations.schema_migrations row. Order: table and index, append-only trigger functions and triggers, grants and policy,
 -- the shared helpers, the three functions and their grants, comments.
 --
--- ── APP SIDE (lectual.app) ───────────────────────────────────────────────────────────────────────────────────────────
+-- -- APP SIDE (lectual.app) -------------------------------------------------------------------------------------------
 --   Until this is applied, owner_view_as_state() is missing (42883 / PGRST202) and the table is missing (42P01 / PGRST205): the app
 --   reads that as "not set up", offers no preview, and the View as button says "Viewing as a teammate isn't switched on for your firm
 --   yet." Read by error CODE only.
 -- =====================================================================================================================
 
 
--- ── 1. The table ───────────────────────────────────────────────────────────────────────────────────────────────────
+-- -- 1. The table ---------------------------------------------------------------------------------------------------
 create table if not exists public.owner_view_as_event (
   id              uuid primary key default gen_random_uuid(),
   org_id          uuid not null references public.crm_org (id) on delete cascade,
@@ -99,7 +99,7 @@ create index if not exists owner_view_as_event_lookup_idx
   on public.owner_view_as_event (org_id, actor_id, auth_session_id, created_at desc);
 
 
--- ── 2. Append-only (0103 / 0106's form) ────────────────────────────────────────────────────────────────────────────
+-- -- 2. Append-only (0103 / 0106's form) ----------------------------------------------------------------------------
 create or replace function public.owner_view_as_event_no_update()
 returns trigger
 language plpgsql
@@ -150,7 +150,7 @@ revoke all on function public.owner_view_as_event_no_update() from public, anon,
 revoke all on function public.owner_view_as_event_delete_guard() from public, anon, authenticated;
 
 
--- ── 3. Grants and the one policy ───────────────────────────────────────────────────────────────────────────────────
+-- -- 3. Grants and the one policy -----------------------------------------------------------------------------------
 alter table public.owner_view_as_event enable row level security;
 
 revoke all on public.owner_view_as_event from anon;
@@ -192,7 +192,7 @@ end
 $$;
 
 
--- ── 4. Shared helpers (not callable by API roles) ──────────────────────────────────────────────────────────────────
+-- -- 4. Shared helpers (not callable by API roles) ------------------------------------------------------------------
 -- Shared check 1: auth.uid() and the JWT session_id claim. Returns the session id, or raises view_as_no_session.
 create or replace function public.owner_view_as_session_id()
 returns uuid
@@ -321,7 +321,7 @@ revoke all on function public.owner_view_as_close_stale(uuid, uuid) from public,
 revoke all on function public.owner_view_as_open_entry(uuid, uuid, uuid) from public, anon, authenticated;
 
 
--- ── 5. The three functions ─────────────────────────────────────────────────────────────────────────────────────────
+-- -- 5. The three functions -----------------------------------------------------------------------------------------
 create or replace function public.owner_view_as_start(p_target uuid)
 returns timestamptz
 language plpgsql
@@ -431,7 +431,7 @@ grant execute on function public.owner_view_as_end(text) to authenticated;
 grant execute on function public.owner_view_as_state() to authenticated;
 
 
--- ── 6. Comments ────────────────────────────────────────────────────────────────────────────────────────────────────
+-- -- 6. Comments ----------------------------------------------------------------------------------------------------
 comment on table public.owner_view_as_event is
   '0117: an owner''s read-only View as preview. Who, whom, auth session, enter/exit and how it ended. Written only by the owner_view_as_* functions; append-only; real owners of the firm read it.';
 comment on function public.owner_view_as_state() is

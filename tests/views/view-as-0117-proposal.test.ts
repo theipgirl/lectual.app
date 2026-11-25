@@ -60,6 +60,16 @@ describe("0117 owner_view_as_event (proposal text)", () => {
 
   it("is pinned: any change to the file is deliberate", () => {
     // Nov 24 (security review): MAINTAIN revoked behind the PostgreSQL 17 guard, case T7.
-    expect(createHash("md5").update(raw).digest("hex")).toBe("ccc5b60563a103b5b17563b24bc486b2");
+    // Nov 25: comment dividers made plain ASCII (no SQL changed) so the file survives any transport byte for byte.
+    expect(createHash("md5").update(raw).digest("hex")).toBe("a57535a8be850451e68dab5cb970baf8");
+  });
+});
+
+describe("0117 and 0118 proposals are pure ASCII (non-ASCII was garbled in transit when 0119 went to dev)", () => {
+  it("has no byte above 0x7F", async () => {
+    const { readFileSync } = await import("node:fs");
+    for (const f of ["docs/pge/2026-11-17-agentic-ip-os/0117-proposed.sql.txt", "docs/pge/2026-11-17-agentic-ip-os/0118-proposed.sql.txt"]) {
+      expect([...readFileSync(f)].some((b) => b > 0x7f), f).toBe(false);
+    }
   });
 });
