@@ -15,6 +15,7 @@ import {
   ADD_ROW_LABEL,
   ADD_ROW_LAST_NAME,
   ADD_ROW_LEAD_HINT,
+  LEADS_ADD_ROW_HINT,
   ADD_ROW_OPEN_LEAD,
   ADD_ROW_OPEN_LEADS,
   ADD_ROW_OPEN_MATTER,
@@ -38,7 +39,7 @@ const EMPTY: AddLeadState = {};
 export type StartStage = { id: string; name: string };
 
 /** `stages`: the firm's open lead stages in pipeline order (null = they couldn't be read: no picker, the lead starts in the new-enquiry stage). */
-export function AddRow({ canAddLead, canOpenMatter, stages = null, defaultStageId = null }: { canAddLead: boolean; canOpenMatter: boolean; stages?: readonly StartStage[] | null; defaultStageId?: string | null }) {
+export function AddRow({ canAddLead, canOpenMatter, stages = null, defaultStageId = null, onLeads = false }: { canAddLead: boolean; canOpenMatter: boolean; stages?: readonly StartStage[] | null; defaultStageId?: string | null; /** Drawn under the Leads List itself (build step 6): its words talk about Leads, not "this list", and there is no "Go to Leads". */ onLeads?: boolean }) {
   const [open, setOpen] = useState(false);
   const [round, setRound] = useState(0);
   if (!canAddLead && !canOpenMatter) return null;
@@ -63,6 +64,7 @@ export function AddRow({ canAddLead, canOpenMatter, stages = null, defaultStageI
             key={round}
             stages={stages}
             defaultStageId={defaultStageId}
+            onLeads={onLeads}
             onAnother={() => setRound((r) => r + 1)}
             onCancel={() => setOpen(false)}
           />
@@ -72,20 +74,22 @@ export function AddRow({ canAddLead, canOpenMatter, stages = null, defaultStageI
   );
 }
 
-export function AddLeadForm({ onAnother, onCancel, stages = null, defaultStageId = null }: { onAnother: () => void; onCancel: () => void; stages?: readonly StartStage[] | null; defaultStageId?: string | null }) {
+export function AddLeadForm({ onAnother, onCancel, stages = null, defaultStageId = null, onLeads = false }: { onAnother: () => void; onCancel: () => void; stages?: readonly StartStage[] | null; defaultStageId?: string | null; onLeads?: boolean }) {
   const [state, action, pending] = useActionState(addLeadFromReviewAction, EMPTY);
   if (state.saved && state.leadId) {
     return (
       <div className="rv-addrow-done" role="status">
         <p className="lx-note">{state.message ?? ADD_ROW_ADDED}</p>
-        {!state.joinsList && <p className="lx-note">{ADD_ROW_AFTER}</p>}
+        {!onLeads && !state.joinsList && <p className="lx-note">{ADD_ROW_AFTER}</p>}
         <p className="rv-addrow-acts">
           <Link href={`/dashboard/leads/${state.leadId}/`} className="lx-link">
             {ADD_ROW_OPEN_LEAD}
           </Link>
-          <Link href={INTAKE_LIST_PATH} className="lx-link">
-            {ADD_ROW_OPEN_LEADS}
-          </Link>
+          {!onLeads && (
+            <Link href={INTAKE_LIST_PATH} className="lx-link">
+              {ADD_ROW_OPEN_LEADS}
+            </Link>
+          )}
           <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={onAnother}>
             {ADD_ROW_ANOTHER}
           </button>
@@ -127,7 +131,7 @@ export function AddLeadForm({ onAnother, onCancel, stages = null, defaultStageId
       ) : (
         <p className="lx-note rv-addrow-hint">{ADD_ROW_STAGE_UNREADABLE}</p>
       )}
-      <p className="lx-note rv-addrow-hint">{ADD_ROW_LEAD_HINT}</p>
+      <p className="lx-note rv-addrow-hint">{onLeads ? LEADS_ADD_ROW_HINT : ADD_ROW_LEAD_HINT}</p>
       <div className="rv-addrow-acts">
         <button type="submit" className="lx-btn lx-btn-pri" disabled={pending}>
           {pending ? SAVING : ADD_ROW_SUBMIT}

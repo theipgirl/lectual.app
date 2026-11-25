@@ -47,6 +47,18 @@ import { pageTitle } from "@/lib/ui/page-title";
 import { loadOwnerState } from "@/lib/views/layout/owner-load";
 import { isOwner } from "@/lib/views/layout/owner";
 import { loadStageHoldings } from "@/lib/stages/holdings";
+import { loadViewLayout } from "@/lib/views/layout/load";
+import { layoutNote, savedLayoutOf } from "@/lib/views/layout/state";
+import { resolveLayout } from "@/lib/views/layout/apply";
+import type { HiddenGroup } from "@/components/views/layout/HiddenColumnsMenu";
+import { LEADS_VIEW_KEYS, leadsBoardBase, leadsListColumns } from "@/lib/leads/views";
+import { loadLeadListExtras } from "@/lib/leads/list-extras";
+import { leadFirmColumns } from "@/lib/leads/firm-cells";
+import { canSeeCustomMoney } from "@/lib/custom-columns/rules";
+import { civilDateIn } from "@/lib/review/build";
+import { CAN_WRITE_LEAD } from "@/lib/pipeline/leads";
+import { defaultStartStageId, startStages } from "@/lib/review/add-lead-stage";
+import { HIDDEN_FIRM_COLUMN, TEAMMATE } from "@/lib/ui/words";
 
 export const metadata: Metadata = { title: pageTitle(INTAKE_NAME) };
 
@@ -174,7 +186,15 @@ export default async function IntakePage({
 
   // "Next step" degrades from the latest note to the factual reply state rather than taking the list down, but a FAILED
   // or cut-short read is reported, never turned into "no activity". Only the leads on screen are asked about.
-  const notes = await loadLatestNotes(sinceIso, leads.map((l) => l.id));
+  const leadIds = leads.map((l) => l.id);
+  const [notes, ownerRead, previewing, listLayoutRead, boardLayoutRead] = await Promise.all([
+    loadLatestNotes(sinceIso, leadIds),
+    loadOwnerState(),
+    inPreview(),
+    // The firm's saved layouts for the two views (three-state; anything but a read row draws the standard columns / stage columns).
+    loadViewLayout(LEADS_VIEW_KEYS.list),
+    loadViewLayout(LEADS_VIEW_KEYS.board),
+  ]);
 
   // Time on cards (§13.1). Two reads: this week's entries for the leads on
   // screen, and the caller's own open timer (which may have started before the
@@ -265,7 +285,8 @@ export default async function IntakePage({
   // The owner's stage menu on the stage board (spec-editable-views.md 3b): an owner MEMBERSHIP ROW (never the role claim; Lectual
   // staff acting in a firm are not owners), never in a preview. What each stage holds is read only then, for the delete dialog; a
   // failed read offers no delete and no type change rather than calling a stage empty. Every action asks the row again.
-  const stageOwner = isOwner(await loadOwnerState()) && !(await inPreview());
+  const ownerNow = isOwner(ownerRead) && !previewing;
+  const stageOwner = ownerNow;
   const held = stageOwner ? await loadStageHoldings("lead") : null;
   const stageAdmin = stageOwner
     ? {
@@ -274,6 +295,47 @@ export default async function IntakePage({
         merged: held?.status === "ok" ? held.merged : null,
       }
     : null;
+
+  // The firm's own columns (read-only on the List; Money is a real owner's alone, asked again here from the re-resolved session) and the
+  // two layouts. An owner by their own membership row, never in a preview, gets the menus; everyone else reads the same view.
+  const canMoney = session?.kind === "ok" && canSeeCustomMoney(session.role, session.actingAsStaff);
+  const firmState = await loadLeadListExtras({ leadIds, canSeeMoney: canMoney });
+  const firm = leadFirmColumns({
+    leadIds,
+    state: firmState,
+    canSeeMoney: canMoney,
+    members: members.map((m) => ({ userId: m.userId, name: (m.displayName ?? m.email ?? "").trim() || TEAMMATE })),
+    today: civilDateIn(now, firmZone),
+  });
+  const listColumns = leadsListColumns(firm.fields, canMoney);
+  const savedList = savedLayoutOf(listLayoutRead);
+  const savedBoard = savedLayoutOf(boardLayoutRead);
+  const listEdit = ownerNow && listLayoutRead.status === "ok" ? { view: LEADS_VIEW_KEYS.list, rev: listLayoutRead.rev } : null;
+  const boardEdit = ownerNow && boardLayoutRead.status === "ok" ? { view: LEADS_VIEW_KEYS.board, rev: boardLayoutRead.rev } : null;
+  // The owner's "Hidden columns": what each layout hides, each with Show. A hidden firm column whose fields weren't read this time is
+  // still listed, under a fixed name, so it can be brought back.
+  const hiddenListGroups: HiddenGroup[] | null = listEdit
+    ? (() => {
+        const known = new Set(listColumns.map((c) => c.key));
+        const items = resolveLayout(listColumns, savedList)
+          .filter((r) => r.hidden)
+          .map((r) => ({ key: r.key, label: r.label }));
+        for (const c of savedList ?? []) if (c.hidden && c.key.startsWith("cf:") && !known.has(c.key)) items.push({ key: c.key, label: HIDDEN_FIRM_COLUMN });
+        return items.length > 0 ? [{ view: listEdit.view, rev: listEdit.rev, items }] : null;
+      })()
+    : null;
+  const hiddenBoardGroup: HiddenGroup | null = boardEdit
+    ? {
+        view: boardEdit.view,
+        rev: boardEdit.rev,
+        items: resolveLayout(leadsBoardBase(stages), savedBoard)
+          .filter((r) => r.hidden)
+          .map((r) => ({ key: r.key, label: r.label })),
+      }
+    : null;
+  // "Add a lead" under the List: a role that can create a lead, never in a preview. The server re-checks the role and the stage.
+  const canAddLead = !previewing && session?.kind === "ok" && CAN_WRITE_LEAD.includes(session.role);
+  const addRow = canAddLead ? { stages: startStages(stages).map((st) => ({ id: st.id, name: st.name })), defaultStageId: defaultStartStageId(stages) } : null;
 
   return (
     <div className="intake-root" data-tour="intake-board">
@@ -303,6 +365,18 @@ export default async function IntakePage({
       agentMoves={agentMoves.status === "ok" ? { status: "ok", truncated: agentMoves.truncated } : { status: "unavailable" }}
       stageDecisions={decisions.status === "ok" ? { status: "ok", truncated: decisions.truncated } : { status: "unavailable" }}
       stageAdmin={stageAdmin}
+      listView={{
+        columns: listColumns,
+        layout: savedList,
+        edit: listEdit,
+        fieldMeta: firm.meta,
+        firmCells: firm.cells,
+        hidden: hiddenListGroups,
+        note: layoutNote(listLayoutRead),
+        firmUnavailable: firm.unavailable,
+      }}
+      boardView={{ layout: savedBoard, edit: boardEdit, hidden: hiddenBoardGroup, note: layoutNote(boardLayoutRead) }}
+      addRow={addRow}
     />
     {openRef ? <RecordCardHost open={openRef} path="/dashboard/intake/" params={params as Record<string, string | string[] | undefined>} duplicateOf={duplicates[openRef.id]?.leadId ?? null} /> : null}
     </div>

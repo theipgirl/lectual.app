@@ -18,6 +18,9 @@ import type { Lane } from "@/lib/leads/lane";
 import type { ReferralSource } from "@/lib/intake";
 import { neighbours, stageMenuModel, type MenuStage } from "@/lib/stages/menu-model";
 import { StageMenu } from "@/components/views/stages/StageMenu";
+import { ColumnMenu } from "@/components/views/layout/ColumnMenu";
+import { stageColumnKey } from "@/lib/views/layout/stage-columns";
+import type { ViewKey } from "@/lib/views/layout/types";
 
 /**
  * Both boards, drawn from a `BoardModel` (the pure rules live in board-columns.ts). A column's title is its stage name in
@@ -53,7 +56,13 @@ export default function IntakeBoard({
   timeZone,
   onCompare,
   stageAdmin = null,
+  layoutEdit = null,
 }: {
+  /**
+   * Given only for an owner whose saved `leads_board` layout was read: the column menu on each STAGE column. The layout only hides a
+   * stage column here (its name and place are the stage's own, changed from the stage menu), so the menu offers Hide and nothing else.
+   */
+  layoutEdit?: { view: ViewKey; rev: number | null } | null;
   /** The owner's stage menu (absent for everyone else): every lead stage and what each holds (null = unreadable). */
   stageAdmin?: { all: MenuStage[]; holdings: Record<string, string[]> | null; merged?: Record<string, number> | null } | null;
   group: "stage" | "owner";
@@ -90,11 +99,17 @@ export default function IntakeBoard({
   // The stage columns in the order drawn: Move left / right go beside the VISIBLE neighbour, so the move is seen.
   const stageOrder = group === "stage" ? model.columns.flatMap((c) => (c.drop.kind === "stage" ? [c.drop.stageId] : [])) : [];
   const menuFor = (column: BoardModel["columns"][number]) => {
-    if (!stageAdmin || group !== "stage" || column.drop.kind !== "stage") return undefined;
+    if (group !== "stage" || column.drop.kind !== "stage") return undefined;
     const stageId = column.drop.stageId;
-    const stage = stageAdmin.all.find((s) => s.id === stageId);
-    if (!stage) return undefined;
-    return <StageMenu model={stageMenuModel({ kind: "lead", stage, all: stageAdmin.all, ...neighbours(stageOrder, stageId), holdings: stageAdmin.holdings, merged: stageAdmin.merged ?? null })} />;
+    const stage = stageAdmin?.all.find((s) => s.id === stageId);
+    const stageMenu = stageAdmin && stage ? <StageMenu model={stageMenuModel({ kind: "lead", stage, all: stageAdmin.all, ...neighbours(stageOrder, stageId), holdings: stageAdmin.holdings, merged: stageAdmin.merged ?? null })} /> : null;
+    const columnMenu = layoutEdit ? <ColumnMenu view={layoutEdit.view} rev={layoutEdit.rev} columnKey={stageColumnKey(stageId)} label={column.label} kind="stage" /> : null;
+    return stageMenu || columnMenu ? (
+      <>
+        {columnMenu}
+        {stageMenu}
+      </>
+    ) : undefined;
   };
 
   function drop(leadId: string, column: BoardModel["columns"][number]) {

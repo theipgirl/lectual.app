@@ -140,7 +140,10 @@ describe("the menu is drawn only where the page hands it", () => {
   it("the pages hand it only to an owner membership row outside a preview, and the Leads board only on the stage board", () => {
     const root = process.cwd();
     const intake = readFileSync(path.join(root, "src/app/dashboard/intake/page.tsx"), "utf8");
-    expect(intake).toMatch(/isOwner\(await loadOwnerState\(\)\) && !\(await inPreview\(\)\)/);
+    // The Leads page reads both once, beside its other reads (the layout menus need them too), exactly as Matters does.
+    expect(intake).toMatch(/loadOwnerState\(\),\s*inPreview\(\)/);
+    expect(intake).toMatch(/const ownerNow = isOwner\(ownerRead\) && !previewing;/);
+    expect(intake).toContain("const stageOwner = ownerNow;");
     // Matters reads the owner row and the preview flag ONCE, beside its other reads (the layout menus need them too), and joins them.
     const matters = readFileSync(path.join(root, "src/app/dashboard/matters/page.tsx"), "utf8");
     expect(matters).toMatch(/loadOwnerState\(\),\s*inPreview\(\)/);
