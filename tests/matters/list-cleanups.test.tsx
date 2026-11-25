@@ -105,7 +105,7 @@ describe("F5: Matters list", () => {
     expect(html).not.toContain("3. Filed");
     expect(html).not.toContain("<th>Status</th>");
     // The List draws through the shared ViewTable: a header cell is named by the column's fixed key.
-    expect(html).toMatch(/<th scope="col" data-column="in_stage">In stage<\/th>/);
+    expect(html).toMatch(/<th scope="col" data-column="in_stage" class="num">In stage<\/th>/);
     expect(html).toContain("On hold");
     expect(html).toMatch(/<a [^>]*href="\/dashboard\/queue\/q9\/?"[^>]*>Review<\/a>/);
     expect(html).toContain("2d");

@@ -13,8 +13,10 @@ import {
   LAYOUT_OWNER_ONLY,
   LAYOUT_READ_FAILED,
   LAYOUT_SAVE_FAILED,
+  LAYOUT_STAGE_BOARD_HIDE_ONLY,
   LAYOUT_TOO_MANY,
 } from "@/lib/ui/words";
+import { isMatterBoardView } from "@/lib/matters/views";
 import { layoutOf, resolveLayout } from "./apply";
 import { insertColumn, moveColumn, moveColumnBeside, moveColumnTo, renameColumn, setHidden, setWidth, type Next, type NextRefusal } from "./next";
 import { isOwner, type OwnerState } from "./owner";
@@ -181,6 +183,8 @@ export async function changeLayout(deps: SaveDeps, view: unknown, rawOp: unknown
   const op = parseOp(rawOp);
   const seen = parseRev(rawRev);
   if (!op || !seen.ok) return fail(LAYOUT_SAVE_FAILED);
+  // A stage board's columns are stages: the layout only hides or shows them (order and names are the stages', changed from the stage menu).
+  if (isMatterBoardView(view) && op.op !== "hide" && op.op !== "show") return fail(LAYOUT_STAGE_BOARD_HIDE_ONLY);
 
   const first = await attempt(deps, view, op, seen.rev, false);
   if (first.kind === "race") {

@@ -13,7 +13,7 @@ const st = (id: string, label: string, phase: string | null | undefined, order: 
   ({ id, code: id, label, order_index: order, is_open: open, waiting_on: "firm", ...(phase === undefined ? {} : { phase }) }) as MatterStage;
 const S = {
   a: st("sa", "New client", "pipeline", 1),
-  // The firm's signed-engagement stage: the Matters page draws from here on. (A firm with none cuts nothing: see below.)
+  // The firm's signed-engagement stage: the Matters page draws from here on. (A firm with none keeps the old rule and a warning: see below.)
   hired: st("sh", "Signed LOE / Deposit Received", "pipeline", 1.5),
   b: st("sb", "Questionnaire", "pre_filing", 2),
   b2: st("sb2", "Balance received", "pre_filing", 3),

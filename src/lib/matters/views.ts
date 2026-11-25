@@ -1,5 +1,5 @@
 import { isTrademarkRow } from "@/lib/review/sheet";
-import { customColumnId, fieldFits, type CustomColumnField, type SheetSectionId } from "@/lib/review/sheet-columns";
+import { fieldsForSection, type CustomColumnField, type SheetSectionId } from "@/lib/review/sheet-columns";
 import { applyLayout } from "@/lib/views/layout/apply";
 import { cfKey } from "@/lib/views/layout/validate";
 import type { Layout, LayoutDefault, ViewKey } from "@/lib/views/layout/types";
@@ -39,7 +39,6 @@ export const MATTER_VIEW_KEYS = {
 } as const satisfies Record<MatterKind, { list: ViewKey; board: ViewKey }>;
 
 export const MATTER_LIST_VIEWS: readonly ViewKey[] = [MATTER_VIEW_KEYS.trademarks.list, MATTER_VIEW_KEYS.contracts.list];
-export const MATTER_BOARD_VIEWS: readonly ViewKey[] = [MATTER_VIEW_KEYS.trademarks.board, MATTER_VIEW_KEYS.contracts.board];
 
 export const isMatterListView = (view: unknown): view is "matters_list" | "contracts_list" => view === "matters_list" || view === "contracts_list";
 export const isMatterBoardView = (view: unknown): view is "matters_board" | "contracts_board" => view === "matters_board" || view === "contracts_board";
@@ -67,8 +66,10 @@ export const MATTER_LIST_BUILTIN: readonly LayoutDefault[] = [
  * caller's re-resolved rule (a real owner): a Money column is never in anyone else's list, so a saved layout can't add it.
  */
 export function matterListColumns(fields: readonly CustomColumnField[], kind: MatterKind, canSeeMoney: boolean): MatterListColumn[] {
-  const own = fields
-    .filter((f) => fieldFits(f, kind) && (canSeeMoney || f.kind !== "money"))
+  // The section's own order (position, then label, then id): the same function the Weekly review's columns use, and the same list the
+  // server's layout write builds its base from (`baseFor` calls this function), so what is drawn and what is saved never disagree.
+  const own = fieldsForSection(fields, kind)
+    .filter((f) => canSeeMoney || f.kind !== "money")
     .map((f): MatterListColumn => ({ key: cfKey(f.id), label: f.label, kind: f.kind }));
   return [...MATTER_LIST_BUILTIN, ...own];
 }
@@ -77,10 +78,6 @@ export function matterListColumns(fields: readonly CustomColumnField[], kind: Ma
 export function drawnMatterColumns(columns: readonly MatterListColumn[], saved: Layout | null | undefined) {
   return applyLayout(columns, saved);
 }
-
-export const isFirmColumnKey = (key: string): boolean => key.startsWith("cf:");
-export const fieldIdOfKey = (key: string): string => key.slice(3);
-export { customColumnId };
 
 /* ── The Board's columns ── */
 

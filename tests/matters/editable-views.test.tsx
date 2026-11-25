@@ -124,6 +124,7 @@ type Opts = {
   extras?: unknown;
   holdings?: unknown;
   extrasFn?: unknown;
+  staff?: boolean;
 };
 
 async function render(o: Opts) {
@@ -138,7 +139,7 @@ async function render(o: Opts) {
   vi.doMock("@/lib/views/view-as", async (orig) => ({
     ...(await orig<typeof import("@/lib/views/view-as")>()),
     inPreview: vi.fn(async () => o.preview === true),
-    resolveViewSession: vi.fn(async () => ({ kind: "ok", role: o.role ?? "owner", actingAsStaff: false, user: { id: "u1" } })),
+    resolveViewSession: vi.fn(async () => ({ kind: "ok", role: o.role ?? "owner", actingAsStaff: o.staff === true, user: { id: "u1" } })),
   }));
   vi.doMock("@/lib/views/layout/load", () => ({ loadViewLayout: vi.fn(async () => o.layout ?? { status: "not-set-up" }) }));
   vi.doMock("@/lib/views/layout/owner-load", () => ({ loadOwnerState: vi.fn(async () => o.owner ?? "not-owner") }));
@@ -361,5 +362,117 @@ describe("one List and one Board", () => {
   it("a layout change redraws the Matters page as well as the Weekly review", () => {
     const actions = src("src/lib/views/layout/actions.ts");
     expect(actions).toMatch(/revalidatePath\(REVIEW_PATH\);\s*revalidatePath\(MATTERS_PATH\)/);
+  });
+});
+
+const FIELD = (id: string, over: Record<string, unknown> = {}) => ({ id, section: "trademarks", label: "Priority", kind: "text", position: 1, options: [], ...over });
+const stateWith = (fields: unknown[], values: unknown[] = []) => ({ custom: { status: "ok", fields, values, mergedInto: {}, leadOfMatter: {} }, notes: { status: "ok", byKey: new Map() } });
+
+describe("step 5 review fixes", () => {
+  const list = { view: "table" };
+  const one = () => ((n = 0), [matter("TM", STAGES[2])]);
+
+  it("firm columns that couldn't be read say so once; not set up says nothing", async () => {
+    const bad = await render({ matters: one(), params: list, extras: { custom: { status: "unavailable" }, notes: { status: "ok", byKey: new Map() } } });
+    expect(bad).toContain("Some details couldn&#x27;t load (your firm&#x27;s columns). Refresh to try again.");
+    expect(bad.split("your firm&#x27;s columns").length - 1).toBe(1);
+    const quiet = await render({ matters: one(), params: list, extras: { custom: { status: "not-set-up" }, notes: { status: "ok", byKey: new Map() } } });
+    expect(quiet).not.toContain("your firm&#x27;s columns");
+  });
+
+  it("the other view's matches for the same status chip and search are one line with a link; no matches, no line", async () => {
+    const mixed = () => ((n = 0), [matter("TM", STAGES[2]), matter("BL", null), matter("BL", null, { status: "closed" })]);
+    const html = await render({ matters: mixed(), params: list });
+    expect(html).toMatch(/<a href="\/dashboard\/matters\/?\?kind=contracts&amp;view=table">Contracts has 1<\/a>/);
+    // the closed chip counts the other view's closed matters, and the link keeps it
+    const closed = await render({ matters: mixed(), params: { ...list, seg: "closed" } });
+    expect(closed).toMatch(/\?seg=closed&amp;kind=contracts&amp;view=table">Contracts has 1</);
+    // reverse, with a search that matches only one side
+    const rev = await render({ matters: mixed(), params: { ...list, kind: "contracts" } });
+    expect(rev).toMatch(/kind=contracts/);
+    expect(rev).toMatch(/>Matters has 1</);
+    const searched = await render({ matters: mixed(), params: { ...list, q: "Mk2z" } });
+    expect(searched).toContain("Contracts has 1");
+    const none = await render({ matters: mixed(), params: { ...list, q: "nothing-matches" } });
+    expect(none).not.toContain(" has ");
+    // a firm with no contracts gets no line
+    expect(await render({ matters: one(), params: list })).not.toContain("Contracts has");
+  });
+
+  it("firm columns are ordered by position, label, id, however they arrive; the layout write builds its base the same way", () => {
+    const f = (id: string, label: string, position: number) => ({ id, section: "both", label, kind: "text", position });
+    const a = f("00000000-0000-4000-8000-00000000000b", "Beta", 2);
+    const b = f("00000000-0000-4000-8000-00000000000a", "Alpha", 2);
+    const c = f("00000000-0000-4000-8000-00000000000c", "Zed", 1);
+    const keys = (fields: unknown[]) => matterListColumns(fields as never, "trademarks", true).slice(7).map((x) => x.label);
+    expect(keys([a, b, c])).toEqual(["Zed", "Alpha", "Beta"]);
+    expect(keys([c, b, a])).toEqual(keys([a, b, c]));
+    expect(readFileSync("src/lib/views/layout/actions.ts", "utf8")).toMatch(/matterListColumns\(\(await fieldStore\(db\)\.readLiveFields\(\)\) as CustomColumnField\[\], kind, true\)/);
+  });
+
+  describe("Money stays the real owner's", () => {
+    const money = FIELD("11111111-1111-4111-8111-1111111111aa", { label: "Retainer", kind: "money" });
+    const value = { id: "v9", fieldId: money.id, leadId: null, matterId: "m1", text: null, date: null, cents: 123456, choice: null, userId: null, updatedAt: "x" };
+    const leaked = () => stateWith([FIELD("22222222-2222-4222-8222-2222222222bb", { label: "Priority" }), money], [value]);
+    const noMoney = (html: string) => {
+      expect(html).not.toContain("Retainer");
+      expect(html).not.toContain("1,234.56");
+      expect(html).not.toContain("123456");
+      expect(heads(html)).not.toContain("cf:11111111-1111-4111-8111-1111111111aa");
+    };
+    it("Lectual staff acting in the firm with an owner role see no Money header, cell or menu data", async () => {
+      noMoney(await render({ matters: one(), params: list, role: "owner", staff: true, extras: leaked(), layout: LAYOUT([{ key: "matter" }]), owner: "not-owner" }));
+    });
+    it("a non-owner sees none either, even if the read leaked one", async () => {
+      noMoney(await render({ matters: one(), params: list, role: "attorney", extras: leaked() }));
+    });
+    it("the real owner sees the column", async () => {
+      const html = await render({ matters: one(), params: list, role: "owner", extras: leaked() });
+      expect(heads(html)).toContain("cf:11111111-1111-4111-8111-1111111111aa");
+      expect(html).toContain("Retainer");
+    });
+  });
+
+  it("a Board layout refuses every operation but hide and show, with one fixed sentence, and writes nothing", async () => {
+    const { changeLayout } = await import("@/lib/views/layout/save");
+    const calls: string[] = [];
+    const deps = {
+      owner: async () => "owner" as const,
+      orgId: async () => "o",
+      read: async () => ({ status: "ok" as const, layout: null, rev: null }),
+      base: async () => ({ defaults: [{ key: "not_on_docket", label: "Not on the docket yet" }, { key: "closed", label: "Closed" }] }),
+      insert: async () => (calls.push("insert"), { error: null }),
+      update: async () => (calls.push("update"), { error: null, rev: 2 }),
+      revalidate: () => calls.push("revalidate"),
+    };
+    for (const view of ["matters_board", "contracts_board"]) {
+      for (const op of [{ op: "rename", key: "closed", label: "X" }, { op: "move", key: "closed", dir: "left" }, { op: "width", key: "closed", px: 100 }]) {
+        expect(await changeLayout(deps, view, op, null), `${view} ${op.op}`).toEqual({ ok: false, error: "On this board a column can only be hidden or shown. Rename and move stages from the stage menu." });
+      }
+      expect((await changeLayout(deps, view, { op: "hide", key: "closed" }, null)).ok).toBe(true);
+    }
+    expect(calls.filter((c) => c !== "revalidate")).toEqual(["insert", "insert"]);
+  });
+
+  it("the board with empty stages is drawn ONCE (empty columns last and marked, hidden by the page's CSS until Show)", async () => {
+    n = 0;
+    const html = await render({ matters: [matter("TM", STAGES[2])] });
+    expect(html.split('id="matter-card-m1"').length - 1).toBe(1);
+    expect(html).toContain("empty stage");
+    expect(html).toMatch(/data-shown="false"/);
+    expect(html).toContain('data-empty-stage="true"');
+    expect(readFileSync("src/app/dashboard/matters/matters.css", "utf8")).toMatch(/\[data-shown="false"\] \[data-empty-stage\] \{ display: none; \}/);
+  });
+
+  it("the List is fixed-layout with default widths until a layout sets one", async () => {
+    const plain = await render({ matters: one(), params: list });
+    expect(plain).toMatch(/<col style="width:230px"\/>/);
+    const set = await render({ matters: one(), params: list, layout: LAYOUT([{ key: "matter", width: 300 }]) });
+    expect(set).toMatch(/<col style="width:300px"\/>/);
+  });
+
+  it("the words the page shows live in words.ts", () => {
+    const page = readFileSync("src/app/dashboard/matters/page.tsx", "utf8");
+    expect(page).not.toMatch(/No contracts yet|No matters yet|<summary>Open a matter/);
   });
 });

@@ -30,6 +30,9 @@ import { BLANK, NO_MAINTENANCE_DEADLINE_HINT, NO_OPEN_DEADLINE, NO_OPEN_DEADLINE
 export type DrawnMatterColumn = MatterListColumn & { width: number | null };
 
 const ACTIONS_KEY = "actions";
+/** The table is fixed-layout: these are the widths (px) until a layout sets one. Together they stay near the width the old fixed percentages gave. */
+const DEFAULT_WIDTHS: Record<string, number> = { matter: 230, type: 70, stage: 150, in_stage: 70, owner: 90, next_step: 220, notes: 180, [ACTIONS_KEY]: 50 };
+const FIRM_COLUMN_WIDTH = 140;
 
 export function MatterListTable({
   matters,
@@ -67,7 +70,7 @@ export function MatterListTable({
   today: string;
 }) {
   const listColumns: ListColumn[] = [
-    ...columns.map((c): ListColumn => ({ key: c.key, label: c.label, width: c.width, pinned: c.key === "matter", kind: c.kind })),
+    ...columns.map((c): ListColumn => ({ key: c.key, label: c.label, width: c.width, pinned: c.key === "matter", kind: c.kind, headClass: c.key === "in_stage" ? "num" : undefined })),
     { key: ACTIONS_KEY, label: "Actions" },
   ];
 
@@ -179,6 +182,8 @@ export function MatterListTable({
       rows={matters.map((m) => ({ key: m.id }))}
       cell={(row, c) => cell(byId.get(row.key)!, c)}
       renderHead={head}
+      fixed
+      widthOf={(c) => c.width ?? DEFAULT_WIDTHS[c.key] ?? FIRM_COLUMN_WIDTH}
       minWidth={800}
       rowClass={() => "lp-row"}
       canEditCells={canWrite}

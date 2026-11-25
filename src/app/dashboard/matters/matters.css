@@ -9,3 +9,6 @@
 /* Hidden columns of a Board: one quiet line with the owner's control beside it. */
 .lp-root .lx-board-hidden { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
 .lp-root .lx-list-add { padding: 10px 0 0; }
+
+/* Empty stages are drawn (once) and hidden until "Show". */
+.lp-root .lx-empty-stages[data-shown="false"] [data-empty-stage] { display: none; }

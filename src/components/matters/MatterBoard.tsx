@@ -141,7 +141,7 @@ export function MatterBoard(props: {
     return <StageMenu model={stageMenuModel({ kind: "matter", stage, all: admin.all, ...neighbours(order, stageId), holdings: admin.holdings, shown })} />;
   };
 
-  const spec = (c: Col): BoardColumnSpec<Matter> => {
+  const spec = (c: Col, emptyStage = false): BoardColumnSpec<Matter> => {
     const stageMenu = c.stageId ? stageMenuFor(c.stageId, c.matters.length) : null;
     const columnMenu = props.layoutEdit ? <ColumnMenu view={props.layoutEdit.view} rev={props.layoutEdit.rev} columnKey={c.key} label={c.title} kind="stage" /> : null;
     return {
@@ -149,10 +149,11 @@ export function MatterBoard(props: {
       title: c.title,
       count: `${c.matters.length}${c.stale ? ` · ${c.stale} gone quiet` : ""}${c.sub ? ` · ${c.sub}` : ""}`,
       menu: stageMenu || columnMenu ? <>{columnMenu}{stageMenu}</> : undefined,
+      ...(emptyStage ? { attrs: { "data-empty-stage": "true" } } : {}),
       groups: [{ key: "cards", empty: columnEmpty("matters"), cards: c.matters }],
     };
   };
-  const board_ = (cols: readonly Col[]) => <ViewBoard columns={cols.map(spec)} renderCard={card} role="region" aria-label="Docket board" />;
+  const board_ = (cols: readonly Col[], emptyKeys: ReadonlySet<string> = new Set()) => <ViewBoard columns={cols.map((c) => spec(c, emptyKeys.has(c.key)))} renderCard={card} role="region" aria-label="Docket board" />;
 
   const hiddenBar =
     hidden.length > 0 ? (
@@ -184,8 +185,7 @@ export function MatterBoard(props: {
         <BoardEmptyStages
           labelHidden={emptyStagesLabel(empty.length, false, names)}
           labelShown={emptyStagesLabel(empty.length, true, names)}
-          collapsed={board_(populated)}
-          expanded={board_([...populated, ...empty])}
+          board={board_([...populated, ...empty], new Set(empty.map((c) => c.key)))}
         />
       </>
     );

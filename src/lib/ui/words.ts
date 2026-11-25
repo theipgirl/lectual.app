@@ -1897,3 +1897,8 @@ export const manageStagesHolds = (n: number) => `${n} ${n === 1 ? "matter" : "ma
 export const MANAGE_STAGES_HOLDS_UNKNOWN = "Count couldn't be read";
 export const MANAGE_STAGES_NONE = "There are no matter stages yet.";
 export const MATTERS_OPEN_ROW = "Open a matter";
+export const MATTERS_NONE_YET = "No matters yet";
+export const CONTRACTS_NONE_YET = "No contracts yet";
+export const MATTER_FIRM_COLUMNS_UNAVAILABLE = "Some details couldn't load (your firm's columns). Refresh to try again.";
+export const matterOtherKindHas = (name: string, n: number) => `${name} has ${n}`;
+export const LAYOUT_STAGE_BOARD_HIDE_ONLY = "On this board a column can only be hidden or shown. Rename and move stages from the stage menu.";

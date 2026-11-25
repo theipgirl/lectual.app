@@ -38,7 +38,7 @@ import {
   parseGroupChoice,
   phaseGroupCounts,
 } from "@/lib/matters/phase-group";
-import { searchPlaceholder, MATTERS_NAME, TEAMMATE, MATTER_GROUPS_NAV, MATTER_GROUP_ALL, MATTER_INTAKE_STAGES, MATTER_INTAKE_SHOW, MATTER_SHOWING_INTAKE, MATTER_BACK_TO_PAST_INTAKE, MATTER_ALL_INTAKE_BODY, MATTER_ALL_INTAKE_TITLE, MATTER_GROUP_EMPTY, MATTER_GROUP_LABEL, MATTER_PHASES_UNAVAILABLE, MATTER_NO_HIRED_STAGE, MATTER_STATUS_NAV, CONTRACTS_NAME, MATTER_KIND_NAV, HIDDEN_FIRM_COLUMN, DEADLINE_FLAGS_UNCHECKED } from "@/lib/ui/words";
+import { searchPlaceholder, MATTERS_NAME, TEAMMATE, MATTER_GROUPS_NAV, MATTER_GROUP_ALL, MATTER_INTAKE_STAGES, MATTER_INTAKE_SHOW, MATTER_SHOWING_INTAKE, MATTER_BACK_TO_PAST_INTAKE, MATTER_ALL_INTAKE_BODY, MATTER_ALL_INTAKE_TITLE, MATTER_GROUP_EMPTY, MATTER_GROUP_LABEL, MATTER_PHASES_UNAVAILABLE, MATTER_NO_HIRED_STAGE, MATTER_STATUS_NAV, CONTRACTS_NAME, MATTER_KIND_NAV, HIDDEN_FIRM_COLUMN, MATTERS_OPEN_ROW, MATTERS_NONE_YET, CONTRACTS_NONE_YET, MATTER_FIRM_COLUMNS_UNAVAILABLE, matterOtherKindHas, DEADLINE_FLAGS_UNCHECKED } from "@/lib/ui/words";
 import { inPreview, resolveViewSession } from "@/lib/views/view-as";
 import { loadOwnerState } from "@/lib/views/layout/owner-load";
 import { isOwner } from "@/lib/views/layout/owner";
@@ -49,9 +49,11 @@ import { resolveLayout } from "@/lib/views/layout/apply";
 import { HiddenColumnsMenu, type HiddenGroup } from "@/components/views/layout/HiddenColumnsMenu";
 import { MatterListTable } from "@/components/matters/MatterListTable";
 import { ManageStages } from "@/components/matters/ManageStages";
+import { cfKey } from "@/lib/views/layout/validate";
 import { MATTER_VIEW_KEYS, drawnMatterColumns, filterByMatterKind, matterListColumns, parseMatterKind, type MatterKind } from "@/lib/matters/views";
 import { loadMatterListExtras } from "@/lib/matters/list-extras";
-import { canSeeCustomMoney, customCells } from "@/lib/custom-columns/rules";
+import { canSeeCustomMoney, customCells, withoutMoney } from "@/lib/custom-columns/rules";
+import type { FactCell } from "@/lib/review/sheet-cells";
 import { civilDateIn } from "@/lib/review/build";
 import { isRegisteredTrademark, needsDeadlineCheck, noOpenDeadline } from "@/lib/matters/deadline-safety";
 import { loadOpenDeadlineMatterIds } from "@/lib/matters/open-deadlines-read";
@@ -140,14 +142,14 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
   const stageList = stageRead.status === "unavailable" ? [] : stageRead.stages;
   const phasesFailed = stageRead.status === "unavailable";
   // Phase groups and the past-signed-LOE cut are the Trademarks view's; Contracts has no phases to group by and is never cut.
+  // (A firm with no signed-engagement stage keeps today's rule: every pipeline-phase stage is intake, and a warning says so.)
   const phasesOn = stageRead.status === "ok" && firmHasPhases(stageList);
   const grouped = kind === "trademarks" && phasesOn;
-  // What the Matters chip counts: the trademark matters past the signed engagement (all of them for a firm that has no such stage).
+  // What the Matters chip counts: the trademark matters past the signed engagement (intake-stage ones are left out, as on the page).
   const trademarksPastLoe = phasesOn ? pastLoeView(byKind.trademarks, stageList, intakeStageIds(stageList)).matters : byKind.trademarks;
   // The default group depends on the status chip (Pre-filing only while it holds a matter under that filter), so it is
   // worked out for every status once; a link that omits `group` means "the default for the status it names".
   // Only matters past Signed LOE are drawn: a matter on an intake-phase stage is counted and named in one line instead.
-  // A firm with no signed-engagement stage cuts nothing (`intakeStageIds` is empty): a record is never hidden on a guess.
   const intakeView = grouped ? pastLoeView(scoped, stageList, intakeStageIds(stageList)) : null;
   const pastLoe = intakeView ? intakeView.matters : scoped;
   const groupCountsBySeg = new Map(SEGMENTS.map((s) => [s.key, phaseGroupCounts(filterBySegment(pastLoe, s.key, sets))]));
@@ -211,15 +213,27 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
   const canMoneyColumns = session.kind === "ok" && canSeeCustomMoney(session.role, session.actingAsStaff);
   const notesShown = savedLayout?.find((c) => c.key === "notes")?.hidden !== true;
   const extras = !boardView && !loadError && shown.length > 0 ? await loadMatterListExtras({ matters: shown, withNotes: notesShown, timeZone: firmZone, canSeeMoney: canMoneyColumns }) : null;
-  const firmFields = extras?.custom.status === "ok" ? extras.custom.fields : [];
+  // Cleaned again here (the loader never read an amount for a non-owner): no Money field or amount reaches any header, cell or menu.
+  const customState = extras ? (canMoneyColumns ? extras.custom : withoutMoney(extras.custom)) : null;
+  const firmFields = customState?.status === "ok" ? customState.fields : [];
   const listColumns = matterListColumns(firmFields, kind, canMoneyColumns);
   const drawnColumns = drawnMatterColumns(listColumns, savedLayout);
   const todayCivil = civilDateIn(new Date(), firmZone);
-  const firmCells =
-    extras?.custom.status === "ok"
-      ? customCells(shown.map((m) => ({ key: m.id, kind: "matter" as const, id: m.id, matterType: m.type })), firmFields, extras.custom, members.map((m) => ({ userId: m.userId, name: (m.displayName ?? m.email ?? "").trim() || TEAMMATE })), todayCivil)
+  // A firm column's key is built one way everywhere: lowercased `cfKey` (the cells' own ids are re-keyed to it).
+  const lowerKeys = <T,>(o: Record<string, T>): Record<string, T> => Object.fromEntries(Object.entries(o).map(([k, v]) => [k.startsWith("cf:") ? cfKey(k.slice(3)) : k, v]));
+  const firmCells: Record<string, Record<string, FactCell>> =
+    customState?.status === "ok"
+      ? Object.fromEntries(
+          Object.entries(customCells(shown.map((m) => ({ key: m.id, kind: "matter" as const, id: m.id, matterType: m.type })), firmFields, customState, members.map((m) => ({ userId: m.userId, name: (m.displayName ?? m.email ?? "").trim() || TEAMMATE })), todayCivil)).map(([id, cells]) => [id, lowerKeys(cells)]),
+        )
       : {};
-  const fieldMeta = Object.fromEntries(firmFields.map((f) => [`cf:${f.id.toLowerCase()}`, { kind: f.kind as string, options: f.options as readonly string[] }]));
+  const fieldMeta = Object.fromEntries(firmFields.map((f) => [cfKey(f.id), { kind: f.kind as string, options: f.options as readonly string[] }]));
+  // The firm's own columns couldn't be read: said once, never as "no columns". Not set up says nothing.
+  const firmColumnsUnavailable = customState?.status === "unavailable";
+  // The other view's matches for the SAME status chip and search (Today's and Copilot's links land on Matters, so a firm whose matches are
+  // contracts is told, with a link, instead of seeing a shorter list than the count it clicked). Counts elsewhere are unchanged.
+  const otherKind: MatterKind = kind === "trademarks" ? "contracts" : "trademarks";
+  const otherKindCount = searchMatters(filterBySegment(otherKind === "contracts" ? byKind.contracts : trademarksPastLoe, seg, sets), search).length;
   // The owner's "Hidden columns" for the List: the columns the firm's layout hides, each with Show.
   const hiddenListGroups: HiddenGroup[] | null =
     layoutEdit && !boardView
@@ -313,6 +327,11 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
           </Chip>
         ))}
       </FilterChips>
+      {otherKindCount > 0 && (
+        <p role="status" className="lx-note lx-state-line" data-other-kind={otherKind}>
+          <Link href={href({ kind: otherKind })}>{matterOtherKindHas(otherKind === "contracts" ? CONTRACTS_NAME : MATTERS_NAME, otherKindCount)}</Link>
+        </p>
+      )}
       {showIntake && (
         <p role="status" className="lx-note lx-state-line">
           {MATTER_SHOWING_INTAKE} <Link href={href({ intake: false })}>{MATTER_BACK_TO_PAST_INTAKE}</Link>
@@ -326,6 +345,11 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
       {noHiredStage && (
         <Notice tone="warn" role="status">
           {MATTER_NO_HIRED_STAGE}
+        </Notice>
+      )}
+      {firmColumnsUnavailable && (
+        <Notice tone="warn" role="status">
+          {MATTER_FIRM_COLUMNS_UNAVAILABLE}
         </Notice>
       )}
       {layoutSaid && (
@@ -352,7 +376,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
       {boardView && manageStages && stageAdmin && <ManageStages stages={manageStages.stages} holdings={stageAdmin.holdings} leftOut={manageStages.leftOut} />}
 
       <details id={OPEN_MATTER_PANEL_ID} className="lx-card lx-disclosure">
-        <summary>Open a matter</summary>
+        <summary>{MATTERS_OPEN_ROW}</summary>
         <NewMatterForm leads={leadOptions} canCreateLitigation={canCreateLitigation} />
       </details>
 
@@ -380,7 +404,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
         </>
       ) : bands.length === 0 ? (
         scoped.length === 0 ? (
-          <EmptyState title={kind === "contracts" ? "No contracts yet" : "No matters yet"} action={<OpenMatterButton />}>
+          <EmptyState title={kind === "contracts" ? CONTRACTS_NONE_YET : MATTERS_NONE_YET} action={<OpenMatterButton />}>
             A matter opens when a lead signs, or from the form above.
           </EmptyState>
         ) : everyMatterInIntake ? (
