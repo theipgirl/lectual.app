@@ -55,7 +55,7 @@ export default function IntakeBoard({
   stageAdmin = null,
 }: {
   /** The owner's stage menu (absent for everyone else): every lead stage and what each holds (null = unreadable). */
-  stageAdmin?: { all: MenuStage[]; holdings: Record<string, string[]> | null } | null;
+  stageAdmin?: { all: MenuStage[]; holdings: Record<string, string[]> | null; merged?: Record<string, number> | null } | null;
   group: "stage" | "owner";
   model: BoardModel;
   moveStages: Stage[];
@@ -94,7 +94,7 @@ export default function IntakeBoard({
     const stageId = column.drop.stageId;
     const stage = stageAdmin.all.find((s) => s.id === stageId);
     if (!stage) return undefined;
-    return <StageMenu model={stageMenuModel({ kind: "lead", stage, all: stageAdmin.all, ...neighbours(stageOrder, stageId), holdings: stageAdmin.holdings })} />;
+    return <StageMenu model={stageMenuModel({ kind: "lead", stage, all: stageAdmin.all, ...neighbours(stageOrder, stageId), holdings: stageAdmin.holdings, merged: stageAdmin.merged ?? null })} />;
   };
 
   function drop(leadId: string, column: BoardModel["columns"][number]) {

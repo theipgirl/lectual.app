@@ -32,18 +32,23 @@ beforeEach(() => {
 });
 
 describe("loadStageHoldings", () => {
-  it("lead: groups ids by stage and leaves merged leads out", async () => {
+  it("lead: groups live ids by stage; merged leads are COUNTED per stage, never listed", async () => {
     h.rows = [
-      { id: "l1", current_stage_id: "a" },
-      { id: "l2", current_stage_id: "a" },
-      { id: "l3", current_stage_id: "b" },
+      { id: "l1", current_stage_id: "a", merged_into_id: null },
+      { id: "l2", current_stage_id: "a", merged_into_id: null },
+      { id: "l3", current_stage_id: "b", merged_into_id: null },
+      { id: "dup1", current_stage_id: "a", merged_into_id: "l1" },
+      { id: "dup2", current_stage_id: "c", merged_into_id: "l3" },
     ];
-    expect(await loadStageHoldings("lead")).toEqual({ status: "ok", byStage: { a: ["l1", "l2"], b: ["l3"] } });
-    expect(h.calls[0]).toEqual({ table: "crm_lead", is: true });
+    const got = await loadStageHoldings("lead");
+    expect(got).toEqual({ status: "ok", byStage: { a: ["l1", "l2"], b: ["l3"] }, merged: { a: 1, c: 1 } });
+    expect(JSON.stringify(got)).not.toContain("dup");
+    // Read WITHOUT the live filter: a merged lead still sits in the stage.
+    expect(h.calls[0]).toEqual({ table: "crm_lead", is: false });
   });
   it("matter: every matter, any status", async () => {
     h.rows = [{ id: "m1", stage_id: "s" }];
-    expect(await loadStageHoldings("matter")).toEqual({ status: "ok", byStage: { s: ["m1"] } });
+    expect(await loadStageHoldings("matter")).toEqual({ status: "ok", byStage: { s: ["m1"] }, merged: {} });
     expect(h.calls[0]).toEqual({ table: "crm_matter", is: false });
   });
   it("a failed read is unavailable, never empty", async () => {

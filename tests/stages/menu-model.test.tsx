@@ -63,6 +63,27 @@ describe("lead stages", () => {
     const one = [{ id: "a", name: "A", category: "open" }, { id: "w", name: "W", category: "won" }];
     expect(at("a", {}, one).delete).toEqual({ available: false, reason: "last-open" });
   });
+  it("a stage holding only merged leads: no type change, and the delete needs a destination", () => {
+    const m = stageMenuModel({ kind: "lead", stage: LEADS[1], all: LEADS, prevId: null, nextId: null, holdings: {}, merged: { cs: 2 } });
+    expect(m.canChangeType).toBe(false);
+    expect(m.merged).toBe(2);
+    expect(m.total).toBe(2);
+    if (!m.delete.available) throw new Error("expected delete");
+    expect(m.delete.ids).toEqual([]);
+    expect(m.delete.destinations.length).toBeGreaterThan(0);
+  });
+  it("a stage holding a category-bound role never offers Change type, even empty", () => {
+    for (const id of ["new", "won"]) {
+      const m = at(id, {});
+      expect(m.typeHidden).toBe(true);
+      expect(m.canChangeType).toBe(false);
+    }
+    const plain = at("cs", {});
+    expect(plain.typeHidden).toBe(false);
+    expect(plain.canChangeType).toBe(true);
+    const withOther = at("cs", {}, LEADS.map((s) => (s.id === "cs" ? { ...s, role: "consult_scheduled" } : s)));
+    expect(withOther.typeHidden).toBe(false);
+  });
   it("neighbours are the visible columns", () => {
     expect(neighbours(["a", "b", "c"], "b")).toEqual({ prevId: "a", nextId: "c" });
     expect(neighbours(["a", "b", "c"], "a")).toEqual({ prevId: null, nextId: "b" });
@@ -84,6 +105,12 @@ describe("matter stages", () => {
     expect(d.destinations.map((s) => s.id)).toEqual(["s1"]);
     expect(d.otherOpenDestinations.map((s) => s.id)).toEqual(["s3", "s4"]);
   });
+  it("the count differs from the column: said; every matter role hides open/closed", () => {
+    const m = stageMenuModel({ kind: "matter", stage: M[1], all: M, prevId: null, nextId: null, holdings: { s2: ["m1", "m2"] }, shown: 1 });
+    expect(m.countDiffers).toBe(true);
+    expect(stageMenuModel({ kind: "matter", stage: M[1], all: M, prevId: null, nextId: null, holdings: { s2: ["m1"] }, shown: 1 }).countDiffers).toBe(false);
+    expect(mat("s3").typeHidden).toBe(true);
+  });
   it("signed_loe never drops; registered goes to a closed stage or drops", () => {
     const signed = mat("s1").delete;
     const reg = mat("s3").delete;
@@ -104,6 +131,7 @@ describe("the menu is drawn only where the page hands it", () => {
     const admin = { all: stages.map((s) => ({ id: s.id, name: s.label, isOpen: s.is_open })), holdings: { s2: ["m1"] } };
     const owner = renderToStaticMarkup(<MatterBoard stages={stages} matters={[matter]} canMove reviewIds={new Set()} ownerName={() => null} stageAdmin={admin} />);
     expect(owner).toContain('aria-label="Stage options: Drafting"');
+    // The panel is closed in a static render; the delete dialog's wording is covered by the model tests.
     expect(owner).not.toContain("Stage options: Registered");
     const other = renderToStaticMarkup(<MatterBoard stages={stages} matters={[matter]} canMove reviewIds={new Set()} ownerName={() => null} />);
     expect(other).not.toContain("Stage options");

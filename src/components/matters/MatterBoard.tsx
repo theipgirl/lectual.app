@@ -45,7 +45,7 @@ export function MatterBoard(props: {
    * (null = couldn't be read). Absent for everyone but an owner membership row, and in a preview. "Closed" and "Not on the docket
    * yet" are not stages and get no menu.
    */
-  stageAdmin?: { all: MenuStage[]; holdings: Record<string, string[]> | null } | null;
+  stageAdmin?: { all: MenuStage[]; holdings: Record<string, string[]> | null; merged?: Record<string, number> | null } | null;
 }) {
   const board = buildBoard(props.stages, props.matters);
   const stageOptions = (props.moveStages ?? props.stages).map((s) => ({ id: s.id, label: s.label, phase: s.phase ?? null }));
@@ -109,19 +109,19 @@ export function MatterBoard(props: {
   // populated ones, and an empty column's are the other empty ones (drawn together when shown).
   const populatedOrder = board.open.filter((c) => !props.collapseEmpty || c.matters.length > 0).map((c) => c.stage.id);
   const emptyOrder = props.collapseEmpty ? board.open.filter((c) => c.matters.length === 0).map((c) => c.stage.id) : [];
-  const menuFor = (stageId: string) => {
+  const menuFor = (stageId: string, shown: number) => {
     const admin = props.stageAdmin;
     const stage = admin?.all.find((s) => s.id === stageId);
     if (!admin || !stage) return undefined;
     const order = emptyOrder.includes(stageId) ? emptyOrder : populatedOrder;
-    return <StageMenu model={stageMenuModel({ kind: "matter", stage, all: admin.all, ...neighbours(order, stageId), holdings: admin.holdings })} />;
+    return <StageMenu model={stageMenuModel({ kind: "matter", stage, all: admin.all, ...neighbours(order, stageId), holdings: admin.holdings, shown })} />;
   };
 
   const column = (key: string, title: string, sub: string | null, matters: Matter[], stale = 0, stageId: string | null = null) => (
     <BoardColumn
       key={key}
       title={title}
-      menu={stageId ? menuFor(stageId) : undefined}
+      menu={stageId ? menuFor(stageId, matters.length) : undefined}
       count={`${matters.length}${stale ? ` · ${stale} gone quiet` : ""}${sub ? ` · ${sub}` : ""}`}
       empty={columnEmpty("matters")}
     >

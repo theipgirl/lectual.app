@@ -2906,4 +2906,12 @@ Spec `docs/pge/2026-11-17-agentic-ip-os/spec-editable-views.md` (build step 3 an
   destination is only reachable from a won stage). A stop that didn't finish is said (`STAGE_DELETED_SEQUENCES_NOTE`); the delete stands.
 - **Working rule and the Stage Keeper:** a `stage_changed` row with `payload.stage_deleted` is never a person's work (`REAL_ACTIVITY_FILTER` and the JS
   both skip it) and never a person's placement: the Stage Keeper's "a person moved this lead in 7 days" check (`countsAsPersonMove` in `run.ts`) ignores it.
+- **Merged leads (0107) in a stage:** `loadStageHoldings("lead")` reads leads WITHOUT the live filter and reports merged ones only as a COUNT per stage
+  (`merged`); their ids are never sent (0119 moves them itself). A stage holding any lead, live or merged, needs a destination on delete and offers no
+  "Change type". "Change type" is never offered on a stage holding a type-bound role (lead `new_enquiry` / `follow_up` / `signed_loe` / `lost`; every
+  matter role). More than 5,000 ids is refused with `STAGE_TOO_MANY_RECORDS`. The Matters dialog says when its count (every matter, closed and filtered-out
+  included) differs from the column. The sequence stop runs in chunks of 80 lead ids (`stopInChunks`) and is ok only when every chunk is. A change
+  revalidates the boards, Reconcile, the Weekly review, Pipeline and the lead / matter pages (`/[id]`, "page").
+- **Not built yet (step 5):** closed matter stages (folded into "Closed") and intake-phase matter stages the Matters board hides have no stage menu. The USPTO
+  compare's role argument has no caller yet.
 - **Not verified:** any database (0119's functions and role column were never called from this app), a real browser (fixed panel placement, focus, phone width).

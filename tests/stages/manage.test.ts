@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { changeStage, placeBeside, orderedIds, type ManagedStage, type StageDeps } from "@/lib/stages/manage";
+import { changeStage, placeBeside, orderedIds, stopInChunks, MAX_DELETE_IDS, type ManagedStage, type StageDeps } from "@/lib/stages/manage";
 import { stageErrorSentence, isStageFunctionMissing } from "@/lib/stages/errors";
 import * as W from "@/lib/ui/words";
 
@@ -142,6 +142,23 @@ describe("delete", () => {
     await changeStage(deps, "matter", { op: "delete", stageId: id(11), destination: id(12), expectedIds: [id(31)], confirmOpenChange: true });
     expect(calls[0].args).toEqual({ p_stage: id(11), p_destination: id(12), p_expected_ids: [id(31)], p_role_to: null, p_confirm_open_change: true });
   });
+  it("more ids than one delete takes: its own sentence, no call", async () => {
+    const { deps, calls } = make();
+    const many = Array.from({ length: MAX_DELETE_IDS + 1 }, (_, i) => id(1000 + i));
+    expect(await changeStage(deps, "lead", { op: "delete", stageId: id(2), destination: id(1), expectedIds: many })).toEqual({ ok: false, error: W.STAGE_TOO_MANY_RECORDS });
+    expect(calls).toEqual([]);
+  });
+  it("sequence stops go in chunks of 80; ok only when every chunk is", async () => {
+    const ids = Array.from({ length: 170 }, (_, i) => id(2000 + i));
+    const seen: number[] = [];
+    expect(await stopInChunks(ids, async (c) => (seen.push(c.length), true))).toBe(true);
+    expect(seen).toEqual([80, 80, 10]);
+    let n = 0;
+    const tried: number[] = [];
+    expect(await stopInChunks(ids, async (c) => (tried.push(c.length), n++ !== 1))).toBe(false);
+    expect(tried).toEqual([80, 80, 10]);
+    expect(await stopInChunks(ids, async () => Promise.reject(new Error("x")))).toBe(false);
+  });
   it("ids that aren't ids are refused before the call", async () => {
     const { deps, calls } = make();
     expect((await changeStage(deps, "lead", { op: "delete", stageId: id(2), destination: id(1), expectedIds: ["x"] })).ok).toBe(false);
@@ -175,6 +192,7 @@ describe("errors", () => {
       "stage_bad_position", "stage_bad_category", "stage_delete_bad_ids", "stage_delete_needs_destination", "stage_delete_same_stage", "matter_stage_bad_waiting_on",
       "stage_limit", "stage_order_overflow", "stage_not_empty", "stage_last_open", "stage_last_won", "stage_holds_role", "stage_role_taken",
       "stage_role_category_mismatch", "stage_role_delete", "stage_delete_records_changed", "stage_delete_won_destination", "stage_delete_won_source", "stage_delete_open_mismatch",
+      "matter_stage_bad_phase", "matter_stage_phase_unavailable",
     ];
     for (const p of prefixes) {
       const s = stageErrorSentence({ code: "23514", message: `${p}: secret database words` });

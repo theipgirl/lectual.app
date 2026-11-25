@@ -1848,6 +1848,10 @@ export const stageDeleteHolds = (n: number, kind: "lead" | "matter") =>
   n === 0 ? `It holds no ${kind === "lead" ? "leads" : "matters"}.` : `It holds ${n} ${kind === "lead" ? (n === 1 ? "lead" : "leads") : n === 1 ? "matter" : "matters"}.`;
 export const stageDeleteMoveTo = (n: number, kind: "lead" | "matter") => `Move ${n === 1 ? `the ${kind}` : `all ${n} ${kind === "lead" ? "leads" : "matters"}`} to`;
 export const STAGE_DELETE_CHOOSE = "Choose a stage";
+export const stageDeleteMerged = (n: number) => (n === 1 ? "One of them is a merged duplicate. It moves too." : `${n} of them are merged duplicates. They move too.`);
+export const STAGE_DELETE_COUNT_WIDER = "This count includes closed matters and any the board's filters hide.";
+export const STAGE_TOO_MANY_RECORDS = "This stage holds too many records to delete here.";
+export const STAGE_PHASE_BAD = "That docket group isn't one this firm uses. Refresh and try again.";
 export const STAGE_DELETE_ALSO_OPEN = "Also change open/closed";
 export const stageRoleAsk = (role: string) => `This stage is your “${role}” stage. Which stage takes that over?`;
 export const STAGE_ROLE_DROP = "Drop the role";

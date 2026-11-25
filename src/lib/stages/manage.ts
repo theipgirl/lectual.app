@@ -10,6 +10,7 @@ import {
   STAGE_NAME_EMPTY,
   STAGE_OWNER_ONLY,
   STAGE_PLACE_GONE,
+  STAGE_TOO_MANY_RECORDS,
   stageNameTooLong,
 } from "@/lib/ui/words";
 import { isStageLockError, stageErrorSentence } from "./errors";
@@ -59,10 +60,33 @@ const WAITING_ON = ["firm", "client", "uspto", "court"] as const;
 const PHASES = ["pipeline", "pre_filing", "post_filing", "maintenance", "inactive"] as const;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const NAME_MAX: Record<StageKind, number> = { lead: 80, matter: 200 };
+/** The most record ids one delete sends (a request has to stay a sane size). */
+export const MAX_DELETE_IDS = 5000;
 
 const isUuid = (v: unknown): v is string => typeof v === "string" && UUID.test(v);
 const isSide = (v: unknown): v is "left" | "right" => v === "left" || v === "right";
 const fail = (error: string): StageResult => ({ ok: false, error });
+
+/** How many lead ids one sequence-stop call takes (the stop reads the leads with an `in` filter; a long list would not fit a URL). */
+export const STOP_CHUNK = 80;
+
+/**
+ * Stop sequences for `leadIds` in chunks of `STOP_CHUNK`, one call after another. True only when EVERY chunk finished; a chunk that
+ * failed (or threw) does not stop the others from being tried.
+ */
+export async function stopInChunks(leadIds: readonly string[], stop: (ids: string[]) => Promise<boolean>, size = STOP_CHUNK): Promise<boolean> {
+  let all = true;
+  for (let i = 0; i < leadIds.length; i += size) {
+    let ok = false;
+    try {
+      ok = await stop(leadIds.slice(i, i + size));
+    } catch {
+      ok = false;
+    }
+    if (!ok) all = false;
+  }
+  return all;
+}
 
 /** The firm's stages in the one order the functions use (order_index, then name, then id; a matter stage's name is its label). */
 export function orderedIds(stages: readonly ManagedStage[]): string[] {
@@ -199,7 +223,8 @@ export async function changeStage(deps: StageDeps, kindIn: unknown, input: unkno
       if (!isUuid(op.stageId)) return fail(STAGE_GONE);
       // The ids the dialog showed, passed through as they came: the database compares them with who is in the stage now.
       const ids = Array.isArray(op.expectedIds) ? op.expectedIds : null;
-      if (!ids || ids.length > 5000 || !ids.every(isUuid)) return fail(stageErrorSentence({ message: "stage_delete_bad_ids:" }, kind));
+      if (ids && ids.length > MAX_DELETE_IDS) return fail(STAGE_TOO_MANY_RECORDS);
+      if (!ids || !ids.every(isUuid)) return fail(stageErrorSentence({ message: "stage_delete_bad_ids:" }, kind));
       const destination = op.destination === null || op.destination === undefined || op.destination === "" ? null : op.destination;
       if (destination !== null && !isUuid(destination)) return fail(stageErrorSentence({ message: "stage_delete_bad_destination:" }, kind));
       const roleTo = op.roleTo === null || op.roleTo === undefined || op.roleTo === "" ? null : op.roleTo;

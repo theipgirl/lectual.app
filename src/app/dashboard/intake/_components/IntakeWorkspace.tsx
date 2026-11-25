@@ -113,7 +113,7 @@ export default function IntakeWorkspace({
    * The owner's stage menu on the stage board (spec-editable-views.md 3b): every lead stage the firm has (role included) and what
    * each holds (null = couldn't be read). Absent for everyone but an owner membership row, and in a preview.
    */
-  stageAdmin?: { all: MenuStage[]; holdings: Record<string, string[]> | null } | null;
+  stageAdmin?: { all: MenuStage[]; holdings: Record<string, string[]> | null; merged?: Record<string, number> | null } | null;
   /** `canSeeFormsAndProposals(role)`: offer "Open your intake form" in the empty state. Absent = not offered. */
   showFormsLink?: boolean;
   /** The rows of the server's set: the intake list, or the lost leads when `lostView`. */

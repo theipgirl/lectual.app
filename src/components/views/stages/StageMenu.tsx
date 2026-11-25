@@ -41,6 +41,8 @@ import {
   STAGE_WON_WARNING,
   stageDeleteAsk,
   stageDeleteHolds,
+  stageDeleteMerged,
+  STAGE_DELETE_COUNT_WIDER,
   stageDeleteMoveTo,
   stageMenuLabel,
   stageRoleAsk,
@@ -220,7 +222,8 @@ export function StageMenu({ model }: { model: StageMenuModel }) {
   );
 
   const del = model.delete;
-  const holdsCount = model.holds?.length ?? 0;
+  // Live AND merged: a merged duplicate still has to go somewhere (0119 moves it with the others), so it needs a destination too.
+  const holdsCount = model.total;
   const destinations = del.available ? [...del.destinations, ...(alsoFlip ? del.otherOpenDestinations : [])] : [];
   const nameMax = kind === "lead" ? 80 : 200;
 
@@ -244,10 +247,11 @@ export function StageMenu({ model }: { model: StageMenuModel }) {
                 {model.nextId && <Fragment>{item(COLUMN_MENU_RIGHT, () => run({ op: "move", stageId: stage.id, beside: model.nextId, side: "right" }))}</Fragment>}
                 {item(STAGE_MENU_ADD_LEFT, () => (setSide("left"), setCategory("open"), setMode("add")))}
                 {item(STAGE_MENU_ADD_RIGHT, () => (setSide("right"), setCategory("open"), setMode("add")))}
-                {item(kind === "lead" ? STAGE_MENU_TYPE : STAGE_MENU_OPEN_CLOSED, () => setMode("type"), !model.canChangeType, model.canChangeType ? undefined : STAGE_TYPE_ONLY_EMPTY)}
+                {/* A stage holding a role tied to its type never offers a type change (the role would no longer fit). */}
+                {!model.typeHidden && item(kind === "lead" ? STAGE_MENU_TYPE : STAGE_MENU_OPEN_CLOSED, () => setMode("type"), !model.canChangeType, model.canChangeType ? undefined : STAGE_TYPE_ONLY_EMPTY)}
                 {item(STAGE_MENU_DELETE, () => (setAlsoFlip(false), setNoWon(false), setMode("delete")))}
               </div>
-              {!model.canChangeType && <p className="lx-note cm-foot">{STAGE_TYPE_ONLY_EMPTY}</p>}
+              {!model.typeHidden && !model.canChangeType && <p className="lx-note cm-foot">{STAGE_TYPE_ONLY_EMPTY}</p>}
               <p className="lx-note cm-foot">{STAGE_CHANGES_NOTE}</p>
             </>
           )}
@@ -349,6 +353,8 @@ export function StageMenu({ model }: { model: StageMenuModel }) {
               ) : (
                 <>
                   <p className="lx-note">{stageDeleteHolds(holdsCount, kind)}</p>
+                  {model.merged > 0 && <p className="lx-note">{stageDeleteMerged(model.merged)}</p>}
+                  {model.countDiffers && <p className="lx-note">{STAGE_DELETE_COUNT_WIDER}</p>}
                   {holdsCount > 0 && kind === "matter" && del.otherOpenDestinations.length > 0 && (
                     <label className="cm-field cm-tick">
                       <span>

@@ -22,9 +22,17 @@ export type StageMenuModel = {
   kind: StageKind;
   prevId: string | null;
   nextId: string | null;
-  /** null: the holdings couldn't be read. */
+  /** null: the holdings couldn't be read. LIVE records only (merged leads are in `merged`). */
   holds: string[] | null;
+  /** Merged leads sitting in the stage (lead stages; 0 for matters). They block a type change and need a destination on delete. */
+  merged: number;
+  /** Live and merged: how many records the delete moves. 0 when unread. */
+  total: number;
   canChangeType: boolean;
+  /** The stage holds a role tied to its type (lead new_enquiry / follow_up / signed_loe / lost; every matter role): no "Change type" at all. */
+  typeHidden: boolean;
+  /** Matter: the column on the board shows a different number than the stage holds (closed or filtered-out matters). */
+  countDiffers: boolean;
   /** A lead stage that is the firm's only won stage (changing its type or deleting it needs the "No won stage" tick). */
   lastWon: boolean;
   delete:
@@ -40,6 +48,9 @@ export type StageMenuModel = {
       };
 };
 
+/** Lead roles 0119 ties to a category: changing the type of the stage holding one would be refused (or leave the role misfit). */
+const TYPE_BOUND_LEAD_ROLES: readonly string[] = ["new_enquiry", "follow_up", "signed_loe", "lost"];
+
 export function stageMenuModel(input: {
   kind: StageKind;
   stage: MenuStage;
@@ -49,12 +60,31 @@ export function stageMenuModel(input: {
   nextId: string | null;
   /** stage id -> record ids; null = couldn't be read. */
   holdings: Readonly<Record<string, readonly string[]>> | null;
+  /** Lead stages: stage id -> merged leads there (read with `holdings`). */
+  merged?: Readonly<Record<string, number>> | null;
+  /** How many records the board column shows for this stage, when the page knows. */
+  shown?: number;
 }): StageMenuModel {
   const { kind, stage, all } = input;
   const holds = input.holdings ? [...(input.holdings[stage.id] ?? [])] : null;
+  const merged = holds !== null && kind === "lead" ? (input.merged?.[stage.id] ?? 0) : 0;
+  const total = holds === null ? 0 : holds.length + merged;
   const others = all.filter((s) => s.id !== stage.id);
   const lastWonStage = kind === "lead" && stage.category === "won" && !others.some((s) => s.category === "won");
-  const base = { stage, kind, prevId: input.prevId, nextId: input.nextId, holds, canChangeType: holds !== null && holds.length === 0, lastWon: lastWonStage };
+  const typeHidden = kind === "lead" ? TYPE_BOUND_LEAD_ROLES.includes(String(stage.role)) : isMatterStageRole(stage.role);
+  const base = {
+    stage,
+    kind,
+    prevId: input.prevId,
+    nextId: input.nextId,
+    holds,
+    merged,
+    total,
+    canChangeType: !typeHidden && holds !== null && total === 0,
+    typeHidden,
+    countDiffers: kind === "matter" && holds !== null && input.shown !== undefined && input.shown !== holds.length,
+    lastWon: lastWonStage,
+  };
   if (holds === null) return { ...base, delete: { available: false, reason: "unreadable" } };
 
   if (kind === "lead") {

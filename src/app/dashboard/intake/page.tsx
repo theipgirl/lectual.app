@@ -266,10 +266,12 @@ export default async function IntakePage({
   // staff acting in a firm are not owners), never in a preview. What each stage holds is read only then, for the delete dialog; a
   // failed read offers no delete and no type change rather than calling a stage empty. Every action asks the row again.
   const stageOwner = isOwner(await loadOwnerState()) && !(await inPreview());
+  const held = stageOwner ? await loadStageHoldings("lead") : null;
   const stageAdmin = stageOwner
     ? {
         all: stages.map((s) => ({ id: s.id, name: s.name, category: s.category, role: s.role ?? null })),
-        holdings: await loadStageHoldings("lead").then((h) => (h.status === "ok" ? h.byStage : null)),
+        holdings: held?.status === "ok" ? held.byStage : null,
+        merged: held?.status === "ok" ? held.merged : null,
       }
     : null;
 
