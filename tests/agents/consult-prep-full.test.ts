@@ -11,7 +11,8 @@ import type { InternalMail, InternalMailResult } from "@/lib/mail/internal-mail"
 import type { StructuredCall } from "@/lib/ai/claude";
 import type { QueueItem } from "@/lib/queue/api";
 import { agentCtx, assertOrgFenced, NOW, ORG } from "./helpers";
-import { memDb, type Row, type Tables } from "./mem-db";
+import { memDb, type DbError, type Row, type Tables } from "./mem-db";
+import type { Recorded } from "../mailbox/fake-db";
 import { FIRM, JUDGMENT, PDF_BYTES, usptoFetch } from "../consult-prep/full-fixtures";
 import type { RoutePlan } from "@/lib/consult-prep/judge/schemas";
 
@@ -47,18 +48,18 @@ function model(...outputs: Array<unknown>) {
   return { llm, calls };
 }
 
-type Run = { now?: number; llm?: unknown[]; scope?: import("@/lib/agents/types").RunScope; mailOut?: (m: InternalMail) => Promise<InternalMailResult>; full?: boolean; withBuilder?: boolean };
+type Run = { now?: number; llm?: unknown[]; queue?: boolean; scope?: import("@/lib/agents/types").RunScope; mailOut?: (m: InternalMail) => Promise<InternalMailResult>; full?: boolean; withBuilder?: boolean };
 
 /** One firm's world, run as many times as a test likes (the database, the sends and the saved files persist across runs). */
-function world(initial: Tables = tables()) {
-  const db = memDb(initial);
+function world(initial: Tables = tables(), failures?: (q: Recorded) => DbError | undefined) {
+  const db = memDb(initial, { failures });
   const sent: InternalMail[] = [];
   const saved = new Map<string, PrepFile[]>();
   const files = {
     save: vi.fn(async ({ prepKey, files: f }: { leadId: string; prepKey: string; files: readonly PrepFile[] }) => {
-      if (saved.has(prepKey)) return { saved: 0, already: f.length, skipped: 0, failed: 0 };
+      if (saved.has(prepKey)) return { saved: 0, already: f.length, skipped: 0, failed: 0, unlogged: 0 };
       saved.set(prepKey, [...f]);
-      return { saved: f.length, already: 0, skipped: 0, failed: 0 };
+      return { saved: f.length, already: 0, skipped: 0, failed: 0, unlogged: 0 };
     }),
     load: vi.fn(async ({ prepKey }: { leadId: string; prepKey: string }) => ({ state: "ok" as const, files: saved.get(prepKey) ?? [] })),
   };
@@ -72,7 +73,7 @@ function world(initial: Tables = tables()) {
     const m = model(...(r.llm ?? [PLAN, JUDGMENT]));
     const made = agentCtx(handler, {
       autonomy: "draft",
-      queue: true,
+      queue: r.queue ?? true,
       llm: m.llm,
       // No client-prep template: the only model calls are the full build's.
       modules: ["mailbox"],
@@ -220,8 +221,17 @@ describe("consult prep builds the full brief (S2b)", () => {
     expect(w.sends().find((p) => p.kind === "booked")?.status).toBe("sent");
   });
 
-  it("a duplicate (409) or a rate limit (429) is not re-posted without the files", async () => {
-    for (const http of [409, 429]) {
+  it("only a refusal that plausibly means the files (400, 413, 422) is re-posted without them", async () => {
+    for (const http of [400, 413]) {
+      const w = world();
+      const posts: InternalMail[] = [];
+      await w.run({ mailOut: async (m) => (posts.push(m), m.attachments ? { status: "failed", http } : { status: "sent", id: "x" }) });
+      expect(posts.some((p) => p.idempotencyKey?.endsWith(":noatt"))).toBe(true);
+    }
+  });
+
+  it("a duplicate (409), a rate limit (429), a bad key or sender (401, 403) or a timeout (408) is not re-posted without the files", async () => {
+    for (const http of [401, 403, 408, 409, 429]) {
       const w = world();
       const posts: InternalMail[] = [];
       await w.run({ mailOut: async (m) => (posts.push(m), { status: "failed", http }) });
@@ -263,5 +273,77 @@ describe("consult prep builds the full brief (S2b)", () => {
     const r = await w.run({ withBuilder: false });
     expect(r.calls).toHaveLength(0);
     expect(w.sends().map((p) => p.status)).toEqual(["withheld", "withheld", "scheduled"]);
+  });
+
+  it("no approval queue: no build is tried (the full text could not be kept for later emails); the prep is S2a's facts prep, and the summary says so", async () => {
+    const w = world();
+    const r = await w.run({ queue: false });
+    expect(r.calls).toHaveLength(0);
+    expect(r.builder).not.toHaveBeenCalled();
+    expect(w.sends().map((p) => [p.kind, p.status, p.quality ?? "full"])).toEqual([
+      ["booked", "withheld", "full"],
+      ["24h", "withheld", "full"],
+      ["1h", "scheduled", "facts"],
+    ]);
+    expect(w.markers()[0].payload).not.toHaveProperty("full");
+    expect(r.result.summary).toContain("got the facts brief only: a full prep is kept in Approvals for every email, and no approval queue is connected.");
+  });
+
+  it("the BRIEFING can't be queued: nothing is sent as full and nothing is marked (the next run tries again, within the attempt cap)", async () => {
+    const w = world();
+    w.items.push = () => {
+      throw new Error("queue down");
+    };
+    const r = await w.run();
+    expect(w.sent).toEqual([]);
+    expect(w.markers()).toEqual([]);
+    expect(w.files.save).not.toHaveBeenCalled();
+    expect(r.result.summary).toContain("could not be prepped and will be tried again");
+  });
+
+  it("a marker that fails to write is repaired by the next run from the build record: no rebuild, no second BRIEFING", async () => {
+    let failMarkers = true;
+    const w = world(tables(), (q) =>
+      failMarkers && q.table === "crm_activity" && q.action === "insert" && [q.values].flat().some((v) => (v as Row).type === "queue_drafted") ? { message: "x" } : undefined,
+    );
+    const first = await w.run();
+    expect(first.calls).toHaveLength(2);
+    expect(w.items).toHaveLength(1);
+    expect(w.markers()).toHaveLength(0);
+    failMarkers = false;
+    const second = await w.run({ now: NOW + 3_600_000 });
+    expect(second.calls).toHaveLength(0);
+    expect(second.builder).not.toHaveBeenCalled();
+    expect(w.items).toHaveLength(1);
+    expect(w.markers()[0].payload).toMatchObject({ full: true, queueItemId: "q-1", attach: { uspto_xlsx: "built", packages_pdf: "built" } });
+    expect(second.result.summary).toContain("recorded on the lead now (nothing rebuilt)");
+    // And from then on it is an ordinary prepped consult.
+    const third = await w.run({ now: NOW + 2 * 3_600_000 });
+    expect(third.calls).toHaveLength(0);
+    expect(w.items).toHaveLength(1);
+  });
+
+  it("a prep is built at most MAX_BUILD_ATTEMPTS times, however many runs see it owed", async () => {
+    const w = world();
+    let total = 0;
+    for (let i = 0; i < 6; i += 1) {
+      const r = await w.run({ now: NOW + i * 600_000, llm: [new Error("down")] });
+      total += r.calls.length;
+    }
+    expect(total).toBe(3);
+    const builds = w.db.tables.crm_activity.filter((a) => (a.payload as { source?: string }).source === "consult-prep-build");
+    expect(builds.filter((b) => (b.payload as { status?: string }).status === "started")).toHaveLength(3);
+  });
+
+  it("a later email whose saved copy can't be read says so (not 'could not be built')", async () => {
+    const w = world({ ...tables(), crm_calendar_event: [event({ starts_at: hours(80) })] });
+    await w.run();
+    w.files.load.mockImplementation(async () => ({ state: "ok" as const, files: [] }));
+    await w.run({ now: NOW + 10 * 3_600_000 });
+    const oneHour = w.sent.at(-1)!;
+    expect(oneHour.attachments).toBeUndefined();
+    expect(oneHour.text).toContain("USPTO search results workbook not attached: the saved copy couldn't be read for this email.");
+    expect(oneHour.text).toContain("Packages PDF not attached: the saved copy couldn't be read for this email.");
+    expect(oneHour.text).not.toContain("could not be built");
   });
 });

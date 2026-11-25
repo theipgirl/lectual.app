@@ -1695,6 +1695,8 @@ export const CONSULT_PREP_RERUN_OFF = "Consult prep isn't switched on for your f
 export const CONSULT_PREP_RERUN_NOTHING = "There is no consult to prepare for this lead yet.";
 export const CONSULT_PREP_RERUN_FAILED = "Couldn't re-run prep. Nothing was changed. Try again in a minute.";
 export const CONSULT_PREP_TIMELINE_PREP = "Consult prep made";
+/** S2b: a full-brief build attempt (`started`) and a full brief kept in Approvals (`queued`). */
+export const consultPrepTimelineBuild = (status: unknown): string => (status === "queued" ? "Consult prep: full brief ready" : "Consult prep: full brief started");
 export const consultPrepTimelineSend = (kind: "booked" | "24h" | "1h", status: "sent" | "scheduled" | "cancelled" | "failed" | "duplicate" | "withheld"): string => {
   const what = kind === "booked" ? "Consult prep email" : kind === "24h" ? "Consult prep reminder, a day before" : "Consult prep reminder, an hour before";
   return `${what}: ${status === "failed" ? "couldn't be sent" : status === "duplicate" ? "already sent by another run" : status === "withheld" ? "waiting for the full prep" : status}`;

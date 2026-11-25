@@ -135,7 +135,7 @@ export function capPdfMarks(
 export function attachmentsForEmail(
   plan: AttachPlan,
   files: readonly PrepFile[],
-  opts: { refused?: boolean; loadFailed?: boolean } = {},
+  opts: { refused?: boolean; loadFailed?: boolean; fromSaved?: boolean } = {},
 ): { attach: PrepFile[]; lines: string[] } {
   const kinds = PREP_FILE_KINDS.filter((k) => plan[k] !== undefined);
   if (kinds.length === 0 || kinds.every((k) => plan[k] === "none")) return { attach: [], lines: [NO_ATTACHMENTS_LINE] };
@@ -151,7 +151,8 @@ export function attachmentsForEmail(
     }
     const file = files.find((f) => f.kind === kind);
     if (!file) {
-      lines.push(missingLine(kind, opts.loadFailed ? "not_loaded" : "failed") as string);
+      // Built, but not here: read back from the saved copies (a later email), it could not be read; built now, it was not kept.
+      lines.push(missingLine(kind, opts.loadFailed || opts.fromSaved ? "not_loaded" : "failed") as string);
       continue;
     }
     if (opts.refused) {

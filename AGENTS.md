@@ -2741,8 +2741,15 @@ still only to the firm's own people through the recipients guard, and the sender
   facts brief is queued as before, booked and 24 h are withheld, the 1 h is facts only, and it is counted by reason. **Retry:** a later run, for a prep with
   no full brief whose booked / 24 h is still owed or whose facts-only 1 h is still waiting at Resend, and only with a queue and Approvals read, builds the
   full prep again; built, it queues a second BRIEFING, writes a `full` marker for the same key (the card shows the newest item), sends what is owed with the
-  files, and the facts 1 h is cancelled and planned again (S2a's upgrade). With no queue a full brief can't be kept for a later email: the build-time
-  emails carry it, a later run's emails are facts only, and no retry is attempted. Reminders of a built prep read the full text back from Approvals.
+  files, and the facts 1 h is cancelled and planned again (S2a's upgrade). Reminders of a built prep read the full text back from Approvals.
+- **No queue = no build.** The full text lives in Approvals, where every later email reads it, so a firm with no approval queue is not built for at
+  all (no model call): its prep is S2a's facts prep (booked and 24 h withheld, 1 h facts only) and the summary says so. A BRIEFING that can't be queued
+  marks nothing and sends nothing (as before); a build whose BRIEFING did not land is never counted as full.
+- **Build records, the attempt cap and the marker repair** (`ai_insight` rows `source: consult-prep-build`, ids and codes only; timeline line from
+  `consultPrepTimelineBuild`, left out of "What Lectual did"). Before any build a `started` row is written (it can't be written = no build), and a queued
+  full brief writes a `queued` row with its item id and file codes. A prep key gets at most `MAX_BUILD_ATTEMPTS` (3) builds, whatever fails (the model,
+  USPTO, a marker that will not write). A full brief that was queued but whose marker did not land is found again from its `queued` row: the next run
+  writes the marker (or, on the retry path, uses that item) and builds nothing and queues nothing again. An unreadable build history builds nothing.
 - **The two files** (`attachments.ts`), each optional (a failure never holds the brief or an email back): the USPTO site's own export workbook
   (`searchUsptoSite` on the mark, then `buildUsptoXlsx` with the firm's calendar date and an image budget clipped to the run's time left) and the packages
   PDF (`buildPackagesSpec` with the grounded, capped, class-number-free marks from `capPdfMarks`, the firm's name, zone, list and slug, then
@@ -2750,22 +2757,29 @@ still only to the firm's own people through the recipients guard, and the sender
 - **Email attachments** (`internal-mail.ts`, still the only file that names Resend, gains `attachments` as name + base64): every email of a built prep
   carries the files, and its body ends with "Attachments" lines saying what this email carries or why a file is missing (fixed sentences, `missingLine`;
   the stored brief never claims a file). A file over 15 MB, or past 25 MB in all, is not attached and is said to be too large (Resend's limit is 40 MB with
-  base64). A later run's email reads the saved copies back (`files.load`); a copy that can't be read is named. **Refused with files** (a 4xx other than 409
-  and 429): posted ONCE more without them under `<key>:noatt`, and the body names each file as refused. Whether Resend keeps the key of a refused request
+  base64). A later run's email reads the saved copies back (`files.load`); a copy that can't be read is named. **Refused with files** (only 400, 413 or
+  422; a 401 / 403 is the key or the sender, 408 a timeout, 409 a duplicate, 429 a rate limit, each a plain failure): posted ONCE more without them under `<key>:noatt`, and the body names each file as refused. Whether Resend keeps the key of a refused request
   is NOT verified, so the re-post never reuses it; a refused request was not accepted, so the re-post cannot double a delivered email. An adopted prep
   (a person's or the skill's) carries no files and no Attachments lines (decision: default no; its files would belong to another build).
+- **Concurrency and crashes (known, not fixed):** two runs that pick up the same consult at the same instant (S1's known race) can BOTH pay for the two
+  model calls and both queue a BRIEFING; their files share one id per kind, so only one copy is saved. A crash after the emails and before the marker
+  rebuilds on the next run with DIFFERENT text under the same idempotency keys: Resend answers 409 (counted as `duplicate`), so nothing is sent twice,
+  but S1's "a re-post carries the same payload" no longer holds for a full prep (the build record caps how often that can happen).
 - **Saved to Documents & files** (`save-files.ts`, `prepFileStore(ctx.admin, orgId)`: the ONE service-role `crm_file` write and storage upload; the client
   is the run's own, nothing imported for it). The org is the LEAD ROW's (re-read live and org-fenced; a merged or foreign lead saves nothing); the path is
   `buildStoragePath` (`{org}/lead/{lead}/{file}.{ext}`), the type `checkFileName`'s, the size the real byte count, the row exactly the scoped flow's
   columns; object first, then the row (a refused row removes the object), then a `file_uploaded` activity carrying `source: consult-prep`, `prep_key` and
-  `kind`. **Once per prep key:** those activity rows are what "done" is read from; a kind already saved for the key is skipped, and reminders never save.
-  A re-run's key saves its own. No bucket or no table is `skipped`; an unreadable done-check saves nothing. Never throws into the run; counts only.
+  `kind`. **Once per prep key:** the file's id is derived from (org, prep key, kind) (`prepFileId`), so "saved" is the `crm_file` row itself (a timeline
+  entry that did not land is only counted as `unlogged`), a duplicate id is "already", and an object left by a half-finished save is reused. Reminders
+  never save; a re-run's key saves its own. No bucket or no table is `skipped`; an unreadable done-check saves nothing. Never throws into the run.
+  A saved copy whose row or object can't be read back is named in the email as "the saved copy couldn't be read", never "could not be built".
 - **Counts only** in the summary (`full preps built`, failures by reason in words, emails re-sent without attachments, files saved / skipped / not saved),
   `agent_run`, logs and errors: never a name, mark, file name or brief text. `next.config.ts` traces the PDF fonts for `/dashboard/**` and `/api/cron/**`
   (Run now, the stage hook's `after()` in any page that moves a lead, the mail sync's Stage Keeper).
 - **Tests:** `tests/consult-prep/{full-build,save-files,attachments}.test.ts`, `tests/agents/consult-prep-full.test.ts`, the attachments block of
   `tests/consult-prep/internal-mail.test.ts`. Engine tests without a `full` dep run exactly as S2a (the builder is a dependency; production wires it in
-  `deps.ts`). **Existing assertion changed:** `tests/ui/no-build-words.test.ts` gains an allow-list entry for `compose.ts` ("scope" is the legal term).
+  `deps.ts`). Review fixes add: no queue, a queue failure, the attempt cap, the marker repair, a saved copy that can't be read, which refusals re-post,
+  and `saved` judged from the row. **Existing assertion changed:** `tests/ui/no-build-words.test.ts` gains an allow-list entry for `compose.ts` ("scope" is the legal term).
 - **NOT verified:** a live Resend with attachments (the `attachments` body shape, a `scheduled_at` email with attachments, what Resend does with a
   refused request's idempotency key), a live model (Sonnet on the two structured calls), a live USPTO (both endpoints and the mark images), a real
   `client-files` bucket upload and download from the service role, Vercel's tracing of the fonts for the new route globs, a real browser.

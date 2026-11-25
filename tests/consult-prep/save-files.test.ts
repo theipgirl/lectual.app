@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { prepFileStore } from "@/lib/consult-prep/save-files";
+import { prepFileId, prepFileStore } from "@/lib/consult-prep/save-files";
 import type { PrepFile } from "@/lib/consult-prep/attachments";
 import { memDb, type DbError, type Tables } from "../agents/mem-db";
 import type { Recorded } from "../mailbox/fake-db";
@@ -56,10 +56,35 @@ function setup(tables: Tables, opts: { storage?: StorageOpts; failures?: (q: Rec
 const lead = (over: Record<string, unknown> = {}) => ({ id: LEAD, org_id: ORG, merged_into_id: null, ...over });
 
 describe("prepFileStore.save", () => {
+  it("'saved' is the crm_file row itself: a timeline entry that did not land still counts, and a second save writes nothing", async () => {
+    const s = setup({ crm_lead: [lead()], crm_file: [], crm_activity: [] }, { failures: (q: Recorded) => (q.table === "crm_activity" && q.action === "insert" ? { message: "x" } : undefined) });
+    expect(await s.store.save({ leadId: LEAD, prepKey: KEY, files })).toEqual({ saved: 2, already: 0, skipped: 0, failed: 0, unlogged: 2 });
+    expect(s.db.tables.crm_file.map((r) => r.id).sort()).toEqual([prepFileId(ORG, KEY, "packages_pdf"), prepFileId(ORG, KEY, "uspto_xlsx")].sort());
+    s.events.length = 0;
+    expect(await s.store.save({ leadId: LEAD, prepKey: KEY, files })).toEqual({ saved: 0, already: 2, skipped: 0, failed: 0, unlogged: 0 });
+    expect(s.events).toEqual([]);
+    // And a later email reads them back without the timeline entries.
+    const back = await s.store.load({ leadId: LEAD, prepKey: KEY });
+    expect(back.state === "ok" ? back.files.length : -1).toBe(2);
+  });
+
+  it("an object left by a half-finished save is reused (same id, same path): no second copy", async () => {
+    const s = setup({ crm_lead: [lead()], crm_file: [], crm_activity: [] });
+    const path = `${ORG}/lead/${LEAD}/${prepFileId(ORG, KEY, "uspto_xlsx")}.xlsx`;
+    s.objects.set(path, Buffer.from("old"));
+    const admin = s.admin as unknown as { storage: { from: (b: string) => { upload: (...a: unknown[]) => Promise<unknown> } } };
+    const realFrom = admin.storage.from;
+    admin.storage.from = (b: string) => ({ ...realFrom(b), upload: async (p: unknown) => (p === path ? { data: null, error: { message: "The resource already exists", statusCode: "409" } } : realFrom(b).upload(p, Buffer.from("x"), { contentType: "x", upsert: false })) });
+    const out = await prepFileStore(s.admin, ORG).save({ leadId: LEAD, prepKey: KEY, files: [files[0]] });
+    expect(out.saved).toBe(1);
+    expect(s.db.tables.crm_file).toHaveLength(1);
+    expect(s.db.tables.crm_file[0].storage_path).toBe(path);
+  });
+
   it("uploads the object, then inserts the row, then logs file_uploaded, with the org from the lead row, the path rule and the mapped type", async () => {
     const s = setup({ crm_lead: [lead()], crm_file: [], crm_activity: [] });
     const out = await s.store.save({ leadId: LEAD, prepKey: KEY, files });
-    expect(out).toEqual({ saved: 2, already: 0, skipped: 0, failed: 0 });
+    expect(out).toEqual({ saved: 2, already: 0, skipped: 0, failed: 0, unlogged: 0 });
     expect(s.events[0]).toMatch(new RegExp(`^upload client-files ${ORG}/lead/${LEAD}/[0-9a-f-]{36}\\.xlsx application/vnd\\.openxmlformats-officedocument\\.spreadsheetml\\.sheet upsert=false$`));
     expect(s.events[1]).toBe("insert crm_file");
     expect(s.events[2]).toBe("insert crm_activity");
@@ -82,7 +107,7 @@ describe("prepFileStore.save", () => {
     const s = setup({ crm_lead: [lead()], crm_file: [], crm_activity: [] });
     await s.store.save({ leadId: LEAD, prepKey: KEY, files });
     s.events.length = 0;
-    expect(await s.store.save({ leadId: LEAD, prepKey: KEY, files })).toEqual({ saved: 0, already: 2, skipped: 0, failed: 0 });
+    expect(await s.store.save({ leadId: LEAD, prepKey: KEY, files })).toEqual({ saved: 0, already: 2, skipped: 0, failed: 0, unlogged: 0 });
     expect(s.events).toEqual([]);
     // A re-run's key is another prep: it saves its own.
     expect((await s.store.save({ leadId: LEAD, prepKey: `${KEY}:rerun:1`, files })).saved).toBe(2);
@@ -99,12 +124,12 @@ describe("prepFileStore.save", () => {
 
   it("no bucket is skipped (storage not switched on); a row that can't be written removes its object; nothing throws", async () => {
     const nobucket = setup({ crm_lead: [lead()], crm_file: [], crm_activity: [] }, { storage: { uploadError: { message: "Bucket not found" } } });
-    expect(await nobucket.store.save({ leadId: LEAD, prepKey: KEY, files })).toEqual({ saved: 0, already: 0, skipped: 2, failed: 0 });
+    expect(await nobucket.store.save({ leadId: LEAD, prepKey: KEY, files })).toEqual({ saved: 0, already: 0, skipped: 2, failed: 0, unlogged: 0 });
     const notable = setup({ crm_lead: [lead()], crm_activity: [] }, { failures: (q: Recorded) => (q.table === "crm_file" && q.action === "insert" ? { message: "x", code: "42P01" } : undefined) });
-    expect(await notable.store.save({ leadId: LEAD, prepKey: KEY, files })).toEqual({ saved: 0, already: 0, skipped: 2, failed: 0 });
+    expect(await notable.store.save({ leadId: LEAD, prepKey: KEY, files })).toEqual({ saved: 0, already: 0, skipped: 2, failed: 0, unlogged: 0 });
     expect(notable.events.some((e) => e.startsWith("remove "))).toBe(true);
     expect(notable.objects.size).toBe(0);
-    const unreadable = setup({ crm_lead: [lead()], crm_file: [], crm_activity: [] }, { failures: (q: Recorded) => (q.table === "crm_activity" && q.action === "select" ? { message: "x" } : undefined) });
+    const unreadable = setup({ crm_lead: [lead()], crm_file: [], crm_activity: [] }, { failures: (q: Recorded) => (q.table === "crm_file" && q.action === "select" ? { message: "x" } : undefined) });
     expect((await unreadable.store.save({ leadId: LEAD, prepKey: KEY, files })).failed).toBe(2);
     expect(unreadable.events).toEqual([]);
   });
@@ -116,5 +141,11 @@ describe("prepFileStore.save", () => {
     expect(back.state).toBe("ok");
     if (back.state === "ok") expect(back.files.map((f) => [f.kind, f.fileName, f.bytes.toString()]).sort()).toEqual(files.map((f) => [f.kind, f.fileName, f.bytes.toString()]).sort());
     expect(await s.store.load({ leadId: LEAD, prepKey: "other" })).toEqual({ state: "ok", files: [] });
+  });
+
+  it("a saved copy that can't be downloaded is left out (the email then says it couldn't be read)", async () => {
+    const s = setup({ crm_lead: [lead()], crm_file: [], crm_activity: [] }, { storage: { downloadMissing: true } });
+    await s.store.save({ leadId: LEAD, prepKey: KEY, files });
+    expect(await s.store.load({ leadId: LEAD, prepKey: KEY })).toEqual({ state: "ok", files: [] });
   });
 });

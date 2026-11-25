@@ -12,6 +12,9 @@
 /** `payload.source` on the `ai_insight` rows that record one email send (booked, 24h, 1h). */
 export const PREP_SEND_SOURCE = "consult-prep-send";
 
+/** `payload.source` on the `ai_insight` rows that record a full-brief build attempt (`started`) and a queued full brief (`queued`, its item id). S2b. */
+export const PREP_BUILD_SOURCE = "consult-prep-build";
+
 /** `payload.kind` of the `queue_drafted` marker that records the prep itself and points at its stored brief. */
 export const PREP_BRIEF_KIND = "brief";
 

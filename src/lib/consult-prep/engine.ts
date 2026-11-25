@@ -28,7 +28,7 @@ import { briefOwnWording, renderAdoptedBrief, renderConsultBrief, type BriefFact
 import { attachmentsForEmail, type AttachPlan, type PrepFile } from "./attachments";
 import type { FullBuild, FullBuildFailure } from "./full";
 import type { PrepFileStore } from "./save-files";
-import { PREP_BRIEF_KIND, PREP_SEND_SOURCE, eventPrepKey, markerEventId, normalizedStart, parsePrepKey, rerunKey, stagePrepKey } from "./keys";
+import { PREP_BRIEF_KIND, PREP_BUILD_SOURCE, PREP_SEND_SOURCE, eventPrepKey, markerEventId, normalizedStart, parsePrepKey, rerunKey, stagePrepKey } from "./keys";
 import { readLawmaticsIntake, type LawmaticsRead, type ProspectReader } from "./lawmatics-intake";
 import { CONSULT_PREP_KEY, guardRecipients, parseRecipientSetting } from "./recipients";
 import type { GuardResult } from "./recipients";
@@ -187,13 +187,21 @@ type Counts = {
   filesSaved: number;
   filesSkipped: number;
   filesFailed: number;
+  /** S2b: files saved whose timeline entry did not land. */
+  filesUnlogged: number;
+  /** S2b: consults that got the facts brief only because the firm has no queue (a full prep's text is kept in Approvals for every email). */
+  fullNoQueue: number;
+  /** S2b: full builds not tried because this prep already had MAX_BUILD_ATTEMPTS attempts. */
+  buildCapped: number;
+  /** S2b: preps whose full brief was queued on an earlier run but whose marker was not written: the marker was written now, nothing rebuilt. */
+  repaired: number;
   unreadSections: Record<string, number>;
 };
 
 const emptyCounts = (): Counts => ({
   prepped: 0, drafts: 0, noAddress: 0, noTemplate: 0, refused: 0, failed: 0, partial: 0, unrecorded: 0, sent: 0, scheduled: 0, cancelled: 0,
   cancelUnchecked: 0, noRecipients: 0, emailOff: 0, recipientsUnread: 0, sendFailed: 0, nothingToDeliver: 0, mergedSkipped: 0, duplicate: 0, leadsOver: 0, leftSkipped: 0, twins: 0, alreadyPrepped: 0, leftCancelled: 0, recipientsChanged: 0, over: 0, deferred: 0, adopted: 0, adoptionUnread: 0, withheld: 0, factsOnly: 0, upgraded: 0, adoptedGone: 0,
-  fullBuilt: 0, fullFailed: {}, attachRefused: 0, filesSaved: 0, filesSkipped: 0, filesFailed: 0,
+  fullBuilt: 0, fullFailed: {}, attachRefused: 0, filesSaved: 0, filesSkipped: 0, filesFailed: 0, filesUnlogged: 0, fullNoQueue: 0, buildCapped: 0, repaired: 0,
   unreadSections: { answers: 0, mail: 0, meetings: 0, files: 0, lawmatics: 0, labels: 0 },
 });
 
@@ -536,7 +544,13 @@ type PrepContent = {
 };
 
 /** A refusal of the request itself (not a duplicate, not a rate limit): the one case the email is re-posted without its files. */
-const refusedWithFiles = (r: InternalMailResult): boolean => r.status === "failed" && r.http !== null && r.http >= 400 && r.http < 500 && r.http !== 409 && r.http !== 429;
+const ATTACHMENT_REFUSALS: readonly number[] = [400, 413, 422];
+/**
+ * A refusal that plausibly means the FILES were refused (a bad request, too large, unprocessable): the one case the email is re-posted
+ * without them. A 401 / 403 (the key, or a sender the account has not verified), 408, 409 or 429 is a plain failure or retry, never "the mail
+ * service refused attachments".
+ */
+const refusedWithFiles = (r: InternalMailResult): boolean => r.status === "failed" && r.http !== null && ATTACHMENT_REFUSALS.includes(r.http);
 
 /** Approvals as one run sees it, read once: the pending and approved items. `none`: no queue (or no reader), so nothing to reuse. */
 type Approvals = { state: "ok"; items: QueueItem[] } | { state: "none" } | { state: "unavailable" };
@@ -640,7 +654,8 @@ async function deliver(
     if (!content.adopted && action.kind !== "1h") continue;
     // The emailed copy is a pure function of the facts (no "Prepared" time), so a re-posted send under the same key carries the same payload.
     const briefFacts = { lead: g.facts.lead, startsAt: g.facts.startsAt, tz: g.facts.tz, send: action.kind };
-    const withFiles = content.adopted && content.attach ? attachmentsForEmail(content.attach.plan, files, { loadFailed }) : null;
+    const fromSaved = content.attach?.files === "load";
+    const withFiles = content.adopted && content.attach ? attachmentsForEmail(content.attach.plan, files, { loadFailed, fromSaved }) : null;
     const brief = content.adopted
       ? renderAdoptedBrief(content.adopted, briefFacts, withFiles?.lines)
       : renderConsultBrief({ ...g.facts, send: action.kind, factsOnly: true }, { prepared: false });
@@ -668,7 +683,7 @@ async function deliver(
       // A distinct key (`:noatt`): whether Resend keeps the key of a refused request is not verified, and reusing it could be answered
       // with the refusal again. A refused request was not accepted, so the second post cannot double a delivered email.
       counts.attachRefused += 1;
-      const bare = attachmentsForEmail(content.attach!.plan, files, { refused: true, loadFailed });
+      const bare = attachmentsForEmail(content.attach!.plan, files, { refused: true, loadFailed, fromSaved });
       result = await mail(renderAdoptedBrief(content.adopted!, briefFacts, bare.lines), `${key}:noatt`, []);
     }
     // HTTP 409 from Resend = this key is already handled (another run got there first): done, never a failure.
@@ -748,6 +763,46 @@ async function writeAdoptMarker(admin: SupabaseClient, orgId: string, c: Candida
       ...(built ? { full: true, attach: built } : { adopted: true }),
     },
   });
+  return !error;
+}
+
+/**
+ * S2b: the full builds tried for one prep key, from the `ai_insight` rows `consult-prep-build` (ids, codes and times only). Every attempt
+ * writes a `started` row BEFORE the model is called, and a queued full brief writes a `queued` row with its Approvals item id. So:
+ *   - a prep is never built more than MAX_BUILD_ATTEMPTS times (a model that keeps failing, or a marker that keeps failing to write);
+ *   - a full brief that was queued but whose marker did not land is found again here and its marker written, with no rebuild.
+ * Null = couldn't be read: no build on a guess.
+ */
+export const MAX_BUILD_ATTEMPTS = 3;
+type PriorBuilds = { attempts: number; queued: { itemId: string; attach: AttachPlan } | null };
+
+async function readPriorBuilds(admin: SupabaseClient, orgId: string, leadId: string, prepKey: string): Promise<PriorBuilds | null> {
+  try {
+    const { data, error } = await admin
+      .from("crm_activity")
+      .select("created_at, payload")
+      .eq("org_id", orgId)
+      .eq("lead_id", leadId)
+      .eq("type", "ai_insight")
+      .eq("payload->>source", PREP_BUILD_SOURCE)
+      .eq("payload->>prep_key", prepKey)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (error) return null;
+    const out: PriorBuilds = { attempts: 0, queued: null };
+    for (const row of (data ?? []) as Array<{ payload: Record<string, unknown> | null }>) {
+      const p = row.payload ?? {};
+      if (p.status === "started") out.attempts += 1;
+      else if (p.status === "queued" && typeof p.queue_item_id === "string" && !out.queued) out.queued = { itemId: p.queue_item_id, attach: parseAttachPlan(p.attach) };
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+async function writeBuildRow(admin: SupabaseClient, orgId: string, leadId: string, payload: Record<string, unknown>): Promise<boolean> {
+  const { error } = await admin.from("crm_activity").insert({ org_id: orgId, lead_id: leadId, type: "ai_insight", actor_id: null, actor_type: "ai", payload: { source: PREP_BUILD_SOURCE, ...payload } });
   return !error;
 }
 
@@ -1104,7 +1159,7 @@ export async function runPrep(ctx: AgentContext, rawDeps: PrepDeps, generate: Dr
     return null;
   };
   /** S2b (a retry): build the full prep and keep its text in Approvals, where every later email reads it. */
-  const buildAndQueue = async (g: Gathered): Promise<FullPrep | null> => {
+  const buildAndQueue = async (g: Gathered, key: string): Promise<FullPrep | null> => {
     const built = await buildFull(g.facts);
     if (!built || !ctx.queueOrgKey) return null;
     const text = renderConsultBrief({ ...g.facts, full: built.sections }).text;
@@ -1122,11 +1177,33 @@ export async function runPrep(ctx: AgentContext, rawDeps: PrepDeps, generate: Dr
       });
       counts.fullBuilt += 1;
       counts.drafts += 1;
+      await writeBuildRow(admin, orgId, g.lead.id, { prep_key: key, status: "queued", queue_item_id: item.id, attach: built.attachPlan });
       return { text, itemId: item.id, isNew: true, built: built.attachPlan, files: built.files };
     } catch {
       counts.fullFailed.unexpected = (counts.fullFailed.unexpected ?? 0) + 1;
       return null;
     }
+  };
+  /**
+   * S2b: may this prep key try the full build now? `repair`: a full brief was queued on an earlier run (its marker never landed): use it,
+   * nothing is rebuilt. `go`: a `started` row was written, so the attempt counts. `no`: unreadable, capped, or the row couldn't be written.
+   */
+  const buildGate = async (c: Candidate): Promise<{ kind: "go" } | { kind: "no" } | { kind: "repair"; itemId: string; attach: AttachPlan }> => {
+    const prior = await readPriorBuilds(admin, orgId, c.leadId, c.key);
+    if (!prior) {
+      counts.fullFailed.unexpected = (counts.fullFailed.unexpected ?? 0) + 1;
+      return { kind: "no" };
+    }
+    if (prior.queued) return { kind: "repair", ...prior.queued };
+    if (prior.attempts >= MAX_BUILD_ATTEMPTS) {
+      counts.buildCapped += 1;
+      return { kind: "no" };
+    }
+    if (!(await writeBuildRow(admin, orgId, c.leadId, { prep_key: c.key, status: "started" }))) {
+      counts.fullFailed.unexpected = (counts.fullFailed.unexpected ?? 0) + 1;
+      return { kind: "no" };
+    }
+    return { kind: "go" };
   };
   /** S2b: the full prep's files to the lead's Documents & files, once per prep key. Never throws into the run. */
   const saveFiles = async (c: Candidate, files: readonly PrepFile[]): Promise<void> => {
@@ -1136,6 +1213,7 @@ export async function runPrep(ctx: AgentContext, rawDeps: PrepDeps, generate: Dr
       counts.filesSaved += out.saved;
       counts.filesSkipped += out.skipped;
       counts.filesFailed += out.failed;
+      counts.filesUnlogged += out.unlogged ?? 0;
     } catch {
       counts.filesFailed += files.length;
     }
@@ -1194,11 +1272,23 @@ export async function runPrep(ctx: AgentContext, rawDeps: PrepDeps, generate: Dr
         // facts-only 1 h email still waiting): try the full build again. It needs Approvals, where the full text is kept for every email.
         let retryGathered: Gathered | null = null;
         if (!c.rerun && !full && !adoptedGone && deps.full && ctx.queueOrgKey && approvalsRead) {
+          // (No queue: a full brief can't be kept for a later email, so no build is tried; the facts brief stands.)
           const fullProbe = planSends({ ...base, brief: "full", existing });
           const wouldSend = fullProbe.actions.some((a) => a.kind !== "1h") || factsScheduled;
           if (wouldSend) {
-            retryGathered = await gather(admin, orgId, c, nowMs, style.timeZone, deps, null);
-            if (retryGathered) full = await buildAndQueue(retryGathered);
+            const gate = await buildGate(c);
+            if (gate.kind === "repair") {
+              // Built and queued before, but its marker never landed: that item is the full prep (when it is still in Approvals).
+              const a = await approvals();
+              const hit = a.state === "ok" ? stillAdoptable(a.items, gate.itemId, { built: true }) : null;
+              if (hit) {
+                full = { text: itemText(hit), itemId: hit.id, isNew: true, built: gate.attach };
+                counts.repaired += 1;
+              }
+            } else if (gate.kind === "go") {
+              retryGathered = await gather(admin, orgId, c, nowMs, style.timeZone, deps, null);
+              if (retryGathered) full = await buildAndQueue(retryGathered, c.key);
+            }
           }
         }
         // Sends still waiting at Resend that carry the wrong text are cancelled, and the plan below sends them again: a facts-only 1 h when a full brief
@@ -1227,7 +1317,7 @@ export async function runPrep(ctx: AgentContext, rawDeps: PrepDeps, generate: Dr
           await deliver(ctx, deps, mailer, counts, state, g, c, plan.actions, contentOf(full));
         }
         if (full?.files && full.files.length > 0) await saveFiles(c, full.files);
-        if (full?.isNew && !(await writeAdoptMarker(admin, orgId, c, full.itemId, full.files ? full.built : undefined))) counts.unrecorded += 1;
+        if (full?.isNew && !(await writeAdoptMarker(admin, orgId, c, full.itemId, full.built))) counts.unrecorded += 1;
         continue;
       }
 
@@ -1251,6 +1341,22 @@ export async function runPrep(ctx: AgentContext, rawDeps: PrepDeps, generate: Dr
         }
         if (found.state === "found") adoption = found.item;
       }
+      // S2b: may the full prep be built? Only with a queue: the full text is kept in Approvals, where every later email of the prep reads
+      // it. With no queue the prep is a facts prep (S2a), said in the summary. A full brief queued earlier whose marker never landed is
+      // recorded now, and nothing is rebuilt or queued again.
+      let mayBuild = false;
+      if (!adoption && deps.full) {
+        if (!ctx.queueOrgKey) counts.fullNoQueue += 1;
+        else {
+          const gate = await buildGate(c);
+          if (gate.kind === "repair") {
+            if (await writeAdoptMarker(admin, orgId, c, gate.itemId, gate.attach)) counts.repaired += 1;
+            else counts.unrecorded += 1;
+            continue;
+          }
+          mayBuild = gate.kind === "go";
+        }
+      }
       const g = await gather(admin, orgId, c, nowMs, style.timeZone, deps, counts);
       if (!g) {
         counts.failed += 1;
@@ -1263,8 +1369,8 @@ export async function runPrep(ctx: AgentContext, rawDeps: PrepDeps, generate: Dr
       // The guard reads the system's own FACTS wording; the full brief's judgment is the point of S2b and is checked by its own scrubbers.
       if (!adoption) assertNoJudgmentContent(briefOwnWording(facts), "consult prep brief");
       // S2b: a prep that adopted nothing builds the FULL brief (a person's re-run always does). A failure keeps the facts brief.
-      const built = adoption ? null : await buildFull(facts);
-      const brief = renderConsultBrief(built ? { ...facts, full: built.sections } : facts);
+      let built = mayBuild ? await buildFull(facts) : null;
+      let brief = renderConsultBrief(built ? { ...facts, full: built.sections } : facts);
       const address = realAddress(lead.email);
       let clientBody: string | null = null;
       // An adopted prep brings its own drafts: no second client email is written beside it.
@@ -1326,6 +1432,7 @@ export async function runPrep(ctx: AgentContext, rawDeps: PrepDeps, generate: Dr
             leadId: lead.id,
           });
           queued.push({ kind: PREP_BRIEF_KIND, id: item.id });
+          if (built) await writeBuildRow(admin, orgId, lead.id, { prep_key: c.key, status: "queued", queue_item_id: item.id, attach: built.attachPlan });
           if (clientBody) {
             try {
               const prep = await ctx.createDraft({
@@ -1359,6 +1466,11 @@ export async function runPrep(ctx: AgentContext, rawDeps: PrepDeps, generate: Dr
         continue;
       }
       if (queued.length === 0) queued.push({ kind: PREP_BRIEF_KIND, id: null });
+      if (built && !queued.some((q) => q.kind === PREP_BRIEF_KIND && q.id && !q.adopted)) {
+        // The full brief could not be kept in Approvals: no later email could carry it, so this is a facts prep (S2a) after all.
+        built = null;
+        brief = renderConsultBrief(facts);
+      }
 
       counts.prepped += 1;
       if (built) counts.fullBuilt += 1;
@@ -1448,6 +1560,10 @@ function summaryOf(c: Counts, stageUnread: boolean, outlookNotReady: boolean, ou
   if (c.attachRefused > 0) parts.push(`${plural(c.attachRefused, "email", "emails")} sent again without attachments: the mail service refused them.`);
   if (c.filesSaved > 0) parts.push(`${plural(c.filesSaved, "file", "files")} saved to the lead's Documents & files.`);
   if (c.filesSkipped > 0) parts.push(`${plural(c.filesSkipped, "file", "files")} not saved: file storage isn't switched on for your firm yet.`);
+  if (c.filesUnlogged > 0) parts.push(`${plural(c.filesUnlogged, "saved file", "saved files")} could not be noted on the lead's timeline.`);
+  if (c.fullNoQueue > 0) parts.push(`${plural(c.fullNoQueue, "consult", "consults")} got the facts brief only: a full prep is kept in Approvals for every email, and no approval queue is connected.`);
+  if (c.buildCapped > 0) parts.push(`${plural(c.buildCapped, "consult", "consults")} kept the facts brief: the full prep was already tried ${MAX_BUILD_ATTEMPTS} times.`);
+  if (c.repaired > 0) parts.push(`${plural(c.repaired, "full prep", "full preps")} from an earlier run recorded on the lead now (nothing rebuilt).`);
   if (c.filesFailed > 0) parts.push(`${plural(c.filesFailed, "file", "files")} could not be saved to Documents & files.`);
   if (c.adoptedGone > 0) parts.push(`${plural(c.adoptedGone, "scheduled email", "scheduled emails")} cancelled because the prep they carried is no longer in Approvals.`);
   if (c.noTemplate > 0) parts.push(`${plural(c.noTemplate, "consult", "consults")} got only the heads-up: the client-prep email template isn't set up for this firm, so no client email was written.`);
