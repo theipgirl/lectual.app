@@ -212,14 +212,15 @@ describe("phase groups on the Matters page", () => {
     expect(html).toMatch(/\?intake=1&amp;seg=unassigned">Show them<\/a>/);
   });
 
-  it("a firm with no signed-engagement stage is never cut: every matter shows and nothing new is said (never hide on a guess)", async () => {
+  it("phases with no signed-engagement stage say so in one quiet warn line; with one, nothing is said", async () => {
     n = 0;
     const { hired: _hired, ...noHired } = S;
     void _hired;
-    const html = await render({ matters: sample(), read: { status: "ok", stages: Object.values(noHired) }, params: { group: "all", view: "table" } });
-    expect(html).not.toContain("in intake stages");
-    expect(html).not.toContain("No signed-engagement stage was found");
-    for (const i of [1, 2, 3, 4, 5, 6, 7, 11]) expect(html).toContain(`Mk${i}z`);
+    const without = await render({ matters: sample(), read: { status: "ok", stages: Object.values(noHired) } });
+    expect(without).toContain("No signed-engagement stage was found");
+    n = 0;
+    const withIt = await render({ matters: sample(), read: ok });
+    expect(withIt).not.toContain("No signed-engagement stage was found");
   });
 
   it("when every matter is in an intake stage the empty state says so, not 'match these filters'", async () => {

@@ -160,8 +160,8 @@ describe("hired-matter sync", () => {
       { id: "c", label: "Drafting", order_index: 3, phase: "pre_filing" },
     ];
     expect([...intakeStageIds(stages)]).toEqual(["a"]);
-    // Without the role, a renamed stage is not found and nothing is cut (a record is never hidden on a guess; before, every pipeline stage stayed intake).
-    expect([...intakeStageIds(stages.map((s) => ({ ...s, role: null })))]).toEqual([]);
+    // Without the role, a renamed stage is not found and every pipeline stage stays intake (today's rule).
+    expect([...intakeStageIds(stages.map((s) => ({ ...s, role: null })))].sort()).toEqual(["a", "b"]);
   });
 });
 

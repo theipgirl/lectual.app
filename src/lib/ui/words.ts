@@ -900,6 +900,8 @@ export const MATTER_MOVED_TO = "Moved to";
 export const MATTER_INTAKE_STAGES = (n: number, matching = false) =>
   `${n} ${matching ? "matching " : ""}${n === 1 ? "matter is" : "matters are"} in intake stages`;
 export const MATTER_INTAKE_SHOW = "Show them";
+/** Phases are set but no signed-engagement stage was found, so every intake-phase stage is treated as intake. */
+export const MATTER_NO_HIRED_STAGE = "No signed-engagement stage was found, so matters on every intake stage are left out here. Check your matter stage names.";
 export const MATTER_SHOWING_INTAKE = "Showing matters still in intake stages.";
 export const MATTER_BACK_TO_PAST_INTAKE = "Back to matters";
 export const MATTER_ALL_INTAKE_TITLE = "No matters past intake yet";

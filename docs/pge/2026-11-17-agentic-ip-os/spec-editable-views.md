@@ -132,6 +132,7 @@ operation, so the rules below hold whoever calls.
 
 - Matters (List and Board) shows only matters past "Signed LOE / Deposit Received"; intake stages never appear there.
 - Pre-filing and post-filing are two groups on the Trademarks board; Contracts is its own List and Board.
+- On stage boards (Matters, Contracts), the saved layout only hides columns; order and names are the stages' own (the stage menu is the one source).
 - Weekly review List gains: Timeline (the newest outbound item, with its date) and Next step (title and real date). Load per person stays the
   Board's lanes.
 - Caitlyn's view leaves out Forms and Proposals in the rail (the rail is a courtesy; the pages keep their gates).

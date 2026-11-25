@@ -209,9 +209,9 @@ describe("intake stages (Nov 17): pipeline-phase stages before Signed LOE / Depo
     expect(isHiredStage({ label: "signed loe / deposit received" })).toBe(false);
   });
 
-  it("a firm with no such stage hides NOTHING (never hide a record on a guess); no phase column hides nothing either", async () => {
+  it("a firm with no such stage hides every pipeline-phase stage, as before; no phase column hides nothing", async () => {
     const { intakeStageIds } = await import("../../src/lib/matters/phase-group");
-    expect(intakeStageIds([st("a", "New", 0, "pipeline"), st("b", "Next", 1, "pipeline"), st("c", "Filed", 2, "post_filing")]).size).toBe(0);
+    expect([...intakeStageIds([st("a", "New", 0, "pipeline"), st("b", "Next", 1, "pipeline"), st("c", "Filed", 2, "post_filing")])].sort()).toEqual(["a", "b"]);
     expect(intakeStageIds([st("a", "New", 0), st("b", "Filed", 1)]).size).toBe(0);
   });
 

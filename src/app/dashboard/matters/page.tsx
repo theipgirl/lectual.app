@@ -38,7 +38,7 @@ import {
   parseGroupChoice,
   phaseGroupCounts,
 } from "@/lib/matters/phase-group";
-import { searchPlaceholder, MATTERS_NAME, TEAMMATE, MATTER_GROUPS_NAV, MATTER_GROUP_ALL, MATTER_INTAKE_STAGES, MATTER_INTAKE_SHOW, MATTER_SHOWING_INTAKE, MATTER_BACK_TO_PAST_INTAKE, MATTER_ALL_INTAKE_BODY, MATTER_ALL_INTAKE_TITLE, MATTER_GROUP_EMPTY, MATTER_GROUP_LABEL, MATTER_PHASES_UNAVAILABLE, MATTER_STATUS_NAV, CONTRACTS_NAME, MATTER_KIND_NAV, HIDDEN_FIRM_COLUMN, DEADLINE_FLAGS_UNCHECKED } from "@/lib/ui/words";
+import { searchPlaceholder, MATTERS_NAME, TEAMMATE, MATTER_GROUPS_NAV, MATTER_GROUP_ALL, MATTER_INTAKE_STAGES, MATTER_INTAKE_SHOW, MATTER_SHOWING_INTAKE, MATTER_BACK_TO_PAST_INTAKE, MATTER_ALL_INTAKE_BODY, MATTER_ALL_INTAKE_TITLE, MATTER_GROUP_EMPTY, MATTER_GROUP_LABEL, MATTER_PHASES_UNAVAILABLE, MATTER_NO_HIRED_STAGE, MATTER_STATUS_NAV, CONTRACTS_NAME, MATTER_KIND_NAV, HIDDEN_FIRM_COLUMN, DEADLINE_FLAGS_UNCHECKED } from "@/lib/ui/words";
 import { inPreview, resolveViewSession } from "@/lib/views/view-as";
 import { loadOwnerState } from "@/lib/views/layout/owner-load";
 import { isOwner } from "@/lib/views/layout/owner";
@@ -58,6 +58,7 @@ import { loadOpenDeadlineMatterIds } from "@/lib/matters/open-deadlines-read";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import { matterIdsNeedingReview } from "./list-utils";
 import { MATTERS_LIST_VALUE, mattersViewFromParam } from "@/lib/matters/list-href";
+import { hiredStageOf } from "@/lib/matters/hired-stage";
 import { sortStagesByOrder } from "@/lib/matters/board";
 import { LIST_CHIPS, mattersSubtitle, reviewItemByMatter } from "@/lib/matters/list-view";
 import { OPEN_MATTER_PANEL_ID, OpenMatterButton } from "@/components/matters/OpenMatterButton";
@@ -183,6 +184,8 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
         holdings: await loadStageHoldings("matter").then((h) => (h.status === "ok" ? h.byStage : null)),
       }
     : null;
+  // Phases are on but no signed-engagement stage was found: every intake-phase stage counts as intake. Said, never silent.
+  const noHiredStage = grouped && hiredStageOf(stageList) === null;
   const everyMatterInIntake = !showIntake && !!intakeView && scoped.length > 0 && pastLoe.length === 0;
   // Manage stages (owner): every matter stage, the closed and the left-out intake ones included, each with the board column's stage menu.
   const orderedStages = sortStagesByOrder(stageList);
@@ -319,6 +322,11 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
         <p role="status" className="lx-note lx-state-line">
           {MATTER_INTAKE_STAGES(stillInIntake, !!search)} · <Link href={href({ intake: true })}>{MATTER_INTAKE_SHOW}</Link>
         </p>
+      )}
+      {noHiredStage && (
+        <Notice tone="warn" role="status">
+          {MATTER_NO_HIRED_STAGE}
+        </Notice>
       )}
       {layoutSaid && (
         <Notice tone="warn" role="status">
