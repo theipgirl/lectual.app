@@ -2942,6 +2942,10 @@ Spec `docs/pge/2026-11-17-agentic-ip-os/spec-editable-views.md` (build step 3 an
   stages the Matters view leaves out included, each with its state ("Open stage" / "Closed stage" / "Left out of Matters"), its matter count (holdings; unread = "Count couldn't be read", never 0) and the
   SAME `StageMenu` (rename, move, add, change open/closed, delete with a move) over the same `changeStageAction`.
 - **Add row:** "Open a matter" under the List (a second `OpenMatterButton`, only for `MATTER_WRITE_ROLES`, hidden in a preview) opens the existing open-a-matter panel. No new form.
+- **Review fixes:** Today's and Copilot's links land on Matters, so each view shows one line for the OTHER view's matches under the same status chip and search ("Contracts has N" / "Matters has N", a link; counts elsewhere are
+  unchanged). Firm columns that couldn't be read say so once ("Some details couldn't load (your firm's columns)"); not set up is silent. Firm columns are ordered by `fieldsForSection` (the same function the layout write's base uses) and keyed one way
+  (lowercased `cfKey`). The page strips Money again for anyone but a real owner. The List is fixed-layout with default widths until a layout sets one. `changeLayout` refuses every op but hide / show on `matters_board` / `contracts_board`
+  (`LAYOUT_STAGE_BOARD_HIDE_ONLY`). The Board with empty stages is sent ONCE (empty columns last, `data-empty-stage`, hidden by CSS until Show).
 - **Kept:** the four chips, search, `MovedCardScroller`, the move menus, deadlines tags, Review pills, the record card.
 - **Existing assertions changed on purpose:** `phase-page` (the sample now has a signed-engagement stage and contracts live on the Contracts view), the list-page / review-fixes / list-cleanups source and markup pins (the List's row, width and header markup moved into `MatterListTable` / `ViewTable`),
   the board-default and matters-links allow-lists (`layout/actions.ts` revalidates the Matters path), `menu-model` (the page joins the owner row and preview flag it reads once), `add-column` and `store-and-actions`
