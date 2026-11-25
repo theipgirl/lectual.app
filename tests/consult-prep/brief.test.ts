@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BRIEF_FOOTER, CLIENT_WORDS_HEADING, NEXT_UPDATE_LINE, briefOwnWording, briefSubject, renderConsultBrief, sessionText, type BriefFacts } from "@/lib/consult-prep/brief";
+import { BRIEF_FOOTER, CLIENT_WORDS_HEADING, FACTS_ONLY_LINE, LABELS_UNREAD_LINE, NEXT_UPDATE_LINE, briefOwnWording, briefSubject, renderAdoptedBrief, renderConsultBrief, sessionText, type BriefFacts } from "@/lib/consult-prep/brief";
 import { hasJudgmentContent } from "@/lib/prep-consult/prep-consult";
 
 const lead = { id: "l1", firstName: "Dana", lastName: "Ruiz", businessName: "Sankofa Brewing", email: "dana@client.example", phone: "555-0100", practiceArea: "Trademark", markText: "SANKOFA", referralSource: "Booth", referralDetail: "UGW 2026", stage: "Consultation Scheduled", lawmaticsId: null };
@@ -180,5 +180,46 @@ describe("review fixes: the emailed copy, the html order, never 'null'", () => {
     expect(b.html).not.toMatch(/\bnull\b/);
     expect(b.text).toContain("- Budget: not recorded");
     expect(b.text).toContain("- Subject: not recorded");
+  });
+});
+
+describe("S2a: the facts-only mark, the adopted prep and the labels note", () => {
+  it("a facts-only brief says so in the subject, as the first line of the text and first in the html", () => {
+    const b = renderConsultBrief(facts({ send: "1h", factsOnly: true }));
+    expect(b.subject).toBe("Facts only: In 1 hour: Consult prep: Dana Ruiz · Wed Nov 25, 2:00 PM EST");
+    expect(b.text.startsWith(`${FACTS_ONLY_LINE}\n\n`)).toBe(true);
+    expect(FACTS_ONLY_LINE).toBe("Facts only: the full prep couldn't be built in time.");
+    const escaped = FACTS_ONLY_LINE.replace("'", "&#39;");
+    expect(b.html.indexOf(escaped)).toBeGreaterThan(-1);
+    expect(b.html.indexOf(escaped)).toBeLessThan(b.html.indexOf("Consult prep for Dana Ruiz"));
+  });
+  it("an ordinary brief carries no such mark", () => {
+    const b = renderConsultBrief(facts({ send: "1h" }));
+    expect(b.subject).not.toMatch(/Facts only/);
+    expect(b.text).not.toContain(FACTS_ONLY_LINE);
+  });
+  it("the facts-only mark does not weaken the judgment guard: the system's own wording is unchanged by it", () => {
+    expect(briefOwnWording(facts({ factsOnly: true }))).toBe(briefOwnWording(facts()));
+    expect(hasJudgmentContent(FACTS_ONLY_LINE)).toBe(false);
+    expect(hasJudgmentContent(LABELS_UNREAD_LINE)).toBe(false);
+  });
+  it("an adopted prep's email is that text, exactly, then the internal-only footer; the html escapes it inside a pre-wrapped block", () => {
+    const text = "Likely classes\n<script>alert(1)</script> & \"quotes\"\nRisk read\nPackage recommendation";
+    const b = renderAdoptedBrief(text, { lead, startsAt: "2026-11-25T19:00:00.000Z", tz: "America/New_York", send: "24h" });
+    expect(b.subject).toBe("Tomorrow: Consult prep: Dana Ruiz · Wed Nov 25, 2:00 PM EST");
+    expect(b.text).toBe(`${text}\n\n${BRIEF_FOOTER}`);
+    expect(b.html).toContain("white-space:pre-wrap");
+    expect(b.html).toContain("&lt;script&gt;alert(1)&lt;/script&gt; &amp; &quot;quotes&quot;");
+    expect(b.html).not.toContain("<script>");
+    expect(b.html).toContain(BRIEF_FOOTER);
+  });
+  it("an adopted brief is a pure function of its inputs (a re-posted send is the same payload)", () => {
+    const args = ["Likely classes\nx", { lead, startsAt: "2026-11-25T19:00:00.000Z", tz: "America/New_York", send: "1h" as const }] as const;
+    expect(renderAdoptedBrief(...args)).toEqual(renderAdoptedBrief(...args));
+  });
+  it("a Lawmatics section whose answer labels could not be read says so; one that was read says nothing", () => {
+    const read = (labels: "ok" | "failed") => ({ state: "ok" as const, other: [], submittedAt: null, contactEmail: null, labels, intake: { practiceArea: null, inquiry: null, mark: null, productsServices: null, company: null, useInCommerce: null, competitors: null, goals: null, consultFeePaid: null, website: null, referralSource: null } });
+    expect(renderConsultBrief(facts({ lawmatics: read("failed") })).text).toContain(LABELS_UNREAD_LINE);
+    expect(renderConsultBrief(facts({ lawmatics: read("ok") })).text).not.toContain(LABELS_UNREAD_LINE);
   });
 });

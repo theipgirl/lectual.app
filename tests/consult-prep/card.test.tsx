@@ -161,3 +161,36 @@ describe("the old form is gone", () => {
     expect(found).toBe(false);
   });
 });
+
+describe("S2a: the card says when the prep in Approvals was used, and when the email is waiting for a full prep", () => {
+  const first = { prepKey: KEY, queueItemId: "q-facts", at: "2026-11-24T19:10:00.000Z" };
+  const adopted = { prepKey: KEY, queueItemId: "q-full", at: "2026-11-24T21:00:00.000Z", adopted: true };
+
+  it("an adopted prep says the prep already in Approvals was used, shows THAT item, and keeps the time it was first made", () => {
+    const v = consultPrepCardView(inputs({ markers: { status: "ok", value: [first, adopted] }, sends: { status: "ok", value: [send({})] } }));
+    expect(v).toMatchObject({ kind: "prepared", queueItemId: "q-full" });
+    if (v.kind !== "prepared") throw new Error("expected prepared");
+    expect(v.lines[0]).toMatch(/^Prepared Nov 24, 2:10 PM/);
+    expect(v.lines).toContain("The prep already in Approvals was used.");
+  });
+  it("a prep that was not adopted says nothing of the kind", () => {
+    const v = consultPrepCardView(inputs({ markers: { status: "ok", value: [first] } }));
+    if (v.kind !== "prepared") throw new Error("expected prepared");
+    expect(v.lines.join(" ")).not.toMatch(/already in Approvals/);
+  });
+  it("a booked email that is withheld reads as waiting for the full prep, not as a failure and not as emailed", () => {
+    const v = consultPrepCardView(inputs({ markers: { status: "ok", value: [first] }, sends: { status: "ok", value: [send({ status: "withheld", resendId: null })] } }));
+    if (v.kind !== "prepared") throw new Error("expected prepared");
+    expect(v.lines[0]).toContain("not emailed yet: waiting for the full prep");
+    expect(v.lines[0]).not.toContain("couldn't be sent");
+    expect(v.lines.join(" ")).not.toMatch(/emailed ·/);
+  });
+});
+
+describe("S2a: the timeline line for a withheld email", () => {
+  it("reads as waiting for the full prep", async () => {
+    const { consultPrepTimelineSend } = await import("@/lib/ui/words");
+    expect(consultPrepTimelineSend("booked", "withheld")).toBe("Consult prep email: waiting for the full prep");
+    expect(consultPrepTimelineSend("24h", "withheld")).toBe("Consult prep reminder, a day before: waiting for the full prep");
+  });
+});

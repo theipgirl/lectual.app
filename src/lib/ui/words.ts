@@ -1678,6 +1678,8 @@ export const CONSULT_PREP_ASK_ADMIN = "An owner or admin can set it in Settings 
 export const CONSULT_PREP_COULDNT_LOAD = "Couldn't load consult prep. Refresh to try again.";
 export const CONSULT_PREP_EMAIL_OFF = "Email isn't switched on for your firm yet. Lectual will turn it on.";
 export const CONSULT_PREP_NOT_EMAILED = "not emailed";
+export const CONSULT_PREP_WAITING_FULL = "not emailed yet: waiting for the full prep";
+export const CONSULT_PREP_ADOPTED = "The prep already in Approvals was used.";
 export const CONSULT_PREP_RECIPIENTS_NOW = "Emails now go to the people set in Settings → Team";
 export const CONSULT_PREP_RECIPIENTS_UNREAD = "Who gets consult prep couldn't be read.";
 export const CONSULT_PREP_VIEW_BRIEF = "View the brief";
@@ -1693,9 +1695,9 @@ export const CONSULT_PREP_RERUN_OFF = "Consult prep isn't switched on for your f
 export const CONSULT_PREP_RERUN_NOTHING = "There is no consult to prepare for this lead yet.";
 export const CONSULT_PREP_RERUN_FAILED = "Couldn't re-run prep. Nothing was changed. Try again in a minute.";
 export const CONSULT_PREP_TIMELINE_PREP = "Consult prep made";
-export const consultPrepTimelineSend = (kind: "booked" | "24h" | "1h", status: "sent" | "scheduled" | "cancelled" | "failed" | "duplicate"): string => {
+export const consultPrepTimelineSend = (kind: "booked" | "24h" | "1h", status: "sent" | "scheduled" | "cancelled" | "failed" | "duplicate" | "withheld"): string => {
   const what = kind === "booked" ? "Consult prep email" : kind === "24h" ? "Consult prep reminder, a day before" : "Consult prep reminder, an hour before";
-  return `${what}: ${status === "failed" ? "couldn't be sent" : status === "duplicate" ? "already sent by another run" : status}`;
+  return `${what}: ${status === "failed" ? "couldn't be sent" : status === "duplicate" ? "already sent by another run" : status === "withheld" ? "waiting for the full prep" : status}`;
 };
 export const CONSULT_PREP_TEAM_HEADING = "Consult prep emails";
 export const CONSULT_PREP_TEAM_HELP = "When a consult is prepared, the brief is emailed to the people chosen here when it is booked, a day before (if it was booked more than a day ahead) and an hour before. It goes only to the firm, never to a client. Cc addresses must be on the same email domain as someone chosen.";

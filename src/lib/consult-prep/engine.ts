@@ -9,7 +9,9 @@ import { parseStageMapping, type StageMapping } from "@/lib/agents/stage-keeper/
 import type { StageOpt } from "@/lib/reconcile/types";
 import { PREP_SOURCE } from "@/lib/agents/consult-prep/constants";
 import { MAILBOX_GATE_REASON, agentToolkitModuleState, mailboxModuleState } from "@/lib/agents/mailbox-gate";
-import { IN_CHUNK, budgetNearlySpent, chunk, neutralise, readFirmStyle, realAddress } from "@/lib/agents/shared";
+import { IN_CHUNK, budgetNearlySpent, chunk, neutralise, orgFencedReader, readFirmStyle, realAddress } from "@/lib/agents/shared";
+import { resolveBatch, type Resolved } from "@/lib/queue/resolve-batch";
+import type { QueueItem } from "@/lib/queue/api";
 import type { AgentContext, AgentResult } from "@/lib/agents/types";
 import {
   cardName,
@@ -21,7 +23,8 @@ import {
   readMeetingHistory,
   type LeadFacts,
 } from "@/lib/agents/consult-prep/facts";
-import { briefOwnWording, renderConsultBrief, type BriefFacts } from "./brief";
+import { adoptableItems, adoptionSinceMs, itemText, pickAdoption, stillAdoptable } from "./adopt";
+import { briefOwnWording, renderAdoptedBrief, renderConsultBrief, type BriefFacts } from "./brief";
 import { PREP_BRIEF_KIND, PREP_SEND_SOURCE, eventPrepKey, markerEventId, normalizedStart, parsePrepKey, rerunKey, stagePrepKey } from "./keys";
 import { readLawmaticsIntake, type LawmaticsRead, type ProspectReader } from "./lawmatics-intake";
 import { CONSULT_PREP_KEY, guardRecipients, parseRecipientSetting } from "./recipients";
@@ -35,8 +38,10 @@ import {
   sendRecordPayload,
   shouldCancel,
   stageBookedRecently,
+  type BriefQuality,
   type EventNow,
   type SendAction,
+  type SendKind,
   type SendRecord,
   type SendStatus,
 } from "./sends";
@@ -92,7 +97,7 @@ export type PrepDeps = {
   memberAddresses: (userIds: readonly string[]) => Promise<string[] | null>;
 };
 
-type EventRow = { id: string; org_id: string; lead_id: string | null; starts_at: string; join_url: string | null; is_consult: boolean | null; source: string | null; external_id?: string | null };
+type EventRow = { id: string; org_id: string; lead_id: string | null; starts_at: string; join_url: string | null; is_consult: boolean | null; source: string | null; external_id?: string | null; created_at?: string | null };
 
 type Candidate = {
   /** The key the marker and the sends carry (a re-run's has its suffix). */
@@ -102,6 +107,8 @@ type Candidate = {
   leadId: string;
   event: { id: string; startsAt: string; joinUrl: string | null } | null;
   rerun: boolean;
+  /** When the consult was booked: the calendar row's own `created_at`, else (a stage-keyed prep) the lead's stage-entered time. Null = not known. */
+  bookedAt: string | null;
 };
 
 type Counts = {
@@ -132,13 +139,23 @@ type Counts = {
   recipientsChanged: number;
   over: number;
   deferred: number;
+  /** Preps that reused a full brief already in Approvals (no new briefing was queued). */
+  adopted: number;
+  /** Candidates left for the next run because Approvals could not be read (no adoption, and no build, on a guess). */
+  adoptionUnread: number;
+  /** Booked / 24 h emails not sent because the prep only has the facts brief (they stay owed). */
+  withheld: number;
+  /** 1 h emails sent or scheduled as "facts only". */
+  factsOnly: number;
+  /** Scheduled facts-only 1 h emails cancelled and planned again with a full brief. */
+  upgraded: number;
   unreadSections: Record<string, number>;
 };
 
 const emptyCounts = (): Counts => ({
   prepped: 0, drafts: 0, noAddress: 0, noTemplate: 0, refused: 0, failed: 0, partial: 0, unrecorded: 0, sent: 0, scheduled: 0, cancelled: 0,
-  cancelUnchecked: 0, noRecipients: 0, emailOff: 0, recipientsUnread: 0, sendFailed: 0, nothingToDeliver: 0, mergedSkipped: 0, duplicate: 0, leadsOver: 0, leftSkipped: 0, twins: 0, alreadyPrepped: 0, leftCancelled: 0, recipientsChanged: 0, over: 0, deferred: 0,
-  unreadSections: { answers: 0, mail: 0, meetings: 0, files: 0, lawmatics: 0 },
+  cancelUnchecked: 0, noRecipients: 0, emailOff: 0, recipientsUnread: 0, sendFailed: 0, nothingToDeliver: 0, mergedSkipped: 0, duplicate: 0, leadsOver: 0, leftSkipped: 0, twins: 0, alreadyPrepped: 0, leftCancelled: 0, recipientsChanged: 0, over: 0, deferred: 0, adopted: 0, adoptionUnread: 0, withheld: 0, factsOnly: 0, upgraded: 0,
+  unreadSections: { answers: 0, mail: 0, meetings: 0, files: 0, lawmatics: 0, labels: 0 },
 });
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -152,7 +169,7 @@ async function readCalendar(admin: SupabaseClient, orgId: string, nowMs: number,
   const one = async (source: "lawmatics" | "outlook") => {
     let q = admin
       .from("crm_calendar_event")
-      .select("id, org_id, lead_id, starts_at, join_url, is_consult, source, external_id")
+      .select("id, org_id, lead_id, starts_at, join_url, is_consult, source, external_id, created_at")
       .eq("org_id", orgId)
       .eq("source", source)
       .eq("is_consult", true)
@@ -245,11 +262,17 @@ async function newestStageRow(admin: SupabaseClient, orgId: string, leadId: stri
   return ((data ?? [])[0] as { id?: string } | undefined)?.id ?? null;
 }
 
-type MarkerRead = { byKey: Map<string, string>; legacyEvents: Set<string> };
+type MarkerRead = {
+  byKey: Map<string, string>;
+  legacyEvents: Set<string>;
+  /** Prep key -> the id of the Approvals item the prep adopted (the newest adopting marker of that exact key). */
+  adopted: Map<string, string>;
+};
 
 /** The prep markers for these keys and event ids. A marker with no `prep_key` is an older, event-keyed one. */
 async function readMarkers(admin: SupabaseClient, orgId: string, eventIds: readonly string[]): Promise<MarkerRead> {
-  const out: MarkerRead = { byKey: new Map(), legacyEvents: new Set() };
+  const out: MarkerRead = { byKey: new Map(), legacyEvents: new Set(), adopted: new Map() };
+  const adoptedAt = new Map<string, string>();
   for (const batch of chunk([...new Set(eventIds)], IN_CHUNK)) {
     const res = await admin
       .from("crm_activity")
@@ -263,6 +286,13 @@ async function readMarkers(admin: SupabaseClient, orgId: string, eventIds: reado
     if ((res.data ?? []).length >= MARKER_ROWS) throw new Error(CUT_SHORT);
     for (const row of (res.data ?? []) as Array<{ created_at: string; payload: Record<string, unknown> | null }>) {
       const key = row.payload?.prep_key;
+      if (typeof key === "string" && row.payload?.adopted === true && typeof row.payload?.queueItemId === "string") {
+        const seen = adoptedAt.get(key);
+        if (!seen || Date.parse(row.created_at) >= Date.parse(seen)) {
+          adoptedAt.set(key, row.created_at);
+          out.adopted.set(key, row.payload.queueItemId);
+        }
+      }
       if (typeof key === "string") {
         // A person's re-run marker (`<base>:rerun:<ms>`) is also the base key's prep: the base is built (BRIEFING, client draft, booked
         // email) already, and only its reminders, which a re-run never plans, are still owed. Reminders are planned for it as for any prep.
@@ -394,6 +424,7 @@ async function gather(admin: SupabaseClient, orgId: string, c: Candidate, nowMs:
     if (meetings.state !== "ok") counts.unreadSections.meetings += 1;
     if (files.state === "unavailable") counts.unreadSections.files += 1;
     if (lawmatics.state === "unavailable") counts.unreadSections.lawmatics += 1;
+    if (lawmatics.state === "ok" && lawmatics.labels === "failed") counts.unreadSections.labels += 1;
   }
   const facts: BriefFacts = {
     lead,
@@ -435,6 +466,43 @@ async function writeSendRecord(
   return !error;
 }
 
+/**
+ * What a prep's emails carry. `adopted`: the text of the full brief already in Approvals (every email sends it). Absent: the facts
+ * brief only, which is emailed as a marked 1 h email and never as booked or 24 h.
+ */
+type PrepContent = { adopted: string | null };
+
+/** Approvals as one run sees it, read once: the pending and approved items. `none`: no queue (or no reader), so nothing to reuse. */
+type Approvals = { state: "ok"; items: QueueItem[] } | { state: "none" } | { state: "unavailable" };
+
+function approvalsReader(ctx: AgentContext): () => Promise<Approvals> {
+  let memo: Promise<Approvals> | null = null;
+  return () =>
+    (memo ??= (async (): Promise<Approvals> => {
+      // No queue, or no reader wired for it, is "nothing in Approvals". A reader that rejects is "couldn't read": never "none".
+      if (!ctx.queueOrgKey || (!ctx.listPending && !ctx.listApproved)) return { state: "none" };
+      try {
+        const [pending, approved] = await Promise.all([ctx.listPending ? ctx.listPending() : [], ctx.listApproved ? ctx.listApproved() : []]);
+        return { state: "ok", items: [...pending, ...approved] };
+      } catch {
+        return { state: "unavailable" };
+      }
+    })());
+}
+
+type Adoption = { state: "none" } | { state: "found"; item: QueueItem } | { state: "unavailable" };
+
+/** The lead's stage-entered time, when a candidate has no booking time of its own. A failed read is "not known" (the day's start alone is then used). */
+async function stageEnteredAt(admin: SupabaseClient, orgId: string, leadId: string): Promise<string | null> {
+  try {
+    const res = await leadRead(({ live }) => live(admin.from("crm_lead").select("id, stage_entered_at")).eq("org_id", orgId).eq("id", leadId).limit(1));
+    if (res.error) return null;
+    return ((res.data ?? [])[0] as { stage_entered_at?: string | null } | undefined)?.stage_entered_at ?? null;
+  } catch {
+    return null;
+  }
+}
+
 type Mailer = {
   recipients: () => Promise<RecipientsRead>;
 };
@@ -466,6 +534,7 @@ async function deliver(
   g: Gathered,
   c: Candidate,
   actions: readonly SendAction[],
+  content: PrepContent,
 ): Promise<void> {
   if (actions.length === 0) return;
   const { apiKey, from } = deps.mail;
@@ -490,8 +559,14 @@ async function deliver(
   }
   const listHash = recipientsSha256(guarded.to, guarded.cc);
   for (const action of actions) {
+    // An email carries a FULL brief: the adopted item's text. A facts-only brief is sent only as the 1 h email, marked as such (the plan
+    // never offers it anything else; this refuses it again, so a facts email can never go out as a booked or 24 h one).
+    if (!content.adopted && action.kind !== "1h") continue;
     // The emailed copy is a pure function of the facts (no "Prepared" time), so a re-posted send under the same key carries the same payload.
-    const brief = renderConsultBrief({ ...g.facts, send: action.kind }, { prepared: false });
+    const brief = content.adopted
+      ? renderAdoptedBrief(content.adopted, { lead: g.facts.lead, startsAt: g.facts.startsAt, tz: g.facts.tz, send: action.kind })
+      : renderConsultBrief({ ...g.facts, send: action.kind, factsOnly: true }, { prepared: false });
+    const quality: BriefQuality = content.adopted ? "full" : "facts";
     const scheduledFor = action.mode === "schedule" ? action.at : null;
     const gen = state.gens.get(recordSlot(c.key, action.kind)) ?? 0;
     const result = await deps.mailOut({
@@ -512,6 +587,7 @@ async function deliver(
     if (result.status === "sent") {
       if (status === "scheduled") counts.scheduled += 1;
       else counts.sent += 1;
+      if (quality === "facts") counts.factsOnly += 1;
     } else if (duplicate) counts.duplicate += 1;
     else counts.sendFailed += 1;
     const written = await writeSendRecord(ctx.admin, ctx.orgId, g.lead.id, {
@@ -521,10 +597,53 @@ async function deliver(
       scheduledFor,
       status,
       recipientsSha256: listHash,
+      ...(quality === "facts" ? { quality } : {}),
       ...(status === "failed" && result.status === "failed" && result.http === null ? { noResponse: true } : {}),
     });
     if (!written) counts.unrecorded += 1;
   }
+}
+
+type FullPrep = { text: string; itemId: string; /** Not yet recorded on the lead: the marker still has to be written. */ isNew: boolean };
+
+/**
+ * Records, once per slot, an email that is OWED but not sent because the prep only has the facts brief. A slot that is already
+ * withheld (or failed, which is retried by its own rule) gets nothing new. A person's re-run never owes one: its booked email waits for
+ * the full build (S2b) and nothing later comes back to it.
+ */
+async function recordWithheld(ctx: Pick<AgentContext, "admin" | "orgId">, counts: Counts, state: RunState, c: Candidate, kinds: readonly SendKind[]): Promise<void> {
+  if (c.rerun) return;
+  for (const kind of kinds) {
+    counts.withheld += 1;
+    const slot = recordSlot(c.key, kind);
+    const have = state.folded.get(slot);
+    if (have && (have.status === "withheld" || have.status === "failed")) continue;
+    const ok = await writeSendRecord(ctx.admin, ctx.orgId, c.leadId, { prepKey: c.key, kind, resendId: null, scheduledFor: null, status: "withheld" });
+    if (ok) state.folded.set(slot, { leadId: c.leadId, prepKey: c.key, kind, resendId: null, scheduledFor: null, status: "withheld", at: new Date().toISOString() });
+    else counts.unrecorded += 1;
+  }
+}
+
+/** A prep that found its full brief AFTER it was made (or whose adopted item changed): the marker says which Approvals item the card and the emails now use. */
+async function writeAdoptMarker(admin: SupabaseClient, orgId: string, c: Candidate, itemId: string): Promise<boolean> {
+  const { error } = await admin.from("crm_activity").insert({
+    org_id: orgId,
+    lead_id: c.leadId,
+    type: "queue_drafted",
+    actor_id: null,
+    actor_type: "ai",
+    payload: {
+      source: PREP_SOURCE,
+      agent: PREP_SOURCE,
+      kind: PREP_BRIEF_KIND,
+      event_id: markerEventId(c.baseKey),
+      prep_key: c.key,
+      ...(c.event ? { start_at: c.event.startsAt } : {}),
+      queueItemId: itemId,
+      adopted: true,
+    },
+  });
+  return !error;
 }
 
 // ── cancel ───────────────────────────────────────────────────────────────────
@@ -694,7 +813,7 @@ async function cancelStaleRecipients(ctx: AgentContext, deps: PrepDeps, counts: 
       // Cheap check with the lead's own address; only a difference is confirmed with everything the guard knows about the client.
       const cheap = sha(guardRecipients({ to: recipients.to, cc: recipients.cc, clientAddresses: [emails.get(leadId)] }));
       if (cheap === record.recipientsSha256) continue;
-      if (!full.has(leadId)) full.set(leadId, gather(ctx.admin, ctx.orgId, { key: record.prepKey, baseKey: record.prepKey, leadId, event: null, rerun: false }, nowMs, state.tz, deps, null).catch(() => null));
+      if (!full.has(leadId)) full.set(leadId, gather(ctx.admin, ctx.orgId, { key: record.prepKey, baseKey: record.prepKey, leadId, event: null, rerun: false, bookedAt: null }, nowMs, state.tz, deps, null).catch(() => null));
       const g = await full.get(leadId)!;
       if (!g) {
         counts.cancelUnchecked += 1;
@@ -710,7 +829,14 @@ async function cancelStaleRecipients(ctx: AgentContext, deps: PrepDeps, counts: 
 
 type Ev = EventRow & { leadId: string; startsAt: string };
 
-export async function runPrep(ctx: AgentContext, deps: PrepDeps, generate: DraftTextGenerator): Promise<AgentResult> {
+/** One Lawmatics client for the whole run, so the account's field list is read once (see `readFieldMeta`). */
+function memoProspects(reader: ProspectReader): ProspectReader {
+  let memo: ReturnType<ProspectReader["client"]> | null = null;
+  return { client: () => (memo ??= reader.client()) };
+}
+
+export async function runPrep(ctx: AgentContext, rawDeps: PrepDeps, generate: DraftTextGenerator): Promise<AgentResult> {
+  const deps: PrepDeps = { ...rawDeps, prospects: memoProspects(rawDeps.prospects) };
   const { admin, orgId, autonomy } = ctx;
   const nowMs = ctx.now();
   const scope = ctx.scope;
@@ -744,7 +870,7 @@ export async function runPrep(ctx: AgentContext, deps: PrepDeps, generate: Draft
 
   const candidates: Candidate[] = events.map((e) => {
     const base = eventPrepKey(e.leadId, e.id, e.starts_at);
-    return { key: rerunRun ? rerunKey(base, nowMs) : base, baseKey: base, leadId: e.leadId, event: { id: e.id, startsAt: normalizedStart(e.starts_at) ?? e.starts_at, joinUrl: e.join_url }, rerun: rerunRun };
+    return { key: rerunRun ? rerunKey(base, nowMs) : base, baseKey: base, leadId: e.leadId, event: { id: e.id, startsAt: normalizedStart(e.starts_at) ?? e.starts_at, joinUrl: e.join_url }, rerun: rerunRun, bookedAt: e.created_at ?? null };
   });
 
   let stageUnread = false;
@@ -763,10 +889,11 @@ export async function runPrep(ctx: AgentContext, deps: PrepDeps, generate: Draft
         const rowId = (await newestStageRow(admin, orgId, lead.id, stage.id)) ?? lead.stageEnteredAt;
         if (!rowId) continue;
         const base = stagePrepKey(lead.id, rowId);
-        found.push({ key: rerunRun ? rerunKey(base, nowMs) : base, baseKey: base, leadId: lead.id, event: null, rerun: rerunRun });
+        found.push({ key: rerunRun ? rerunKey(base, nowMs) : base, baseKey: base, leadId: lead.id, event: null, rerun: rerunRun, bookedAt: lead.stageEnteredAt });
       }
       const stageMarkers = await readMarkers(admin, orgId, found.map((c) => markerEventId(c.baseKey)).filter((x): x is string => !!x));
       for (const [k, v] of stageMarkers.byKey) markers.byKey.set(k, v);
+      for (const [k, v] of stageMarkers.adopted) markers.adopted.set(k, v);
       for (const id of stageMarkers.legacyEvents) markers.legacyEvents.add(id);
       candidates.push(...found);
     }
@@ -819,6 +946,41 @@ export async function runPrep(ctx: AgentContext, deps: PrepDeps, generate: Draft
   const templateOn = agentToolkitModuleState(ctx) === "on";
   let newPreps = 0;
   let reminders = 0;
+
+  // Approvals, read once per run and only when a prep needs it. Which item belongs to which lead is the queue's own resolver's answer.
+  const approvals = approvalsReader(ctx);
+  const resolvedCache = new Map<string, Resolved>();
+  const adoptionFor = async (c: Candidate): Promise<Adoption> => {
+    const a = await approvals();
+    if (a.state === "none") return { state: "none" };
+    if (a.state === "unavailable") return { state: "unavailable" };
+    const booked = c.bookedAt ?? (await stageEnteredAt(admin, orgId, c.leadId));
+    const candidates = adoptableItems(a.items, adoptionSinceMs(booked, nowMs, style.timeZone));
+    if (candidates.length === 0) return { state: "none" };
+    const unresolved = candidates.filter((i) => !resolvedCache.has(i.id));
+    if (unresolved.length > 0) {
+      try {
+        const resolved = await resolveBatch(orgFencedReader(admin, orgId), unresolved);
+        for (const i of unresolved) resolvedCache.set(i.id, resolved.get(i.id) ?? { leadIds: [], kind: null });
+      } catch {
+        return { state: "unavailable" };
+      }
+    }
+    const item = pickAdoption(candidates, resolvedCache, c.leadId);
+    return item ? { state: "found", item } : { state: "none" };
+  };
+  /** A prep that already exists: the item it adopted if that is still in Approvals, else whatever full prep is there now. */
+  const fullForPrepped = async (c: Candidate, adoptedId: string | undefined): Promise<{ state: "unavailable" } | { state: "ok"; full: FullPrep | null }> => {
+    const a = await approvals();
+    if (a.state === "unavailable") return { state: "unavailable" };
+    if (a.state === "ok" && adoptedId) {
+      const hit = stillAdoptable(a.items, adoptedId);
+      if (hit) return { state: "ok", full: { text: itemText(hit), itemId: hit.id, isNew: false } };
+    }
+    const found = await adoptionFor(c);
+    if (found.state === "unavailable") return { state: "unavailable" };
+    return { state: "ok", full: found.state === "found" ? { text: itemText(found.item), itemId: found.item.id, isNew: found.item.id !== adoptedId } : null };
+  };
   for (const c of standing) {
     if (budgetNearlySpent(ctx, NO_NEW_ITEM_RESERVE_MS)) {
       counts.deferred += 1;
@@ -830,30 +992,62 @@ export async function runPrep(ctx: AgentContext, deps: PrepDeps, generate: Draft
     const startMs = c.event ? Date.parse(c.event.startsAt) : null;
     try {
       if (preppedAt !== undefined || legacy) {
-        // Already prepped: only what is still owed (a reminder inside Resend's window, a booked email that failed).
+        // Already prepped: only what is still owed (a reminder inside Resend's window, a booked email that failed or was withheld).
         if (reminders >= REMINDER_BATCH) {
           counts.over += 1;
           continue;
         }
-        const plan = planSends({
+        // A prep from before the sends existed has no booked email to retry and made no promise about reminders it never planned.
+        if (legacy) continue;
+        const base = {
           prepKey: c.key,
           startsAtMs: startMs,
           nowMs,
           preppedAtMs: preppedAt !== undefined ? Date.parse(preppedAt) : nowMs - 24 * HOUR_MS - 1,
           madeNow: false,
           suppressBooked: false,
-          existing,
+        };
+        const adoptedId = markers.adopted.get(c.key);
+        // A facts-only 1 h email that has not gone out yet (its time is still ahead). One whose time has passed is already sent: it stays.
+        const factsScheduled = (["1h"] as const).some((k) => {
+          const r = existing.get(recordSlot(c.key, k));
+          return r?.status === "scheduled" && r.quality === "facts" && !!r.scheduledFor && Date.parse(r.scheduledFor) > nowMs;
         });
-        // A prep from before the sends existed has no booked email to retry and made no promise about reminders it never planned.
-        const actions = legacy ? [] : plan.actions;
-        if (actions.length === 0) continue;
-        reminders += 1;
-        const g = await gather(admin, orgId, c, nowMs, style.timeZone, deps, null);
-        if (!g) {
-          counts.failed += 1;
-          continue;
+        // Is there anything a FULL brief would change? Nothing owed and nothing to upgrade: Approvals is not even read.
+        const probe = planSends({ ...base, brief: "facts", existing });
+        if (probe.actions.length === 0 && probe.withheld.length === 0 && !factsScheduled && !adoptedId) continue;
+        let full: FullPrep | null = null;
+        if (!c.rerun) {
+          const looked = await fullForPrepped(c, adoptedId);
+          if (looked.state === "unavailable") {
+            // Not knowing what Approvals holds is not "no full prep": nothing is sent or withheld on a guess, and the next run asks again.
+            counts.adoptionUnread += 1;
+            continue;
+          }
+          full = looked.full;
         }
-        await deliver(ctx, deps, mailer, counts, state, g, c, actions);
+        // A facts-only 1 h email still waiting at Resend is replaced by the full brief: cancel it, and the plan below sends it again.
+        let owed = existing;
+        if (full && factsScheduled) {
+          const record = existing.get(recordSlot(c.key, "1h")) as SendRecord;
+          if (await cancelOne(ctx, deps, counts, state, record, nowMs)) {
+            counts.upgraded += 1;
+            owed = new Map(state.folded);
+          }
+        }
+        const plan = planSends({ ...base, brief: full ? "full" : "facts", existing: owed });
+        await recordWithheld(ctx, counts, state, c, plan.withheld);
+        if (plan.actions.length === 0 && !full?.isNew) continue;
+        if (plan.actions.length > 0) {
+          reminders += 1;
+          const g = await gather(admin, orgId, c, nowMs, style.timeZone, deps, null);
+          if (!g) {
+            counts.failed += 1;
+            continue;
+          }
+          await deliver(ctx, deps, mailer, counts, state, g, c, plan.actions, { adopted: full?.text ?? null });
+        }
+        if (full?.isNew && !(await writeAdoptMarker(admin, orgId, c, full.itemId))) counts.unrecorded += 1;
         continue;
       }
 
@@ -866,6 +1060,17 @@ export async function runPrep(ctx: AgentContext, deps: PrepDeps, generate: Draft
         counts.over += 1;
         continue;
       }
+      // Before a NEW prep is built, a full one that is already in Approvals for this lead is reused (never for a person's re-run). An
+      // Approvals that cannot be read is not "none found": this consult waits for the next run, and nothing is built on a guess.
+      let adoption: QueueItem | null = null;
+      if (!c.rerun) {
+        const found = await adoptionFor(c);
+        if (found.state === "unavailable") {
+          counts.adoptionUnread += 1;
+          continue;
+        }
+        if (found.state === "found") adoption = found.item;
+      }
       const g = await gather(admin, orgId, c, nowMs, style.timeZone, deps, counts);
       if (!g) {
         counts.failed += 1;
@@ -875,11 +1080,12 @@ export async function runPrep(ctx: AgentContext, deps: PrepDeps, generate: Draft
       const name = cardName(lead);
       const shownName = scrubJudgmentContent(name);
       const brief = renderConsultBrief(facts);
-      // Build and check BOTH drafts before queueing either.
-      assertNoJudgmentContent(briefOwnWording(facts), "consult prep brief");
+      // Build and check BOTH drafts before queueing either. (An adopted prep is the firm's own text and has no facts brief to check.)
+      if (!adoption) assertNoJudgmentContent(briefOwnWording(facts), "consult prep brief");
       const address = realAddress(lead.email);
       let clientBody: string | null = null;
-      if (autonomy !== "suggest" && c.event) {
+      // An adopted prep brings its own drafts: no second client email is written beside it.
+      if (autonomy !== "suggest" && c.event && !adoption) {
         if (!templateOn) counts.noTemplate += 1;
         else if (!address) counts.noAddress += 1;
         else {
@@ -920,9 +1126,11 @@ export async function runPrep(ctx: AgentContext, deps: PrepDeps, generate: Draft
         }
       }
 
-      const queued: Array<{ kind: string; id: string | null }> = [];
+      const queued: Array<{ kind: string; id: string | null; adopted?: true }> = [];
       let queueFailed = false;
-      if (ctx.queueOrgKey) {
+      if (adoption) {
+        queued.push({ kind: PREP_BRIEF_KIND, id: adoption.id, adopted: true });
+      } else if (ctx.queueOrgKey) {
         try {
           const item = await ctx.createDraft({
             orgKey: ctx.queueOrgKey,
@@ -971,13 +1179,15 @@ export async function runPrep(ctx: AgentContext, deps: PrepDeps, generate: Draft
 
       counts.prepped += 1;
       newPreps += 1;
-      counts.drafts += queued.filter((q) => q.id).length;
+      counts.drafts += queued.filter((q) => q.id && !q.adopted).length;
+      if (adoption) counts.adopted += 1;
 
       // The emails go BEFORE the marker is written: a crash between the two just posts the same keys with the same payload again
       // (Resend dedupes), where a marker with no email would never send the booked email.
       const bookedHeld = !!c.event && stageBookedRecently(records, lead.id, nowMs);
-      const plan = planSends({ prepKey: c.key, startsAtMs: startMs, nowMs, preppedAtMs: nowMs, madeNow: true, suppressBooked: bookedHeld, bookedOnly: c.rerun, existing });
-      await deliver(ctx, deps, mailer, counts, state, g, c, plan.actions);
+      const plan = planSends({ prepKey: c.key, startsAtMs: startMs, nowMs, preppedAtMs: nowMs, madeNow: true, suppressBooked: bookedHeld, bookedOnly: c.rerun, brief: adoption ? "full" : "facts", existing });
+      await recordWithheld(ctx, counts, state, c, plan.withheld);
+      await deliver(ctx, deps, mailer, counts, state, g, c, plan.actions, { adopted: adoption ? itemText(adoption) : null });
 
       const { error: recordError } = await admin.from("crm_activity").insert(
         queued.map((q) => ({
@@ -994,6 +1204,7 @@ export async function runPrep(ctx: AgentContext, deps: PrepDeps, generate: Draft
             prep_key: c.key,
             ...(c.event ? { start_at: c.event.startsAt } : {}),
             ...(q.id ? { queueItemId: q.id } : {}),
+            ...(q.adopted ? { adopted: true } : {}),
           },
         })),
       );
@@ -1031,6 +1242,11 @@ function summaryOf(c: Counts, stageUnread: boolean, outlookNotReady: boolean, ou
   if (c.sendFailed > 0) parts.push(`${plural(c.sendFailed, "email", "emails")} could not be sent or cancelled and will be tried again.`);
   if (c.cancelUnchecked > 0) parts.push(`${plural(c.cancelUnchecked, "scheduled email", "scheduled emails")} could not be checked against the calendar.`);
   if (c.nothingToDeliver > 0) parts.push(`${plural(c.nothingToDeliver, "consult", "consults")} left for a later run: approvals and email are both off, so there is nowhere to put the prep.`);
+  if (c.adopted > 0) parts.push(`${plural(c.adopted, "consult", "consults")} reused a full prep that was already in Approvals, so no new briefing was queued.`);
+  if (c.adoptionUnread > 0) parts.push(`${plural(c.adoptionUnread, "consult", "consults")} left for the next run: Approvals could not be read, so nothing was built or sent on a guess.`);
+  if (c.withheld > 0) parts.push(`${plural(c.withheld, "email", "emails")} held back: only the facts brief exists, and an email carries the full prep. ${c.withheld === 1 ? "It is" : "They are"} sent if a full prep appears while still due.`);
+  if (c.factsOnly > 0) parts.push(`${plural(c.factsOnly, "hour-before email", "hour-before emails")} sent or scheduled marked "facts only".`);
+  if (c.upgraded > 0) parts.push(`${plural(c.upgraded, "facts-only email", "facts-only emails")} cancelled and planned again with the full prep.`);
   if (c.noTemplate > 0) parts.push(`${plural(c.noTemplate, "consult", "consults")} got only the heads-up: the client-prep email template isn't set up for this firm, so no client email was written.`);
   if (c.noAddress > 0) parts.push(`${plural(c.noAddress, "consult", "consults")} had no client address, so only the heads-up was written.`);
   if (c.refused > 0) parts.push(`${plural(c.refused, "consult", "consults")} held back because a draft contained attorney-judgment content.`);

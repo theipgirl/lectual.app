@@ -44,6 +44,7 @@ async function readMarkers(leadIds: readonly string[]): Promise<Read3<PrepMarker
       prepKey: typeof r.payload?.prep_key === "string" ? r.payload.prep_key : null,
       queueItemId: typeof r.payload?.queueItemId === "string" ? r.payload.queueItemId : null,
       at: r.created_at,
+      adopted: r.payload?.adopted === true,
     }));
     return { status: "ok", value };
   } catch {

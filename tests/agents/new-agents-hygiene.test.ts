@@ -115,8 +115,9 @@ describe("Sprint 17 hygiene", () => {
     expect(hits).toEqual([path.join("src/lib/queue/resolve-batch.ts")]);
     const importers = walk("src", /\.(ts|tsx)$/).filter((f) => /import \{[^}]*\bresolveBatch\b[^}]*\} from/.test(read(f)));
     // The Stage Keeper (Sprint 29) matches approved post-consult emails to leads through the same resolver.
+    // Consult prep (S2a) does the same to find a full prep already in Approvals for a lead, before it builds one.
     expect(importers.sort()).toEqual(
-      [path.join("src/lib/agents/morning-brief/follow-ups.ts"), path.join("src/lib/agents/stage-keeper/run.ts"), path.join("src/lib/queue/lead-pending.ts")].sort(),
+      [path.join("src/lib/agents/morning-brief/follow-ups.ts"), path.join("src/lib/agents/stage-keeper/run.ts"), path.join("src/lib/consult-prep/engine.ts"), path.join("src/lib/queue/lead-pending.ts")].sort(),
     );
   });
 

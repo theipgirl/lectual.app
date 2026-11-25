@@ -213,3 +213,95 @@ describe("review fixes: folding and planning", () => {
     expect(parseSendRecord({ lead_id: null, created_at: T(0), payload: { prep_key: KEY, kind: "booked", status: "failed", no_response: true } })?.noResponse).toBe(true);
   });
 });
+
+describe("S2a: an email carries a full brief; the facts brief is emailed only as a marked 1 h email", () => {
+  const withheld = (kind: "booked" | "24h", over: Partial<SendRecord> = {}) => rec({ kind, status: "withheld", resendId: null, ...over });
+  const slots = (...records: SendRecord[]) => new Map(records.map((r) => [recordSlot(r.prepKey, r.kind), r]));
+
+  it("a facts brief withholds booked and 24h (they stay owed), and still plans the 1 h", () => {
+    const p = plan(50, { brief: "facts" });
+    expect(p.actions).toEqual([{ kind: "1h", mode: "schedule", at: new Date(at(49)).toISOString() }]);
+    expect(p.withheld).toEqual(["booked", "24h"]);
+  });
+  it("a full brief plans all three, as before, and withholds nothing", () => {
+    for (const brief of [undefined, "full" as const]) {
+      const p = plan(50, { brief });
+      expect(p.actions.map((a) => a.kind)).toEqual(["booked", "24h", "1h"]);
+      expect(p.withheld).toEqual([]);
+    }
+  });
+  it("a stage-keyed prep with a facts brief withholds its booked email", () => {
+    const p = plan(null, { brief: "facts" });
+    expect(p.actions).toEqual([]);
+    expect(p.withheld).toEqual(["booked"]);
+  });
+  it("a later run with a full brief sends the withheld booked and 24h while they are still due", () => {
+    const existing = slots(withheld("booked"), withheld("24h"));
+    const p = plan(50, { madeNow: false, brief: "full", existing, preppedAtMs: NOW - HOUR_MS });
+    expect(p.actions.map((a) => a.kind)).toEqual(["booked", "24h", "1h"]);
+  });
+  it("a later run with still only facts withholds them again (no new action), and the 1 h is planned once", () => {
+    const existing = slots(withheld("booked"), withheld("24h"));
+    const p = plan(50, { madeNow: false, brief: "facts", existing });
+    expect(p.actions.map((a) => a.kind)).toEqual(["1h"]);
+    expect(p.withheld).toEqual(["booked", "24h"]);
+  });
+  it("a withheld booked email is never sent late: not once the 24 h time has passed", () => {
+    const existing = slots(withheld("booked"));
+    const before = plan(24.5, { madeNow: false, brief: "full", existing, preppedAtMs: NOW - HOUR_MS });
+    expect(before.actions.map((a) => a.kind)).toEqual(["booked", "24h", "1h"]);
+    const after = plan(23.9, { madeNow: false, brief: "full", existing, preppedAtMs: NOW - HOUR_MS });
+    expect(after.actions.map((a) => a.kind)).toEqual(["1h"]);
+    expect(after.withheld).toEqual([]);
+  });
+  it("a withheld stage-keyed booked email is dropped 3 days after the prep was made", () => {
+    const stageKey = stagePrepKey(LEAD, "row-1");
+    const existing = new Map([[recordSlot(stageKey, "booked"), withheld("booked", { prepKey: stageKey })]]);
+    const base = { prepKey: stageKey, madeNow: false, brief: "full" as const, existing };
+    expect(plan(null, { ...base, preppedAtMs: NOW - 2 * 24 * HOUR_MS }).actions).toEqual([{ kind: "booked", mode: "now" }]);
+    expect(plan(null, { ...base, preppedAtMs: NOW - 4 * 24 * HOUR_MS }).actions).toEqual([]);
+  });
+  it("a withheld 24h whose time has passed is sent NOW with a full brief, until 2 hours before the start; never later", () => {
+    const existing = slots(withheld("24h"));
+    const p = plan(10, { madeNow: false, brief: "full", existing, preppedAtMs: NOW - 30 * HOUR_MS });
+    expect(p.actions).toContainEqual({ kind: "24h", mode: "now" });
+    const tooLate = plan(1.9, { madeNow: false, brief: "full", existing, preppedAtMs: NOW - 30 * HOUR_MS });
+    expect(tooLate.actions.map((a) => a.kind)).not.toContain("24h");
+    const stillFacts = plan(10, { madeNow: false, brief: "facts", existing, preppedAtMs: NOW - 30 * HOUR_MS });
+    expect(stillFacts.actions.map((a) => a.kind)).not.toContain("24h");
+  });
+  it("a 24h that was never wanted (the prep was made under a day ahead) is not made owed by a full brief", () => {
+    const p = plan(10, { madeNow: false, brief: "full", existing: new Map() });
+    expect(p.actions).toEqual([{ kind: "1h", mode: "schedule", at: new Date(at(9)).toISOString() }]);
+  });
+  it("a slot that is done is never planned again, whatever the brief", () => {
+    const existing = slots(rec({ kind: "booked" }), rec({ kind: "24h", status: "scheduled" }), rec({ kind: "1h", status: "scheduled" }));
+    expect(plan(50, { madeNow: false, brief: "full", existing }).actions).toEqual([]);
+    expect(plan(50, { madeNow: false, brief: "facts", existing }).withheld).toEqual([]);
+  });
+  it("a re-run (booked only) with a facts brief withholds its booked email and plans no reminder", () => {
+    const p = plan(50, { bookedOnly: true, brief: "facts" });
+    expect(p.actions).toEqual([]);
+    expect(p.withheld).toEqual(["booked"]);
+  });
+});
+
+describe("S2a: withheld records and the quality mark", () => {
+  it("a withheld row round-trips, and never hides an email that was sent, scheduled, handled elsewhere or failed", () => {
+    const w = rec({ status: "withheld", resendId: null, at: new Date(NOW + 1000).toISOString() });
+    expect(parseSendRecord({ lead_id: LEAD, created_at: w.at, payload: sendRecordPayload(w) })).toMatchObject({ status: "withheld", kind: "booked" });
+    for (const status of ["sent", "scheduled", "duplicate", "failed"] as const) {
+      const first = rec({ status, at: new Date(NOW).toISOString() });
+      expect(foldSendRecords([first, w]).get(recordSlot(KEY, "booked"))?.status, status).toBe(status);
+    }
+    const cancelled = rec({ status: "cancelled", at: new Date(NOW).toISOString() });
+    expect(foldSendRecords([cancelled, w]).get(recordSlot(KEY, "booked"))?.status).toBe("withheld");
+  });
+  it("a send that carried the facts brief is marked, and an unmarked one is full", () => {
+    const facts = rec({ kind: "1h", status: "scheduled", quality: "facts" });
+    expect(sendRecordPayload(facts)).toHaveProperty("quality", "facts");
+    expect(parseSendRecord({ payload: sendRecordPayload(facts) })?.quality).toBe("facts");
+    expect(sendRecordPayload(rec({ kind: "1h" }))).not.toHaveProperty("quality");
+    expect(parseSendRecord({ payload: sendRecordPayload(rec({ kind: "1h" })) })?.quality).toBeUndefined();
+  });
+});

@@ -18,6 +18,11 @@ export const NOT_RECORDED = "not recorded";
 export const CLIENT_WORDS_HEADING = "In the client's words";
 export const FILES_HEADING = "Files on file";
 /** One line saying what comes later. It avoids the words the judgment guard refuses, because it is the system's own wording. */
+/** The first line of a facts-only email (the 1 h email when no full brief could be had). */
+export const FACTS_ONLY_LINE = "Facts only: the full prep couldn't be built in time.";
+export const FACTS_ONLY_PREFIX = "Facts only: ";
+/** Said in the Lawmatics section when the account's field list (names, types, option labels) could not be read. */
+export const LABELS_UNREAD_LINE = "Some Lawmatics answers are shown as not recorded: the answer labels couldn't be read.";
 export const NEXT_UPDATE_LINE = "The likely classes, a first look at conflicts and a package suggestion come in the next update.";
 
 export type BriefFacts = {
@@ -34,6 +39,8 @@ export type BriefFacts = {
   meetings: MeetingsRead;
   /** Which email this is; `booked` and a preview carry no prefix. */
   send?: SendKind;
+  /** The facts-only mark: the subject and the first line of the body say so. Used only for the 1 h email when no full brief exists. */
+  factsOnly?: boolean;
 };
 
 /** `prepared: false` leaves the "Prepared:" time out: the EMAILED copy must be a pure function of the facts, so a re-posted send carries the same payload. */
@@ -62,10 +69,10 @@ export function sessionText(iso: string, tz: string): string {
 
 const SUBJECT_PREFIX: Record<SendKind, string> = { booked: "", "24h": "Tomorrow: ", "1h": "In 1 hour: " };
 
-export function briefSubject(facts: Pick<BriefFacts, "lead" | "startsAt" | "tz" | "send">): string {
+export function briefSubject(facts: Pick<BriefFacts, "lead" | "startsAt" | "tz" | "send" | "factsOnly">): string {
   const name = flat(cardName(facts.lead)) ?? "the client";
   const when = facts.startsAt ? sessionText(facts.startsAt, facts.tz) : "time not set";
-  return `${SUBJECT_PREFIX[facts.send ?? "booked"]}Consult prep: ${name} · ${when}`;
+  return `${facts.factsOnly ? FACTS_ONLY_PREFIX : ""}${SUBJECT_PREFIX[facts.send ?? "booked"]}Consult prep: ${name} · ${when}`;
 }
 
 function sections(f: BriefFacts, opts: BriefOptions = {}): { own: Section[]; words: Section; afterWords: Section[] } {
@@ -130,6 +137,7 @@ function sections(f: BriefFacts, opts: BriefOptions = {}): { own: Section[]; wor
         row("How they heard of the firm", flat(lm?.referralSource)),
       );
       for (const p of f.lawmatics.other) lawLines.push(`- ${orNot(p.label)}: ${orNot(p.value)}`);
+      if (f.lawmatics.labels === "failed") lawLines.push(LABELS_UNREAD_LINE);
       break;
     case "not-linked":
       lawLines.push("Not linked to Lawmatics, so there are no Lawmatics answers.");
@@ -194,7 +202,7 @@ function textOf(sec: Section[]): string {
   return sec.map((s) => [s.heading, ...s.lines].join("\n")).join("\n\n");
 }
 
-function htmlOf(all: Section[], footer: string): string {
+function htmlOf(all: Section[], footer: string, lead?: string): string {
   const body = all
     .map((s, i) => {
       const tag = i === 0 ? "h2" : "h3";
@@ -215,17 +223,32 @@ function htmlOf(all: Section[], footer: string): string {
       return open ? `${out}</ul>` : out;
     })
     .join("");
-  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#1a1a1a">${body}<hr><p style="color:#555">${esc(footer)}</p></div>`;
+  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#1a1a1a">${lead ? `<p><strong>${esc(lead)}</strong></p>` : ""}${body}<hr><p style="color:#555">${esc(footer)}</p></div>`;
 }
 
 /** The brief. Facts only: the same renderer for the email, the stored copy and the lead page. */
 export function renderConsultBrief(facts: BriefFacts, opts: BriefOptions = {}): Brief {
   const { own, words, afterWords } = sections(facts, opts);
   const all = [...own, words, ...afterWords];
+  const lead = facts.factsOnly ? FACTS_ONLY_LINE : undefined;
   return {
     subject: briefSubject(facts),
-    text: `${textOf(all)}\n\n${BRIEF_FOOTER}`,
-    html: htmlOf(all, BRIEF_FOOTER),
+    text: `${lead ? `${lead}\n\n` : ""}${textOf(all)}\n\n${BRIEF_FOOTER}`,
+    html: htmlOf(all, BRIEF_FOOTER, lead),
+  };
+}
+
+/**
+ * The email for a prep that ADOPTED a full brief already in Approvals: that item's text, exactly as it stands, with the system's
+ * fixed internal-only footer beneath it. The text is not re-written, scrubbed or checked: it is the firm's own prep. The html is the
+ * text escaped inside a pre-wrapped block (so a tag-shaped word in it is shown, never run). A pure function of (text, facts).
+ */
+export function renderAdoptedBrief(adoptedText: string, facts: Pick<BriefFacts, "lead" | "startsAt" | "tz" | "send">): Brief {
+  const body = adoptedText.trim();
+  return {
+    subject: briefSubject({ ...facts, factsOnly: false }),
+    text: `${body}\n\n${BRIEF_FOOTER}`,
+    html: `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#1a1a1a"><div style="white-space:pre-wrap">${esc(body)}</div><hr><p style="color:#555">${esc(BRIEF_FOOTER)}</p></div>`,
   };
 }
 
