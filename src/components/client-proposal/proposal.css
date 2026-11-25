@@ -531,10 +531,12 @@ button.cp-step-btn:focus-visible { outline: 3px solid var(--cp-brand); outline-o
 .cp-work-head { margin: 0; }
 .cp-work-head .cp-num { color: var(--cp-soft); white-space: nowrap; }
 .cp-work-intro { margin: 6px 0 0; }
-/* Tailwind's reset removes list bullets, so the work bullets set theirs back. */
-.cp-work-details { margin: 8px 0 0; padding-left: 22px; list-style: disc outside; }
-.cp-work-details li { display: list-item; }
-.cp-work-details li + li { margin-top: 4px; }
+/* Each bullet of a piece of work is a row like the fee table's: text left, its hours right, a hairline between rows. */
+.cp-work-lines { width: 100%; margin: 8px 0 0; border-collapse: collapse; font-size: 15.5px; table-layout: auto; }
+.cp-work-lines td { padding: 7px 0; border-bottom: 1px solid var(--cp-line); vertical-align: top; text-align: left; overflow-wrap: anywhere; }
+.cp-work-lines tr:last-child td { border-bottom: 0; }
+.cp-work-lines td.cp-num { text-align: right; white-space: nowrap; width: 1%; padding-left: 14px; }
+.cp-sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
 /* The "Legal Fee Summary" table: it scrolls inside its own box, never the page, on a phone. */
 .cp-fee-sum-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
@@ -544,6 +546,12 @@ button.cp-step-btn:focus-visible { outline: 3px solid var(--cp-brand); outline-o
 .cp-fee-tbl td.cp-num, .cp-fee-tbl th.cp-num { text-align: right; white-space: nowrap; }
 .cp-fee-tbl thead th + th { text-align: right; }
 .cp-fee-tbl tfoot th, .cp-fee-tbl tfoot td { font-weight: 700; border-bottom: 0; border-top: 2px solid var(--cp-line-2); }
+/* In the narrow totals panel: no minimum width, compact cells, headers may wrap, so nothing scrolls sideways. */
+.cp-fee-sum-side .cp-fee-tbl { min-width: 0; font-size: 14px; table-layout: auto; }
+.cp-fee-sum-side .cp-fee-tbl th, .cp-fee-sum-side .cp-fee-tbl td { padding: 6px 6px; overflow-wrap: anywhere; }
+.cp-fee-sum-side .cp-fee-tbl thead th { font-size: 12.5px; }
+.cp-fee-sum-side .cp-fee-tbl th:first-child, .cp-fee-sum-side .cp-fee-tbl td:first-child { padding-left: 0; }
+.cp-fee-sum-side .cp-fee-tbl th:last-child, .cp-fee-sum-side .cp-fee-tbl td:last-child { padding-right: 0; }
 
 /* A deposit: the part of the fee due today, and the line beside the pay button after acceptance. */
 .cp-due-today .cp-l b { color: var(--cp-brand); }

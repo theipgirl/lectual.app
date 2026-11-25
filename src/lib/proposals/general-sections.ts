@@ -27,6 +27,19 @@ export function itemDetails(item: GeneralItem | undefined): string[] {
   return cleanLines(item?.details);
 }
 
+/**
+ * Splits a bullet's trailing hours off its text: "Draft the agreement (2.5 hours)." -> { text: "Draft the agreement.", hours: "2.5" }.
+ * Recognises a final parenthetical "(N hour|hours)" (any case, optional period after it). The number is returned exactly as
+ * written (a string, no arithmetic). No hours found = the whole text and `hours: null`.
+ */
+export function splitDetailHours(raw: string): { text: string; hours: string | null } {
+  const m = /^([\s\S]*?)\s*\(\s*(\d+(?:\.\d+)?)\s*hours?\s*\)\s*(\.?)\s*$/i.exec(raw.trim());
+  if (!m) return { text: raw.trim(), hours: null };
+  let text = m[1].trim();
+  if (m[3] === "." && text && !/[.!?]$/.test(text)) text += ".";
+  return { text, hours: m[2] };
+}
+
 /** True when some work item has an intro or bullet points: the page then draws numbered sections. */
 export function usesWorkSections(content: Pick<ProposalContent, "general"> | null | undefined): boolean {
   const items = Array.isArray(content?.general?.items) ? content!.general!.items : [];

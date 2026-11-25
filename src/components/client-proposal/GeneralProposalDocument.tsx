@@ -19,7 +19,7 @@ import { LoeStepBar } from "./LoeStepBar";
 import { saveDetailsInBackground, showsSavedNote, useLoeFlow } from "./loe-flow";
 import { depositOf, DueTodayRows, PayToday } from "./DueToday";
 import { DUE_TODAY_BAR, FEE_SUMMARY_COLUMNS, FEE_SUMMARY_HEADING, FLAT_FEE_TOTAL_LABEL } from "@/lib/loe/client-words";
-import { feeSummary, itemDetails, itemIntro, sectionFigures, usesWorkSections } from "@/lib/proposals/general-sections";
+import { feeSummary, itemDetails, itemIntro, sectionFigures, splitDetailHours, usesWorkSections } from "@/lib/proposals/general-sections";
 import { brandForSlug, formatCivilDate, money, paragraphs, richSegments, safeHttpsUrl, type ProposalBrand } from "./format";
 import "./proposal.css";
 
@@ -250,11 +250,25 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
                               ))
                             : null}
                           {details.length > 0 ? (
-                            <ul className="cp-work-details">
-                              {details.map((d, j) => (
-                                <li key={j}>{d}</li>
-                              ))}
-                            </ul>
+                            <table className="cp-work-lines">
+                              <thead className="cp-sr-only">
+                                <tr>
+                                  <th scope="col">Task</th>
+                                  <th scope="col">Estimated hours</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {details.map((d, j) => {
+                                  const line = splitDetailHours(d);
+                                  return (
+                                    <tr key={j}>
+                                      <td>{line.text}</td>
+                                      <td className="cp-num">{line.hours ?? ""}</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
                           ) : null}
                         </li>
                       );
@@ -274,41 +288,6 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
                 </ul>
               </div>
               )}
-              {summary ? (
-                <div className="cp-card cp-fee-sum">
-                  <h3>{FEE_SUMMARY_HEADING}</h3>
-                  <div className="cp-fee-sum-wrap">
-                    <table className="cp-fee-tbl">
-                      <thead>
-                        <tr>
-                          {FEE_SUMMARY_COLUMNS.map((c) => (
-                            <th key={c} scope="col">
-                              {c}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {summary.rows.map((r, i) => (
-                          <tr key={i}>
-                            <td>{r.label}</td>
-                            <td className="cp-num">{r.hours}</td>
-                            <td className="cp-num">{r.fees}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot>
-                        <tr>
-                          <th scope="row">{summary.total.label}</th>
-                          <td className="cp-num">{summary.total.hours}</td>
-                          <td className="cp-num">{summary.total.fees}</td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                </div>
-              ) : null}
-
               {excludes.length > 0 ? (
                 <div className="cp-card">
                   <h3>Not included</h3>
@@ -353,6 +332,38 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
               </div>
               <div className="cp-panel-b" aria-live="polite">
                 <div className="cp-lines">
+                  {summary ? (
+                    <div className="cp-grp cp-fee-sum cp-fee-sum-side">
+                      <h3>{FEE_SUMMARY_HEADING}</h3>
+                      <table className="cp-fee-tbl">
+                        <thead>
+                          <tr>
+                            {FEE_SUMMARY_COLUMNS.map((c) => (
+                              <th key={c} scope="col">
+                                {c}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {summary.rows.map((r, i) => (
+                            <tr key={i}>
+                              <td>{r.label}</td>
+                              <td className="cp-num">{r.hours}</td>
+                              <td className="cp-num">{r.fees}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr>
+                            <th scope="row">{summary.total.label}</th>
+                            <td className="cp-num">{summary.total.hours}</td>
+                            <td className="cp-num">{summary.total.fees}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  ) : null}
                   {valueOverFee ? (
                     <div className="cp-grp">
                       <div className="cp-ln">

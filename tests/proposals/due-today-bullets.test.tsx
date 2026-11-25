@@ -11,7 +11,7 @@ import { ProposalDocument } from "@/components/client-proposal/ProposalDocument"
 import { GeneralProposalDocument } from "@/components/client-proposal/GeneralProposalDocument";
 import { activePaymentTerms, dueToday } from "@/lib/proposals/due-today";
 import { acceptedDueToday, staffDueTodayLine } from "@/lib/proposals/due-today-staff";
-import { feeSummary, sectionFigures, usesWorkSections } from "@/lib/proposals/general-sections";
+import { feeSummary, sectionFigures, splitDetailHours, usesWorkSections } from "@/lib/proposals/general-sections";
 import { defaultSelection, quoteProposal } from "@/lib/proposals/pricing";
 import { validateContent } from "@/lib/proposals/validate";
 import { buildAcceptedSnapshot, publicContent } from "@/lib/proposals/public";
@@ -272,10 +272,32 @@ describe("flat-fee work as numbered sections", () => {
     expect((html.match(/<li class="cp-work-sec">/g) ?? []).length).toBe(3);
     expect(html).toContain('<b>1. Review both management agreements</b><span class="cp-num"> (1 Hour | $500)</span>');
     expect(html).toContain('<b>2. Review all correspondence and evidence</b><span class="cp-num"> (0.5 Hours | $250)</span>');
-    expect(html).toMatch(/<ul class="cp-work-details"><li>Read the 2019 agreement \(0\.5 hours\)\.<\/li><li>Read the 2023 renewal \(0\.5 hours\)\.<\/li><\/ul>/);
+    // Changed on purpose: bullets are line-item rows with their hours in their own cell (was a <ul class="cp-work-details">).
+    expect(html).not.toContain("cp-work-details");
+    expect(html).toContain('<tr><td>Read the 2019 agreement.</td><td class="cp-num">0.5</td></tr><tr><td>Read the 2023 renewal.</td><td class="cp-num">0.5</td></tr>');
     expect(html).toMatch(/\(0\.5 Hours \| \$250\)<\/span><\/p><p class="cp-work-intro">To keep your costs down/);
     // The old one-line list (a <span> label per item) is not drawn; "Not included" keeps its own list.
     expect(html).not.toContain('<ul class="cp-work"><li><span>');
+  });
+
+  it("splitDetailHours reads a trailing hours parenthetical", () => {
+    expect(splitDetailHours("Drafting the agreement (2.5 hours).")).toEqual({ text: "Drafting the agreement.", hours: "2.5" });
+    expect(splitDetailHours("Review the lease (1 hour).")).toEqual({ text: "Review the lease.", hours: "1" });
+    expect(splitDetailHours("Review the lease. (1 hour)")).toEqual({ text: "Review the lease.", hours: "1" });
+    expect(splitDetailHours("Call the client (0.5 Hours)")).toEqual({ text: "Call the client", hours: "0.5" });
+    expect(splitDetailHours("No hours here.")).toEqual({ text: "No hours here.", hours: null });
+    expect(splitDetailHours("About (2 hours) of work, mid-sentence.")).toEqual({ text: "About (2 hours) of work, mid-sentence.", hours: null });
+  });
+
+  it("work lines are a semantic table with hours cells; the Legal Fee Summary is in the side panel exactly once", () => {
+    const html = renderGeneral(withSections(), "live");
+    expect(html).toContain('<table class="cp-work-lines">');
+    expect(html).toContain("Estimated hours");
+    const at = html.indexOf('<aside class="cp-side"');
+    const side = html.slice(at);
+    expect(html.slice(0, at)).not.toContain("Legal Fee Summary");
+    expect((html.match(/Legal Fee Summary/g) ?? []).length).toBe(1);
+    expect(side.indexOf("Legal Fee Summary")).toBeLessThan(side.indexOf("Flat fee due now"));
   });
 
   it("the Legal Fee Summary: a row per item, then a bold Total of hours and fees", () => {

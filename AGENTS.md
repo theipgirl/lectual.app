@@ -2794,6 +2794,9 @@ Display and data only: no migration, no dependency, nothing sends. `src/lib/prop
   Total: hours summed only when every item has them, else "—"; the fee total is the quote's `value_cents`). It scrolls inside `.cp-fee-sum-wrap`, never the page.
   Otherwise the old one-line list. The editor's work rows have "Intro (optional)" and "Details (one per line)" (`parseGeneralItems`, blank lines dropped); the
   staff card lists them. The Lawmatics note, the accepted-proposal docx and the letter are unchanged.
+  **Layout update:** each bullet is a line-item row (`<table class="cp-work-lines">`, hidden "Task" / "Estimated hours" header, hairline between rows): the text on the left,
+  and its hours on the right, read from a trailing "(0.5 hours)" by the pure `splitDetailHours` (the number as written, no arithmetic; no hours = empty cell). The Legal Fee
+  Summary now sits in the "Review and accept" side panel above the flat-fee lines (compact `.cp-fee-sum-side`, no minimum width), once, and no longer in the main column.
 - **Up to four packages per choice** (`MAX_PACKAGE_CHOICE_OPTIONS = 4`, a leaf module `src/lib/proposals/package-choice-limit.ts`, re-exported by `types.ts`): a
   brand name's and a mark's `package_choice`, the firm's "New proposals offer", the builder (`draft-spec.ts`), the editor ("tick from 1 to 4 packages"), Copilot's
   `draft_proposal` (schema `maxItems` and its own check) and `consultChoice`. The comparison table already scrolls sideways in `.cp-cmp-wrap`. No pricing change.
