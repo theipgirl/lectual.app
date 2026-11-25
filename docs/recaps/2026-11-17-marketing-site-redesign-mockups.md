@@ -242,6 +242,40 @@ reviewed by the orchestrator. Nothing needed sending back this round.
   real phone, a real trackpad, the cost of five blurred layers on real hardware, a screen
   reader.
 
+## Round seven (Nov 25, night): six more comments on Horizon
+
+Six new comments, "ok resolve new comments". Same link. Four builders in parallel (top of
+page, overnight, workspace, connections); the orchestrator made the one-line shared change for
+the deadlines windows' dots, merged and reviewed. Nothing needed sending back.
+
+- **Workspace ("change this back to the last slider that went full width at the bottom and
+  remove the side arrows"):** the earlier layout is back: heading on top, tabs above the
+  cards, full-width cards, the progress line under them. The left column, the "1 of 6" counter
+  and the previous/next arrows are gone. The intake form from the last round is kept.
+- **Hero sky ("add more sky from the other side over here"):** sky now also comes in from the
+  left edge and the top-left corner, at lower strength than the right, with a clear patch of
+  paper kept behind the headline and lede (measured 11:1 or better for the headline). Desktop
+  only; on the phone the sky still comes from below.
+- **Window dots ("the colors of the close, open, minimize tabs"):** red, yellow, green on
+  every window: hero, the small differentiator windows, overnight, and the two deadlines
+  windows.
+- **"Apply for private beta" to the nav bar, "Log in" just text:** the nav's one filled pill
+  is now "Apply for private beta"; "Log in" is a plain text link before it. The hero button is
+  removed; the lede is a little larger. On the phone the bar shows a short "Apply" pill and
+  "Log in" is the first row of the Menu.
+- **"Remove outer pill" (on the tab group):** the five tabs have no container shape in any
+  state, only the sliding highlight. The dark nav bar that appears on scroll is kept (the
+  comment was pinned to the tab group).
+- **Connector tiles ("come forward from background... just use the icon but when you hover it
+  shows the name"):** ten icon-only tiles that start small and blurred near the horizon and
+  travel forward to their places as the section scrolls in. The name shows on hover, keyboard
+  focus or tap, and is read by screen readers. Phone, reduced motion and no-JavaScript show a
+  grid with the names as captions.
+- **Checks:** no sideways scroll at 1440, 1280, 1024 and 390 wide; nav Apply pill clickable;
+  no console errors; every frame of a desktop and phone walk-through reviewed.
+- **Not checked:** Safari and Firefox, a real phone, a real trackpad, hover on a real mouse
+  (the tiles drift, so the label can move a few pixels under a resting cursor), a screen reader.
+
 ## Recommendation on Astro (not decided)
 
 Stay on Next.js for this redesign. The loader, pin scrolling and micro-animations are the same

@@ -7,12 +7,18 @@ Newest section first. Tick an item when it is done; don't delete it.
 
 Recap: `docs/recaps/2026-11-17-marketing-site-redesign-mockups.md` (round three). Omi cross-check: still the open item "Review the new website".
 
+### Taylor, after the six newest comments (Nov 25, night)
+- [ ] Review Horizon again (same link) and resolve your comment threads on the page; Claude can't close them from the session.
+- [ ] Say whether "remove outer pill" meant the soft shape around the five tabs (removed) or the whole dark nav bar that appears once you scroll (kept).
+- [ ] Hover a connector tile and check the name label; say if the tiles should be bigger or the names always visible on desktop too.
+- [ ] Look at the hero on your own screen: sky now comes in from the left as well, with a clear patch kept behind the headline. On the phone the sky still comes only from below.
+
 ### Taylor, after the seven newest comments (Nov 25, evening)
 - [ ] Review Horizon again (same link) and resolve your comment threads on the page; Claude can't close them from the session.
 - [ ] Before any of this goes live: SharePoint, Google Drive and ChatGPT connections are not in the product, and Gmail is mail only (no calendar). The page and its "What does it connect to?" answer now name all ten. Build them, label them "coming soon", or take them off the live page.
 - [ ] Check each company's brand rules before using the ten logos on the live site (now also Gmail, SharePoint, Google Drive, Claude, ChatGPT).
 - [ ] Say whether "slow release" meant the top blur letting go gradually (built) or the pinned sections releasing more slowly.
-- [ ] Say whether the workspace heading should also sit left of the slider on small laptops (under 1180px wide it sits above, so the cards stay wide enough).
+- [x] Workspace heading left of the slider: reversed by Taylor (Nov 25); the full-width slider is back.
 - [ ] Look at the frosted top bar at night (overnight scene): it had to be brightened for legibility, so it reads as soft grey-white there.
 
 ### Taylor, after the ten further comments (Nov 25, afternoon)
