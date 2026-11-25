@@ -1,6 +1,7 @@
-import type { SendRecord } from "./sends";
+import { HOUR_MS, STAGE_BOOKED_OWED_MS, type SendRecord } from "./sends";
 import { parsePrepKey } from "./keys";
 import {
+  CONSULT_PREP_ADOPTED,
   CONSULT_PREP_ASK_ADMIN,
   CONSULT_PREP_EMAIL_OFF,
   CONSULT_PREP_NOT_EMAILED,
@@ -10,6 +11,7 @@ import {
   CONSULT_PREP_RECIPIENTS_NOW,
   CONSULT_PREP_RECIPIENTS_UNREAD,
   CONSULT_PREP_SET_IN_TEAM,
+  CONSULT_PREP_WAITING_FULL,
 } from "@/lib/ui/words";
 
 /**
@@ -19,7 +21,7 @@ import {
 
 export type Read3<T> = { status: "ok"; value: T } | { status: "unavailable" };
 
-export type PrepMarker = { prepKey: string | null; queueItemId: string | null; at: string };
+export type PrepMarker = { prepKey: string | null; queueItemId: string | null; at: string; /** The prep reused a full brief already in Approvals. */ adopted?: boolean };
 export type RecipientsView = { names: string[]; cc: string[] };
 
 export type CardInputs = {
@@ -34,6 +36,8 @@ export type CardInputs = {
   emailOn: boolean;
   adminTier: boolean;
   tz: string;
+  /** The clock, for "is the owed booked email still due?". Absent: it is taken as still due. */
+  nowMs?: number;
 };
 
 export type CardView =
@@ -53,12 +57,26 @@ const list = (names: readonly string[]): string => (names.length <= 1 ? (names[0
 
 const noRecipientsLines = (adminTier: boolean): string[] => [`${CONSULT_PREP_NO_RECIPIENTS} ${adminTier ? CONSULT_PREP_SET_IN_TEAM : CONSULT_PREP_ASK_ADMIN}`];
 
+/** The owed booked email lapses at the consult's 24 h time (a stage-keyed prep: 3 days after it was made), as `planSends` decides. */
+function bookedStillOwed(marker: PrepMarker, nowMs: number | undefined): boolean {
+  if (nowMs === undefined) return true;
+  const parsed = marker.prepKey ? parsePrepKey(marker.prepKey) : null;
+  if (parsed?.kind === "event") {
+    const start = Date.parse(parsed.startsAt);
+    return Number.isFinite(start) ? nowMs < start - 24 * HOUR_MS : true;
+  }
+  const made = Date.parse(marker.at);
+  return Number.isFinite(made) ? nowMs - made <= STAGE_BOOKED_OWED_MS : true;
+}
+
 export function consultPrepCardView(input: CardInputs): CardView {
   if (input.agents === "off") return { kind: "hidden" };
   if (input.agents === "unreadable" || input.markers.status !== "ok" || input.sends.status !== "ok") return { kind: "unavailable" };
 
   const markers = [...input.markers.value].sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
   const newest = markers[0];
+  // The prep was MADE at its first marker; a later marker for the same key only records that it found a full brief in Approvals.
+  const madeAt = newest && newest.prepKey !== null ? (markers.filter((m) => m.prepKey === newest.prepKey).map((m) => m.at).sort((a, b) => Date.parse(a) - Date.parse(b))[0] ?? newest.at) : newest?.at;
   const recipientsEmpty = input.recipients.status === "ok" && input.recipients.value.names.length === 0;
 
   if (newest) {
@@ -74,6 +92,8 @@ export function consultPrepCardView(input: CardInputs): CardView {
       mail = "emailed";
     } else if (booked?.status === "failed") {
       mail = "the email couldn't be sent and will be tried again";
+    } else if (booked?.status === "withheld" && bookedStillOwed({ ...newest, at: madeAt ?? newest.at }, input.nowMs)) {
+      mail = CONSULT_PREP_WAITING_FULL;
     } else if (!input.emailOn) {
       mail = `${CONSULT_PREP_NOT_EMAILED} (${CONSULT_PREP_EMAIL_OFF})`;
     } else {
@@ -85,8 +105,9 @@ export function consultPrepCardView(input: CardInputs): CardView {
       if (!r || (r.status !== "scheduled" && r.status !== "sent")) continue;
       reminders.push(`${kind === "24h" ? "a day before" : "an hour before"}${r.scheduledFor ? `, ${when(r.scheduledFor, input.tz)}` : ""}`);
     }
-    const head = [`Prepared ${when(newest.at, input.tz)}`, mail, ...(reminders.length > 0 ? [`reminders: ${reminders.join("; ")}`] : [])].join(" · ");
+    const head = [`Prepared ${when(madeAt ?? newest.at, input.tz)}`, mail, ...(reminders.length > 0 ? [`reminders: ${reminders.join("; ")}`] : [])].join(" · ");
     const lines = [head];
+    if (newest.adopted) lines.push(CONSULT_PREP_ADOPTED);
     if (mail === "emailed" && input.recipients.status === "ok" && input.recipients.value.names.length > 0) {
       const to = list(input.recipients.value.names);
       const cc = input.recipients.value.cc;

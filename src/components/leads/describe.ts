@@ -6,9 +6,9 @@
 import { STOP_REASON_LABEL, isStopReason } from "@/lib/campaigns/stops";
 import { CONSULT_OUTCOME_LABEL, isConsultOutcome } from "@/lib/pipeline/consult-outcome-labels";
 import { formatFileSize } from "@/lib/files/rules";
-import { PREP_SEND_SOURCE } from "@/lib/consult-prep/keys";
+import { PREP_BUILD_SOURCE, PREP_SEND_SOURCE } from "@/lib/consult-prep/keys";
 import { parseSendRecord } from "@/lib/consult-prep/sends";
-import { AUTOMATIC_STAGE_MOVES, CAME_BACK_TIMELINE, consultPrepTimelineSend, FIRST_READ, FROM_THEIR_EMAILS, LAWMATICS_NAME } from "@/lib/ui/words";
+import { AUTOMATIC_STAGE_MOVES, CAME_BACK_TIMELINE, consultPrepTimelineBuild, consultPrepTimelineSend, FIRST_READ, FROM_THEIR_EMAILS, LAWMATICS_NAME } from "@/lib/ui/words";
 import { CAME_BACK_SOURCE, isCameBackRow } from "@/lib/today/came-back-rules";
 import { reasonText } from "@/lib/stage-keeper/format";
 import { AGENT_ACTOR, REVIEW_SOURCE, SUGGESTION_SOURCE, WHY_TEXT, parseAgentMove, parseSuggestion } from "@/lib/stage-keeper/moves";
@@ -263,6 +263,8 @@ export function describeActivity(row: Row & { id?: string }, options: DescribeOp
         const send = parseSendRecord({ payload: p });
         return { title: send ? consultPrepTimelineSend(send.kind, send.status) : AI_SOURCES[source] ?? "AI insight", detail: null, tone: "ai", link: null };
       }
+      // S2b: a full-brief build record (codes and ids only), so the line is the glossary's.
+      if (source === PREP_BUILD_SOURCE) return { title: consultPrepTimelineBuild(p.status), detail: null, tone: "ai", link: null };
       if (source === "intake-triage") {
         return { title: `First read: ${String(p.lane ?? "").toUpperCase() || "scored"}`, detail: str(p.reason), tone: "ai", link: null };
       }

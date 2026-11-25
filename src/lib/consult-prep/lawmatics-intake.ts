@@ -1,4 +1,5 @@
 import type { LawmaticsClient } from "@/lib/lawmatics/client";
+import { NOT_RECORDED_TEXT, findField, readFieldMeta, resolveValue, type LabelLookup } from "@/lib/lawmatics/field-meta";
 import { bag, idOf, includedIndex, records, related, type Raw } from "@/lib/lawmatics/jsonapi";
 
 /**
@@ -58,7 +59,8 @@ export function mapIntake(pairs: readonly IntakePair[]): Partial<Record<IntakeFa
   const out: Partial<Record<IntakeFactKey, string>> = {};
   for (const p of pairs) {
     const key = mapIntakeLabel(p.label);
-    if (key && !out[key] && p.value.trim()) out[key] = p.value.trim();
+    // A value that could not be put into words ("not recorded", an option id that was never printed) never takes a fact's place.
+    if (key && !out[key] && p.value.trim() && p.value.trim() !== NOT_RECORDED_TEXT) out[key] = p.value.trim();
   }
   return out;
 }
@@ -102,13 +104,30 @@ function scalarText(v: unknown): string | null {
     const parts = v.map(scalarText).filter((x): x is string => !!x);
     return parts.length ? parts.join(", ") : null;
   }
+  if (isRaw(v)) {
+    // `{ id, name }`, `{ value, label }`: the readable part, never the id.
+    for (const k of ["formatted_value", "name", "label", "value"]) {
+      const inner = scalarText(v[k]);
+      if (inner) return inner;
+    }
+  }
   return null;
 }
 
 const LABEL_KEYS = ["label", "name", "field_name", "custom_field_name", "title", "question"];
-const VALUE_KEYS = ["formatted_value", "value", "answer", "response", "data", "display_value"];
+const RAW_VALUE_KEYS = ["value", "answer", "response", "data", "display_value"];
 
-function pairFrom(entry: Raw, fieldNames?: ReadonlyMap<string, string>): IntakePair | null {
+/**
+ * One answer as a pair. The value goes through the ONE resolver (`resolveValue`): Lawmatics' own `formatted_value` when it is
+ * words, else the option's label, else "not recorded" for a number that is probably an option id. Never an id.
+ */
+function valuePair(label: string, fieldId: string | null, formatted: string | null, raw: string | null, labels: LabelLookup): IntakePair | null {
+  if (!formatted && !raw) return null;
+  const value = resolveValue({ formatted, raw, meta: findField(labels, fieldId, label), labels: labels?.state === "ok" ? "ok" : "failed" });
+  return { label, value: value ?? NOT_RECORDED_TEXT };
+}
+
+function pairFrom(entry: Raw, fieldNames: ReadonlyMap<string, string> | undefined, labels: LabelLookup, keyId?: string): IntakePair | null {
   const b = bag(entry);
   let label: string | null = null;
   for (const k of LABEL_KEYS) {
@@ -125,24 +144,24 @@ function pairFrom(entry: Raw, fieldNames?: ReadonlyMap<string, string>): IntakeP
       }
     }
   }
-  if (!label) {
-    const cf = b.custom_field ?? entry.custom_field;
-    if (isRaw(cf)) label = [cf.name, cf.label].find((x): x is string => typeof x === "string" && x.trim().length > 0)?.trim() ?? null;
+  const cf = b.custom_field ?? entry.custom_field;
+  let fieldId: string | null = keyId ?? null;
+  const idRaw = b.custom_field_id ?? entry.custom_field_id;
+  if (typeof idRaw === "string" || typeof idRaw === "number") fieldId = String(idRaw);
+  else if (isRaw(cf) && (typeof cf.id === "string" || typeof cf.id === "number")) fieldId = String(cf.id);
+  if (!label && isRaw(cf)) label = [cf.name, cf.label].find((x): x is string => typeof x === "string" && x.trim().length > 0)?.trim() ?? null;
+  if (!label && fieldNames && fieldId) label = fieldNames.get(fieldId) ?? null;
+  const formatted = scalarText(b.formatted_value ?? entry.formatted_value);
+  let raw: string | null = null;
+  for (const k of RAW_VALUE_KEYS) {
+    raw = scalarText(b[k] ?? entry[k]);
+    if (raw) break;
   }
-  if (!label && fieldNames) {
-    const id = b.custom_field_id ?? entry.custom_field_id;
-    if (typeof id === "string" || typeof id === "number") label = fieldNames.get(String(id)) ?? null;
-  }
-  let value: string | null = null;
-  for (const k of VALUE_KEYS) {
-    value = scalarText(b[k] ?? entry[k]);
-    if (value) break;
-  }
-  return label && value ? { label, value } : null;
+  return label ? valuePair(label, fieldId, formatted, raw, labels) : null;
 }
 
 /** Every intake (custom-field) label/value pair the response carries, whichever of the likely shapes it uses. */
-export function customFieldPairs(payload: unknown, fieldNames?: ReadonlyMap<string, string>): IntakePair[] {
+export function customFieldPairs(payload: unknown, fieldNames?: ReadonlyMap<string, string>, labels?: LabelLookup): IntakePair[] {
   const rec = records(payload)[0];
   const out: IntakePair[] = [];
   if (rec) {
@@ -152,19 +171,19 @@ export function customFieldPairs(payload: unknown, fieldNames?: ReadonlyMap<stri
       if (Array.isArray(v)) {
         for (const e of v) {
           if (!isRaw(e)) continue;
-          const p = pairFrom(e, fieldNames);
+          const p = pairFrom(e, fieldNames, labels);
           if (p) out.push(p);
         }
       } else if (isRaw(v)) {
         for (const [k, raw] of Object.entries(v)) {
           if (isRaw(raw)) {
-            const p = pairFrom({ ...raw, ...(raw.name || raw.label || raw.custom_field_name ? {} : { name: fieldNames?.get(k) ?? "" }) }, fieldNames);
+            const p = pairFrom({ ...raw, ...(raw.name || raw.label || raw.custom_field_name ? {} : { name: fieldNames?.get(k) ?? "" }) }, fieldNames, labels, /^\d+$/.test(k) ? k : undefined);
             if (p) out.push(p);
           } else {
-            const value = scalarText(raw);
             // A map keyed by the label itself, or by a custom field id the firm's field list names.
             const label = fieldNames?.get(k) ?? k;
-            if (label.trim() && value) out.push({ label: label.trim(), value });
+            const p = label.trim() ? valuePair(label.trim(), /^\d+$/.test(k) ? k : null, null, scalarText(raw), labels) : null;
+            if (p) out.push(p);
           }
         }
       }
@@ -173,7 +192,7 @@ export function customFieldPairs(payload: unknown, fieldNames?: ReadonlyMap<stri
   const index = includedIndex(payload);
   for (const [key, inc] of index) {
     if (/^custom_?field/i.test(key.split(":")[0] ?? "")) {
-      const p = pairFrom(inc, fieldNames);
+      const p = pairFrom(inc, fieldNames, labels);
       if (p) out.push(p);
     }
   }
@@ -234,7 +253,15 @@ export type LawmaticsIntake = {
 };
 
 export type LawmaticsRead =
-  | { state: "ok"; intake: LawmaticsIntake; other: IntakePair[]; submittedAt: string | null; contactEmail: string | null }
+  | {
+      state: "ok";
+      intake: LawmaticsIntake;
+      other: IntakePair[];
+      submittedAt: string | null;
+      contactEmail: string | null;
+      /** `failed`: the field list (names, types, option labels) could not be read, so an answer that is only an option id reads "not recorded". */
+      labels?: "ok" | "failed";
+    }
   | { state: "not-linked" }
   | { state: "not-connected" }
   | { state: "unavailable" };
@@ -247,10 +274,10 @@ export type ProspectReader = {
 const FETCH_PARAMS = { include: "practice_area,stage,contact", fields: "all" };
 
 /** The pairs plus every named fact, from a payload that has been checked to be the prospect asked for. */
-export function summariseProspect(payload: unknown, fieldNames?: ReadonlyMap<string, string>): Extract<LawmaticsRead, { state: "ok" }> {
+export function summariseProspect(payload: unknown, fieldNames?: ReadonlyMap<string, string>, labels?: LabelLookup): Extract<LawmaticsRead, { state: "ok" }> {
   const rec = records(payload)[0];
   const index = includedIndex(payload);
-  const pairs = sanitizeIntake(customFieldPairs(payload, fieldNames));
+  const pairs = sanitizeIntake(customFieldPairs(payload, fieldNames, labels));
   const mapped = mapIntake(pairs);
   const used = new Set<string>();
   for (const p of pairs) if (mapIntakeLabel(p.label)) used.add(`${p.label}\u0000${p.value}`);
@@ -275,6 +302,7 @@ export function summariseProspect(payload: unknown, fieldNames?: ReadonlyMap<str
     other: pairs.filter((p) => !used.has(`${p.label}\u0000${p.value}`)).slice(0, 15),
     submittedAt: rec ? strAttr(rec, "created_at") : null,
     contactEmail,
+    labels: labels?.state === "ok" ? "ok" : "failed",
   };
 }
 
@@ -306,21 +334,12 @@ export async function readLawmaticsIntake(reader: ProspectReader, lawmaticsId: s
   };
   const payload = (await attempt(FETCH_PARAMS)) ?? (await attempt());
   if (!payload) return { state: "unavailable" };
+  // The firm's field list (names, types, option labels), read once per client and so once per run. A failed read is not "no fields".
+  const labels = await readFieldMeta(client);
   let fieldNames: Map<string, string> | undefined;
-  if (needsFieldNames(payload)) {
-    try {
-      const list = await client.listAll("/custom_fields", { maxRecords: 1000 });
-      if (!list.unrecognisedShape) {
-        fieldNames = new Map();
-        for (const rec of list.records) {
-          const rid = idOf(rec);
-          const name = strAttr(rec, "name", "title", "label");
-          if (rid && name) fieldNames.set(rid, name);
-        }
-      }
-    } catch {
-      fieldNames = undefined;
-    }
+  if (labels.state === "ok") {
+    fieldNames = new Map();
+    for (const [rid, m] of labels.index.byId) if (m.name) fieldNames.set(rid, m.name);
   }
-  return summariseProspect(payload, fieldNames);
+  return summariseProspect(payload, fieldNames, labels);
 }

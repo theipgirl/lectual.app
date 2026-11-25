@@ -13,10 +13,21 @@ import { parsePrepKey, normalizedStart } from "./keys";
 
 export type SendKind = "booked" | "24h" | "1h";
 export const SEND_KINDS: readonly SendKind[] = ["booked", "24h", "1h"];
-/** `duplicate`: Resend answered 409 (the same key is already handled by another run). It counts as done and never as a failure. */
-export type SendStatus = "sent" | "scheduled" | "cancelled" | "failed" | "duplicate";
+/**
+ * `duplicate`: Resend answered 409 (the same key is already handled by another run). It counts as done and never as a failure.
+ * `withheld`: the email is OWED but was not sent because the prep only has the facts brief (S2a: an email carries a full brief). It is
+ * not done: a later run that has a full brief sends it while it is still due. Written once per slot; no Resend call is behind it.
+ */
+export type SendStatus = "sent" | "scheduled" | "cancelled" | "failed" | "duplicate" | "withheld";
+
+/** `full`: the class, risk and package prep (adopted from Approvals, or S2b's own build). `facts`: S1's facts-only brief. */
+export type BriefQuality = "full" | "facts";
 
 export const HOUR_MS = 3_600_000;
+/** An owed `24h` is not sent less than this long before the start. */
+export const REMINDER_24H_CUTOFF_MS = 2 * HOUR_MS;
+/** An owed `booked` of a stage-keyed prep (no consult time) is dropped this long after the prep was made. */
+export const STAGE_BOOKED_OWED_MS = 3 * 24 * HOUR_MS;
 /** Only a send inside this window is handed to Resend with a time; a later one waits for a later run. */
 export const SCHEDULE_HORIZON_MS = 72 * HOUR_MS;
 /** A booked email already sent for a stage-keyed prep within this long means a consult booking does not send another. */
@@ -39,6 +50,11 @@ export type SendRecord = {
    * deliver a second email).
    */
   noResponse?: boolean;
+  /**
+   * `facts` on a send that carried the facts-only brief (only a marked 1 h email can). Written only when `facts`; an absent value is
+   * `full`. A still-scheduled `facts` send is cancelled and planned again when a full brief turns up before it goes out.
+   */
+  quality?: BriefQuality;
   /** When the record was written. */
   at: string;
 };
@@ -46,7 +62,7 @@ export type SendRecord = {
 export const recordSlot = (prepKey: string, kind: SendKind): string => `${prepKey}|${kind}`;
 
 const isKind = (v: unknown): v is SendKind => v === "booked" || v === "24h" || v === "1h";
-const isStatus = (v: unknown): v is SendStatus => v === "sent" || v === "scheduled" || v === "cancelled" || v === "failed" || v === "duplicate";
+const isStatus = (v: unknown): v is SendStatus => v === "sent" || v === "scheduled" || v === "cancelled" || v === "failed" || v === "duplicate" || v === "withheld";
 
 /** A `crm_activity` row that may be a send record. Anything that is not exactly one is null. */
 export function parseSendRecord(row: { lead_id?: string | null; created_at?: string | null; payload?: unknown }): SendRecord | null {
@@ -60,6 +76,7 @@ export function parseSendRecord(row: { lead_id?: string | null; created_at?: str
     scheduledFor: typeof p.scheduled_for === "string" ? p.scheduled_for : null,
     status: p.status,
     noResponse: p.no_response === true,
+    ...(p.quality === "facts" ? { quality: "facts" as const } : {}),
     recipientsSha256: typeof p.recipients_sha256 === "string" && /^[0-9a-f]{64}$/.test(p.recipients_sha256) ? p.recipients_sha256 : null,
     at: typeof row.created_at === "string" ? row.created_at : "",
   };
@@ -76,6 +93,7 @@ export function sendRecordPayload(r: Omit<SendRecord, "at" | "leadId">): Record<
     status: r.status,
     ...(r.recipientsSha256 ? { recipients_sha256: r.recipientsSha256 } : {}),
     ...(r.status === "failed" && r.noResponse ? { no_response: true } : {}),
+    ...(r.quality === "facts" ? { quality: "facts" } : {}),
   };
 }
 
@@ -94,6 +112,8 @@ export function foldSendRecords(records: readonly SendRecord[]): Map<string, Sen
     // slot is still owed and is retried. Only a sent or scheduled row with an id is protected from a later failure.
     // Exception: a `failed` row that got no answer at all may have been accepted, and a later 409 says it was: the duplicate wins.
     if (have && r.status === "duplicate" && have.status === "failed" && !have.noResponse) continue;
+    // A `withheld` row (nothing was sent) never hides a row that says an email was sent, scheduled, handled elsewhere or failed.
+    if (have && r.status === "withheld" && have.status !== "cancelled") continue;
     if (have && (r.status === "failed" || r.status === "duplicate") && have.resendId && (have.status === "sent" || have.status === "scheduled")) continue;
     if (!have || Date.parse(r.at) >= Date.parse(have.at) || !Number.isFinite(Date.parse(have.at))) out.set(slot, r);
   }
@@ -103,7 +123,8 @@ export function foldSendRecords(records: readonly SendRecord[]): Map<string, Sen
 const done = (r: SendRecord | undefined): boolean => !!r && (r.status === "sent" || r.status === "scheduled" || r.status === "duplicate");
 
 export type SendAction = { kind: SendKind; mode: "now" } | { kind: SendKind; mode: "schedule"; at: string };
-export type SendPlan = { actions: SendAction[]; owedLater: SendKind[] };
+/** `withheld`: what would have been sent but for a facts-only brief (the caller writes a `withheld` record for each, once). */
+export type SendPlan = { actions: SendAction[]; owedLater: SendKind[]; withheld: SendKind[] };
 
 export type PlanInput = {
   prepKey: string;
@@ -112,36 +133,66 @@ export type PlanInput = {
   nowMs: number;
   /** When the prep was made (the marker's time). */
   preppedAtMs: number;
-  /** The run that made the prep may send `booked`; a later run only retries one that was recorded as failed. */
+  /** The run that made the prep may send `booked`; a later run only retries one that was recorded as failed (or withheld). */
   madeNow: boolean;
   /** A stage-keyed booked email went out in the last 7 days: this consult's booking does not send another. */
   suppressBooked: boolean;
   /** A person's re-run sends ONLY a fresh booked email; reminders belong to the base key and are never planned under a re-run key. */
   bookedOnly?: boolean;
+  /**
+   * What the prep has: `full` (adopted, or S2b's build) or `facts` (S1). Only a full brief is emailed as `booked` or `24h`; the `1h`
+   * goes out either way, marked, so the person never walks in with nothing. Absent = `full` (the rules before S2a).
+   */
+  brief?: BriefQuality;
   existing: ReadonlyMap<string, SendRecord>;
 };
 
+/**
+ * What a run owes. With a `facts` brief, `booked` and `24h` are WITHHELD (they stay owed) and a later run with a full brief sends
+ * them while still due, never late: `booked` not once the 24 h time has passed, `24h` not under 2 hours before the start.
+ */
 export function planSends(input: PlanInput): SendPlan {
   const actions: SendAction[] = [];
   const owedLater: SendKind[] = [];
+  const withheld: SendKind[] = [];
+  const full = (input.brief ?? "full") === "full";
   const get = (kind: SendKind) => input.existing.get(recordSlot(input.prepKey, kind));
+  const start = input.startsAtMs;
 
   const booked = get("booked");
-  if (!done(booked) && !input.suppressBooked && (input.madeNow || booked?.status === "failed")) actions.push({ kind: "booked", mode: "now" });
+  const wasWithheld = booked?.status === "withheld";
+  if (!done(booked) && !input.suppressBooked && (input.madeNow || booked?.status === "failed" || wasWithheld)) {
+    // An owed booked email (withheld, or failed and tried again) is not sent late, whatever state its slot is in: not after its consult's
+    // 24 h time, nor long after a stage-keyed prep was made.
+    const late = !input.madeNow && (start !== null ? input.nowMs >= start - 24 * HOUR_MS : input.nowMs - input.preppedAtMs > STAGE_BOOKED_OWED_MS);
+    if (!late) {
+      if (full) actions.push({ kind: "booked", mode: "now" });
+      else withheld.push("booked");
+    }
+  }
 
-  if (input.startsAtMs === null || input.bookedOnly) return { actions, owedLater };
-  const start = input.startsAtMs;
+  if (start === null || input.bookedOnly) return { actions, owedLater, withheld };
   const reminders: Array<[SendKind, number, boolean]> = [
     ["24h", start - 24 * HOUR_MS, start - input.preppedAtMs > 24 * HOUR_MS],
     ["1h", start - HOUR_MS, true],
   ];
   for (const [kind, at, wanted] of reminders) {
     if (!wanted || done(get(kind))) continue;
-    if (at <= input.nowMs) continue; // its time has passed: nothing more is owed for it
+    if (at <= input.nowMs) {
+      // Its time has passed: nothing more is owed for it, except a withheld 24h, which a full brief still sends until 2 h before the start.
+      // A 24h that is owed (withheld, or failed and never retried) is retried while it is still inside its window, whatever its status.
+      const status = get(kind)?.status;
+      if (kind === "24h" && (status === "withheld" || status === "failed") && input.nowMs < start - REMINDER_24H_CUTOFF_MS && full) actions.push({ kind, mode: "now" });
+      continue;
+    }
+    if (kind === "24h" && !full) {
+      withheld.push(kind);
+      continue;
+    }
     if (at - input.nowMs <= SCHEDULE_HORIZON_MS) actions.push({ kind, mode: "schedule", at: new Date(at).toISOString() });
     else owedLater.push(kind);
   }
-  return { actions, owedLater };
+  return { actions, owedLater, withheld };
 }
 
 /** True when a stage-keyed prep of this lead sent (or scheduled) its booked email in the last 7 days. */

@@ -1678,6 +1678,8 @@ export const CONSULT_PREP_ASK_ADMIN = "An owner or admin can set it in Settings 
 export const CONSULT_PREP_COULDNT_LOAD = "Couldn't load consult prep. Refresh to try again.";
 export const CONSULT_PREP_EMAIL_OFF = "Email isn't switched on for your firm yet. Lectual will turn it on.";
 export const CONSULT_PREP_NOT_EMAILED = "not emailed";
+export const CONSULT_PREP_WAITING_FULL = "not emailed yet: waiting for the full prep";
+export const CONSULT_PREP_ADOPTED = "The prep already in Approvals was used.";
 export const CONSULT_PREP_RECIPIENTS_NOW = "Emails now go to the people set in Settings → Team";
 export const CONSULT_PREP_RECIPIENTS_UNREAD = "Who gets consult prep couldn't be read.";
 export const CONSULT_PREP_VIEW_BRIEF = "View the brief";
@@ -1685,7 +1687,7 @@ export const CONSULT_PREP_BRIEF_NOT_KEPT = "The brief isn't kept in Lectual beca
 export const CONSULT_PREP_BRIEF_UNAVAILABLE = "The brief couldn't be loaded. Refresh to try again.";
 export const CONSULT_PREP_BRIEF_MISSING = "The brief is no longer in Approvals.";
 export const CONSULT_PREP_RERUN = "Re-run prep";
-export const CONSULT_PREP_RERUN_CONFIRM = "Re-run prep? It prepares this consult again and emails a new brief to your team. Reminders already scheduled are not repeated.";
+export const CONSULT_PREP_RERUN_CONFIRM = "Re-run prep? It builds a fresh prep for this consult. It is emailed to the people set in Settings → Team when the full prep is ready. Reminders already scheduled are not repeated.";
 export const CONSULT_PREP_RERUN_RUNNING = "Preparing…";
 export const CONSULT_PREP_RERUN_DONE = "Prep re-run. Refresh to see it.";
 export const CONSULT_PREP_RERUN_NOT_ALLOWED = "Only an owner, admin or attorney can re-run consult prep.";
@@ -1693,9 +1695,11 @@ export const CONSULT_PREP_RERUN_OFF = "Consult prep isn't switched on for your f
 export const CONSULT_PREP_RERUN_NOTHING = "There is no consult to prepare for this lead yet.";
 export const CONSULT_PREP_RERUN_FAILED = "Couldn't re-run prep. Nothing was changed. Try again in a minute.";
 export const CONSULT_PREP_TIMELINE_PREP = "Consult prep made";
-export const consultPrepTimelineSend = (kind: "booked" | "24h" | "1h", status: "sent" | "scheduled" | "cancelled" | "failed" | "duplicate"): string => {
+/** S2b: a full-brief build attempt (`started`) and a full brief kept in Approvals (`queued`). */
+export const consultPrepTimelineBuild = (status: unknown): string => (status === "queued" ? "Consult prep: full brief ready" : "Consult prep: full brief started");
+export const consultPrepTimelineSend = (kind: "booked" | "24h" | "1h", status: "sent" | "scheduled" | "cancelled" | "failed" | "duplicate" | "withheld"): string => {
   const what = kind === "booked" ? "Consult prep email" : kind === "24h" ? "Consult prep reminder, a day before" : "Consult prep reminder, an hour before";
-  return `${what}: ${status === "failed" ? "couldn't be sent" : status === "duplicate" ? "already sent by another run" : status}`;
+  return `${what}: ${status === "failed" ? "couldn't be sent" : status === "duplicate" ? "already sent by another run" : status === "withheld" ? "waiting for the full prep" : status}`;
 };
 export const CONSULT_PREP_TEAM_HEADING = "Consult prep emails";
 export const CONSULT_PREP_TEAM_HELP = "When a consult is prepared, the brief is emailed to the people chosen here when it is booked, a day before (if it was booked more than a day ahead) and an hour before. It goes only to the firm, never to a client. Cc addresses must be on the same email domain as someone chosen.";
@@ -1707,3 +1711,6 @@ export const CONSULT_PREP_TEAM_INELIGIBLE = "Viewers and social media members ca
 export const CONSULT_PREP_TEAM_CC_FORMAT = "Each Cc must be a plain email address, like info@yourfirm.com.";
 export const CONSULT_PREP_TEAM_CC_DOMAIN = "A Cc address must be on the same email domain as someone chosen above.";
 export const CONSULT_PREP_TEAM_CC_COUNT = "You can add up to 5 Cc addresses.";
+
+// Approvals: an internal briefing has no client recipient to show (the prep-consult skill's address only links the lead).
+export const INTERNAL_BRIEFING_TO = "Internal briefing, not sent to anyone";

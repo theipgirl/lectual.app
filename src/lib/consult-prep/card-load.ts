@@ -44,6 +44,7 @@ async function readMarkers(leadIds: readonly string[]): Promise<Read3<PrepMarker
       prepKey: typeof r.payload?.prep_key === "string" ? r.payload.prep_key : null,
       queueItemId: typeof r.payload?.queueItemId === "string" ? r.payload.queueItemId : null,
       at: r.created_at,
+      adopted: r.payload?.adopted === true,
     }));
     return { status: "ok", value };
   } catch {
@@ -129,6 +130,7 @@ export async function loadConsultPrepCard(args: { leadIds: readonly string[]; ad
       emailOn: Boolean(env.RESEND_API_KEY?.trim() && env.CONSULT_PREP_FROM?.trim()),
       adminTier: args.adminTier,
       tz: args.tz,
+      nowMs: Date.now(),
     });
     const brief = view.kind === "prepared" ? await readBrief(view.queueItemId) : ({ status: "none" } as const);
     return { view, brief };

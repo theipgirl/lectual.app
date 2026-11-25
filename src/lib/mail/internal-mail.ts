@@ -33,7 +33,20 @@ export type InternalMail = {
   idempotencyKey?: string;
   /** ISO time: Resend holds the email and sends it then (`scheduled_at`). Absent = send now. */
   scheduledAt?: string;
+  /**
+   * Files sent with the email (Resend's `attachments`: a name and the content as base64). A Buffer is encoded here; a string is taken
+   * as base64 already. The caller keeps the total under Resend's 40 MB limit; this file only passes them on and never logs them.
+   */
+  attachments?: MailAttachment[];
 };
+
+export type MailAttachment = { filename: string; content: Buffer | Uint8Array | string };
+
+/** Base64 for Resend: a Buffer or bytes are encoded, a string is taken as base64 already. */
+export function attachmentBase64(content: MailAttachment["content"]): string {
+  if (typeof content === "string") return content;
+  return Buffer.from(content).toString("base64");
+}
 
 /** `id` is Resend's id for the email (what a cancel needs), or null when the answer carried none. Never the body. */
 export type InternalMailResult = { status: "sent"; id?: string | null } | { status: "failed"; http: number | null };
@@ -58,6 +71,9 @@ export async function sendInternalMail(mail: InternalMail): Promise<InternalMail
         text: mail.text,
         ...(mail.html ? { html: mail.html } : {}),
         ...(mail.scheduledAt ? { scheduled_at: mail.scheduledAt } : {}),
+        ...(mail.attachments && mail.attachments.length > 0
+          ? { attachments: mail.attachments.map((a) => ({ filename: a.filename, content: attachmentBase64(a.content) })) }
+          : {}),
       }),
     });
     if (!res.ok) {

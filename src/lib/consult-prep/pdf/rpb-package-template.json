@@ -1,0 +1,210 @@
+{
+  "packages": {
+    "tiers": [
+      {
+        "name": "ESSENTIAL™",
+        "price": "$1,950"
+      },
+      {
+        "name": "ENHANCED™",
+        "price": "$3,250"
+      },
+      {
+        "name": "CONCIERGE™",
+        "price": "$4,950"
+      }
+    ],
+    "rows": [
+      {
+        "label": "Classes Included",
+        "cells": [
+          "1 Class",
+          "2 Classes",
+          "3 Classes"
+        ],
+        "cls": "disc"
+      },
+      {
+        "label": "Preliminary Consultation Strategy Call",
+        "value": "$450",
+        "cells": [
+          "✔",
+          "✔",
+          "✔"
+        ]
+      },
+      {
+        "label": "USPTO Knockout Searches",
+        "value": "$900",
+        "cells": [
+          "Unlimited",
+          "Unlimited",
+          "Unlimited"
+        ]
+      },
+      {
+        "label": "Comprehensive Trademark Search Report",
+        "value": "$675 each",
+        "cells": [
+          "1 included",
+          "2 included",
+          "2 included"
+        ]
+      },
+      {
+        "label": "Trademark Opinion Letter",
+        "value": "$900 each",
+        "cells": [
+          "1 included",
+          "2 if high risk",
+          "2 if high risk"
+        ]
+      },
+      {
+        "label": "Post Search Strategy Call",
+        "value": "$450 each",
+        "cells": [
+          "1 included",
+          "2 included",
+          "2 included"
+        ]
+      },
+      {
+        "label": "Trademark Application Preparation and Filing",
+        "value": "$900",
+        "cells": [
+          "✔",
+          "✔",
+          "✔"
+        ]
+      },
+      {
+        "label": "Dedicated Attorney Support (8 to 18 months)",
+        "value": "$2,250",
+        "cells": [
+          "✔",
+          "✔",
+          "✔"
+        ]
+      },
+      {
+        "label": "Monthly Monitoring of Application and Email Updates",
+        "value": "$350",
+        "cells": [
+          "✔",
+          "✔",
+          "✔"
+        ]
+      },
+      {
+        "label": "Non-Substantive Office Action Response",
+        "value": "$450 each",
+        "cells": [
+          "1 included",
+          "2 included",
+          "Unlimited"
+        ]
+      },
+      {
+        "label": "Statement of Use Legal Fee",
+        "value": "$500",
+        "cells": [
+          "✔",
+          "✔",
+          "✔"
+        ]
+      },
+      {
+        "label": "Extension Legal Fees",
+        "value": "$225 each",
+        "cells": [
+          "—",
+          "1 included",
+          "Unlimited"
+        ]
+      },
+      {
+        "label": "Comprehensive IP Audit (Trademarks + Copyright)",
+        "value": "$1,500",
+        "cells": [
+          "—",
+          "✔",
+          "✔"
+        ]
+      },
+      {
+        "label": "Substantive Office Action Legal Strategy Review",
+        "value": "$675",
+        "note": "Does not include actual response to Substantive Office Action",
+        "cells": [
+          "—",
+          "—",
+          "✔"
+        ]
+      },
+      {
+        "label": "Post Registration Monitoring (12 months)",
+        "value": "$1,800",
+        "cells": [
+          "—",
+          "—",
+          "✔"
+        ]
+      },
+      {
+        "label": "Cease and Desist Letter Template",
+        "value": "$750",
+        "cells": [
+          "—",
+          "—",
+          "✔"
+        ]
+      },
+      {
+        "label": "Trademark Assignment Agreement",
+        "value": "$1,500",
+        "cells": [
+          "—",
+          "—",
+          "✔"
+        ]
+      },
+      {
+        "label": "Discount off Corresponding Word/Logo Trademark Package",
+        "cells": [
+          "10% discount",
+          "15% discount",
+          "20% discount"
+        ],
+        "cls": "disc"
+      },
+      {
+        "label": "Total Estimated Value",
+        "cells": [
+          "≈ $7,800+",
+          "≈ $12,000+",
+          "≈ $17,750+"
+        ],
+        "cls": "tev"
+      },
+      {
+        "label": "YOU PAY",
+        "cells": [
+          "$1,950",
+          "$3,250",
+          "$4,950"
+        ],
+        "cls": "pay"
+      },
+      {
+        "label": "Additional Class Fee",
+        "cells": [
+          "$825 per class",
+          "$825 per class",
+          "$825 per class"
+        ],
+        "cls": "addl"
+      }
+    ]
+  }
+}

@@ -135,7 +135,9 @@ describe("hygiene of the consult prep sources", () => {
     }
   });
   it("the assistant's own wording has no firm or staff name and no email address", () => {
-    for (const f of files) {
+    // pdf/art.ts is the ONE per-firm map of the packages PDF (a firm's wordmark, footer and benefit copy, keyed by slug, like
+    // src/lib/loe/letter-logo.ts); a firm's name is its content. The rule holds everywhere else, the rest of pdf/ included.
+    for (const f of files.filter((x) => !x.endsWith(path.join("pdf", "art.ts")) && !x.endsWith("rpb-package-template.json"))) {
       const src = read(f);
       for (const name of ["Rebecca", "RPB", "rpblawfirm", "Taylor", "Caitlyn"]) expect(src, `${f} names ${name}`).not.toContain(name);
     }

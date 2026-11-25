@@ -161,3 +161,56 @@ describe("the old form is gone", () => {
     expect(found).toBe(false);
   });
 });
+
+describe("S2a: the card says when the prep in Approvals was used, and when the email is waiting for a full prep", () => {
+  const first = { prepKey: KEY, queueItemId: "q-facts", at: "2026-11-24T19:10:00.000Z" };
+  const adopted = { prepKey: KEY, queueItemId: "q-full", at: "2026-11-24T21:00:00.000Z", adopted: true };
+
+  it("an adopted prep says the prep already in Approvals was used, shows THAT item, and keeps the time it was first made", () => {
+    const v = consultPrepCardView(inputs({ markers: { status: "ok", value: [first, adopted] }, sends: { status: "ok", value: [send({})] } }));
+    expect(v).toMatchObject({ kind: "prepared", queueItemId: "q-full" });
+    if (v.kind !== "prepared") throw new Error("expected prepared");
+    expect(v.lines[0]).toMatch(/^Prepared Nov 24, 2:10 PM/);
+    expect(v.lines).toContain("The prep already in Approvals was used.");
+  });
+  it("a prep that was not adopted says nothing of the kind", () => {
+    const v = consultPrepCardView(inputs({ markers: { status: "ok", value: [first] } }));
+    if (v.kind !== "prepared") throw new Error("expected prepared");
+    expect(v.lines.join(" ")).not.toMatch(/already in Approvals/);
+  });
+  it("a booked email that is withheld reads as waiting for the full prep, not as a failure and not as emailed", () => {
+    const v = consultPrepCardView(inputs({ markers: { status: "ok", value: [first] }, sends: { status: "ok", value: [send({ status: "withheld", resendId: null })] } }));
+    if (v.kind !== "prepared") throw new Error("expected prepared");
+    expect(v.lines[0]).toContain("not emailed yet: waiting for the full prep");
+    expect(v.lines[0]).not.toContain("couldn't be sent");
+    expect(v.lines.join(" ")).not.toMatch(/emailed ·/);
+  });
+});
+
+describe("S2a: the timeline line for a withheld email", () => {
+  it("reads as waiting for the full prep", async () => {
+    const { consultPrepTimelineSend } = await import("@/lib/ui/words");
+    expect(consultPrepTimelineSend("booked", "withheld")).toBe("Consult prep email: waiting for the full prep");
+    expect(consultPrepTimelineSend("24h", "withheld")).toBe("Consult prep reminder, a day before: waiting for the full prep");
+  });
+});
+
+describe("D8: the card stops saying 'waiting for the full prep' once the owed booked email has lapsed", () => {
+  const withheldInputs = (nowMs: number) => inputs({ markers: prepared, sends: { status: "ok", value: [send({ status: "withheld", resendId: null })] }, nowMs });
+  const start = Date.parse("2026-11-25T19:00:00.000Z");
+  it("still owed before start - 24 h; lapsed after", () => {
+    const early = consultPrepCardView(withheldInputs(start - 25 * 3_600_000));
+    const late = consultPrepCardView(withheldInputs(start - 23 * 3_600_000));
+    if (early.kind !== "prepared" || late.kind !== "prepared") throw new Error("expected prepared");
+    expect(early.lines[0]).toContain("waiting for the full prep");
+    expect(late.lines[0]).not.toContain("waiting for the full prep");
+    expect(late.lines[0]).toContain("not emailed");
+  });
+  it("the Re-run confirm sentence does not promise an email now", async () => {
+    const { CONSULT_PREP_RERUN_CONFIRM } = await import("@/lib/ui/words");
+    expect(CONSULT_PREP_RERUN_CONFIRM).toContain("builds a fresh prep");
+    expect(CONSULT_PREP_RERUN_CONFIRM).toContain("emailed to the people set in Settings");
+    expect(CONSULT_PREP_RERUN_CONFIRM).toContain("when the full prep is ready");
+    expect(CONSULT_PREP_RERUN_CONFIRM).not.toContain("emails a new brief");
+  });
+});

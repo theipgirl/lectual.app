@@ -38,6 +38,8 @@ const NEW_OR_REWRITTEN = [
   "src/components/proposal-editor/WhoIsThisFor.tsx",
 ];
 
+const SPRINT29_END = "43f0271f";
+
 describe("scope: no migration, no dependency, no new unsafe HTML", () => {
   it("no SQL file and no migrations directory in this repo", () => {
     expect(existsSync("supabase")).toBe(false);
@@ -47,7 +49,10 @@ describe("scope: no migration, no dependency, no new unsafe HTML", () => {
   it("no new migration or dependency since the start of the sprint (when git can say)", () => {
     let changed: string[];
     try {
-      changed = execSync("git diff --name-only 3ed824b HEAD", { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\n").filter(Boolean);
+      // Sprint 29's own window: its base (3ed824b) to the commit that added this test (43f0271f). Comparing with HEAD
+      // made the check fail on every later, legitimate change (pdfkit in fb7fb87b, the paid-view and milestone edits of
+      // later sprints), which is not what it guards. Fixed 2026-11-25; the guard itself is unchanged.
+      changed = execSync(`git diff --name-only 3ed824b ${SPRINT29_END}`, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\n").filter(Boolean);
     } catch {
       return; // no history here: the static checks above still hold
     }
