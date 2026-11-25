@@ -1794,3 +1794,85 @@ export const boardLanesHidden = (people: number, unassigned: boolean): string =>
   return `${person} ${people === 1 ? "is" : "are"} hidden in this firm's layout.`;
 };
 export const BOARD_LANES_HIDDEN_LINK = "See them in the List";
+
+/* ── Changing stages from a Board's header (owners; lectual 0119's stage functions). Fixed sentences, never database text. ── */
+export const STAGES_NOT_READY = notReadyYet("Changing stages");
+export const STAGE_OWNER_ONLY = "Only an owner can change stages.";
+export const STAGE_GONE = "That stage isn't on your pipeline any more. Refresh and try again.";
+export const STAGE_NOT_YOURS = "Choose one of your own stages.";
+export const STAGE_NAME_TAKEN = "Another stage already has that name.";
+export const STAGE_NAME_BAD = "A stage name needs at least one letter or number, and no hidden characters.";
+export const STAGE_NAME_EMPTY = "Type a name for the stage.";
+export const stageNameTooLong = (max: number) => `A stage name can be up to ${max} characters.`;
+export const STAGE_PLACE_GONE = "That place in the stage order changed. Refresh and try again.";
+export const STAGE_BAD_CATEGORY = "Choose open, won, lost or nurture.";
+export const STAGE_BAD_OPEN = "Choose open or closed.";
+export const STAGE_BAD_WAITING_ON = "Choose who the stage waits on.";
+export const STAGE_TOO_MANY = "A pipeline can have up to 200 stages.";
+export const STAGE_ORDER_FULL = "The stage order can't take another change. Ask Lectual to tidy it.";
+export const STAGE_TYPE_NOT_EMPTY = "A stage's type changes only while it holds no records. Move them first.";
+export const STAGE_LAST_OPEN = "Your pipeline needs at least one open stage.";
+export const STAGE_LAST_WON = "This is your last won stage. Tick “No won stage: hired clients stay where they are” to go ahead.";
+export const STAGE_HOLDS_ROLE = "Choose which stage takes this stage's role.";
+export const STAGE_ROLE_TAKEN = "That stage already has a role. Choose another.";
+export const STAGE_ROLE_MISFIT = "That stage can't take this role: its type doesn't fit.";
+export const STAGE_RECORDS_CHANGED = "Some records moved since you opened this. Refresh and try again.";
+export const STAGE_NEEDS_DESTINATION = "Choose where this stage's records go.";
+export const STAGE_SAME_DESTINATION = "Records can't move to the stage being deleted.";
+export const STAGE_NO_WON_DESTINATION = "Leads are never moved into a won stage this way.";
+export const STAGE_WON_SOURCE = "Hired clients can only move to another won stage.";
+export const STAGE_OPEN_MISMATCH = "That stage would reopen or close these matters. Tick “Also change open/closed” to go ahead.";
+export const STAGE_BUSY = "Someone else is changing stages. Try again.";
+export const STAGE_CHANGE_FAILED = "Couldn't change the stage. Nothing was changed. Try again.";
+export const STAGE_DELETED_SEQUENCES_NOTE = "The stage was deleted, but taking the moved clients out of their campaigns didn't finish. Check Campaigns.";
+export const stageMenuLabel = (name: string) => `Stage options: ${name}`;
+export const STAGE_MENU_RENAME = "Rename stage";
+export const STAGE_MENU_ADD_LEFT = "Add a stage to the left";
+export const STAGE_MENU_ADD_RIGHT = "Add a stage to the right";
+export const STAGE_MENU_TYPE = "Change type";
+export const STAGE_MENU_OPEN_CLOSED = "Change open/closed";
+export const STAGE_MENU_DELETE = "Delete stage";
+export const STAGE_NAME_LABEL = "Stage name";
+export const STAGE_ADD_SUBMIT = "Add stage";
+export const STAGE_TYPE_LABEL = "Type";
+export const STAGE_TYPE_WORDS: Record<"open" | "won" | "lost" | "nurture", string> = { open: "Open", won: "Won", lost: "Lost", nurture: "Nurture" };
+export const STAGE_OPEN_LABEL = "Open or closed";
+export const STAGE_OPEN_WORDS = { open: "Open", closed: "Closed" } as const;
+export const STAGE_WAITS_ON_LABEL = "Waits on";
+export const STAGE_WAITS_ON_WORDS: Record<"firm" | "client" | "uspto" | "court", string> = { firm: "The firm", client: "The client", uspto: "The USPTO", court: "The court" };
+export const STAGE_WON_WARNING = "A lead a person moves into a won stage opens a matter and leaves its campaigns, as today.";
+export const STAGE_TYPE_ONLY_EMPTY = "The type can change only while the stage holds no records.";
+export const STAGE_CHANGES_NOTE = "A change here is the firm's pipeline for everyone.";
+export const stageDeleteAsk = (name: string) => `Delete the stage “${name}”?`;
+export const stageDeleteHolds = (n: number, kind: "lead" | "matter") =>
+  n === 0 ? `It holds no ${kind === "lead" ? "leads" : "matters"}.` : `It holds ${n} ${kind === "lead" ? (n === 1 ? "lead" : "leads") : n === 1 ? "matter" : "matters"}.`;
+export const stageDeleteMoveTo = (n: number, kind: "lead" | "matter") => `Move ${n === 1 ? `the ${kind}` : `all ${n} ${kind === "lead" ? "leads" : "matters"}`} to`;
+export const STAGE_DELETE_CHOOSE = "Choose a stage";
+export const STAGE_DELETE_ALSO_OPEN = "Also change open/closed";
+export const stageRoleAsk = (role: string) => `This stage is your “${role}” stage. Which stage takes that over?`;
+export const STAGE_ROLE_DROP = "Drop the role";
+export const STAGE_NO_WON_TICK = "No won stage: hired clients stay where they are";
+export const STAGE_DELETE_CONFIRM = "Delete stage";
+export const STAGE_HOLDINGS_UNREADABLE = "Couldn't count what this stage holds, so it can't be deleted right now. Refresh to try again.";
+export const STAGE_NO_DESTINATION = "No other stage can take these records. Add one first.";
+/** Plain words for the roles 0119 sets (never typed in the app; shown only when deleting the stage that holds one). */
+export const STAGE_ROLE_WORDS: Record<string, string> = {
+  new_enquiry: "new enquiry",
+  follow_up: "follow-up",
+  consult_scheduled: "consult scheduled",
+  consult_held: "consult held",
+  questionnaire_sent: "questionnaire sent",
+  proposal_sent: "proposal sent",
+  follow_up_sent: "follow-up sent",
+  loe_sent: "engagement letter sent",
+  welcome_sent: "welcome sent",
+  opinion_letter_sent: "opinion letter sent",
+  signed_loe: "signed engagement letter",
+  lost: "lost",
+  application_filed: "application filed",
+  oa_issued: "office action issued",
+  awaiting_registration: "awaiting registration",
+  publication: "publication",
+  registered: "registered",
+  abandoned: "abandoned",
+};
