@@ -23,6 +23,12 @@ const SECTIONS: readonly RegExp[] = [
   /^package\s+recommendation\b/i,
 ];
 
+/**
+ * S2b: a general or dispute matter has no classes, risk read or package; the full prep this assistant builds for one is the scope and
+ * engagement read and the questions. Both need a heading AND real content, the same test as the three above (`isFullGeneralBrief`).
+ */
+const GENERAL_SECTIONS: readonly RegExp[] = [/^scope\s+(?:and|&)\s+engagement\b/i, /^questions\s+for(?:\s+[A-Za-z'’]+){0,3}/i];
+
 /** A line that says there is nothing yet. */
 const PLACEHOLDER = /^(?:n\/?a|none|tbd|tba|pending|unknown|to be determined|not\s+(?:available|recorded|applicable|drafted|built|yet)(?:\s+yet)?|[-–—.…]+)\.?$/i;
 const isPlaceholder = (text: string): boolean => PLACEHOLDER.test(text.replace(/[*_`]/g, "").trim());
@@ -53,9 +59,24 @@ export const itemText = (item: Pick<QueueItem, "draft_body" | "final_body">): st
  */
 export function isFullBrief(text: string): boolean {
   if (!text || text.includes(NEXT_UPDATE_LINE)) return false;
-  const lines = text.split(/\r?\n/);
-  const headingIndex = (line: string): number => SECTIONS.findIndex((h) => headingRest(line, h) !== null);
-  return SECTIONS.every((heading) => {
+  return hasEverySection(text.split(/\r?\n/), SECTIONS);
+}
+
+/**
+ * S2b: the full prep THIS assistant built for a general or dispute matter (no classes, risk read or package apply): a "Scope and
+ * engagement" section and a "Questions for ..." section, each with content. Used ONLY for a prep whose own marker says it built it
+ * (`stillAdoptable(..., { built: true })`); a BRIEFING found in Approvals is still adopted only when it is a trademark-path full prep
+ * (`isFullBrief`), so a general brief from elsewhere is not taken as the full prep and Lectual builds its own.
+ */
+export function isFullGeneralBrief(text: string): boolean {
+  if (!text || text.includes(NEXT_UPDATE_LINE)) return false;
+  return hasEverySection(text.split(/\r?\n/), GENERAL_SECTIONS);
+}
+
+/** Every section in `wanted` has a heading line with real content under it (or after it on its line). */
+function hasEverySection(lines: readonly string[], wanted: readonly RegExp[]): boolean {
+  const headingIndex = (line: string): number => [...SECTIONS, ...GENERAL_SECTIONS].findIndex((h) => headingRest(line, h) !== null);
+  return wanted.every((heading) => {
     for (let i = 0; i < lines.length; i += 1) {
       const rest = headingRest(lines[i], heading);
       if (rest === null) continue;
@@ -101,11 +122,13 @@ export function pickAdoption<T extends Item>(candidates: readonly T[], resolved:
 }
 
 /** A prep that adopted an item on an earlier run: that item, if it is still in Approvals (pending or approved) and still a full brief. */
-export function stillAdoptable<T extends Item>(items: readonly T[], itemId: string): T | null {
+export function stillAdoptable<T extends Item>(items: readonly T[], itemId: string, opts: { built?: boolean } = {}): T | null {
   const hit = items.find((i) => i.id === itemId);
   if (!hit || hit.type !== "BRIEFING" || !ADOPT_AGENTS.includes(hit.agent)) return null;
   if (hit.status !== "pending" && hit.status !== "approved") return null;
-  return isFullBrief(itemText(hit)) ? hit : null;
+  const text = itemText(hit);
+  // S2b: a full prep this assistant built may be a general-matter one (no classes, risk or package): that is its full prep.
+  return isFullBrief(text) || (opts.built === true && isFullGeneralBrief(text)) ? hit : null;
 }
 
 /** The instant the firm's calendar day containing `nowMs` began, in its zone. */

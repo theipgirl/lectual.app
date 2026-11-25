@@ -21,6 +21,10 @@ const nextConfig: NextConfig = {
     "/api/cron/agents": [PACKAGES_PDF_ASSETS],
     "/api/cron/lawmatics-matters": [PACKAGES_PDF_ASSETS],
     "/dashboard/leads/*": [PACKAGES_PDF_ASSETS],
+    // S2b: the full prep (with its PDF) is also built by Run now (Assistants), by the mail sync's Stage Keeper moves, and after any
+    // stage move into the consult stage (the hook runs in that request's after(): Leads, Intake, the Weekly review, Reconcile...).
+    "/dashboard/**": [PACKAGES_PDF_ASSETS],
+    "/api/cron/**": [PACKAGES_PDF_ASSETS],
   },
   experimental: {
     // The stage reconciliation screen posts an intake sheet (up to 5 MB, see
