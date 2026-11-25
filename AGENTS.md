@@ -3183,7 +3183,7 @@ Display and data only: no migration, no dependency, nothing sends. `src/lib/prop
   plain text; a bullet carries its own hours in its words, nothing adds them up), validated and kept by `publicContent`. When ANY item has either
   (`usesWorkSections`, `src/lib/proposals/general-sections.ts`), "What we'll do" becomes numbered sections: "1. <label> (5 Hours | $2,475)" (`sectionFigures`: "Hour"
   for exactly 1, parts omitted when absent; the amount is the item's own quote value through the page's `money`), the intro, then the bullets, with a 1px
-  `--cp-line` hairline between sections; with two or more items a "Legal Fee Summary" table follows (Scope of Services | Estimated Hours | Legal Fees, a bold
+  `--cp-line` hairline between sections; with one or more items (one item since Nov 25) a "Legal Fee Summary" table follows (Scope of Services | Estimated Hours | Legal Fees, a bold
   Total: hours summed only when every item has them, else "—"; the fee total is the quote's `value_cents`). It scrolls inside `.cp-fee-sum-wrap`, never the page.
   Otherwise the old one-line list. The editor's work rows have "Intro (optional)" and "Details (one per line)" (`parseGeneralItems`, blank lines dropped); the
   staff card lists them. The Lawmatics note, the accepted-proposal docx and the letter are unchanged.
