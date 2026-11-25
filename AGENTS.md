@@ -2659,6 +2659,51 @@ pull and packages PDF are S2 and are NOT built (the brief says "come in the next
   - **Existing assertions changed on purpose:** the send payload's key list (now with `recipients_sha256`), the card's status line (no "emailed to <names>"), and `hook-schedule.test.ts` (the hook starts `startPrepOnStageEntries` with a batch). Tests: the "review fixes" blocks of
     `tests/agents/consult-prep.test.ts`, `tests/consult-prep/{sends,recipients,brief,deps,sync-hook,trigger,hook-schedule,card}.test.*`.
 
+### S2a: picklist labels, reuse of a full prep, emails carry only a full brief (no schema; spec `docs/pge/2026-11-24-auto-consult-prep/sprint-2a.md`, `revision-2026-11-25.md`)
+Nothing here sends to a client, adds a migration or a dependency, or calls Lawmatics, Resend or a model in a test. The sender is still unset, so nothing is emailed to anyone.
+- **Picklist labels.** `src/lib/lawmatics/field-meta.ts` (no `server-only`, read-only) is the ONE `/custom_fields` reader: `readFieldMeta(client)` keeps each field's name, type and
+  option labels (option id -> label), read ONCE per client (a `WeakMap`), and the engine keeps ONE client for the whole run (`memoProspects`), so a run reads the list once however many leads it preps.
+  `lead-origin-read.ts` (`readOriginLookups`) takes its field NAMES from the same read and exposes it as `fieldMeta` (so the importers' lookups are unchanged and there is no second reader).
+  `parseFieldMeta` is tolerant of shape: options under `options`, `picklist_options`, `values`, `choices`, `option_values`, `picklist_values`, `select_options` (arrays of `{id|value|key, name|label|value}`, or an
+  `{ id: label }` map) or sideloaded through `included`; the type from `field_type`, `data_type`, `input_type`, `kind` or `type`. **The real `/custom_fields` shape is NOT verified against a live account.**
+- **One resolver, `resolveValue`** (pure), used for every Lawmatics value the brief prints (`customFieldPairs`, so the intake facts and the "other answers" alike): (1) `formatted_value` when present and not a bare id (digits, or
+  a comma list of them); (2) else the option label(s) of a select/picklist/dropdown/radio/multi-select field, comma-joined; (3) else a bare number of 3+ digits on a select field (or one with options) is "not recorded";
+  (4) otherwise the value. A value that cannot be put into words keeps its pair with the value "not recorded" (never dropped silently, never a number) and never takes an intake fact's place (`mapIntake` skips it).
+  **Choices where the spec left room (the safe side each time):** a field the successful list does NOT name, with a 3+ digit value, is "not recorded"; a field list that FAILED makes every bare 3+ digit value (even on a text field)
+  "not recorded", and the Lawmatics section says `LABELS_UNREAD_LINE` and the run counts `labels` among the unread sections; a field is found by id first, then by name; a select with an unlisted 1 or 2 digit value keeps it (not an id).
+  Lectual's own `referral_source` and the stage name are already labels and are printed as they were. `LawmaticsRead.labels` is optional so older fixtures hold.
+- **Reuse of a full prep (never for a person's re-run).** `src/lib/consult-prep/adopt.ts` (pure). Before a NEW prep is built for a key the run reads Approvals once (`ctx.listPending` + `ctx.listApproved`, three states: a
+  rejection is "couldn't read", an absent reader or no queue is "nothing there", which is how tests without a queue behave) and looks for a BRIEFING from agent `prep-consult` or `consult-prep`, pending or approved, created
+  since the consult's booking or the start of the firm's day today, whichever is EARLIER (booking = the calendar row's `created_at`, else the lead's `stage_entered_at`; unknown = the day's start), that `isFullBrief` calls full,
+  and that the queue's own `resolveBatch` (through `orgFencedReader`) links to EXACTLY this one lead. The newest wins. `isFullBrief`: the text has heading-like lines (short, markdown/numbering ignored, any case) for "likely classes",
+  "risk read" or "preliminary risk", and "package recommendation"; a text carrying `NEXT_UPDATE_LINE` (Lectual's own S1 facts brief) is never full. A heads-up is not.
+  A failed read of either list, or of the resolver, means NO adoption and NO build for that key this run (`adoptionUnread`, "left for the next run"), never "none found".
+- **Adoption writes** no new BRIEFING and **no client-prep draft** (decision: the prep that was found brings its own drafts, and a second client email in Approvals could be approved twice). The marker is the usual `queue_drafted` row with
+  `queueItemId` = the item's id and `adopted: true`. A prep that was made earlier with the facts brief and finds a full one later (a person drafted it since) gets a SECOND marker for the same key; the card shows the newest one's item and
+  the earliest one's time (`madeAt`), so "Prepared ..." keeps its time. The prep's later emails read the adopted item by id from the pending and approved lists (an approver's edit, `final_body`, wins) and stop being full if that item is
+  gone or rejected. The lead's files are **not** searched: `crm_file` holds PDFs and Word files whose contents this app never reads, so a prep that lives only there is not found. **Known limit:** a BRIEFING queued by a tool that leaves no
+  `queue_drafted` row for the lead (and has no matter or recipient) cannot be linked and is not adopted. The lead page's Documents card is where such a file still is.
+- **Emails carry only a full brief.** A prep's brief is `full` (adopted; S2b's build later) or `facts` (S1). `planSends` takes `brief`: with `facts`, `booked` and `24h` are WITHHELD, the `1h` is still planned. A withheld email is a
+  new send status `withheld` (an append-only `ai_insight` send row, written once per slot, never hiding a sent, scheduled, duplicate or failed row; no Resend call behind it) and stays OWED: a later run that finds a full brief sends it while it
+  is still due, never late: `booked` not once the 24 h time has passed (a stage-keyed one: not 3 days after the prep), `24h` not within 2 hours of the start (`REMINDER_24H_CUTOFF_MS`) and, being past its time, goes NOW. A `withheld` slot is not
+  done, so cancel-on-change, recipients and every S1 key rule are untouched. A person's re-run has no full brief (it never adopts), so its booked email is withheld and NEVER written as owed or sent (S2b changes that); the confirm text of the
+  Re-run button ("emails a new brief") is therefore not true until S2b: a decision for Taylor, left as it was.
+- **The marked 1 h.** With no full brief the `1h` email goes (scheduled with Resend as before), subject `Facts only: In 1 hour: Consult prep: ...`, the first line of the body `Facts only: the full prep couldn't be built in time.` (html first
+  too), the send record carries `quality: "facts"` (written only when `facts`; absent means full). A facts-only `1h` that is still waiting at Resend when a full brief turns up is CANCELLED (the existing `cancelOne`, its slot gets a new
+  `:g<n>` idempotency key) and planned again with the full text; one whose time has passed is already sent and is never touched ("adoption after a facts-only 1 h changes nothing already sent"). An email of an adopted prep is that item's
+  text unchanged, then `BRIEF_FOOTER` (internal only), the html the escaped text in a pre-wrapped block (`renderAdoptedBrief`, a pure function of its inputs). It is not run through the judgment guard (it is the firm's own prep).
+- **Counts, never content:** `adopted`, `adoptionUnread`, `withheld`, `factsOnly`, `upgraded` in the summary; no text, name or id of an item reaches a log, `agent_run` or an error.
+- **Card and timeline:** the card says "The prep already in Approvals was used." for an adopted prep and "not emailed yet: waiting for the full prep" while the booked email is withheld; the timeline line for a withheld row is
+  "...: waiting for the full prep". The lead's "What Lectual did" may list an adopted prep's second marker as a second "prep" line (not deduplicated).
+- **Existing assertions changed on purpose** (all forced by "an email carries a full brief" or by the marker rows): `tests/agents/consult-prep.test.ts` got a `full` fixture (a full BRIEFING in Approvals linked to the lead by its own
+  marker) and the send-mechanics tests (booked/24h/1h, retries, 409, cancel on change, re-plan on a recipient change, twins, scope, left leads, the R3.1/R3.7 blocks) now run with it, so they hold the same properties on the adopted text; where
+  they asserted a queued BRIEFING or `<h2>` html they now assert no BRIEFING and the adopted block; the stage-keyed test now expects the booked email withheld (and has a full-prep twin); "no recipients" / "email not switched on" filter
+  `withheld` rows out of their "no send rows" check; every re-run test now expects no email from a re-run and still checks the base key's reminders; the `markers` helper leaves out the fixture's own marker; R3.1's last line allows the
+  base-key marker that records an adoption. `tests/agents/new-agents-hygiene.test.ts`'s `resolveBatch` importer list gains `src/lib/consult-prep/engine.ts`. `tests/agents/helpers.ts` gained an optional `listApproved`.
+  New tests: `tests/lawmatics/field-meta.test.ts`, `tests/consult-prep/adopt.test.ts`, the S2a blocks of `tests/consult-prep/{sends,brief,card}.test.*` and `tests/agents/consult-prep.test.ts`.
+- **Not verified / not done:** a live Lawmatics (`/custom_fields` shape, option labels), a real Approvals queue (the linking of a skill's BRIEFING to a lead), a real browser, a real Resend. The Re-run button's confirm text is not changed.
+  S2b (the full build, the attachments, saving the files) and S2c (cutover, sender, switching lawmatics-mcp off) are not built.
+
 ## Rail: Forms and Proposals for the admin tier only (no schema)
 **Superseded (Taylor, Nov 2026):** intake is shown them too, through one predicate; see "Forms and Proposals: shown to the admin tier and intake" below.
 The Forms, Proposals and older Quotes rows carry `minRole: ADMIN_TIER_MIN_ROLE` (`senior_admin`, ranked, so owner / admin / senior_admin) in
