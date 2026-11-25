@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NOTES_PRESENT, columnsFor } from "@/lib/review/sheet-columns";
+import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
+import { CAN_WRITE_LEAD } from "@/lib/pipeline/leads";
+import { canWriteCustomValue } from "@/lib/custom-columns/rules";
 import { COLUMNS_ADD, CUSTOM_COLUMNS_NOT_ON } from "@/lib/ui/words";
 import { customFixture, members, rows, tableHeaders, TODAY } from "./columns-fixtures";
 import { mockPage, renderPage, spies } from "./custom-page-harness";
@@ -14,9 +17,9 @@ const alertTexts = (html: string) => [...html.matchAll(/role="alert"[^>]*>([\s\S
 const NOTE = "Some details couldn't load (custom columns). Refresh to try again.";
 const builtin = (section: "trademarks" | "contracts", money: boolean) => columnsFor(section, { canSeeMoney: money, hasNotes: NOTES_PRESENT }).map((c) => c.header);
 
-/** The read-only List (an attorney) and the owner's editable Sheet (an owner in a firm with role views). */
+/** The read-only List (a viewer: no edit allowed) and the owner's editable Sheet (an owner in a firm with role views). */
 const LISTS = [
-  ["read-only List", { role: "attorney", roleViews: false, money: false, marker: 'class="rv-sheets"' }],
+  ["read-only List", { role: "viewer", roleViews: false, money: false, marker: 'class="rv-sheets"' }],
   ["owner's editable Sheet", { role: "owner", roleViews: true, money: true, marker: 'class="rse-root"' }],
 ] as const;
 
@@ -101,11 +104,11 @@ describe("CO4: not switched on, every role and a signed-out caller", () => {
   for (const role of [...ROLES, null]) {
     const adminTier = role === "owner" || role === "admin" || role === "senior_admin";
     it(`${role ?? "null"}: the sentence is ${adminTier ? "in both section notes" : "absent"}, and there is no "Add a column" link`, async () => {
-      // The owner gets the editable Sheet (role views on); everyone else the read-only List.
+      // Any role whose own permissions allow an edit gets the editable List, in either look; the rest get the read-only List.
       mockPage({ load: { ...base, failed: [], custom: { status: "not-set-up" } }, role, roleViews: role === "owner" });
       const html = decode(await renderPage({ view: "sheet" }));
-      if (role === "owner") expect(html).toContain('class="rse-root"');
-      else if (role !== null) expect(html).toContain('class="rv-sheets"');
+      const canEdit = !!role && (MATTER_WRITE_ROLES.includes(role as never) || CAN_WRITE_LEAD.includes(role as never) || canWriteCustomValue(role));
+      if (role !== null) expect(html).toContain(canEdit ? 'class="rse-root"' : 'class="rv-sheets"');
       const count = html.split(CUSTOM_COLUMNS_NOT_ON).length - 1;
       expect(count).toBe(adminTier ? 2 : 0);
       expect(html).not.toContain(COLUMNS_ADD);

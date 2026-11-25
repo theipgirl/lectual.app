@@ -66,8 +66,8 @@ describe("every table uses the sheet table kit", () => {
     }
   });
 
-  it("finds the two tables that are already on the kit", () => {
+  it("finds the two tables that are already on the kit (the shared List draws the Weekly review's)", () => {
     const sheetUsers = files.filter((f) => fs.readFileSync(path.join(ROOT, f), "utf8").includes("<SheetTable"));
-    expect(sheetUsers).toEqual(expect.arrayContaining(["src/components/review/SheetEditTable.tsx", "src/app/dashboard/intake/_components/IntakeTable.tsx"]));
+    expect(sheetUsers).toEqual(expect.arrayContaining(["src/components/views/table/ViewTable.tsx", "src/app/dashboard/intake/_components/IntakeTable.tsx"]));
   });
 });

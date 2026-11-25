@@ -13,7 +13,7 @@ import { DeadlinesStrip, KpiStrip, ReviewBoard, ViewSwitch, WaitingOnStrip } fro
 import { SheetView } from "@/components/review/SheetView";
 import { SheetSaveStatus } from "@/components/review/SheetSaveStatus";
 import { loadSheetStages } from "@/lib/review/sheet-edit-load";
-import { READ_ONLY_PERMS, type SheetPerms } from "@/lib/review/sheet-edit";
+import type { SheetPerms } from "@/lib/review/sheet-edit";
 import { CardsDeck, PersonChips } from "@/components/review/CardsDeck";
 import { ReviewCardAside } from "@/components/review/ReviewCardExtras";
 import { RecordCardHost } from "@/components/record-card/RecordCardHost";
@@ -27,6 +27,9 @@ import { loadReview } from "@/lib/review/load";
 import { canSeeBilling } from "@/lib/billing/can-see";
 import { ColumnChooser, type ChooserSection } from "@/components/review/ColumnChooser";
 import { NOTES_PRESENT, columnsFor } from "@/lib/review/sheet-columns";
+import { applyReviewLayout } from "@/lib/review/layout";
+import { loadViewLayout } from "@/lib/views/layout/load";
+import { layoutNote, savedLayoutOf } from "@/lib/views/layout/state";
 import { loadCardCustomColumns } from "@/lib/custom-columns/card-load";
 import { canSeeCustomMoney, canWriteCustomValue, firmColumnsBlock, withoutMoney, type FirmColumnsBlock } from "@/lib/custom-columns/rules";
 import { canSeeSetup } from "@/lib/setup/roles";
@@ -71,6 +74,11 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const actingAsStaff = session.kind === "ok" ? session.actingAsStaff : true;
   const customMoney = canSeeCustomMoney(role, actingAsStaff);
   const load = await loadReview(new Date(), { withFees, withCustom, notes, customMoney });
+  // The firm's saved column layout for the view being drawn (the List's or the Board's; Cards has none). A layout that is missing or
+  // can't be read draws the standard columns (never an empty table); only a failed read says so.
+  const layoutRead = params.view === "sheet" ? await loadViewLayout("review_list") : params.view === "board" ? await loadViewLayout("review_board") : null;
+  const layout = savedLayoutOf(layoutRead);
+  const layoutSaid = layoutNote(layoutRead);
   const userId = session.kind === "ok" ? session.user.id : null;
   const canWrite = !!role && MATTER_WRITE_ROLES.includes(role);
   const canMove = canWrite && CAN_MOVE_STAGE.includes(role);
@@ -110,21 +118,25 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const custom = load.custom ? (customMoney ? load.custom : withoutMoney(load.custom)) : null;
   const customFields = custom?.status === "ok" ? custom.fields : [];
   const customMembers = load.failed.includes("team names") ? null : load.members;
-  // The owner's Sheet edits in place. Each permission comes from the role re-resolved above; the stage lists are read only for a role that can move one.
+  // The List edits in place for any role whose own permissions allow an edit, in either look (the owner view or the standard one): record
+  // edits keep today's role gates. Each permission comes from the role re-resolved above, and every action behind a cell checks it again.
+  // A role that can edit nothing gets the read-only List. The stage lists are read only for a role that can move one.
   let sheetPerms: SheetPerms | null = null;
-  if (owner && params.view === "sheet") {
+  if (params.view === "sheet") {
     const writeLead = !!role && CAN_WRITE_LEAD.includes(role);
     const moveLead = writeLead && !!role && CAN_MOVE_STAGE.includes(role);
-    const stages = canWrite || moveLead ? await loadSheetStages() : { matter: null, lead: null };
-    sheetPerms = canWrite || writeLead ? { writeMatter: canWrite, writeLead, moveLead, matterStages: canWrite ? stages.matter : null, leadStages: moveLead ? stages.lead : null, writeCustom } : READ_ONLY_PERMS;
+    if (canWrite || writeLead || writeCustom) {
+      const stages = canWrite || moveLead ? await loadSheetStages() : { matter: null, lead: null };
+      sheetPerms = { writeMatter: canWrite, writeLead, moveLead, matterStages: canWrite ? stages.matter : null, leadStages: moveLead ? stages.lead : null, writeCustom };
+    }
   }
   // "Columns" (draw-only, kept in this browser): offered on the List only, over exactly the columns this viewer may have.
   const chooser =
     params.view === "sheet" ? (
       <ColumnChooser
         sections={[
-          { id: "trademarks", title: "Trademarks", columns: columnsFor("trademarks", { canSeeMoney, canSeeCustomMoney: customMoney, hasNotes: NOTES_PRESENT, customFields }) },
-          { id: "contracts", title: "Contracts", columns: columnsFor("contracts", { canSeeMoney, canSeeCustomMoney: customMoney, hasNotes: NOTES_PRESENT, customFields }) },
+          { id: "trademarks", title: "Trademarks", columns: applyReviewLayout(columnsFor("trademarks", { canSeeMoney, canSeeCustomMoney: customMoney, hasNotes: NOTES_PRESENT, customFields }), layout) },
+          { id: "contracts", title: "Contracts", columns: applyReviewLayout(columnsFor("contracts", { canSeeMoney, canSeeCustomMoney: customMoney, hasNotes: NOTES_PRESENT, customFields }), layout) },
         ] satisfies ChooserSection[]}
       />
     ) : null;
@@ -227,7 +239,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
         className="rv-head lx-head-split"
         sub={buckets.total === 0 ? reviewSubline(buckets) : reviewIntro(buckets.total)}
         actions={
-          sheetPerms && sheetPerms !== READ_ONLY_PERMS ? (
+          sheetPerms ? (
             <div className="rse-head-right">
               <SheetSaveStatus />
               {chooser}
@@ -285,7 +297,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           hidden: searchHidden,
           clearHref: link({ q: "", i: 1 }),
         }}
-        toggle={<ViewSwitch params={params} />}
+        toggle={sheetPerms ? <span className="rse-head-right"><SheetSaveStatus /><ViewSwitch params={params} /></span> : <ViewSwitch params={params} />}
         more={chooser}
       />
 
@@ -321,6 +333,11 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           {note}
         </Notice>
       )}
+      {layoutSaid && (
+        <Notice tone="warn" role="status">
+          {layoutSaid}
+        </Notice>
+      )}
       {notice && (
         <Notice tone="warn" role="alert">
           {notice}
@@ -339,12 +356,12 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
       ) : params.view === "sheet" ? (
         <>
           {strips}
-          <SheetView rows={shown} canSeeMoney={canSeeMoney} canSeeCustomMoney={customMoney} custom={custom} customMembers={customMembers} adminTier={adminTier} notes={sheetNotes} {...common} {...(sheetPerms ? { sheetEdit: { perms: sheetPerms } } : {})} />
+          <SheetView rows={shown} canSeeMoney={canSeeMoney} canSeeCustomMoney={customMoney} custom={custom} customMembers={customMembers} adminTier={adminTier} notes={sheetNotes} layout={layout} {...common} {...(sheetPerms ? { sheetEdit: { perms: sheetPerms } } : {})} />
         </>
       ) : (
         <>
           {strips}
-          <ReviewBoard lanes={lanes} {...common} />
+          <ReviewBoard lanes={lanes} layout={layout} {...common} />
           {owner ? (
             <div className="rv-rest">
               <ReviewSection bucket="uspto" rows={rest.uspto} collapsed {...common} />

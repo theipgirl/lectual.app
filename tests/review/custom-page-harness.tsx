@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+import { mockLayoutRead } from "./layout-mock";
 import { renderToStaticMarkup } from "react-dom/server";
 
 /**
@@ -16,6 +17,7 @@ export function mockPage(opts: { load: unknown; role: string | null; roleViews?:
   spies.cardLoad = vi.fn(async () => opts.card ?? { status: "not-found" });
   spies.cardCustom = vi.fn(async () => opts.cardCustom ?? { status: "ok", fields: [], values: [], mergedInto: {}, leadOfMatter: {} });
   vi.doMock("@/lib/review/load", () => ({ loadReview: spies.loadReview }));
+  mockLayoutRead();
   vi.doMock("@/lib/custom-columns/card-load", () => ({ loadCardCustomColumns: spies.cardCustom }));
   vi.doMock("@/lib/firm/session", () => ({
     resolveFirmSession: vi.fn(async () =>

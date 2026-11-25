@@ -25,7 +25,6 @@ import {
   MIN_COL,
   NEXT_MIN_WIDTH,
   colWidth,
-  sheetMinWidth,
   MIN_ROW,
   NO_SIZES,
   SHEET_SIZES_KEY,
@@ -92,7 +91,7 @@ import {
   noLongerAChoice,
 } from "@/lib/ui/words";
 import type { PrefsDocument } from "@/lib/review/column-prefs-storage";
-import { fieldFits, isCustomColumnId, type CustomColumnId, type CustomKind, type CustomSection, type CustomStateLike, type SheetColumn, type SheetSectionId } from "@/lib/review/sheet-columns";
+import { fieldFits, isCustomColumnId, type CustomColumnId, type CustomKind, type CustomSection, type ColumnId, type CustomStateLike, type SheetColumn, type SheetSectionId } from "@/lib/review/sheet-columns";
 import type { CustomMember } from "@/lib/custom-columns/rules";
 import { CustomValuePop } from "./CustomValueInput";
 import { SectionNote } from "./SectionNote";
@@ -101,7 +100,9 @@ import { useColumnPrefs } from "./use-column-prefs";
 import { usePopPlacement } from "./pop-placement";
 import { NotesCell } from "./NotesCell";
 import { sheetStatusStore } from "./sheet-status-store";
-import { SheetCard, SheetScroll, SheetTable } from "@/components/ui/SheetTable";
+import { SheetCard } from "@/components/ui/SheetTable";
+import { ViewTable } from "@/components/views/table/ViewTable";
+import { listColumnOf } from "@/lib/review/list-columns";
 import "./review-sheet-edit.css";
 
 export type SheetPerson = { userId: string; name: string; /** What the cell shows. */ short: string; roleLabel: string };
@@ -404,64 +405,25 @@ export function SheetEditTable({
           <kbd className="rse-key">Enter</kbd> {SHEET_KEYS_EDIT} <kbd className="rse-key">Tab</kbd> {SHEET_KEYS_NEXT} <kbd className="rse-key">Esc</kbd> {SHEET_KEYS_CANCEL}
         </p>
       )}
+      {/* eslint-disable-next-line react-hooks/refs -- the rows carry the editors' handlers; `save` reads `latestRows.current` only after its request answers (never in render), as it did when these handlers sat inline in the JSX. */}
       {sections.map((sec) => {
         const drawn = drawnBy[sec.id];
-        const colCount = drawn.length;
         const labelOf = (col: SizedColumn) => columns[sec.id].find((c) => sizeKeyOf(c.id) === col)?.header ?? "";
-        return (
-      <SheetCard key={sec.id} className="rse-sec-card">
-       <h2 id={`rse-sheet-${sec.id}`} className="lx-h3 rv-sheet-title">
-         {sec.title} <span className="lx-note">{sec.rows.length}</span>
-       </h2>
-       <SectionNote section={sec.id} customState={noteState} adminTier={adminTier} />
-       <SheetScroll>
-        <SheetTable className="rse-tbl" fixed minWidth={sheetMinWidth(sizes, drawn.map((c) => sizeKeyOf(c.id)))}>
-          <colgroup>
-            {drawn.map((c) => {
-              const cw = colWidth(sizes, sizeKeyOf(c.id));
-              return <col key={c.id} style={cw ? { width: cw } : undefined} />;
-            })}
-          </colgroup>
-          <thead>
-            <tr>
-              {drawn.map((c) => {
-                const h = { col: sizeKeyOf(c.id), label: c.header };
-                // The pencil only on a column someone here can type in, in this table: Notes by the note rule (its own inline editor),
-                // every other typed column by the cells' own predicate (a firm's column also needs `writeCustom` and to be drawn here).
-                const notes = c.id === "notes";
-                const typed = editing && (notes ? sec.rows.some((r) => canNote(r.kind, perms)) : c.editable && isEditableColumn(h.col) && sec.rows.some((r) => cellEditable(h.col, r, perms, fit)));
-                const locked = (notes ? !anyNote : !c.editable || (!!c.kind && !perms.writeCustom)) && !c.pinned && c.id !== "mark";
-                const w = colWidth(sizes, h.col);
-                const active = initial?.activeColumn === h.col || dragCol === h.col;
-                return (
-                  <th key={h.col} className={locked ? "rse-lock-th" : undefined} scope="col" title={c.title}>
-                    {h.label}
-                    {typed && (
-                      <>
-                        {" "}
-                        <Icon name="pencil" size={13} />
-                      </>
-                    )}
-                    {editing && (
-                      <span
-                        className={`rse-col-grip${active ? " is-active" : ""}`}
-                        role="separator"
-                        aria-orientation="vertical"
-                        aria-label={sheetResizeColumn(h.label)}
-                        tabIndex={0}
-                        onPointerDown={startColDrag(h.col)}
-                        onKeyDown={colKey(h.col)}
-                      />
-                    )}
-                    {editing && active && <span className="rse-col-tip">{Math.round(w ?? NEXT_MIN_WIDTH)} px</span>}
-                  </th>
-                );
-              })}
-            </tr>
-          </thead>
-          <tbody>
-              <SectionRows sec={sec} colCount={colCount}>
-                {sec.rows.map((raw) => {
+        /** What a header cell needs to know about its column in this section (the pencil, the lock, the width, the resize tip). */
+        const headState = (c: SheetColumn) => {
+          const col = sizeKeyOf(c.id);
+          // The pencil only on a column someone here can type in, in this table: Notes by the note rule (its own inline editor),
+          // every other typed column by the cells' own predicate (a firm's column also needs `writeCustom` and to be drawn here).
+          const notes = c.id === "notes";
+          const typed = editing && (notes ? sec.rows.some((r) => canNote(r.kind, perms)) : c.editable && isEditableColumn(col) && sec.rows.some((r) => cellEditable(col, r, perms, fit)));
+          const locked = (notes ? !anyNote : !c.editable || (!!c.kind && !perms.writeCustom)) && !c.pinned && c.id !== "mark";
+          const active = initial?.activeColumn === col || dragCol === col;
+          return { col, typed, locked, active };
+        };
+        /** A column's drawn width: this viewer's own resize, else the firm's saved width, else the default (null = flexible). */
+        const widthFor = (id: ColumnId, layoutWidth: number | null | undefined): number | null => sizes.cols[sizeKeyOf(id)] ?? layoutWidth ?? colWidth(NO_SIZES, sizeKeyOf(id));
+        const listColumns = drawn.map((c) => ({ ...listColumnOf(c), headClass: headState(c).locked ? "rse-lock-th" : undefined }));
+        const tableRows = sec.rows.map((raw) => {
                   const row = shownRow(raw, state);
                   const h = sizes.rows[row.key];
                   const nt = nextText(row, today);
@@ -734,36 +696,61 @@ export function SheetEditTable({
                       govFeeDue: fact("govFeeDue"),
                       oaDue: fact("oaDue"),
                   };
-                  return (
-                    <tr key={row.key} style={h ? { height: h } : undefined} data-row={row.key}>
-                      {drawn.map((c) => (
-                        <Fragment key={c.id}>{c.kind && isCustomColumnId(c.id) ? customTd(c.id, c.header) : cells[sizeKeyOf(c.id)] ?? null}</Fragment>
-                      ))}
-                    </tr>
-                  );
-                })}
-              </SectionRows>
-          </tbody>
-        </SheetTable>
-       </SheetScroll>
+                  // The cells by column, in the shared List's terms: the drawn columns, a firm's column through its own cell.
+                  const byKey: Record<string, React.ReactNode> = {};
+                  for (const c of drawn) byKey[c.id] = c.kind && isCustomColumnId(c.id) ? customTd(c.id, c.header) : cells[sizeKeyOf(c.id)] ?? null;
+                  return { key: row.key, height: h ?? null, cells: byKey };
+                });
+        return (
+      <SheetCard key={sec.id} className="rse-sec-card">
+       <h2 id={`rse-sheet-${sec.id}`} className="lx-h3 rv-sheet-title">
+         {sec.title} <span className="lx-note">{sec.rows.length}</span>
+       </h2>
+       <SectionNote section={sec.id} customState={noteState} adminTier={adminTier} />
+       <ViewTable
+         columns={listColumns}
+         rows={tableRows}
+         cell={(r, c) => r.cells[c.key] ?? null}
+         tableClass="rse-tbl"
+         fixed
+         canEditCells={editing}
+         minWidth={drawn.reduce((total, c) => total + (widthFor(c.id, c.width) ?? NEXT_MIN_WIDTH), 0)}
+         widthOf={(lc) => widthFor(lc.key as ColumnId, lc.width)}
+         emptyText={SHEET_EMPTY_SECTION}
+         renderHead={(lc) => {
+           const c = drawn.find((d) => d.id === lc.key);
+           if (!c) return lc.label;
+           const { col, typed, active } = headState(c);
+           const w = widthFor(c.id, c.width);
+           return (
+             <>
+               {lc.label}
+               {typed && (
+                 <>
+                   {" "}
+                   <Icon name="pencil" size={13} />
+                 </>
+               )}
+               {editing && (
+                 <span
+                   className={`rse-col-grip${active ? " is-active" : ""}`}
+                   role="separator"
+                   aria-orientation="vertical"
+                   aria-label={sheetResizeColumn(lc.label)}
+                   tabIndex={0}
+                   onPointerDown={startColDrag(col)}
+                   onKeyDown={colKey(col)}
+                 />
+               )}
+               {editing && active && <span className="rse-col-tip">{Math.round(w ?? NEXT_MIN_WIDTH)} px</span>}
+             </>
+           );
+         }}
+       />
       </SheetCard>
         );
       })}
     </div>
-  );
-}
-
-function SectionRows({ sec, colCount, children }: { sec: SheetSection; colCount: number; children: React.ReactNode }) {
-  return (
-    <>
-      {sec.rows.length === 0 ? (
-        <tr className="sheet-empty">
-          <td colSpan={colCount}>{SHEET_EMPTY_SECTION}</td>
-        </tr>
-      ) : (
-        children
-      )}
-    </>
   );
 }
 

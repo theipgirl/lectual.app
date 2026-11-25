@@ -4,6 +4,8 @@ import { dueText, lastContactText, shortDate } from "@/lib/review/format";
 import { documentsTag } from "@/lib/review/documents";
 import { laneOf } from "@/lib/review/lanes";
 import { sheetSections, waitingCell } from "@/lib/review/sheet";
+import { applyReviewLayout } from "@/lib/review/layout";
+import type { Layout } from "@/lib/views/layout/types";
 import { FACT_COLUMN_IDS, NOTES_PRESENT, columnsFor, type ColumnId, type CustomStateLike, type SheetColumn, type SheetSectionId } from "@/lib/review/sheet-columns";
 import { factCells, type FactCell } from "@/lib/review/sheet-cells";
 import { customCells, noteStateOf, withoutMoney, type CustomColumnsState, type CustomMember } from "@/lib/custom-columns/rules";
@@ -88,9 +90,10 @@ function SheetSection({ id, title, rows, today, members, params, canWrite, colum
 }
 
 /** The Excel tracker as one table: Trademarks, then Contracts, in pipeline order. Edits happen in the record card the Client link opens. */
-export function SheetView({ rows, owner, sheetEdit, canSeeMoney = false, canSeeCustomMoney = false, initialPrefs, custom: customIn = null, customMembers, adminTier = false, notes = null, ...common }: Common & {
+export function SheetView({ rows, sheetEdit, canSeeMoney = false, canSeeCustomMoney = false, initialPrefs, layout = null, custom: customIn = null, customMembers, adminTier = false, notes = null, ...common }: Common & {
   rows: ReviewRow[];
-  /** The owner view's editable sheet (owner view only). */ sheetEdit?: { perms: SheetPerms };
+  /** The editable List: given for any role whose own permissions allow an edit (from the page's re-resolved role), in either look. Absent: the read-only List. */ sheetEdit?: { perms: SheetPerms };
+  /** The firm's saved column layout for this List (order, names, hidden, widths); null = the standard columns. */ layout?: Layout | null;
   /** From the page's re-resolved role (`canSeeBilling`), never from the browser. */ canSeeMoney?: boolean;
   /** A REAL owner only (`canSeeCustomMoney(role, actingAsStaff)`): the firm's own Money columns. Never Lectual staff. */ canSeeCustomMoney?: boolean;
   /** Drawing-only starting column choices (a test or preview). */ initialPrefs?: PrefsDocument;
@@ -101,12 +104,12 @@ export function SheetView({ rows, owner, sheetEdit, canSeeMoney = false, canSeeC
 }) {
   // The component enforces its own prop: without canSeeCustomMoney no Money field or amount goes further, whatever a caller handed in.
   const custom = canSeeCustomMoney ? customIn : customIn && withoutMoney(customIn);
-  if (owner && sheetEdit) return <SheetEdit rows={rows} perms={sheetEdit.perms} owner canSeeMoney={canSeeMoney} canSeeCustomMoney={canSeeCustomMoney} initialPrefs={initialPrefs} custom={custom} customMembers={customMembers} adminTier={adminTier} notes={notes} {...common} />;
+  if (sheetEdit) return <SheetEdit rows={rows} perms={sheetEdit.perms} canSeeMoney={canSeeMoney} canSeeCustomMoney={canSeeCustomMoney} initialPrefs={initialPrefs} layout={layout} custom={custom} customMembers={customMembers} adminTier={adminTier} notes={notes} {...common} />;
   const { trademarks, contracts } = sheetSections(rows);
   const fields = custom?.status === "ok" ? custom.fields : [];
   const cells = custom?.status === "ok" ? customCells(rows, fields, custom, customMembers === undefined ? common.members : customMembers, common.today) : {};
   const noteState = noteStateOf(custom);
-  const columns = { trademarks: columnsFor("trademarks", { canSeeMoney, canSeeCustomMoney, hasNotes: NOTES_PRESENT, customFields: fields }), contracts: columnsFor("contracts", { canSeeMoney, canSeeCustomMoney, hasNotes: NOTES_PRESENT, customFields: fields }) };
+  const columns = { trademarks: applyReviewLayout(columnsFor("trademarks", { canSeeMoney, canSeeCustomMoney, hasNotes: NOTES_PRESENT, customFields: fields }), layout), contracts: applyReviewLayout(columnsFor("contracts", { canSeeMoney, canSeeCustomMoney, hasNotes: NOTES_PRESENT, customFields: fields }), layout) };
   return (
     <div className="rv-sheets">
       <SheetSection id="trademarks" title="Trademarks" rows={trademarks} columns={columns.trademarks} initialPrefs={initialPrefs} custom={cells} noteState={noteState} adminTier={adminTier} notes={notes} {...common} />

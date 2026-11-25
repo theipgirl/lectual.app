@@ -16,6 +16,9 @@ const NON_OWNERS = ["admin", "senior_admin", "attorney", "intake", "paralegal", 
  * Changed on purpose (Taylor, Nov 23): a firm's own Money columns are owner-only, the same rule as the built-in fee columns
  * (`canSeeBilling`). This file used to pin the opposite (the open question, "every member sees it").
  */
+/** A header cell with this label, in the read-only List (`>Label</th>`) or the editable one (the label, then its pencil or resize grip). */
+const hasHeader = (html: string, label: string) => new RegExp(`<th[^>]*>${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=<| <)`).test(html);
+
 describe("custom Money columns are owner-only, like the fee columns", () => {
   beforeEach(() => vi.resetModules());
 
@@ -31,9 +34,9 @@ describe("custom Money columns are owner-only, like the fee columns", () => {
       vi.resetModules();
       mockPage({ load, role });
       const html = await renderPage({ view: "sheet" });
-      expect(html, role).not.toContain(">Quoted fee</th>");
+      expect(hasHeader(html, "Quoted fee"), role).toBe(false);
       expect(html, role).not.toContain("$1,250.00");
-      for (const h of FEE_HEADERS) expect(html, `${role} ${h}`).not.toContain(`>${h}</th>`);
+      for (const h of FEE_HEADERS) expect(hasHeader(html, h), `${role} ${h}`).toBe(false);
       // The chooser (draw-only) lists no Money field either.
       expect(html, role).not.toContain("Quoted fee");
       // The server read itself is told not to read amounts.
@@ -44,8 +47,8 @@ describe("custom Money columns are owner-only, like the fee columns", () => {
   it("the owner sees both: the fee columns and the money custom column, and the read asks for amounts", async () => {
     mockPage({ load, role: "owner" });
     const html = await renderPage({ view: "sheet" });
-    expect(html).toContain(">Quoted fee</th>");
-    for (const h of FEE_HEADERS) expect(html, h).toContain(`>${h}</th>`);
+    expect(hasHeader(html, "Quoted fee")).toBe(true);
+    for (const h of FEE_HEADERS) expect(hasHeader(html, h), h).toBe(true);
     expect(spies.loadReview.mock.calls[0][1]).toMatchObject({ customMoney: true });
   });
 
@@ -100,7 +103,7 @@ describe("Lectual staff acting inside a firm (owner role claim) get no custom mo
     // The built-in Legal Fee is also $1,250.00 in the fixture, so the custom amount is checked by its column, never by the figure.
     expect(html).not.toContain("Quoted fee");
     expect(html).not.toContain(`cf:${CF.quote}`);
-    for (const h of FEE_HEADERS) expect(html, h).toContain(`>${h}</th>`);
+    for (const h of FEE_HEADERS) expect(hasHeader(html, h), h).toBe(true);
   });
 
   it("the owner Sheet (role-views): no Money column or amount in what is drawn or handed to the client table", async () => {

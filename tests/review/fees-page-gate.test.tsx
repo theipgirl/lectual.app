@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { mockLayoutRead } from "./layout-mock";
 import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -22,6 +23,7 @@ function mock(role: string | null, opts: { roleViews?: boolean } = {}) {
     return ok;
   });
   vi.doMock("@/lib/review/load", () => ({ loadReview: loadSpy }));
+  mockLayoutRead();
   vi.doMock("@/lib/firm/session", () => ({
     resolveFirmSession: vi.fn(async () => {
       order.push("resolveFirmSession");
@@ -83,20 +85,25 @@ describe("the server decides who may see fees", () => {
     expect(order).toEqual(["resolveFirmSession", "loadReview"]);
   });
 
-  it("the same boolean reaches both tables: fee headers for the owner in the read-only List and in the owner's editable Sheet, nowhere else", async () => {
-    // Owner, no role views: the read-only List.
+  it("the same boolean reaches both tables: fee headers for the owner in the read-only List and in the editable List (either look), nowhere else", async () => {
+    // Changed on purpose (the List edits for any role that may edit, not only in the owner view): an owner without role views now gets the
+    // editable List too. The read-only List is what a role that can edit nothing gets, so the viewer stands in for it.
     mock("owner");
-    const readOnly = await render({ view: "sheet" });
-    expect(readOnly).toContain("rv-sheet");
-    expect(readOnly).toContain(">Legal Fee</th>");
-    expect(readOnly).toContain("$1,250.00");
-    // Owner with role views: the editable Sheet.
+    const standard = await render({ view: "sheet" });
+    expect(standard).toContain("rse-tbl");
+    expect(standard).toContain("Legal Fee");
+    expect(standard).toContain("$1,250.00");
+    // Owner with role views: the same editable List in the owner's look.
     vi.resetModules();
     mock("owner", { roleViews: true });
     const editable = await render({ view: "sheet" });
     expect(editable).toContain("rse-tbl");
     expect(editable).toContain("Legal Fee");
     expect(editable).toContain("$1,250.00");
+    // The read-only List: a viewer sees no fee (the server never sent one).
+    vi.resetModules();
+    mock("viewer");
+    expect(await render({ view: "sheet" })).toContain("rv-sheet");
     // Everyone else, in both looks: no fee header, cell or chooser entry, even though the (mocked) loader handed fee data to the page.
     for (const role of ["admin", "attorney", "paralegal", "viewer"]) {
       for (const roleViews of [false, true]) {

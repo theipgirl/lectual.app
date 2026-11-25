@@ -138,6 +138,8 @@ export type SheetColumn = {
   editable: boolean;
   /** A firm's own column: its kind (the chooser names it). Absent on the spreadsheet's columns. */
   kind?: CustomKind;
+  /** The firm's saved width in pixels (its layout, `applyReviewLayout`). Absent = the table's default. */
+  width?: number | null;
 };
 
 type Meta = { header: string | Record<SheetSectionId, string>; title?: string | Partial<Record<SheetSectionId, string>> };
