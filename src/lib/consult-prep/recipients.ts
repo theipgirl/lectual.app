@@ -111,3 +111,23 @@ export function guardReplyTo(input: { replyTo: string | null | undefined; from: 
   const to = input.to.map((a) => bareAddress(a)).filter((a): a is string => a !== null && !client.has(a));
   return ccAllowed(reply, new Set(to.map(domainOf)), new Set(to)) ? reply : null;
 }
+
+/**
+ * S2c: the extra, explicit check before a TEST brief goes (on top of `guardRecipients`): there is at least one To, and every To and Cc
+ * is on a firm domain (the sender's own domain, or a domain of one of the firm members the guard kept, never a public webmail domain) or
+ * is exactly one of those members' addresses. Anything else and nothing is sent.
+ */
+export function testRecipientsOnFirmDomains(input: { to: readonly string[]; cc: readonly string[]; from: string | null | undefined }): boolean {
+  const to = input.to.map((a) => bareAddress(a)).filter((a): a is string => a !== null);
+  if (to.length === 0 || to.length !== input.to.length) return false;
+  const members = new Set(to);
+  const firm = new Set(to.map(domainOf).filter((d) => !isPublicMailDomain(d)));
+  const sender = senderAddress(input.from);
+  if (sender && !isPublicMailDomain(domainOf(sender))) firm.add(domainOf(sender));
+  for (const raw of [...input.to, ...input.cc]) {
+    const a = bareAddress(raw);
+    if (!a) return false;
+    if (!members.has(a) && !firm.has(domainOf(a))) return false;
+  }
+  return true;
+}

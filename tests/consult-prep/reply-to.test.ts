@@ -31,3 +31,15 @@ describe("guardReplyTo", () => {
     expect(guardReplyTo({ replyTo: "rebecca@gmail.com", from: "Firm <firm@gmail.com>", to: ["rebecca@gmail.com"], clientAddresses: [] })).toBe("rebecca@gmail.com");
   });
 });
+
+describe("testRecipientsOnFirmDomains (the test brief's explicit check)", () => {
+  it("needs a To, and every address on the sender's or a member's domain, or exactly a member", async () => {
+    const { testRecipientsOnFirmDomains } = await import("@/lib/consult-prep/recipients");
+    expect(testRecipientsOnFirmDomains({ to: ["rebecca@rpblawfirm.com"], cc: ["info@rpblawfirm.com"], from: FROM })).toBe(true);
+    expect(testRecipientsOnFirmDomains({ to: [], cc: ["info@rpblawfirm.com"], from: FROM })).toBe(false);
+    expect(testRecipientsOnFirmDomains({ to: ["rebecca@rpblawfirm.com"], cc: ["x@elsewhere.example"], from: FROM })).toBe(false);
+    expect(testRecipientsOnFirmDomains({ to: ["rebecca@gmail.com"], cc: ["someone@gmail.com"], from: FROM })).toBe(false);
+    expect(testRecipientsOnFirmDomains({ to: ["rebecca@gmail.com"], cc: [], from: FROM })).toBe(true);
+    expect(testRecipientsOnFirmDomains({ to: ["not an address"], cc: [], from: FROM })).toBe(false);
+  });
+});

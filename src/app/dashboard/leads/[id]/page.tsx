@@ -25,7 +25,7 @@ import { AssignSelect, EditLeadForm, NoteComposer, ProposalCard, StageSelect } f
 import { LeadTags } from "@/components/leads/LeadExtras";
 import { ConsultPrepCard } from "@/components/leads/ConsultPrepCard";
 import { loadConsultPrepCard } from "@/lib/consult-prep/card-load";
-import { canRerunConsultPrep } from "@/lib/consult-prep/roles";
+import { canRerunConsultPrep, canSendTestBrief } from "@/lib/consult-prep/roles";
 import { canSeeSetup } from "@/lib/setup/roles";
 import { LeadMattersLine } from "@/components/leads/LeadMatters";
 import { loadMattersForLead } from "@/lib/matters/for-lead";
@@ -372,7 +372,7 @@ export default async function LeadPage({
             <Timeline rows={rows} mediaUrls={voiceUrls} timeZone={tz} undo={{ leadId: lead.id, canMove, currentStageId: lead.current_stage_id }} />
           </section>
 
-          <ConsultPrepCard data={prepCard} leadId={lead.id} canRerun={canRerunConsultPrep(session.role)} adminTier={canSeeSetup(session.role)} />
+          <ConsultPrepCard data={prepCard} leadId={lead.id} canRerun={canRerunConsultPrep(session.role)} adminTier={canSeeSetup(session.role)} canTest={canSendTestBrief(session.role, session.actingAsStaff)} />
 
           <ConsultDetailsSection leadId={lead.id} canWrite={canWrite} timeZone={tz} />
 

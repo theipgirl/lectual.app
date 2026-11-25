@@ -93,3 +93,11 @@ export function supersededByCutover(kind: "booked" | "24h" | "1h", startsAtMs: n
   if (kind === "1h") return hour;
   return day || hour;
 }
+
+/**
+ * S2c (B): real consult prep emails start only once the switch-over has happened: `CONSULT_PREP_CUTOVER_AT` set, valid, and now at or
+ * after it. Unset, invalid or still ahead = NO email (fail closed). Builds, queue items, markers and saved files are not affected.
+ */
+export function emailsStarted(cutoverAtMs: number | null | undefined, nowMs: number): boolean {
+  return typeof cutoverAtMs === "number" && Number.isFinite(cutoverAtMs) && nowMs >= cutoverAtMs;
+}

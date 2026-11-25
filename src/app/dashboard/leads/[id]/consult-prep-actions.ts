@@ -5,8 +5,16 @@ import { currentRole } from "@/lib/auth/current-role";
 import { productionRunnerDeps } from "@/lib/agents/deps";
 import { getLead } from "@/lib/pipeline";
 import { runConsultPrepScoped } from "@/lib/consult-prep/trigger";
-import { canRerunConsultPrep } from "@/lib/consult-prep/roles";
+import { canRerunConsultPrep, canSendTestBrief } from "@/lib/consult-prep/roles";
+import { resolveFirmSession } from "@/lib/firm/session";
+import { createRateLimiter } from "@/lib/feedback/rate-limit";
 import {
+  CONSULT_PREP_TEST_FAILED,
+  CONSULT_PREP_TEST_LIMIT,
+  CONSULT_PREP_TEST_OFF,
+  CONSULT_PREP_TEST_OUTCOMES,
+  CONSULT_PREP_TEST_OWNER_ONLY,
+  CONSULT_PREP_TEST_SENT,
   CONSULT_PREP_RERUN_DONE,
   CONSULT_PREP_RERUN_FAILED,
   CONSULT_PREP_RERUN_NOTHING,
@@ -39,5 +47,35 @@ export async function rerunConsultPrepAction(leadId: string): Promise<RerunPrepS
     return { ok: true, message: CONSULT_PREP_RERUN_DONE };
   } catch {
     return { message: CONSULT_PREP_RERUN_FAILED };
+  }
+}
+
+/** S2c: at most 5 test briefs an hour per owner. In memory per server instance (like the feedback limit): a courtesy limit, not a hard cap. */
+const TEST_BRIEF_LIMIT = 5;
+const testBriefLimiter = createRateLimiter({ max: TEST_BRIEF_LIMIT, windowMs: 60 * 60 * 1000 });
+
+/**
+ * S2c: "Send a test brief" on the lead page. Its own POST entry point: the session is re-resolved here and only the firm's real OWNER may
+ * press it (Lectual staff acting inside the firm are refused); the lead is read through the caller's scoped client and must be in the
+ * session's firm. The run goes through the agent runner (the Assistants feature, the setting, Autopilot and the budget apply), with a
+ * `test` scope: the engine builds a real full prep and emails it, marked [TEST], to the firm's consult prep recipients only, and writes
+ * nothing. Fixed sentences only.
+ */
+export async function sendTestBriefAction(leadId: string): Promise<RerunPrepState> {
+  try {
+    const session = await resolveFirmSession();
+    if (session.kind !== "ok" || !canSendTestBrief(session.role, session.actingAsStaff)) return { message: CONSULT_PREP_TEST_OWNER_ONLY };
+    if (typeof leadId !== "string" || !UUID.test(leadId)) return { message: CONSULT_PREP_TEST_FAILED };
+    if (!testBriefLimiter.allowed(session.user.id)) return { message: CONSULT_PREP_TEST_LIMIT };
+    const lead = await getLead(leadId);
+    if (!lead || lead.merged_into_id || lead.org_id !== session.org.id) return { message: CONSULT_PREP_TEST_FAILED };
+    testBriefLimiter.record(session.user.id);
+    const outcome = await runConsultPrepScoped(productionRunnerDeps(), { orgId: session.org.id, scope: { leadIds: [lead.id], reason: "test" }, trigger: "manual" });
+    if (!outcome) return { message: CONSULT_PREP_TEST_OFF };
+    const said = outcome.status === "ok" ? outcome.result?.summary : null;
+    if (!said || !CONSULT_PREP_TEST_OUTCOMES.includes(said)) return { message: CONSULT_PREP_TEST_FAILED };
+    return { ok: said === CONSULT_PREP_TEST_SENT, message: said };
+  } catch {
+    return { message: CONSULT_PREP_TEST_FAILED };
   }
 }

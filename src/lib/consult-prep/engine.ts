@@ -30,8 +30,18 @@ import type { FullBuild, FullBuildFailure } from "./full";
 import type { PrepFileStore } from "./save-files";
 import { PREP_BRIEF_KIND, PREP_BUILD_SOURCE, PREP_SEND_SOURCE, eventPrepKey, markerEventId, normalizedStart, parsePrepKey, rerunKey, stagePrepKey } from "./keys";
 import { readLawmaticsIntake, type LawmaticsRead, type ProspectReader } from "./lawmatics-intake";
-import { CONSULT_PREP_KEY, guardRecipients, guardReplyTo, parseRecipientSetting } from "./recipients";
-import { lawmaticsReach, type CutoverReach } from "./cutover";
+import { CONSULT_PREP_KEY, guardRecipients, guardReplyTo, parseRecipientSetting, testRecipientsOnFirmDomains } from "./recipients";
+import {
+  CONSULT_PREP_TEST_EMAIL_OFF,
+  CONSULT_PREP_TEST_FAILED,
+  CONSULT_PREP_TEST_FIRST_LINE,
+  CONSULT_PREP_TEST_NOT_BUILT,
+  CONSULT_PREP_TEST_NO_RECIPIENTS,
+  CONSULT_PREP_TEST_RECIPIENTS_UNREAD,
+  CONSULT_PREP_TEST_SENT,
+  CONSULT_PREP_TEST_SUBJECT_PREFIX,
+} from "@/lib/ui/words";
+import { emailsStarted, lawmaticsReach, type CutoverReach } from "./cutover";
 import type { GuardResult } from "./recipients";
 import {
   HOUR_MS,
@@ -115,7 +125,8 @@ export type PrepDeps = {
   mail: { apiKey: string | null; from: string | null; replyTo?: string | null };
   /**
    * S2c: `CONSULT_PREP_CUTOVER_AT` as an instant, or null (unset or not a full ISO instant with a zone = no cutover rule). An
-   * event-keyed email lawmatics-mcp may already have scheduled before it was switched off is not sent (`cutover.ts`).
+   * event-keyed email lawmatics-mcp may already have scheduled before it was switched off is not sent (`cutover.ts`). And NO real
+   * email goes until it is set, valid and past (fail closed): absent, null or still ahead = the emails wait, nothing is recorded.
    */
   cutoverAtMs?: number | null;
   mailOut: (m: InternalMail) => Promise<InternalMailResult>;
@@ -186,6 +197,8 @@ type Counts = {
   superseded: number;
   /** S2c: emails sent without the configured reply-to because it isn't a firm address for that email. */
   replyToRefused: number;
+  /** S2c: emails not sent (and not recorded) because the switch-over has not happened yet. */
+  awaitingCutover: number;
   /** Scheduled facts-only 1 h emails cancelled and planned again with a full brief. */
   upgraded: number;
   /** Scheduled emails cancelled because the Approvals item they carried was rejected or is gone. */
@@ -213,7 +226,7 @@ type Counts = {
 
 const emptyCounts = (): Counts => ({
   prepped: 0, drafts: 0, noAddress: 0, noTemplate: 0, refused: 0, failed: 0, partial: 0, unrecorded: 0, sent: 0, scheduled: 0, cancelled: 0,
-  cancelUnchecked: 0, noRecipients: 0, emailOff: 0, recipientsUnread: 0, sendFailed: 0, nothingToDeliver: 0, mergedSkipped: 0, duplicate: 0, leadsOver: 0, leftSkipped: 0, twins: 0, alreadyPrepped: 0, leftCancelled: 0, recipientsChanged: 0, over: 0, deferred: 0, adopted: 0, adoptionUnread: 0, withheld: 0, factsOnly: 0, superseded: 0, replyToRefused: 0, upgraded: 0, adoptedGone: 0,
+  cancelUnchecked: 0, noRecipients: 0, emailOff: 0, recipientsUnread: 0, sendFailed: 0, nothingToDeliver: 0, mergedSkipped: 0, duplicate: 0, leadsOver: 0, leftSkipped: 0, twins: 0, alreadyPrepped: 0, leftCancelled: 0, recipientsChanged: 0, over: 0, deferred: 0, adopted: 0, adoptionUnread: 0, withheld: 0, factsOnly: 0, superseded: 0, replyToRefused: 0, awaitingCutover: 0, upgraded: 0, adoptedGone: 0,
   fullBuilt: 0, fullFailed: {}, attachRefused: 0, filesSaved: 0, filesSkipped: 0, filesFailed: 0, filesUnlogged: 0, fullNoQueue: 0, buildCapped: 0, repaired: 0,
   unreadSections: { answers: 0, mail: 0, meetings: 0, files: 0, lawmatics: 0, labels: 0 },
 });
@@ -1033,7 +1046,70 @@ function memoProspects(reader: ProspectReader): ProspectReader {
   return { client: () => (memo ??= reader.client()) };
 }
 
+/**
+ * S2c: the owner's "Send a test brief". A REAL full prep for one lead's next consult (or its stage path when it has none), built through
+ * the same builder (`deps.full`: the firm's own package list, the model's two calls, the USPTO pull, the two files) and emailed through
+ * the same mailer to the SAME recipients (the Settings -> Team note, `guardRecipients`, then `testRecipientsOnFirmDomains`), with
+ * "[TEST] " on the subject and a first line saying it is a test. It ignores the switch-over (it is not a real email to a consult).
+ *
+ * It writes NOTHING: no queue item, no marker, no send or build record, no file. The idempotency key is unique per press. The answer is
+ * one fixed sentence (the run's summary); no name, address, mark or word of the brief reaches it.
+ */
+async function runTestBrief(ctx: AgentContext, deps: PrepDeps, leadId: string): Promise<AgentResult> {
+  const { admin, orgId } = ctx;
+  const nowMs = ctx.now();
+  const done = (summary: string): AgentResult => ({ itemsIn: 0, draftsOut: 0, summary });
+  const { apiKey, from } = deps.mail;
+  if (!apiKey || !from) return done(CONSULT_PREP_TEST_EMAIL_OFF);
+  if (!deps.full) return done(CONSULT_PREP_TEST_NOT_BUILT);
+  try {
+    // Who gets it first: nothing is built for an email nobody may receive.
+    const recipients = await readRecipients(admin, orgId, deps);
+    if (recipients.state === "unreadable") return done(CONSULT_PREP_TEST_RECIPIENTS_UNREAD);
+    if (recipients.state === "none") return done(CONSULT_PREP_TEST_NO_RECIPIENTS);
+    // The lead's next consult (any source the real run reads), else the stage path (no consult time).
+    const calendar = await readCalendar(admin, orgId, nowMs, mailboxModuleState(ctx) === "on", [leadId]);
+    const next = calendar.rows
+      .filter((e) => e.lead_id === leadId)
+      .sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at))[0];
+    const key = next ? eventPrepKey(leadId, next.id, next.starts_at) : stagePrepKey(leadId, "test");
+    const c: Candidate = { key, baseKey: key, leadId, event: next ? { id: next.id, startsAt: normalizedStart(next.starts_at) ?? next.starts_at, joinUrl: next.join_url } : null, rerun: false, bookedAt: null };
+    const style = await readFirmStyle(admin, orgId);
+    const g = await gather(admin, orgId, c, nowMs, style.timeZone, { ...deps, prospects: memoProspects(deps.prospects) }, null);
+    if (!g) return done(CONSULT_PREP_TEST_FAILED);
+    const guarded = guardRecipients({ to: recipients.to, cc: recipients.cc, clientAddresses: g.clientAddresses });
+    if (guarded.to.length === 0) return done(CONSULT_PREP_TEST_NO_RECIPIENTS);
+    // The explicit check: a non-empty list, every address on the firm's own domain(s). Anything else and nothing goes.
+    if (!testRecipientsOnFirmDomains({ to: guarded.to, cc: guarded.cc, from })) return done(CONSULT_PREP_TEST_FAILED);
+    const built = await deps.full(g.facts);
+    if (!built.ok) return done(CONSULT_PREP_TEST_NOT_BUILT);
+    const text = renderConsultBrief({ ...g.facts, full: built.sections }).text;
+    const withFiles = attachmentsForEmail(built.attachPlan, built.files);
+    const brief = renderAdoptedBrief(text, { lead: g.facts.lead, startsAt: g.facts.startsAt, tz: g.facts.tz, send: "booked" }, withFiles.lines);
+    const replyTo = deps.mail.replyTo ? guardReplyTo({ replyTo: deps.mail.replyTo, from, to: guarded.to, clientAddresses: g.clientAddresses }) : null;
+    const nonce = Math.random().toString(36).slice(2, 10);
+    const result = await deps.mailOut({
+      apiKey,
+      from,
+      to: guarded.to,
+      ...(guarded.cc.length > 0 ? { cc: guarded.cc } : {}),
+      ...(replyTo ? { replyTo } : {}),
+      subject: `${CONSULT_PREP_TEST_SUBJECT_PREFIX}${brief.subject}`,
+      text: `${CONSULT_PREP_TEST_FIRST_LINE}\n\n${brief.text}`,
+      html: `<p style="font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:#8a1c1c">${CONSULT_PREP_TEST_FIRST_LINE}</p>${brief.html}`,
+      idempotencyKey: `consult-prep-test:${orgId}:${leadId}:${Math.trunc(nowMs)}:${nonce}`,
+      ...(withFiles.attach.length > 0 ? { attachments: withFiles.attach.map((f) => ({ filename: f.fileName, content: f.bytes })) } : {}),
+      label: "consult-prep",
+    });
+    return done(result.status === "sent" ? CONSULT_PREP_TEST_SENT : CONSULT_PREP_TEST_FAILED);
+  } catch {
+    return done(CONSULT_PREP_TEST_FAILED);
+  }
+}
+
 export async function runPrep(ctx: AgentContext, rawDeps: PrepDeps, generate: DraftTextGenerator): Promise<AgentResult> {
+  // S2c: the owner's test brief is its own path, which writes nothing.
+  if (ctx.scope?.reason === "test") return runTestBrief(ctx, rawDeps, ctx.scope.leadIds[0]);
   const deps: PrepDeps = { ...rawDeps, prospects: memoProspects(rawDeps.prospects) };
   const { admin, orgId, autonomy } = ctx;
   const nowMs = ctx.now();
@@ -1105,6 +1181,10 @@ export async function runPrep(ctx: AgentContext, rawDeps: PrepDeps, generate: Dr
   const state: RunState = { folded: foldSendRecords(records), gens: generationsOf(records), scopedIds, tz: "UTC" };
   // S2c: how far lawmatics-mcp can have scheduled its own briefs before it was switched off (null = no cutover rule).
   const reach: CutoverReach | null = typeof deps.cutoverAtMs === "number" && Number.isFinite(deps.cutoverAtMs) ? lawmaticsReach(deps.cutoverAtMs) : null;
+  // S2c (B): no real email until the switch-over has happened. Before it, nothing is sent and nothing is recorded as sent, owed or
+  // superseded, so the day it passes only what is still due under the normal rules goes out (a prep made earlier never gets a late
+  // booked email: that is owed only to the run that made it).
+  const mailOpen = emailsStarted(deps.cutoverAtMs, nowMs);
   const style = await readFirmStyle(admin, orgId);
   state.tz = style.timeZone;
 
@@ -1271,6 +1351,11 @@ export async function runPrep(ctx: AgentContext, rawDeps: PrepDeps, generate: Dr
         }
         // A prep from before the sends existed has no booked email to retry and made no promise about reminders it never planned.
         if (legacy) continue;
+        // Everything below is about emails (what is owed, a full brief to carry it, a facts email to upgrade): it waits for the switch-over.
+        if (!mailOpen) {
+          counts.awaitingCutover += planSends({ prepKey: c.key, startsAtMs: startMs, nowMs, preppedAtMs: preppedAt !== undefined ? Date.parse(preppedAt) : nowMs, madeNow: false, suppressBooked: false, existing }).actions.length;
+          continue;
+        }
         const base = {
           prepKey: c.key,
           startsAtMs: startMs,
@@ -1521,14 +1606,16 @@ export async function runPrep(ctx: AgentContext, rawDeps: PrepDeps, generate: Dr
       // (Resend dedupes), where a marker with no email would never send the booked email.
       const bookedHeld = !!c.event && stageBookedRecently(records, lead.id, nowMs);
       const plan = planSends({ prepKey: c.key, startsAtMs: startMs, nowMs, preppedAtMs: nowMs, madeNow: true, suppressBooked: bookedHeld, bookedOnly: c.rerun, brief: adoption || built ? "full" : "facts", cutover: c.rerun ? null : reach, existing });
-      await recordWithheld(ctx, counts, state, c, plan.withheld);
-      await recordSuperseded(ctx, counts, state, c, plan.superseded);
+      if (mailOpen) {
+        await recordWithheld(ctx, counts, state, c, plan.withheld);
+        await recordSuperseded(ctx, counts, state, c, plan.superseded);
+      } else counts.awaitingCutover += plan.actions.length + plan.withheld.length;
       const content: PrepContent = adoption
         ? { adopted: itemText(adoption) }
         : built
           ? { adopted: brief.text, attach: { plan: built.attachPlan, files: built.files } }
           : { adopted: null };
-      await deliver(ctx, deps, mailer, counts, state, g, c, plan.actions, content);
+      if (mailOpen) await deliver(ctx, deps, mailer, counts, state, g, c, plan.actions, content);
       if (built) await saveFiles(c, built.files);
 
       const { error: recordError } = await admin.from("crm_activity").insert(
@@ -1589,6 +1676,7 @@ function summaryOf(c: Counts, stageUnread: boolean, outlookNotReady: boolean, ou
   if (c.adopted > 0) parts.push(`${plural(c.adopted, "consult", "consults")} reused a full prep that was already in Approvals, so no new briefing was queued.`);
   if (c.adoptionUnread > 0) parts.push(`${plural(c.adoptionUnread, "consult", "consults")} left for the next run: Approvals could not be read, so nothing was built or sent on a guess.`);
   if (c.withheld > 0) parts.push(`${plural(c.withheld, "email", "emails")} held back: only the facts brief exists, and an email carries the full prep. ${c.withheld === 1 ? "It is" : "They are"} sent if a full prep appears while still due.`);
+  if (c.awaitingCutover > 0) parts.push(`${plural(c.awaitingCutover, "email", "emails")} not sent: consult prep emails start when the switch-over is done.`);
   if (c.superseded > 0) parts.push(`${plural(c.superseded, "email", "emails")} not sent: the old brief was already scheduled for ${c.superseded === 1 ? "that consult" : "those consults"} before the switch-over.`);
   if (c.replyToRefused > 0) parts.push(`${plural(c.replyToRefused, "consult's emails", "consults' emails")} went without the reply-to address: it isn't a firm address for those emails.`);
   if (c.factsOnly > 0) parts.push(`${plural(c.factsOnly, "hour-before email", "hour-before emails")} sent or scheduled marked "facts only".`);

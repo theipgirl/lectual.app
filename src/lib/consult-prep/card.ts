@@ -4,6 +4,7 @@ import {
   CONSULT_PREP_ADOPTED,
   CONSULT_PREP_ASK_ADMIN,
   CONSULT_PREP_EMAIL_OFF,
+  CONSULT_PREP_EMAILS_WAIT,
   CONSULT_PREP_NOT_EMAILED,
   CONSULT_PREP_NOT_YET,
   CONSULT_PREP_NO_RECIPIENTS,
@@ -35,6 +36,8 @@ export type CardInputs = {
   recipients: Read3<RecipientsView>;
   /** The deployment can send email (a key and a sender). */
   emailOn: boolean;
+  /** S2c: the switch-over has happened, so real emails go (`emailsStarted`). Absent = started (the rules before S2c). */
+  emailsStarted?: boolean;
   adminTier: boolean;
   tz: string;
   /** The clock, for "is the owed booked email still due?". Absent: it is taken as still due. */
@@ -100,6 +103,8 @@ export function consultPrepCardView(input: CardInputs): CardView {
       mail = CONSULT_PREP_WAITING_FULL;
     } else if (!input.emailOn) {
       mail = `${CONSULT_PREP_NOT_EMAILED} (${CONSULT_PREP_EMAIL_OFF})`;
+    } else if (input.emailsStarted === false) {
+      mail = CONSULT_PREP_EMAILS_WAIT;
     } else {
       mail = CONSULT_PREP_NOT_EMAILED;
     }

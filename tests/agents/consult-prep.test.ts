@@ -100,6 +100,8 @@ type Setup = {
   listApproved?: () => Promise<import("@/lib/queue/api").QueueItem[]>;
 };
 
+/** A switch-over 60 days before NOW: emails are on, and lawmatics-mcp's reach is long past. */
+const LONG_AGO_CUTOVER = NOW - 60 * 86_400_000;
 const FULL_ITEM_ID = "full-1";
 const FULL_TEXT = "Consult prep for Dana Ruiz\n\nLikely classes\nClass 25 clothing, Class 32 beer\n\nRisk read\nPreliminary: one close mark found\n\nPackage recommendation\nEnhanced";
 /** The BRIEFING a person or the prep-consult skill left in Approvals, as the queue returns it. */
@@ -154,6 +156,8 @@ function setup(s: Setup = {}) {
   const cancelled: CancelMail[] = [];
   const deps: PrepDeps = {
     mail: { apiKey: "re_key", from: "prep@lectual.example" },
+    // S2c: real emails go only after the switch-over. The tests that are not about it run long after one (nothing is in its window).
+    cutoverAtMs: LONG_AGO_CUTOVER,
     mailOut: async (m) => {
       sent.push(m);
       return { status: "sent", id: `re_${sent.length}` };
@@ -1790,7 +1794,7 @@ describe("S2c: the switch-over from lawmatics-mcp's brief (CONSULT_PREP_CUTOVER_
     for (const [now, deps] of [
       [NOW + 2 * 3_600_000, CUTOVER],
       [NOW + 20 * 3_600_000, CUTOVER],
-      [NOW + 3 * 3_600_000, { cutoverAtMs: null }],
+      [NOW + 3 * 3_600_000, { cutoverAtMs: NOW - 60 * 86_400_000 }], // an earlier cutover: the rows still say it is done
     ] as const) {
       const again = setup({ full: true, tables: { ...at(30), crm_activity: first.db.tables.crm_activity }, deps, now });
       await again.run();
@@ -1799,8 +1803,37 @@ describe("S2c: the switch-over from lawmatics-mcp's brief (CONSULT_PREP_CUTOVER_
     }
   });
 
-  it("unset or invalid (null) is no cutover rule", async () => {
-    const s = setup({ full: true, tables: at(30), deps: { cutoverAtMs: null } });
+  it("unset or invalid (null): no real email at all, and nothing recorded (fail closed); the prep is still made", async () => {
+    for (const cutoverAtMs of [null, undefined]) {
+      const s = setup({ full: true, tables: at(50), deps: { cutoverAtMs } });
+      const result = await s.run();
+      expect(s.sent).toHaveLength(0);
+      expect(sendRows(s.db)).toHaveLength(0);
+      expect(markers(s.db).length).toBeGreaterThan(0);
+      expect(result.summary).toMatch(/3 emails not sent: consult prep emails start when the switch-over is done\./);
+    }
+  });
+
+  it("before, at and after the switch-over: nothing before; at and after, only what is still due goes, and no backlog", async () => {
+    // The prep is made 6 h before the switch-over (cutover at NOW + 6 h, the consult at NOW + 50 h).
+    const cutover = { cutoverAtMs: NOW + 6 * 3_600_000 };
+    const before = setup({ full: true, tables: at(50), deps: cutover });
+    await before.run();
+    expect(before.sent).toHaveLength(0);
+    expect(sendRows(before.db)).toHaveLength(0);
+    expect(markers(before.db).length).toBeGreaterThan(0);
+    // At the switch-over: the booked email belonged to the run that made the prep, so it is not sent late; the reminders still due go.
+    const atIt = setup({ full: true, tables: { ...at(50), crm_activity: before.db.tables.crm_activity }, deps: cutover, now: NOW + 6 * 3_600_000 });
+    await atIt.run();
+    expect(atIt.sent.map(kindOf)).toEqual(["24h", "1h"]);
+    // After it: nothing twice.
+    const after = setup({ full: true, tables: { ...at(50), crm_activity: atIt.db.tables.crm_activity }, deps: cutover, now: NOW + 8 * 3_600_000 });
+    await after.run();
+    expect(after.sent).toHaveLength(0);
+  });
+
+  it("a new prep after the switch-over sends as usual", async () => {
+    const s = setup({ full: true, tables: at(50), deps: { cutoverAtMs: NOW - 1 } });
     await s.run();
     expect(s.sent.map(kindOf)).toEqual(["booked", "24h", "1h"]);
   });

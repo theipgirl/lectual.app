@@ -6,6 +6,7 @@ import { activeQueueOrgKey } from "@/lib/queue/org";
 import { activeOrgModulesOrNull } from "@/lib/org/modules";
 import { PREP_SOURCE } from "@/lib/agents/consult-prep/constants";
 import { env } from "@/lib/env";
+import { emailsStarted, parseCutoverAt } from "./cutover";
 import { PREP_BRIEF_KIND, PREP_SEND_SOURCE } from "./keys";
 import { consultPrepCardView, type CardView, type PrepMarker, type Read3, type RecipientsView } from "./card";
 import { loadConsultPrepSetting } from "./recipients-store";
@@ -128,6 +129,7 @@ export async function loadConsultPrepCard(args: { leadIds: readonly string[]; ad
       sends,
       recipients,
       emailOn: Boolean(env.RESEND_API_KEY?.trim() && env.CONSULT_PREP_FROM?.trim()),
+      emailsStarted: emailsStarted(parseCutoverAt(env.CONSULT_PREP_CUTOVER_AT), Date.now()),
       adminTier: args.adminTier,
       tz: args.tz,
       nowMs: Date.now(),

@@ -1680,6 +1680,8 @@ export const CONSULT_PREP_EMAIL_OFF = "Email isn't switched on for your firm yet
 export const CONSULT_PREP_NOT_EMAILED = "not emailed";
 export const CONSULT_PREP_WAITING_FULL = "not emailed yet: waiting for the full prep";
 /** S2c: Lectual sent nothing because the brief from before the switch-over was already scheduled for this consult. */
+/** S2c: Lectual's consult prep emails have not started yet (the switch-over from the old brief is not done). */
+export const CONSULT_PREP_EMAILS_WAIT = "not emailed: emails start when the switch-over is done";
 export const CONSULT_PREP_SUPERSEDED = "not emailed: the old brief was already scheduled for this consult";
 export const CONSULT_PREP_ADOPTED = "The prep already in Approvals was used.";
 export const CONSULT_PREP_RECIPIENTS_NOW = "Emails now go to the people set in Settings → Team";
@@ -1703,6 +1705,31 @@ export const consultPrepTimelineSend = (kind: "booked" | "24h" | "1h", status: "
   const what = kind === "booked" ? "Consult prep email" : kind === "24h" ? "Consult prep reminder, a day before" : "Consult prep reminder, an hour before";
   return `${what}: ${status === "failed" ? "couldn't be sent" : status === "duplicate" ? "already sent by another run" : status === "withheld" ? "waiting for the full prep" : status === "superseded" ? CONSULT_PREP_SUPERSEDED : status}`;
 };
+// S2c: "Send a test brief" on the lead page's Consult prep card (owner only). The engine's run returns exactly one of the sentences
+// below as its summary (counts and fixed words only), and the action shows it.
+export const CONSULT_PREP_TEST_BUTTON = "Send a test brief";
+export const CONSULT_PREP_TEST_CONFIRM = "Send a test brief? It builds a real prep for this lead's next consult and emails it, marked [TEST], only to the people set in Settings → Team. Nothing is saved in Lectual.";
+export const CONSULT_PREP_TEST_SENT = "Test brief sent to the people set in Settings → Team.";
+export const CONSULT_PREP_TEST_OWNER_ONLY = "Only the firm's owner can send a test brief.";
+export const CONSULT_PREP_TEST_LIMIT = "You've sent 5 test briefs in the last hour. Try again later.";
+export const CONSULT_PREP_TEST_OFF = "Consult prep isn't switched on for your firm, so no test brief was sent.";
+export const CONSULT_PREP_TEST_EMAIL_OFF = "Can't send a test brief: email isn't switched on for your firm yet. Lectual will turn it on.";
+export const CONSULT_PREP_TEST_NO_RECIPIENTS = "Can't send a test brief: no one is set to receive consult prep. Set it in Settings → Team.";
+export const CONSULT_PREP_TEST_RECIPIENTS_UNREAD = "Can't send a test brief: who gets consult prep couldn't be read. Try again in a minute.";
+export const CONSULT_PREP_TEST_NOT_BUILT = "Can't send a test brief: the full prep couldn't be built. Try again in a few minutes.";
+export const CONSULT_PREP_TEST_FAILED = "Couldn't send the test brief. Nothing was saved. Try again in a minute.";
+/** The first line of a test brief's body. */
+export const CONSULT_PREP_TEST_FIRST_LINE = "TEST: this is a test of the consult prep email. It is not a real prep, and nothing about it was saved in Lectual.";
+export const CONSULT_PREP_TEST_SUBJECT_PREFIX = "[TEST] ";
+/** Every answer the test run can give (the action shows only one of these). */
+export const CONSULT_PREP_TEST_OUTCOMES: readonly string[] = [
+  CONSULT_PREP_TEST_SENT,
+  CONSULT_PREP_TEST_EMAIL_OFF,
+  CONSULT_PREP_TEST_NO_RECIPIENTS,
+  CONSULT_PREP_TEST_RECIPIENTS_UNREAD,
+  CONSULT_PREP_TEST_NOT_BUILT,
+  CONSULT_PREP_TEST_FAILED,
+];
 export const CONSULT_PREP_TEAM_HEADING = "Consult prep emails";
 export const CONSULT_PREP_TEAM_HELP = "When a consult is prepared, the brief is emailed to the people chosen here when it is booked, a day before (if it was booked more than a day ahead) and an hour before. It goes only to the firm, never to a client. Cc addresses must be on the same email domain as someone chosen.";
 export const CONSULT_PREP_TEAM_NONE = "Nobody is chosen yet, so no consult prep emails go out.";

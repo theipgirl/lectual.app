@@ -2784,6 +2784,49 @@ still only to the firm's own people through the recipients guard, and the sender
   refused request's idempotency key), a live model (Sonnet on the two structured calls), a live USPTO (both endpoints and the mark images), a real
   `client-files` bucket upload and download from the service role, Vercel's tracing of the fonts for the new route globs, a real browser.
 
+### S2c: the switch-over from lawmatics-mcp, the reply-to, and the owner's test brief (no schema; runbook `docs/pge/2026-11-24-auto-consult-prep/s2c-runbook.md`)
+Nothing goes to a client; no migration, no dependency. Three env vars, all read in `deps.ts` and validated there (anything invalid is ignored).
+- **Emails wait for the switch-over (fail closed).** A real consult prep email (booked, 24h, 1h) goes only when `CONSULT_PREP_CUTOVER_AT` is set,
+  is a full ISO instant WITH a zone (`parseCutoverAt`; a date alone or a time with no zone is ignored), and now >= it (`emailsStarted`,
+  `cutover.ts`). Unset, invalid or ahead: no email and NOTHING recorded (no send, withheld or superseded row), counted as `awaitingCutover`
+  ("N emails not sent: consult prep emails start when the switch-over is done."). Builds, queue items, markers and saved files go on as before.
+  No backlog when it opens: a prep made earlier gets only what is still due (a booked email is owed only to the run that made the prep), and a
+  prep that already existed skips the whole owed-email path (no Approvals read, no retry build) until then. The card reads
+  "not emailed: emails start when the switch-over is done" (`CONSULT_PREP_EMAILS_WAIT`, `CardInputs.emailsStarted`).
+- **No doubles with lawmatics-mcp** (`lawmaticsReach`, `supersededByCutover`, `cutover.ts`, pure). lawmatics-mcp schedules its 24 h / 1 h briefs
+  with Resend ahead and never cancels. From its own `slots.ts` rules (7:30 AM and 8:00 PM America/New_York, a run acts for a slot up to 1 h
+  early, schedules send times in [S, N), plus 1 h briefs in [N, N + 3 h) after a MORNING slot), its reach is N (24 h briefs) and N or N + 3 h
+  (1 h briefs) of the latest slot at or before cutover + 1 h, worked out under BOTH weekday settings (its `BRIEF_WEEKDAYS_ONLY` is unknown here)
+  and the later kept: at most about 16.5 h after a weekday cutover, up to Monday 7:30 AM from Friday evening. Per slot, by its nominal time: a 24h email is
+  superseded when start - 24 h < reach.day, a 1h when start - 1 h < reach.hour, the booked one when either (it goes only when lawmatics-mcp sent
+  nothing). **Decision:** a per-slot horizon from its schedule, not the plan's flat "start < cutover + 48 h": the flat window would leave consults
+  with no 1 h brief from either system (lawmatics-mcp reaches about 16 h, not 48 h), and 48 h is too short for a weekday-only weekend (about 61.5 h).
+  A covered slot gets an append-only send record `status: "superseded"` (once per slot, `recordSuperseded`, no Resend call), which `planSends` treats
+  as done, so no later run sends it whatever the clock or env says; it never hides a sent / scheduled / duplicate row. Stage-keyed preps (no consult
+  time; lawmatics-mcp briefs only booked events) and a person's re-run (they asked for it; lawmatics-mcp has no booked email to double) are exempt. A
+  reschedule is a new key, judged by its new start. Card and timeline: "not emailed: the old brief was already scheduled for this consult"
+  (`CONSULT_PREP_SUPERSEDED`).
+- **Reply-to** (`CONSULT_PREP_REPLY_TO`, `bareAddress` at read): on every email only when `guardReplyTo` (recipients.ts) allows it for that email:
+  not any client address, and on the SENDER's own domain (not a public webmail one) or passing the Cc rule against this email's To list. Refused =
+  sent without it, counted (`replyToRefused`). **Decision:** enforced at send time, since brief@ may not be a real mailbox and replies must reach the firm.
+- **Who receives (checked, unchanged):** To = the Settings -> Team firm note's `user_ids` (`crm_firm_brain_entry` key `consult_prep_recipients`, read
+  org-fenced) resolved by `memberAddresses` (this firm's `crm_org_member` rows in the eight staff roles, `auth.admin.getUserById`; any failed lookup =
+  unreadable, nothing sent); Cc = the note's list; then `guardRecipients` on EVERY send drops every client address (the lead's, the Lawmatics contact's,
+  merged leads', any email in the intake answers or Lawmatics fields) and every Cc off a To member's domain (public webmail: exact member only).
+- **"Send a test brief"** (lead page, Consult prep card, `TestBrief.tsx`; owner only: `canSendTestBrief` = role `owner` AND `actingAsStaff === false`,
+  so Lectual staff in a firm are refused). Lead page, not Settings: the lead is the consult being prepared, already chosen. `sendTestBriefAction`
+  re-resolves the session, reads the lead through the scoped client (must be in the session's firm, not merged), limits 5 an hour per owner in
+  memory (a courtesy limit), and runs consult prep through the runner with scope `{ reason: "test", leadIds: [lead] }` (the assistant must be on;
+  an `agent_run` row records the run, counts only). `runTestBrief` (engine.ts) builds a REAL full prep for the lead's next consult (else its stage
+  path) through `deps.full` (two model calls at most, the firm's packages, the USPTO pull, both files) and sends ONE email to the same recipients
+  (`guardRecipients`, then `testRecipientsOnFirmDomains`: a To, every address on the sender's or a member's non-public domain or exactly a member),
+  subject `[TEST] ...`, first line `CONSULT_PREP_TEST_FIRST_LINE`, a fresh idempotency key per press. It ignores the switch-over and writes NOTHING
+  (no queue item, marker, send or build record, file). Its answer is one of `CONSULT_PREP_TEST_OUTCOMES` (fixed sentences).
+- Tests: `tests/consult-prep/{cutover,reply-to,test-brief-action,deps}.test.ts`, the S2c blocks of `tests/agents/consult-prep.test.ts` and
+  `tests/agents/consult-prep-full.test.ts`. **Harness change:** both engine harnesses now pass `cutoverAtMs` 60 days before NOW, since emails are
+  shut without one. **Not verified:** a live Resend reply-to and attachments on a scheduled email, that `rpblawfirm.com` is verified on lectual-app's
+  Resend account, and lawmatics-mcp's prod `BRIEF_*` hours (the defaults are assumed).
+
 ## Rail: Forms and Proposals for the admin tier only (no schema)
 **Superseded (Taylor, Nov 2026):** intake is shown them too, through one predicate; see "Forms and Proposals: shown to the admin tier and intake" below.
 The Forms, Proposals and older Quotes rows carry `minRole: ADMIN_TIER_MIN_ROLE` (`senior_admin`, ranked, so owner / admin / senior_admin) in

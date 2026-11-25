@@ -170,3 +170,34 @@ describe("the superseded record", () => {
     expect(consultPrepTimelineSend("booked", "superseded")).toBe(`Consult prep email: ${CONSULT_PREP_SUPERSEDED}`);
   });
 });
+
+describe("emails wait for the switch-over (fail closed)", async () => {
+  const { emailsStarted } = await import("@/lib/consult-prep/cutover");
+  const { CONSULT_PREP_EMAILS_WAIT } = await import("@/lib/ui/words");
+  it("only when set, valid and now at or after it", () => {
+    const at = Z("2026-12-01T20:00:00Z");
+    expect(emailsStarted(at, at - 1)).toBe(false);
+    expect(emailsStarted(at, at)).toBe(true);
+    expect(emailsStarted(at, at + 1)).toBe(true);
+    expect(emailsStarted(null, at)).toBe(false);
+    expect(emailsStarted(undefined, at)).toBe(false);
+    expect(emailsStarted(Number.NaN, at)).toBe(false);
+    expect(emailsStarted(parseCutoverAt("2026-12-01"), at)).toBe(false);
+  });
+  it("the card says so instead of 'not emailed'", () => {
+    const k = eventPrepKey("lead-1", "ev-1", "2026-12-04T10:00:00.000Z");
+    const view = consultPrepCardView({
+      agents: "on",
+      setting: "on",
+      markers: { status: "ok", value: [{ prepKey: k, queueItemId: "q-1", at: "2026-12-01T21:00:00Z" }] },
+      sends: { status: "ok", value: [] },
+      recipients: { status: "ok", value: { names: ["Rebecca"], cc: [] } },
+      emailOn: true,
+      emailsStarted: false,
+      adminTier: true,
+      tz: "America/New_York",
+    });
+    expect(view.kind === "prepared" && view.lines[0]).toContain(CONSULT_PREP_EMAILS_WAIT);
+    expect(CONSULT_PREP_EMAILS_WAIT).toBe("not emailed: emails start when the switch-over is done");
+  });
+});
