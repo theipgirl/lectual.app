@@ -112,7 +112,7 @@ export const DUE_TODAY_BAR = "Due today";
 /** Beside the pay button after acceptance: "Pay $1,732.50 today". */
 export const payTodayLine = (amount: string): string => `Pay ${amount} today`;
 
-/** Flat-fee work shown as numbered sections: the fee table under them (two or more pieces of work). */
+/** Flat-fee work shown as numbered sections: the fee table under them (one or more pieces of work). */
 export const FEE_SUMMARY_HEADING = "Legal Fee Summary";
 export const FEE_SUMMARY_COLUMNS = ["Scope of Services", "Estimated Hours", "Legal Fees"] as const;
 export const FEE_SUMMARY_TOTAL = "Total";

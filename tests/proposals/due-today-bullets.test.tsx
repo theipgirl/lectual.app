@@ -314,12 +314,17 @@ describe("flat-fee work as numbered sections", () => {
     expect(s.total).toEqual({ label: "Total", hours: "—", fees: "$1,100" });
   });
 
-  it("one item: sections but no summary table; figures omit what the item lacks", () => {
+  it("one item: sections and a one-row summary table with its Total; figures omit what the item lacks", () => {
     const c = withSections();
     c.general!.items = [c.general!.items[0]];
     const html = renderGeneral(c, "live");
     expect(html).toContain("cp-work-sec");
-    expect(html).not.toContain("Legal Fee Summary");
+    expect((html.match(/Legal Fee Summary/g) ?? []).length).toBe(1);
+    const s = feeSummary(quoteProposal(c, {}), money)!;
+    expect(s.rows).toHaveLength(1);
+    expect(s.total.label).toBe("Total");
+    expect(s.total.hours).toBe(s.rows[0].hours);
+    expect(s.total.fees).toBe(s.rows[0].fees);
     expect(sectionFigures({ hours: 5, value_cents: 247_500 }, money)).toBe("(5 Hours | $2,475)");
     expect(sectionFigures({ hours: 1, value_cents: 0 }, money)).toBe("(1 Hour)");
     expect(sectionFigures({ value_cents: 247_500 }, money)).toBe("($2,475)");
