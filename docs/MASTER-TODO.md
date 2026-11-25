@@ -17,7 +17,12 @@ Newest section first. Tick an item when it is done; don't delete it.
 - [ ] Annick trademark draft v2 (https://app.lectual.app/dashboard/proposals/daaa4fe6-f4f7-474d-8646-480879f0d171/): Black Friday, Essential,
       Enhanced or Concierge per mark, 50% due today. Check, Save and create link.
 - [ ] Send Annick the contract email with the deposit sentence (your send, from Outlook).
-- [ ] Tell Claude the two Black Friday pay links, or choose: two proposals now, or build a pay link per package.
+- [ ] Tell Claude the two Black Friday pay links, or choose: two proposals now, or build a pay link per package. (Tabled: pay link per package
+      is on the build list below.)
+- [x] GC agent (lectual.app#38): a non-trademark consult now drafts a flat-fee proposal + email for approval. Fees only from Rebecca's own
+      words on the call; otherwise a "Set the flat fee" check blocks the link.
+- [ ] Add credits to the Anthropic account behind ANTHROPIC_API_KEY (lectual-app on Vercel), then re-run "Draft the proposal" on that consult.
+- [ ] Kika Wise (Black Box Franchising): follow-up reply-all draft is in info@ Drafts. Review and send.
 
 ## 2026-11-24: Annick Charles proposal (Black Friday), next proposal-maker build list
 
