@@ -1,7 +1,12 @@
 -- =====================================================================================================================
--- PROPOSAL ONLY. NOT A MIGRATION OF THIS REPO. NOT APPLIED ANYWHERE (not lectual-dev, not lectual-prod).
+-- NOT A MIGRATION OF THIS REPO. Applied to lectual-dev (first copy, then 0119b); NOT applied to lectual-prod.
 -- =====================================================================================================================
--- 0119_editable_views.sql (proposed): firm-wide view layouts, stage roles, and owner-only stage functions.
+-- 0119_editable_views.sql: firm-wide view layouts, stage roles, and owner-only stage functions.
+-- STATUS: the first copy of this file was applied to lectual-dev at lectual.app c46913f (recorded there as 0119_editable_views), then
+-- brought to this file's exact definitions by 0119b (0119b-proposed.sql.txt, dev only). THIS FILE IS THE FINAL ONE FOR A FRESH APPLY ON
+-- lectual-prod, which is untouched. Needs the owner's OK. It is pure ASCII: every character that is not ASCII is built with chr().
+-- Revised after the step 3 review: the Weekly review List has one layout per section (view keys review_list_trademarks and
+-- review_list_contracts; there is no review_list), because the two sections head `client` and `mark` differently.
 -- Revised after the step 2 review: the layout label CHECK now refuses leading / trailing Unicode whitespace and C1 controls explicitly,
 -- the same rule as lectual.app's parseLayout (see crm_view_layout_column_valid).
 --
@@ -34,7 +39,7 @@
 -- database without 0115 still applies), 0116 (APPLIED 2026-11-23: an owner membership row can only be made by a real owner, which is
 -- what makes "an owner membership row" a trustworthy gate here).
 --
--- ── WHAT IT ADDS ────────────────────────────────────────────────────────────────────────────────────────────────────
+-- -- WHAT IT ADDS ----------------------------------------------------------------------------------------------------
 --   crm_view_layout              one row per firm and view key: an ordered jsonb list of columns {key, label, hidden, width}. Members
 --                                read; only a REAL owner (membership row) writes. Firm-wide: no user column, no per-user rows.
 --   crm_stage.role               nullable, fixed list (STAGE ROLES), unique per firm, set only by this file's back-fill and by Lectual
@@ -46,7 +51,7 @@
 --   crm_stage_roles_backfill(p_org, p_dry_run)  the one-time back-fill, kept so Lectual can run it for a firm later (service role only).
 --   Helpers: crm_stage_name_key, crm_matter_stage_label_key, crm_view_layout_columns_valid (pure); the rest are internal.
 --
--- ── WHAT IT CHANGES (each is narrowing, none drops an object or a row) ───────────────────────────────────────────────
+-- -- WHAT IT CHANGES (each is narrowing, none drops an object or a row) -----------------------------------------------
 --   1. crm_lead_merge_guard (0107) is REPLACED (create or replace) with 0107's body verbatim plus ONE branch: inside
 --      crm_stage_delete only, a merged lead parked in the stage being deleted may have current_stage_id (and nothing else) moved to
 --      the destination. See MERGED LEADS. PRE-APPLY CHECK 2 compares the live body with 0107's first.
@@ -84,8 +89,8 @@
 --      field's own section (trademarks / contracts / both) already decides which records it applies to, and which views show it is
 --      exactly what the layout says, so a join table would be a second place to say the same thing.
 --
--- ── VIEW LAYOUTS ────────────────────────────────────────────────────────────────────────────────────────────────────
---   view_key in: review_list, review_board, matters_list, matters_board, contracts_list, contracts_board, leads_list, leads_board.
+-- -- VIEW LAYOUTS ----------------------------------------------------------------------------------------------------
+--   view_key in: review_list_trademarks, review_list_contracts, review_board, matters_list, matters_board, contracts_list, contracts_board, leads_list, leads_board.
 --   columns: a jsonb ARRAY of 1..80 objects, keys exactly from {key, label, hidden, width}:
 --     key     required. A built-in column key, ^[a-z][a-z0-9_]{0,39}$ (the app's fixed keys; the database does not know which keys a
 --             view has: an unknown built-in key is the app's to ignore), or `cf:<uuid>` naming one of THIS firm's crm_custom_field rows
@@ -102,7 +107,7 @@
 --   Grants: authenticated SELECT, DELETE, INSERT (org_id, view_key, columns), UPDATE (columns). rev, updated_by, updated_at,
 --   created_at and id have no write grant: the trigger stamps them (updated_by = auth.uid(), null = the system, as 0085).
 --
--- ── STAGE ROLES ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- -- STAGE ROLES -----------------------------------------------------------------------------------------------------
 -- A role is a fixed tag a RULE reads instead of a stage's name, so a rename or reorder changes nothing a rule does. Every role below
 -- exists because a rule in lectual.app finds a stage by NAME today (file named). Roles are never typed in the UI.
 --
@@ -131,9 +136,9 @@
 --   consult_scheduled  reader: Stage Keeper consult-scheduled (src/lib/agents/stage-keeper/mapping.ts DEFAULT_STAGE_NAMES; consult-prep
 --                      and Reconcile's consult_scheduled use the same list): resolve "Consultation Scheduled", "Consult Scheduled",
 --                      "Consult Booked", "Strategy Session Scheduled", "Discovery Call Scheduled".
---   consult_held       readers: Stage Keeper consult-held: resolve "Consult Held – Proposal in Progress", "Consult Held", "Consultation
+--   consult_held       readers: Stage Keeper consult-held: resolve "Consult Held - Proposal in Progress", "Consult Held", "Consultation
 --                      Held", "Consult Completed", else (the code's own fallback) the consult_scheduled stage; AND Reconcile's
---                      consult_held: resolve "Consult Held – Proposal in Progress", "Consultation Held", "Consult Held", "Consultation
+--                      consult_held: resolve "Consult Held - Proposal in Progress", "Consultation Held", "Consult Held", "Consultation
 --                      Completed", "Consult Completed", "Consultation Complete". The lists differ in order; both must agree.
 --   questionnaire_sent reader: Stage Keeper questionnaire-sent = Reconcile questionnaire_sent: "Questionnaire Sent", "Intake Questionnaire
 --                      Sent", "Questionnaire".
@@ -175,7 +180,7 @@
 -- application_filed, oa_issued, awaiting_registration and publication sit on OPEN stages only; registered and abandoned on CLOSED
 -- stages only (stage_role_category_mismatch). The back-fill skips a pick that breaks it.
 --
--- ── STAGE FUNCTIONS: SHARED RULES ───────────────────────────────────────────────────────────────────────────────────
+-- -- STAGE FUNCTIONS: SHARED RULES -----------------------------------------------------------------------------------
 --   * Caller: an OWNER MEMBERSHIP ROW (crm_org_member: org_id = current_org_id(), user_id = auth.uid(), role = 'owner'). Never the
 --     claim, so a platform admin (0050) inside a firm is refused like a paralegal (stage_not_owner). No session = stage_not_owner.
 --   * The firm is always current_org_id(); there is no org argument. A stage id of another firm reads exactly like a missing one
@@ -202,7 +207,7 @@
 --     from_label, to_code, to_label, plus from_stage_id / to_stage_id), actor_type user, actor_id auth.uid(), plus
 --     reason 'stage deleted' and stage_deleted true. last_activity_at is NOT touched (lists sort on it; the cleanup script's rule).
 --
--- ── DELETE WITH MOVE ────────────────────────────────────────────────────────────────────────────────────────────────
+-- -- DELETE WITH MOVE ------------------------------------------------------------------------------------------------
 --   In ONE transaction: lock the stage, lock every record in it, compare the SET of live record ids (leads: merged_into_id is null;
 --   matters: all, any status) with p_expected_ids (exactly the records the dialog showed; an empty stage takes '{}'). Any difference,
 --   in count or in which records, is stage_delete_records_changed and nothing is written: a count alone cannot see one lead moving
@@ -230,7 +235,7 @@
 --   explicitly whether stage_changed rules fire (recommended: not, since nobody chose a new stage for these leads). The Working
 --   rule and any reader that counts "a person moved this lead" must skip rows whose payload has stage_deleted = true.
 --
--- ── MERGED LEADS (0107) ─────────────────────────────────────────────────────────────────────────────────────────────
+-- -- MERGED LEADS (0107) ---------------------------------------------------------------------------------------------
 --   A merged lead keeps its current_stage_id forever and 0107's guard refuses ANY update of it, so a stage holding a merged
 --   duplicate could never be deleted (the FK is NO ACTION) and an owner would be blocked by a record the app does not even show.
 --   Rule chosen: merged leads do not block and are not in p_expected_ids. crm_stage_delete moves them to the destination with
@@ -244,20 +249,20 @@
 --   '<old.current_stage_id>><new.current_stage_id>' (set by crm_stage_delete just before, cleared just after), and nothing but
 --   current_stage_id differs (to_jsonb(new) - 'current_stage_id' = to_jsonb(old) - 'current_stage_id'). Every 0107 behaviour is
 --   unchanged. Same limit as 0107: a session running AS the function owner (postgres: dashboard SQL, migrations) can set the marker,
---   and so could any OTHER postgres-owned SECURITY DEFINER function that calls set_config('lectual.…', <caller's argument>):
+--   and so could any OTHER postgres-owned SECURITY DEFINER function that calls set_config('lectual....', <caller's argument>):
 --   PRE-APPLY CHECK 9 looks for one.
 --   Not chosen: refusing the delete (an owner blocked by an invisible row); moving them to the keeper's stage (each merged lead would
 --   land somewhere different, and the keeper's stage might be the one being deleted); a soft-deleted "archived" stage (every stage
 --   read in both apps would have to learn to hide it).
 --
--- ── PHASE (crm_matter_stage.phase) ──────────────────────────────────────────────────────────────────────────────────
+-- -- PHASE (crm_matter_stage.phase) ----------------------------------------------------------------------------------
 --   lectual.app reads crm_matter_stage.phase (pipeline, pre_filing, post_filing, maintenance, inactive; phase-group.ts), which is on
 --   lectual-prod (checked Nov 17, AGENTS.md "Matters: only matters past Signed LOE") but is NOT created by any migration in lectual's
 --   main. This file never creates it. crm_matter_stage_add takes an optional p_phase and writes it, cast to the column's own type,
 --   only when the column exists; a phase given on a database without the column is matter_stage_phase_unavailable. The UPDATE grant
 --   on `phase` is kept for authenticated when the column exists (today's admin-tier edit is not narrowed). PRE-APPLY CHECK 4.
 --
--- ── ERROR PREFIXES ──────────────────────────────────────────────────────────────────────────────────────────────────
+-- -- ERROR PREFIXES --------------------------------------------------------------------------------------------------
 --   42501: stage_not_owner, stage_not_found, stage_delete_bad_destination, stage_role_guarded, stage_owner_only, stage_code_fixed
 --   23505: stage_name_taken
 --   22023: stage_bad_name, stage_bad_position, stage_bad_category, stage_delete_bad_ids, stage_delete_needs_destination,
@@ -271,7 +276,7 @@
 --          plain 42501 "new row violates row-level security policy" or 0 rows.
 --   The app reads these by prefix and shows fixed sentences, never the database text.
 --
--- ── PRE-APPLY CHECKS (read-only; run on each project first) ──────────────────────────────────────────────────────────
+-- -- PRE-APPLY CHECKS (read-only; run on each project first) ----------------------------------------------------------
 --   1. Dependencies present (expect four non-null values and one trigger row):
 --        select to_regprocedure('public.crm_merge_leads(uuid,uuid,jsonb)'), to_regclass('public.crm_custom_field'),
 --               to_regclass('public.crm_view_layout') is null as layout_absent,
@@ -300,12 +305,13 @@
 --      after this file only an owner can create, rename, reorder, re-categorise or delete there. lectual.app has no such writer in use.
 --   8. After applying parts 1-8 only, review what the back-fill would write before part 9 (no write):
 --        select o.name, public.crm_stage_roles_backfill(o.id, true) from crm_org o order by 1;
---   9. No OTHER postgres-owned function can set a `lectual.` marker from its caller's input (expect only crm_merge_leads and, after
---      apply, crm_stage_delete, each setting it from a value it read itself):
+--   9. No OTHER postgres-owned function can set a `lectual.` marker from its caller's input (expect crm_merge_leads; 0106's two
+--      functions (the sign-and-accept function and the template approve trigger function), which call set_config('lectual.loe_*', ...)
+--      with FIXED names and values they read themselves; and, after apply, crm_stage_delete, each setting it from a value it read itself):
 --        select p.oid::regprocedure, pg_get_userbyid(p.proowner) from pg_proc p
 --         where p.prosrc ilike '%set_config(%lectual.%' order by 1;
 --
--- ── APPLYING IT ──────────────────────────────────────────────────────────────────────────────────────────────────────
+-- -- APPLYING IT ------------------------------------------------------------------------------------------------------
 -- Additive and idempotent (if not exists, create or replace, do $$ blocks that test pg_constraint / pg_trigger / pg_policies first,
 -- 0103's form). No drop of any existing object, no delete of any row, no grant revoked from a signed-in role except TRUNCATE /
 -- REFERENCES / TRIGGER / MAINTAIN; the only row writes are part 9's role back-fill (an UPDATE of crm_stage.role /
@@ -317,7 +323,7 @@
 --   6 internal helpers  7 grants and owner policies  8 stage functions  9 back-fill  10 0115 restrictive policies  11 comments
 -- Dev first; run the cases at the end of this file there; prod only with the owner's OK.
 --
--- ── APP SIDE (lectual.app, build steps 2-7) ─────────────────────────────────────────────────────────────────────────
+-- -- APP SIDE (lectual.app, build steps 2-7) -------------------------------------------------------------------------
 --   * Until applied: crm_view_layout is missing (42P01 / PGRST205: "not set up", the default layout, no structure controls); the stage
 --     functions are missing (42883 / PGRST202: no stage controls); `role` is missing (42703 / PGRST204: every rule keeps its name
 --     match). Read by error CODE only. Every rule reads: brain entry (where it has one) -> role -> today's name rule -> fallback.
@@ -331,7 +337,7 @@
 -- =====================================================================================================================
 
 
--- ── 1. Pure helpers ─────────────────────────────────────────────────────────────────────────────────────────────────
+-- -- 1. Pure helpers -------------------------------------------------------------------------------------------------
 -- lectual.app normalizeStageName (src/lib/lawmatics/stage-map.ts), exactly. Pure; execute stays with PUBLIC.
 create or replace function public.crm_stage_name_key(p_name text)
 returns text
@@ -356,7 +362,7 @@ set search_path = ''
 as $$
   select pg_catalog.lower(pg_catalog.btrim(pg_catalog.regexp_replace(
     case when x.s = '' then pg_catalog.btrim(coalesce(p_label, '')) else x.s end, '\s+', ' ', 'g')))
-  from (select pg_catalog.btrim(pg_catalog.regexp_replace(coalesce(p_label, ''), '^\s*\d+[A-Za-z]?(\s*[.·:)–-]\s*|\s+)', '')) as s) x
+  from (select pg_catalog.btrim(pg_catalog.regexp_replace(coalesce(p_label, ''), ('^\s*\d+[A-Za-z]?(\s*[.' || pg_catalog.chr(183) || ':)' || pg_catalog.chr(8211) || '-]\s*|\s+)'), '')) as s) x
 $$;
 
 -- One layout column. Pure; CASE chains so nothing is cast or expanded before its type is known.
@@ -366,6 +372,17 @@ language plpgsql
 immutable
 set search_path = ''
 as $$
+declare
+  -- Built with chr() so this body is pure ASCII and survives any transport (dev's first copy had its escapes turned into literal
+  -- invisible characters in transit). Space-like: tab, LF, CR, FF, VT, U+00A0, U+1680, U+2000-200A, U+2028, U+2029, U+202F, U+205F,
+  -- U+3000, U+FEFF. Controls: U+0001-001F, U+007F-009F. Invisible marks: U+200B-200F, U+202A-202E, U+2066-2069.
+  v_space text := '[ ' || pg_catalog.chr(9) || pg_catalog.chr(10) || pg_catalog.chr(13) || pg_catalog.chr(12) || pg_catalog.chr(11)
+                  || pg_catalog.chr(160) || pg_catalog.chr(5760) || pg_catalog.chr(8192) || '-' || pg_catalog.chr(8202)
+                  || pg_catalog.chr(8232) || pg_catalog.chr(8233) || pg_catalog.chr(8239) || pg_catalog.chr(8287)
+                  || pg_catalog.chr(12288) || pg_catalog.chr(65279) || ']';
+  v_ctl   text := '[' || pg_catalog.chr(1) || '-' || pg_catalog.chr(31) || pg_catalog.chr(127) || '-' || pg_catalog.chr(159) || ']';
+  v_inv   text := '[' || pg_catalog.chr(8203) || '-' || pg_catalog.chr(8207) || pg_catalog.chr(8234) || '-' || pg_catalog.chr(8238)
+                  || pg_catalog.chr(8294) || '-' || pg_catalog.chr(8297) || ']';
 begin
   if pg_catalog.jsonb_typeof(p) is distinct from 'object' then return false; end if;
   if exists (select 1 from pg_catalog.jsonb_object_keys(p) k where k not in ('key', 'label', 'hidden', 'width')) then return false; end if;
@@ -380,10 +397,10 @@ begin
        or pg_catalog.char_length(p ->> 'label') not between 1 and 60
        -- Revised after the step 2 review: the rule is written out character by character, never through the locale-dependent POSIX classes
        -- (control and space), so the app's parseLayout (src/lib/views/layout/validate.ts) and this CHECK accept exactly the same labels.
-       or (p ->> 'label') ~ '^[ \t\n\r\f\v\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF]'
-       or (p ->> 'label') ~ '[ \t\n\r\f\v\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF]$'
-       or (p ->> 'label') ~ '[\u0001-\u001F\u007F-\u009F]'
-       or (p ->> 'label') ~ '[\u200B-\u200F\u202A-\u202E\u2066-\u2069]' then
+       or (p ->> 'label') ~ ('^' || v_space)
+       or (p ->> 'label') ~ (v_space || '$')
+       or (p ->> 'label') ~ v_ctl
+       or (p ->> 'label') ~ v_inv then
       return false;
     end if;
   end if;
@@ -413,7 +430,7 @@ end
 $$;
 
 
--- ── 2. crm_view_layout ─────────────────────────────────────────────────────────────────────────────────────────────
+-- -- 2. crm_view_layout ---------------------------------------------------------------------------------------------
 create table if not exists public.crm_view_layout (
   id          uuid        primary key default gen_random_uuid(),
   org_id      uuid        not null references public.crm_org(id) on delete cascade,
@@ -425,7 +442,7 @@ create table if not exists public.crm_view_layout (
   updated_at  timestamptz not null default now(),
   created_at  timestamptz not null default now(),
   constraint crm_view_layout_view_key check (view_key in (
-    'review_list', 'review_board', 'matters_list', 'matters_board',
+    'review_list_trademarks', 'review_list_contracts', 'review_board', 'matters_list', 'matters_board',
     'contracts_list', 'contracts_board', 'leads_list', 'leads_board')),
   constraint crm_view_layout_columns check (public.crm_view_layout_columns_valid(columns)),
   constraint crm_view_layout_rev check (rev >= 1),
@@ -551,7 +568,7 @@ end
 $$;
 
 
--- ── 3. Stage role columns ───────────────────────────────────────────────────────────────────────────────────────────
+-- -- 3. Stage role columns -------------------------------------------------------------------------------------------
 alter table public.crm_stage add column if not exists role text null;
 alter table public.crm_matter_stage add column if not exists role text null;
 
@@ -575,7 +592,7 @@ create unique index if not exists crm_stage_org_role_uniq on public.crm_stage (o
 create unique index if not exists crm_matter_stage_org_role_uniq on public.crm_matter_stage (org_id, role) where role is not null;
 
 
--- ── 4. Role and structure triggers ──────────────────────────────────────────────────────────────────────────────────
+-- -- 4. Role and structure triggers ----------------------------------------------------------------------------------
 -- Roles: signed-in callers cannot write `role` (stage_role_guarded); every caller obeys the role / category (lead) and role / open
 -- (matter) pairings and "a role holder is not deleted" (clear, drop or move the role first; the delete functions do).
 -- Structure (WHAT IT CHANGES 2): a signed-in caller without an owner membership row cannot change a structural column
@@ -692,7 +709,7 @@ end
 $$;
 
 
--- ── 5. crm_lead_merge_guard: 0107's body verbatim, plus the stage-delete branch (marked 0119) ────────────────────────
+-- -- 5. crm_lead_merge_guard: 0107's body verbatim, plus the stage-delete branch (marked 0119) ------------------------
 create or replace function public.crm_lead_merge_guard()
 returns trigger
 language plpgsql
@@ -778,7 +795,7 @@ revoke all on function public.crm_lead_merge_guard() from public, anon, authenti
 -- The trigger itself (0107: crm_lead_merge_guard, before insert or update or delete) is unchanged and not re-created.
 
 
--- ── 6. Internal helpers (called only from the functions in part 8; no execute for any API role) ─────────────────────
+-- -- 6. Internal helpers (called only from the functions in part 8; no execute for any API role) ---------------------
 create or replace function public.crm_stage_require_owner()
 returns uuid
 language plpgsql
@@ -806,9 +823,12 @@ set search_path = ''
 as $$
 declare
   v text := pg_catalog.btrim(coalesce(p_name, ''));
+  -- U+200B-200F, U+202A-202E, U+2066-2069, built with chr() so this body is pure ASCII.
+  v_inv text := '[' || pg_catalog.chr(8203) || '-' || pg_catalog.chr(8207) || pg_catalog.chr(8234) || '-' || pg_catalog.chr(8238)
+                || pg_catalog.chr(8294) || '-' || pg_catalog.chr(8297) || ']';
 begin
   if pg_catalog.char_length(v) not between 1 and p_max or v ~ '[[:cntrl:]]'
-     or v ~ '[\u200B-\u200F\u202A-\u202E\u2066-\u2069]' then
+     or v ~ v_inv then
     raise exception 'stage_bad_name: a stage name is 1 to % characters with no control or invisible characters', p_max using errcode = '22023';
   end if;
   return v;
@@ -971,7 +991,7 @@ revoke all on function public.crm_matter_stage_ordered_ids(uuid, uuid) from publ
 revoke all on function public.crm_stage_backfill_resolve(uuid, text[], boolean, boolean) from public, anon, authenticated, service_role;
 
 
--- ── 7. Grants and owner policies on the two stage tables (WHAT IT CHANGES 2) ────────────────────────────────────────
+-- -- 7. Grants and owner policies on the two stage tables (WHAT IT CHANGES 2) ----------------------------------------
 -- No INSERT / UPDATE / DELETE grant is revoked (lectual's own settings write these tables as a signed-in owner).
 revoke truncate, references, trigger on public.crm_stage from anon, authenticated;
 revoke truncate, references, trigger on public.crm_matter_stage from anon, authenticated;
@@ -1008,7 +1028,7 @@ end
 $$;
 
 
--- ── 8. Stage functions ──────────────────────────────────────────────────────────────────────────────────────────────
+-- -- 8. Stage functions ----------------------------------------------------------------------------------------------
 -- Locking (header): the per-firm advisory lock serializes these functions; only the stage being changed (and on delete its records)
 -- is row-locked up front. The part 4 trigger does not judge these functions (they run as the table owner, not `authenticated`).
 -- 8a. Lead stages (crm_stage).
@@ -1338,7 +1358,7 @@ begin
 
   -- The code: never changes after this (see header).
   v_base := pg_catalog.upper(pg_catalog.left(pg_catalog.regexp_replace(
-              pg_catalog.regexp_replace(v_label, '^\s*\d+[A-Za-z]?(\s*[.·:)–-]\s*|\s+)', ''), '[^A-Za-z0-9]+', '', 'g'), 12));
+              pg_catalog.regexp_replace(v_label, ('^\s*\d+[A-Za-z]?(\s*[.' || pg_catalog.chr(183) || ':)' || pg_catalog.chr(8211) || '-]\s*|\s+)'), ''), '[^A-Za-z0-9]+', '', 'g'), 12));
   if v_base = '' then
     v_base := 'STAGE';
   elsif v_base ~ '^[0-9]' then
@@ -1567,7 +1587,7 @@ grant execute on function public.crm_matter_stage_set_open(uuid, boolean) to aut
 grant execute on function public.crm_matter_stage_delete(uuid, uuid, uuid[], uuid, boolean) to authenticated;
 
 
--- ── 9. The role back-fill ───────────────────────────────────────────────────────────────────────────────────────────
+-- -- 9. The role back-fill -------------------------------------------------------------------------------------------
 -- One firm at a time. Writes a role only where the role is free in the firm AND the stage holds none (never overwrites what
 -- Lectual set). p_dry_run = true writes nothing and returns what it would write. Service role only (Lectual runs it for a new firm).
 create or replace function public.crm_stage_roles_backfill(p_org uuid, p_dry_run boolean default false)
@@ -1620,9 +1640,9 @@ begin
 
   -- consult_held: the Stage Keeper (with its fallback to the scheduled stage) and Reconcile must agree.
   v_ch_sk := coalesce(public.crm_stage_backfill_resolve(p_org,
-    array['Consult Held – Proposal in Progress', 'Consult Held', 'Consultation Held', 'Consult Completed'], true, false), v_cs);
+    array[('Consult Held ' || pg_catalog.chr(8211) || ' Proposal in Progress'), 'Consult Held', 'Consultation Held', 'Consult Completed'], true, false), v_cs);
   v_ch_r := public.crm_stage_backfill_resolve(p_org,
-    array['Consult Held – Proposal in Progress', 'Consultation Held', 'Consult Held', 'Consultation Completed', 'Consult Completed',
+    array[('Consult Held ' || pg_catalog.chr(8211) || ' Proposal in Progress'), 'Consultation Held', 'Consult Held', 'Consultation Completed', 'Consult Completed',
           'Consultation Complete'], true, false);
   if v_ch_r is not null and v_ch_r = v_ch_sk then
     v_pick := v_pick || pg_catalog.jsonb_build_object('consult_held', v_ch_r);
@@ -1740,7 +1760,7 @@ end
 $$;
 
 
--- ── 10. 0115: field definitions become owner-only to create and change (WHAT IT CHANGES 3) ──────────────────────────
+-- -- 10. 0115: field definitions become owner-only to create and change (WHAT IT CHANGES 3) --------------------------
 do $$
 begin
   if pg_catalog.to_regclass('public.crm_custom_field') is null then
@@ -1770,7 +1790,7 @@ end
 $$;
 
 
--- ── 11. Comments ────────────────────────────────────────────────────────────────────────────────────────────────────
+-- -- 11. Comments ----------------------------------------------------------------------------------------------------
 comment on table public.crm_view_layout is
   '0119: a firm''s layout of one List or Board: ordered columns {key, label, hidden, width}. Firm-wide. Members read; only an owner membership row writes. rev guards against a stale form.';
 comment on column public.crm_stage.role is
@@ -1784,7 +1804,7 @@ comment on function public.crm_matter_stage_delete(uuid, uuid, uuid[], uuid, boo
 comment on function public.crm_stage_roles_backfill(uuid, boolean) is
   '0119: writes stage roles where every rule that reads one already picks that stage by name. Never overwrites. Service role only.';
 
--- ── KNOWN LIMITS ───────────────────────────────────────────────────────────────────────────────────────────────────
+-- -- KNOWN LIMITS ---------------------------------------------------------------------------------------------------
 --   * Deadlocks: a person's lead move into the stage being deleted (row lock on the lead, then the FK's KEY SHARE on the stage) and
 --     crm_stage_delete (the stage FOR UPDATE, then its leads) can deadlock; Postgres aborts one with 40P01 after deadlock_timeout and
 --     the app retries once, then says a fixed sentence. A move that loses to the delete fails with 23503 on the FK (the stage is gone):
@@ -1806,7 +1826,7 @@ comment on function public.crm_stage_roles_backfill(uuid, boolean) is
 --   * A platform admin inside a firm has no owner row: no layout writes, no stage functions or structural stage writes, no
 --     firm-column definitions there.
 
--- ── MIGRATION-TEXT CASES (a new lectual tests/editable-views.test.ts, always run) ─────────────────────────────────────
+-- -- MIGRATION-TEXT CASES (a new lectual tests/editable-views.test.ts, always run) -------------------------------------
 --   T1. Every error prefix in the header is raised somewhere in the file, and every one is listed in lectual AGENTS.md's 0119 section.
 --   T2. Part 5's crm_lead_merge_guard body equals 0107's body line for line except the lines marked 0119 (declare v_move, and the
 --       one `if tg_op = 'UPDATE' and old.merged_into_id is not null` block placed before "Only inside crm_merge_leads"), and that
@@ -1818,7 +1838,7 @@ comment on function public.crm_stage_roles_backfill(uuid, boolean) is
 --   T4. crm_stage_require_owner and crm_stage_is_owner_row read crm_org_member with m.role = 'owner' and never call
 --       current_org_role(). No `revoke insert`, `revoke update` or `revoke delete` on crm_stage / crm_matter_stage.
 --   T5. crm_stage_name_key and crm_matter_stage_label_key: a table of inputs pinned against lectual.app normalizeStageName and
---       compare.ts normalise ("4. Follow up" -> "follow up", "LOE & Invoice Sent" -> "loe and invoice sent", "Consult Held – Proposal in
+--       compare.ts normalise ("4. Follow up" -> "follow up", "LOE & Invoice Sent" -> "loe and invoice sent", "Consult Held - Proposal in
 --       Progress" -> "consult held proposal in progress", "19A. OA Issued" -> "oa issued", "17 Application Filed" -> "application
 --       filed", "17." -> "17."). Run on a database in the DB block; the text test checks the regexes match the app's.
 --   T6. The alias jsonb in crm_stage_backfill_resolve equals ALIASES, and the back-fill's candidate lists equal
@@ -1829,7 +1849,7 @@ comment on function public.crm_stage_roles_backfill(uuid, boolean) is
 --   T8. crm_view_layout: grants are select, delete, insert (org_id, view_key, columns), update (columns); no policy names
 --       current_org_role.
 
--- ── CASES FOR lectual tests/tenant-isolation.test.ts (fail until applied) ─────────────────────────────────────────────
+-- -- CASES FOR lectual tests/tenant-isolation.test.ts (fail until applied) ---------------------------------------------
 -- Fixtures: firm A (owner OA, admin AD, senior_admin SA, paralegal PA, viewer VA), firm B (owner OB). LS: a platform admin acting in A
 -- (claim owner, no row). A's lead stages: "Potential New Client" (open), "Consult Held" (open), "Follow-Up" (open), "Signed LOE /
 -- Deposit Received" (won), "Lost" (lost); A's matter stages: '7' "Signed LOE / Deposit Received" (open), '17' "17. Application Filed"
@@ -1910,7 +1930,7 @@ comment on function public.crm_stage_roles_backfill(uuid, boolean) is
 --  24. Isolation regression: the existing 0016 / 0042 / 0105 / 0107 cases, with a signed-in ADMIN's stage insert / delete /
 --      structural update now refused (use an owner where a case needs the write to succeed).
 
--- ── SQL TO RUN IN A ROLLED-BACK TRANSACTION ON lectual-dev (after applying) ───────────────────────────────────────────
+-- -- SQL TO RUN IN A ROLLED-BACK TRANSACTION ON lectual-dev (after applying) -------------------------------------------
 -- Uses throwaway rows; nothing survives the rollback. `:x` are psql variables the operator sets to fresh uuids. Each refusal is in
 -- its own savepoint (rolled back). The claims mirror 0002: active_org_id and org_role; sub is the user id.
 --
@@ -1953,7 +1973,7 @@ comment on function public.crm_stage_roles_backfill(uuid, boolean) is
 --   rollback to savepoint c8;
 --   update crm_stage set aging_threshold_days = 9 where id = :s_fu;             -- 1 row
 --   savepoint c9; insert into crm_view_layout (org_id, view_key, columns)
---     values (:a, 'review_list', '[{"key":"client","hidden":false}]');          -- 42501 (RLS)
+--     values (:a, 'review_list_trademarks', '[{"key":"client","hidden":false}]');          -- 42501 (RLS)
 --   rollback to savepoint c9;
 --   select set_config('request.jwt.claims', json_build_object('sub', :'ob', 'role', 'authenticated', 'active_org_id', :'b', 'org_role', 'owner')::text, true);
 --   select count(*) from crm_view_layout where org_id = :a;                     -- 0

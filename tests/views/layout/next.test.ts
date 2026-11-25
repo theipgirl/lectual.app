@@ -143,3 +143,23 @@ describe("moveColumnTo", () => {
     expect(moveColumnTo(base(), "mark", 1.5)).toEqual({ ok: false, reason: "nothing-to-move" });
   });
 });
+
+describe("moveColumnBeside (Move left / right go beside the VISIBLE neighbour)", () => {
+  it("places the column beside a named one, past columns that are not drawn", async () => {
+    const { moveColumnBeside } = await import("@/lib/views/layout/next");
+    const l: Layout = [c("client"), c("a"), c("hidden_other", { hidden: true }), c("b"), c("other_section"), c("d")];
+    expect(keys(ok(moveColumnBeside(l, "d", "b", "right")))).toEqual(["client", "a", "hidden_other", "b", "d", "other_section"]);
+    expect(keys(ok(moveColumnBeside(l, "b", "a", "left")))).toEqual(["client", "b", "a", "hidden_other", "other_section", "d"]);
+  });
+  it("both keys must be in the layout; a pinned column doesn't move and nothing goes left of it; no change is no move", async () => {
+    const { moveColumnBeside } = await import("@/lib/views/layout/next");
+    const l: Layout = [c("client"), c("a"), c("b")];
+    expect(moveColumnBeside(l, "a", "gone", "left")).toEqual({ ok: false, reason: "unknown-column" });
+    expect(moveColumnBeside(l, "gone", "a", "left")).toEqual({ ok: false, reason: "unknown-column" });
+    expect(moveColumnBeside(l, "client", "b", "right", ["client"])).toEqual({ ok: false, reason: "pinned" });
+    expect(moveColumnBeside(l, "b", "client", "left", ["client"])).toEqual({ ok: false, reason: "pinned" });
+    expect(moveColumnBeside(l, "a", "b", "left")).toEqual({ ok: false, reason: "nothing-to-move" });
+    expect(moveColumnBeside(l, "a", "a", "left")).toEqual({ ok: false, reason: "nothing-to-move" });
+    expect(l.map((x) => x.key)).toEqual(["client", "a", "b"]);
+  });
+});

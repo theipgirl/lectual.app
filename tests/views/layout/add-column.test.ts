@@ -3,7 +3,7 @@ import { addColumn, type AddColumnDeps } from "@/lib/views/layout/add-column";
 import * as W from "@/lib/ui/words";
 
 const ID = "0A1B2C3D-0000-4000-8000-00000000F001";
-const input = { view: "review_list", rev: 2, relativeTo: "mark", side: "right", label: "Priority", section: "trademarks", kind: "text", choices: "" };
+const input = { view: "review_list_trademarks", rev: 2, relativeTo: "mark", side: "right", label: "Priority", section: "trademarks", kind: "text", choices: "" };
 
 function deps(over: Partial<AddColumnDeps> = {}) {
   return {
@@ -18,7 +18,7 @@ describe("Add a column: the field and its place, in one action", () => {
     const d = deps();
     expect(await addColumn(d, input)).toEqual({ ok: true, rev: 3, placed: true });
     expect(d.createField).toHaveBeenCalledWith({ label: "Priority", section: "trademarks", kind: "text", choices: "" });
-    expect(d.changeLayout).toHaveBeenCalledWith("review_list", { op: "insert", key: "cf:0a1b2c3d-0000-4000-8000-00000000f001", relativeTo: "mark", side: "right" }, 2);
+    expect(d.changeLayout).toHaveBeenCalledWith("review_list_trademarks", { op: "insert", key: "cf:0a1b2c3d-0000-4000-8000-00000000f001", relativeTo: "mark", side: "right" }, 2);
   });
   it("a refused field (the owner sentence, a clash, a bad kind) is the answer, and nothing is placed", async () => {
     const d = deps({ createField: vi.fn(async () => ({ state: { error: W.COLUMNS_NO_PERMISSION }, id: null })) });
@@ -39,6 +39,8 @@ describe("Add a column: the field and its place, in one action", () => {
   it("a bad view or side is refused before a field is made", async () => {
     const d = deps();
     expect((await addColumn(d, { ...input, view: "nope" })).ok).toBe(false);
+    // only a List section takes a new column: the Board and every other view are refused before createField
+    for (const view of ["review_board", "matters_list", "leads_list", "review_list"]) expect((await addColumn(d, { ...input, view })).ok, view).toBe(false);
     expect((await addColumn(d, { ...input, side: "up" })).ok).toBe(false);
     expect((await addColumn(d, { ...input, relativeTo: 4 })).ok).toBe(false);
     expect(d.createField).not.toHaveBeenCalled();

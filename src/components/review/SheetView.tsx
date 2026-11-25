@@ -5,7 +5,7 @@ import { documentsTag } from "@/lib/review/documents";
 import { laneOf } from "@/lib/review/lanes";
 import { sheetSections, waitingCell } from "@/lib/review/sheet";
 import { applyReviewLayout } from "@/lib/review/layout";
-import type { Layout } from "@/lib/views/layout/types";
+import type { SectionLayouts } from "@/lib/review/layout";
 import { FACT_COLUMN_IDS, NOTES_PRESENT, columnsFor, type ColumnId, type CustomStateLike, type SheetColumn, type SheetSectionId } from "@/lib/review/sheet-columns";
 import { factCells, type FactCell } from "@/lib/review/sheet-cells";
 import { customCells, noteStateOf, withoutMoney, type CustomColumnsState, type CustomMember } from "@/lib/custom-columns/rules";
@@ -93,8 +93,8 @@ function SheetSection({ id, title, rows, today, members, params, canWrite, colum
 export function SheetView({ rows, sheetEdit, canSeeMoney = false, canSeeCustomMoney = false, initialPrefs, layout = null, layoutEdit = null, custom: customIn = null, customMembers, adminTier = false, notes = null, ...common }: Common & {
   rows: ReviewRow[];
   /** The editable List: given for any role whose own permissions allow an edit (from the page's re-resolved role), in either look. Absent: the read-only List. */ sheetEdit?: { perms: SheetPerms };
-  /** The firm's saved column layout for this List (order, names, hidden, widths); null = the standard columns. */ layout?: Layout | null;
-  /** Given only for an owner, with an editable List: the column menu on each header (the page decides; the actions re-check). */ layoutEdit?: { rev: number | null } | null;
+  /** The firm's saved column layout for this List (order, names, hidden, widths); null = the standard columns. */ layout?: SectionLayouts | null;
+  /** Given only for an owner, with an editable List: the column menu on each header (the page decides; the actions re-check). */ layoutEdit?: { revs: Record<SheetSectionId, number | null> } | null;
   /** From the page's re-resolved role (`canSeeBilling`), never from the browser. */ canSeeMoney?: boolean;
   /** A REAL owner only (`canSeeCustomMoney(role, actingAsStaff)`): the firm's own Money columns. Never Lectual staff. */ canSeeCustomMoney?: boolean;
   /** Drawing-only starting column choices (a test or preview). */ initialPrefs?: PrefsDocument;
@@ -110,7 +110,7 @@ export function SheetView({ rows, sheetEdit, canSeeMoney = false, canSeeCustomMo
   const fields = custom?.status === "ok" ? custom.fields : [];
   const cells = custom?.status === "ok" ? customCells(rows, fields, custom, customMembers === undefined ? common.members : customMembers, common.today) : {};
   const noteState = noteStateOf(custom);
-  const columns = { trademarks: applyReviewLayout(columnsFor("trademarks", { canSeeMoney, canSeeCustomMoney, hasNotes: NOTES_PRESENT, customFields: fields }), layout), contracts: applyReviewLayout(columnsFor("contracts", { canSeeMoney, canSeeCustomMoney, hasNotes: NOTES_PRESENT, customFields: fields }), layout) };
+  const columns = { trademarks: applyReviewLayout(columnsFor("trademarks", { canSeeMoney, canSeeCustomMoney, hasNotes: NOTES_PRESENT, customFields: fields }), layout?.trademarks), contracts: applyReviewLayout(columnsFor("contracts", { canSeeMoney, canSeeCustomMoney, hasNotes: NOTES_PRESENT, customFields: fields }), layout?.contracts) };
   return (
     <div className="rv-sheets">
       <SheetSection id="trademarks" title="Trademarks" rows={trademarks} columns={columns.trademarks} initialPrefs={initialPrefs} custom={cells} noteState={noteState} adminTier={adminTier} notes={notes} {...common} />

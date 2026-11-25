@@ -4,14 +4,16 @@ import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { resolveFirmSession } from "@/lib/firm/session";
-import { createFieldWithId } from "@/lib/custom-columns/field-actions";
+import { createFieldWithId, updateField } from "@/lib/custom-columns/field-actions";
 import { isMissingTable } from "@/lib/custom-columns/errors";
 import { fieldStore, type StoreClient } from "@/lib/custom-columns/store";
 import { fieldDepsFor } from "@/lib/custom-columns/field-deps";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { reviewBoardBase, reviewListBase } from "@/lib/review/layout-base";
+import { REVIEW_LIST_VIEWS, isReviewListView, sectionOfListView } from "@/lib/review/layout";
 import type { CustomColumnField } from "@/lib/review/sheet-columns";
 import { addColumn, type AddColumnResult } from "./add-column";
+import { changeFirmColumn, type FirmColumnResult } from "./firm-column";
 import { readViewLayout } from "./load";
 import { loadOwnerState } from "./owner-load";
 import { changeLayout, type LayoutBase, type LayoutResult, type SaveDeps } from "./save";
@@ -28,13 +30,13 @@ const REVIEW_PATH = "/dashboard/review/";
 
 /** The columns an owner has for a view. Only the Weekly review's two views exist so far; any other view has none to change yet. */
 async function baseFor(view: ViewKey): Promise<LayoutBase | null> {
-  if (view === "review_list") {
+  if (isReviewListView(view)) {
     try {
       const db = (await getScopedClient()) as unknown as StoreClient;
-      return { defaults: reviewListBase((await fieldStore(db).readLiveFields()) as CustomColumnField[]) };
+      return { defaults: reviewListBase((await fieldStore(db).readLiveFields()) as CustomColumnField[], sectionOfListView(view)) };
     } catch (e) {
       // The firm's own columns aren't switched on: the List is the spreadsheet's columns alone. Any other failure is "couldn't read".
-      return isMissingTable(e) ? { defaults: reviewListBase([]) } : null;
+      return isMissingTable(e) ? { defaults: reviewListBase([], sectionOfListView(view)) } : null;
     }
   }
   if (view === "review_board") {
@@ -77,6 +79,36 @@ export const addColumnAction = previewSafe(async function addColumnAction(input:
       changeLayout: (view, op, rev) => changeLayout(deps, view, op, rev),
     },
     { view: input?.view, rev: input?.rev, relativeTo: input?.relativeTo, side: input?.side, label: input?.label, section: input?.section, kind: input?.kind, choices: input?.choices },
+  );
+  revalidatePath(REVIEW_PATH);
+  return result;
+}, "state");
+
+/** Rename (the field itself), edit the choices of, or archive a firm's own column, from its header menu. See `firm-column.ts`. */
+export const firmColumnAction = previewSafe(async function firmColumnAction(input: { op: string; key: string; label?: string; choices?: string }): Promise<FirmColumnResult> {
+  const fields = fieldDepsFor();
+  const deps = saveDeps();
+  const result = await changeFirmColumn(
+    {
+      owner: () => fields.owner(),
+      readStamp: async (id) => (await fields.readField(id))?.updated_at ?? null,
+      update: (i) => updateField(fields, i),
+      clearLabels: async (key) => {
+        let all = true;
+        for (const view of Object.values(REVIEW_LIST_VIEWS)) {
+          const read = await deps.read(view);
+          if (read.status === "not-set-up") continue;
+          if (read.status !== "ok") {
+            all = false;
+            continue;
+          }
+          if (!read.layout?.some((c) => c.key === key && c.label !== null)) continue;
+          if (!(await changeLayout(deps, view, { op: "rename", key, label: "" }, read.rev)).ok) all = false;
+        }
+        return all;
+      },
+    },
+    { op: input?.op, key: input?.key, label: input?.label, choices: input?.choices },
   );
   revalidatePath(REVIEW_PATH);
   return result;

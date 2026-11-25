@@ -1753,6 +1753,13 @@ export const hiddenColumnsLabel = (n: number) => `Hidden columns (${n})`;
 export const HIDDEN_COLUMN_SHOW = "Show";
 export const hiddenColumnShowLabel = (name: string) => `Show ${name}`;
 export const laneMenuLabel = (name: string) => `Column options for ${name}`;
+export const HIDDEN_FIRM_COLUMN = "A firm column";
+export const COLUMN_MENU_EDIT_CHOICES = "Edit choices";
+export const COLUMN_CHOICES_SAVE = "Save choices";
+export const COLUMN_MENU_ARCHIVE = "Archive column";
+export const COLUMN_ARCHIVE_ASK = "Archive this column? It is removed from the List and from record cards, and its values are kept. Restore isn't available on screen yet.";
+export const COLUMN_ARCHIVE_CONFIRM = "Archive";
+export const FIRM_COLUMN_LABEL_NOT_CLEARED = "Renamed. An older name for this column in the view couldn't be cleared. Refresh to check how it reads.";
 
 /* ── Add a real lead or matter from the bottom of the Weekly review List ── */
 export const ADD_ROW_LEAD_HINT = "This adds a real lead in your new-enquiry stage, the same as Leads. It joins this list once it moves past first contact.";
@@ -1766,6 +1773,8 @@ export const ADD_ROW_OPEN_MATTER = "Open a matter";
 export const ADD_ROW_ADDED = "Lead added.";
 export const ADD_ROW_OPEN_LEAD = "Open the lead";
 export const ADD_ROW_ANOTHER = "Add another";
+export const ADD_ROW_AFTER = "It is in your new-enquiry stage, so it joins this list once it moves past first contact.";
+export const ADD_ROW_OPEN_LEADS = "Go to Leads";
 export const ADD_ROW_NO_PERMISSION = "You don't have permission to add leads. Ask an attorney or an admin.";
 export const ADD_ROW_FAILED = "Couldn't add this lead. Nothing was added. Try again.";
 

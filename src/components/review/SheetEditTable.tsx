@@ -103,7 +103,7 @@ import { sheetStatusStore } from "./sheet-status-store";
 import { SheetCard } from "@/components/ui/SheetTable";
 import { ViewTable } from "@/components/views/table/ViewTable";
 import { ColumnMenu } from "@/components/views/layout/ColumnMenu";
-import { layoutKeyOf } from "@/lib/review/layout";
+import { REVIEW_LIST_VIEWS, layoutKeyOf } from "@/lib/review/layout";
 import { listColumnOf } from "@/lib/review/list-columns";
 import "./review-sheet-edit.css";
 
@@ -237,7 +237,7 @@ export function SheetEditTable({
   /** The admin tier (the page's re-resolved role): the notes' "not switched on" line and "Add a column" link. */ adminTier?: boolean;
   /** The firm's live columns, by `cf:<field id>` (empty unless the custom state is ok). */ fieldMeta?: Record<string, CustomFieldMeta>;
   /** The member directory for person cells as they are drawn while saving; null when it couldn't be read. */ cellMembers?: CustomMember[] | null;
-  /** Given ONLY for an owner (the page's membership-row check, with a saved-layout read that worked): each header gets the column menu. `rev` is the layout's. */ layoutEdit?: { rev: number | null } | null;
+  /** Given ONLY for an owner (the page's membership-row check, with saved-layout reads that worked): each header gets the column menu. One rev per section (each section has its own layout). */ layoutEdit?: { revs: Record<SheetSectionId, number | null> } | null;
 }) {
   // One hook per section, always both: the chooser's choices apply to this table and to the read-only List alike.
   const drawnBy: Record<SheetSectionId, SheetColumn[]> = {
@@ -731,7 +731,27 @@ export function SheetEditTable({
            return (
              <>
                {lc.label}
-               {layoutEdit && <ColumnMenu view="review_list" rev={layoutEdit.rev} columnKey={layoutKeyOf(c.id)} label={lc.label} pinned={c.pinned} allowAdd section={sec.id} />}
+               {layoutEdit && (() => {
+                 // The visible neighbours (what is drawn in THIS section), so Move left and right are seen; the pinned one can't be moved beside on its left.
+                 const at = drawn.findIndex((d) => d.id === c.id);
+                 const prev = drawn[at - 1];
+                 const next = drawn[at + 1];
+                 const meta = isCustomColumnId(c.id) ? fieldMeta[c.id] : undefined;
+                 return (
+                   <ColumnMenu
+                     view={REVIEW_LIST_VIEWS[sec.id]}
+                     rev={layoutEdit.revs[sec.id]}
+                     columnKey={layoutKeyOf(c.id)}
+                     label={lc.label}
+                     pinned={c.pinned}
+                     allowAdd
+                     section={sec.id}
+                     prevKey={prev && !prev.pinned ? layoutKeyOf(prev.id) : null}
+                     nextKey={next ? layoutKeyOf(next.id) : null}
+                     firm={meta ? { kind: meta.kind, options: meta.options } : null}
+                   />
+                 );
+               })()}
                {typed && (
                  <>
                    {" "}

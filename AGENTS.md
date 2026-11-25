@@ -2844,7 +2844,7 @@ Spec `docs/pge/2026-11-17-agentic-ip-os/spec-editable-views.md` (build step 3 an
 - **Who:** an owner by the caller's own `crm_org_member` ROW (`loadOwnerState`, step 2), never the role claim; Lectual staff acting in a firm are not owners. The page draws the
   menu only for an owner, not while previewing a teammate, and only when the saved layout was READ (its `rev` is what a change is fenced on). Every action asks the row again first.
 - **Layout write** (`src/lib/views/layout/save.ts`, deps injected; `actions.ts` is the thin `"use server"` pair, both `previewSafe`): the browser sends a view key, an OPERATION
-  (`rename | hide | show | move | moveTo | width | insert`) and the `rev` it drew, never a layout. The server re-reads the saved layout, builds the next one from the step-2 `next.ts`
+  (`rename | hide | show | move | moveTo | moveBeside | width | insert`) and the `rev` it drew, never a layout. The server re-reads the saved layout, builds the next one from the step-2 `next.ts`
   helpers over the columns the viewer has (`layout-base.ts`: the List's base is both sections' columns merged, the Board's is every member's lane), validates it (`parseLayout`) and
   writes through `store.ts`: INSERT when there is no row (23505 = another owner got there first: re-read, apply the same operation to THEIR layout, update, once), else UPDATE of
   `columns` alone fenced on `rev` (0 rows = "Someone else changed this view. Refresh to see their change."). Never an upsert. Every answer is a fixed sentence (`writeFailure` maps by
@@ -2864,3 +2864,10 @@ Spec `docs/pge/2026-11-17-agentic-ip-os/spec-editable-views.md` (build step 3 an
   `/dashboard/matters/#open-matter`. Neither is drawn for a role that can't create the record.
 - **Removed:** Settings -> Columns (page, `ColumnsSettings*`, its CSS, `settings-load.ts`, the tab, the section note's "Add a column" link, its words and the design-harness screens). The
   card's `FirmColumnsEdit` (typing values) stays. The per-person Columns chooser stays until a later step.
+- **One List layout per section (step 3 review):** view keys `review_list_trademarks` and `review_list_contracts` (no `review_list`): the sections head `client` and `mark` differently, so a rename
+  in one must not relabel the other. The page reads both, each header menu is fenced on its own section's rev. Move left and right are `moveBeside` the VISIBLE neighbour the browser names (the
+  server checks both keys are in the layout), so a move is seen even when the layout holds columns that aren't drawn.
+- **A firm column's menu** (`cf:` keys, `firm-column.ts`, `firmColumnAction`, owner-gated): Rename renames the FIELD itself (and clears any view label for it, so the record card and the name rules
+  agree); Edit choices (Choice kind); Archive, with a confirm saying there is no Restore on screen yet. Add a column is refused for any view but the two List keys, before the field is made.
+- **Databases:** `0119-proposed.sql.txt` is the FINAL 0119 for a fresh prod apply (pure ASCII, characters built with `chr()`); `0119b-proposed.sql.txt` is the dev-only delta from the first copy applied
+  to lectual-dev at c46913f. Neither is applied by this repo; prod needs the owner's OK. `tests/views/layout/sql-proposal-text.test.ts` pins them.

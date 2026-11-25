@@ -73,6 +73,25 @@ export function moveColumnTo(layout: Layout, key: string, index: number, pinned:
   return { ok: true, layout: out };
 }
 
+/**
+ * Move a column beside another one: the owner's Move left / Move right. The browser names the VISIBLE neighbour it saw, so the move is
+ * seen even when the layout also holds columns that are not drawn (the other section's, a person with no rows). Both keys must be in the
+ * layout; a pinned column doesn't move and nothing goes to the left of one. Placing it where it already is, is no move.
+ */
+export function moveColumnBeside(layout: Layout, key: string, relativeTo: string, side: "left" | "right", pinned: readonly string[] = []): Next {
+  if (key === relativeTo) return refuse("nothing-to-move");
+  const from = indexOf(layout, key);
+  if (from < 0 || indexOf(layout, relativeTo) < 0) return refuse("unknown-column");
+  if (pinned.includes(key)) return refuse("pinned");
+  if (side === "left" && pinned.includes(relativeTo)) return refuse("pinned");
+  const without = layout.filter((c) => c.key !== key);
+  const at = without.findIndex((c) => c.key === relativeTo);
+  const out = [...without];
+  out.splice(side === "left" ? at : at + 1, 0, layout[from]);
+  if (out.every((c, i) => c.key === layout[i].key)) return refuse("nothing-to-move");
+  return { ok: true, layout: out };
+}
+
 /** Add a column to the left or right of another (a new firm column: the key is its `cf:` key). Left of a pinned column is refused. */
 export function insertColumn(layout: Layout, column: { key: string; label?: string | null; width?: number | null }, relativeTo: string, side: "left" | "right", pinned: readonly string[] = []): Next {
   if (layout.length >= LAYOUT_MAX_COLUMNS) return refuse("too-many");

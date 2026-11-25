@@ -7,8 +7,8 @@ const col = (over: Record<string, unknown> = {}) => ({ key: "status", label: nul
 
 describe("layout keys", () => {
   it("the eight view keys, and nothing else", () => {
-    expect([...VIEW_KEYS]).toEqual(["review_list", "review_board", "matters_list", "matters_board", "contracts_list", "contracts_board", "leads_list", "leads_board"]);
-    expect(isViewKey("review_list")).toBe(true);
+    expect([...VIEW_KEYS]).toEqual(["review_list_trademarks", "review_list_contracts", "review_board", "matters_list", "matters_board", "contracts_list", "contracts_board", "leads_list", "leads_board"]);
+    expect(isViewKey("review_list_trademarks")).toBe(true);
     for (const bad of ["review", "Review_List", "", null, 3, undefined]) expect(isViewKey(bad), String(bad)).toBe(false);
   });
 

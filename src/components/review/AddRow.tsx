@@ -6,6 +6,7 @@ import { addLeadFromReviewAction, type AddLeadState } from "@/app/dashboard/revi
 import {
   ADD_A_LEAD,
   ADD_ROW_ADDED,
+  ADD_ROW_AFTER,
   ADD_ROW_ANOTHER,
   ADD_ROW_BUSINESS,
   ADD_ROW_EMAIL,
@@ -14,6 +15,7 @@ import {
   ADD_ROW_LAST_NAME,
   ADD_ROW_LEAD_HINT,
   ADD_ROW_OPEN_LEAD,
+  ADD_ROW_OPEN_LEADS,
   ADD_ROW_OPEN_MATTER,
   ADD_ROW_SUBMIT,
   CANCEL,
@@ -67,9 +69,13 @@ export function AddLeadForm({ onAnother, onCancel }: { onAnother: () => void; on
     return (
       <div className="rv-addrow-done" role="status">
         <p className="lx-note">{state.message ?? ADD_ROW_ADDED}</p>
+        <p className="lx-note">{ADD_ROW_AFTER}</p>
         <p className="rv-addrow-acts">
           <Link href={`/dashboard/leads/${state.leadId}/`} className="lx-link">
             {ADD_ROW_OPEN_LEAD}
+          </Link>
+          <Link href="/dashboard/intake/" className="lx-link">
+            {ADD_ROW_OPEN_LEADS}
           </Link>
           <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={onAnother}>
             {ADD_ROW_ANOTHER}

@@ -1,43 +1,42 @@
 import { describe, expect, it } from "vitest";
-import { mergeDefaults, reviewBoardBase, reviewListBase } from "@/lib/review/layout-base";
+import { reviewBoardBase, reviewListBase } from "@/lib/review/layout-base";
 import { applyReviewLayout } from "@/lib/review/layout";
 import { columnsFor } from "@/lib/review/sheet-columns";
 import { laneKey } from "@/lib/review/board-layout";
 import { currentLayout } from "@/lib/views/layout/save";
 
-describe("the base of an owner's List change", () => {
-  it("is both sections' columns merged: the Trademarks order, practice area after the client", () => {
-    const keys = reviewListBase([]).map((d) => d.key);
-    expect(keys.slice(0, 3)).toEqual(["client", "practice_area", "mark"]);
-    for (const k of ["serial", "status", "notes", "owner", "legal_fee", "gov_fee", "oa_due", "next", "waiting", "contact"]) expect(keys).toContain(k);
-    expect(new Set(keys).size).toBe(keys.length);
-    expect(reviewListBase([]).find((d) => d.key === "client")!.pinned).toBe(true);
+describe("the base of an owner's List change: one per section", () => {
+  it("Trademarks and Contracts each get their own columns, in their own default order", () => {
+    const t = reviewListBase([], "trademarks").map((d) => d.key);
+    const c = reviewListBase([], "contracts").map((d) => d.key);
+    expect(t.slice(0, 3)).toEqual(["client", "mark", "serial"]);
+    expect(c.slice(0, 3)).toEqual(["client", "practice_area", "mark"]);
+    expect(t).not.toContain("practice_area");
+    expect(c).not.toContain("serial");
+    expect(reviewListBase([], "trademarks").find((d) => d.key === "client")!.pinned).toBe(true);
+    // the same key carries each section's own built-in header
+    expect(reviewListBase([], "trademarks").find((d) => d.key === "client")!.label).not.toBe(reviewListBase([], "contracts").find((d) => d.key === "client")!.label);
   });
-  it("holds the firm's columns, a Money one included (an owner's base)", () => {
+  it("holds the firm's columns that fit the section, a Money one included (an owner's base)", () => {
     const F = "0a1b2c3d-0000-4000-8000-00000000f001";
     const M = "0a1b2c3d-0000-4000-8000-00000000f002";
-    const keys = reviewListBase([
-      { id: F, section: "both", label: "Priority", kind: "text", position: 0 },
-      { id: M, section: "contracts", label: "Quoted", kind: "money", position: 1 },
-    ]).map((d) => d.key);
-    expect(keys).toContain(`cf:${F}`);
-    expect(keys).toContain(`cf:${M}`);
+    const fields = [
+      { id: F, section: "both" as const, label: "Priority", kind: "text" as const, position: 0 },
+      { id: M, section: "contracts" as const, label: "Quoted", kind: "money" as const, position: 1 },
+    ];
+    const t = reviewListBase(fields, "trademarks").map((d) => d.key);
+    const c = reviewListBase(fields, "contracts").map((d) => d.key);
+    expect(t).toContain(`cf:${F}`);
+    expect(t).not.toContain(`cf:${M}`);
+    expect(c).toContain(`cf:${F}`);
+    expect(c).toContain(`cf:${M}`);
   });
-  it("saving a layout built from it changes nothing either section draws until the firm changes something", () => {
-    const base = reviewListBase([]);
-    const layout = currentLayout({ defaults: base }, null);
+  it("saving a layout built from a section's base changes nothing that section draws", () => {
     for (const section of ["trademarks", "contracts"] as const) {
       const cols = columnsFor(section, { canSeeMoney: true, hasNotes: true });
-      const plain = cols.map((c) => c.id);
-      const drawn = applyReviewLayout(cols, layout).map((c) => c.id);
-      // the same columns; only the order may follow the merged one, and the trademarks order is untouched
-      expect([...drawn].sort()).toEqual([...plain].sort());
-      if (section === "trademarks") expect(drawn).toEqual(plain);
+      const layout = currentLayout({ defaults: reviewListBase([], section) }, null);
+      expect(applyReviewLayout(cols, layout).map((c) => c.id)).toEqual(cols.map((c) => c.id));
     }
-  });
-  it("mergeDefaults keeps the first list's order and slots the rest after their predecessor", () => {
-    const d = (key: string) => ({ key, label: key });
-    expect(mergeDefaults([d("a"), d("b"), d("c")], [d("a"), d("x"), d("c"), d("y")]).map((x) => x.key)).toEqual(["a", "x", "b", "c", "y"]);
   });
 });
 

@@ -1,6 +1,7 @@
 import { LAYOUT_PLACE_NOT_SAVED, CUSTOM_SAVE_FAILED } from "@/lib/ui/words";
 import type { ActionState, CreateInput } from "@/lib/custom-columns/field-actions";
-import { cfKey, isViewKey } from "./validate";
+import { isReviewListView } from "@/lib/review/layout";
+import { cfKey } from "./validate";
 import type { LayoutResult } from "./save";
 
 /**
@@ -22,8 +23,9 @@ export type AddColumnDeps = {
 };
 
 export async function addColumn(deps: AddColumnDeps, input: AddColumnInput): Promise<AddColumnResult> {
-  // A bad view or side is refused before a field is made: nothing half done for a request that could never be placed.
-  if (!isViewKey(input.view) || (input.side !== "left" && input.side !== "right") || typeof input.relativeTo !== "string") return { ok: false, error: CUSTOM_SAVE_FAILED };
+  // Only a List section can take a new column; any other view, a bad side or a missing neighbour is refused before a field is made:
+  // nothing half done for a request that could never be placed.
+  if (!isReviewListView(input.view) || (input.side !== "left" && input.side !== "right") || typeof input.relativeTo !== "string") return { ok: false, error: CUSTOM_SAVE_FAILED };
   let made: { state: ActionState; id: string | null };
   try {
     made = await deps.createField({ label: input.label, section: input.section, kind: input.kind, choices: input.choices });

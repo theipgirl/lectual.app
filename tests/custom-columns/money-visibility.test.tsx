@@ -75,11 +75,14 @@ describe("custom Money columns are owner-only, like the fee columns", () => {
 });
 
 
-describe("the column menu's Money hint (Add a column)", () => {
-  it("says money columns are shown only to the owner, next to the kind choice, only when Money is picked", async () => {
+describe("Add a column (the column menu): the Money hint sits outside the kind label and describes the select", () => {
+  it("aria-describedby ties the select to the hint (same id); the hint is not inside the <label>", async () => {
     const { readFileSync } = await import("node:fs");
     const src = readFileSync("src/components/views/layout/ColumnMenu.tsx", "utf8");
-    expect(src).toMatch(/newKind === "money" && <p className="lx-note">\{COLUMNS_KIND_MONEY_HINT\}<\/p>/);
+    expect(src).toContain("aria-describedby={moneyHintId}");
+    expect(src).toMatch(/<p id=\{moneyHintId\} className="lx-note">\s*\{COLUMNS_KIND_MONEY_HINT\}/);
+    const label = src.slice(src.indexOf("{COLUMNS_KIND_LABEL}"), src.indexOf("</label>", src.indexOf("{COLUMNS_KIND_LABEL}")));
+    expect(label).not.toContain("COLUMNS_KIND_MONEY_HINT");
   });
 });
 

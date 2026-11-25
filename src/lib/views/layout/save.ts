@@ -16,7 +16,7 @@ import {
   LAYOUT_TOO_MANY,
 } from "@/lib/ui/words";
 import { layoutOf, resolveLayout } from "./apply";
-import { insertColumn, moveColumn, moveColumnTo, renameColumn, setHidden, setWidth, type Next, type NextRefusal } from "./next";
+import { insertColumn, moveColumn, moveColumnBeside, moveColumnTo, renameColumn, setHidden, setWidth, type Next, type NextRefusal } from "./next";
 import { isOwner, type OwnerState } from "./owner";
 import type { LayoutRead } from "./state";
 import type { Layout, LayoutDefault, ViewKey } from "./types";
@@ -40,6 +40,7 @@ export type LayoutOp =
   | { op: "show"; key: string }
   | { op: "move"; key: string; dir: "left" | "right" }
   | { op: "moveTo"; key: string; index: number }
+  | { op: "moveBeside"; key: string; relativeTo: string; side: "left" | "right" }
   | { op: "width"; key: string; px: number | null }
   | { op: "insert"; key: string; label?: string | null; relativeTo: string; side: "left" | "right" };
 
@@ -111,6 +112,8 @@ export function parseOp(raw: unknown): LayoutOp | null {
       return o.dir === "left" || o.dir === "right" ? { op: "move", key, dir: o.dir } : null;
     case "moveTo":
       return typeof o.index === "number" && Number.isInteger(o.index) ? { op: "moveTo", key, index: o.index } : null;
+    case "moveBeside":
+      return isLayoutKey(o.relativeTo) && (o.side === "left" || o.side === "right") ? { op: "moveBeside", key, relativeTo: o.relativeTo, side: o.side } : null;
     case "width":
       return o.px === null || (typeof o.px === "number" && Number.isFinite(o.px)) ? { op: "width", key, px: o.px } : null;
     case "insert": {
@@ -144,6 +147,8 @@ export function applyOp(current: Layout, op: LayoutOp, base: LayoutBase): Next {
       return moveColumn(current, op.key, op.dir === "left" ? -1 : 1, pinned);
     case "moveTo":
       return moveColumnTo(current, op.key, op.index, pinned);
+    case "moveBeside":
+      return moveColumnBeside(current, op.key, op.relativeTo, op.side, pinned);
     case "width":
       return setWidth(current, op.key, op.px);
     case "insert": {

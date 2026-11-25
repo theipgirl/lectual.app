@@ -5,7 +5,7 @@
  * may change: the order, a display label, whether the column is hidden and its width. A rename is a LABEL only; data, filters and every
  * rule keep reading the key.
  */
-export const VIEW_KEYS = ["review_list", "review_board", "matters_list", "matters_board", "contracts_list", "contracts_board", "leads_list", "leads_board"] as const;
+export const VIEW_KEYS = ["review_list_trademarks", "review_list_contracts", "review_board", "matters_list", "matters_board", "contracts_list", "contracts_board", "leads_list", "leads_board"] as const;
 export type ViewKey = (typeof VIEW_KEYS)[number];
 
 export type LayoutColumn = {

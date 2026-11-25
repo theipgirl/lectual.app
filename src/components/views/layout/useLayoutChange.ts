@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { addColumnAction, changeLayoutAction } from "@/lib/views/layout/actions";
+import { addColumnAction, changeLayoutAction, firmColumnAction } from "@/lib/views/layout/actions";
+import type { FirmColumnResult } from "@/lib/views/layout/firm-column";
 import type { AddColumnResult } from "@/lib/views/layout/add-column";
 import type { LayoutOp, LayoutResult } from "@/lib/views/layout/save";
 import { LAYOUT_SAVE_FAILED } from "@/lib/ui/words";
@@ -56,5 +57,19 @@ export function useLayoutChange(view: ViewKey, propRev: number | null) {
     }
   }
 
-  return { run, add, pending };
+  /** Rename (the field itself), edit the choices of or archive a firm's own column. */
+  async function firm(input: { op: "rename" | "options" | "archive"; key: string; label?: string; choices?: string }): Promise<FirmColumnResult> {
+    setPending(true);
+    try {
+      const result = await firmColumnAction(input);
+      if (result.ok) router.refresh();
+      return result;
+    } catch {
+      return { ok: false, error: LAYOUT_SAVE_FAILED };
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return { run, add, firm, pending };
 }

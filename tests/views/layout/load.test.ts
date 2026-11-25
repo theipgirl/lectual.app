@@ -32,8 +32,8 @@ const col = (key: string, over: object = {}) => ({ key, label: null, hidden: fal
 describe("readViewLayout: three states", () => {
   it("ok with a row: the layout and its rev; the read names its columns and asks for that view only", async () => {
     const { db, calls } = fakeDb({ data: { columns: [col("client"), col("status", { label: "Stage" })], rev: 3 } });
-    expect(await readViewLayout(db, "review_list")).toEqual({ status: "ok", layout: [col("client"), col("status", { label: "Stage" })], rev: 3 });
-    expect(calls).toEqual([{ table: "crm_view_layout", select: "columns, rev", eq: [["view_key", "review_list"]] }]);
+    expect(await readViewLayout(db, "review_list_trademarks")).toEqual({ status: "ok", layout: [col("client"), col("status", { label: "Stage" })], rev: 3 });
+    expect(calls).toEqual([{ table: "crm_view_layout", select: "columns, rev", eq: [["view_key", "review_list_trademarks"]] }]);
   });
 
   it("ok with no row: no layout (the standard columns), no rev", async () => {
@@ -42,22 +42,22 @@ describe("readViewLayout: three states", () => {
 
   it("not-set-up on the table's or a column's missing code (42P01, PGRST205, 42703), never on message text", async () => {
     for (const code of ["42P01", "PGRST205", "42703"]) {
-      expect(await readViewLayout(fakeDb({ error: { code, message: "boom" } }).db, "review_list"), code).toEqual({ status: "not-set-up" });
+      expect(await readViewLayout(fakeDb({ error: { code, message: "boom" } }).db, "review_list_trademarks"), code).toEqual({ status: "not-set-up" });
     }
-    expect(await readViewLayout(fakeDb({ error: { code: "XX000", message: 'relation "crm_view_layout" does not exist' } }).db, "review_list")).toEqual({ status: "unavailable" });
-    expect(await readViewLayout(fakeDb({ error: { message: "relation does not exist" } }).db, "review_list")).toEqual({ status: "unavailable" });
+    expect(await readViewLayout(fakeDb({ error: { code: "XX000", message: 'relation "crm_view_layout" does not exist' } }).db, "review_list_trademarks")).toEqual({ status: "unavailable" });
+    expect(await readViewLayout(fakeDb({ error: { message: "relation does not exist" } }).db, "review_list_trademarks")).toEqual({ status: "unavailable" });
   });
 
   it("unavailable: any other error, a throw, an answer that isn't a row, a layout the database could not have stored, a bad rev", async () => {
-    expect(await readViewLayout(fakeDb({ error: { code: "57014" } }).db, "review_list")).toEqual({ status: "unavailable" });
-    expect(await readViewLayout(fakeDb(() => { throw new Error("network"); }).db, "review_list")).toEqual({ status: "unavailable" });
-    expect(await readViewLayout(fakeDb({ data: [] }).db, "review_list")).toEqual({ status: "unavailable" });
-    expect(await readViewLayout(fakeDb({ data: "x" }).db, "review_list")).toEqual({ status: "unavailable" });
-    expect(await readViewLayout(fakeDb({ data: { columns: [], rev: 1 } }).db, "review_list")).toEqual({ status: "unavailable" });
-    expect(await readViewLayout(fakeDb({ data: { columns: [col("Bad Key")], rev: 1 } }).db, "review_list")).toEqual({ status: "unavailable" });
-    expect(await readViewLayout(fakeDb({ data: { columns: [col("client"), col("client")], rev: 1 } }).db, "review_list")).toEqual({ status: "unavailable" });
-    expect(await readViewLayout(fakeDb({ data: { columns: [col("client")], rev: 0 } }).db, "review_list")).toEqual({ status: "unavailable" });
-    expect(await readViewLayout(fakeDb({ data: { columns: [col("client")] } }).db, "review_list")).toEqual({ status: "unavailable" });
+    expect(await readViewLayout(fakeDb({ error: { code: "57014" } }).db, "review_list_trademarks")).toEqual({ status: "unavailable" });
+    expect(await readViewLayout(fakeDb(() => { throw new Error("network"); }).db, "review_list_trademarks")).toEqual({ status: "unavailable" });
+    expect(await readViewLayout(fakeDb({ data: [] }).db, "review_list_trademarks")).toEqual({ status: "unavailable" });
+    expect(await readViewLayout(fakeDb({ data: "x" }).db, "review_list_trademarks")).toEqual({ status: "unavailable" });
+    expect(await readViewLayout(fakeDb({ data: { columns: [], rev: 1 } }).db, "review_list_trademarks")).toEqual({ status: "unavailable" });
+    expect(await readViewLayout(fakeDb({ data: { columns: [col("Bad Key")], rev: 1 } }).db, "review_list_trademarks")).toEqual({ status: "unavailable" });
+    expect(await readViewLayout(fakeDb({ data: { columns: [col("client"), col("client")], rev: 1 } }).db, "review_list_trademarks")).toEqual({ status: "unavailable" });
+    expect(await readViewLayout(fakeDb({ data: { columns: [col("client")], rev: 0 } }).db, "review_list_trademarks")).toEqual({ status: "unavailable" });
+    expect(await readViewLayout(fakeDb({ data: { columns: [col("client")] } }).db, "review_list_trademarks")).toEqual({ status: "unavailable" });
   });
 });
 

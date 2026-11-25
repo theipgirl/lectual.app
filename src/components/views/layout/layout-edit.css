@@ -16,3 +16,6 @@
 .cm-note { margin-left: 6px; }
 .cm-show { margin-left: auto; padding-left: 12px; color: var(--ox); font-weight: 600; }
 @media (pointer: coarse) { .cm-btn { width: 44px; height: 44px; } }
+.cm-items { display: flex; flex-direction: column; gap: 2px; }
+.cm-group { margin: 6px 8px 2px; }
+.cm-hidden { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 4px; }

@@ -23,8 +23,8 @@ describe("the owner's column menu on the Weekly review List", () => {
     const html = decode(await renderPage({ view: "sheet" }));
     expect(html.match(new RegExp(MENU, "g"))!.length).toBeGreaterThanOrEqual(8);
     expect(html).toMatch(/aria-label="Column options: What happened"/);
-    // the hidden column can be shown again
-    expect(html).toContain("Hidden columns (1)");
+    // the hidden column can be shown again: the one layout read hides Mark in each section's own layout
+    expect(html).toContain("Hidden columns (2)");
   });
   it("every other caller gets no menu and no Hidden columns control: the same table", async () => {
     for (const [role, owner, staff] of [["owner", false, false], ["admin", false, false], ["attorney", false, false], ["owner", false, true], ["viewer", false, false]] as const) {
@@ -76,7 +76,7 @@ describe("the owner's lane menu on the Weekly review Board", () => {
 describe("the menu component", () => {
   it("draws a button and no panel until opened; the label names the column", async () => {
     const { ColumnMenu } = await import("@/components/views/layout/ColumnMenu");
-    const html = renderToStaticMarkup(<ColumnMenu view="review_list" rev={1} columnKey="status" label="Status" allowAdd />);
+    const html = renderToStaticMarkup(<ColumnMenu view="review_list_trademarks" rev={1} columnKey="status" label="Status" allowAdd />);
     expect(html).toContain('aria-label="Column options: Status"');
     expect(html).toContain('aria-haspopup="menu"');
     expect(html).toContain('aria-expanded="false"');
@@ -84,7 +84,31 @@ describe("the menu component", () => {
   });
 });
 
+describe("one layout per section, and hidden firm columns", () => {
+  it("each section draws ITS OWN saved layout and its menu is fenced on its own rev", async () => {
+    mockPage({ load, role: "owner", roleViews: true, owner: true });
+    mockLayoutRead((view: string) => ({ status: "ok", rev: view.endsWith("trademarks") ? 7 : 3, layout: view.endsWith("trademarks") ? [col("client"), col("mark", { label: "Brand" })] : [col("client"), col("mark", { label: "Agreement" })] }));
+    const html = decode(await renderPage({ view: "sheet" }));
+    expect(html).toMatch(/data-column="mark"[^>]*>Brand/);
+    expect(html).toMatch(/data-column="mark"[^>]*>Agreement/);
+    expect(html).not.toMatch(/data-column="mark"[^>]*>Brand[^]*?data-column="mark"[^>]*>Brand/);
+  });
+  it("a hidden firm column is listed even when the custom columns weren't read", async () => {
+    const F = "cf:0a1b2c3d-0000-4000-8000-00000000f001";
+    mockPage({ load: { ...load, custom: { status: "unavailable" } }, role: "owner", roleViews: true, owner: true });
+    mockLayoutRead({ status: "ok", rev: 2, layout: [col("client"), col(F, { hidden: true })] });
+    expect(decode(await renderPage({ view: "sheet" }))).toContain("Hidden columns (");
+  });
+});
+
 describe("which items the menu offers", () => {
+  it("move items need a visible neighbour; a firm column can edit choices (Choice) and be archived", async () => {
+    const { menuItems } = await import("@/lib/views/layout/menu-items");
+    expect(menuItems({ pinned: false, allowAdd: true, hasPrev: false, hasNext: true })).toEqual(["rename", "hide", "right", "add-left", "add-right"]);
+    expect(menuItems({ pinned: false, allowAdd: true, firm: { kind: "choice" } })).toEqual(["rename", "hide", "left", "right", "add-left", "add-right", "choices", "archive"]);
+    expect(menuItems({ pinned: false, allowAdd: true, firm: { kind: "text" } }).slice(-1)).toEqual(["archive"]);
+    expect(menuItems({ pinned: true, allowAdd: true, firm: null })).toEqual(["rename", "add-right"]);
+  });
   it("a pinned column can only be renamed (and added beside on its right); a lane has no Add", async () => {
     const { menuItems } = await import("@/lib/views/layout/menu-items");
     expect(menuItems({ pinned: false, allowAdd: true })).toEqual(["rename", "hide", "left", "right", "add-left", "add-right"]);

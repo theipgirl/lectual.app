@@ -1,7 +1,7 @@
 import { applyLayout } from "@/lib/views/layout/apply";
 import { cfKey } from "@/lib/views/layout/validate";
-import type { Layout, LayoutDefault } from "@/lib/views/layout/types";
-import { isCustomColumnId, type BuiltinColumnId, type ColumnId, type SheetColumn } from "./sheet-columns";
+import type { Layout, LayoutDefault, ViewKey } from "@/lib/views/layout/types";
+import { isCustomColumnId, type BuiltinColumnId, type ColumnId, type SheetColumn, type SheetSectionId } from "./sheet-columns";
 
 /**
  * The Weekly review List's columns as a firm's saved layout names them. Pure.
@@ -47,3 +47,14 @@ export function applyReviewLayout(columns: readonly SheetColumn[], saved: Layout
   const defaults = columns.map((c): LayoutDefault & { col: SheetColumn } => ({ key: layoutKeyOf(c.id), label: c.header, pinned: c.pinned, col: c }));
   return applyLayout(defaults, saved).map(({ col, label, width }) => ({ ...col, header: label, ...(width !== null ? { width } : {}) }));
 }
+
+/**
+ * The Weekly review List has ONE saved layout per section: Trademarks and Contracts head `client` and `mark` differently, so a rename in
+ * one must not relabel the other (and each section keeps its own order).
+ */
+export const REVIEW_LIST_VIEWS = { trademarks: "review_list_trademarks", contracts: "review_list_contracts" } as const satisfies Record<SheetSectionId, ViewKey>;
+export const isReviewListView = (view: unknown): view is (typeof REVIEW_LIST_VIEWS)[SheetSectionId] => view === REVIEW_LIST_VIEWS.trademarks || view === REVIEW_LIST_VIEWS.contracts;
+export const sectionOfListView = (view: (typeof REVIEW_LIST_VIEWS)[SheetSectionId]): SheetSectionId => (view === REVIEW_LIST_VIEWS.trademarks ? "trademarks" : "contracts");
+
+/** The saved layout of each List section (null = the standard columns). */
+export type SectionLayouts = Record<SheetSectionId, Layout | null>;

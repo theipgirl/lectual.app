@@ -16,9 +16,14 @@ import {
   COLUMNS_RENAME,
   COLUMNS_SECTION_LABEL,
   COLUMN_ADD_SUBMIT,
+  COLUMN_ARCHIVE_ASK,
+  COLUMN_ARCHIVE_CONFIRM,
+  COLUMN_CHOICES_SAVE,
   COLUMN_CHANGES_NOTE,
   COLUMN_MENU_ADD_LEFT,
   COLUMN_MENU_ADD_RIGHT,
+  COLUMN_MENU_ARCHIVE,
+  COLUMN_MENU_EDIT_CHOICES,
   COLUMN_MENU_HIDE,
   COLUMN_MENU_LEFT,
   COLUMN_MENU_RIGHT,
@@ -56,12 +61,17 @@ export type ColumnMenuProps = {
   /** The List section the header is in: where a new column starts out (Trademarks, Contracts). */
   section?: CustomSection;
   kind?: "column" | "lane";
+  /** The visible columns either side (null: none, or the pinned one). Move left and right go BESIDE these, so the move is seen. */
+  prevKey?: string | null;
+  nextKey?: string | null;
+  /** A firm's own column (`cf:` key): its kind and choices. Rename renames the field itself; Edit choices and Archive are offered. */
+  firm?: { kind: string; options: readonly string[] } | null;
 };
 
-type Mode = "menu" | "rename" | "add";
+type Mode = "menu" | "rename" | "add" | "choices" | "archive";
 const PANEL_WIDTH = 288;
 
-export function ColumnMenu({ view, rev, columnKey, label, pinned = false, allowAdd = false, section = "trademarks", kind = "column" }: ColumnMenuProps) {
+export function ColumnMenu({ view, rev, columnKey, label, pinned = false, allowAdd = false, section = "trademarks", kind = "column", prevKey = null, nextKey = null, firm = null }: ColumnMenuProps) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("menu");
   const [side, setSide] = useState<"left" | "right">("right");
@@ -70,11 +80,13 @@ export function ColumnMenu({ view, rev, columnKey, label, pinned = false, allowA
   const [place, setPlace] = useState<CSSProperties>({});
   const [name, setName] = useState(label);
   const [newKind, setNewKind] = useState<string>("text");
+  const [choices, setChoices] = useState("");
   const wrap = useRef<HTMLSpanElement | null>(null);
   const trigger = useRef<HTMLButtonElement | null>(null);
   const panel = useRef<HTMLDivElement | null>(null);
   const restoreFocus = useRef(false);
   const id = useId();
+  const moneyHintId = `${id}-money`;
   const change = useLayoutChange(view, rev);
   const aria = kind === "lane" ? laneMenuLabel(label) : columnMenuLabel(label);
 
@@ -97,6 +109,7 @@ export function ColumnMenu({ view, rev, columnKey, label, pinned = false, allowA
       setPlace({ top: rect.bottom + 4, left });
     }
     setName(label);
+    setChoices(firm?.options.join("\n") ?? "");
     setNote(null);
     setError(null);
     setMode("menu");
@@ -117,16 +130,24 @@ export function ColumnMenu({ view, rev, columnKey, label, pinned = false, allowA
       setOpen(false);
       setMode("menu");
     };
-    const onMove = () => setOpen(false);
+    // Scrolling INSIDE the panel (a long form) and the phone keyboard resizing the window (the width stays) must not close it.
+    const width = window.innerWidth;
+    const onScroll = (e: Event) => {
+      if (panel.current && e.target instanceof Node && panel.current.contains(e.target)) return;
+      setOpen(false);
+    };
+    const onResize = () => {
+      if (window.innerWidth !== width) setOpen(false);
+    };
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey, true);
-    window.addEventListener("resize", onMove);
-    window.addEventListener("scroll", onMove, true);
+    window.addEventListener("resize", onResize);
+    window.addEventListener("scroll", onScroll, true);
     return () => {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey, true);
-      window.removeEventListener("resize", onMove);
-      window.removeEventListener("scroll", onMove, true);
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("scroll", onScroll, true);
     };
   }, [open]);
 
@@ -159,7 +180,20 @@ export function ColumnMenu({ view, rev, columnKey, label, pinned = false, allowA
 
   async function saveName(e: React.FormEvent) {
     e.preventDefault();
-    await simple({ op: "rename", key: columnKey, label: name });
+    if (!firm) return simple({ op: "rename", key: columnKey, label: name });
+    // A firm's own column: the FIELD is renamed (the record card and the name rules read it), and any view label is cleared.
+    setError(null);
+    const out = await change.firm({ op: "rename", key: columnKey, label: name });
+    if (!out.ok) return setError(out.error);
+    if (out.note) setNote(out.note);
+    close();
+  }
+
+  async function firmAction(op: "options" | "archive") {
+    setError(null);
+    const out = await change.firm({ op, key: columnKey, ...(op === "options" ? { choices } : {}) });
+    if (!out.ok) return setError(out.error);
+    close();
   }
 
   async function submitAdd(e: React.FormEvent<HTMLFormElement>) {
@@ -205,27 +239,63 @@ export function ColumnMenu({ view, rev, columnKey, label, pinned = false, allowA
         </span>
       )}
       {open && (
-        <div id={id} ref={panel} className="cm-panel" role={mode === "menu" ? "menu" : "dialog"} aria-label={aria} style={{ ...place, width: PANEL_WIDTH }} onKeyDown={arrows} onClick={() => { restoreFocus.current = true; }}>
+        <div id={id} ref={panel} className="cm-panel" aria-label={aria} style={{ ...place, width: PANEL_WIDTH }} onKeyDown={arrows} onClick={() => { restoreFocus.current = true; }}>
           {mode === "menu" && (
             <>
-              {menuItems({ pinned, allowAdd }).map((id) => {
-                switch (id) {
-                  case "rename":
-                    return <Fragment key={id}>{item(COLUMNS_RENAME, () => setMode("rename"))}</Fragment>;
-                  case "hide":
-                    return <Fragment key={id}>{item(COLUMN_MENU_HIDE, () => simple({ op: "hide", key: columnKey }))}</Fragment>;
-                  case "left":
-                    return <Fragment key={id}>{item(COLUMN_MENU_LEFT, () => simple({ op: "move", key: columnKey, dir: "left" }))}</Fragment>;
-                  case "right":
-                    return <Fragment key={id}>{item(COLUMN_MENU_RIGHT, () => simple({ op: "move", key: columnKey, dir: "right" }))}</Fragment>;
-                  case "add-left":
-                    return <Fragment key={id}>{item(COLUMN_MENU_ADD_LEFT, () => (setSide("left"), setMode("add")))}</Fragment>;
-                  case "add-right":
-                    return <Fragment key={id}>{item(COLUMN_MENU_ADD_RIGHT, () => (setSide("right"), setMode("add")))}</Fragment>;
-                }
-              })}
+              {/* Only the items are the menu: the note and the error below are outside it. */}
+              <div role="menu" aria-label={aria} className="cm-items">
+                {menuItems({ pinned, allowAdd, hasPrev: prevKey !== null, hasNext: nextKey !== null, firm }).map((id) => {
+                  switch (id) {
+                    case "rename":
+                      return <Fragment key={id}>{item(COLUMNS_RENAME, () => setMode("rename"))}</Fragment>;
+                    case "hide":
+                      return <Fragment key={id}>{item(COLUMN_MENU_HIDE, () => simple({ op: "hide", key: columnKey }))}</Fragment>;
+                    case "left":
+                      return <Fragment key={id}>{item(COLUMN_MENU_LEFT, () => simple({ op: "moveBeside", key: columnKey, relativeTo: prevKey ?? "", side: "left" }))}</Fragment>;
+                    case "right":
+                      return <Fragment key={id}>{item(COLUMN_MENU_RIGHT, () => simple({ op: "moveBeside", key: columnKey, relativeTo: nextKey ?? "", side: "right" }))}</Fragment>;
+                    case "add-left":
+                      return <Fragment key={id}>{item(COLUMN_MENU_ADD_LEFT, () => (setSide("left"), setMode("add")))}</Fragment>;
+                    case "add-right":
+                      return <Fragment key={id}>{item(COLUMN_MENU_ADD_RIGHT, () => (setSide("right"), setMode("add")))}</Fragment>;
+                    case "choices":
+                      return <Fragment key={id}>{item(COLUMN_MENU_EDIT_CHOICES, () => setMode("choices"))}</Fragment>;
+                    case "archive":
+                      return <Fragment key={id}>{item(COLUMN_MENU_ARCHIVE, () => setMode("archive"))}</Fragment>;
+                  }
+                })}
+              </div>
               <p className="lx-note cm-foot">{COLUMN_CHANGES_NOTE}</p>
             </>
+          )}
+          {mode === "choices" && (
+            <form className="cm-form" onSubmit={(e) => (e.preventDefault(), firmAction("options"))}>
+              <label className="cm-field">
+                <span className="lx-label">{COLUMNS_CHOICES_LABEL}</span>
+                <textarea className="lx-input cm-textarea" value={choices} rows={5} onChange={(e) => setChoices(e.target.value)} />
+              </label>
+              <div className="cm-acts">
+                <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={change.pending}>
+                  {change.pending ? SAVING : COLUMN_CHOICES_SAVE}
+                </button>
+                <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={() => (setMode("menu"), setError(null))}>
+                  {CANCEL}
+                </button>
+              </div>
+            </form>
+          )}
+          {mode === "archive" && (
+            <div className="cm-form">
+              <p className="cm-title">{COLUMN_ARCHIVE_ASK}</p>
+              <div className="cm-acts">
+                <button type="button" className="lx-btn lx-btn-pri lx-btn-sm" disabled={change.pending} onClick={() => firmAction("archive")}>
+                  {change.pending ? SAVING : COLUMN_ARCHIVE_CONFIRM}
+                </button>
+                <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={() => (setMode("menu"), setError(null))}>
+                  {CANCEL}
+                </button>
+              </div>
+            </div>
           )}
           {mode === "rename" && (
             <form className="cm-form" onSubmit={saveName}>
@@ -252,7 +322,7 @@ export function ColumnMenu({ view, rev, columnKey, label, pinned = false, allowA
               </label>
               <label className="cm-field">
                 <span className="lx-label">{COLUMNS_KIND_LABEL}</span>
-                <select className="lx-input" name="kind" value={newKind} onChange={(e) => setNewKind(e.target.value)}>
+                <select className="lx-input" name="kind" value={newKind} onChange={(e) => setNewKind(e.target.value)} aria-describedby={moneyHintId}>
                   {CUSTOM_KINDS.map((k) => (
                     <option key={k} value={k}>
                       {CUSTOM_KIND_WORDS[k]}
@@ -260,11 +330,14 @@ export function ColumnMenu({ view, rev, columnKey, label, pinned = false, allowA
                   ))}
                 </select>
               </label>
-              {newKind === "money" && <p className="lx-note">{COLUMNS_KIND_MONEY_HINT}</p>}
+              {/* Outside the label (so it isn't part of the select's name), tied to the select by aria-describedby. */}
+              <p id={moneyHintId} className="lx-note">
+                {COLUMNS_KIND_MONEY_HINT}
+              </p>
               <label className="cm-field">
                 <span className="lx-label">{COLUMNS_SECTION_LABEL}</span>
                 <select className="lx-input" name="section" defaultValue={section}>
-                  {CUSTOM_SECTIONS.map((s) => (
+                  {CUSTOM_SECTIONS.filter((s) => s === "both" || s === section).map((s) => (
                     <option key={s} value={s}>
                       {CUSTOM_SECTION_WORDS[s]}
                     </option>

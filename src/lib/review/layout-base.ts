@@ -1,40 +1,16 @@
 import { laneKey, UNASSIGNED_LANE_KEY } from "./board-layout";
 import { layoutKeyOf } from "./layout";
-import { NOTES_PRESENT, SHEET_SECTIONS, columnsFor, type CustomColumnField } from "./sheet-columns";
+import { NOTES_PRESENT, columnsFor, type CustomColumnField, type SheetSectionId } from "./sheet-columns";
 import { UNASSIGNED_LANE } from "./lanes";
 import type { LayoutDefault } from "@/lib/views/layout/types";
 
 /**
  * The columns an OWNER'S layout change starts from, as `LayoutDefault`s (the server builds them itself; the browser never sends a layout).
- * Pure.
- *
- * The Weekly review's two sections (Trademarks and Contracts) share ONE saved List layout, so the base is both sections' columns merged:
- * the Trademarks order, with each Contracts-only column placed after the column that precedes it in Contracts. A layout key a section
- * doesn't draw is ignored by that section (`applyReviewLayout`), so the merge changes nothing on screen until a firm saves.
+ * Pure. One base per List SECTION: the Weekly review keeps one layout for Trademarks and one for Contracts.
  */
-export function mergeDefaults(a: readonly LayoutDefault[], b: readonly LayoutDefault[]): LayoutDefault[] {
-  const out = [...a];
-  b.forEach((d, i) => {
-    if (out.some((x) => x.key === d.key)) return;
-    let at = 0;
-    for (let j = i - 1; j >= 0; j--) {
-      const k = out.findIndex((x) => x.key === b[j].key);
-      if (k >= 0) {
-        at = k + 1;
-        break;
-      }
-    }
-    out.splice(at, 0, d);
-  });
-  return out;
-}
-
-/** Every column the owner may have on the Weekly review List (the owner sees fees and the firm's Money columns), in merged default order. */
-export function reviewListBase(fields: readonly CustomColumnField[]): LayoutDefault[] {
-  const perSection = SHEET_SECTIONS.map((section) =>
-    columnsFor(section, { canSeeMoney: true, canSeeCustomMoney: true, hasNotes: NOTES_PRESENT, customFields: fields }).map((c): LayoutDefault => ({ key: layoutKeyOf(c.id), label: c.header, pinned: c.pinned })),
-  );
-  return perSection.reduce<LayoutDefault[]>((all, next) => mergeDefaults(all, next), []);
+/** Every column the owner may have in one section (the owner sees fees and the firm's Money columns), in default order. */
+export function reviewListBase(fields: readonly CustomColumnField[], section: SheetSectionId): LayoutDefault[] {
+  return columnsFor(section, { canSeeMoney: true, canSeeCustomMoney: true, hasNotes: NOTES_PRESENT, customFields: fields }).map((c): LayoutDefault => ({ key: layoutKeyOf(c.id), label: c.header, pinned: c.pinned }));
 }
 
 export type BoardMember = { userId: string; name: string; role: string };

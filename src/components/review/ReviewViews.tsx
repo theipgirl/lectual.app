@@ -117,7 +117,7 @@ export function ReviewBoard({ lanes, layout = null, layoutEdit = null, ...common
     return <EmptyState title="Nothing needs attention">No records are waiting on us or on a client for this view.</EmptyState>;
   }
   const { lanes: drawn, hidden, hiddenUnassigned, hiddenLanes } = applyBoardLayout(lanes, layout);
-  const columns: BoardColumnSpec<ReviewRow>[] = drawn.map((lane) => {
+  const columns: BoardColumnSpec<ReviewRow>[] = drawn.map((lane, at) => {
     const load = laneLoad(lane, common.today);
     const split = laneLoadText(load);
     return {
@@ -129,7 +129,7 @@ export function ReviewBoard({ lanes, layout = null, layoutEdit = null, ...common
       className: "rv-person",
       attrs: { "data-lane": lane.userId ?? "none" },
       note: split ? <p className="lx-note rv-lane-load" data-lane-load>{split}</p> : undefined,
-      menu: layoutEdit ? <ColumnMenu view="review_board" rev={layoutEdit.rev} columnKey={lane.key} label={lane.title} kind="lane" /> : undefined,
+      menu: layoutEdit ? <ColumnMenu view="review_board" rev={layoutEdit.rev} columnKey={lane.key} label={lane.title} kind="lane" prevKey={drawn[at - 1]?.key ?? null} nextKey={drawn[at + 1]?.key ?? null} /> : undefined,
       groups: [
         { key: "our", heading: `${OUR_TURN} · ${lane.our.length}`, empty: LANE_NOTHING_FOR_US, cards: lane.our, attrs: { "data-half": "our" } },
         { key: "client", heading: `${LANE_WAITING_ON_CLIENT} · ${lane.client.length}`, empty: LANE_NOBODY_WAITING, cards: lane.client, attrs: { "data-half": "client" } },
@@ -149,7 +149,7 @@ export function ReviewBoard({ lanes, layout = null, layoutEdit = null, ...common
       )}
       {layoutEdit && hiddenLanes.length > 0 && (
         <div className="rv-board-tools">
-          <HiddenColumnsMenu view="review_board" rev={layoutEdit.rev} items={hiddenLanes} />
+          <HiddenColumnsMenu groups={[{ view: "review_board", rev: layoutEdit.rev, items: hiddenLanes }]} />
         </div>
       )}
       <ViewBoard

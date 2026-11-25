@@ -31,7 +31,7 @@ describe("the Weekly review List draws the firm's saved layout", () => {
       expect(keys).not.toContain("mark");
       expect(first).toMatch(/<th[^>]*data-column="notes"[^>]*>What happened/);
       expect(html).not.toContain(VIEW_LAYOUT_UNAVAILABLE);
-      expect(layoutSpy).toHaveBeenCalledWith("review_list");
+      expect(layoutSpy).toHaveBeenCalledWith("review_list_trademarks");
       // A viewer, and anyone who may not see fees, is not given the fee column by a layout that names it.
       if (!["owner"].includes(role)) expect(first).not.toContain('data-column="legalFee"');
     });
@@ -73,8 +73,8 @@ describe("the Weekly review List draws the firm's saved layout", () => {
     }
   });
 
-  it("the layout is read for the view being drawn and for no other: List -> review_list, Board -> review_board, Cards -> none", async () => {
-    for (const [params, expected] of [[{ view: "sheet" }, ["review_list"]], [{}, ["review_board"]], [{ view: "cards" }, []]] as const) {
+  it("the layout is read for the view being drawn and for no other: List -> review_list_trademarks and review_list_contracts, Board -> review_board, Cards -> none", async () => {
+    for (const [params, expected] of [[{ view: "sheet" }, ["review_list_trademarks", "review_list_contracts"]], [{}, ["review_board"]], [{ view: "cards" }, []]] as const) {
       vi.resetModules();
       mockPage({ load, role: "attorney" });
       mockLayoutRead();
