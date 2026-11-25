@@ -521,3 +521,28 @@ button.cp-step-btn:focus-visible { outline: 3px solid var(--cp-brand); outline-o
 
 /* The firm's logo above its engagement letter: centred, 220-260px on a desktop, scaling down on a phone. */
 .cp-letter-logo { display: block; margin: 0 auto 18px; width: 100%; max-width: 250px; height: auto; }
+
+/* Flat-fee work as numbered sections (an intro or bullet points on some piece of work): a thin hairline between sections. */
+.cp-work-secs { list-style: none; margin: 0; padding: 0; font-size: 16px; line-height: 1.55; overflow-wrap: anywhere; }
+.cp-work-sec { padding: 14px 0; }
+.cp-work-sec:first-child { padding-top: 2px; }
+.cp-work-sec:last-child { padding-bottom: 0; }
+.cp-work-sec + .cp-work-sec { border-top: 1px solid var(--cp-line); }
+.cp-work-head { margin: 0; }
+.cp-work-head .cp-num { color: var(--cp-soft); white-space: nowrap; }
+.cp-work-intro { margin: 6px 0 0; }
+.cp-work-details { margin: 8px 0 0; padding-left: 22px; }
+.cp-work-details li + li { margin-top: 4px; }
+
+/* The "Legal Fee Summary" table: it scrolls inside its own box, never the page, on a phone. */
+.cp-fee-sum-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+.cp-fee-tbl { width: 100%; border-collapse: collapse; font-size: 15.5px; min-width: 420px; }
+.cp-fee-tbl th, .cp-fee-tbl td { padding: 8px 10px; border-bottom: 1px solid var(--cp-line); text-align: left; vertical-align: top; }
+.cp-fee-tbl thead th { font-weight: 700; font-size: 14px; color: var(--cp-soft); }
+.cp-fee-tbl td.cp-num, .cp-fee-tbl th.cp-num { text-align: right; white-space: nowrap; }
+.cp-fee-tbl thead th + th { text-align: right; }
+.cp-fee-tbl tfoot th, .cp-fee-tbl tfoot td { font-weight: 700; border-bottom: 0; border-top: 2px solid var(--cp-line-2); }
+
+/* A deposit: the part of the fee due today, and the line beside the pay button after acceptance. */
+.cp-due-today .cp-l b { color: var(--cp-brand); }
+.cp-paytoday { margin: 0; font-size: 17px; text-align: center; }

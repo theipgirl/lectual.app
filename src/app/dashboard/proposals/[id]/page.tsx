@@ -34,6 +34,8 @@ import { loadLeadOptions } from "@/lib/proposals/lead-options";
 import { defaultSelection, generalValueOverFee, priceForClassCount, quoteProposal } from "@/lib/proposals/pricing";
 import { isGeneralContent } from "@/lib/proposals/types";
 import { generalFormValues } from "@/lib/proposal-editor/general-form";
+import { paymentTermsValues } from "@/lib/proposal-editor/payment-terms-form";
+import { acceptedDueToday, staffDueTodayLine } from "@/lib/proposals/due-today-staff";
 import { GeneralFields } from "@/components/proposal-editor/GeneralFields";
 import { IssueList, type ShownIssue } from "@/components/proposal-editor/ActionForm";
 import { describeIssuePath, groupIssues } from "@/lib/proposal-editor/issues";
@@ -460,7 +462,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
                       <p className="lx-note pe-hint">A contract or other matter at one flat fee. No packages, classes or USPTO fees.</p>
                     </header>
                     <fieldset className="pe-fieldset" disabled={!editable}>
-                      <GeneralFields values={generalFormValues(content.general)} editable={editable} />
+                      <GeneralFields values={generalFormValues(content.general)} editable={editable} paymentTerms={paymentTermsValues(content)} />
                       <IssueList issues={issuesFor(/^general(\.|$)/)} />
                     </fieldset>
                   </section>
@@ -480,6 +482,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
                   customHelp={customHelp}
                   includes={content.includes ?? []}
                   packageIncludes={general ? null : editorPackageIncludes(content)}
+                  paymentTerms={general ? undefined : paymentTermsValues(content)}
                 />
                 <MessageSection
                   editable={editable}
@@ -493,7 +496,7 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
             </div>
 
             <aside className="pe-side" aria-label="Figures and preview">
-              <PayBox quote={quote} general={general} valueOverFee={valueOverFee} />
+              <PayBox quote={quote} general={general} valueOverFee={valueOverFee} dueTodayLine={staffDueTodayLine(content, quote)} />
 
           {proposal.status === "accepted" && proposal.accepted_snapshot?.quote && (
             <section className="lx-card pe-totals" aria-label="What the client accepted">
@@ -517,6 +520,12 @@ export default async function ProposalEditorPage({ params }: { params: Promise<{
                   <dt>Legal fee accepted</dt>
                   <dd>{formatMoney(proposal.accepted_snapshot.quote.legal_total_cents)}</dd>
                 </div>
+                {acceptedDueToday(proposal.accepted_snapshot) ? (
+                  <div className="pe-line pe-line-mute pe-due-today">
+                    <dt>{acceptedDueToday(proposal.accepted_snapshot)}</dt>
+                    <dd />
+                  </div>
+                ) : null}
                 {!proposal.accepted_snapshot.quote.general && (
                   <div className="pe-line pe-line-mute">
                     <dt>USPTO fees, due at filing</dt>

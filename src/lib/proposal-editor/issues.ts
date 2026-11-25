@@ -32,7 +32,7 @@ export function groupIssues(issues: readonly ValidationIssue[]): IssueGroups {
     } else if (/^(title|client_email|pay_url|client)(\.|$)/.test(p)) g.details.push(issue);
     else if (/^expires_on$/.test(p)) g.pricing.push(issue);
     else if (/^(greeting|recommendation|office_action_note)$/.test(p)) g.message.push(issue);
-    else if (/^pricing(\.|$)/.test(p)) g.pricing.push(issue);
+    else if (/^(pricing|payment_terms)(\.|$)/.test(p)) g.pricing.push(issue);
     else if (/^adjustments(\[|$)/.test(p)) g.adjustments.push(issue);
     else if (/^includes(\[|$)/.test(p)) g.includes.push(issue);
     else g.general.push(issue);

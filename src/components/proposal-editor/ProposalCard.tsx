@@ -1,4 +1,5 @@
 import "@/app/dashboard/proposals/proposals.css";
+import { dueTodayStaffLine } from "@/lib/proposal-editor/vocabulary";
 import { showingOf } from "@/lib/ui/words";
 import type { ProposalCard as Card } from "@/lib/proposals/card";
 import { formatDollars } from "@/lib/proposal-editor/events";
@@ -51,6 +52,14 @@ export function ProposalCard({ card, showFees = true }: { card: Card; /** The ed
                   {it.label}
                   {typeof it.hours === "number" ? ` · ${it.hours} ${it.hours === 1 ? "hr" : "hrs"}` : ""}
                   {it.valueCents > 0 ? ` · ${formatDollars(it.valueCents)}` : ""}
+                  {it.intro ? <span className="lx-note pe-work-intro">{it.intro}</span> : null}
+                  {it.details ? (
+                    <ul className="pe-work-details">
+                      {it.details.map((d, j) => (
+                        <li key={j}>{d}</li>
+                      ))}
+                    </ul>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -94,6 +103,11 @@ export function ProposalCard({ card, showFees = true }: { card: Card; /** The ed
           </div>
         </dl>
       )}
+      {showFees && card.dueToday ? (
+        <p className="lx-note pe-due-today" style={{ margin: 0 }}>
+          {dueTodayStaffLine(formatDollars(card.dueToday.dueNowCents), formatDollars(card.dueToday.balanceCents))}
+        </p>
+      ) : null}
       {showFees && !card.general && (
         <>
         <dl className="pe-pcard-fees">

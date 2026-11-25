@@ -18,6 +18,7 @@ const EXEMPT = new Set([
   "src/components/ui/SheetTable.tsx",
   "src/components/markdown/Markdown.tsx",
   "src/components/client-proposal/ProposalDocument.tsx",
+  "src/components/client-proposal/GeneralProposalDocument.tsx",
   "src/components/client-proposal/LoeExhibitTable.tsx",
 ]);
 

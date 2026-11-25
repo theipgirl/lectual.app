@@ -361,7 +361,11 @@
 .pe-work-head, .pe-work-row { display: grid; grid-template-columns: minmax(160px, 3fr) minmax(64px, 0.8fr) minmax(80px, 1fr) minmax(80px, 1fr) auto; gap: 8px; align-items: center; }
 .pe-work-head { font-size: var(--fs-1); font-weight: 500; color: var(--muted); }
 .pe-general-items { margin: 0; padding-left: 18px; }
+/* Each piece of work's intro and bullet points, under its row, the full width. */
+.pe-work-more { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--line-2); }
+.pe-work-more .lx-label { font-size: var(--fs-1); }
 @media (max-width: 640px) {
+  .pe-work-more { grid-template-columns: minmax(0, 1fr); border-bottom: 0; }
   .pe-work-head { display: none; }
   .pe-work-row { grid-template-columns: repeat(3, minmax(0, 1fr)); padding-bottom: 10px; border-bottom: 1px solid var(--line-2); }
   .pe-work-row input[name$=".label"], .pe-work-row button { grid-column: 1 / -1; }
@@ -484,3 +488,7 @@
 .pe-signed-filing { display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: 1px solid var(--line-2); }
 @media (max-width: 640px) { .pe-signed-dl { grid-template-columns: 1fr; gap: 2px; } .pe-signed-dl dd { margin-bottom: 8px; } }
 .pe-letter-logo { display: block; margin: 0 auto 6px; width: 100%; max-width: 240px; height: auto; }
+
+/* A flat-fee piece of work's intro and bullet points on the staff card. */
+.pe-work-intro { display: block; margin: 2px 0 0; }
+.pe-work-details { margin: 2px 0 4px; padding-left: 18px; }

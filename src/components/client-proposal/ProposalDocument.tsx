@@ -56,6 +56,8 @@ import { LoeSideAction } from "./LoeSideAction";
 import { LoeSignPanel } from "./LoeSignPanel";
 import { LoeStepBar } from "./LoeStepBar";
 import { saveDetailsInBackground, showsSavedNote, useLoeFlow, type LoeLetterData, type LoeStep } from "./loe-flow";
+import { depositOf, DueTodayRows, PayToday } from "./DueToday";
+import { DUE_TODAY_BAR, LEGAL_FEE_TOTAL_LABEL } from "@/lib/loe/client-words";
 import { RPB_FONT_VARS } from "./fonts";
 import {
   brandForSlug,
@@ -341,6 +343,9 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
     [mode, acceptedQuote, priced],
   );
   const display = useMemo(() => markDisplayPrices(shown, shownSelection), [shown, shownSelection]);
+  // A deposit: part of the legal fee today, the balance later (never the USPTO fees). Null = drawn exactly as before.
+  const deposit = depositOf(content, quote);
+  const payNowText = money(deposit ? deposit.split.due_now_cents : quote.legal_total_cents);
   // What a SIGNING is made over. The letter's Exhibit A, and so the fingerprint the page sends, must be built from exactly what
   // the server will sign: the same content with the client's own class words CLEANED the way the server cleans them
   // (`quoteForAcceptance`, the function the accept path calls). The cards above show what the client typed as typed; the
@@ -1179,6 +1184,9 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
                 </div>
 
                 <div className="cp-tot">
+                  {deposit ? (
+                    <DueTodayRows deposit={deposit} totalLabel={LEGAL_FEE_TOTAL_LABEL} />
+                  ) : (
                   <div className="cp-row">
                     <div className="cp-l">
                       <b>Legal fee due now</b>
@@ -1186,6 +1194,7 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
                     </div>
                     <div className="cp-big cp-num">{money(quote.legal_total_cents)}</div>
                   </div>
+                  )}
                   <div className="cp-row">
                     <div className="cp-l">
                       <b>USPTO filing fees, due at filing</b>
@@ -1217,7 +1226,8 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
                         </p>
                       ) : null
                     }
-                    legalTotalText={money(quote.legal_total_cents)}
+                    legalTotalText={payNowText}
+                    payToday={<PayToday deposit={deposit} />}
                     onContinue={() => {
                       // Leaving "Your details": the address goes to the firm's records, without waiting and without a word on the page.
                       if (loeFlow.step === 2) saveDetailsInBackground(onSaveDetails, loeFlow.detailsOk, loeFlow.cleaned);
@@ -1245,6 +1255,7 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
                           : " We will send your payment link by email."}
                       </p>
                     </div>
+                    {finalPayUrl ? <PayToday deposit={deposit} /> : null}
                     {finalPayUrl ? (
                       <a className="cp-btn" href={finalPayUrl} target="_blank" rel="noopener noreferrer">
                         Pay my legal fee
@@ -1283,7 +1294,7 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
                       </p>
                     ) : null}
                     <p className="cp-paynote">
-                      You&rsquo;ll pay <b className="cp-num">{money(quote.legal_total_cents)}</b>{" "}
+                      You&rsquo;ll pay <b className="cp-num">{payNowText}</b>{" "}
                       through our secure client
                       portal. Once it&rsquo;s received, we&rsquo;ll send your engagement agreement for review and signature.
                     </p>
@@ -1330,9 +1341,15 @@ function TrademarkProposalDocument(props: ProposalDocumentProps) {
       {accepted && !loeOn ? null : (
         <div className="cp-bar">
           <div className="cp-bar-in">
+            {deposit ? (
+              <span>
+                {DUE_TODAY_BAR} <b className="cp-num">{payNowText}</b>
+              </span>
+            ) : (
             <span>
               Legal fee due now <b className="cp-num">{money(quote.legal_total_cents)}</b>
             </span>
+            )}
             <a href="#cp-review">{accepted ? "Your receipt" : "Review and accept"}</a>
           </div>
         </div>

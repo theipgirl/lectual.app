@@ -13,7 +13,18 @@ import { UnsavedPriceNote } from "./UnsavedGuard";
  */
 
 /** "What the client pays": the SAVED prices. While the page has unsaved changes it says they update when you save. */
-export function PayBox({ quote, general, valueOverFee }: { quote: ProposalQuote; general: boolean; valueOverFee: { value_cents: number } | null }) {
+export function PayBox({
+  quote,
+  general,
+  valueOverFee,
+  dueTodayLine = null,
+}: {
+  quote: ProposalQuote;
+  general: boolean;
+  valueOverFee: { value_cents: number } | null;
+  /** "Due today $X · Balance $Y" when part of the fee is due today (`dueTodayStaffLine`). */
+  dueTodayLine?: string | null;
+}) {
   return (
     <section className="lx-card pe-totals" aria-label={EDITOR_WORDS.clientPays}>
       <div className="lx-label">{EDITOR_WORDS.clientPays}</div>
@@ -84,6 +95,11 @@ export function PayBox({ quote, general, valueOverFee }: { quote: ProposalQuote;
           </p>
         </>
       )}
+      {dueTodayLine ? (
+        <p className="lx-note pe-due-today" style={{ margin: 0 }}>
+          {dueTodayLine}
+        </p>
+      ) : null}
       <UnsavedPriceNote text={EDITOR_WORDS.pricesUpdateOnSave} />
     </section>
   );
