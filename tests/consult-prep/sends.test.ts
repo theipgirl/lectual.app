@@ -305,3 +305,26 @@ describe("S2a: withheld records and the quality mark", () => {
     expect(parseSendRecord({ payload: sendRecordPayload(rec({ kind: "1h" })) })?.quality).toBeUndefined();
   });
 });
+
+describe("D4: lateness holds whatever state the slot is in", () => {
+  const slot = (kind: "booked" | "24h", status: SendRecord["status"]) => new Map([[recordSlot(KEY, kind), rec({ kind, status, resendId: null })]]);
+  const later = (startHours: number, existing: Map<string, SendRecord>) => plan(startHours, { madeNow: false, brief: "full", existing, preppedAtMs: NOW - 30 * HOUR_MS });
+  it("a booked email that failed is retried inside its window and never after start - 24 h", () => {
+    expect(later(30, slot("booked", "failed")).actions.map((a) => a.kind)).toContain("booked");
+    expect(later(23, slot("booked", "failed")).actions.map((a) => a.kind)).not.toContain("booked");
+    expect(later(23, slot("booked", "withheld")).actions.map((a) => a.kind)).not.toContain("booked");
+  });
+  it("a stage-keyed booked email that failed is not retried 3 days after the prep", () => {
+    const stageKey = stagePrepKey(LEAD, "r");
+    const existing = new Map([[recordSlot(stageKey, "booked"), rec({ prepKey: stageKey, status: "failed", resendId: null })]]);
+    const base = { prepKey: stageKey, madeNow: false, brief: "full" as const, existing };
+    expect(plan(null, { ...base, preppedAtMs: NOW - 2 * 24 * HOUR_MS }).actions).toEqual([{ kind: "booked", mode: "now" }]);
+    expect(plan(null, { ...base, preppedAtMs: NOW - 4 * 24 * HOUR_MS }).actions).toEqual([]);
+  });
+  it("a 24h that failed is retried while inside its window (sent now once its time has passed) and never within 2 h of the start", () => {
+    expect(later(10, slot("24h", "failed")).actions).toContainEqual({ kind: "24h", mode: "now" });
+    expect(later(1.9, slot("24h", "failed")).actions.map((a) => a.kind)).not.toContain("24h");
+    expect(later(1.9, slot("24h", "withheld")).actions.map((a) => a.kind)).not.toContain("24h");
+    expect(plan(10, { madeNow: false, brief: "facts", existing: slot("24h", "failed"), preppedAtMs: NOW - 30 * HOUR_MS }).actions.map((a) => a.kind)).not.toContain("24h");
+  });
+});

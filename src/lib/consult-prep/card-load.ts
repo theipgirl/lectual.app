@@ -130,6 +130,7 @@ export async function loadConsultPrepCard(args: { leadIds: readonly string[]; ad
       emailOn: Boolean(env.RESEND_API_KEY?.trim() && env.CONSULT_PREP_FROM?.trim()),
       adminTier: args.adminTier,
       tz: args.tz,
+      nowMs: Date.now(),
     });
     const brief = view.kind === "prepared" ? await readBrief(view.queueItemId) : ({ status: "none" } as const);
     return { view, brief };

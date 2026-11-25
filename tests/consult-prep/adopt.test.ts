@@ -31,7 +31,7 @@ describe("isFullBrief: the class, risk and package sections", () => {
   it("is true when all three headings are there, in any case and with markdown or numbering around them", () => {
     expect(isFullBrief(FULL)).toBe(true);
     expect(isFullBrief("## LIKELY CLASSES\nx\n**Preliminary risk**\ny\n3) package recommendation: Enhanced")).toBe(true);
-    expect(isFullBrief("Likely classes\nRisk read\nPackage recommendation")).toBe(true);
+    expect(isFullBrief("Likely classes\nClass 25\nRisk read\nLow\nPackage recommendation\nEnhanced")).toBe(true);
   });
   it("a heads-up or a facts-only brief is not full", () => {
     expect(isFullBrief("Heads-up\nSession tomorrow 2 PM\nClient: Dana Ruiz")).toBe(false);
@@ -60,6 +60,30 @@ describe("isFullBrief: the class, risk and package sections", () => {
     expect(facts).toContain(NEXT_UPDATE_LINE);
     expect(isFullBrief(facts)).toBe(false);
     expect(isFullBrief(`${FULL}\n${NEXT_UPDATE_LINE}`)).toBe(false);
+  });
+});
+
+describe("D5: a section counts only with a real heading and real content", () => {
+  it("headings with nothing under them are not a full prep", () => {
+    expect(isFullBrief("Likely classes\nRisk read\nPackage recommendation")).toBe(false);
+    expect(isFullBrief("Likely classes\nClass 25\nRisk read\nLow\nPackage recommendation\n")).toBe(false);
+  });
+  it("a placeholder is not content, inline or on the next line", () => {
+    expect(isFullBrief("Likely classes\nClass 25\nRisk read\nLow\nPackage recommendation: not available")).toBe(false);
+    for (const p of ["n/a", "N/A.", "tbd", "TBD", "not recorded", "Not available", "none", "-", "pending"]) {
+      expect(isFullBrief(`Likely classes: Class 25\nRisk read: Low\nPackage recommendation\n${p}`), p).toBe(false);
+      expect(isFullBrief(`Likely classes: Class 25\nRisk read: Low\n**Package recommendation:** ${p}`), p).toBe(false);
+    }
+  });
+  it("content may be inline after a separator or on a following line, with markdown and bullets", () => {
+    expect(isFullBrief("**Likely classes:** Class 25\n- Risk read - low\n3. Package recommendation\n- Enhanced")).toBe(true);
+  });
+  it("a sentence that only starts with the heading words, or buries them mid-line, is not a heading", () => {
+    expect(isFullBrief("Likely classes will be discussed on the call.\nRisk read will follow.\nPackage recommendation comes later.")).toBe(false);
+    expect(isFullBrief("See the likely classes\nand the risk read\nand the package recommendation\nall below")).toBe(false);
+  });
+  it("an empty section followed by the next heading does not borrow that heading as content", () => {
+    expect(isFullBrief("Likely classes\nRisk read\nLow\nPackage recommendation\nEnhanced")).toBe(false);
   });
 });
 

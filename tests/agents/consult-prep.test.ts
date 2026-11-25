@@ -1593,14 +1593,78 @@ describe("S2a: emails carry only a full brief", () => {
     expect(later.sent[0].text.startsWith(FULL_TEXT)).toBe(true);
   });
 
-  it("Approvals unreadable on a later run: nothing is sent or withheld on a guess, and it is counted", async () => {
+  it("D2: Approvals unreadable on a later run: the facts-only 1h is still planned, nothing is adopted or cancelled on a guess, booked and 24h stay withheld, and it is counted", async () => {
+    const start = hours(200);
+    const tables = { crm_calendar_event: [event("e1", { starts_at: start })] };
+    const first = setup({ tables, ...FACTS });
+    await first.run();
+    expect(first.sent).toHaveLength(0); // the 1h is not inside Resend's window yet
+    const later = NOW + 130 * 3_600_000; // 70 hours before the start
+    const down = setup({ now: later, tables: { ...tables, crm_activity: first.db.tables.crm_activity }, listPending: async () => { throw new Error("x"); }, listApproved: async () => [] });
+    const result = await down.run();
+    expect(down.sent.map(lastWord)).toEqual(["1h"]);
+    expect(down.sent[0].subject).toMatch(/^Facts only: /);
+    expect(down.cancelled).toHaveLength(0);
+    expect(adoptMarkers(down.db)).toHaveLength(0);
+    expect(sendPayloads(down.db).filter((p) => p.status === "withheld").map((p) => p.kind).sort()).toEqual(["24h", "booked"]);
+    expect(result.summary).toMatch(/Approvals could not be read/);
+  });
+
+  it("D2: a facts-only 1h already scheduled is kept (not cancelled) while Approvals is down", async () => {
     const first = setup({ tables: FIFTY_H(), ...FACTS });
     await first.run();
     const down = setup({ now: NOW + 3_600_000, tables: { ...FIFTY_H(), crm_activity: first.db.tables.crm_activity }, listPending: async () => { throw new Error("x"); }, listApproved: async () => [] });
-    const result = await down.run();
+    await down.run();
     expect(down.sent).toHaveLength(0);
     expect(down.cancelled).toHaveLength(0);
-    expect(result.summary).toMatch(/Approvals could not be read/);
+  });
+
+  it("D6: an adopted item that is later rejected (or gone) has its still-scheduled sends cancelled, and the 1h is planned again as facts only", async () => {
+    const first = setup({ full: true, tables: FIFTY_H() });
+    await first.run();
+    expect(first.sent.map(lastWord)).toEqual(["booked", "24h", "1h"]);
+    for (const gone of [async () => [] as never[], async () => [fullItem({ status: "rejected" })]]) {
+      const later = setup({ now: NOW + 3_600_000, tables: { ...FIFTY_H(), crm_activity: first.db.tables.crm_activity }, listPending: gone, listApproved: async () => [] });
+      const result = await later.run();
+      expect(later.cancelled.map((c) => c.id).sort()).toEqual(["re_2", "re_3"]);
+      expect(later.sent.map(lastWord)).toEqual(["1h"]);
+      expect(later.sent[0].subject).toMatch(/^Facts only: /);
+      expect(result.summary).toMatch(/2 scheduled emails cancelled because the prep they carried is no longer in Approvals/);
+    }
+  });
+
+  it("D6: a failed Approvals read cancels nothing, however the adopted item may look", async () => {
+    const first = setup({ full: true, tables: FIFTY_H() });
+    await first.run();
+    const down = setup({ now: NOW + 3_600_000, tables: { ...FIFTY_H(), crm_activity: first.db.tables.crm_activity }, listPending: async () => { throw new Error("x"); }, listApproved: async () => [] });
+    await down.run();
+    expect(down.cancelled).toHaveLength(0);
+  });
+
+  it("D7: a cancel whose row could not be written is not re-planned under the cancelled email's key", async () => {
+    const first = setup({ tables: FIFTY_H(), ...FACTS });
+    await first.run();
+    const later = setup({
+      full: true,
+      now: NOW + 3_600_000,
+      tables: { ...FIFTY_H(), crm_activity: first.db.tables.crm_activity },
+      failures: (q) => (q.table === "crm_activity" && q.action === "insert" && JSON.stringify(q.values).includes('"status":"cancelled"') ? { message: "down" } : undefined),
+    });
+    const result = await later.run();
+    expect(later.cancelled.map((c) => c.id)).toEqual(["re_1"]);
+    expect(later.sent.map(lastWord)).toEqual(["booked", "24h"]); // no new 1h: its slot was not treated as cancelled
+    expect(later.sent.every((m) => !m.idempotencyKey?.includes(":g"))).toBe(true);
+    expect(result.summary).toMatch(/could not be recorded/);
+  });
+
+  it("D8: an email is counted as held back only when its withheld row was written", async () => {
+    const { run } = setup({
+      tables: FIFTY_H(),
+      ...FACTS,
+      failures: (q) => (q.table === "crm_activity" && q.action === "insert" && JSON.stringify(q.values).includes('"status":"withheld"') ? { message: "down" } : undefined),
+    });
+    const result = await run();
+    expect(result.summary).not.toMatch(/held back: only the facts brief/);
   });
 
   it("the guards on every send still hold for an adopted prep (no recipient, the lead's own address, email off)", async () => {

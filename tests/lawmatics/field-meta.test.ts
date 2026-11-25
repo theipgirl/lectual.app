@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { findField, isSelectType, parseFieldMeta, readFieldMeta, resolveValue, type FieldMeta, type FieldMetaRead } from "@/lib/lawmatics/field-meta";
+import { withoutBareIds, findField, isSelectType, parseFieldMeta, readFieldMeta, resolveValue, type FieldMeta, type FieldMetaRead } from "@/lib/lawmatics/field-meta";
 import type { LawmaticsClient } from "@/lib/lawmatics/client";
 import { customFieldPairs, readLawmaticsIntake, summariseProspect } from "@/lib/consult-prep/lawmatics-intake";
 
@@ -171,5 +171,16 @@ describe("readLawmaticsIntake reads the field list once per client, and says whe
     const out = await readLawmaticsIntake(mk(async () => { throw new Error("down"); }), "p1");
     expect(out).toMatchObject({ state: "ok", labels: "failed" });
     expect(JSON.stringify(out)).not.toContain("589386");
+  });
+});
+
+describe("withoutBareIds", () => {
+  it("replaces a bare 3+ digit value, or comma part, and leaves the rest", () => {
+    expect(withoutBareIds("589386")).toBe("not recorded");
+    expect(withoutBareIds("Booth, 589386, UGW")).toBe("Booth, not recorded, UGW");
+    expect(withoutBareIds("Booth 2026")).toBe("Booth 2026");
+    expect(withoutBareIds("12")).toBe("12");
+    expect(withoutBareIds("  ")).toBeNull();
+    expect(withoutBareIds(null)).toBeNull();
   });
 });

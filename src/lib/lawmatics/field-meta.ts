@@ -203,3 +203,16 @@ export function findField(lookup: LabelLookup, id: string | null | undefined, na
   if (byId) return byId;
   return name ? lookup.index.byName.get(name.trim().toLowerCase()) : undefined;
 }
+
+/**
+ * A value Lectual stores that came from Lawmatics and may still be a bare option id (a lead's referral detail, say). A value, or a
+ * comma-separated part of one, that is a number of 3+ digits reads "not recorded" and the number is never printed. Words pass unchanged;
+ * a value with no such part is returned as it was.
+ */
+export function withoutBareIds(value: string | null | undefined): string | null {
+  const text = (value ?? "").trim();
+  if (!text) return null;
+  const parts = text.split(",").map((p) => p.trim());
+  if (!parts.some((p) => /^\d{3,}$/.test(p))) return text;
+  return parts.filter((p) => p !== "").map((p) => (/^\d{3,}$/.test(p) ? NOT_RECORDED_TEXT : p)).join(", ");
+}

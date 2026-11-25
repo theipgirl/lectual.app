@@ -31,6 +31,7 @@ import { CONSULT_PREP_KEY, guardRecipients, parseRecipientSetting } from "./reci
 import type { GuardResult } from "./recipients";
 import {
   HOUR_MS,
+  SEND_KINDS,
   foldSendRecords,
   parseSendRecord,
   planSends,
@@ -149,12 +150,14 @@ type Counts = {
   factsOnly: number;
   /** Scheduled facts-only 1 h emails cancelled and planned again with a full brief. */
   upgraded: number;
+  /** Scheduled emails cancelled because the Approvals item they carried was rejected or is gone. */
+  adoptedGone: number;
   unreadSections: Record<string, number>;
 };
 
 const emptyCounts = (): Counts => ({
   prepped: 0, drafts: 0, noAddress: 0, noTemplate: 0, refused: 0, failed: 0, partial: 0, unrecorded: 0, sent: 0, scheduled: 0, cancelled: 0,
-  cancelUnchecked: 0, noRecipients: 0, emailOff: 0, recipientsUnread: 0, sendFailed: 0, nothingToDeliver: 0, mergedSkipped: 0, duplicate: 0, leadsOver: 0, leftSkipped: 0, twins: 0, alreadyPrepped: 0, leftCancelled: 0, recipientsChanged: 0, over: 0, deferred: 0, adopted: 0, adoptionUnread: 0, withheld: 0, factsOnly: 0, upgraded: 0,
+  cancelUnchecked: 0, noRecipients: 0, emailOff: 0, recipientsUnread: 0, sendFailed: 0, nothingToDeliver: 0, mergedSkipped: 0, duplicate: 0, leadsOver: 0, leftSkipped: 0, twins: 0, alreadyPrepped: 0, leftCancelled: 0, recipientsChanged: 0, over: 0, deferred: 0, adopted: 0, adoptionUnread: 0, withheld: 0, factsOnly: 0, upgraded: 0, adoptedGone: 0,
   unreadSections: { answers: 0, mail: 0, meetings: 0, files: 0, lawmatics: 0, labels: 0 },
 });
 
@@ -614,13 +617,14 @@ type FullPrep = { text: string; itemId: string; /** Not yet recorded on the lead
 async function recordWithheld(ctx: Pick<AgentContext, "admin" | "orgId">, counts: Counts, state: RunState, c: Candidate, kinds: readonly SendKind[]): Promise<void> {
   if (c.rerun) return;
   for (const kind of kinds) {
-    counts.withheld += 1;
     const slot = recordSlot(c.key, kind);
     const have = state.folded.get(slot);
     if (have && (have.status === "withheld" || have.status === "failed")) continue;
     const ok = await writeSendRecord(ctx.admin, ctx.orgId, c.leadId, { prepKey: c.key, kind, resendId: null, scheduledFor: null, status: "withheld" });
-    if (ok) state.folded.set(slot, { leadId: c.leadId, prepKey: c.key, kind, resendId: null, scheduledFor: null, status: "withheld", at: new Date().toISOString() });
-    else counts.unrecorded += 1;
+    if (ok) {
+      counts.withheld += 1; // counted only when a new row is written
+      state.folded.set(slot, { leadId: c.leadId, prepKey: c.key, kind, resendId: null, scheduledFor: null, status: "withheld", at: new Date().toISOString() });
+    } else counts.unrecorded += 1;
   }
 }
 
@@ -669,15 +673,20 @@ async function cancelOne(ctx: Pick<AgentContext, "admin" | "orgId">, deps: PrepD
     return false;
   }
   counts.cancelled += 1;
-  // The slot is no longer done: a later plan in this run sees it as cancelled, and a new send for it gets a new idempotency key.
-  const slot = recordSlot(record.prepKey, record.kind);
-  state.folded.set(slot, { ...record, status: "cancelled", at: new Date(nowMs).toISOString() });
-  state.gens.set(slot, (state.gens.get(slot) ?? 0) + 1);
   const leadId = leadOfRecord(record);
   const ok = leadId
     ? await writeSendRecord(ctx.admin, ctx.orgId, leadId, { prepKey: record.prepKey, kind: record.kind, resendId: record.resendId, scheduledFor: record.scheduledFor, status: "cancelled", recipientsSha256: record.recipientsSha256 })
     : false;
-  if (!ok) counts.unrecorded += 1;
+  if (!ok) {
+    // The email is cancelled at Resend but the row saying so was not written: the slot is NOT treated as cancelled, so nothing is planned
+    // again under a key the generation count has not moved past (a re-plan would reuse the cancelled email's key).
+    counts.unrecorded += 1;
+    return false;
+  }
+  // The slot is no longer done: a later plan in this run sees it as cancelled, and a new send for it gets a new idempotency key.
+  const slot = recordSlot(record.prepKey, record.kind);
+  state.folded.set(slot, { ...record, status: "cancelled", at: new Date(nowMs).toISOString() });
+  state.gens.set(slot, (state.gens.get(slot) ?? 0) + 1);
   return true;
 }
 
@@ -970,16 +979,18 @@ export async function runPrep(ctx: AgentContext, rawDeps: PrepDeps, generate: Dr
     return item ? { state: "found", item } : { state: "none" };
   };
   /** A prep that already exists: the item it adopted if that is still in Approvals, else whatever full prep is there now. */
-  const fullForPrepped = async (c: Candidate, adoptedId: string | undefined): Promise<{ state: "unavailable" } | { state: "ok"; full: FullPrep | null }> => {
+  const fullForPrepped = async (c: Candidate, adoptedId: string | undefined): Promise<{ state: "unavailable" } | { state: "ok"; full: FullPrep | null; adoptedGone: boolean }> => {
     const a = await approvals();
     if (a.state === "unavailable") return { state: "unavailable" };
+    let adoptedGone = false;
     if (a.state === "ok" && adoptedId) {
       const hit = stillAdoptable(a.items, adoptedId);
-      if (hit) return { state: "ok", full: { text: itemText(hit), itemId: hit.id, isNew: false } };
+      if (hit) return { state: "ok", full: { text: itemText(hit), itemId: hit.id, isNew: false }, adoptedGone: false };
+      adoptedGone = true; // read fine, and the item it adopted is rejected, edited into something else, or no longer there
     }
     const found = await adoptionFor(c);
     if (found.state === "unavailable") return { state: "unavailable" };
-    return { state: "ok", full: found.state === "found" ? { text: itemText(found.item), itemId: found.item.id, isNew: found.item.id !== adoptedId } : null };
+    return { state: "ok", full: found.state === "found" ? { text: itemText(found.item), itemId: found.item.id, isNew: found.item.id !== adoptedId } : null, adoptedGone };
   };
   for (const c of standing) {
     if (budgetNearlySpent(ctx, NO_NEW_ITEM_RESERVE_MS)) {
@@ -1017,21 +1028,28 @@ export async function runPrep(ctx: AgentContext, rawDeps: PrepDeps, generate: Dr
         const probe = planSends({ ...base, brief: "facts", existing });
         if (probe.actions.length === 0 && probe.withheld.length === 0 && !factsScheduled && !adoptedId) continue;
         let full: FullPrep | null = null;
+        let adoptedGone = false;
         if (!c.rerun) {
           const looked = await fullForPrepped(c, adoptedId);
           if (looked.state === "unavailable") {
-            // Not knowing what Approvals holds is not "no full prep": nothing is sent or withheld on a guess, and the next run asks again.
+            // Approvals could not be read: it is said, nothing is adopted and NOTHING is cancelled on a guess, and the plan below runs as with a
+            // facts brief, so the facts-only 1 h email is not lost (a full prep that turns up later replaces it).
             counts.adoptionUnread += 1;
-            continue;
+          } else {
+            full = looked.full;
+            adoptedGone = looked.adoptedGone;
           }
-          full = looked.full;
         }
-        // A facts-only 1 h email still waiting at Resend is replaced by the full brief: cancel it, and the plan below sends it again.
+        // Sends still waiting at Resend that carry the wrong text are cancelled, and the plan below sends them again: a facts-only 1 h when a full brief
+        // has turned up, and anything made from an adopted item that is now rejected or gone (it carries text nobody should rely on any more).
         let owed = existing;
-        if (full && factsScheduled) {
-          const record = existing.get(recordSlot(c.key, "1h")) as SendRecord;
+        const stale = SEND_KINDS.map((k) => existing.get(recordSlot(c.key, k))).filter(
+          (r): r is SendRecord => !!r && r.status === "scheduled" && !!r.scheduledFor && Date.parse(r.scheduledFor) > nowMs && ((!!full && r.quality === "facts") || (adoptedGone && r.quality !== "facts")),
+        );
+        for (const record of stale) {
           if (await cancelOne(ctx, deps, counts, state, record, nowMs)) {
-            counts.upgraded += 1;
+            if (record.quality === "facts") counts.upgraded += 1;
+            else counts.adoptedGone += 1;
             owed = new Map(state.folded);
           }
         }
@@ -1247,6 +1265,7 @@ function summaryOf(c: Counts, stageUnread: boolean, outlookNotReady: boolean, ou
   if (c.withheld > 0) parts.push(`${plural(c.withheld, "email", "emails")} held back: only the facts brief exists, and an email carries the full prep. ${c.withheld === 1 ? "It is" : "They are"} sent if a full prep appears while still due.`);
   if (c.factsOnly > 0) parts.push(`${plural(c.factsOnly, "hour-before email", "hour-before emails")} sent or scheduled marked "facts only".`);
   if (c.upgraded > 0) parts.push(`${plural(c.upgraded, "facts-only email", "facts-only emails")} cancelled and planned again with the full prep.`);
+  if (c.adoptedGone > 0) parts.push(`${plural(c.adoptedGone, "scheduled email", "scheduled emails")} cancelled because the prep they carried is no longer in Approvals.`);
   if (c.noTemplate > 0) parts.push(`${plural(c.noTemplate, "consult", "consults")} got only the heads-up: the client-prep email template isn't set up for this firm, so no client email was written.`);
   if (c.noAddress > 0) parts.push(`${plural(c.noAddress, "consult", "consults")} had no client address, so only the heads-up was written.`);
   if (c.refused > 0) parts.push(`${plural(c.refused, "consult", "consults")} held back because a draft contained attorney-judgment content.`);

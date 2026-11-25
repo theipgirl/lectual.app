@@ -223,3 +223,20 @@ describe("S2a: the facts-only mark, the adopted prep and the labels note", () =>
     expect(renderConsultBrief(facts({ lawmatics: read("ok") })).text).not.toContain(LABELS_UNREAD_LINE);
   });
 });
+
+describe("D3: a Lawmatics option id stored on the lead never prints", () => {
+  const src = (referralSource: string | null, referralDetail: string | null) => renderConsultBrief(facts({ lead: { ...lead, referralSource, referralDetail } })).text;
+  it("a bare id as the detail, or as a comma part of it, reads not recorded", () => {
+    expect(src("Booth", "589386")).toContain("- Source: Booth, not recorded");
+    expect(src("Booth", "UGW 2026, 878263")).toContain("- Source: Booth, UGW 2026, not recorded");
+    expect(src("589386", null)).toContain("- Source: not recorded");
+    expect(src("Booth", "589386")).not.toContain("589386");
+  });
+  it("words and short numbers pass unchanged", () => {
+    expect(src("Booth", "UGW 2026")).toContain("- Source: Booth, UGW 2026");
+    expect(src("Booth", "Table 12")).toContain("- Source: Booth, Table 12");
+  });
+  it("the practice area on the lead is held to the same rule", () => {
+    expect(renderConsultBrief(facts({ lead: { ...lead, practiceArea: "700700" } })).text).not.toContain("700700");
+  });
+});

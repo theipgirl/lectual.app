@@ -2,6 +2,7 @@ import { scrubJudgmentContent } from "@/lib/prep-consult/prep-consult";
 import type { AnswersRead, FilesRead, LeadFacts, MailRead, MeetingsRead } from "@/lib/agents/consult-prep/facts";
 import { ANSWER_PAIR_CAP, cardName } from "@/lib/agents/consult-prep/facts";
 import { civilDay } from "@/lib/agents/shared";
+import { withoutBareIds } from "@/lib/lawmatics/field-meta";
 import type { LawmaticsRead } from "./lawmatics-intake";
 import type { SendKind } from "./sends";
 
@@ -97,7 +98,8 @@ function sections(f: BriefFacts, opts: BriefOptions = {}): { own: Section[]; wor
       row("Email", flat(lead.email)),
       row("Phone", flat(lead.phone)),
       row("Stage", flat(lead.stage)),
-      row("Source", flat([lead.referralSource, lead.referralDetail].filter(Boolean).join(", "))),
+      // The source and its detail can come from Lawmatics, where a picklist answer may have been stored as its option id: a bare number never prints.
+      row("Source", flat([withoutBareIds(lead.referralSource), withoutBareIds(lead.referralDetail)].filter(Boolean).join(", "))),
     ],
   };
 
@@ -111,7 +113,7 @@ function sections(f: BriefFacts, opts: BriefOptions = {}): { own: Section[]; wor
   const need: Section = {
     heading: "What they need",
     lines: [
-      row("Practice area", flat(lead.practiceArea) ?? flat(lm?.practiceArea)),
+      row("Practice area", flat(withoutBareIds(lead.practiceArea)) ?? flat(lm?.practiceArea)),
       ...(fromIntake.length > 0
         ? fromIntake.map((l) => `- ${l}`)
         : [row("Their inquiry", flat(lm ? clip(lm.inquiry ?? "", 600) : null))]),

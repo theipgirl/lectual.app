@@ -162,8 +162,9 @@ export function planSends(input: PlanInput): SendPlan {
   const booked = get("booked");
   const wasWithheld = booked?.status === "withheld";
   if (!done(booked) && !input.suppressBooked && (input.madeNow || booked?.status === "failed" || wasWithheld)) {
-    // An owed (withheld) booked email is not sent late: not after its consult's 24 h time, nor long after a stage-keyed prep was made.
-    const late = wasWithheld && !input.madeNow && (start !== null ? input.nowMs >= start - 24 * HOUR_MS : input.nowMs - input.preppedAtMs > STAGE_BOOKED_OWED_MS);
+    // An owed booked email (withheld, or failed and tried again) is not sent late, whatever state its slot is in: not after its consult's
+    // 24 h time, nor long after a stage-keyed prep was made.
+    const late = !input.madeNow && (start !== null ? input.nowMs >= start - 24 * HOUR_MS : input.nowMs - input.preppedAtMs > STAGE_BOOKED_OWED_MS);
     if (!late) {
       if (full) actions.push({ kind: "booked", mode: "now" });
       else withheld.push("booked");
@@ -179,7 +180,9 @@ export function planSends(input: PlanInput): SendPlan {
     if (!wanted || done(get(kind))) continue;
     if (at <= input.nowMs) {
       // Its time has passed: nothing more is owed for it, except a withheld 24h, which a full brief still sends until 2 h before the start.
-      if (kind === "24h" && get(kind)?.status === "withheld" && input.nowMs < start - REMINDER_24H_CUTOFF_MS && full) actions.push({ kind, mode: "now" });
+      // A 24h that is owed (withheld, or failed and never retried) is retried while it is still inside its window, whatever its status.
+      const status = get(kind)?.status;
+      if (kind === "24h" && (status === "withheld" || status === "failed") && input.nowMs < start - REMINDER_24H_CUTOFF_MS && full) actions.push({ kind, mode: "now" });
       continue;
     }
     if (kind === "24h" && !full) {

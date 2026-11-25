@@ -1,4 +1,4 @@
-import type { SendRecord } from "./sends";
+import { HOUR_MS, STAGE_BOOKED_OWED_MS, type SendRecord } from "./sends";
 import { parsePrepKey } from "./keys";
 import {
   CONSULT_PREP_ADOPTED,
@@ -36,6 +36,8 @@ export type CardInputs = {
   emailOn: boolean;
   adminTier: boolean;
   tz: string;
+  /** The clock, for "is the owed booked email still due?". Absent: it is taken as still due. */
+  nowMs?: number;
 };
 
 export type CardView =
@@ -54,6 +56,18 @@ const when = (iso: string, tz: string): string => {
 const list = (names: readonly string[]): string => (names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`);
 
 const noRecipientsLines = (adminTier: boolean): string[] => [`${CONSULT_PREP_NO_RECIPIENTS} ${adminTier ? CONSULT_PREP_SET_IN_TEAM : CONSULT_PREP_ASK_ADMIN}`];
+
+/** The owed booked email lapses at the consult's 24 h time (a stage-keyed prep: 3 days after it was made), as `planSends` decides. */
+function bookedStillOwed(marker: PrepMarker, nowMs: number | undefined): boolean {
+  if (nowMs === undefined) return true;
+  const parsed = marker.prepKey ? parsePrepKey(marker.prepKey) : null;
+  if (parsed?.kind === "event") {
+    const start = Date.parse(parsed.startsAt);
+    return Number.isFinite(start) ? nowMs < start - 24 * HOUR_MS : true;
+  }
+  const made = Date.parse(marker.at);
+  return Number.isFinite(made) ? nowMs - made <= STAGE_BOOKED_OWED_MS : true;
+}
 
 export function consultPrepCardView(input: CardInputs): CardView {
   if (input.agents === "off") return { kind: "hidden" };
@@ -78,7 +92,7 @@ export function consultPrepCardView(input: CardInputs): CardView {
       mail = "emailed";
     } else if (booked?.status === "failed") {
       mail = "the email couldn't be sent and will be tried again";
-    } else if (booked?.status === "withheld") {
+    } else if (booked?.status === "withheld" && bookedStillOwed({ ...newest, at: madeAt ?? newest.at }, input.nowMs)) {
       mail = CONSULT_PREP_WAITING_FULL;
     } else if (!input.emailOn) {
       mail = `${CONSULT_PREP_NOT_EMAILED} (${CONSULT_PREP_EMAIL_OFF})`;
