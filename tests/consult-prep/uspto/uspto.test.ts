@@ -119,6 +119,15 @@ describe('row mapping', () => {
       owner: 'Legacy Events, Inc.',
       goods_services: 'Services for 90000001',
       tsdr: 'https://tsdr.uspto.gov/#caseNumber=90000001&caseSearchType=US_APPLICATION&caseType=DEFAULT&searchType=statusSearch',
+      sheet: {
+        goods: 'Services for 90000001',
+        basis: '1A',
+        classes: '041 035',
+        owner: '',
+        priority: '',
+        reg_type: '',
+        supplemental: '',
+      },
     });
     expect(r.rows[1].status).toBe('DEAD');
     expect(tsdrLink('1')).toContain('caseNumber=1&');
