@@ -1,4 +1,5 @@
 import "server-only";
+import { MAX_PACKAGE_CHOICE_OPTIONS } from "@/lib/proposals/package-choice-limit";
 import { z } from "zod";
 import { AGENT_POLICY } from "@/lib/agents/policy";
 import {
@@ -1040,12 +1041,12 @@ export async function draftProposalFromConsult(input: DraftConsultProposalInput)
 /**
  * What a "client chooses" firm offers on a consult (Sprint 5, D2): the setting's options, starting on the package
  * recommended on the call. A recommended package missing from the options is added, dropping the last option when
- * three are already offered. With no recommended package on the list, the setting's own start stands.
+ * the most a choice may offer (MAX_PACKAGE_CHOICE_OPTIONS, four) are already offered. With no recommended package on the list, the setting's own start stands.
  */
 export function consultChoice(offer: NewOffer, recommended: string | null): DraftChoice {
   if (!recommended) return { options: [...offer.options], start: offer.start };
   if (offer.options.includes(recommended)) return { options: [...offer.options], start: recommended };
-  const kept = offer.options.length >= 3 ? offer.options.slice(0, 2) : [...offer.options];
+  const kept = offer.options.length >= MAX_PACKAGE_CHOICE_OPTIONS ? offer.options.slice(0, MAX_PACKAGE_CHOICE_OPTIONS - 1) : [...offer.options];
   return { options: [...kept, recommended], start: recommended };
 }
 

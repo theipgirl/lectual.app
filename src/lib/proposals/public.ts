@@ -1,5 +1,6 @@
 import "server-only";
 
+import { activePaymentTerms, dueToday } from "./due-today";
 import { after } from "next/server";
 import { getAdminClient } from "@/lib/db/admin";
 import { resolveTimeZone } from "@/lib/org/profile-rules";
@@ -273,12 +274,16 @@ export function buildAcceptedSnapshot(input: {
   /** A signed acceptance (engagement letter): schema 2 with who signed and what the letter was merged with. */
   signed?: { agreement: NonNullable<AcceptedSnapshot["agreement"]>; signing: NonNullable<AcceptedSnapshot["signing"]> };
 }): AcceptedSnapshot {
+  // A deposit (`payment_terms` below 100%): the terms and what was due today ride along, so the receipt and the staff page
+  // never re-derive them from a later edit. Absent otherwise, exactly as before.
+  const terms = activePaymentTerms(input.content);
   const base = {
     version: input.version,
     content: input.content,
     selection: input.selection,
     quote: input.quote,
     accepted_at: input.acceptedAt,
+    ...(terms ? { payment_terms: terms, due_now_cents: dueToday(input.quote, terms).due_now_cents } : {}),
   };
   if (input.signed) return { schema: 2, ...base, agreement: input.signed.agreement, signing: input.signed.signing };
   return { schema: 1, ...base };
@@ -353,10 +358,17 @@ export function publicContent(raw: unknown): ProposalContent {
   if (isObject(c.loe)) out.loe = pick(c.loe, ["title", "body", "kind"]);
   // Spec 9: a general (flat-fee) proposal's matter, work items and fee. Only the keys `GeneralBlock` defines.
   if (c.kind === "trademark" || c.kind === "general") out.kind = c.kind;
+  // The deposit terms (both kinds): the part of the legal fee due today and when the balance is due. Its two keys only.
+  if (isObject(c.payment_terms)) out.payment_terms = pick(c.payment_terms, ["due_now_pct", "balance_note"]);
   if (c.kind === "general" && isObject(c.general)) {
     const g = c.general;
     const general = pick(g, ["matter_title", "summary", "fee_cents", "terms_note"]);
-    general.items = objects(g.items).map((it) => pick(it, ["id", "label", "hours", "rate_cents", "value_cents"]));
+    general.items = objects(g.items).map((it) => {
+      const item = pick(it, ["id", "label", "hours", "rate_cents", "value_cents", "intro"]);
+      // The item's bullet points: strings only.
+      if (Array.isArray(it.details)) item.details = it.details.filter((x): x is string => typeof x === "string");
+      return item;
+    });
     if (Array.isArray(g.excludes)) general.excludes = g.excludes.filter((x): x is string => typeof x === "string");
     out.general = general;
   }

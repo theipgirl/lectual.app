@@ -151,8 +151,8 @@ describe("validateContent: package choice and the brand name discount", () => {
     expect(paths(dup)).toContain("names[0].package_choice.options");
 
     const many = renata();
-    many.packages = [...many.packages!, { ...ESSENTIAL, package: "Extra" }];
-    many.names[0].package_choice = { options: ["Essential", "Enhanced", "Concierge", "Extra"], default: "Essential" };
+    many.packages = [...many.packages!, { ...ESSENTIAL, package: "Extra" }, { ...ESSENTIAL, package: "More" }];
+    many.names[0].package_choice = { options: ["Essential", "Enhanced", "Concierge", "Extra", "More"], default: "Essential" };
     expect(paths(many)).toContain("names[0].package_choice.options");
 
     const none = renata();
@@ -261,10 +261,10 @@ describe("the editor's brand name form (parseName)", () => {
     expect(r.value.discount_pct).toBe(10);
   });
 
-  it("refuses no package, more than 3, a default not ticked, a bad discount, and an own price beside a choice", () => {
+  it("refuses no package, more than 4, a default not ticked, a bad discount, and an own price beside a choice", () => {
     const bad: Array<Record<string, string | string[]>> = [
       { pkgFields: "1", pkgChoice: "on" },
-      { pkgFields: "1", pkgChoice: "on", pkgOption: ["A", "B", "C", "D"] },
+      { pkgFields: "1", pkgChoice: "on", pkgOption: ["A", "B", "C", "D", "E"] },
       { pkgFields: "1", pkgChoice: "on", pkgOption: ["Essential"], pkgDefault: "Concierge" },
       { pkgFields: "1", discountPct: "51" },
       { pkgFields: "1", discountPct: "5.5" },

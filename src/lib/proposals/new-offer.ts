@@ -4,17 +4,18 @@
  * Stored under ONE key inside the existing settings pricing jsonb (`pricing.new_offer`), so no migration. It holds
  * package NAMES only, never a number: the prices always come from the firm's package list. Pure (no database).
  *
- *   { mode: "one" | "choice", per: "brand" | "mark", options: string[] (1..3), start: string }
+ *   { mode: "one" | "choice", per: "brand" | "mark", options: string[] (1..4), start: string }
  *
- * `one` offers a single package (`options` is just `[start]`); `choice` lets the client pick among up to three
+ * `one` offers a single package (`options` is just `[start]`); `choice` lets the client pick among up to four
  * named packages, starting on `start`, per brand name or per mark. No key at all = one package, the firm's first.
  */
 
+import { MAX_PACKAGE_CHOICE_OPTIONS } from "./package-choice-limit";
 import { normalisePackages } from "./package-list";
 import { NEW_OFFER_WORDS } from "@/lib/proposal-editor/vocabulary";
 
 export const NEW_OFFER_KEY = "new_offer";
-export const MAX_NEW_OFFER_OPTIONS = 3;
+export const MAX_NEW_OFFER_OPTIONS = MAX_PACKAGE_CHOICE_OPTIONS;
 /** The settings jsonb's own cap (lectual 0089). */
 export const MAX_SETTINGS_PRICING_BYTES = 64 * 1024;
 
@@ -38,7 +39,7 @@ function firmNamesOf(pricing: unknown): string[] {
 }
 
 /**
- * The stored value as a usable offer: unknown package names are dropped, at most three options are kept, and a
+ * The stored value as a usable offer: unknown package names are dropped, at most four options are kept, and a
  * start that is not among them becomes the first. Nothing usable = null (the firm's first package).
  */
 export function parseNewOffer(raw: unknown, firmNames: readonly string[]): NewOffer | null {

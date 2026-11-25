@@ -11,6 +11,7 @@ import { withoutLetterCheck } from "@/lib/proposals/attach-letter";
 import { hasPendingLetterCheck } from "@/lib/proposals/letter-check";
 import { applyGeneralForm } from "./general-form";
 import { applyPackageIncludes } from "./package-includes";
+import { applyPaymentTermsForm } from "./payment-terms-form";
 import {
   parseAdjustments,
   parseDetails,
@@ -182,6 +183,10 @@ export async function buildDraftUpdate(
     const pricing = parsePricing(form);
     if (!pricing.ok) return refuse("Fees and payment", pricing.error);
     content = { ...content, pricing: pricing.value };
+    // "Due today" (a deposit on the legal fee), beside the pay link. Only when the form carries the fields.
+    const terms = applyPaymentTermsForm(form, content);
+    if (!terms.ok) return refuse("Fees and payment", terms.error);
+    content = terms.value;
     if (form.has("incFields")) {
       const includes = parseIncludes(form);
       if (!includes.ok) return refuse("Fees and payment", includes.error);

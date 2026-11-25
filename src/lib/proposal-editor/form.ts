@@ -22,6 +22,7 @@
  * rather than rounding someone's typo.
  */
 
+import { MAX_PACKAGE_CHOICE_OPTIONS } from "@/lib/proposals/package-choice-limit";
 import { centsToInput, parseDollarsToCents } from "@/lib/quotes/money";
 import {
   MARK_KIND_DEFAULT_DESC,
@@ -236,8 +237,8 @@ export function parsePackageChoiceFields(form: FormData, prefix: string, which?:
     const o = typeof v === "string" ? v.trim() : "";
     if (o && !options.includes(o)) options.push(o);
   }
-  if (options.length < 1 || options.length > 3) {
-    return fail(`${which ? `${which}, packages` : "Packages"} the client can choose: tick from 1 to 3 packages.`);
+  if (options.length < 1 || options.length > MAX_PACKAGE_CHOICE_OPTIONS) {
+    return fail(`${which ? `${which}, packages` : "Packages"} the client can choose: tick from 1 to ${MAX_PACKAGE_CHOICE_OPTIONS} packages.`);
   }
   const wanted = text(form, `${prefix}pkgDefault`);
   const def = options.includes(wanted) ? wanted : wanted ? null : options[0];

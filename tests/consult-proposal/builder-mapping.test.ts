@@ -69,10 +69,11 @@ describe("F2: the firm's 'client chooses' offer starts on the package recommende
     expect(validateContent(d.content).filter((i) => i.level === "error")).toEqual([]);
   });
 
-  it("a recommended package missing from the options is added and the last other option dropped (never over 3)", async () => {
+  it("a recommended package missing from the options is added and the last other option dropped (never over 4)", async () => {
     const d = ok(await run({ settingPricing: settingWith({ mode: "choice", per: "brand", options: ["Enhanced", "Concierge"], start: "Enhanced" }) }, melvinOutput(CALM)));
     expect(d.content.names[0].package_choice).toEqual({ options: ["Enhanced", "Concierge", "Essential"], default: "Essential" });
-    expect(consultChoice({ mode: "choice", per: "brand", options: ["A", "B", "C"], start: "A" }, "D")).toEqual({ options: ["A", "B", "D"], start: "D" });
+    expect(consultChoice({ mode: "choice", per: "brand", options: ["A", "B", "C", "X"], start: "A" }, "D")).toEqual({ options: ["A", "B", "C", "D"], start: "D" });
+    expect(consultChoice({ mode: "choice", per: "brand", options: ["A", "B", "C"], start: "A" }, "D")).toEqual({ options: ["A", "B", "C", "D"], start: "D" });
     expect(consultChoice({ mode: "choice", per: "brand", options: ["A", "B"], start: "A" }, "D")).toEqual({ options: ["A", "B", "D"], start: "D" });
   });
 

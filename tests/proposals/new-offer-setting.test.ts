@@ -55,14 +55,14 @@ const INCLUDE_FIELDS: Array<[string, string]> = [
 ];
 
 describe("parsing the stored setting", () => {
-  it("drops unknown package names, keeps at most 3 options, and starts on the first when the start is gone", () => {
+  it("drops unknown package names, keeps at most 4 options, and starts on the first when the start is gone", () => {
     expect(parseNewOffer({ mode: "choice", per: "brand", options: ["Platinum", "Essential", "Enhanced", "Concierge", "Essential"], start: "Platinum" }, NAMES)).toEqual({
       mode: "choice",
       per: "brand",
       options: ["Essential", "Enhanced", "Concierge"],
       start: "Essential",
     });
-    expect(parseNewOffer({ mode: "choice", per: "mark", options: ["A", "B", "C", "D"], start: "A" }, ["A", "B", "C", "D"])!.options).toEqual(["A", "B", "C"]);
+    expect(parseNewOffer({ mode: "choice", per: "mark", options: ["A", "B", "C", "D", "E"], start: "A" }, ["A", "B", "C", "D", "E"])!.options).toEqual(["A", "B", "C", "D"]);
   });
 
   it("nothing usable is null (the firm's first package)", () => {
@@ -86,11 +86,11 @@ describe("the form's fields", () => {
     expect(parseNewOfferForm(form(OFFER_FIELDS), NAMES)).toEqual({ ok: true, value: { mode: "choice", per: "brand", options: ["Essential", "Enhanced"], start: "Enhanced" } });
   });
 
-  it("refuses a package that isn't the firm's, more than 3, none, and an unknown mode", () => {
+  it("refuses a package that isn't the firm's, more than 4, none, and an unknown mode", () => {
     const bad = (extra: Array<[string, string]>) => parseNewOfferForm(form([[NEW_OFFER_MARKER, "1"], ["newOffer.mode", "choice"], ...extra]), NAMES);
     expect(bad([["newOffer.option", "Platinum"]])).toMatchObject({ ok: false });
     expect(bad([])).toMatchObject({ ok: false });
-    expect(parseNewOfferForm(form([[NEW_OFFER_MARKER, "1"], ["newOffer.mode", "choice"], ...["A", "B", "C", "D"].map((o): [string, string] => ["newOffer.option", o])]), ["A", "B", "C", "D"])).toMatchObject({ ok: false });
+    expect(parseNewOfferForm(form([[NEW_OFFER_MARKER, "1"], ["newOffer.mode", "choice"], ...["A", "B", "C", "D", "E"].map((o): [string, string] => ["newOffer.option", o])]), ["A", "B", "C", "D", "E"])).toMatchObject({ ok: false });
     expect(parseNewOfferForm(form([[NEW_OFFER_MARKER, "1"], ["newOffer.mode", "robot"]]), NAMES)).toMatchObject({ ok: false });
   });
 });

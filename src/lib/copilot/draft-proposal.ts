@@ -1,4 +1,5 @@
 import { hash } from "node:crypto";
+import { MAX_PACKAGE_CHOICE_OPTIONS } from "@/lib/proposals/package-choice-limit";
 import { clientFromLead, type LeadFill } from "@/lib/proposals/prefill";
 import { findPackage, normalisePackages, packageOption } from "@/lib/proposals/package-list";
 import { defaultGreeting, parseMoney, parsePercent } from "@/lib/proposal-editor/form";
@@ -50,7 +51,7 @@ export const MAX_ITEM_LABEL = 200;
 export const MAX_ITEMS = 20;
 export const MAX_EXCLUDES = 10;
 export const MAX_EXCLUDE_TEXT = 200;
-export const MAX_OFFER_OPTIONS = 3;
+export const MAX_OFFER_OPTIONS = MAX_PACKAGE_CHOICE_OPTIONS;
 
 /* ───────────────────────── the request ──────────────────────────────────── */
 

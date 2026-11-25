@@ -11,6 +11,7 @@
  * spec carries). It never sends, queues or approves anything.
  */
 
+import { NEW_OFFER_WORDS } from "@/lib/proposal-editor/vocabulary";
 import { buildNewContent, cleanId } from "@/lib/proposal-editor/form";
 import { buildGeneralContent } from "@/lib/proposal-editor/general-form";
 import { loeIssues } from "@/lib/loe/validate";
@@ -27,6 +28,7 @@ import {
   type ContentCheck,
   MAX_CHECK_TEXT,
   MAX_CONTENT_CHECKS,
+  MAX_PACKAGE_CHOICE_OPTIONS,
   type MarkKind,
   type ProposalAdjustment,
   type ProposalContent,
@@ -37,7 +39,7 @@ import { validateContent, type ValidationIssue } from "./validate";
 
 /* ─────────────────────────── the spec ─────────────────────────── */
 
-/** A choice among named packages (1 to 3, all on the firm's list), starting on one of them. */
+/** A choice among named packages (1 to 4, all on the firm's list), starting on one of them. */
 export type DraftChoice = { options: string[]; start?: string };
 
 /** How a brand name's package is offered. Names only: the prices are the firm's. */
@@ -135,7 +137,7 @@ export type DraftResult =
 
 /* ─────────────────────────── the builder ─────────────────────────── */
 
-const MAX_CHOICE = 3;
+const MAX_CHOICE = MAX_PACKAGE_CHOICE_OPTIONS;
 
 /**
  * Errors a draft may still carry (it is being built; the editor's checklist lists them): a trademark draft with no
@@ -258,7 +260,7 @@ function checkNames(asked: string[], names: string[]): Fail | null {
 function choiceOf(c: DraftChoice, names: string[]): Built<{ options: string[]; default: string }> {
   const options = [...new Set(c.options)];
   if (options.length === 0) return { ok: false, error: "Pick at least one package to offer." };
-  if (options.length > MAX_CHOICE) return { ok: false, error: "Offer at most 3 packages." };
+  if (options.length > MAX_CHOICE) return { ok: false, error: NEW_OFFER_WORDS.tooMany };
   const refused = checkNames([...options, ...(c.start ? [c.start] : [])], names);
   if (refused) return refused;
   const start = c.start ?? options[0];

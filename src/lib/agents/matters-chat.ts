@@ -1,4 +1,5 @@
 import "server-only";
+import { MAX_PACKAGE_CHOICE_OPTIONS } from "@/lib/proposals/package-choice-limit";
 import type {
   BetaContentBlockParam,
   BetaMessageParam,
@@ -444,7 +445,7 @@ function buildTools(
                   type: "object",
                   description: "The user wants the client to choose among packages for this brand name",
                   properties: {
-                    options: { type: "array", minItems: 1, maxItems: 3, items: { type: "string", minLength: 1 }, description: "Package names, as the user said them" },
+                    options: { type: "array", minItems: 1, maxItems: MAX_PACKAGE_CHOICE_OPTIONS, items: { type: "string", minLength: 1 }, description: "Package names, as the user said them" },
                     start: { type: "string", description: "The package the choice starts on; one of the options" },
                   },
                   required: ["options"],
@@ -453,8 +454,8 @@ function buildTools(
                   type: "object",
                   description: "The user wants a package chosen for each mark of this brand name",
                   properties: {
-                    word: { type: "object", properties: { options: { type: "array", minItems: 1, maxItems: 3, items: { type: "string" } }, start: { type: "string" } }, required: ["options"] },
-                    logo: { type: "object", properties: { options: { type: "array", minItems: 1, maxItems: 3, items: { type: "string" } }, start: { type: "string" } }, required: ["options"] },
+                    word: { type: "object", properties: { options: { type: "array", minItems: 1, maxItems: MAX_PACKAGE_CHOICE_OPTIONS, items: { type: "string" } }, start: { type: "string" } }, required: ["options"] },
+                    logo: { type: "object", properties: { options: { type: "array", minItems: 1, maxItems: MAX_PACKAGE_CHOICE_OPTIONS, items: { type: "string" } }, start: { type: "string" } }, required: ["options"] },
                   },
                 },
                 discountPercent: { type: "integer", minimum: 0, maximum: 50, description: "A whole percent off this brand name, only when the user gave one" },
