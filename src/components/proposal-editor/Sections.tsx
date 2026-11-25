@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { classLock } from "@/lib/proposals/class-lock";
 import { DEFAULT_CLIENT_ADD, DEFAULT_CLIENT_ENTRY_PROMPT, MAX_CLIENT_ADD } from "@/lib/proposals/client-classes";
-import { MARK_KIND_DEFAULT_DESC, MARK_KIND_LABEL, MARK_KINDS, type MarkKind, type ProposalInclude } from "@/lib/proposals/types";
+import { MARK_KIND_DEFAULT_DESC, MARK_KIND_LABEL, MARK_KINDS, MAX_PACKAGE_CHOICE_OPTIONS, type MarkKind, type ProposalInclude } from "@/lib/proposals/types";
 import { addNameAction, removeNameAction } from "@/app/dashboard/proposals/[id]/actions";
 import { fieldId, sectionId } from "@/lib/proposal-editor/checklist";
 import { EDITOR_WORDS } from "@/lib/proposal-editor/vocabulary";
@@ -12,6 +12,7 @@ import { yesVerb, OPTIONAL } from "@/lib/ui/words";
 import { ActionForm, IssueList, Outcome, type ShownIssue } from "./ActionForm";
 import { ExpiryField } from "./ExpiryField";
 import { IncludesFields } from "./IncludesFields";
+import { PaymentTermsFields } from "./PaymentTermsFields";
 import { newRowId, useRows, type Keyed } from "./rows";
 import { useUnsaved } from "./UnsavedGuard";
 
@@ -138,6 +139,7 @@ export function FeesSection({
   customHelp,
   includes,
   packageIncludes = null,
+  paymentTerms,
 }: Editable & {
   issues: ShownIssue[];
   general?: boolean;
@@ -155,6 +157,8 @@ export function FeesSection({
   includes?: ProposalInclude[];
   /** The offered packages' own rows (`editorPackageIncludes`): when given, these are the tables the client sees, and the single table is not offered. */
   packageIncludes?: { package: string; includes: ProposalInclude[] }[] | null;
+  /** "Due today" (a deposit) beside the pay link. Trademark drafts only: a flat-fee draft has it in "Matter and flat fee". */
+  paymentTerms?: { dueNowPct: string; balanceNote: string };
 }) {
   return (
     <Section id={sectionId.fees} title="Fees and payment" hint="Totals are always worked out from the package, never typed. Packages are edited in Settings → Proposals.">
@@ -173,6 +177,7 @@ export function FeesSection({
             </label>
           )}
         </div>
+        {!general && paymentTerms ? <PaymentTermsFields values={paymentTerms} /> : null}
         {!general && pricing && hasBrandPackage && (
           <>
             <input type="hidden" name="package" value={pricing.package} />
@@ -589,7 +594,7 @@ export function NameCard({
                 <>
                   <input type="hidden" name={`${p}pkgChoice`} value="on" />
                   <span className="lx-note" id={`pe-pkg-${value.id}`}>
-                    Tick 1 to 3 packages. The client picks one for this brand name, and it is priced at that package&rsquo;s prices.
+                    Tick 1 to {MAX_PACKAGE_CHOICE_OPTIONS}{" "}packages. The client picks one for this brand name, and it is priced at that package&rsquo;s prices.
                   </span>
                   <div className="pe-pkg-options" role="group" aria-describedby={`pe-pkg-${value.id}`}>
                     {list.map((x) => (
@@ -722,7 +727,7 @@ function MarkPackageChoice({ prefix, label, saved, firmPackages }: { prefix: str
       {on ? (
         <>
           <span className="lx-note" id={noteId}>
-            Tick 1 to 3 packages. This mark is priced at the package the client picks; a second mark still gets that package&rsquo;s second-mark discount.
+            Tick 1 to {MAX_PACKAGE_CHOICE_OPTIONS}{" "}packages. This mark is priced at the package the client picks; a second mark still gets that package&rsquo;s second-mark discount.
           </span>
           <div className="pe-pkg-options" role="group" aria-describedby={noteId}>
             {firmPackages.map((x) => (

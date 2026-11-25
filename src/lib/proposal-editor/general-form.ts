@@ -4,7 +4,8 @@
  *
  * Fields:
  *   matterTitle, summary, fee ($), excludes (one line each), termsNote, and, in the editor, greeting;
- *   item.<n>.id / label / hours / rate ($ an hour) / value ($): one work item per row. A row with every field
+ *   item.<n>.id / label / hours / rate ($ an hour) / value ($) / intro / details (one bullet point per line): one work
+ *   item per row. A row with every field
  *   blank is skipped (the form always shows a spare one). Money is dollars in the form and cents in the block;
  *   no amount is worked out here (an item's value is `pricing.ts#generalItemValue`). Everything is the staff
  *   member's own words: nothing here writes text for the client.
@@ -14,6 +15,7 @@ import { centsToInput } from "@/lib/quotes/money";
 import { GENERAL_PRICING_STUB, type GeneralBlock, type GeneralItem, type ProposalContent } from "@/lib/proposals/types";
 import { GENERAL_LIMITS, isQuarterHours } from "@/lib/proposals/validate";
 import { cleanId, collectRows, defaultGreeting, parseMoney, type Parsed } from "./form";
+import { applyPaymentTermsForm } from "./payment-terms-form";
 
 const ok = <T,>(value: T): Parsed<T> => ({ ok: true, value });
 const fail = (error: string): Parsed<never> => ({ ok: false, error });
@@ -32,12 +34,12 @@ function parseHours(raw: string, row: number): Parsed<number> {
 
 /** The work items, in row order. A blank row is skipped; a row with numbers but no label is refused. */
 export function parseGeneralItems(form: FormData, rand: () => string): Parsed<GeneralItem[]> {
-  const rows = collectRows(form, "item", ["id", "label", "hours", "rate", "value"]);
+  const rows = collectRows(form, "item", ["id", "label", "hours", "rate", "value", "intro", "details"]);
   const taken = new Set<string>();
   const items: GeneralItem[] = [];
   let shown = 0;
   for (const r of rows) {
-    if (!r.label && !r.hours && !r.rate && !r.value) continue;
+    if (!r.label && !r.hours && !r.rate && !r.value && !r.intro && !r.details) continue;
     shown += 1;
     if (!r.label) return fail(`Work ${shown}: say what this piece of work is.`);
     if (r.label.length > GENERAL_LIMITS.itemLabel) return fail(`Work ${shown}: keep it to ${GENERAL_LIMITS.itemLabel} characters.`);
@@ -59,6 +61,18 @@ export function parseGeneralItems(form: FormData, rand: () => string): Parsed<Ge
       if (!value.ok) return value;
       item.value_cents = value.value;
     }
+    if (r.intro) {
+      if (r.intro.length > GENERAL_LIMITS.intro) return fail(`Work ${shown} intro: keep it to ${GENERAL_LIMITS.intro} characters.`);
+      item.intro = r.intro;
+    }
+    // Details: one bullet point per line, blank lines dropped.
+    const details = r.details
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (details.length > GENERAL_LIMITS.details) return fail(`Work ${shown} details: use at most ${GENERAL_LIMITS.details} lines.`);
+    if (details.some((l) => l.length > GENERAL_LIMITS.detailLine)) return fail(`Work ${shown} details: keep each line to ${GENERAL_LIMITS.detailLine} characters.`);
+    if (details.length > 0) item.details = details;
     items.push(item);
   }
   if (items.length === 0) return fail("Add at least one piece of work.");
@@ -129,7 +143,11 @@ export function applyGeneralForm(form: FormData, current: ProposalContent, rand:
   if (current.kind !== "general") return fail("This is a trademark proposal. Its matter and flat fee can't be set here.");
   const general = parseGeneralForm(form, rand);
   if (!general.ok) return general;
-  const next: ProposalContent = { ...current, general: general.value };
+  let next: ProposalContent = { ...current, general: general.value };
+  // "Due today" sits in this section on a flat-fee draft.
+  const terms = applyPaymentTermsForm(form, next);
+  if (!terms.ok) return terms;
+  next = terms.value;
   if (form.has("greeting")) {
     const greeting = text(form, "greeting");
     if (!greeting) return fail("Greeting: write the greeting paragraph.");
@@ -145,7 +163,7 @@ export type GeneralFormValues = {
   fee: string;
   excludes: string;
   termsNote: string;
-  items: Array<{ id: string; label: string; hours: string; rate: string; value: string }>;
+  items: Array<{ id: string; label: string; hours: string; rate: string; value: string; intro: string; details: string }>;
 };
 
 export function generalFormValues(g: GeneralBlock | undefined): GeneralFormValues {
@@ -162,6 +180,8 @@ export function generalFormValues(g: GeneralBlock | undefined): GeneralFormValue
       hours: typeof it.hours === "number" ? String(it.hours) : "",
       rate: money(it.rate_cents),
       value: money(it.value_cents),
+      intro: it.intro ?? "",
+      details: (it.details ?? []).join("\n"),
     })),
   };
 }

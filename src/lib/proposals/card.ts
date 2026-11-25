@@ -1,6 +1,8 @@
 import { formatDollars } from "@/lib/proposal-editor/events";
+import { activePaymentTerms, dueToday } from "./due-today";
+import { itemDetails, itemIntro } from "./general-sections";
 import { defaultSelection, quoteProposal } from "./pricing";
-import { MARK_KIND_LABEL, isMarkKind, type ProposalContent, type ProposalEventRow } from "./types";
+import { MARK_KIND_LABEL, isMarkKind, type GeneralItem, type ProposalContent, type ProposalEventRow } from "./types";
 
 /**
  * The proposal card: one summary of an agent-drafted (or hand-made) proposal so
@@ -56,12 +58,14 @@ export type ProposalCard = {
   receipts: ProposalCardReceipts;
   /** Spec 9: present only on a general (flat-fee) proposal; then `brands` is empty and there is no USPTO fee. */
   general?: ProposalCardGeneral;
+  /** A deposit (`payment_terms` below 100%): the legal fee due today and the balance. Absent = all due at signing. */
+  dueToday?: { dueNowCents: number; balanceCents: number };
 };
 
 export type ProposalCardGeneral = {
   matterTitle: string;
   summary: string | null;
-  items: Array<{ label: string; hours?: number; valueCents: number }>;
+  items: Array<{ label: string; hours?: number; valueCents: number; intro?: string; details?: string[] }>;
   valueCents: number;
   feeCents: number;
   excludes: string[];
@@ -170,6 +174,7 @@ export function buildProposalCard(
     expiresOn: row.expires_on,
     receipts: receiptsFrom(events),
     ...(quote.general ? { general: generalCard(content, quote.general) } : {}),
+    ...depositCard(content, quote),
   };
 }
 
@@ -179,9 +184,29 @@ function generalCard(content: Partial<ProposalContent>, q: NonNullable<ReturnTyp
   return {
     matterTitle: text(g.matter_title) ?? "",
     summary: text(g.summary),
-    items: q.items.map((i) => ({ label: i.label, ...(i.hours !== undefined ? { hours: i.hours } : {}), valueCents: i.value_cents })),
+    items: q.items.map((i, n) => {
+      // The item's own intro and bullet points (by position: the quote lists the content's items in order).
+      const source = arr<GeneralItem>(g.items)[n];
+      const intro = itemIntro(source);
+      const details = itemDetails(source);
+      return {
+        label: i.label,
+        ...(i.hours !== undefined ? { hours: i.hours } : {}),
+        valueCents: i.value_cents,
+        ...(intro ? { intro } : {}),
+        ...(details.length > 0 ? { details } : {}),
+      };
+    }),
     valueCents: q.value_cents,
     feeCents: q.fee_cents,
     excludes: arr<unknown>(g.excludes).map(text).filter((l): l is string => l !== null),
   };
+}
+
+/** "Due today $X · Balance $Y": only when the proposal asks for part of the fee today. */
+function depositCard(content: Partial<ProposalContent>, quote: ReturnType<typeof quoteProposal>): { dueToday?: ProposalCard["dueToday"] } {
+  const terms = activePaymentTerms(content);
+  if (!terms) return {};
+  const split = dueToday(quote, terms);
+  return { dueToday: { dueNowCents: split.due_now_cents, balanceCents: split.balance_cents } };
 }

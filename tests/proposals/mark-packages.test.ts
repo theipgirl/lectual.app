@@ -163,8 +163,8 @@ describe("validateContent: mark-level choices", () => {
     expect(paths(badDefault)).toContain("names[0].marks[1].package_choice.default");
 
     const many = fold();
-    many.packages = [...many.packages!, { ...ESSENTIAL, package: "Extra" }];
-    many.names[0].marks[0].package_choice = { options: ["Essential", "Enhanced", "Concierge", "Extra"], default: "Essential" };
+    many.packages = [...many.packages!, { ...ESSENTIAL, package: "Extra" }, { ...ESSENTIAL, package: "More" }];
+    many.names[0].marks[0].package_choice = { options: ["Essential", "Enhanced", "Concierge", "Extra", "More"], default: "Essential" };
     expect(paths(many)).toContain("names[0].marks[0].package_choice.options");
 
     const none = fold();
@@ -232,7 +232,7 @@ describe("publicContent, the snapshot and the editor", () => {
       { pkgFields: "1", pkgChoice: "on", pkgOption: "Essential", "mark.0.pkgChoice": "on", "mark.0.pkgOption": "Essential" },
       { pkgFields: "1", overrideBase: "100", "mark.0.pkgChoice": "on", "mark.0.pkgOption": "Essential" },
       { pkgFields: "1", "mark.0.pkgChoice": "on" },
-      { pkgFields: "1", "mark.0.pkgChoice": "on", "mark.0.pkgOption": ["A", "B", "C", "D"] },
+      { pkgFields: "1", "mark.0.pkgChoice": "on", "mark.0.pkgOption": ["A", "B", "C", "D", "E"] },
       { pkgFields: "1", "mark.0.pkgChoice": "on", "mark.0.pkgOption": "Essential", "mark.0.pkgDefault": "Concierge" },
     ];
     for (const extra of bad) expect(parseName(form(extra), fold(), rand).ok).toBe(false);

@@ -28,7 +28,8 @@
  * required too (they are columns, not content, so the caller passes them in).
  */
 
-import { CHECK_SOURCES, isMarkKind, MADE_BY_VALUES, MAX_CHECK_TEXT, MAX_CONTENT_CHECKS } from "./types";
+import { CHECK_SOURCES, isMarkKind, MADE_BY_VALUES, MAX_CHECK_TEXT, MAX_CONTENT_CHECKS, MAX_PACKAGE_CHOICE_OPTIONS } from "./types";
+import { paymentTermsIssues } from "./due-today";
 import { LETTER_CHECK_PATH, hasPendingLetterCheck } from "./letter-check";
 import { LETTER_PENDING_FIX } from "@/lib/ui/words";
 import { MAX_CLASSES_TOTAL_PER_BRAND, MAX_CLIENT_ADD } from "./client-classes";
@@ -326,6 +327,8 @@ export function validateContent(content: unknown, options: ValidateOptions = {})
   // without one (`letter-check.ts`): it may be edited and saved, but it cannot be approved for a link. A firm with an approved
   // letter never gets a live proposal that silently lacks it.
   if (options.forApproval && hasPendingLetterCheck(content)) err(LETTER_CHECK_PATH, LETTER_PENDING_FIX);
+  // A deposit on the legal fee (both kinds): a whole 1..100 percent due today, and when the balance is due.
+  for (const issue of paymentTermsIssues(content.payment_terms)) err(issue.path, issue.message);
   if (content.kind === "general") {
     validateGeneralContent(content, out);
     return out;
@@ -431,13 +434,15 @@ export function validateContent(content: unknown, options: ValidateOptions = {})
     err("pricing.custom_discount", "A custom discount belongs on one of the packages the client chooses from, not on the proposal's pricing.");
   }
 
-  // Spec 6 / Spec 7: one package choice (a brand name's or a mark's): 1 to 3 of this proposal's packages, the default one of them.
+  // Spec 6 / Spec 7: one package choice (a brand name's or a mark's): 1 to 4 of this proposal's packages, the default one of them.
   const checkChoice = (path: string, raw: unknown) => {
     const choice = isObj(raw) ? raw : null;
     const options = choice && Array.isArray(choice.options) ? choice.options : null;
     if (!hasPackages) err(path, "Add the packages to choose from before letting the client choose one.");
     if (!choice || !options) return err(path, "The package choice is not readable.");
-    if (options.length < 1 || options.length > 3) err(`${path}.options`, "Offer from 1 to 3 packages to choose from.");
+    if (options.length < 1 || options.length > MAX_PACKAGE_CHOICE_OPTIONS) {
+      err(`${path}.options`, `Offer from 1 to ${MAX_PACKAGE_CHOICE_OPTIONS} packages to choose from.`);
+    }
     const seenOptions = new Set<string>();
     for (const option of options) {
       if (typeof option !== "string" || !option.trim()) {
@@ -639,7 +644,15 @@ export const GENERAL_LIMITS = {
   excludes: 10,
   excludeLine: 200,
   termsNote: 600,
+  details: 12,
+  detailLine: 300,
+  intro: 600,
 } as const;
+
+/** An item's intro paragraph: plain text, line breaks allowed (no angle brackets, no other control characters). */
+function isPlainIntro(text: string): boolean {
+  return isPlainLabel(text.replace(/\r?\n/g, " "));
+}
 
 /** Hours in quarter-hour steps, above 0 and at most 100. */
 export function isQuarterHours(v: unknown): v is number {
@@ -712,6 +725,24 @@ function validateGeneralContent(content: Record<string, unknown>, out: Validatio
       }
       if (raw.rate_cents != null && raw.hours == null) err(`${p}.rate_cents`, "Give the hours with the rate, or a value instead.");
       if (raw.value_cents != null && !isCents(raw.value_cents)) err(`${p}.value_cents`, "A value must be a whole number of cents, zero or more.");
+      if (raw.intro != null) {
+        const intro = typeof raw.intro === "string" ? raw.intro.trim() : null;
+        if (intro === null || !intro) err(`${p}.intro`, "The intro for this piece of work can't be blank. Leave it out instead.");
+        else if (intro.length > L.intro) err(`${p}.intro`, `Keep the intro to ${L.intro} characters.`);
+        else if (!isPlainIntro(intro)) err(`${p}.intro`, "The intro must be plain text.");
+      }
+      if (raw.details != null) {
+        if (!Array.isArray(raw.details)) err(`${p}.details`, "The bullet points must be a list.");
+        else {
+          if (raw.details.length > L.details) err(`${p}.details`, `Use at most ${L.details} bullet points for one piece of work.`);
+          raw.details.forEach((line, j) => {
+            const t = typeof line === "string" ? line.trim() : "";
+            if (!t) err(`${p}.details[${j}]`, "A bullet point can't be blank.");
+            else if (t.length > L.detailLine) err(`${p}.details[${j}]`, `Keep each bullet point to ${L.detailLine} characters.`);
+            else if (!isPlainLabel(t)) err(`${p}.details[${j}]`, "A bullet point must be plain text.");
+          });
+        }
+      }
     });
 
     const fee = g.fee_cents;

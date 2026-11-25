@@ -26,6 +26,8 @@ export const fieldId = {
   adjustments: "pe-f-adjustments",
   includes: "pe-f-includes",
   general: "pe-f-general",
+  dueNowPct: "pe-f-dueNowPct",
+  balanceNote: "pe-f-balanceNote",
   pricing: (key: string) => `pe-f-pricing-${key}`,
   brand: (i: number) => `pe-f-brand-${i}`,
   brandName: (i: number) => `pe-f-brand-${i}-name`,
@@ -67,6 +69,8 @@ export function targetForPath(path: string): string {
   const price = /^pricing\.(base_cents|included_classes|per_class_cents|second_mark_discount_pct|gov_per_class_cents)$/.exec(path);
   if (price) return fieldId.pricing(price[1]);
   if (/^pricing(\.|$)/.test(path)) return fieldId.pricing("package");
+  if (path === "payment_terms.balance_note") return fieldId.balanceNote;
+  if (/^payment_terms(\.|$)/.test(path)) return fieldId.dueNowPct;
   if (/^general(\.|$)/.test(path)) return fieldId.general;
   if (/^loe(\.|$)/.test(path)) return sectionId.letter;
   return sectionId.brands;

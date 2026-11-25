@@ -100,9 +100,9 @@ describe("a spec's package choice reaches the stored content and the client page
   it.each([
     ["a package that isn't the firm's", { options: ["Essential", "Platinum"] }, "Platinum"],
     ["a start outside the options", { options: ["Essential"], start: "Enhanced" }, "starting package"],
-    ["four packages", { options: ["Essential", "Enhanced", "Concierge", "Plus"] }, "at most 3"],
+    ["five packages", { options: ["Essential", "Enhanced", "Concierge", "Plus", "Max"] }, "at most 4"],
   ])("refuses %s and builds nothing", (_label, choice, message) => {
-    const r = buildDraftContent({ ...base, names: [{ name: "The Pleat", classes: ["x"], offer: { mode: "choice", ...choice } }] }, { pricing: { packages: [...PACKAGES, { ...PACKAGES[0], package: "Plus" }] }, letter: null }, () => `i${(n++).toString(36).padStart(4, "0")}`);
+    const r = buildDraftContent({ ...base, names: [{ name: "The Pleat", classes: ["x"], offer: { mode: "choice", ...choice } }] }, { pricing: { packages: [...PACKAGES, { ...PACKAGES[0], package: "Plus" }, { ...PACKAGES[0], package: "Max" }] }, letter: null }, () => `i${(n++).toString(36).padStart(4, "0")}`);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toContain(message);
   });

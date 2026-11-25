@@ -49,6 +49,7 @@ type Allow = { file: RegExp; rules: string[]; reason: string };
 const ALLOW: Allow[] = [
   { file: /^src\/lib\/(documents\/(loe|loe-prefill|opinion-letter|trademark-clearance)|prep-consult\/drafts|consult-proposal\/draft|agents\/matters-chat)\.ts$/, rules: ["scope"], reason: "model prompts and letter text: 'scope' is the legal term (scope of work), not OAuth vocabulary" },
   { file: /^src\/lib\/quotes\/engagement-terms\.ts$/, rules: ["scope"], reason: "legal term in a letter, not OAuth vocabulary" },
+  { file: /^src\/lib\/loe\/client-words\.ts$/, rules: ["scope"], reason: "the flat-fee proposal's \"Scope of Services\" fee-table heading: the legal term, not OAuth vocabulary" },
   { file: /^src\/app\/dashboard\/documents\/new\//, rules: ["scope"], reason: "legal term in a letter, not OAuth vocabulary (the LOE form's 'Scope' field)" },
   { file: /^src\/lib\/agents\/intake-triage\.ts$/, rules: ["lane"], reason: "model instructions (the triage prompt names the routing lane), not text for a person" },
   { file: /^src\/lib\/env\.ts$/, rules: ["environment"], reason: "developer error thrown at server start-up, never rendered to a person" },
