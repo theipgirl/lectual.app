@@ -117,15 +117,14 @@ describe("CO4: not switched on, every role and a signed-out caller", () => {
   }
 });
 
-describe("P5 on the page: the admin tier's \"Add a column\" link appears with the custom state ok", () => {
+// Changed on purpose (editable views): the admin tier's "Add a column" link to Settings -> Columns is gone with that page; nobody is linked to it.
+describe("no section note links to a Settings page for columns, whatever the role", () => {
   beforeEach(() => vi.resetModules());
   for (const role of ROLES) {
-    const adminTier = role === "owner" || role === "admin" || role === "senior_admin";
-    it(`${role}: ${adminTier ? "a link in each section note" : "no link"}`, async () => {
+    it(`${role}: no link`, async () => {
       mockPage({ load: { ...base, failed: [], custom: customFixture }, role, roleViews: role === "owner" });
       const html = decode(await renderPage({ view: "sheet" }));
-      const links = html.split('href="/dashboard/settings/columns/"').length - 1;
-      expect(links).toBe(adminTier ? 2 : 0);
+      expect(html).not.toContain("/dashboard/settings/columns");
     });
   }
 });

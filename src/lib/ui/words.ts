@@ -1497,37 +1497,15 @@ export const CUSTOM_KIND_MONEY = "Money";
 export const CUSTOM_KIND_CHOICE = "Choice";
 export const CUSTOM_KIND_PERSON = "Person";
 
-/* ── Settings -> Columns and the custom-column writes (Sprint 3; lectual 0115, proposed) ── */
-export const COLUMNS_SETTINGS_NAME = "Columns";
-export const COLUMNS_SETTINGS_SUB =
-  "Your firm's own columns on the Weekly review List. Everyone in the firm sees them, money columns included. A column's kind and section can't change after it's added. Archiving a column keeps its values.";
-export const columnsCount = (n: number) => `${n} of 40 columns`;
+/* ── The firm's own columns and the custom-column writes (lectual 0115; changed from a column's own menu) ── */
 export const COLUMNS_ADD = "Add a column";
-export const COLUMNS_NAME_LABEL = "Name";
 export const COLUMNS_SECTION_LABEL = "Section";
 export const COLUMNS_KIND_LABEL = "Kind";
 export const COLUMNS_CHOICES_LABEL = "Choices (one per line)";
 export const COLUMNS_CHOICES_HINT = "Only for a Choice column";
 /** The List's two sections, and a column that shows in both. */
 export const CUSTOM_SECTION_WORDS = { trademarks: "Trademarks", contracts: "Contracts", both: "Both" } as const;
-export const archiveQuestion = (label: string) => `Archive ${label}? It leaves the List; its values are kept.`;
-export const archivedHeading = (n: number) => `Archived columns (${n})`;
-/** Settings -> Columns lists the first `n` archived columns; there are more (never an error page). */
-export const archivedShownNote = (n: number) => `Showing the first ${n} archived columns.`;
-export const COLUMNS_ARCHIVE = "Archive";
-export const COLUMNS_RESTORE = "Restore";
 export const COLUMNS_RENAME = "Rename";
-export const COLUMNS_EDIT_CHOICES = "Edit choices";
-export const COLUMNS_SAVE_NAME = "Save name";
-export const COLUMNS_SAVE_CHOICES = "Save choices";
-export const columnsRenameLabel = (label: string) => `New name for ${label}`;
-export const columnsChoicesFor = (label: string) => `Choices for ${label}, one per line`;
-export const columnsRestoreLabel = (label: string) => `Restore ${label}`;
-export const columnsArchiveLabel = (label: string) => `Archive ${label}`;
-export const COLUMNS_AT_LIMIT = "Your firm has 40 columns, the most it can have. Archive one to add another.";
-export const COLUMNS_NONE = "No columns yet. Add one below.";
-export const choiceUse = (option: string, n: number) => `${option}: used on ${n} ${n === 1 ? "record" : "records"}`;
-export const COLUMNS_USE_UNCOUNTED = "Couldn't count which choices are in use. Saving still checks.";
 /** The field actions' gate: an owner's membership row (lectual 0119 makes field create and change owner-only). */
 export const COLUMNS_NO_PERMISSION = "Only an owner can change columns.";
 

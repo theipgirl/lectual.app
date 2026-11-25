@@ -20,9 +20,8 @@ const CLIENT_AND_NEW = [
   // Sprint 2: the custom-columns read side and the card's Firm columns block
   "src/lib/custom-columns/rules.ts",
   "src/components/review/ReviewCardExtras.tsx",
-  // Sprint 3: the shared custom-value input and the Settings -> Columns presentational component (their forms live elsewhere)
+  // Sprint 3: the shared custom-value input
   "src/components/review/CustomValueInput.tsx",
-  "src/components/settings/ColumnsSettings.tsx",
 ];
 
 describe("no new write path", () => {

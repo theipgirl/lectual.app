@@ -2838,3 +2838,29 @@ dashboard code, RLS runs as the owner; only "whose view" changes. This is NOT a 
   per-(firm, owner) advisory lock and scans that owner's open entries; firms have one to three owners, so this is accepted, but a future change could
   skip it when the hint cookie has been absent for a while. **Not verified:** a real browser (desktop or 375px), 0117 on any database, PostgREST GET for the read RPCs on a
   live project (they are STABLE in lectual's migration text), and Next's real memo behaviour of `headers()` across a server action plus its re-render.
+
+## Editable views, step 3: the owner's column menu, Add a lead, and no Settings -> Columns (needs lectual 0119, NOT applied anywhere)
+Spec `docs/pge/2026-11-17-agentic-ip-os/spec-editable-views.md` (build step 3 and 7); the DB proposal is `0119-proposed.sql.txt`. Weekly review List and Board only.
+- **Who:** an owner by the caller's own `crm_org_member` ROW (`loadOwnerState`, step 2), never the role claim; Lectual staff acting in a firm are not owners. The page draws the
+  menu only for an owner, not while previewing a teammate, and only when the saved layout was READ (its `rev` is what a change is fenced on). Every action asks the row again first.
+- **Layout write** (`src/lib/views/layout/save.ts`, deps injected; `actions.ts` is the thin `"use server"` pair, both `previewSafe`): the browser sends a view key, an OPERATION
+  (`rename | hide | show | move | moveTo | width | insert`) and the `rev` it drew, never a layout. The server re-reads the saved layout, builds the next one from the step-2 `next.ts`
+  helpers over the columns the viewer has (`layout-base.ts`: the List's base is both sections' columns merged, the Board's is every member's lane), validates it (`parseLayout`) and
+  writes through `store.ts`: INSERT when there is no row (23505 = another owner got there first: re-read, apply the same operation to THEIR layout, update, once), else UPDATE of
+  `columns` alone fenced on `rev` (0 rows = "Someone else changed this view. Refresh to see their change."). Never an upsert. Every answer is a fixed sentence (`writeFailure` maps by
+  error CODE only); a missing table is `notReadyYet("Changing columns")`, RLS 42501 is "Only an owner can change this view."
+- **Add a column** (`add-column.ts`): creates the firm field (`createFieldWithId`) and inserts its lowercase `cf:` key beside the chosen column in one action. If the field was made but
+  the layout write failed, the column still shows (a layout draws any column it doesn't name at the end) and the answer says its place couldn't be saved. The kinds are the existing
+  create's (Text, Date, Money, Choice, Person; there is no Checkbox kind in 0115); Money stays owner-only.
+- **Firm column create/rename/choices/move/archive are owner-only** (`FieldDeps.owner`, from the membership row; `field-deps.ts` builds the deps for both action files). The refusal is
+  "Only an owner can change columns."; 0119 makes it a DB rule too. There is no screen for Edit choices, Archive or Restore any more (the actions remain; the menu offers Rename,
+  Hide, Move and Add).
+- **UI:** `ColumnMenu` (List header and a Board lane) draws a fixed-position panel (the List scrolls sideways inside its card and would cut an absolute one off), closes on Esc (focus back),
+  an outside press and scroll/resize; `HiddenColumnsMenu` shows a hidden column or lane again. `menuItems` (pure) says what a pinned column or a lane is offered.
+  Not verified in a real browser: placement of the fixed panel, focus order, phone width.
+- **Add row** (`AddRow.tsx`, `addLeadFromReviewAction`): "Add a lead" creates a REAL lead through `createLead` (first and last name, email (required: `crm_lead.email` is NOT NULL), business
+  optional; never a stage, owner or org from the browser) in the firm's new-enquiry stage. **That stage is not in the Weekly review** (`reviewLeadStageIds` leaves out the new-enquiry
+  and Follow-Up stages), so the new lead joins the List only once it moves past first contact; the form says so and links the lead. "Open a matter" is a plain link to
+  `/dashboard/matters/#open-matter`. Neither is drawn for a role that can't create the record.
+- **Removed:** Settings -> Columns (page, `ColumnsSettings*`, its CSS, `settings-load.ts`, the tab, the section note's "Add a column" link, its words and the design-harness screens). The
+  card's `FirmColumnsEdit` (typing values) stays. The per-person Columns chooser stays until a later step.

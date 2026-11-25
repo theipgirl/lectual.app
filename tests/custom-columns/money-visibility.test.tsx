@@ -75,14 +75,11 @@ describe("custom Money columns are owner-only, like the fee columns", () => {
 });
 
 
-describe("Settings -> Columns: the Money hint sits outside the kind label and describes the select (review fix)", () => {
-  it("aria-describedby ties the select to the hint; the hint is not inside the <label>", async () => {
+describe("the column menu's Money hint (Add a column)", () => {
+  it("says money columns are shown only to the owner, next to the kind choice, only when Money is picked", async () => {
     const { readFileSync } = await import("node:fs");
-    const src = readFileSync("src/components/settings/ColumnsSettingsForms.tsx", "utf8");
-    expect(src).toContain('aria-describedby="cs-kind-money-hint"');
-    const label = src.slice(src.indexOf("{COLUMNS_KIND_LABEL}"), src.indexOf("</label>", src.indexOf("{COLUMNS_KIND_LABEL}")));
-    expect(label).not.toContain("COLUMNS_KIND_MONEY_HINT");
-    expect(src).toMatch(/<\/label>\s*\{\/\*[^]*?\*\/\}\s*<span id="cs-kind-money-hint" className="lx-note">\s*\{COLUMNS_KIND_MONEY_HINT\}/);
+    const src = readFileSync("src/components/views/layout/ColumnMenu.tsx", "utf8");
+    expect(src).toMatch(/newKind === "money" && <p className="lx-note">\{COLUMNS_KIND_MONEY_HINT\}<\/p>/);
   });
 });
 

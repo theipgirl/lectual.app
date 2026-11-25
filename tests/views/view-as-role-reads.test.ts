@@ -120,7 +120,6 @@ describe("every session role read is classified", () => {
     const uses = (f: string, re: RegExp) => re.test(readFileSync(path.join(ROOT, f), "utf8"));
     for (const f of [
       "src/app/dashboard/settings/approvals/page.tsx",
-      "src/app/dashboard/settings/columns/page.tsx",
       "src/app/dashboard/settings/proposals/page.tsx",
       "src/app/dashboard/proposals/new/page.tsx",
       "src/app/dashboard/proposals/page.tsx",

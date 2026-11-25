@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/dashboard/settings/integrations/" }));
 
-/** F1: the "Columns" settings tab is the admin tier's (a courtesy: the page gates itself). */
+/** Changed on purpose (editable views): Settings -> Columns is gone; columns are changed from the List's own header menu by an owner. */
 async function tabs(role: string) {
   vi.doMock("@/lib/org/modules", () => ({ activeOrgModules: vi.fn(async () => []) }));
   vi.doMock("@/lib/firm/session", () => ({ resolveFirmSession: vi.fn(async () => ({ kind: "ok", role })) }));
@@ -13,16 +13,17 @@ async function tabs(role: string) {
   return renderToStaticMarkup(await Layout({ children: null }));
 }
 
-describe("Settings -> Columns tab", () => {
+describe("Settings has no Columns tab", () => {
   beforeEach(() => vi.resetModules());
-  for (const role of ["owner", "admin", "senior_admin"])
-    it(`${role}: shown`, async () => {
-      const html = await tabs(role);
-      expect(html).toMatch(/href="\/dashboard\/settings\/columns\/?"[^>]*>Columns</);
-    });
-  for (const role of ["attorney", "viewer"])
+  for (const role of ["owner", "admin", "senior_admin", "attorney", "viewer"])
     it(`${role}: absent`, async () => {
       const html = await tabs(role);
       expect(html).not.toContain("/dashboard/settings/columns");
+      expect(html).not.toMatch(/>Columns</);
     });
+  it("the page is gone: no file under settings/columns", async () => {
+    const { existsSync } = await import("node:fs");
+    expect(existsSync("src/app/dashboard/settings/columns")).toBe(false);
+    expect(existsSync("src/components/settings/ColumnsSettings.tsx")).toBe(false);
+  });
 });

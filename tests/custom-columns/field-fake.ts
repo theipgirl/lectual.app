@@ -54,9 +54,10 @@ export function makeStore(initial: FakeField[], opts: { role?: string | null | (
       rec("readOptionUse", [fieldId, options]);
       return Object.fromEntries(options.map((o) => [o, opts.use?.[o] ?? 0]));
     }),
-    insertField: vi.fn(async (row: Record<string, unknown>) => {
+    insertField: vi.fn(async (row: Record<string, unknown>): Promise<string | undefined> => {
       rec("insertField", [row]);
       rows.push({ id: fid(900 + rows.length), section: String(row.section), kind: String(row.kind), label: String(row.label), options: row.options, position: Number(row.position), archived: false, updated_at: stamp() });
+      return undefined;
     }),
     updateField: vi.fn(async (id: string, patch: FieldPatch, guards: FieldGuard) => {
       rec("updateField", [id, patch, guards]);
