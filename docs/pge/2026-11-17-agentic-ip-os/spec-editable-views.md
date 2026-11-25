@@ -14,12 +14,12 @@ Sources: the Nov 17 working session with Caitlyn, the Nov 23 team meeting (Caitl
 | Order | **Weekly review (List and Board) first, then Matters and Contracts, then Leads.** |
 | Caitlyn's role | **Stays owner** (Taylor via the director, Nov 25; this replaces "senior admin" said in chat earlier the same day). |
 | Stages | **Full control from a Board**: rename, reorder, add and delete stages (Taylor via the director, Nov 25). Safeguards in "Stages" below. |
+| Stage roles (fixed tags rules read) | **Yes** (Taylor, in chat Nov 25: "yes do the stage tags"). Section "Stages", rule 4. |
 | Settings -> Columns | **Removed.** Editing happens on the view itself. |
 
 Still open (default chosen; Taylor can overrule before the build):
 - **Each person hiding or reordering columns just for themselves.** Default: not in the first build (firm-wide only, as decided). The existing
   per-person chooser on the Weekly review List stays until the shared layout replaces it, then is removed.
-- **Stage roles** (section "Stages", rule 4): recommended, needs Taylor's yes because it is the bigger part of the schema change.
 
 ## What Caitlyn asked for (synthesis)
 
@@ -102,7 +102,7 @@ operation, so the rules below hold whoever calls.
    naive two-row swap). Lead stages keep their category; order never changes a category.
 3. **Add.** Owner picks the name, the position and, for a lead stage, the category (default `open`); for a matter stage, open or closed and
    who it waits on. Adding a `won` stage shows a warning that leads moved there by a person run the matter handoff (today's behaviour).
-4. **Stage roles (recommended).** Several rules find a stage by its NAME today: the new-enquiry rule (`src/lib/pipeline/new-enquiry.ts`, alias
+4. **Stage roles (decided: yes, Taylor Nov 25).** Several rules find a stage by its NAME today: the new-enquiry rule (`src/lib/pipeline/new-enquiry.ts`, alias
    list), the Stage Keeper's defaults (`src/lib/agents/stage-keeper/mapping.ts`), Reconcile's milestone names (`src/lib/reconcile/milestones.ts`),
    the hired-matter sync's TM stage and won target ("Signed LOE / Deposit Received", `src/lib/lawmatics/hired-sync-plan.ts`), the USPTO wait
    (`src/lib/review/waiting.ts`), and the Matters board's "past signed engagement letter" line. A rename would silently break them. Add a
@@ -147,7 +147,7 @@ operation, so the rules below hold whoever calls.
 | Step | What | Who (model) | Needs |
 |---|---|---|---|
 | 0 | Done Nov 25 (director): Caitlyn is owner, role-views on, 0115 applied | — | — |
-| 1 | Migration proposal: layouts, stage roles + back-fill, stage functions (reorder, add, delete-with-move); isolation cases | Opus | Taylor's yes on stage roles |
+| 1 | Migration proposal: layouts, stage roles + back-fill, stage functions (reorder, add, delete-with-move); isolation cases | Opus | — |
 | 2 | Shared List and Board components; Weekly review on them | Sonnet, Opus review | step 1 on dev |
 | 3 | Column menu, add column, rename, move, add row (real records) | Sonnet, Opus review | step 2 |
 | 4 | Stage management on the Board header; every name-based rule reads the role first | Opus (rules), Sonnet (UI) | step 1 on dev |
