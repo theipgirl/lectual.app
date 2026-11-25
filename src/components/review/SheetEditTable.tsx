@@ -24,7 +24,6 @@ import {
   MAX_ROW,
   MIN_COL,
   NEXT_MIN_WIDTH,
-  colWidth,
   drawnWidth,
   MIN_ROW,
   NO_SIZES,
