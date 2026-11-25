@@ -7,6 +7,14 @@ Newest section first. Tick an item when it is done; don't delete it.
 
 Recap: `docs/recaps/2026-11-17-marketing-site-redesign-mockups.md` (round three). Omi cross-check: still the open item "Review the new website".
 
+### Taylor, after the ten further comments (Nov 25, afternoon)
+- [ ] Pick a hero sky with the "Sky" switcher at the left of the hero: 1 time-lapse regraded, 2 cloud sunset, 3 soft colour field, 4 horizon line.
+- [ ] Say whether the product window should stay in neutral ink or use the real app's oxblood.
+- [ ] Say whether "the background should not be doubled" meant the full-screen sky in the firm brain section (fixed there).
+- [ ] Decide on the connectors comment you marked resolved: Gmail could be added truthfully (mail); SharePoint, Drive, Claude and ChatGPT are not built.
+- [ ] Read the new copy: the Home tab, "Lectual does the admin, so your time goes to the legal work only you can do.", and the firm brain section.
+- [ ] Resolve your comment threads on the page (Claude can't close them from the session).
+
 ### Taylor, after the 18 comments were worked through (Nov 25, later)
 - [ ] Review Horizon again (same link) and resolve your 18 comment threads on the page; Claude can't close them from the session.
 - [ ] Say whether these three were read correctly: "remove for now" = the moving text strip; "remove since we added it up above" = the

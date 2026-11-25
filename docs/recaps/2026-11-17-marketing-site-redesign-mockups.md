@@ -160,6 +160,49 @@ director use subs to complete". Same link: https://claude.ai/artifact/1X2fXmvjbU
   Three older threads were resolved (Log in on Overnight; the growing window and the motion
   graphic on Gate). The unreadable Gate comment is still open.
 
+## Round five (Nov 25, afternoon): ten more comments on Horizon
+
+Taylor left ten new comments and said "ok resolve new comments". Same link. Five builders in
+parallel again (four resumed, one new for the sky options), merged and reviewed by the
+orchestrator; two merge bugs were sent back and fixed before publishing.
+
+- **Nav:** the five links are tabs with a highlight pill that slides to the section on screen.
+- **Differentiators list:** one hairline per boundary, the progress fill runs along it, equal
+  20px spacing above and below every item.
+- **Product window:** restyled after the real workspace (top bar with a "Your firm" slot, search
+  and initials; dark ink rail with Today, Approvals, Weekly review, Proposals, then More), in the
+  page's neutral ink rather than the app's oxblood. New default **Home** tab: "Good morning.",
+  "Three things are ready for you.", three prepared items arriving, the first draft writing
+  itself with Review and Approve & send, an "Ask Copilot…" row, and a Today side column.
+- **Hero background:** a "Sky" switcher (shown only while the hero is on screen) with four
+  options: 1 the time-lapse regraded and sharpened, 2 a procedural cloud sunset (the default),
+  3 a soft colour-field sky, 4 a single horizon line. The builder's pick for a law-firm audience
+  is 4, with 2 as the more emotional alternative. Frame rate on a real graphics card was not
+  measured.
+- **Overnight scene:** the queue is now the approval deck. Cards stack overnight (five approval
+  cards; the inquiry and the routed legal question stay as rows), the top card opens in the
+  morning, "Yes" with the five-second hold and Undo, the card lifts away, the next card comes up
+  as "1 of 4", then "Draft is in Outlook. Nothing is sent until someone presses Send."
+- **Statement:** "A legal CRM remembers." small; "Lectual acts." at up to 150px with a drawn
+  underline; new line "Lectual does the admin, so your time goes to the legal work only you can
+  do."
+- **Firm brain:** the voice section is now "Every draft starts from your firm brain." with four
+  sources (Consult notes, Templates, Approved language, House rules) flowing into a circle
+  captioned "Firm brain".
+- **"Background doubled":** pinned to the whole page; fixed where it was found, in the full-sky
+  states of the firm brain section (two time-lapse frames cross-fading read as a double
+  exposure; it now holds one frame). The closing band and footer were checked and are one sky.
+- **Footer:** giant wordmark left, the menu to its right on the wordmark's baseline, a hairline,
+  then the legal lines left and the copyright right. "Agents" is now "Assistants".
+- **Chip labels:** the small mono labels on the connection chips are now the text face.
+- **Left alone:** "add other connectors like gmail, sharepoint, drive, claude chat gpt", which
+  Taylor had marked resolved. Gmail mail connections exist in the product; nothing was found
+  for SharePoint, Drive, Claude or ChatGPT.
+- **Merge bugs fixed before publishing:** the firm brain section's draft card made the page
+  scroll sideways at 1280 and 1024 wide; the Sky switcher covered the footer's legal line.
+- **Not checked:** the independent reviewer's full pass was not repeated for this round; Safari,
+  Firefox, a real phone and a real trackpad are still untested; shader speed on real hardware.
+
 ## Recommendation on Astro (not decided)
 
 Stay on Next.js for this redesign. The loader, pin scrolling and micro-animations are the same
