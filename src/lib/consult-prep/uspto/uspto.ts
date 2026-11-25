@@ -1,0 +1,358 @@
+// TypeScript port of lectual-plugin scripts/uspto_knockout.py: a two-tier
+// USPTO trademark knockout pull. The endpoint is undocumented, so every
+// failure (network, timeout, non-2xx, unexpected body, a failure on any page
+// of either tier) makes the WHOLE pull `unavailable`. A partial list is never
+// presented as complete, and an unreachable search is never "no conflicts".
+// Nothing here logs: marks, owners and goods/services are client content.
+
+export const USPTO_URL = 'https://tmsearch.uspto.gov/prod-stage-v1-0-0/tmsearch';
+export const PAGE_SIZE = 500;
+/** The backend caps from+size at 10,000; the script stops once the next offset reaches 9,500. */
+export const PAGING_CAP = 10000 - PAGE_SIZE;
+export const DEFAULT_LIMIT = 500;
+export const DEFAULT_TIMEOUT_MS = 20_000;
+export const NEAR_IDENTICAL_LISTED = 20;
+export const GOODS_MAX = 600;
+
+export type FetchFn = typeof fetch;
+
+export interface UsptoRow {
+  tier: string;
+  serial: string;
+  wordmark: string;
+  status: 'LIVE' | 'DEAD';
+  classes: string;
+  reg_no: string;
+  filed: string;
+  reg_date: string;
+  basis: string;
+  owner: string;
+  goods_services: string;
+  tsdr: string;
+}
+
+export interface NearIdenticalHit {
+  wordmark: string;
+  status: 'LIVE' | 'DEAD';
+  classes: string;
+  owner: string;
+  serial: string;
+}
+
+export interface UsptoInput {
+  mark: string;
+  stem?: string;
+  /** Likely Nice classes: 41, "041" and "41" format identically. Non-positive-integer entries are dropped. */
+  classes?: Array<number | string>;
+  variants?: string[];
+  limit?: number;
+  /** Required: the caller injects the transport (no ambient global, so tests and firms never reach the network by accident). */
+  fetch: FetchFn;
+  /** Per request. Clipped to what is left before `deadline`, when one is given. */
+  timeoutMs?: number;
+  /**
+   * Absolute time budget (epoch ms). No request starts at or after it, and each
+   * request's timeout is clipped to the time left, so the whole pull ends by it.
+   * A pull cut short is `unavailable`, never a partial list shown as complete.
+   */
+  deadline?: number;
+  clock?: () => number;
+}
+
+/** Why tier 2 produced no total. */
+export type StemSearch = 'ran' | 'not-run-no-stem' | 'not-run-filled';
+
+export interface UsptoOk {
+  status: 'ok';
+  mark: string;
+  limit: number;
+  rows: UsptoRow[];
+  written: number;
+  /** Per-tier totals from each tier's FIRST page, keyed by tier label. */
+  totals: Record<string, number>;
+  tier1Total: number;
+  /** Live-stem total in the likely classes; null unless tier 2 actually ran. */
+  tier2Total: number | null;
+  tier2Label: string | null;
+  /** The stem tier 2 searched ("LEGACY") and its classes as plain numbers (["41", "35"]); null / [] unless it ran. */
+  tier2Stem: string | null;
+  tier2Classes: string[];
+  stemSearch: StemSearch;
+  /** The list was cut: written reached the limit, or paging hit the cap with more beyond it. */
+  truncated: boolean;
+  nearIdentical: NearIdenticalHit[];
+}
+
+export interface UsptoUnavailable {
+  status: 'unavailable';
+  /** Fixed generic phrase plus at most an HTTP status code, never response content. */
+  reason: string;
+}
+
+export interface UsptoSkipped {
+  status: 'skipped';
+  reason: 'no mark';
+}
+
+export type UsptoResult = UsptoOk | UsptoUnavailable | UsptoSkipped;
+
+/** `reason` is always one of this file's fixed sentences, never response content. */
+class UnavailableError extends Error {
+  constructor(readonly reason: string) {
+    super(reason);
+  }
+}
+
+/** Quotes and backslashes would corrupt the unescaped query string, as in the script. */
+const stripQuoting = (s: string) => s.replace(/["\\]/g, '');
+
+export function formatClass(c: number | string): string | null {
+  const text = String(c).trim();
+  if (!/^\d+$/.test(text)) return null;
+  const n = parseInt(text, 10);
+  if (!Number.isSafeInteger(n) || n < 1) return null;
+  return `IC ${String(n).padStart(3, '0')}`;
+}
+
+/** Valid classes, in the order and spelling supplied. */
+function validClasses(classes: Array<number | string>): Array<{ raw: string; ic: string }> {
+  const out: Array<{ raw: string; ic: string }> = [];
+  for (const c of classes) {
+    const ic = formatClass(c);
+    if (ic) out.push({ raw: String(c).trim(), ic });
+  }
+  return out;
+}
+
+function cleanVariants(variants: string[], mark: string): string[] {
+  const seen = new Set<string>([mark.toLowerCase()]);
+  const out: string[] = [];
+  for (const v of variants) {
+    const t = stripQuoting(String(v)).trim();
+    const key = t.toLowerCase();
+    if (!t || seen.has(key)) continue;
+    seen.add(key);
+    out.push(t);
+  }
+  return out;
+}
+
+export function buildTier1Query(mark: string, variants: string[]): string {
+  const m = mark.toLowerCase();
+  const terms = [m, `${m}*`, ...variants.map((v) => `"${v.toLowerCase()}"`)];
+  return `wordmark:(${terms.join(' OR ')})`;
+}
+
+export function buildTier2Query(stem: string, ics: string[]): string {
+  const classes = ics.map((ic) => `internationalClass:"${ic}"`).join(' OR ');
+  return `wordmark:${stem.toLowerCase()}* AND alive:true AND (${classes})`;
+}
+
+type Obj = Record<string, unknown>;
+const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
+const str = (v: unknown): string => (typeof v === 'string' ? v : typeof v === 'number' ? String(v) : '');
+const strList = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x) => x != null).map(String) : []);
+
+export function tsdrLink(serial: string): string {
+  return `https://tsdr.uspto.gov/#caseNumber=${serial}&caseSearchType=US_APPLICATION&caseType=DEFAULT&searchType=statusSearch`;
+}
+
+export function toRow(tier: string, serial: string, s: Obj): UsptoRow {
+  return {
+    tier,
+    serial,
+    wordmark: str(s.wordmark),
+    status: s.alive ? 'LIVE' : 'DEAD',
+    classes: strList(s.internationalClass).join('; '),
+    reg_no: str(s.registrationId),
+    filed: str(s.filedDate).slice(0, 10),
+    reg_date: str(s.registrationDate).slice(0, 10),
+    basis: strList(s.currentBasis).join(', '),
+    owner: strList(s.ownerName).join('; '),
+    goods_services: strList(s.goodsAndServices).join(' | ').slice(0, GOODS_MAX),
+    tsdr: tsdrLink(serial),
+  };
+}
+
+interface Page {
+  total: number;
+  sources: Array<{ serial: string; source: Obj }>;
+}
+
+/** Validates the script's response shape: hits.totalValue (number) and hits.hits[].source.id. */
+function parsePage(body: unknown): Page {
+  if (!isObj(body) || !isObj(body.hits)) throw new UnavailableError('USPTO search returned an unexpected response');
+  const hits = body.hits;
+  if (typeof hits.totalValue !== 'number' || !Number.isFinite(hits.totalValue) || !Array.isArray(hits.hits)) {
+    throw new UnavailableError('USPTO search returned an unexpected response');
+  }
+  const sources = hits.hits.map((h) => {
+    const source = isObj(h) ? h.source : undefined;
+    const id = isObj(source) ? source.id : undefined;
+    if (!isObj(source) || (typeof id !== 'string' && typeof id !== 'number') || String(id) === '') {
+      throw new UnavailableError('USPTO search returned an unexpected response');
+    }
+    return { serial: String(id), source };
+  });
+  return { total: hits.totalValue, sources };
+}
+
+async function searchPage(doFetch: FetchFn, query: string, from: number, timeoutMs: number): Promise<Page> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  // The abort stays armed through the body read, and the race makes the
+  // timeout hold even for a fetch that ignores the signal.
+  const timedOut = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new UnavailableError('USPTO search timed out'));
+    }, timeoutMs);
+  });
+  const work = (async () => {
+    let res: Response;
+    try {
+      res = await doFetch(USPTO_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Origin: 'https://tmsearch.uspto.gov',
+          'User-Agent': 'Mozilla/5.0',
+        },
+        body: JSON.stringify({
+          query: { bool: { must: [{ query_string: { query, default_operator: 'AND' } }] } },
+          size: PAGE_SIZE,
+          from,
+          track_total_hits: true,
+        }),
+        signal: controller.signal,
+      });
+    } catch {
+      throw new UnavailableError('USPTO search request failed');
+    }
+    if (!res.ok) throw new UnavailableError(`USPTO search returned HTTP ${res.status}`);
+    let body: unknown;
+    try {
+      body = await res.json();
+    } catch {
+      throw new UnavailableError('USPTO search returned an unexpected response');
+    }
+    return parsePage(body);
+  })();
+  work.catch(() => undefined); // a late failure after the timeout must not go unhandled
+  try {
+    return await Promise.race([work, timedOut]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+interface TierState {
+  rows: UsptoRow[];
+  seen: Set<string>;
+  totals: Record<string, number>;
+  capped: boolean;
+}
+
+/** One tier, exactly as the script loops it. Returns the tier's first-page total (null if no request ran). */
+async function runTier(
+  label: string,
+  query: string,
+  limit: number,
+  state: TierState,
+  doFetch: FetchFn,
+  timeoutMs: () => number,
+): Promise<number | null> {
+  let from = 0;
+  let firstTotal: number | null = null;
+  while (state.rows.length < limit) {
+    const page = await searchPage(doFetch, query, from, timeoutMs());
+    if (firstTotal === null) {
+      firstTotal = page.total;
+      state.totals[label] = page.total;
+    }
+    for (const { serial, source } of page.sources) {
+      if (!state.seen.has(serial) && state.rows.length < limit) {
+        state.seen.add(serial);
+        state.rows.push(toRow(label, serial, source));
+      }
+    }
+    from += PAGE_SIZE;
+    if (page.sources.length === 0 || from >= page.total) break;
+    if (from >= PAGING_CAP) {
+      state.capped = true; // more exists beyond what the cap lets us fetch
+      break;
+    }
+  }
+  return firstTotal;
+}
+
+export async function searchUspto(input: UsptoInput): Promise<UsptoResult> {
+  const mark = stripQuoting(String(input.mark ?? '')).trim();
+  if (!mark) return { status: 'skipped', reason: 'no mark' };
+
+  const limit = Number.isInteger(input.limit) && (input.limit as number) > 0 ? (input.limit as number) : DEFAULT_LIMIT;
+  const perRequestMs = input.timeoutMs && input.timeoutMs > 0 ? input.timeoutMs : DEFAULT_TIMEOUT_MS;
+  const clock = input.clock ?? Date.now;
+  const deadline = input.deadline;
+  // Each request gets min(per-request, time left); none starts once the budget is spent.
+  const timeoutMs = (): number => {
+    if (deadline === undefined) return perRequestMs;
+    const left = deadline - clock();
+    if (left <= 0) throw new UnavailableError('USPTO search ran out of time');
+    return Math.min(perRequestMs, left);
+  };
+  const doFetch = input.fetch;
+  const variants = cleanVariants(input.variants ?? [], mark);
+  const stem = stripQuoting(String(input.stem ?? '')).trim();
+  const classes = validClasses(input.classes ?? []);
+
+  const tier1Label = '1-near-identical';
+  const tier1Query = buildTier1Query(mark, variants);
+  const canRunTier2 = stem !== '' && classes.length > 0;
+  const tier2Label = canRunTier2 ? `2-live ${stem.toUpperCase()} in IC ${classes.map((c) => c.raw).join(',')}` : null;
+
+  const state: TierState = { rows: [], seen: new Set(), totals: {}, capped: false };
+  let tier1Total: number | null;
+  let tier2Total: number | null = null;
+  let stemSearch: StemSearch = 'not-run-no-stem';
+
+  try {
+    tier1Total = await runTier(tier1Label, tier1Query, limit, state, doFetch, timeoutMs);
+    if (canRunTier2 && tier2Label) {
+      if (state.rows.length >= limit) {
+        stemSearch = 'not-run-filled';
+      } else {
+        const tier2Query = buildTier2Query(stem, classes.map((c) => c.ic));
+        tier2Total = await runTier(tier2Label, tier2Query, limit, state, doFetch, timeoutMs);
+        stemSearch = 'ran';
+      }
+    }
+  } catch (err) {
+    const reason = err instanceof UnavailableError ? err.reason : 'USPTO search request failed';
+    return { status: 'unavailable', reason };
+  }
+
+  const nearRows = state.rows.filter((r) => r.tier === tier1Label);
+  return {
+    status: 'ok',
+    mark,
+    limit,
+    rows: state.rows,
+    written: state.rows.length,
+    totals: state.totals,
+    tier1Total: tier1Total ?? 0,
+    tier2Total,
+    tier2Label: stemSearch === 'ran' ? tier2Label : null,
+    tier2Stem: stemSearch === 'ran' ? stem.toUpperCase() : null,
+    tier2Classes: stemSearch === 'ran' ? classes.map((c) => String(parseInt(c.raw, 10))) : [],
+    stemSearch,
+    truncated: state.rows.length >= limit || state.capped,
+    nearIdentical: nearRows.slice(0, NEAR_IDENTICAL_LISTED).map((r) => ({
+      wordmark: r.wordmark,
+      status: r.status,
+      classes: r.classes,
+      owner: r.owner,
+      serial: r.serial,
+    })),
+  };
+}
