@@ -1738,3 +1738,9 @@ export const CONSULT_PREP_TEAM_INELIGIBLE = "Viewers and social media members ca
 export const CONSULT_PREP_TEAM_CC_FORMAT = "Each Cc must be a plain email address, like info@yourfirm.com.";
 export const CONSULT_PREP_TEAM_CC_DOMAIN = "A Cc address must be on the same email domain as someone chosen above.";
 export const CONSULT_PREP_TEAM_CC_COUNT = "You can add up to 5 Cc addresses.";
+
+/** A List or Board's saved column layout couldn't be read: the standard columns are drawn and this is said once. */
+export const VIEW_LAYOUT_UNAVAILABLE = "Saved column layout couldn't load. Showing the standard columns. Refresh to try again.";
+
+/** The firm's Board layout hides some people's columns: said once above the Board, so no one's records are quietly out of it. */
+export const boardLanesHidden = (n: number): string => (n === 1 ? "1 person's column is hidden by this view's layout." : `${n} people's columns are hidden by this view's layout.`);
