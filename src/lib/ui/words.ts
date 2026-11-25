@@ -1707,3 +1707,16 @@ export const CONSULT_PREP_TEAM_INELIGIBLE = "Viewers and social media members ca
 export const CONSULT_PREP_TEAM_CC_FORMAT = "Each Cc must be a plain email address, like info@yourfirm.com.";
 export const CONSULT_PREP_TEAM_CC_DOMAIN = "A Cc address must be on the same email domain as someone chosen above.";
 export const CONSULT_PREP_TEAM_CC_COUNT = "You can add up to 5 Cc addresses.";
+
+// General consult drafter (a non-trademark consult -> a DRAFT flat-fee proposal)
+/** The consult agent's answer for a call that holds no recommended legal work at all (reason `not_trademark`). */
+export const CONSULT_NO_LEGAL_WORK =
+  "No recommended legal work was found in this call (no trademark filings and no other work the attorney offered to do), so no proposal was drafted.";
+/** The consult agent's answer when the work it read could not be checked against the call. */
+export const CONSULT_GENERAL_UNCHECKED =
+  "The AI's reading of the call could not be checked against the record (no piece of work had a quote found in the record), so no proposal was drafted.";
+/** The one staff-only check on a flat-fee draft whose title, summary, work and not-included lines the assistant wrote. */
+export const CONSULT_GENERAL_WORDING_CHECK =
+  "Drafted by the assistant from the call: check the wording of the matter, the summary, each piece of work and its bullet points, and the not-included lines.";
+/** The staff-only check when no fee could be taken from the call's own words. */
+export const CONSULT_GENERAL_NO_FEE_CHECK = "No fee was taken from the call. Set the flat fee before creating the link.";

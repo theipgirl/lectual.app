@@ -71,7 +71,17 @@ export type DraftCredit = { id?: string; label: string; kind: "amount" | "percen
 /** Something a person should look at, with where it came from and the field it is about. */
 export type DraftCheck = ContentCheck;
 
-export type DraftWorkItem = { id?: string; label: string; hours?: number; hourlyRate?: number; value?: number };
+export type DraftWorkItem = {
+  id?: string;
+  label: string;
+  hours?: number;
+  hourlyRate?: number;
+  value?: number;
+  /** A paragraph under the item's heading on the client page. */
+  intro?: string;
+  /** Bullet points under the item (a bullet may end with its own hours, "(0.5 hours)"). */
+  details?: string[];
+};
 
 /** The flat-fee matter. `flatFee` is the firm's own typed fee in cents; it is not a package price. */
 export type DraftGeneral = {
@@ -81,6 +91,12 @@ export type DraftGeneral = {
   flatFee: number;
   excludes?: string[];
   termsNote?: string;
+  /**
+   * The assistant read a matter and its work from a call but could not establish the fee from the call's own words.
+   * With `flatFee` 0 the draft is still built, and the missing fee stays an error the editor's checklist shows, so no
+   * link can be created until a person sets it. A fee is never made up to fill the gap.
+   */
+  feeToConfirm?: boolean;
 };
 
 type DraftBase = {
@@ -194,7 +210,8 @@ export function buildDraftContent(spec: ProposalDraftSpec, firm: DraftFirm, newI
   const errors = issues.filter((i) => i.level === "error");
   // A flat-fee draft may be wholly unwritten (a person who just chose the client); a half-filled one must be right.
   const unwritten = spec.kind === "general" && !spec.general.matterTitle.trim() && spec.general.items.length === 0 && spec.general.flatFee === 0;
-  const incomplete = spec.kind === "general" ? (unwritten ? GENERAL_INCOMPLETE_OK : /^$/) : INCOMPLETE_OK;
+  const feePending = spec.kind === "general" && spec.general.feeToConfirm === true && spec.general.flatFee === 0;
+  const incomplete = spec.kind === "general" ? (unwritten ? GENERAL_INCOMPLETE_OK : feePending ? /^general\.fee_cents$/ : /^$/) : INCOMPLETE_OK;
   const blocking = errors.filter((i) => !incomplete.test(i.path));
   if (blocking.length > 0) return { ok: false, error: blocking[0].message, problems: [...new Set(blocking.map((i) => i.message))] };
   if (content.loe) {
@@ -224,6 +241,8 @@ function buildGeneral(spec: GeneralDraftSpec, newId: () => string): Built<Genera
     ...(it.hours !== undefined ? { hours: it.hours } : {}),
     ...(it.hourlyRate !== undefined ? { rate_cents: it.hourlyRate } : {}),
     ...(it.value !== undefined ? { value_cents: it.value } : {}),
+    ...(it.intro?.trim() ? { intro: it.intro.trim() } : {}),
+    ...(it.details && it.details.some((d) => d.trim()) ? { details: it.details.map((d) => d.trim()).filter(Boolean) } : {}),
   }));
   const excludes = (g.excludes ?? []).map((l) => l.trim()).filter(Boolean);
   return {
