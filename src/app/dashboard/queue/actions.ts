@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { resolveQueueItem } from "@/lib/queue/api";
@@ -24,7 +25,7 @@ export type ReviewState = { error?: string };
  * `runQueueReview` (src/lib/queue/review-core.ts), which the approval deck calls too. Here the result becomes the
  * page's revalidate + redirect, exactly as before the split.
  */
-export async function reviewQueueAction(_prev: ReviewState, formData: FormData): Promise<ReviewState> {
+export const reviewQueueAction = previewSafe(async function reviewQueueAction(_prev: ReviewState, formData: FormData): Promise<ReviewState> {
   const id = String(formData.get("id") ?? "");
   const intent = String(formData.get("intent") ?? "");
   const body = formData.get("body");
@@ -49,7 +50,7 @@ export async function reviewQueueAction(_prev: ReviewState, formData: FormData):
   // Sprint 4: before lectual 0112 the email went to the approver's own mailbox instead of the drafter; the page says so.
   const passParam = outcome.kind === "resolved" && outcome.handoff?.status === "not-switched-on" ? "&pass=off" : outcome.handoff?.status === "queue-drafted" ? "&pass=queue" : "";
   redirect(`/dashboard/queue/${id}/?resolved=${outcome.intent}${sendParam}${passParam}`);
-}
+}, "state");
 
 export type DismissState = { message?: string; error?: string };
 
@@ -57,7 +58,7 @@ export type DismissState = { message?: string; error?: string };
  * "Dismiss follow-ups older than 7 days": rejects the stale stalled-lead follow-ups the caller owns (any, for the
  * admin tier). The form posts a confirm flag and nothing else; the list is re-read and the eligible set chosen here.
  */
-export async function dismissStaleFollowupsAction(_prev: DismissState, formData: FormData): Promise<DismissState> {
+export const dismissStaleFollowupsAction = previewSafe(async function dismissStaleFollowupsAction(_prev: DismissState, formData: FormData): Promise<DismissState> {
   if (formData.get("confirm") !== "yes") return { error: "Confirm first, then try again." };
   const qKey = await activeQueueOrgKey();
   if (!qKey) return { error: "No approval queue is configured for this firm." };
@@ -94,7 +95,7 @@ export async function dismissStaleFollowupsAction(_prev: DismissState, formData:
   });
   revalidatePath("/dashboard/queue/");
   return dismissMessage(result);
-}
+}, "state");
 
 function dismissMessage(r: DismissResult): DismissState {
   const rest = r.remaining > 0 ? ` ${r.remaining} more are left. Run it again to clear them.` : "";
@@ -111,7 +112,7 @@ export type SendBackState = { error?: string };
  * re-read, refused unless the caller is the CURRENT hand-off target. It records a `returned` event and tells the person who
  * handed it (bell only). It never changes who may approve and sends nothing. The form posts the id and an optional note only.
  */
-export async function sendBackAction(_prev: SendBackState, formData: FormData): Promise<SendBackState> {
+export const sendBackAction = previewSafe(async function sendBackAction(_prev: SendBackState, formData: FormData): Promise<SendBackState> {
   const id = cardIdOf(formData.get("id"));
   if (!id) return { error: DECK_FAILED };
   const rawNote = formData.get("note");
@@ -122,7 +123,7 @@ export async function sendBackAction(_prev: SendBackState, formData: FormData): 
   revalidatePath("/dashboard/queue/deck/");
   revalidatePath(`/dashboard/queue/${id}/`);
   redirect(`/dashboard/queue/${id}/?returned=1`);
-}
+}, "state");
 
 export type MakeDraftState = { error?: string; message?: string; webLink?: string | null };
 
@@ -130,7 +131,7 @@ export type MakeDraftState = { error?: string; message?: string; webLink?: strin
  * "Make the draft in my Outlook" (Sprint 4). The form posts the item id; a posted `connection_id`, if any, is only ever
  * compared with the caller's own connection (`makeDraftInMyOutlook`), never used. Every check is in the core.
  */
-export async function makeDraftAction(_prev: MakeDraftState, formData: FormData): Promise<MakeDraftState> {
+export const makeDraftAction = previewSafe(async function makeDraftAction(_prev: MakeDraftState, formData: FormData): Promise<MakeDraftState> {
   const id = cardIdOf(formData.get("id"));
   if (!id) return { error: DECK_FAILED };
   const made = await makeDraftInMyOutlook({ id, postedConnectionId: formData.get("connection_id") ?? undefined });
@@ -138,10 +139,10 @@ export async function makeDraftAction(_prev: MakeDraftState, formData: FormData)
   revalidatePath("/dashboard/queue/");
   revalidatePath(`/dashboard/queue/${id}/`);
   return { message: made.message, webLink: made.webLink };
-}
+}, "state");
 
 /** "Pass to <drafter>" (S3): the approver passes an approved email on again after a pass that didn't go through. */
-export async function retryPassAction(_prev: MakeDraftState, formData: FormData): Promise<MakeDraftState> {
+export const retryPassAction = previewSafe(async function retryPassAction(_prev: MakeDraftState, formData: FormData): Promise<MakeDraftState> {
   const id = cardIdOf(formData.get("id"));
   if (!id) return { error: DECK_FAILED };
   const passed = await retryPassToDrafter({ id });
@@ -149,10 +150,10 @@ export async function retryPassAction(_prev: MakeDraftState, formData: FormData)
   revalidatePath("/dashboard/queue/");
   revalidatePath(`/dashboard/queue/${id}/`);
   return { message: passed.message };
-}
+}, "state");
 
 /** "It isn't in my Drafts, try again": the drafter clears an open claim (the item id only; every check is in the core). */
-export async function clearClaimAction(_prev: MakeDraftState, formData: FormData): Promise<MakeDraftState> {
+export const clearClaimAction = previewSafe(async function clearClaimAction(_prev: MakeDraftState, formData: FormData): Promise<MakeDraftState> {
   const id = cardIdOf(formData.get("id"));
   if (!id) return { error: DECK_FAILED };
   const cleared = await clearOpenClaim({ id });
@@ -160,4 +161,4 @@ export async function clearClaimAction(_prev: MakeDraftState, formData: FormData
   revalidatePath("/dashboard/queue/");
   revalidatePath(`/dashboard/queue/${id}/`);
   return { message: cleared.message };
-}
+}, "state");

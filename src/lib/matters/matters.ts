@@ -75,7 +75,7 @@ function isRole(value: unknown): value is Role {
 export async function requireMatterWriteRole(
   supabase: Awaited<ReturnType<typeof getScopedClient>>,
 ): Promise<Role> {
-  const { data, error } = await supabase.rpc("current_org_role");
+  const { data, error } = await supabase.rpc("current_org_role", undefined, { get: true });
   if (error) throw error;
   if (!isRole(data)) {
     throw new ReadableError("You don't have permission to edit matters.");
@@ -206,7 +206,7 @@ export async function createMatter(input: CreateMatterInput): Promise<MatterRow>
   // org_id is the caller's active org (never taken from the input). RLS's
   // with-check also requires it to equal current_org_id(), so this is the
   // single source of truth for the new matter's tenant.
-  const { data: orgId, error: orgError } = await supabase.rpc("current_org_id");
+  const { data: orgId, error: orgError } = await supabase.rpc("current_org_id", undefined, { get: true });
   if (orgError) throw orgError;
   if (!orgId) throw new ReadableError("No active organization for the current session.");
 
@@ -449,7 +449,7 @@ export async function closeMatterWithOverride(id: string, reason: unknown): Prom
       return !session || session.kind !== "ok" || session.actingAsStaff === true;
     },
     role: async () => {
-      const { data, error } = await supabase.rpc("current_org_role");
+      const { data, error } = await supabase.rpc("current_org_role", undefined, { get: true });
       return error || typeof data !== "string" ? null : data;
     },
     callOverride: async (text) => {

@@ -1,6 +1,5 @@
-// Sprint 3 V1-V4: loads the four custom-columns screens rendered by run.mjs (out/<id>.html) in Chromium and checks what the
-// contract measures. Run after `node scripts/design-harness/run.mjs settings-columns settings-columns-phone review-sheet-edit-custom
-// record-card-firm-columns-edit`. Exits 1 on any failure; prints one line per check. Fonts are not needed for these checks.
+// Sprint 3 V3-V4: loads the two custom-columns screens rendered by run.mjs (out/<id>.html) in Chromium and checks what the
+// contract measures. Run after `node scripts/design-harness/run.mjs review-sheet-edit-custom record-card-firm-columns-edit`. Exits 1 on any failure; prints one line per check. Fonts are not needed for these checks.
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -37,56 +36,6 @@ async function open(id, opts) {
 }
 
 try {
-  // V1: Settings -> Columns at 1440: every visible text at least 12.5px, no inline colour.
-  {
-    const page = await open("settings-columns", { viewport: { width: 1440, height: 900 } });
-    const m = await page.evaluate(() => {
-      const root = document.querySelector(".cs-card")?.closest(".lx-col") ?? document.body;
-      const small = [];
-      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-      for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-        const t = n.textContent.trim();
-        const el = n.parentElement;
-        if (!t || !el) continue;
-        const r = el.getBoundingClientRect();
-        const cs = getComputedStyle(el);
-        if (!r.width || !r.height || cs.visibility === "hidden" || cs.display === "none") continue;
-        if (parseFloat(cs.fontSize) < 12.5) small.push(`${cs.fontSize} ${t.slice(0, 30)}`);
-      }
-      const inline = [...root.querySelectorAll("[style]")].filter((e) => /colou?r/i.test(e.getAttribute("style") ?? "")).length;
-      return { small, inline, rows: root.querySelectorAll(".cs-row").length, confirm: !!root.querySelector(".lx-inline-confirm") };
-    });
-    check("V1 settings-columns: every text node >= 12.5px", m.small.length === 0, m.small.slice(0, 5).join(" | "));
-    check("V1 settings-columns: no inline colour", m.inline === 0, String(m.inline));
-    check("V1 settings-columns: the one list and the archived row are drawn, the Archive question open", m.rows === 4 && m.confirm, JSON.stringify(m));
-    await page.close();
-  }
-
-  // V2: at 375 with a coarse pointer: no sideways page scroll; row buttons wrap inside their row; buttons at least 44px tall.
-  {
-    const page = await open("settings-columns-phone", { viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true });
-    const m = await page.evaluate(() => {
-      const coarse = matchMedia("(pointer: coarse)").matches;
-      const out = [];
-      const short = [];
-      for (const row of document.querySelectorAll(".cs-row")) {
-        const rr = row.getBoundingClientRect();
-        for (const b of row.querySelectorAll("button, summary.lx-btn")) {
-          const br = b.getBoundingClientRect();
-          if (!br.width) continue;
-          if (br.left < rr.left - 0.5 || br.right > rr.right + 0.5) out.push(b.textContent.trim().slice(0, 20));
-          if (br.height < 44) short.push(`${b.textContent.trim().slice(0, 20)}=${Math.round(br.height)}`);
-        }
-      }
-      return { coarse, scroll: document.documentElement.scrollWidth, out, short };
-    });
-    check("V2 settings-columns-phone: coarse pointer emulated", m.coarse);
-    check("V2 settings-columns-phone: documentElement.scrollWidth === 375", m.scroll === 375, String(m.scroll));
-    check("V2 settings-columns-phone: row buttons stay inside their row", m.out.length === 0, m.out.join(", "));
-    check("V2 settings-columns-phone: buttons >= 44px tall", m.short.length === 0, m.short.join(", "));
-    await page.close();
-  }
-
   // V3: the owner Sheet at 1440: each custom popover starts inside its cell's column; its styles equal Sprint 1's.
   {
     const page = await open("review-sheet-edit-custom", { viewport: { width: 1440, height: 900 } });

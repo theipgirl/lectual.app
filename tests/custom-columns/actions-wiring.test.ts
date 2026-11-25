@@ -46,11 +46,13 @@ const h = vi.hoisted(() => ({
   /** The value action's role and session (Nov 23 follow-up: the actingAsStaff wiring). Undefined = the defaults below. */
   role: undefined as string | undefined,
   session: undefined as unknown,
+  ownerState: "owner" as string,
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/db/scoped-client", () => ({ getScopedClient: async () => ({}) }));
-vi.mock("@/lib/auth/current-role", () => ({ currentRole: async () => "owner" }));
+// The field actions ask the caller's own membership row (an owner), not the role claim.
+vi.mock("@/lib/views/layout/owner-load", () => ({ loadOwnerState: async () => h.ownerState }));
 vi.mock("@/lib/pipeline/leads", () => ({ resolveCurrentRole: async () => h.role ?? "attorney" }));
 vi.mock("@/lib/firm/session", () => ({ resolveFirmSession: async () => h.session ?? { kind: "ok", role: "owner", org: { id: "00000000-0000-4000-8000-0000000000aa" } } }));
 vi.mock("@/lib/leads/live", () => ({ keeperForWrite: async (_db: unknown, id: string) => id }));
@@ -62,6 +64,7 @@ vi.mock("@/lib/custom-columns/store", () => ({
     readOptionUse: async (_id: string, options: string[]) => Object.fromEntries(options.map((o) => [o, 0])),
     insertField: async (row: unknown) => {
       h.inserts.push(row);
+      return null;
     },
     updateField: async (...args: unknown[]) => {
       h.updates.push(args);
@@ -110,6 +113,7 @@ beforeEach(() => {
   h.valueUpdates = [];
   h.role = undefined;
   h.session = undefined;
+  h.ownerState = "owner";
 });
 
 describe("F3 / F7 / F8 / F13: forged fields change no payload", () => {
@@ -120,6 +124,17 @@ describe("F3 / F7 / F8 / F13: forged fields change no payload", () => {
     expect(await createFieldAction({}, form({ label: "Bad", kind: "number", section: "trademarks" }, false))).toEqual({ error: "Choose Text, Date, Money, Choice or Person." });
     expect(await createFieldAction({}, form({ label: "Bad", kind: "text", section: "all" }, false))).toEqual({ error: "Choose Trademarks, Contracts or Both." });
     expect(h.inserts).toHaveLength(1);
+  });
+
+  it("the field actions refuse a caller whose membership row isn't an owner (the admin tier included): nothing is read or written", async () => {
+    const { createFieldAction, updateFieldAction } = await import("@/lib/custom-columns/actions");
+    for (const state of ["not-owner", "unreadable"]) {
+      h.ownerState = state;
+      expect(await createFieldAction({}, form({ label: "Quoted fee", kind: "text", section: "trademarks" }, false))).toEqual({ error: "Only an owner can change columns." });
+      expect(await updateFieldAction({}, form({ op: "archive", id: F1 }))).toEqual({ error: "Only an owner can change columns." });
+    }
+    expect(h.inserts).toEqual([]);
+    expect(h.updates).toEqual([]);
   });
 
   for (const [op, fields, want] of [

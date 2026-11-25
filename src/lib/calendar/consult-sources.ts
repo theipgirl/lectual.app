@@ -8,6 +8,9 @@ import {
   LAWMATICS_CONSULTS_NOT_READY,
   LAWMATICS_CONSULTS_RECONNECT,
   LAWMATICS_CONSULTS_UNAVAILABLE,
+  VIEW_AS_OUTLOOK_UNCHECKED,
+  VIEW_AS_PRIVATE_OUTLOOK,
+  VIEW_AS_ZOOM,
 } from "@/lib/ui/words";
 
 /**
@@ -30,7 +33,8 @@ export type SourceState =
   | "reconnect" // the stored sign-in is dead
   | "no-module" // Mailboxes module off (Outlook only)
   | "update-needed" // database update pending (Outlook only)
-  | "unavailable"; // could not be read
+  | "unavailable" // could not be read
+  | "preview"; // View as: not read in a read-only preview (Zoom), or only the teammate's own Outlook, which isn't checked
 
 export type ConsultSourceName = "outlook" | "lawmatics" | "zoom";
 
@@ -46,7 +50,7 @@ export type ConsultItem = {
 };
 
 /** `lawmatics` is absent only when the caller didn't wire that source (it is then not named on the card). */
-export type TodayConsultsResult = { consults: ConsultItem[]; outlook: SourceState; zoom: SourceState; lawmatics?: SourceState };
+export type TodayConsultsResult = { consults: ConsultItem[]; outlook: SourceState; zoom: SourceState; lawmatics?: SourceState; previewName?: string | null };
 
 export type OutlookConnections = { ok: true; active: number; withCalendar: number } | { ok: false };
 
@@ -67,6 +71,11 @@ export type ConsultDeps = {
   /** Is the firm's own Lawmatics connected? Both Lawmatics deps are optional: absent, that source isn't read or named. */
   lawmaticsGate?(): Promise<LawmaticsGate>;
   lawmatics?(now: Date, timeZone: string): Promise<OutlookRead<{ consults: TodayConsult[] }>>;
+  /**
+   * View as: an owner previewing a teammate. Outlook source notes then come from the firm's SHARED connections only (the
+   * deps' `outlookConnections` is filtered), and Zoom is not read at all (its token refresh would rotate the firm's token).
+   */
+  preview?: { name: string | null };
 };
 
 /** One key for "the same call": a Zoom /j/<id> link and a Zoom meeting id agree, any other link is its own URL. */
@@ -166,8 +175,8 @@ async function readOutlook(now: Date, timeZone: string, deps: ConsultDeps): Prom
     if (!(await deps.hasMailboxModule())) return { state: "no-module", items: [] };
     const conns = await deps.outlookConnections();
     if (!conns.ok) return { state: "unavailable", items: [] };
-    if (conns.active === 0) return { state: "not-connected", items: [] };
-    if (conns.withCalendar === 0) return { state: "needs-calendar", items: [] };
+    if (conns.active === 0) return { state: deps.preview ? "preview" : "not-connected", items: [] };
+    if (conns.withCalendar === 0) return { state: deps.preview ? "preview" : "needs-calendar", items: [] };
     const read = await deps.outlook(now, timeZone);
     if (read.status === "database-update-needed") return { state: "update-needed", items: [] };
     if (read.status === "unavailable") return { state: "unavailable", items: [] };
@@ -178,6 +187,7 @@ async function readOutlook(now: Date, timeZone: string, deps: ConsultDeps): Prom
 }
 
 async function readZoom(now: Date, timeZone: string, deps: ConsultDeps): Promise<{ state: SourceState; items: ConsultItem[] }> {
+  if (deps.preview) return { state: "preview", items: [] };
   try {
     const access = await deps.zoomAccess();
     if (access.state === "not-connected") return { state: "not-connected", items: [] };
@@ -219,6 +229,7 @@ export async function loadTodayConsults(now: Date, timeZone: string, deps: Consu
   const [o, z, l] = await Promise.all([readOutlook(now, timeZone, deps), readZoom(now, timeZone, deps), readLawmatics(now, timeZone, deps)]);
   const result: TodayConsultsResult = { consults: mergeConsults(o.items, z.items, l?.items ?? []), outlook: o.state, zoom: z.state };
   if (l) result.lawmatics = l.state;
+  if (deps.preview) result.previewName = deps.preview.name;
   return result;
 }
 
@@ -238,8 +249,12 @@ const INTEGRATIONS = "/dashboard/settings/integrations/";
 const MEETINGS_SETTINGS = "/dashboard/settings/integrations/meetings/";
 const LAWMATICS_SETTINGS = "/dashboard/settings/integrations/lawmatics/";
 
-export function sourceNote(source: ConsultSourceName, state: SourceState): SourceNote | null {
+export function sourceNote(source: ConsultSourceName, state: SourceState, previewName?: string | null): SourceNote | null {
   if (state === "ok") return null;
+  if (state === "preview") {
+    if (source === "zoom") return { source, text: VIEW_AS_ZOOM, link: null };
+    return { source, text: previewName ? VIEW_AS_PRIVATE_OUTLOOK(previewName) : VIEW_AS_OUTLOOK_UNCHECKED, link: null };
+  }
   if (source === "lawmatics") {
     switch (state) {
       case "not-connected":

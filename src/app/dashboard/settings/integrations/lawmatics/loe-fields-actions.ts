@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
 import { gateAdminAction } from "@/app/dashboard/proposals/gate";
 import { proposalActionError, type ActionState } from "@/app/dashboard/proposals/errors";
@@ -17,7 +18,7 @@ import { getProposalSettings, saveProposalSettings } from "@/lib/proposals/store
  * When the Lawmatics field list couldn't be loaded the form posts `mapping=keep` and no
  * choices: the saved matches are kept and only the on/off switch changes.
  */
-export async function saveLoeFieldsAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const saveLoeFieldsAction = previewSafe(async function saveLoeFieldsAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const refused = await gateAdminAction();
   if (refused) return refused;
 
@@ -39,4 +40,4 @@ export async function saveLoeFieldsAction(_prev: ActionState, formData: FormData
   }
   revalidatePath("/dashboard/settings/integrations/lawmatics/");
   return { saved: true, notice: "Saved." };
-}
+}, "state");

@@ -4,7 +4,8 @@ import { TODAY_CONSULT_DAYS } from "@/lib/calendar/outlook-read";
 import { formatEventWhen, joinHref } from "@/lib/calendar/outlook-format";
 import { consultSources, loadTodayConsults, sourceNote, type TodayConsultsResult } from "@/lib/calendar/consult-sources";
 import { LAWMATICS_NAME } from "@/lib/ui/words";
-import { liveConsultDeps } from "@/lib/calendar/consult-sources-live";
+import { consultDepsForViewer } from "@/lib/calendar/consult-deps-view";
+import { consultPreview } from "@/lib/views/view-as";
 import "./calendar.css";
 
 const SOURCE_LABEL = { outlook: "Outlook", lawmatics: LAWMATICS_NAME, zoom: "Zoom" } as const;
@@ -18,7 +19,7 @@ const SOURCE_LABEL = { outlook: "Outlook", lawmatics: LAWMATICS_NAME, zoom: "Zoo
  */
 export function TodayConsultsView({ result, timeZone }: { result: TodayConsultsResult; timeZone: string }) {
   const sources = consultSources(result);
-  const notes = sources.map((s) => sourceNote(s.source, s.state)).filter((n): n is NonNullable<typeof n> => n !== null);
+  const notes = sources.map((s) => sourceNote(s.source, s.state, result.previewName)).filter((n): n is NonNullable<typeof n> => n !== null);
   const allRead = notes.length === 0;
   const readOk = sources.filter((s) => s.state === "ok").map((s) => SOURCE_LABEL[s.source]);
 
@@ -86,6 +87,6 @@ export function TodayConsultsView({ result, timeZone }: { result: TodayConsultsR
 /** Self-loading, so Today's page only mounts it. It never renders nothing. */
 export async function TodayConsults() {
   const timeZone = await getFirmTimeZone();
-  const result = await loadTodayConsults(new Date(), timeZone, liveConsultDeps);
+  const result = await loadTodayConsults(new Date(), timeZone, await consultDepsForViewer(await consultPreview()));
   return <TodayConsultsView result={result} timeZone={timeZone} />;
 }

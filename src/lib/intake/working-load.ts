@@ -56,12 +56,15 @@ export const REAL_ACTIVITY_TYPES = ["email_sent", "email_received", "call_logged
  * which `moveLeadStage` writes) is an open stage after the new-enquiry and Follow-Up stages. Moving a lead between the
  * first stages is filing. That is decided in JS (`countsMove`, from `isPastFirstContact`) over the same paged read; a row
  * with no usable destination id does not count. An Undo counts only if it lands past the boundary too.
+ *
+ * A move written by an owner DELETING a stage (lectual 0119's `crm_stage_delete`: `actor_type = user`, `stage_deleted: true`) is
+ * not work: nobody chose a new stage for that lead. The filter leaves it out, and the JS skips it again in case it is read.
  */
-export const REAL_ACTIVITY_FILTER = `type.in.(email_sent,email_received),and(type.in.(call_logged,note,voice_note),actor_type.eq.user),and(type.eq.stage_changed,actor_type.eq.user,payload->>actor.is.null)`;
+export const REAL_ACTIVITY_FILTER = `type.in.(email_sent,email_received),and(type.in.(call_logged,note,voice_note),actor_type.eq.user),and(type.eq.stage_changed,actor_type.eq.user,payload->>actor.is.null,payload->>stage_deleted.is.null)`;
 
 type Row = Record<string, unknown>;
 /** The columns the activity read selects: the lead, the type, and a stage move's destination stage id. */
-export const ACTIVITY_SELECT = "lead_id, type, to_stage_id:payload->>to_stage_id";
+export const ACTIVITY_SELECT = "lead_id, type, to_stage_id:payload->>to_stage_id, stage_deleted:payload->>stage_deleted";
 type Page = PromiseLike<{ data: Row[] | null; error: unknown }>;
 /** The narrow slice of the scoped client this module uses (so tests can hand in a fake). */
 export type WorkingDb = {
@@ -112,6 +115,7 @@ export async function readRealActivityLeadIds(
         const rows = data ?? [];
         for (const r of rows) {
           if (typeof r.lead_id !== "string") continue;
+          if (r.type === "stage_changed" && r.stage_deleted !== null && r.stage_deleted !== undefined) continue;
           if (r.type === "stage_changed" && !countsMove(typeof r.to_stage_id === "string" && r.to_stage_id ? r.to_stage_id : null)) continue;
           ids.add(r.lead_id);
         }

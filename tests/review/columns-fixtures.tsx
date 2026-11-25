@@ -1,7 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { row, TODAY } from "./fixtures";
 import type { SheetPerms } from "@/lib/review/sheet-edit";
-import type { PrefsDocument } from "@/lib/review/column-prefs-storage";
 import type { CustomColumnsState, CustomField, CustomMember, CustomValue } from "@/lib/custom-columns/rules";
 
 export { TODAY };
@@ -34,18 +33,18 @@ export const OWNER_PERMS: SheetPerms = { writeMatter: true, writeLead: true, mov
 type CustomOpts = { custom?: CustomColumnsState | null; customMembers?: CustomMember[] | null };
 
 /** `canSeeCustomMoney` defaults to `canSeeMoney` here: the fixture viewer is a real owner (staff are tested on the page). */
-export async function renderReadOnly(opts: { canSeeMoney: boolean; canSeeCustomMoney?: boolean; initialPrefs?: PrefsDocument; rows?: typeof rows } & CustomOpts) {
+export async function renderReadOnly(opts: { canSeeMoney: boolean; canSeeCustomMoney?: boolean; rows?: typeof rows } & CustomOpts) {
   const { SheetView } = await import("@/components/review/SheetView");
   return renderToStaticMarkup(
-    <div className="rv-root"><SheetView rows={opts.rows ?? rows} owner={false} today={TODAY} members={members} canWrite={false} params={params} canSeeMoney={opts.canSeeMoney} canSeeCustomMoney={opts.canSeeCustomMoney ?? opts.canSeeMoney} initialPrefs={opts.initialPrefs} custom={opts.custom} customMembers={opts.customMembers} /></div>,
+    <div className="rv-root"><SheetView rows={opts.rows ?? rows} owner={false} today={TODAY} members={members} canWrite={false} params={params} canSeeMoney={opts.canSeeMoney} canSeeCustomMoney={opts.canSeeCustomMoney ?? opts.canSeeMoney} custom={opts.custom} customMembers={opts.customMembers} /></div>,
   );
 }
 
-export async function renderOwnerSheet(opts: { canSeeMoney: boolean; canSeeCustomMoney?: boolean; initialPrefs?: PrefsDocument; perms?: SheetPerms; rows?: typeof rows } & CustomOpts) {
+export async function renderOwnerSheet(opts: { canSeeMoney: boolean; canSeeCustomMoney?: boolean; perms?: SheetPerms; rows?: typeof rows } & CustomOpts) {
   const { SheetEdit } = await import("@/components/review/SheetEdit");
   const perms = opts.perms ?? OWNER_PERMS;
   return renderToStaticMarkup(
-    <div className="rv-owner"><SheetEdit rows={opts.rows ?? rows} perms={perms} owner today={TODAY} members={members} canWrite={perms.writeMatter} params={params} canSeeMoney={opts.canSeeMoney} canSeeCustomMoney={opts.canSeeCustomMoney ?? opts.canSeeMoney} initialPrefs={opts.initialPrefs} custom={opts.custom} customMembers={opts.customMembers} /></div>,
+    <div className="rv-owner"><SheetEdit rows={opts.rows ?? rows} perms={perms} owner today={TODAY} members={members} canWrite={perms.writeMatter} params={params} canSeeMoney={opts.canSeeMoney} canSeeCustomMoney={opts.canSeeCustomMoney ?? opts.canSeeMoney} custom={opts.custom} customMembers={opts.customMembers} /></div>,
   );
 }
 

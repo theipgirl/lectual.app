@@ -39,14 +39,16 @@ describe("F16 / CO3: a firm's live column takes its name off the 'Not tracked' l
   });
 });
 
-describe("P5 / R11 / CO4: the admin tier's line and link", () => {
+// Changed on purpose (editable views): there is no Settings -> Columns page, so the admin tier's "Add a column" link is gone. Adding a
+// column is an owner's, from a column's own menu on the List. What stays is CO4's "not switched on" sentence for the admin tier.
+describe("CO4: the admin tier's line, and no link to a Settings page", () => {
   for (const role of ROLES) {
     const admin = isAdmin(role);
-    it(`${role ?? "null"}: ok ${admin ? "adds the link inside the one <p>" : "has no link"}; not switched on ${admin ? "says so with no link" : "says nothing"}`, () => {
+    it(`${role ?? "null"}: ok has no link; not switched on ${admin ? "says so with no link" : "says nothing"}`, () => {
       const okHtml = note("trademarks", ok([]), admin);
       expect((okHtml.match(/<p /g) ?? []).length).toBe(1);
-      if (admin) expect(okHtml).toMatch(/^<p class="lx-note rv-sheet-note" data-section-note="trademarks">[^<]*<a href="\/dashboard\/settings\/columns\/">Add a column<\/a><\/p>$/);
-      else expect(okHtml).not.toContain("<a ");
+      expect(okHtml).not.toContain("<a ");
+      expect(okHtml).not.toContain("/dashboard/settings/columns");
       const off = note("trademarks", { status: "not-set-up" }, admin);
       expect(off).not.toContain("<a ");
       expect(off.includes(W.CUSTOM_COLUMNS_NOT_ON)).toBe(admin);
@@ -54,14 +56,14 @@ describe("P5 / R11 / CO4: the admin tier's line and link", () => {
       expect(note("trademarks", null, admin)).not.toContain("<a ");
     });
   }
-  // Changed on purpose (merge with the Notes cell): with every Trademarks name added, the Notes sentence stays, then the link, in the one <p>.
-  it("the Notes sentence and the link are drawn inside the one <p>", () => {
+  it("with every Trademarks name added, the one <p> holds the Notes sentence alone, for the admin tier too", () => {
     const st = ok(["Priority", "Opinion Letter Due Date", "Completion Date", "Office Action Fee"].map((label) => ({ label, section: "trademarks" as const })));
-    expect(note("trademarks", st, true)).toBe(`<p class="lx-note rv-sheet-note" data-section-note="trademarks">${W.NOT_TRACKED_NOTES_SENTENCE} <a href="/dashboard/settings/columns/">Add a column</a></p>`);
+    expect(note("trademarks", st, true)).toBe(`<p class="lx-note rv-sheet-note" data-section-note="trademarks">${W.NOT_TRACKED_NOTES_SENTENCE}</p>`);
   });
-  it("nothing to say and no link: no <p>", () => {
+  it("nothing to say: no <p>", () => {
     const st = ok(["Priority", "Completion Date"].map((label) => ({ label, section: "contracts" as const })));
     expect(note("contracts", st, false)).toBe("");
+    expect(note("contracts", st, true)).toBe("");
     expect(note("contracts", { status: "unavailable" }, true)).toContain("Not tracked");
   });
 });

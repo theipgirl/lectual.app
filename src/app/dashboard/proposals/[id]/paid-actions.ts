@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
 import { isRetryableStep } from "@/lib/proposals/paid";
 import { markProposalPaid, retryProposalStep, undoProposalPaid, type FlowResult } from "@/lib/proposals/paid-flow";
@@ -32,7 +33,7 @@ function stateOf(result: FlowResult, headline: string | null): ActionState {
   return { saved: true, notice: parts.join(" ") };
 }
 
-export async function markPaidAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const markPaidAction = previewSafe(async function markPaidAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const refused = await gatePaidAction();
   if (refused) return refused;
   const id = field(formData, "proposalId");
@@ -45,9 +46,9 @@ export async function markPaidAction(_prev: ActionState, formData: FormData): Pr
   revalidate(id);
   // An already-paid click says so and nothing else; a fresh mark leads with "Marked paid.".
   return stateOf(result, result.ok && result.alreadyPaid ? null : MARK_PAID_WORDS.markedNotice);
-}
+}, "state");
 
-export async function undoPaidAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const undoPaidAction = previewSafe(async function undoPaidAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const refused = await gatePaidAction();
   if (refused) return refused;
   const id = field(formData, "proposalId");
@@ -59,10 +60,10 @@ export async function undoPaidAction(_prev: ActionState, formData: FormData): Pr
   }
   revalidate(id);
   return stateOf(result, MARK_PAID_WORDS.undoneHeadline);
-}
+}, "state");
 
 /** Runs one failed or blocked step again (`step` names it). */
-export async function retryUploadAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const retryUploadAction = previewSafe(async function retryUploadAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const refused = await gatePaidAction();
   if (refused) return refused;
   const id = field(formData, "proposalId");
@@ -76,4 +77,4 @@ export async function retryUploadAction(_prev: ActionState, formData: FormData):
   }
   revalidate(id);
   return stateOf(result, null);
-}
+}, "state");

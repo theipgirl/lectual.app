@@ -9,6 +9,7 @@ import { loadAgentSettings, runOneAgent, type RunnerDeps, type RunOutcome } from
 import type { RunScope } from "@/lib/agents/types";
 import type { StageOpt } from "@/lib/reconcile/types";
 import { isConsultScheduledStage } from "./stage";
+import { withRoleFallback } from "@/lib/stages/roles";
 
 /**
  * Starting a consult prep run from somewhere other than the 5 AM run: a lead entering the consult stage, a firm's
@@ -55,12 +56,18 @@ export async function runConsultPrepScoped(deps: RunnerDeps, args: { orgId: stri
 
 async function readStagesAndMapping(admin: Admin, orgId: string): Promise<{ stages: StageOpt[]; mapping: StageMapping } | null> {
   const [stages, notes] = await Promise.all([
-    admin.from("crm_stage").select("id, name, category, order_index").eq("org_id", orgId),
+    withRoleFallback((r) => admin.from("crm_stage").select(r ? "id, name, category, order_index, role" : "id, name, category, order_index").eq("org_id", orgId)),
     admin.from("crm_firm_brain_entry").select("key, body, data").eq("org_id", orgId).eq("category", "stage_mapping"),
   ]);
   if (stages.error || notes.error) return null;
   return {
-    stages: ((stages.data ?? []) as Array<{ id: string; name: string; category: string; order_index: number }>).map((s) => ({ id: s.id, name: s.name, category: String(s.category), orderIndex: s.order_index })),
+    stages: ((stages.data ?? []) as unknown as Array<{ id: string; name: string; category: string; order_index: number; role?: string | null }>).map((s) => ({
+      id: s.id,
+      name: s.name,
+      category: String(s.category),
+      orderIndex: s.order_index,
+      ...(s.role !== undefined ? { role: s.role } : {}),
+    })),
     mapping: parseStageMapping((notes.data ?? []) as Array<{ key?: unknown; body?: unknown; data?: unknown }>),
   };
 }

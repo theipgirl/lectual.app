@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
 import { logConsultOutcome } from "@/lib/pipeline/consult-outcome";
 import { friendlyLeadWriteError } from "../errors";
@@ -11,7 +12,7 @@ export type ConsultOutcomeState = { error?: string; saved?: boolean };
  * role (CAN_WRITE_LEAD) and reads the lead through RLS on every call; this wrapper
  * only turns a failure into a sentence that is safe to show. Nothing is sent.
  */
-export async function logConsultOutcomeAction(
+export const logConsultOutcomeAction = previewSafe(async function logConsultOutcomeAction(
   _prev: ConsultOutcomeState,
   formData: FormData,
 ): Promise<ConsultOutcomeState> {
@@ -31,4 +32,4 @@ export async function logConsultOutcomeAction(
   // A no-show is a `call_logged` row: the Weekly review's last contact and direction read it.
   revalidatePath("/dashboard/review/");
   return { saved: true };
-}
+}, "state");

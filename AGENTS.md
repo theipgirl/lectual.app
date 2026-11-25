@@ -1692,7 +1692,8 @@ A second shell for the managing attorney, beside today's (the TECHNICIAN view, u
   sheet with the old calls). The deck page and every deck action answer `notFound()` without it.
 - **`src/lib/views/` (pure):** view ids technician, owner, attorney, matters-team, intake, office, marketing, read-only; `LIVE_VIEWS =
   ["owner"]` (every other role keeps today's shell). `viewFor({ role, preview, firmHasRoleViews, actingAsStaff })`: switch off -> technician.
-  **Firm members (owner and every other role) have NO view switch** (founder, 2026-11-10): their view is their role's alone (owner -> owner
+  **Firm members (owner and every other role) have NO view switch** (founder, 2026-11-10; View as below is a READ-ONLY look at a teammate,
+  not a switch of one's own view): their view is their role's alone (owner -> owner
   view, everyone else technician while only the owner view is live), and a stored preference is never read for them (the old account-wide
   `user_metadata.lectual_view` is ignored everywhere). **Only Lectual staff acting inside a firm** (`actingAsStaff`, which
   `resolveFirmSession` asks the database via `is_platform_admin`) get the switch (`canSwitchView`), and only when THAT firm has `role-views`:
@@ -2659,6 +2660,185 @@ pull and packages PDF are S2 and are NOT built (the brief says "come in the next
   - **Existing assertions changed on purpose:** the send payload's key list (now with `recipients_sha256`), the card's status line (no "emailed to <names>"), and `hook-schedule.test.ts` (the hook starts `startPrepOnStageEntries` with a batch). Tests: the "review fixes" blocks of
     `tests/agents/consult-prep.test.ts`, `tests/consult-prep/{sends,recipients,brief,deps,sync-hook,trigger,hook-schedule,card}.test.*`.
 
+### S2a: picklist labels, reuse of a full prep, emails carry only a full brief (no schema; spec `docs/pge/2026-11-24-auto-consult-prep/sprint-2a.md`, `revision-2026-11-25.md`)
+Nothing here sends to a client, adds a migration or a dependency, or calls Lawmatics, Resend or a model in a test. The sender is still unset, so nothing is emailed to anyone.
+- **Picklist labels.** `src/lib/lawmatics/field-meta.ts` (no `server-only`, read-only) is the ONE `/custom_fields` reader: `readFieldMeta(client)` keeps each field's name, type and
+  option labels (option id -> label), read ONCE per client (a `WeakMap`), and the engine keeps ONE client for the whole run (`memoProspects`), so a run reads the list once however many leads it preps.
+  `lead-origin-read.ts` (`readOriginLookups`) takes its field NAMES from the same read and exposes it as `fieldMeta` (so the importers' lookups are unchanged and there is no second reader).
+  `parseFieldMeta` is tolerant of shape: options under `options`, `picklist_options`, `values`, `choices`, `option_values`, `picklist_values`, `select_options` (arrays of `{id|value|key, name|label|value}`, or an
+  `{ id: label }` map) or sideloaded through `included`; the type from `field_type`, `data_type`, `input_type`, `kind` or `type`. **The real `/custom_fields` shape is NOT verified against a live account.**
+- **One resolver, `resolveValue`** (pure), used for every Lawmatics value the brief prints (`customFieldPairs`, so the intake facts and the "other answers" alike): (1) `formatted_value` when present and not a bare id (digits, or
+  a comma list of them); (2) else the option label(s) of a select/picklist/dropdown/radio/multi-select field, comma-joined; (3) else a bare number of 3+ digits on a select field (or one with options) is "not recorded";
+  (4) otherwise the value. A value that cannot be put into words keeps its pair with the value "not recorded" (never dropped silently, never a number) and never takes an intake fact's place (`mapIntake` skips it).
+  **Choices where the spec left room (the safe side each time):** a field the successful list does NOT name, with a 3+ digit value, is "not recorded"; a field list that FAILED makes every bare 3+ digit value (even on a text field)
+  "not recorded", and the Lawmatics section says `LABELS_UNREAD_LINE` and the run counts `labels` among the unread sections; a field is found by id first, then by name; a select with an unlisted 1 or 2 digit value keeps it (not an id).
+  Lectual's own `referral_source` and the stage name are already labels and are printed as they were. `LawmaticsRead.labels` is optional so older fixtures hold.
+- **Reuse of a full prep (never for a person's re-run).** `src/lib/consult-prep/adopt.ts` (pure). Before a NEW prep is built for a key the run reads Approvals once (`ctx.listPending` + `ctx.listApproved`, three states: a
+  rejection is "couldn't read", an absent reader or no queue is "nothing there", which is how tests without a queue behave) and looks for a BRIEFING from agent `prep-consult` or `consult-prep`, pending or approved, created
+  since the consult's booking or the start of the firm's day today, whichever is EARLIER (booking = the calendar row's `created_at`, else the lead's `stage_entered_at`; unknown = the day's start), that `isFullBrief` calls full,
+  and that the queue's own `resolveBatch` (through `orgFencedReader`) links to EXACTLY this one lead. The newest wins. `isFullBrief`: the text has heading-like lines (short, markdown/numbering ignored, any case) for "likely classes",
+  "risk read" or "preliminary risk", and "package recommendation"; a text carrying `NEXT_UPDATE_LINE` (Lectual's own S1 facts brief) is never full. A heads-up is not.
+  A failed read of either list, or of the resolver, means NO adoption and NO build for that key this run (`adoptionUnread`, "left for the next run"), never "none found".
+- **Adoption writes** no new BRIEFING and **no client-prep draft** (decision: the prep that was found brings its own drafts, and a second client email in Approvals could be approved twice). The marker is the usual `queue_drafted` row with
+  `queueItemId` = the item's id and `adopted: true`. A prep that was made earlier with the facts brief and finds a full one later (a person drafted it since) gets a SECOND marker for the same key; the card shows the newest one's item and
+  the earliest one's time (`madeAt`), so "Prepared ..." keeps its time. The prep's later emails read the adopted item by id from the pending and approved lists (an approver's edit, `final_body`, wins) and stop being full if that item is
+  gone or rejected. The lead's files are **not** searched: `crm_file` holds PDFs and Word files whose contents this app never reads, so a prep that lives only there is not found. **Known limit:** a BRIEFING queued by a tool that leaves no
+  `queue_drafted` row for the lead (and has no matter or recipient) cannot be linked and is not adopted. The lead page's Documents card is where such a file still is. **The prep-consult skill links its own** (lectual-plugin, Nov 25, Taylor): its heads-up and full brief are BRIEFINGs with `recipient` = the client's email on record, which `resolveBatch`'s rule 3 matches to the lead (an address on two leads adopts for neither). A BRIEFING is never drafted or sent on approval (only CLIENT_EMAIL is), so that recipient only links. `isFullBrief` reads the skill's inline labels ("Likely classes — preliminary — ..."): a leading "preliminary" is not content, and a placeholder on the label's own line makes that section empty (`tests/consult-prep/skill-brief-adoption.test.ts`).
+- **Emails carry only a full brief.** A prep's brief is `full` (adopted; S2b's build later) or `facts` (S1). `planSends` takes `brief`: with `facts`, `booked` and `24h` are WITHHELD, the `1h` is still planned. A withheld email is a
+  new send status `withheld` (an append-only `ai_insight` send row, written once per slot, never hiding a sent, scheduled, duplicate or failed row; no Resend call behind it) and stays OWED: a later run that finds a full brief sends it while it
+  is still due, never late: `booked` not once the 24 h time has passed (a stage-keyed one: not 3 days after the prep), `24h` not within 2 hours of the start (`REMINDER_24H_CUTOFF_MS`) and, being past its time, goes NOW. A `withheld` slot is not
+  done, so cancel-on-change, recipients and every S1 key rule are untouched. A person's re-run has no full brief (it never adopts), so its booked email is withheld and NEVER written as owed or sent (S2b changes that); the confirm text of the
+  Re-run button ("emails a new brief") is therefore not true until S2b: a decision for Taylor, left as it was.
+- **The marked 1 h.** With no full brief the `1h` email goes (scheduled with Resend as before), subject `Facts only: In 1 hour: Consult prep: ...`, the first line of the body `Facts only: the full prep couldn't be built in time.` (html first
+  too), the send record carries `quality: "facts"` (written only when `facts`; absent means full). A facts-only `1h` that is still waiting at Resend when a full brief turns up is CANCELLED (the existing `cancelOne`, its slot gets a new
+  `:g<n>` idempotency key) and planned again with the full text; one whose time has passed is already sent and is never touched ("adoption after a facts-only 1 h changes nothing already sent"). An email of an adopted prep is that item's
+  text unchanged, then `BRIEF_FOOTER` (internal only), the html the escaped text in a pre-wrapped block (`renderAdoptedBrief`, a pure function of its inputs). It is not run through the judgment guard (it is the firm's own prep).
+- **Counts, never content:** `adopted`, `adoptionUnread`, `withheld`, `factsOnly`, `upgraded` in the summary; no text, name or id of an item reaches a log, `agent_run` or an error.
+- **Card and timeline:** the card says "The prep already in Approvals was used." for an adopted prep and "not emailed yet: waiting for the full prep" while the booked email is withheld; the timeline line for a withheld row is
+  "...: waiting for the full prep". The lead's "What Lectual did" may list an adopted prep's second marker as a second "prep" line (not deduplicated).
+- **Existing assertions changed on purpose** (all forced by "an email carries a full brief" or by the marker rows): `tests/agents/consult-prep.test.ts` got a `full` fixture (a full BRIEFING in Approvals linked to the lead by its own
+  marker) and the send-mechanics tests (booked/24h/1h, retries, 409, cancel on change, re-plan on a recipient change, twins, scope, left leads, the R3.1/R3.7 blocks) now run with it, so they hold the same properties on the adopted text; where
+  they asserted a queued BRIEFING or `<h2>` html they now assert no BRIEFING and the adopted block; the stage-keyed test now expects the booked email withheld (and has a full-prep twin); "no recipients" / "email not switched on" filter
+  `withheld` rows out of their "no send rows" check; every re-run test now expects no email from a re-run and still checks the base key's reminders; the `markers` helper leaves out the fixture's own marker; R3.1's last line allows the
+  base-key marker that records an adoption. `tests/agents/new-agents-hygiene.test.ts`'s `resolveBatch` importer list gains `src/lib/consult-prep/engine.ts`. `tests/agents/helpers.ts` gained an optional `listApproved`.
+  New tests: `tests/lawmatics/field-meta.test.ts`, `tests/consult-prep/adopt.test.ts`, the S2a blocks of `tests/consult-prep/{sends,brief,card}.test.*` and `tests/agents/consult-prep.test.ts`.
+- **S2a review fixes.**
+  - **D2:** a failed Approvals read on an already-prepped consult no longer skips it: it is counted, nothing is adopted and NOTHING is cancelled, and the plan runs as with a facts brief, so the facts-only 1 h is still planned/scheduled (booked and 24h stay withheld; a full prep later replaces the 1 h). A NEW consult still waits for the next run on a failed read (no build on a guess).
+  - **D3:** `withoutBareIds` (`field-meta.ts`) is applied to the lead's `referral_source`, `referral_detail` and `practice_area` in the brief: a value, or comma part, that is a 3+ digit number prints "not recorded" (that part only). The mark, business and names are not touched (a mark may be a number).
+  - **D4:** `planSends` applies both cutoffs whatever the slot's status: an owed `booked` (withheld OR failed, on a non-first run) is dropped after start - 24 h (stage-keyed: 3 days after the prep); an owed `24h` (withheld OR failed) is sent now while inside its window and never within 2 h of the start. This changes S1's "a failed booked is retried without limit".
+  - **D5:** `isFullBrief` needs, per section, a real HEADING line (starts with the heading words after markdown, a number or a bullet; a sentence that merely begins with them has no separator and is not one) and real content (inline after `:`/`-`, or a following non-empty line before the next section), not a placeholder (n/a, tbd, none, pending, unknown, "not available/recorded/...").
+  - **D6:** an adopted item that is rejected, edited into something that is no longer full, or gone (Approvals READ fine) has the prep's still-scheduled sends cancelled with `cancelOne` and planned again (the 1 h as facts only, the rest withheld; or from a different full prep found). Counted as `adoptedGone`. A failed read cancels nothing.
+  - **D7:** `cancelOne` returns false, and leaves the slot and generation count alone, when the `cancelled` row can't be written (counted unrecorded); nothing is planned again under the cancelled email's key. Known cost: the next run tries the cancel again and Resend refuses it (counted as a failed send) until the row can be written.
+  - **D8:** `withheld` is counted only when a new row is written; the card says "waiting for the full prep" only while the owed booked email is still due (`nowMs`, same cutoff as the plan) and otherwise "not emailed". The Re-run confirm text now says it builds a fresh prep and that it is emailed to the people set in Settings when the full prep is ready.
+  - **Assertions changed on purpose:** `tests/agents/consult-prep.test.ts` "Approvals unreadable on a later run" (was: nothing sent, whole prep skipped) is replaced by the D2 tests above; `tests/consult-prep/adopt.test.ts` "is true when all three headings are there" now has content under each heading (bare headings are no longer full). Words: `CONSULT_PREP_RERUN_CONFIRM`.
+- **Not verified / not done:** a live Lawmatics (`/custom_fields` shape, option labels), a real Approvals queue (the linking of a skill's BRIEFING to a lead), a real browser, a real Resend. The Re-run button's confirm text is not changed.
+  S2b's full build is now wired (see "S2b" below); S2c (cutover, sender, switching lawmatics-mcp off) is not built.
+
+### S2b: the full brief, its two files, saved to Documents & files (no schema; spec `docs/pge/2026-11-24-auto-consult-prep/sprint-2b.md`)
+P1 (USPTO, `uspto/`), P2 (judgment, `judge/`) and P3 (packages PDF, `pdf/`) are the parts; P4 wires them. Nothing goes to a client; the emails are
+still only to the firm's own people through the recipients guard, and the sender is still unset, so nothing is emailed to anyone until S2c.
+- **One builder** (`full.ts`, `buildFullPrep(facts, firm, deps)`, never throws): the firm's package list (`client_proposal_setting.pricing` through
+  `normalisePackages`, read org-fenced by `readFirmForBrief`; a firm that never saved a setting gets NO list, never `normalisePackages`' made-up default)
+  -> call 1 (route + USPTO plan) -> the USPTO knockout (`searchUspto`, trademark path with a confirmed mark) -> call 2 (judgment) -> `finalizeJudgment`
+  (every model string scrubbed, the package lines from the firm's list) -> `composeFullSections` (`compose.ts`) -> the two files. At most TWO model calls,
+  both through the run's `ctx.llm` with `agent: "consult-prep"` (Sonnet through `agentModel`; a third is refused in code, `MAX_MODEL_CALLS`). The budget is
+  checked before each call (`ctx.timeLeftMs`, `BUILD_RESERVE_MS` kept back; call 1 only with `MIN_START_MS` left for the whole build, call 2 only with
+  `MIN_JUDGE_MS`). `AGENT_POLICY` leads both prompts and record data is inert (P2). Failure codes: the model's (`timeout`, `error`, `invalid`, `refused`,
+  `truncated`), `budget`, `uspto`, `packages`, `unexpected`.
+- **Decision: a USPTO outage alone blocks "full"** on the trademark path (lawmatics-mcp sent its judgment with a "USPTO unavailable" line). A risk read made
+  without the knockout it reads is thinner than the full prep, and the rule is that booked and 24 h carry the full prep or wait for it (the 1 h still goes,
+  marked "facts only"). The judgment call is not spent when the pull failed. "Nothing to search" (no confirmed mark) is NOT an outage: that is the full prep.
+- **The brief** (`brief.ts`, `BriefFacts.full`): the facts brief's sections with the judgment placed in the skill's order: header, Heads-up (nature,
+  flags), Client snapshot (+ the model's summary line), What they need, Mark(s) (+ "As submitted"), Lawmatics answers, the client's words, files, prior
+  contact, then Likely classes — preliminary, USPTO knockout, Preliminary risk read — preliminary, Package recommendation (settled: the firm's prices in a
+  box; else Held with no amount) on the trademark path, or Scope and engagement (and Dispute snapshot) on the general path, then "Questions for the attorney".
+  The "next update" line is gone from a full brief. Every price printed comes from the firm's list; a price the model wrote is "[amount removed]".
+- **Full, honestly.** The trademark-path full brief passes `isFullBrief` (each of the three sections has a heading and content). **Decision (general path):**
+  `isFullBrief` is unchanged, so a general brief found in Approvals is still not adopted (the skill-adoption test's rule stands) and Lectual builds its own;
+  a general brief THIS assistant built is read as full only through its own marker (`full: true`) with `isFullGeneralBrief` (a "Scope and engagement"
+  section and a "Questions for ..." section, each with content), in `stillAdoptable(..., { built: true })`.
+- **Status.** A new prep that adopted nothing, and every person's re-run, builds the full brief. Built: the BRIEFING queued is the full text, the plan is
+  `full` (booked now, 24 h and 1 h as S2a plans them), and the marker carries `full: true`, `queueItemId` and `attach` (the files' CODES). A failure: the
+  facts brief is queued as before, booked and 24 h are withheld, the 1 h is facts only, and it is counted by reason. **Retry:** a later run, for a prep with
+  no full brief whose booked / 24 h is still owed or whose facts-only 1 h is still waiting at Resend, and only with a queue and Approvals read, builds the
+  full prep again; built, it queues a second BRIEFING, writes a `full` marker for the same key (the card shows the newest item), sends what is owed with the
+  files, and the facts 1 h is cancelled and planned again (S2a's upgrade). Reminders of a built prep read the full text back from Approvals.
+- **No queue = no build.** The full text lives in Approvals, where every later email reads it, so a firm with no approval queue is not built for at
+  all (no model call): its prep is S2a's facts prep (booked and 24 h withheld, 1 h facts only) and the summary says so. A BRIEFING that can't be queued
+  marks nothing and sends nothing (as before); a build whose BRIEFING did not land is never counted as full.
+- **Build records, the attempt cap and the marker repair** (`ai_insight` rows `source: consult-prep-build`, ids and codes only; timeline line from
+  `consultPrepTimelineBuild`, left out of "What Lectual did"). Before any build a `started` row is written (it can't be written = no build), and a queued
+  full brief writes a `queued` row with its item id and file codes. A prep key gets at most `MAX_BUILD_ATTEMPTS` (3) builds, whatever fails (the model,
+  USPTO, a marker that will not write). A full brief that was queued but whose marker did not land is found again from its `queued` row: the next run
+  writes the marker (or, on the retry path, uses that item) and builds nothing and queues nothing again. An unreadable build history builds nothing.
+- **The two files** (`attachments.ts`), each optional (a failure never holds the brief or an email back): the USPTO site's own export workbook
+  (`searchUsptoSite` on the mark, then `buildUsptoXlsx` with the firm's calendar date and an image budget clipped to the run's time left) and the packages
+  PDF (`buildPackagesSpec` with the grounded, capped, class-number-free marks from `capPdfMarks`, the firm's name, zone, list and slug, then
+  `renderPackagesPdf`). General path: none. Their codes go on the marker (`built`, `none`, `skipped`, `unavailable`, `failed`, `budget`, a PDF error code).
+- **Email attachments** (`internal-mail.ts`, still the only file that names Resend, gains `attachments` as name + base64): every email of a built prep
+  carries the files, and its body ends with "Attachments" lines saying what this email carries or why a file is missing (fixed sentences, `missingLine`;
+  the stored brief never claims a file). A file over 15 MB, or past 25 MB in all, is not attached and is said to be too large (Resend's limit is 40 MB with
+  base64). A later run's email reads the saved copies back (`files.load`); a copy that can't be read is named. **Refused with files** (only 400, 413 or
+  422; a 401 / 403 is the key or the sender, 408 a timeout, 409 a duplicate, 429 a rate limit, each a plain failure): posted ONCE more without them under `<key>:noatt`, and the body names each file as refused. Whether Resend keeps the key of a refused request
+  is NOT verified, so the re-post never reuses it; a refused request was not accepted, so the re-post cannot double a delivered email. An adopted prep
+  (a person's or the skill's) carries no files and no Attachments lines (decision: default no; its files would belong to another build).
+- **Concurrency and crashes (known, not fixed):** two runs that pick up the same consult at the same instant (S1's known race) can BOTH pay for the two
+  model calls and both queue a BRIEFING; their files share one id per kind, so only one copy is saved. A crash after the emails and before the marker
+  rebuilds on the next run with DIFFERENT text under the same idempotency keys: Resend answers 409 (counted as `duplicate`), so nothing is sent twice,
+  but S1's "a re-post carries the same payload" no longer holds for a full prep (the build record caps how often that can happen).
+- **Saved to Documents & files** (`save-files.ts`, `prepFileStore(ctx.admin, orgId)`: the ONE service-role `crm_file` write and storage upload; the client
+  is the run's own, nothing imported for it). The org is the LEAD ROW's (re-read live and org-fenced; a merged or foreign lead saves nothing); the path is
+  `buildStoragePath` (`{org}/lead/{lead}/{file}.{ext}`), the type `checkFileName`'s, the size the real byte count, the row exactly the scoped flow's
+  columns; object first, then the row (a refused row removes the object), then a `file_uploaded` activity carrying `source: consult-prep`, `prep_key` and
+  `kind`. **Once per prep key:** the file's id is derived from (org, prep key, kind) (`prepFileId`), so "saved" is the `crm_file` row itself (a timeline
+  entry that did not land is only counted as `unlogged`), a duplicate id is "already", and an object left by a half-finished save is reused. Reminders
+  never save; a re-run's key saves its own. No bucket or no table is `skipped`; an unreadable done-check saves nothing. Never throws into the run.
+  A saved copy whose row or object can't be read back is named in the email as "the saved copy couldn't be read", never "could not be built".
+- **Counts only** in the summary (`full preps built`, failures by reason in words, emails re-sent without attachments, files saved / skipped / not saved),
+  `agent_run`, logs and errors: never a name, mark, file name or brief text. `next.config.ts` traces the PDF fonts for `/dashboard/**` and `/api/cron/**`
+  (Run now, the stage hook's `after()` in any page that moves a lead, the mail sync's Stage Keeper).
+- **Tests:** `tests/consult-prep/{full-build,save-files,attachments}.test.ts`, `tests/agents/consult-prep-full.test.ts`, the attachments block of
+  `tests/consult-prep/internal-mail.test.ts`. Engine tests without a `full` dep run exactly as S2a (the builder is a dependency; production wires it in
+  `deps.ts`). Review fixes add: no queue, a queue failure, the attempt cap, the marker repair, a saved copy that can't be read, which refusals re-post,
+  and `saved` judged from the row. **Existing assertion changed:** `tests/ui/no-build-words.test.ts` gains an allow-list entry for `compose.ts` ("scope" is the legal term).
+- **NOT verified:** a live Resend with attachments (the `attachments` body shape, a `scheduled_at` email with attachments, what Resend does with a
+  refused request's idempotency key), a live model (Sonnet on the two structured calls), a live USPTO (both endpoints and the mark images), a real
+  `client-files` bucket upload and download from the service role, Vercel's tracing of the fonts for the new route globs, a real browser.
+
+### S2c: the switch-over from lawmatics-mcp, the reply-to, and the owner's test brief (no schema; runbook `docs/pge/2026-11-24-auto-consult-prep/s2c-runbook.md`)
+Nothing goes to a client; no migration, no dependency. Three env vars, all read in `deps.ts` and validated there (anything invalid is ignored).
+- **Emails wait for the switch-over (fail closed).** A real consult prep email (booked, 24h, 1h) goes only when `CONSULT_PREP_CUTOVER_AT` is set,
+  is a full ISO instant WITH a zone (`parseCutoverAt`; a date alone or a time with no zone is ignored), and now >= it (`emailsStarted`,
+  `cutover.ts`). Unset, invalid or ahead: no email and NOTHING recorded (no send, withheld or superseded row), counted as `awaitingCutover`
+  ("N emails not sent: consult prep emails start when the switch-over is done."). Builds, queue items, markers and saved files go on as before.
+  No backlog when it opens: a prep made earlier gets only what is still due (a booked email is owed only to the run that made the prep), and a
+  prep that already existed skips the whole owed-email path (no Approvals read, no retry build) until then. The card reads
+  "not emailed: emails start when the switch-over is done" (`CONSULT_PREP_EMAILS_WAIT`, `CardInputs.emailsStarted`).
+- **No doubles with lawmatics-mcp** (`lawmaticsReach`, `supersededByCutover`, `cutover.ts`, pure). lawmatics-mcp schedules its 24 h / 1 h briefs
+  with Resend ahead and never cancels. From its own `slots.ts` rules (7:30 AM and 8:00 PM America/New_York, a run acts for a slot up to 1 h
+  early, schedules send times in [S, N), plus 1 h briefs in [N, N + 3 h) after a MORNING slot), its reach is N (24 h briefs) and N or N + 3 h
+  (1 h briefs) of the latest slot at or before cutover + 1 h, worked out under BOTH weekday settings (its `BRIEF_WEEKDAYS_ONLY` is unknown here)
+  and the later kept: at most about 16.5 h after a weekday cutover, up to Monday 7:30 AM from Friday evening. Per slot, by its nominal time: a 24h email is
+  superseded when start - 24 h < reach.day, a 1h when start - 1 h < reach.hour, the booked one when either (it goes only when lawmatics-mcp sent
+  nothing). **Decision:** a per-slot horizon from its schedule, not the plan's flat "start < cutover + 48 h": the flat window would leave consults
+  with no 1 h brief from either system (lawmatics-mcp reaches about 16 h, not 48 h), and 48 h is too short for a weekday-only weekend (about 61.5 h).
+  **Only a consult lawmatics-mcp can have seen** (`cutoverFor`): the rule applies to a Lawmatics consult (the sync's `lmsync:` row, or an Outlook
+  event with such a twin; an Outlook-only consult is never left to it) and only when Lectual's copy of the row at its current start (the later of
+  `created_at` and `synced_at`, so a reschedule counts as new) was written by `reach.seenBy`, the earliest moment lawmatics-mcp's last run can have
+  fired (its slot - 1 h, the earlier of the two weekday settings). A consult known later is Lectual's: a possible duplicate beats no brief. An
+  unknown time keeps the time-only rule. **Rows from before the switch-over are not owed** (`dropPreCutoverOwed`): a `withheld` or `failed` send
+  record written before `CONSULT_PREP_CUTOVER_AT` (S2b wrote them with no sender set) is left out of every plan, so no late booked email and no
+  retry build starts from one; a reminder is planned only by the ordinary rules. The card stops calling such a row pending.
+  A covered slot gets an append-only send record `status: "superseded"` (once per slot, `recordSuperseded`, no Resend call), which `planSends` treats
+  as done, so no later run sends it whatever the clock or env says; it never hides a sent / scheduled / duplicate row. Stage-keyed preps (no consult
+  time; lawmatics-mcp briefs only booked events) and a person's re-run (they asked for it; lawmatics-mcp has no booked email to double) are exempt. A
+  reschedule is a new key, judged by its new start. Card and timeline: "not emailed: the old brief was already scheduled for this consult"
+  (`CONSULT_PREP_SUPERSEDED`).
+- **Reply-to** (`CONSULT_PREP_REPLY_TO`, `bareAddress` at read): on every email only when `guardReplyTo` (recipients.ts) allows it for that email:
+  not any client address, and on the SENDER's own domain (not a public webmail one) or passing the Cc rule against this email's To list. Refused =
+  sent without it, counted (`replyToRefused`). **Decision:** enforced at send time, since brief@ may not be a real mailbox and replies must reach the firm.
+- **Who receives (checked, unchanged):** To = the Settings -> Team firm note's `user_ids` (`crm_firm_brain_entry` key `consult_prep_recipients`, read
+  org-fenced) resolved by `memberAddresses` (this firm's `crm_org_member` rows in the eight staff roles, `auth.admin.getUserById`; any failed lookup =
+  unreadable, nothing sent); Cc = the note's list; then `guardRecipients` on EVERY send drops every client address (the lead's, the Lawmatics contact's,
+  merged leads', any email in the intake answers or Lawmatics fields) and every Cc off a To member's domain (public webmail: exact member only).
+- **"Send a test brief"** (lead page, Consult prep card, `TestBrief.tsx`; owner only: `canSendTestBrief` = role `owner` AND `actingAsStaff === false`,
+  so Lectual staff in a firm are refused). Lead page, not Settings: the lead is the consult being prepared, already chosen. `sendTestBriefAction`
+  re-resolves the session, reads the lead through the scoped client (must be in the session's firm, not merged), limits 5 an hour per owner in
+  memory (a courtesy limit; the slot is taken before any await and given back when the press is refused before a build,
+  `CONSULT_PREP_TEST_REFUSED_BEFORE_BUILD`), and runs consult prep through the runner with scope `{ reason: "test", leadIds: [lead] }` (the assistant must be on;
+  an `agent_run` row records the run, counts only). `runTestBrief` (engine.ts) builds a REAL full prep for the lead's next consult (else its stage
+  path) through `deps.full` (two model calls at most, the firm's packages, the USPTO pull, both files) and sends ONE email to the same recipients
+  (`guardRecipients`, then `testRecipientsOnFirmDomains`: a To, and every To and Cc on a FIRM domain, i.e. the sender's (`CONSULT_PREP_FROM`)
+  or a connected `mailbox_connection` address's, never a public webmail one, or exactly a firm mailbox; otherwise `CONSULT_PREP_TEST_OFF_DOMAIN`
+  and nothing is built),
+  subject `[TEST] ...`, first line `CONSULT_PREP_TEST_FIRST_LINE`, a fresh idempotency key per press. It ignores the switch-over and writes NOTHING
+  (no queue item, marker, send or build record, file). Its answer is one of `CONSULT_PREP_TEST_OUTCOMES` (fixed sentences).
+- The lead page exports `maxDuration = 300`: Re-run prep and the test brief build a full prep inside its server actions.
+- Tests: `tests/consult-prep/{cutover,reply-to,test-brief-action,deps}.test.ts`, the S2c blocks of `tests/agents/consult-prep.test.ts` and
+  `tests/agents/consult-prep-full.test.ts`. **Harness change:** both engine harnesses now pass `cutoverAtMs` 60 days before NOW, since emails are
+  shut without one. **Not verified:** a live Resend reply-to and attachments on a scheduled email, that `rpblawfirm.com` is verified on lectual-app's
+  Resend account, and lawmatics-mcp's prod `BRIEF_*` hours (the defaults are assumed).
+
 ## Rail: Forms and Proposals for the admin tier only (no schema)
 **Superseded (Taylor, Nov 2026):** intake is shown them too, through one predicate; see "Forms and Proposals: shown to the admin tier and intake" below.
 The Forms, Proposals and older Quotes rows carry `minRole: ADMIN_TIER_MIN_ROLE` (`senior_admin`, ranked, so owner / admin / senior_admin) in
@@ -2714,9 +2894,9 @@ says "Not saved yet. Press Enter to save." (`SHEET_NOTE_NOT_SAVED_YET`; a failed
 cancels. `noteCommitter` keeps one post per Enter (a second Enter while saving is ignored); after a failure the next Enter retries.
 
 ## Weekly review List: the Notes cell sits in the column registry's slot (merge of the Notes cell into the columns work, no schema)
-The List's columns come from ONE registry (`src/lib/review/sheet-columns.ts`; `columnsFor`, the per-person chooser) and `NOTES_PRESENT` is now
+The List's columns come from ONE registry (`src/lib/review/sheet-columns.ts`; `columnsFor`; the firm's layout then orders and hides them, there is no per-person chooser) and `NOTES_PRESENT` is now
 `true`: both tables (the read-only `SheetView` and the owner's `SheetEditTable`) draw the merged `NotesCell` at the registry's `notes` slot,
-Trademarks after Source, Contracts after Next step, not last. The chooser hides or moves Notes like any other column. The Trademarks section note
+Trademarks after Source, Contracts after Next step, not last. The firm's layout hides or moves Notes like any other column. The Trademarks section note
 says "Description and Notes are one column in Lectual: Notes." again. Nothing about the cell changed: it saves on Enter only, leaving it never posts,
 and its words are the same.
 - **Read:** `loadReview(now, { withFees, withCustom, notes, customMoney })`, asked together for the List only, in the one parallel read
@@ -2740,7 +2920,7 @@ Money field only (a throw counts as staff). Nothing is hidden only in the browse
   value that still carried an amount is dropped. Callers: the Weekly review List (`loadReview({ customMoney })`, from the page's re-resolved role) and the
   opened card's own read (`loadCardCustomColumns(record, { canSeeMoney })`, the card's re-resolved role AND the page's). The page also cleans what it
   draws with `withoutMoney` (List tables, the owner Sheet's editors, the card's Firm columns). `columnsFor` drops a Money field unless `canSeeMoney`
-  (`customColumn(...).money` is now true for one), so the column chooser never lists it and a stored pref naming it is dropped. No other path reads
+  (`customColumn(...).money` is now true for one), so no column list offers it to anyone else. No other path reads
   `crm_custom_value` (Settings -> Columns reads `value_choice` counts only; no CSV, Matters/Leads list or Copilot reads custom values).
 - **Writes closed:** `setCustomValue` refuses a Money field for every non-owner with `CUSTOM_MONEY_OWNER_ONLY` before the record or the existing value
   is read (decision: owner-only writes too, clears included). Field DEFINITIONS are still the admin tier's (Settings -> Columns says
@@ -2770,6 +2950,219 @@ BEFORE `revoke_member_sessions` (whose order before the delete is kept for 0031'
 the database would refuse. Every other removal and re-role is unchanged. Tests: `tests/settings/owner-row-guard.test.ts`. lectual's ported
 copies need the same fix (`PORTED_FROM.md`).
 
+
+## View as: an owner's read-only preview of a teammate (spec `docs/pge/2026-11-17-agentic-ip-os/spec-owner-view-as.md`, defaults D1-D15; needs lectual 0117 (PROPOSAL, NOT applied) after 0116 (applied to dev and prod))
+A real owner presses "View as" on a teammate's row in Settings -> Team (or "View as a teammate" in the account menu) and every dashboard page draws
+as that teammate would see it, under "Viewing as <name> (read-only)" with Exit. **The session stays the owner's**: no new token, no service role in
+dashboard code, RLS runs as the owner; only "whose view" changes. This is NOT a view switch of one's own (D15) and never "act as".
+- **Who:** only a REAL owner: an owner `crm_org_member` row in THIS firm (`isRealOwner`, `session.member?.role === "owner"`), never the claim and never
+  `!actingAsStaff` alone. A platform admin who is a real owner of the firm may (there only); staff with no row, or a non-owner row, may not. Not
+  yourself; the target must be a current member of the firm; owners may preview owners and admins. Rules: `src/lib/views/view-as-rules.ts` (pure).
+- **The database is the sole authority** (0117 `owner_view_as_event`, proposal file `docs/pge/2026-11-17-agentic-ip-os/0117-proposed.sql.txt`).
+  `owner_view_as_state()` is read ONCE per request for a real owner (`readPreviewState` in `src/lib/views/view-as-flag.ts`, memoized per request on
+  the request's headers object by `src/lib/views/request-memo.ts`, because React `cache` does not memoize in actions or route handlers); non-owners
+  make no read. **Fail closed** (fix of 9a209c0, narrowed Nov 24): an errored read for someone who COULD be a real owner (`readFailed` /
+  `memberReadFailed` on `loadFirmSessionCore`: the membership read itself failed, or an owner row with a failed firm or `is_platform_admin`
+  read) is "unknown"; a non-owner row read fine is never locked out by another read's hiccup; an auth-server error other than "no session" (`authFailed`) and
+  a session that can't be resolved at all are "unknown" while the hint cookie is present and "off" without it. Answers: on / off / not-set-up (42883, PGRST202, 42P01, PGRST205 by CODE, or 0116's guard missing: nothing offered, the Team page and
+  Enter say `notReadyYet("Viewing as a teammate")`) / unknown (a real owner's failed read: the "Couldn't check" banner, writes refused). The hint
+  cookie `lx_view_as` never turns a preview on; clearing it never ends one. A STALE cookie (present, state off or not set up) draws
+  `StalePreviewCookie` ("Your earlier preview has ended." + "Leave preview"), which also posts to Exit once in the background, so the proxy's 409s
+  stop. The per-request memo is forgotten after every wrapped action body (`forgetRequestMemo`), so a same-request re-render reads afresh.
+  2 hours from Enter on the database clock (D1).
+- **Enter, Exit, sign-out are route handlers at fixed paths** (`/dashboard/view-as/enter/`, `/dashboard/view-as/exit/`, `/auth/sign-out/`; logic in
+  `src/lib/views/view-as-routes.ts`, deps injected): same-site POST (Origin, or the Referer when it is missing or "null", against the request
+  URL, Host / X-Forwarded-Host with X-Forwarded-Proto, and `SITE_URL`: `requestOrigins`), session re-read, 303. Sign-out runs the same check
+  but is NEVER blocked by it: a failed check only skips the `owner_view_as_end` log write; it still signs out and clears the cookie. `signOutAction` is gone: every sign-out form posts to
+  `/auth/sign-out/`, which calls `owner_view_as_end('sign_out')` first (best effort), then signs out everywhere. Exit that can't be written keeps the
+  preview and the cookie and says `VIEW_AS_EXIT_FAILED`.
+- **The seam:** `resolveViewer()` (`src/lib/views/view-as.ts`, server-only, memoized) = `{ session, viewAs, viewer, previewState }`. Pages and server
+  components draw from the VIEWER: `resolveViewSession()` (resolveFirmSession as the viewer sees it: role, name, `user.id` and `member` are the
+  teammate's, `user_metadata` empty), and the twins `viewerRole()`, `viewerHasRole()`, `viewerQueueRole()`, `isViewerApprover()`, which outside a
+  preview ARE their session helpers. **No "use server" file and no route.ts imports `@/lib/views/view-as`** (`tests/views/view-as-no-viewer-in-actions`);
+  actions keep deciding with the session and are refused in a preview before deciding anything. Every session role read outside an entry point is
+  pinned and classified in `tests/views/view-as-role-reads.test.ts`; every `auth.getUser()` in `tests/views/view-as-getuser.test.ts`. A new one fails until classified.
+- **The write block, in layers** (a guard against accident, not a hostile owner):
+  (a) **every exported server action is `export const X = previewSafe(async function X(...) {...}, refusal)`** (`src/lib/views/preview-safe.ts`;
+  refusal `"state"` = `{ ok: false, error: VIEW_AS_READ_ONLY }`, `"redirect"` = back with `?notice=preview`, or a function for any other shape, checked
+  by TypeScript), and every mutating route handler `previewSafeRoute(...)` (409). The wrapper reads only the flag. The named read-only allowlist
+  (`previewReadOnly(fn, reason)`: contact search, the leads compare panel, Getting started's record picker, the staff signed-letter download)
+  writes nothing at all and is pinned with its reasons (tested on realistic rows, a found signed proposal included). **Left unwrapped on purpose**
+  (`UNWRAPPED` in the AST test): signing in (`sendMagicLink`, `verifySignInCode`, `confirmSignIn`, the `auth/callback` route: they only create a
+  session) and the public proposal page's two letter downloads (anonymous, token-bound, service-role reads). Entry files are found through the AST
+  (a leading comment can't hide `"use server"`), and a nested inline `"use server"` anywhere under src/ fails; `previewReconcileAction` stays refused (it refreshes mailbox tokens). The AST test
+  `tests/views/view-as-actions-guarded.test.ts` fails CI on an unwrapped action, a re-export, a factory, or an unclassified route.ts.
+  (b) **The database net inside `getScopedClient()`** (`previewNetFetch`, per client instance, never process-wide): while previewing (or unknown),
+  EVERY method other than GET / HEAD / OPTIONS answers 409 without being sent, whatever the path (`/rest/v1`, `/storage/v1`, `/functions/v1`,
+  `/graphql/v1`, a path-prefixed Supabase URL), except the named exemptions: signed DOWNLOAD links, the three `owner_view_as_*` log functions, and
+  auth's own calls other than `PUT /auth/v1/user`. **Read RPCs are called as GET** (`rpc(fn, undefined, { get: true })`: `current_org_id`,
+  `current_org_role`, `is_platform_admin`, `platform_admin_orgs`, `org_member_directory` via `callMemberRpc`, `mailbox_connections_for_owner`; all
+  STABLE in lectual's migrations; `tests/views/view-as-read-rpcs.test.ts`). A read RPC left as POST fails closed in a preview.
+  (c) **The proxy** answers 409 to non-GET signed-in paths (and the OAuth connect / callback GETs) while the hint cookie is present: a quick refusal
+  only; it reads no state. (d) **Render-time provider reads are skipped** whenever the FLAG is on or unknown (`inPreview` /
+  `consultPreview`, not only when a teammate is named): Today's Zoom consults (`VIEW_AS_ZOOM`), My Mail's live Inbox
+  and reading pane (`VIEW_AS_LIVE_MAIL`), so no token is refreshed. (e) `ReadOnlyPreview` cancels form submits in the browser (courtesy).
+  Render-time writes are skipped too: the Forms page's first-draft create (`mayCreate: false`) and the Leads page's stale-timer nudge.
+- **Personal mailboxes:** every render path that lists mailbox connections goes through `listConnectionsForViewer()` (shared mailboxes only while
+  the flag is on or unknown): Integrations (the personal block shows `VIEW_AS_PRIVATE_MAIL` and no Connect), the Assistants readiness check, Settings ->
+  Features' count, Setup, Getting started and Reconcile; My Mail and Today's consults filter themselves (`tests/views/view-as-personal-mailboxes.test.ts`).
+- **Private places** show fixed sentences (`words.ts` `VIEW_AS_*`) and never the owner's own items: the bell (muted, `PreviewBell`) and the
+  notifications page, Copilot (page sentence, launcher hidden, the chat route refused), My Mail (firm SHARED mailboxes only, from stored rows), Today's
+  consults (source notes from firm connections only; the teammate's own Outlook is `VIEW_AS_PRIVATE_OUTLOOK`), the drafter's own Outlook on the
+  approval page and Settings -> Approvals. The tour, welcome deal, Getting started runner and card, and the name / deal-times / feedback dialogs do not
+  open; the account menu holds only "Viewing as <name>", Exit and Sign out. A teammate's own settings (deal times, tips) can't be read: firm defaults (D10).
+- **Tests:** the default for every suite is "not previewing" (`tests/setup-view-as.ts` mocks the flag off; the View as suites unmock it).
+  `tests/views/view-as-*.test.ts(x)`; the 0117 proposal is text-pinned (with an MD5) in `tests/views/view-as-0117-proposal.test.ts`.
+  **Known cost (perf note, not fixed):** every dashboard request by a real owner makes one `owner_view_as_state()` POST, which also takes a
+  per-(firm, owner) advisory lock and scans that owner's open entries; firms have one to three owners, so this is accepted, but a future change could
+  skip it when the hint cookie has been absent for a while. **Not verified:** a real browser (desktop or 375px), 0117 on any database, PostgREST GET for the read RPCs on a
+  live project (they are STABLE in lectual's migration text), and Next's real memo behaviour of `headers()` across a server action plus its re-render.
+
+## Editable views, step 3: the owner's column menu, Add a lead, and no Settings -> Columns (needs lectual 0119, NOT applied anywhere)
+Spec `docs/pge/2026-11-17-agentic-ip-os/spec-editable-views.md` (build step 3 and 7); the DB proposal is `0119-proposed.sql.txt`. Weekly review List and Board only.
+- **Who:** an owner by the caller's own `crm_org_member` ROW (`loadOwnerState`, step 2), never the role claim; Lectual staff acting in a firm are not owners. The page draws the
+  menu only for an owner, not while previewing a teammate, and only when the saved layout was READ (its `rev` is what a change is fenced on). Every action asks the row again first.
+- **Layout write** (`src/lib/views/layout/save.ts`, deps injected; `actions.ts` is the thin `"use server"` pair, both `previewSafe`): the browser sends a view key, an OPERATION
+  (`rename | hide | show | move | moveTo | moveBeside | width | insert`) and the `rev` it drew, never a layout. The server re-reads the saved layout, builds the next one from the step-2 `next.ts`
+  helpers over the columns the viewer has (`layout-base.ts`: the List's base is both sections' columns merged, the Board's is every member's lane), validates it (`parseLayout`) and
+  writes through `store.ts`: INSERT when there is no row (23505 = another owner got there first: re-read, apply the same operation to THEIR layout, update, once), else UPDATE of
+  `columns` alone fenced on `rev` (0 rows = "Someone else changed this view. Refresh to see their change."). Never an upsert. Every answer is a fixed sentence (`writeFailure` maps by
+  error CODE only); a missing table is `notReadyYet("Changing columns")`, RLS 42501 is "Only an owner can change this view."
+- **Add a column** (`add-column.ts`): creates the firm field (`createFieldWithId`) and inserts its lowercase `cf:` key beside the chosen column in one action. If the field was made but
+  the layout write failed, the column still shows (a layout draws any column it doesn't name at the end) and the answer says its place couldn't be saved. The kinds are the existing
+  create's (Text, Date, Money, Choice, Person; there is no Checkbox kind in 0115); Money stays owner-only.
+- **Firm column create/rename/choices/move/archive are owner-only** (`FieldDeps.owner`, from the membership row; `field-deps.ts` builds the deps for both action files). The refusal is
+  "Only an owner can change columns."; 0119 makes it a DB rule too. There is no screen for Edit choices, Archive or Restore any more (the actions remain; the menu offers Rename,
+  Hide, Move and Add).
+- **UI:** `ColumnMenu` (List header and a Board lane) draws a fixed-position panel (the List scrolls sideways inside its card and would cut an absolute one off), closes on Esc (focus back),
+  an outside press and scroll/resize; `HiddenColumnsMenu` shows a hidden column or lane again. `menuItems` (pure) says what a pinned column or a lane is offered.
+  Not verified in a real browser: placement of the fixed panel, focus order, phone width.
+- **Add row** (`AddRow.tsx`, `addLeadFromReviewAction`): "Add a lead" creates a REAL lead through `createLead` (first and last name, email (required: `crm_lead.email` is NOT NULL), business
+  optional). **"Start in"** (Taylor): a select of the firm's OPEN lead stages in pipeline order (`add-lead-stage.ts`), defaulting to the new-enquiry stage; won, lost and nurture are never offered. The
+  server never trusts the posted `stageId`: it re-reads the firm's stage list through the scoped client (a foreign id isn't in it), refuses anything that isn't an open stage of this firm with a fixed
+  sentence, and passes it to `createLead` as `currentStageId` (which stamps `stage_entered_at` and the `lead_created` row with that stage). No stage posted = the new-enquiry stage. If the stage list
+  can't be read there is no select and one quiet sentence. The Weekly review leaves out the new-enquiry and Follow-Up stages (`reviewLeadStageIds`), so a lead started past first contact shows in the
+  List at once; otherwise the success says it joins the List once it moves past first contact, with links to the lead and Leads. "Open a matter" is a plain link to
+  `/dashboard/matters/#open-matter`. Neither is drawn for a role that can't create the record.
+- **Removed:** Settings -> Columns (page, `ColumnsSettings*`, its CSS, `settings-load.ts`, the tab, the section note's "Add a column" link, its words and the design-harness screens). The
+  card's `FirmColumnsEdit` (typing values) stays. 
+- **Also removed (step 7, Nov 25: the firm layouts decide, nobody chooses their own):** the per-person Columns chooser on the Weekly review List
+  (`ColumnChooser`, `use-column-prefs`, `column-prefs-storage`, `applyColumnPrefs` / `parseColumnPrefs` / `prefsReducer` / `parseStoredDocument`, its words
+  and `.rv-cols-*` CSS). Columns drawn = the firm's layout applied to the viewer's allowed columns (`columnsFor` -> `applyReviewLayout`); money rules unchanged.
+  **A stored old choice is never read.** It lived in `localStorage` under `lx-review-sheet-columns`; `LegacyColumnPrefsCleaner` (mounted on the List,
+  draws nothing) deletes that one key after mount, inside try/catch (`removeLegacyColumnPrefs`, `src/lib/review/legacy-column-prefs.ts`), and a present,
+  malformed or huge value changes nothing drawn and throws nothing (`tests/review/legacy-column-prefs.test.tsx`). **Column widths a person dragged are
+  kept:** they live under their own key (`SHEET_SIZES_KEY`, `lx-review-sheet-sizes`), a per-viewer convenience, and are not touched.
+- **One List layout per section (step 3 review):** view keys `review_list_trademarks` and `review_list_contracts` (no `review_list`): the sections head `client` and `mark` differently, so a rename
+  in one must not relabel the other. The page reads both, each header menu is fenced on its own section's rev. Move left and right are `moveBeside` the VISIBLE neighbour the browser names (the
+  server checks both keys are in the layout), so a move is seen even when the layout holds columns that aren't drawn.
+- **A firm column's menu** (`cf:` keys, `firm-column.ts`, `firmColumnAction`, owner-gated): Rename renames the FIELD itself (and clears any view label for it, so the record card and the name rules
+  agree); Edit choices (Choice kind); Archive, with a confirm saying there is no Restore on screen yet. Add a column is refused for any view but the two List keys, before the field is made.
+- **Databases:** `0119-proposed.sql.txt` is the FINAL 0119 for a fresh prod apply (pure ASCII, characters built with `chr()`); `0119b-proposed.sql.txt` is the dev-only delta from the first copy applied
+  to lectual-dev at c46913f. Neither is applied by this repo; prod needs the owner's OK. `tests/views/layout/sql-proposal-text.test.ts` pins them.
+
+## Editable views, step 4: stage roles and the owner's stage menu (needs lectual 0119, NOT applied to prod; spec `spec-editable-views.md` 3b)
+- **Role first, name as the fallback** (`src/lib/stages/roles.ts`, pure). Order everywhere: firm brain `stage_mapping` entry (where the rule has one) ->
+  the ONE stage holding the role -> today's name rule -> today's fallback. A role is trusted only on a stage its category (lead: `new_enquiry` /
+  `follow_up` open, `signed_loe` won, `lost` lost) or open/closed state (matter: `registered` / `abandoned` closed, the rest open) allows, and only when
+  exactly one stage holds it; otherwise the name rule runs, byte for byte as before. Readers: `newEnquiryStage` (`new_enquiry`), Stage Keeper
+  `stageForSignal` (`SIGNAL_ROLES`), Reconcile `stageForMilestone` (`MILESTONE_ROLES`; `contacted` = `new_enquiry`, `declined` = `lost`, `nurture` =
+  `follow_up`), the hired sync's `wonTargetStage` (lead `signed_loe`, won only) and TM matter stage plus the Matters past-signed-LOE cut (`hiredStageOf`,
+  matter `signed_loe`), the Follow-Up boundary (`followUpStageIds`: the role holder alone, else every open stage NAMED Follow-Up; Working rule and the
+  Weekly review's `reviewLeadStageIds`) and the USPTO compare (`compareStatusToStage(read, label, role)`). Nothing in the app writes a role.
+- **Reads:** `role` is hand-added (optional) on both stage Row types. `listStages` selects `*`; every explicit stage select asks for `role` through
+  `withRoleFallback` and reads again without it on 42703 / PGRST204 (by code). `loadMatterStages` tries `phase + role`, `role`, `phase`, plain, in that
+  order. The Stage Keeper and the hired sync keep their service-role client; only their select changed.
+- **The owner's stage menu** (`StageMenu`, on each stage column of the Leads stage board and each open stage column of the Matters board; "Closed" and "Not on
+  the docket yet" get none): drawn only for an owner MEMBERSHIP ROW (`loadOwnerState`) and never while previewing; the Leads board keeps its own board (not
+  moved onto `ViewBoard`), the menu is the column's `menu` slot. Rename, Move left / right (beside the visible neighbour), Add a stage left / right (lead:
+  name + category with the won warning; matter: label + open/closed + who it waits on, the neighbour's phase), Change type (only while the stage holds
+  nothing AND its holdings were read), Delete. Rules for what is offered: `src/lib/stages/menu-model.ts` (pure).
+- **Delete:** the page reads, for owners only, every stage's record ids (`loadStageHoldings`: live leads, merged left out; matters of any status; paged; a
+  failed read offers no delete and no type change, never "empty"). The dialog shows the count and sends exactly those ids back (`p_expected_ids`); the
+  database refuses when they changed ("Some records moved since you opened this. Refresh and try again."). Destinations: lead open / lost / nurture (from a
+  won stage only another won stage); matter the same open/closed unless "Also change open/closed" is ticked. A role holder asks which stage takes the role
+  ("Drop the role" where 0119 allows: never `new_enquiry`, lead `signed_loe` only on the last won stage, matter `signed_loe` never); the last won stage needs
+  the "No won stage" tick; the last open stage is not offered.
+- **One action** (`changeStageAction`, `src/lib/stages/actions.ts`, `previewSafe`; logic `manage.ts`, deps injected): owner row first (before any read),
+  positions worked out from the firm's stage list read through the scoped client (the browser sends "beside X, on this side", never a position), one call to
+  the 0119 function through the scoped client, ONE retry on 40P01 / 55P03 then `STAGE_BUSY`, every 0119 prefix mapped to a fixed sentence (`errors.ts`),
+  PGRST202 / 42883 = `notReadyYet("Changing stages")`. After a lead-stage delete, the moved leads get the sequence stop a person's move into that destination
+  gets (only a won destination stops them, `stopLeadSequencesAsStaff`, reason `client`); NO `stage_changed` automation rule runs and no matter handoff (a won
+  destination is only reachable from a won stage). A stop that didn't finish is said (`STAGE_DELETED_SEQUENCES_NOTE`); the delete stands.
+- **Working rule and the Stage Keeper:** a `stage_changed` row with `payload.stage_deleted` is never a person's work (`REAL_ACTIVITY_FILTER` and the JS
+  both skip it) and never a person's placement: the Stage Keeper's "a person moved this lead in 7 days" check (`countsAsPersonMove` in `run.ts`) ignores it.
+- **Merged leads (0107) in a stage:** `loadStageHoldings("lead")` reads leads WITHOUT the live filter and reports merged ones only as a COUNT per stage
+  (`merged`); their ids are never sent (0119 moves them itself). A stage holding any lead, live or merged, needs a destination on delete and offers no
+  "Change type". "Change type" is never offered on a stage holding a type-bound role (lead `new_enquiry` / `follow_up` / `signed_loe` / `lost`; every
+  matter role). More than 5,000 ids is refused with `STAGE_TOO_MANY_RECORDS`. The Matters dialog says when its count (every matter, closed and filtered-out
+  included) differs from the column. The sequence stop runs in chunks of 80 lead ids (`stopInChunks`) and is ok only when every chunk is. A change
+  revalidates the boards, Reconcile, the Weekly review, Pipeline and the lead / matter pages (`/[id]`, "page").
+- **Closed and intake matter stages** (folded into "Closed" / left off the Matters page) are reached from "Manage stages" (step 5, below). The USPTO
+  compare's role argument has no caller yet.
+- **Not verified:** any database (0119's functions and role column were never called from this app), a real browser (fixed panel placement, focus, phone width).
+
+## Editable views, step 5: Matters and Contracts as two views (needs lectual 0119 for saved layouts and stage changes; NOT applied to prod; spec `spec-editable-views.md` item 4)
+`/dashboard/matters/` is two views over one docket, each with a List and a Board drawn through the shared `ViewTable` / `ViewBoard` with the firm's own layout.
+- **URL shape (least disruption):** `?kind=contracts` is Contracts; no `kind` (every old address) is Matters/Trademarks (`parseMatterKind`, `src/lib/matters/views.ts`). A chip row
+  ("Kind of matter": Matters N, Contracts N) switches; switching starts the other view fresh (its phase group and intake line are Matters-only), keeping the status chip, search and view.
+  `view=table` / no `view` keep their meaning. Layout keys `matters_list` / `matters_board` / `contracts_list` / `contracts_board` (already in `VIEW_KEYS`).
+- **The split is the Weekly review's own type rule** (`isTrademarkRow`): TM, CR, PATENT and no type are Matters; every other type is Contracts. One place; a test compares every type.
+- **Matters shows only matters past the signed engagement**: `pastLoeView` / `intakeStageIds` (role `signed_loe` first, then the exact label, `hiredStageOf`). Pre-filing / Post-filing / "Matters" stay the
+  existing phase-group chips on the Matters view. Contracts is never cut and has no phase chips (its board shows stages with no filing phase plus any stage holding a contract, empty ones folded).
+  A firm with no signed-engagement stage keeps today's rule (pipeline-phase stages are intake, with the existing warning): Today and Copilot's counts are untouched by this step.
+- **List:** `MatterListTable` (one per band) over the layout. Built-in keys `matter` (pinned link), `type`, `stage`, `in_stage`, `owner`, `next_step`, `notes`, then the firm's own columns that fit the
+  kind's section (`cf:` keys; Money only for a real owner). The card's menu is the last column and is not in the layout. Cells reuse the record card's `StagePick` / `OwnerPick` / `NextStepLine` (their own
+  role gates) and the Weekly review's `NotesCell` (`MATTER_WRITE_ROLES`, never in a preview); **firm columns are read-only cells** (typed on the matter's card, which already has the editor).
+  Reads (`list-extras.ts`, scoped client, List only): the firm's fields and values for the shown matters (a matter also shows its lead's value, as on the review) and each matter's newest plain note,
+  asked for only while the Notes column is visible. Each is three-state; a failed one is "couldn't load" in the cell, never empty. Layout read three-state: unreadable = standard columns + one note,
+  not set up = silent.
+- **Board layout hides only (agreed; also noted in the spec under Board).** The Board's columns are stages (`st_<id without dashes>`), plus `not_on_docket` and `closed`. A saved `matters_board` / `contracts_board` layout decides which columns are
+  hidden; **order and names are the stages' own** (the stage menu moves and renames the stage itself, for everyone and for every rule), so no second ordering of one pipeline exists. A hidden column's
+  matters are counted in one line for everyone; the owner gets Show. Never every column hidden. The column menu on a stage column is Hide only (`ColumnMenu kind="stage"`). This is narrower than the spec's
+  "hide / move / rename on the Board"; moving and renaming a stage column is the stage menu.
+- **Owner controls** (owner membership row, never the claim; never while previewing; only when the layout was READ; every action asks again): the column menu on each List header (rename, hide, move beside,
+  add a firm column, firm-column Edit choices / Archive: `addColumnAction` / `firmColumnAction` accept the two Matters/Contracts Lists, `changeLayoutAction`'s `baseFor` has the four keys; a layout change
+  revalidates the review and Matters pages), "Hidden columns" in the toolbar, and on the Board the Hide menu plus the step-4 `StageMenu` on each open stage column.
+- **Manage stages** (`ManageStages`, a closed `<details>` above the Board, owners only, never in a preview, Matters and Contracts boards alike): EVERY matter stage in pipeline order, the closed ones and the intake
+  stages the Matters view leaves out included, each with its state ("Open stage" / "Closed stage" / "Left out of Matters"), its matter count (holdings; unread = "Count couldn't be read", never 0) and the
+  SAME `StageMenu` (rename, move, add, change open/closed, delete with a move) over the same `changeStageAction`.
+- **Add row:** "Open a matter" under the List (a second `OpenMatterButton`, only for `MATTER_WRITE_ROLES`, hidden in a preview) opens the existing open-a-matter panel. No new form.
+- **Review fixes:** Today's and Copilot's links land on Matters, so each view shows one line for the OTHER view's matches under the same status chip and search ("Contracts has N" / "Matters has N", a link; counts elsewhere are
+  unchanged). Firm columns that couldn't be read say so once ("Some details couldn't load (your firm's columns)"); not set up is silent. Firm columns are ordered by `fieldsForSection` (the same function the layout write's base uses) and keyed one way
+  (lowercased `cfKey`). The page strips Money again for anyone but a real owner. The List is fixed-layout with default widths until a layout sets one. `changeLayout` refuses every op but hide / show on `matters_board` / `contracts_board`
+  (`LAYOUT_STAGE_BOARD_HIDE_ONLY`). The Board with empty stages is sent ONCE (empty columns last, `data-empty-stage`, hidden by CSS until Show).
+- **Kept:** the four chips, search, `MovedCardScroller`, the move menus, deadlines tags, Review pills, the record card.
+- **Existing assertions changed on purpose:** `phase-page` (the sample now has a signed-engagement stage and contracts live on the Contracts view), the list-page / review-fixes / list-cleanups source and markup pins (the List's row, width and header markup moved into `MatterListTable` / `ViewTable`),
+  the board-default and matters-links allow-lists (`layout/actions.ts` revalidates the Matters path), `menu-model` (the page joins the owner row and preview flag it reads once), `add-column` and `store-and-actions`
+  (the two Lists now take columns; the Boards save hides only).
+- **Not verified:** a real browser (the Hide menu and Manage stages panels use fixed placement; the stacked cards under 640px with a firm's own columns; the unified List header menus repeated on each band),
+  any database (0119's layout table and stage functions were never called from this app), and a firm with firm columns on Contracts end to end. A firm's own columns are not typed in the List cells.
+
+## Editable views, step 6: Leads as a List and a Board with the firm's layout (needs lectual 0119 for saved layouts; NOT applied to prod; spec `spec-editable-views.md`)
+`/dashboard/intake/` keeps everything Item L built (sets, the Working rule, Lost, paging, select mode, owner board, Long-Term Nurture column, empty-stages row, possible duplicates, notes, time chip, drag). Only the structure
+controls are new. Pure rules in `src/lib/leads/views.ts`; reads in `list-extras.ts` (scoped client) and `firm-cells.ts` (pure).
+- **List = the shared `ViewTable`, not a copy.** `IntakeTable` draws through `ViewTable` with the `leads_list` layout. To keep Item L's look without a regression, `ViewTable` gained four optional slots and nothing else:
+  `headProps` (the `data-col` / `aria-sort` hooks the CSS and tests use), `rowProps` (the row's `data-lead-row`, click-to-open and the pending opacity), `afterRow` (the one-line error row) and `scrollProps`
+  (the `ix-scroll` class and the ref the fit-measurement needs). The row is still `ix-row` (even height), the foot is still `ShowingCount` ("Showing N of M", 25 at a time, `?show=`), sort buttons, the
+  personal drag-resize grips (browser storage), duplicate markers, the notes line, the time chip and the trailing "..." menu column (not in the layout, like Matters' actions column) are all as before.
+  Widths: this person's dragged width, else the layout's width, else the default (Next step stays the one flexible column).
+- **Columns:** built-in keys are Item L's own (`lead` pinned, `stage`, `temp`, `source`, `owner`, `assistant`, `touch`, `next`); then the firm's own columns of the Trademarks section (a lead is a trademark lead, as on the
+  Weekly review), Money only for a real owner (`canSeeCustomMoney` on the re-resolved session; the page strips it again). **Owner and Assistant activity keep Item L's rule** (drawn only while somebody in view has an owner / something to show)
+  whatever the layout says: `drawnLeadColumns` applies the layout, then that rule. A rename is a label only (sort, filters and the Last contact rule keep reading the key). Firm columns are **read-only cells** (typed on the lead's card).
+  Three-state: layout read (unreadable = standard columns + one note; not set up = silent), firm columns (a failed read says so once, never "no columns").
+- **Owner controls** (owner membership row, never in a preview, only when the layout was READ): the column menu on each header (rename, hide, move beside, add a firm column, firm-column Edit choices / Archive), "Hidden columns" in the toolbar
+  beside More. `baseFor` has `leads_list` (built-ins + firm fields) and `leads_board`; `addColumnAction` accepts `leads_list`; `firmColumnAction` clears a renamed firm column's label in `leads_list` too; a layout change revalidates `/dashboard/intake/`.
+- **Board: layout hides only, and IntakeBoard stays as it is (not migrated onto `ViewBoard`).** Migrating would have put frozen set membership, pinned moved cards, select mode, the owner board, the Long-Term Nurture column, the empty-stages row and drag
+  at risk for no gain: the layout only needs to hide stage columns. `leads_board` columns are the firm's intake stages (`st_<id without dashes>`, `stageColumnKey`, now in `src/lib/views/layout/stage-columns.ts` with `splitHiddenColumns` and `isStageBoardView`, shared with Matters).
+  `hideStageColumns` takes the finished board model and removes hidden stage columns (the Nurture column and the named empty stages too); **order and names stay the stages' own** (the step-4 `StageMenu` moves and renames the stage), `changeLayout` refuses every op but hide / show on
+  `leads_board`. A hidden column's leads are counted in one line ("N columns are hidden in your firm's view (M leads)"), `renderedIds` follows what is drawn so a bulk move can't name a hidden card, and a board is never left with no column. The owner board and the Lost set are not touched.
+  Owners get `ColumnMenu kind="stage"` (Hide only) beside the `StageMenu` on each stage column, and Show in "Hidden columns".
+- **Add row:** "Add a lead" under the List (`AddRow` with `onLeads`, the Weekly review's own `AddLeadForm` and `addLeadFromReviewAction`, with the "Start in" picker over the open stages; the server re-checks the role and the stage). Only a role in `CAN_WRITE_LEAD`, never in a preview, List only, not in the Lost set.
+  The action revalidates `/dashboard/intake/`, so the lead appears in whichever set the Working rule puts it in. The toolbar's existing "Add a lead" dialog is unchanged.
+- **Existing assertions changed on purpose:** `col-header-fit` (labels come from `LEADS_LIST_BUILTIN`, the layout's defaults), `l2-view` / `list-page` / `stacked-cards-css` / `sheet-table-guard` (the table's markup pins now name `ViewTable`: `scroll: needsScroll`, `rowClass={() => "ix-row"}`,
+  `data-label={c.label}`), `menu-model` (the page joins the owner row and preview flag it reads once), `leads-cleanup` (the note read names `leadIds`), `add-column` and `store-and-actions` (`leads_list` takes columns, `leads_board` saves hides only).
+- **Not verified:** a real browser (the header menus beside the sort buttons and resize grips, the Hide menu on a stage column, the Add a lead row at 375px, the stacked cards with a firm's own columns), any database (0119's layout table was never called from this app), and a firm with firm columns on Leads end to end.
 
 ## Due today, work-item bullets, four package options (no schema)
 Display and data only: no migration, no dependency, nothing sends. `src/lib/proposals/pricing.ts` has NO diff; every figure below is formatted from

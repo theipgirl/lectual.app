@@ -89,20 +89,6 @@ describe("the field list the registry was given decides the columns", () => {
     expect(ct).toEqual(builtin("contracts", false));
   });
 
-  it("the chooser can hide and move a custom column in both tables (P1, P2)", async () => {
-    const id = `cf:${CF.priority}` as const;
-    const allowed = columnsFor("trademarks", { canSeeMoney: false, hasNotes: NOTES_PRESENT, customFields }).map((c) => c.id);
-    const moved = [...allowed];
-    moved.splice(moved.indexOf(id), 1);
-    moved.splice(1, 0, id);
-    const prefs = { trademarks: { order: moved, hidden: [`cf:${CF.note}`] } };
-    for (const html of [await renderReadOnly({ canSeeMoney: false, custom: customFixture, initialPrefs: prefs }), await renderOwnerSheet({ canSeeMoney: false, custom: customFixture, initialPrefs: prefs })]) {
-      const [tm] = tableHeaders(html);
-      expect(tm[1]).toBe("Priority");
-      expect(tm).not.toContain("Brand note");
-      expect(tm.indexOf("Priority")).toBeLessThan(tm.indexOf("Trademark Name"));
-    }
-  });
 });
 
 /* ── Sprint 3: what Settings -> Columns changes shows on the List (F3, F8 R1) ── */

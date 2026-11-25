@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getScopedClient } from "@/lib/db/scoped-client";
@@ -15,7 +16,7 @@ export type MergeActionState = { error?: string };
  * the two ids the form carries. `crm_merge_leads` is called once through the caller's scoped client, never the
  * service role. Every refusal is a fixed sentence. On success: the kept lead's page, with a quiet "Merged" line.
  */
-export async function mergeLeadsAction(_prev: MergeActionState, form: FormData): Promise<MergeActionState> {
+export const mergeLeadsAction = previewSafe(async function mergeLeadsAction(_prev: MergeActionState, form: FormData): Promise<MergeActionState> {
   const db = await getScopedClient();
   const result = await runMergeLeads(
     { keeperId: form.get("keeper"), loserId: form.get("loser"), choices: buildChoices(form) },
@@ -31,4 +32,4 @@ export async function mergeLeadsAction(_prev: MergeActionState, form: FormData):
   revalidatePath("/dashboard/intake/");
   revalidatePath(`/dashboard/leads/${result.keeperId}`);
   redirect(mergedRedirect(result.keeperId));
-}
+}, "state");

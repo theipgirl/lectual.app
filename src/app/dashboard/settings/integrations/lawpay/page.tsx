@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { hasRole } from "@/lib/auth/roles";
 import { relativeTime } from "@/lib/relative-time";
 import { lawPayDeploymentMode, lawPaySetup } from "@/lib/payments/lawpay-config";
@@ -44,7 +44,7 @@ export default async function LawPayPage({
 }: {
   searchParams: Promise<{ connected?: string; reconnected?: string; unmapped?: string; error?: string }>;
 }) {
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   if (session.kind !== "ok") notFound();
   const canManage = hasRole(session.role, "senior_admin");
   const { connected, reconnected, unmapped, error } = await searchParams;

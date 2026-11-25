@@ -1,10 +1,10 @@
 import { notFound } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { listConnectionsForViewer, previewingAs, resolveViewSession } from "@/lib/views/view-as";
 import { orgHasModule } from "@/lib/org/modules";
 import { canManageScope } from "@/lib/mailbox/access";
 import { connectableProviders } from "@/lib/mailbox/config";
-import { listConnections, type MailboxConnection } from "@/lib/mailbox/connections";
+import type { MailboxConnection } from "@/lib/mailbox/connections";
 import { outcomeMessage } from "@/lib/mailbox/outcome";
 import { getLawmaticsConnection } from "@/lib/lawmatics/connection";
 import { getLawPayConnection } from "@/lib/payments/lawpay-connection";
@@ -23,7 +23,7 @@ import { ModeBadge, StatusPill } from "@/components/integrations/StatusPill";
 import { stateForStatus, type IntegrationState } from "@/components/integrations/states";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
-import { BLANK, FROM_THEIR_EMAILS, integrationErrorLine, LAWPAY_NOT_ISSUED, MAIL_NAME, REFRESH_TO_TRY_AGAIN, SWITCH_ON_WORDS } from "@/lib/ui/words";
+import { BLANK, FROM_THEIR_EMAILS, integrationErrorLine, LAWPAY_NOT_ISSUED, MAIL_NAME, REFRESH_TO_TRY_AGAIN, SWITCH_ON_WORDS, VIEW_AS_PERSONAL_HIDDEN, VIEW_AS_PRIVATE_MAIL } from "@/lib/ui/words";
 import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 import { ClearResultParams } from "@/components/integrations/ClearResultParams";
 
@@ -138,13 +138,14 @@ export default async function IntegrationsPage({
 }) {
   // Integrations itself is open to every firm: Lawmatics uses the firm's own
   // token. The mailbox parts are what the `mailbox` module switches on.
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   if (session.kind !== "ok") notFound();
   const hasMailbox = await orgHasModule("mailbox");
 
   const { connected, reconnected, error } = await searchParams;
   const [list, lawmatics, lawpay, meetingConns] = await Promise.all([
-    hasMailbox ? listConnections() : Promise.resolve({ ok: true as const, connections: [] }),
+    // View as: only the firm's shared mailboxes while previewing (the owner's personal ones are never in a teammate's view).
+    hasMailbox ? listConnectionsForViewer() : Promise.resolve({ ok: true as const, connections: [], hidPersonal: false }),
     getLawmaticsConnection(),
     getLawPayConnection(),
     listMeetingConnections(),
@@ -157,6 +158,8 @@ export default async function IntegrationsPage({
   const connectable = connectableProviders();
   const canManageFirm = canManageScope(session.role, "firm");
   const tz = await getFirmTimeZone();
+  const hidPersonal = list.ok && "hidPersonal" in list && Boolean(list.hidPersonal);
+  const previewName = hidPersonal ? (await previewingAs())?.name ?? null : null;
 
   const errorText = outcomeMessage(error);
   const nothingConfigured = !connectable.google && !connectable.microsoft;
@@ -323,9 +326,15 @@ export default async function IntegrationsPage({
                     <b style={{ color: "var(--ink)" }}>My mailbox</b>
                     <div className="lx-note">Only you can see or disconnect this.</div>
                   </div>
-                  <ConnectButton provider={p} scope="personal" enabled={connectable[p]} label={mineHere.length ? "Connect another" : `Connect ${PROVIDER_LABEL[p]}`} />
+                  {!hidPersonal && <ConnectButton provider={p} scope="personal" enabled={connectable[p]} label={mineHere.length ? "Connect another" : `Connect ${PROVIDER_LABEL[p]}`} />}
                 </div>
-                {mineHere.length > 0 ? mineHere.map((c) => <MailboxRow key={c.id} c={c} canManage tz={tz} />) : <div className="lx-empty">No personal {PROVIDER_LABEL[p]} connected.</div>}
+                {hidPersonal ? (
+                  <div className="lx-empty">{previewName ? VIEW_AS_PRIVATE_MAIL(previewName) : VIEW_AS_PERSONAL_HIDDEN}</div>
+                ) : mineHere.length > 0 ? (
+                  mineHere.map((c) => <MailboxRow key={c.id} c={c} canManage tz={tz} />)
+                ) : (
+                  <div className="lx-empty">No personal {PROVIDER_LABEL[p]} connected.</div>
+                )}
                 <div className="lx-card-head">
                   <div style={{ flex: 1, minWidth: 220 }}>
                     <b style={{ color: "var(--ink)" }}>Firm mailboxes</b>

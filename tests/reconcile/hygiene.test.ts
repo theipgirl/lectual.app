@@ -141,7 +141,8 @@ describe("what the screen is allowed to touch", () => {
 describe("the role gate is in both places", () => {
   it("the page resolves the role itself and answers not-found", () => {
     const page = read("src/app/dashboard/intake/reconcile/page.tsx");
-    expect(page).toMatch(/resolveFirmSession/);
+    // View as (changed on purpose): the page draws for the viewer; the actions still authorize with the session.
+    expect(page).toMatch(/resolveViewSession/);
     expect(page).toMatch(/canReconcile\(session\.role\)\) notFound\(\)/);
     expect(page).toMatch(/export const dynamic = "force-dynamic"/);
   });
@@ -150,7 +151,7 @@ describe("the role gate is in both places", () => {
     const actions = read("src/app/dashboard/intake/reconcile/actions.ts");
     expect(actions).toMatch(/^"use server";/);
     for (const name of ["previewReconcileAction", "applyReconcileAction"]) {
-      const body = actions.slice(actions.indexOf(`export async function ${name}`));
+      const body = actions.slice(actions.indexOf(`async function ${name}`));
       expect(body.indexOf("await authorize()")).toBeGreaterThan(0);
       expect(body.indexOf("await authorize()")).toBeLessThan(body.indexOf("getScopedClient") === -1 ? Infinity : body.indexOf("getScopedClient"));
     }

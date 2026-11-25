@@ -223,6 +223,6 @@ describe("intake stages (Nov 17): pipeline-phase stages before Signed LOE / Depo
 
   it("the stage name never decides anything but the hired stage's own label", async () => {
     const { intakeStageIds } = await import("../../src/lib/matters/phase-group");
-    expect([...intakeStageIds([st("a", "Filed", 0, "pipeline"), st("b", "Intake review", 1, "pre_filing")])]).toEqual(["a"]);
+    expect([...intakeStageIds([st("a", "Filed", 0, "pipeline"), st("b", "Intake review", 1, "pre_filing"), st("h", "Signed LOE / Deposit Received", 2, "pipeline")])]).toEqual(["a"]);
   });
 });

@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { hasRole } from "@/lib/auth/roles";
 import { getSiteOrigin } from "@/lib/site-origin";
 import { loadQuote } from "@/lib/quotes/load";
@@ -48,7 +48,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   return {
     title: await recordPageTitle(async () => {
-      const session = await resolveFirmSession();
+      const session = await resolveViewSession();
       if (session.kind !== "ok" || !hasRole(session.role, "attorney")) return null;
       const read = await loadQuote(id);
       return read.status === "ok" ? read.quote?.title?.trim() || null : null;
@@ -84,7 +84,7 @@ export const dynamic = "force-dynamic";
  */
 export default async function QuoteBuilderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   if (session.kind !== "ok" || !hasRole(session.role, "attorney")) return <QuotesRestricted title="Quote" />;
 
   const load = await loadQuote(id);

@@ -22,6 +22,7 @@ export function BoardColumn({
   headingLevel,
   countTitle,
   bare,
+  menu,
   children,
   className,
   ...rest
@@ -33,6 +34,8 @@ export function BoardColumn({
   countTitle?: string;
   /** The page draws its own lists inside (children are not wrapped in the card `ul`). */
   bare?: boolean;
+  /** A small control after the count (an owner's column menu). Absent for everyone else: nothing is drawn. */
+  menu?: React.ReactNode;
   titleHref?: string;
   /** Extra attributes for the title link (a data hook a test or the page reads). */
   titleLinkProps?: Record<`data-${string}`, string>;
@@ -66,6 +69,7 @@ export function BoardColumn({
       <span className="lx-board-count" title={countTitle}>
         {count}
       </span>
+      {menu}
     </header>
   );
   // An empty array (a page mapping zero cards) counts as no cards, so the empty sentence still shows.

@@ -36,8 +36,8 @@ import {
 /**
  * The List's columns, one registry for both tables (the read-only `SheetView` and the owner's editable Sheet). Pure: no React,
  * no server import, no database. It decides which columns EXIST for a viewer (`columnsFor`: money is dropped unless the page
- * says the viewer may see it, `notes` unless the Notes cell is present) and, for the per-person chooser, what is DRAWN
- * (`applyColumnPrefs`, which can only hide or reorder what `columnsFor` allowed). It never decides access to a record.
+ * says the viewer may see it, `notes` unless the Notes cell is present). The firm's layout then orders and hides them
+ * (`applyReviewLayout`); there is no per-person choice. It never decides access to a record.
  *
  * Internal id note: the owner Sheet's editor id for the Owner column stays `court` in `sheet-edit.ts` (its tests and the
  * `data-rse-cell="<row>|court"` hooks are pinned to it); here the column is `owner`, and `EDIT_ID` maps the two.
@@ -74,7 +74,6 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isFieldId = (x: unknown): x is string => typeof x === "string" && UUID.test(x);
 export const customColumnId = (fieldId: string): CustomColumnId => `cf:${fieldId}`;
 export const isCustomColumnId = (x: unknown): x is CustomColumnId => typeof x === "string" && x.startsWith("cf:") && isFieldId(x.slice(3));
-const isBuiltinColumnId = (x: unknown): x is BuiltinColumnId => typeof x === "string" && (COLUMN_IDS as readonly string[]).includes(x);
 
 /** Whether a field belongs to a List section: a `both` field is in each. */
 export function fieldFits(field: Pick<CustomColumnField, "section">, section: SheetSectionId): boolean {
@@ -108,7 +107,7 @@ export function labelKey(label: string): string {
 /**
  * Whether the Notes cell (the other session's work: `NotesCell`, `sheet-notes.ts`) is present on this branch. It is, since the merge of
  * `claude/gracious-darwin-rceoyv` at 488dd3d: both tables draw it at the `notes` slot (Trademarks after Source, Contracts after Next
- * step), and the chooser hides or moves it like any other column.
+ * step), and the firm's layout hides or moves it like any other column.
  */
 export const NOTES_PRESENT = true;
 
@@ -136,8 +135,10 @@ export type SheetColumn = {
   pinned: boolean;
   /** Typed in the owner Sheet (its editors); every other column is read only. */
   editable: boolean;
-  /** A firm's own column: its kind (the chooser names it). Absent on the spreadsheet's columns. */
+  /** A firm's own column: its kind (a header's hover text names it). Absent on the spreadsheet's columns. */
   kind?: CustomKind;
+  /** The firm's saved width in pixels (its layout, `applyReviewLayout`). Absent = the table's default. */
+  width?: number | null;
 };
 
 type Meta = { header: string | Record<SheetSectionId, string>; title?: string | Partial<Record<SheetSectionId, string>> };
@@ -178,7 +179,7 @@ export function sheetColumn(id: BuiltinColumnId, section: SheetSectionId): Sheet
  * fields (read through the scoped client): that section's come after the spreadsheet columns, in position order. A custom Money
  * column is a REAL owner's only (Taylor, Nov 23): dropped unless `canSeeCustomMoney` is exactly true (`canSeeCustomMoney(role,
  * actingAsStaff)`; Lectual staff inside a firm never get it, while `canSeeMoney` keeps the built-in fee columns as they were), so
- * nobody else's chooser lists it and a stored pref naming it is dropped by `parseColumnPrefs`.
+ * nobody else is given it.
  */
 export function columnsFor(section: SheetSectionId, opts: { canSeeMoney: boolean; canSeeCustomMoney?: boolean; hasNotes: boolean; customFields?: readonly CustomColumnField[] }): SheetColumn[] {
   const builtin = SHEET_SECTION_COLUMNS[section]
@@ -213,97 +214,4 @@ export function notTrackedFor(section: SheetSectionId, state: CustomStateLike): 
   if (!state || state.status !== "ok" || !state.fields) return [...names];
   const taken = new Set(state.fields.filter((f) => fieldFits(f, section)).map((f) => labelKey(f.label)));
   return names.filter((n) => !taken.has(labelKey(n)));
-}
-
-/* ── The per-person chooser: pure rules over `{ order, hidden }` ── */
-
-export type SectionPrefs = { order: ColumnId[]; hidden: ColumnId[] };
-export type StoredPrefs = { v: 1; trademarks: SectionPrefs; contracts: SectionPrefs };
-
-export const COLUMN_PREFS_VERSION = 1;
-/** More ids than any section has (17 of the spreadsheet's plus at most 40 of the firm's): a longer stored list is cut, not trusted. */
-const MAX_STORED_IDS = 64;
-
-const isColumnId = (x: unknown): x is ColumnId => isBuiltinColumnId(x) || isCustomColumnId(x);
-
-/**
- * Cleans one section's stored `{ order, hidden }` against the columns `columnsFor` allowed. Unknown ids, ids not allowed (a stored
- * money id for a non-owner, a `cf:` id of a field that is archived, of the other section or not given), duplicates and an over-long list are dropped; allowed ids missing from the stored order come back at
- * their default position (after the nearest earlier default column that is present); the pinned column is first and never hidden.
- */
-export function parseColumnPrefs(raw: unknown, allowed: readonly ColumnId[]): SectionPrefs {
-  const obj = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as { order?: unknown; hidden?: unknown }) : {};
-  const ok = new Set<ColumnId>(allowed);
-  const list = (v: unknown): ColumnId[] => (Array.isArray(v) ? v.slice(0, MAX_STORED_IDS).filter(isColumnId).filter((id) => ok.has(id)) : []);
-  const order: ColumnId[] = [];
-  for (const id of list(obj.order)) if (!order.includes(id)) order.push(id);
-  allowed.forEach((id, i) => {
-    if (order.includes(id)) return;
-    let at = 0;
-    for (let j = i - 1; j >= 0; j--) {
-      const k = order.indexOf(allowed[j]);
-      if (k >= 0) {
-        at = k + 1;
-        break;
-      }
-    }
-    order.splice(at, 0, id);
-  });
-  const pinned = order.filter(isPinnedColumn);
-  const withPinnedFirst = [...pinned, ...order.filter((id) => !pinned.includes(id))];
-  const hidden: ColumnId[] = [];
-  for (const id of list(obj.hidden)) if (!hidden.includes(id) && !pinned.includes(id)) hidden.push(id);
-  return { order: withPinnedFirst, hidden };
-}
-
-export function defaultSectionPrefs(allowed: readonly ColumnId[]): SectionPrefs {
-  return { order: [...allowed], hidden: [] };
-}
-
-export function defaultStoredPrefs(allowed: Record<SheetSectionId, readonly ColumnId[]>): StoredPrefs {
-  return { v: 1, trademarks: defaultSectionPrefs(allowed.trademarks), contracts: defaultSectionPrefs(allowed.contracts) };
-}
-
-/** The raw stored string (or nothing) as a whole document: malformed JSON, a non-object or another version is "nothing stored". */
-export function parseStoredDocument(raw: string | null | undefined): { trademarks: unknown; contracts: unknown } | null {
-  if (!raw) return null;
-  let data: unknown;
-  try {
-    data = JSON.parse(raw);
-  } catch {
-    return null;
-  }
-  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
-  if ((data as { v?: unknown }).v !== COLUMN_PREFS_VERSION) return null;
-  return { trademarks: (data as { trademarks?: unknown }).trademarks, contracts: (data as { contracts?: unknown }).contracts };
-}
-
-/** The columns to DRAW: `allowed` (from `columnsFor`) reordered and thinned by the person's prefs. Nothing outside `allowed` can appear. */
-export function applyColumnPrefs(allowed: readonly SheetColumn[], prefs: unknown | null): SheetColumn[] {
-  if (!prefs) return [...allowed];
-  const clean = parseColumnPrefs(prefs, allowed.map((c) => c.id));
-  const byId = new Map(allowed.map((c) => [c.id, c]));
-  return clean.order.filter((id) => !clean.hidden.includes(id)).map((id) => byId.get(id)!);
-}
-
-export type PrefsAction =
-  | { type: "toggle"; id: ColumnId }
-  | { type: "move"; id: ColumnId; dir: -1 | 1 }
-  | { type: "reset" };
-
-/** The chooser's edits, over a section's prefs already cleaned against `allowed`. The pinned column can't be hidden or moved. */
-export function prefsReducer(prefs: SectionPrefs, action: PrefsAction, allowed: readonly ColumnId[]): SectionPrefs {
-  if (action.type === "reset") return defaultSectionPrefs(allowed);
-  const cur = parseColumnPrefs(prefs, allowed);
-  if (!allowed.includes(action.id) || isPinnedColumn(action.id)) return cur;
-  if (action.type === "toggle") {
-    return { ...cur, hidden: cur.hidden.includes(action.id) ? cur.hidden.filter((x) => x !== action.id) : [...cur.hidden, action.id] };
-  }
-  const at = cur.order.indexOf(action.id);
-  const to = at + action.dir;
-  // The pinned column holds the first place, so nothing moves above index 1.
-  if (at < 0 || to < 1 || to >= cur.order.length) return cur;
-  const order = [...cur.order];
-  [order[at], order[to]] = [order[to], order[at]];
-  return { ...cur, order };
 }

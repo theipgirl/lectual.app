@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
 import { currentRole } from "@/lib/auth/current-role";
 import { getScopedClient } from "@/lib/db/scoped-client";
@@ -44,18 +45,18 @@ async function deps(): Promise<LetterDeps> {
   };
 }
 
-export async function startDraftAction(_prev: LetterActionState, formData: FormData): Promise<LetterActionState> {
+export const startDraftAction = previewSafe(async function startDraftAction(_prev: LetterActionState, formData: FormData): Promise<LetterActionState> {
   return runStartDraft(await deps(), formData);
-}
+}, "state");
 
-export async function startFromVersionAction(_prev: LetterActionState, formData: FormData): Promise<LetterActionState> {
+export const startFromVersionAction = previewSafe(async function startFromVersionAction(_prev: LetterActionState, formData: FormData): Promise<LetterActionState> {
   return runStartFromVersion(await deps(), formData);
-}
+}, "state");
 
-export async function saveDraftAction(_prev: LetterActionState, formData: FormData): Promise<LetterActionState> {
+export const saveDraftAction = previewSafe(async function saveDraftAction(_prev: LetterActionState, formData: FormData): Promise<LetterActionState> {
   return runSaveDraft(await deps(), formData);
-}
+}, "state");
 
-export async function approveLetterAction(_prev: LetterActionState, formData: FormData): Promise<LetterActionState> {
+export const approveLetterAction = previewSafe(async function approveLetterAction(_prev: LetterActionState, formData: FormData): Promise<LetterActionState> {
   return runApprove(await deps(), formData);
-}
+}, "state");

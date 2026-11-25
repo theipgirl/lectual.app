@@ -86,3 +86,29 @@ describe("one place for each name", () => {
     expect(hits, hits.join("\n")).toEqual([]);
   });
 });
+
+describe("View as sentences (spec 'Private places')", () => {
+  it("are the ones the spec wrote, with no build words", () => {
+    expect(W.VIEW_AS_BANNER("Dana Lee")).toBe("Viewing as Dana Lee (read-only)");
+    expect(W.VIEW_AS_EXIT).toBe("Exit");
+    expect(W.VIEW_AS_READ_ONLY).toBe("This is a read-only preview. Nothing was changed.");
+    expect(W.VIEW_AS_EXIT_FAILED).toBe("Couldn't leave the preview. Try again, or sign out to end it.");
+    expect(W.VIEW_AS_PRIVATE_MAIL("Dana")).toBe("Dana's own mailbox is private to them and isn't shown in a preview.");
+    expect(W.VIEW_AS_LIVE_MAIL).toBe("Live mail isn't read in a preview. Stored messages are shown.");
+    expect(W.VIEW_AS_PRIVATE_OUTLOOK("Dana")).toBe("Dana's own Outlook isn't checked in a preview.");
+    expect(W.VIEW_AS_PRIVATE_COPILOT("Dana")).toBe("Dana's Copilot chats are private to them and aren't shown in a preview.");
+    expect(W.VIEW_AS_PRIVATE_BELL("Dana")).toBe("Dana's notifications are private to them and aren't shown in a preview.");
+    expect(W.VIEW_AS_ZOOM).toBe("Zoom consults aren't read in a preview.");
+    expect(W.VIEW_AS_NOT_ALLOWED).toBe("Only an owner of this firm can view the app as a teammate.");
+    expect(W.VIEW_AS_TARGET_GONE).toBe("That person isn't on your team any more.");
+    expect(W.VIEW_AS_UNCHECKED).toBe("Couldn't check whether you're viewing as a teammate. Nothing can be changed until you refresh.");
+    expect(W.VIEW_AS_LINK).toBe("View as");
+    expect(W.VIEW_AS_MENU).toBe("View as a teammate");
+    expect(W.VIEW_AS_NOT_READY).toBe(W.notReadyYet("Viewing as a teammate"));
+    expect(W.VIEW_AS_OUTLOOK_UNCHECKED).toBe("Outlook calendars aren't checked in a preview.");
+    expect(W.VIEW_AS_STALE).toBe("Your earlier preview has ended.");
+    expect(W.VIEW_AS_LEAVE).toBe("Leave preview");
+    const all = [W.VIEW_AS_BANNER("X"), W.VIEW_AS_READ_ONLY, W.VIEW_AS_EXIT_FAILED, W.VIEW_AS_PRIVATE_MAIL("X"), W.VIEW_AS_LIVE_MAIL, W.VIEW_AS_PRIVATE_OUTLOOK("X"), W.VIEW_AS_PRIVATE_COPILOT("X"), W.VIEW_AS_PRIVATE_BELL("X"), W.VIEW_AS_ZOOM, W.VIEW_AS_NOT_ALLOWED, W.VIEW_AS_TARGET_GONE, W.VIEW_AS_UNCHECKED, W.VIEW_AS_START_FAILED, W.VIEW_AS_TEAM_UNREADABLE, W.VIEW_AS_NOT_READY];
+    for (const s of all) expect(s).not.toMatch(/impersonat|session|\bRLS\b|migration|database|token/i);
+  });
+});

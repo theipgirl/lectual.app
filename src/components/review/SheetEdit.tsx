@@ -3,8 +3,9 @@ import { lastContactText, shortDate } from "@/lib/review/format";
 import { sheetSections, waitingCell } from "@/lib/review/sheet";
 import { factCells, type FactCell, type FactCells } from "@/lib/review/sheet-cells";
 import { customCells, customEditInputs, noteStateOf, withoutMoney, type CustomColumnsState, type CustomEditInput, type CustomMember } from "@/lib/custom-columns/rules";
-import { MONEY_COLUMNS, NOTES_PRESENT, columnsFor, customColumnId } from "@/lib/review/sheet-columns";
-import type { PrefsDocument } from "@/lib/review/column-prefs-storage";
+import { applyReviewLayout } from "@/lib/review/layout";
+import type { SectionLayouts } from "@/lib/review/layout";
+import { MONEY_COLUMNS, NOTES_PRESENT, columnsFor, customColumnId, type SheetSectionId } from "@/lib/review/sheet-columns";
 import { documentsTag } from "@/lib/review/documents";
 import { lastChangedText } from "@/lib/review/last-changed";
 import { contactWords } from "@/lib/review/contact";
@@ -53,13 +54,14 @@ function toSheetRow(r: ReviewRow, href: string, today: string, names: ReadonlyMa
  * are worked out and locked. Every edit goes through an existing review action, which re-resolves the role. A role that can't
  * write gets the same table with no editors. On a phone the rows stack and every edit happens in the record panel.
  */
-export function SheetEdit({ rows, today, members, params, perms, initial, canSeeMoney = false, canSeeCustomMoney = false, initialPrefs, custom: customIn = null, customMembers, adminTier = false, notes = null }: Common & {
+export function SheetEdit({ rows, today, members, params, perms, initial, canSeeMoney = false, canSeeCustomMoney = false, layout = null, layoutEdit = null, custom: customIn = null, customMembers, adminTier = false, notes = null }: Common & {
   rows: ReviewRow[];
   perms: SheetPerms;
   initial?: SheetEditInitial;
   /** From the page's re-resolved role (`canSeeBilling`). Drops the fee columns when false. */ canSeeMoney?: boolean;
   /** A REAL owner only (`canSeeCustomMoney(role, actingAsStaff)`): the firm's own Money columns. Never Lectual staff. */ canSeeCustomMoney?: boolean;
-  /** Drawing-only starting column choices (a test or preview). */ initialPrefs?: PrefsDocument;
+  /** The firm's saved column layout for this List (order, names, hidden, widths); null = the standard columns. */ layout?: SectionLayouts | null;
+  /** Given only for an owner (see the page): the column menu on each header. */ layoutEdit?: { revs: Record<SheetSectionId, number | null> } | null;
   /** The firm's custom columns as the page read them. Typed in place when `perms.writeCustom` and the state is `ok`. */ custom?: CustomColumnsState | null;
   /** The member directory for person cells; null when it couldn't be read. Defaults to `members`. */ customMembers?: CustomMember[] | null;
   /** The admin tier (the page's re-resolved role): the section note's "not switched on" line and "Add a column" link. */ adminTier?: boolean;
@@ -81,7 +83,7 @@ export function SheetEdit({ rows, today, members, params, perms, initial, canSee
     { id: "contracts", title: "Contracts", rows: contracts.map(sheetRow) },
   ];
   const first = (n: string) => n.trim().split(/\s+/)[0] ?? n;
-  const columns = { trademarks: columnsFor("trademarks", { canSeeMoney, canSeeCustomMoney, hasNotes: NOTES_PRESENT, customFields: fields }), contracts: columnsFor("contracts", { canSeeMoney, canSeeCustomMoney, hasNotes: NOTES_PRESENT, customFields: fields }) };
+  const columns = { trademarks: applyReviewLayout(columnsFor("trademarks", { canSeeMoney, canSeeCustomMoney, hasNotes: NOTES_PRESENT, customFields: fields }), layout?.trademarks), contracts: applyReviewLayout(columnsFor("contracts", { canSeeMoney, canSeeCustomMoney, hasNotes: NOTES_PRESENT, customFields: fields }), layout?.contracts) };
   const people: SheetPerson[] = members.map((m) => ({
     userId: m.userId,
     name: m.name,
@@ -98,7 +100,7 @@ export function SheetEdit({ rows, today, members, params, perms, initial, canSee
           {SHEET_STAGES_UNREADABLE}
         </Notice>
       )}
-      <SheetEditTable sections={sections} people={people} perms={perms} sources={[...REFERRAL_SOURCES]} today={today} initial={initial} columns={columns} initialPrefs={initialPrefs} noteState={noteStateOf(custom)} adminTier={adminTier} fieldMeta={fieldMeta} cellMembers={cellMembers} />
+      <SheetEditTable sections={sections} people={people} perms={perms} sources={[...REFERRAL_SOURCES]} today={today} initial={initial} columns={columns} noteState={noteStateOf(custom)} adminTier={adminTier} fieldMeta={fieldMeta} cellMembers={cellMembers} layoutEdit={layoutEdit} />
       {anyEditor && (
         <section className="lx-card rse-legend" aria-label={SHEET_LEGEND_LABEL}>
           <div>

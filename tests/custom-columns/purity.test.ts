@@ -44,12 +44,10 @@ const FIXTURES = [
   "tests/custom-columns/money-input.test.ts",
   "tests/custom-columns/errors.test.ts",
   "tests/custom-columns/field-store.test.ts",
-  "tests/custom-columns/settings-render.test.tsx",
   "tests/review/section-note.test.tsx",
   "tests/review/sheet-edit-custom-render.test.tsx",
   "tests/review/firm-columns-edit.test.tsx",
-  "tests/settings/columns-page.test.tsx",
-  "tests/settings/layout-columns-tab.test.tsx",
+  "tests/settings/no-columns-tab.test.tsx",
   "scripts/design-harness/screens/custom-columns.screen.tsx",
 ];
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_LIVE, createField, nextPosition, updateField, type FieldDeps, type UpdateInput } from "@/lib/custom-columns/field-actions";
+import { MAX_LIVE, createField, createFieldWithId, nextPosition, updateField, type FieldDeps, type UpdateInput } from "@/lib/custom-columns/field-actions";
 import { fieldsForSection, type CustomColumnField } from "@/lib/review/sheet-columns";
 import * as W from "@/lib/ui/words";
 import { ORG, field, fid, makeStore, type FakeField } from "./field-fake";
@@ -8,7 +8,7 @@ import { ORG, field, fid, makeStore, type FakeField } from "./field-fake";
 
 const SPIES = ["orgId", "readField", "readLiveFields", "readOptionUse", "insertField", "updateField"] as const;
 const BAD_ROLES: Array<[string, () => Promise<string | null>]> = [
-  ...["attorney", "paralegal", "intake", "law_clerk", "clerk", "viewer", "social_media"].map((r) => [r, async () => r] as [string, () => Promise<string | null>]),
+  ...["admin", "senior_admin", "attorney", "paralegal", "intake", "law_clerk", "clerk", "viewer", "social_media"].map((r) => [r, async () => r] as [string, () => Promise<string | null>]),
   ["null", async () => null],
   ["a role() that throws", async () => Promise.reject(new Error("rpc down"))],
 ];
@@ -42,12 +42,21 @@ describe("F2: the field actions' role gate", () => {
     const reads = s.calls.length;
     expect(await create(s.deps, { label: "Second" })).toEqual({ error: W.COLUMNS_NO_PERMISSION });
     expect(s.calls.length).toBe(reads);
-    expect(s.deps.role).toHaveBeenCalledTimes(2);
+    expect(s.deps.owner).toHaveBeenCalledTimes(2);
     expect(s.deps.orgId).toHaveBeenCalledTimes(1);
   });
 
-  it("owner, admin and senior_admin pass", async () => {
-    for (const r of ["owner", "admin", "senior_admin"]) expect(await create(makeStore([], { role: r }).deps)).toEqual({ saved: true });
+  // Changed on purpose (editable views): lectual 0119 makes field create and change owner-only, so the admin tier is refused here with
+  // the owner sentence rather than a raw database refusal. The caller's own membership row decides (`deps.owner`), not a role claim.
+  it("only an owner passes; the admin tier and a throwing owner check are refused", async () => {
+    expect(await create(makeStore([], { role: "owner" }).deps)).toEqual({ saved: true });
+    for (const r of ["admin", "senior_admin"]) expect(await create(makeStore([], { role: r }).deps)).toEqual({ error: W.COLUMNS_NO_PERMISSION });
+    const s = makeStore([]);
+    s.deps.owner.mockRejectedValue(new Error("down"));
+    expect(await create(s.deps)).toEqual({ error: W.COLUMNS_NO_PERMISSION });
+  });
+  it("the owner sentence says owner", () => {
+    expect(W.COLUMNS_NO_PERMISSION).toBe("Only an owner can change columns.");
   });
 });
 
@@ -529,3 +538,15 @@ describe("C1: one write per op (Move: two plus at most one compensation), never 
   });
 });
 
+
+describe("createFieldWithId (the column menu's Add a column)", () => {
+  it("answers the new field's id when the store returns one, and null for a refusal", async () => {
+    const s = makeStore([]);
+    s.deps.insertField.mockResolvedValue(fid(77));
+    expect(await createFieldWithId(s.deps, { label: "Priority", section: "trademarks", kind: "text", choices: "" })).toEqual({ state: { saved: true }, id: fid(77) });
+    const none = makeStore([]);
+    expect(await createFieldWithId(none.deps, { label: "Second", section: "trademarks", kind: "text", choices: "" })).toEqual({ state: { saved: true }, id: null });
+    const refused = makeStore([], { role: "admin" });
+    expect(await createFieldWithId(refused.deps, { label: "Third", section: "trademarks", kind: "text", choices: "" })).toEqual({ state: { error: W.COLUMNS_NO_PERMISSION }, id: null });
+  });
+});

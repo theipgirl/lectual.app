@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { currentRole } from "@/lib/auth/current-role";
+import { viewerRole } from "@/lib/views/view-as";
 import { orgHasModule } from "@/lib/org/modules";
 import { canSeeSetup } from "@/lib/setup/roles";
 import { pageTitle } from "@/lib/ui/page-title";
@@ -9,7 +9,8 @@ import { LoadFailedCard, PageHeader } from "@/components/ui";
 import { loadApprovalRouting } from "@/lib/queue/routing-load";
 import { KIND_INFO, QUEUE_KINDS, eligibleDrafters, eligibleOwners, memberName } from "@/lib/queue/routing";
 import { ApprovalRoutingForm, type RoutingRow } from "@/components/queue/ApprovalRoutingForm";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { previewingAs, resolveViewSession } from "@/lib/views/view-as";
+import { VIEW_AS_PRIVATE_OUTLOOK } from "@/lib/ui/words";
 import { myOutlookDraftAccess } from "@/lib/mailbox/my-mailbox";
 import { drafterOutlookLine } from "@/lib/queue/drafter-outlook";
 import { DRAFTER_DROPPED } from "@/lib/ui/words";
@@ -23,7 +24,7 @@ export const dynamic = "force-dynamic";
  * re-checks). Stored in the proposals settings row, so a firm without that feature sees a plain sentence and no form.
  */
 export default async function ApprovalSettingsPage() {
-  if (!canSeeSetup(await currentRole())) notFound();
+  if (!canSeeSetup(await viewerRole())) notFound();
 
   const head = (
     <PageHeader
@@ -67,10 +68,14 @@ export default async function ApprovalSettingsPage() {
   // "Drafts go to": the drafter's Outlook state is shown only when it is the viewer's own (a colleague's personal Outlook
   // is invisible by RLS: "Only <name> can see this").
   const drafterMember = loaded.drafter ? loaded.members.find((m) => m.userId === loaded.drafter) : undefined;
-  const session = drafterMember ? await resolveFirmSession().catch(() => null) : null;
+  const session = drafterMember ? await resolveViewSession().catch(() => null) : null;
   const viewerId = session && session.kind === "ok" ? session.user.id : null;
+  // View as: the teammate's own Outlook is never checked (it would be the owner's own connection that answered).
+  const previewing = drafterMember ? await previewingAs() : null;
   const outlook = drafterMember
-    ? drafterOutlookLine({ drafterName: memberName(drafterMember), isSelf: drafterMember.userId === viewerId, access: drafterMember.userId === viewerId ? await myOutlookDraftAccess() : null })
+    ? previewing && drafterMember.userId === viewerId
+      ? VIEW_AS_PRIVATE_OUTLOOK(previewing.name)
+      : drafterOutlookLine({ drafterName: memberName(drafterMember), isSelf: drafterMember.userId === viewerId, access: drafterMember.userId === viewerId ? await myOutlookDraftAccess() : null })
     : null;
   const drafter = {
     current: loaded.drafter ?? "",

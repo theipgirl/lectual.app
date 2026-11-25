@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { mockLayoutRead } from "./layout-mock";
 import { renderToStaticMarkup } from "react-dom/server";
 import { row, TODAY } from "./fixtures";
 import { Tags } from "@/components/review/shared";
@@ -26,6 +27,7 @@ const rows = [
 
 function mock(load: unknown, role: string | null = "attorney") {
   vi.doMock("@/lib/review/load", () => ({ loadReview: vi.fn(async () => load) }));
+  mockLayoutRead();
   vi.doMock("@/lib/firm/session", () => ({
     resolveFirmSession: vi.fn(async () => (role ? { kind: "ok", role, user: { id: "u-rayn" } } : { kind: "signed-out", redirectTo: "/" })),
   }));
@@ -193,7 +195,8 @@ describe("Weekly review page", () => {
     const contract = row({ key: "k", client: "Contract Co", matterType: "BL", stageLabel: "Drafting", stageOrder: 100_001, waiting: "client", lastOutbound: "2026-10-28", source: "Referral" });
     // Contracts has no Source column in the spreadsheet's order (Sprint 1), so the Source cell is checked on a trademark row.
     const withSource = row({ key: "s", client: "Source Co", source: "Referral" });
-    mock(ok({ rows: [...rows, contract, withSource] }));
+    // A viewer: the read-only List (a role that can edit gets the same table with editors: see the editable List tests below).
+    mock(ok({ rows: [...rows, contract, withSource] }), "viewer");
     const html = await render({ view: "sheet" });
     expect(html).toMatch(/aria-current="page" href="[^"]*">List/);
     expect(html.indexOf("Trademarks")).toBeGreaterThan(-1);
@@ -245,9 +248,14 @@ describe("Weekly review page", () => {
   });
 
   it("a card is a link that opens the panel and keeps the other review params", async () => {
-    mock(ok());
+    mock(ok(), "viewer");
     const html = await render({ view: "sheet", q: "co" });
     expect(html).toMatch(/class="lx-rowlink" href="[^"]*view=sheet[^"]*open=matter%3A/);
+    // The editable List (a role that can edit) links the client the same way, keeping the other params.
+    vi.resetModules();
+    mock(ok());
+    const editable = await render({ view: "sheet", q: "co" });
+    expect(editable).toMatch(/class="sheet-link" href="[^"]*view=sheet[^"]*open=matter%3A/);
     const board = await render({ kind: "matters" });
     expect(board).toMatch(/class="lx-rowlink" href="[^"]*kind=matters[^"]*open=matter%3A/);
   });

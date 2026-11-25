@@ -2786,6 +2786,9 @@ export type Database = {
           // Hand-added: the docket's phase (pipeline / pre_filing / post_filing / maintenance). Null or absent on a
           // database that has not got the column yet. Replace with the generated type on the next codegen run.
           phase: string | null
+          // Hand-added: the stage's role (lectual 0119, proposed). ABSENT on a database without the column; set only by 0119's
+          // back-fill and by Lectual. Replace with the generated type on the next codegen run.
+          role?: string | null
           updated_at: string
           waiting_on: Database["public"]["Enums"]["crm_matter_waiting_on"]
         }
@@ -3176,6 +3179,9 @@ export type Database = {
           name: string
           order_index: number
           org_id: string
+          // Hand-added: the stage's role (lectual 0119, proposed). ABSENT on a database without the column; set only by 0119's
+          // back-fill and by Lectual, never by the app. Replace with the generated type on the next codegen run.
+          role?: string | null
         }
         Insert: {
           aging_threshold_days?: number | null

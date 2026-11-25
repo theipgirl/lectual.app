@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createSequence } from "@/lib/automation/drips";
@@ -15,7 +16,7 @@ import { friendlyCampaignError, type ActionState } from "./errors";
  * `*_insert_admin` RLS policy) — this action does not duplicate that check,
  * it only turns a thrown Error into a readable ActionState.
  */
-export async function createSequenceAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const createSequenceAction = previewSafe(async function createSequenceAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { error: "Enter a name for this campaign." };
   const description = String(formData.get("description") ?? "").trim();
@@ -30,4 +31,4 @@ export async function createSequenceAction(_prev: ActionState, formData: FormDat
 
   revalidatePath("/dashboard/campaigns/");
   redirect(`/dashboard/campaigns/${sequenceId}/`);
-}
+}, "state");

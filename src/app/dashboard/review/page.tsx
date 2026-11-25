@@ -13,20 +13,30 @@ import { DeadlinesStrip, KpiStrip, ReviewBoard, ViewSwitch, WaitingOnStrip } fro
 import { SheetView } from "@/components/review/SheetView";
 import { SheetSaveStatus } from "@/components/review/SheetSaveStatus";
 import { loadSheetStages } from "@/lib/review/sheet-edit-load";
-import { READ_ONLY_PERMS, type SheetPerms } from "@/lib/review/sheet-edit";
+import type { SheetPerms } from "@/lib/review/sheet-edit";
 import { CardsDeck, PersonChips } from "@/components/review/CardsDeck";
 import { ReviewCardAside } from "@/components/review/ReviewCardExtras";
 import { RecordCardHost } from "@/components/record-card/RecordCardHost";
 import { loadRecordCard } from "@/lib/record-card/load";
 import { cardEdits } from "@/lib/record-card/rules";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { inPreview, resolveViewSession } from "@/lib/views/view-as";
 import { NO_PREVIEW, previewFor, viewFor } from "@/lib/views";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import { CAN_MOVE_STAGE, CAN_WRITE_LEAD } from "@/lib/pipeline/leads";
 import { loadReview } from "@/lib/review/load";
 import { canSeeBilling } from "@/lib/billing/can-see";
-import { ColumnChooser, type ChooserSection } from "@/components/review/ColumnChooser";
-import { NOTES_PRESENT, columnsFor } from "@/lib/review/sheet-columns";
+import { LegacyColumnPrefsCleaner } from "@/components/review/LegacyColumnPrefsCleaner";
+import { REVIEW_LIST_VIEWS, type SectionLayouts } from "@/lib/review/layout";
+import { loadViewLayout } from "@/lib/views/layout/load";
+import { loadOwnerState } from "@/lib/views/layout/owner-load";
+import { isOwner } from "@/lib/views/layout/owner";
+import { resolveLayout } from "@/lib/views/layout/apply";
+import { reviewListBase } from "@/lib/review/layout-base";
+import { HiddenColumnsMenu, type HiddenGroup } from "@/components/views/layout/HiddenColumnsMenu";
+import { AddRow } from "@/components/review/AddRow";
+import { listStages } from "@/lib/pipeline/stages";
+import { defaultStartStageId, startStages } from "@/lib/review/add-lead-stage";
+import { layoutNote, savedLayoutOf } from "@/lib/views/layout/state";
 import { loadCardCustomColumns } from "@/lib/custom-columns/card-load";
 import { canSeeCustomMoney, canWriteCustomValue, firmColumnsBlock, withoutMoney, type FirmColumnsBlock } from "@/lib/custom-columns/rules";
 import { canSeeSetup } from "@/lib/setup/roles";
@@ -39,6 +49,7 @@ import { noticeFor } from "@/lib/review/notice";
 import { buildDeck, chosenPerson, deckPeople } from "@/lib/review/deck";
 import { loadDeckDocuments, loadLatestNote } from "@/lib/review/detail-load";
 import { pageTitle } from "@/lib/ui/page-title";
+import { CUSTOM_SECTION_WORDS, HIDDEN_FIRM_COLUMN } from "@/lib/ui/words";
 import { QUEUE_APPROVE_ROLES } from "@/lib/queue/roles";
 import { REVIEW_NAME, REVIEW_SHOW_ALL, REVIEW_SHOWING_ALL, REVIEW_SINCE_LABEL, REVIEW_SINCE_SUSPENDED, reviewIntro, reviewOlderHidden } from "@/lib/ui/words";
 
@@ -58,7 +69,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const params = parseReviewParams(sp);
   // The session comes FIRST: whether this viewer may see fees is decided here from the re-resolved role, before anything is read, so
   // the money reads are never made for anyone else. Fees are the List's columns, so no other view pays for them.
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   const role = session.kind === "ok" ? session.role : null;
   const canSeeMoney = canSeeBilling(role);
   const withFees = canSeeMoney && params.view === "sheet";
@@ -70,7 +81,31 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   // Lectual staff acting inside the firm never see them, even with an owner role claim (Taylor, Nov 23).
   const actingAsStaff = session.kind === "ok" ? session.actingAsStaff : true;
   const customMoney = canSeeCustomMoney(role, actingAsStaff);
-  const load = await loadReview(new Date(), { withFees, withCustom, notes, customMoney });
+  // The firm's saved column layout for the view being drawn (the List's or the Board's; Cards has none), read beside the review itself.
+  // A layout that is missing or can't be read draws the standard columns (never an empty table); only a failed read says so.
+  // Whether this viewer may CHANGE the view's structure: an owner by their own membership row (Lectual staff acting in a firm never are),
+  // not while previewing a teammate (every action refuses then), and only when the saved layout was read (its rev is what a change is
+  // fenced on). Only the List and the Board have a layout. Every action behind the controls asks the membership row again.
+  const listViews = params.view === "sheet" ? ([REVIEW_LIST_VIEWS.trademarks, REVIEW_LIST_VIEWS.contracts] as const) : null;
+  const layoutViews = listViews ?? (params.view === "board" ? (["review_board"] as const) : null);
+  const [load, layoutReads, ownerRead, previewing] = await Promise.all([
+    loadReview(new Date(), { withFees, withCustom, notes, customMoney }),
+    Promise.all((layoutViews ?? []).map((v) => loadViewLayout(v))),
+    layoutViews ? loadOwnerState() : Promise.resolve("not-owner" as const),
+    layoutViews ? inPreview() : Promise.resolve(true),
+  ]);
+  // The List has one saved layout per section (Trademarks and Contracts head some columns differently); the Board has one.
+  const sectionLayouts: SectionLayouts | null = listViews ? { trademarks: savedLayoutOf(layoutReads[0]), contracts: savedLayoutOf(layoutReads[1]) } : null;
+  const layout = params.view === "board" ? savedLayoutOf(layoutReads[0]) : null;
+  const layoutSaid = layoutReads.map((r) => layoutNote(r)).find((n) => n !== null) ?? null;
+  const layoutsOk = layoutReads.length > 0 && layoutReads.every((r) => r?.status === "ok");
+  const okRev = (i: number): number | null => {
+    const r = layoutReads[i];
+    return r && r.status === "ok" ? r.rev : null;
+  };
+  const ownerNow = isOwner(ownerRead) && !previewing && layoutsOk;
+  const listEdit = ownerNow && listViews ? { revs: { trademarks: okRev(0), contracts: okRev(1) } } : null;
+  const boardEdit = ownerNow && params.view === "board" ? { rev: okRev(0) } : null;
   const userId = session.kind === "ok" ? session.user.id : null;
   const canWrite = !!role && MATTER_WRITE_ROLES.includes(role);
   const canMove = canWrite && CAN_MOVE_STAGE.includes(role);
@@ -106,28 +141,53 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   }) === "owner";
   const common = { owner, today: load.today, members: load.members, canWrite, params };
   // Custom columns: the state the List drew from (null when not read), and the directory for person cells (null = it couldn't be read).
-  // Cleaned again here (the loader never read an amount for a non-owner): no Money field or amount reaches any table, card or chooser.
+  // Cleaned again here (the loader never read an amount for a non-owner): no Money field or amount reaches any table or card.
   const custom = load.custom ? (customMoney ? load.custom : withoutMoney(load.custom)) : null;
   const customFields = custom?.status === "ok" ? custom.fields : [];
   const customMembers = load.failed.includes("team names") ? null : load.members;
-  // The owner's Sheet edits in place. Each permission comes from the role re-resolved above; the stage lists are read only for a role that can move one.
+  // The List edits in place for any role whose own permissions allow an edit, in either look (the owner view or the standard one): record
+  // edits keep today's role gates. Each permission comes from the role re-resolved above, and every action behind a cell checks it again.
+  // A role that can edit nothing gets the read-only List. The stage lists are read only for a role that can move one.
   let sheetPerms: SheetPerms | null = null;
-  if (owner && params.view === "sheet") {
+  // While an owner previews a teammate nothing can be saved (every action refuses), so the List is the read-only one.
+  if (params.view === "sheet" && !previewing) {
     const writeLead = !!role && CAN_WRITE_LEAD.includes(role);
     const moveLead = writeLead && !!role && CAN_MOVE_STAGE.includes(role);
-    const stages = canWrite || moveLead ? await loadSheetStages() : { matter: null, lead: null };
-    sheetPerms = canWrite || writeLead ? { writeMatter: canWrite, writeLead, moveLead, matterStages: canWrite ? stages.matter : null, leadStages: moveLead ? stages.lead : null, writeCustom } : READ_ONLY_PERMS;
+    if (canWrite || writeLead || writeCustom) {
+      const stages = canWrite || moveLead ? await loadSheetStages() : { matter: null, lead: null };
+      sheetPerms = { writeMatter: canWrite, writeLead, moveLead, matterStages: canWrite ? stages.matter : null, leadStages: moveLead ? stages.lead : null, writeCustom };
+    }
   }
-  // "Columns" (draw-only, kept in this browser): offered on the List only, over exactly the columns this viewer may have.
-  const chooser =
-    params.view === "sheet" ? (
-      <ColumnChooser
-        sections={[
-          { id: "trademarks", title: "Trademarks", columns: columnsFor("trademarks", { canSeeMoney, canSeeCustomMoney: customMoney, hasNotes: NOTES_PRESENT, customFields }) },
-          { id: "contracts", title: "Contracts", columns: columnsFor("contracts", { canSeeMoney, canSeeCustomMoney: customMoney, hasNotes: NOTES_PRESENT, customFields }) },
-        ] satisfies ChooserSection[]}
-      />
-    ) : null;
+  // "Add a lead"'s "Start in": the firm's OPEN lead stages in pipeline order (null = they couldn't be read: no picker, the new-enquiry stage).
+  let addStages: { id: string; name: string }[] | null = null;
+  let addDefault: string | null = null;
+  if (params.view === "sheet" && !previewing && !!role && CAN_WRITE_LEAD.includes(role)) {
+    try {
+      const all = await listStages();
+      addStages = startStages(all).map((st) => ({ id: st.id, name: st.name }));
+      addDefault = defaultStartStageId(all);
+    } catch {
+      addStages = null;
+    }
+  }
+  // The owner's "Hidden columns": the List's columns the firm's layout hides, each with Show (drawn only for an owner of an editable List).
+  const hiddenControl =
+    params.view === "sheet" && listEdit && sheetPerms && sectionLayouts
+      ? (() => {
+          const groups = (["trademarks", "contracts"] as const).map((section): HiddenGroup => {
+            const base = reviewListBase(customFields, section);
+            const known = new Set(base.map((d) => d.key));
+            const items = resolveLayout(base, sectionLayouts[section])
+              .filter((r) => r.hidden)
+              .map((r) => ({ key: r.key, label: r.label }));
+            // A hidden firm column whose fields weren't read this time (custom columns not read, not switched on yet): still shown as hidden,
+            // under a fixed name, so the owner can bring it back.
+            for (const c of sectionLayouts[section] ?? []) if (c.hidden && c.key.startsWith("cf:") && !known.has(c.key)) items.push({ key: c.key, label: HIDDEN_FIRM_COLUMN });
+            return { view: REVIEW_LIST_VIEWS[section], rev: listEdit.revs[section], title: CUSTOM_SECTION_WORDS[section], items };
+          });
+          return <HiddenColumnsMenu groups={groups} />;
+        })()
+      : null;
   // The Notes column: read with the review's other reads, only for the List (three-state; a failed read says so in the cells).
   const sheetNotes = load.notes ?? null;
   const approvalsKnown = !load.failed.includes("approvals");
@@ -219,6 +279,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
 
   return (
     <div className={owner ? "lp-root rv-root rv-owner" : "lp-root rv-root"}>
+      {params.view === "sheet" ? <LegacyColumnPrefsCleaner /> : null}
       {owner ? (
         <>
       <PageHeader
@@ -227,15 +288,10 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
         className="rv-head lx-head-split"
         sub={buckets.total === 0 ? reviewSubline(buckets) : reviewIntro(buckets.total)}
         actions={
-          sheetPerms && sheetPerms !== READ_ONLY_PERMS ? (
+          sheetPerms ? (
             <div className="rse-head-right">
               <SheetSaveStatus />
-              {chooser}
-              <ViewSwitch params={params} />
-            </div>
-          ) : chooser ? (
-            <div className="rse-head-right">
-              {chooser}
+              {hiddenControl}
               <ViewSwitch params={params} />
             </div>
           ) : (
@@ -285,8 +341,8 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           hidden: searchHidden,
           clearHref: link({ q: "", i: 1 }),
         }}
-        toggle={<ViewSwitch params={params} />}
-        more={chooser}
+        toggle={sheetPerms ? <span className="rse-head-right"><SheetSaveStatus /><ViewSwitch params={params} /></span> : <ViewSwitch params={params} />}
+        more={hiddenControl}
       />
 
       <KpiStrip kpis={kpis(buckets)} />
@@ -321,6 +377,11 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           {note}
         </Notice>
       )}
+      {layoutSaid && (
+        <Notice tone="warn" role="status">
+          {layoutSaid}
+        </Notice>
+      )}
       {notice && (
         <Notice tone="warn" role="alert">
           {notice}
@@ -339,12 +400,13 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
       ) : params.view === "sheet" ? (
         <>
           {strips}
-          <SheetView rows={shown} canSeeMoney={canSeeMoney} canSeeCustomMoney={customMoney} custom={custom} customMembers={customMembers} adminTier={adminTier} notes={sheetNotes} {...common} {...(sheetPerms ? { sheetEdit: { perms: sheetPerms } } : {})} />
+          <SheetView rows={shown} canSeeMoney={canSeeMoney} canSeeCustomMoney={customMoney} custom={custom} customMembers={customMembers} adminTier={adminTier} notes={sheetNotes} layout={sectionLayouts} layoutEdit={sheetPerms ? listEdit : null} {...common} {...(sheetPerms ? { sheetEdit: { perms: sheetPerms } } : {})} />
+          {!previewing && <AddRow canAddLead={!!role && CAN_WRITE_LEAD.includes(role)} canOpenMatter={canWrite} stages={addStages} defaultStageId={addDefault} />}
         </>
       ) : (
         <>
           {strips}
-          <ReviewBoard lanes={lanes} {...common} />
+          <ReviewBoard lanes={lanes} layout={layout} layoutEdit={boardEdit} {...common} />
           {owner ? (
             <div className="rv-rest">
               <ReviewSection bucket="uspto" rows={rest.uspto} collapsed {...common} />

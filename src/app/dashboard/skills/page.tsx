@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { orgHasModule } from "@/lib/org/modules";
 import { listLeads } from "@/lib/pipeline";
 import { listMatters } from "@/lib/matters";
@@ -34,7 +34,7 @@ async function readRecords(kind: RecordKind): Promise<ListRead> {
 /** The page: what the staff-run skills do, and a way onto the record each one works on. Reads only. */
 export default async function SkillsPage({ searchParams }: { searchParams: Promise<Search> }) {
   if (!(await orgHasModule("agent-toolkit"))) notFound();
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   if (session.kind !== "ok") notFound();
 
   const params = await searchParams;

@@ -171,9 +171,10 @@ describe("F12: anything that isn't a PostgREST error gets a fixed sentence and n
 });
 
 describe("the sentences", () => {
-  it("are the contract's, with the admin-tier phrase leading the permission line (N5)", () => {
-    expect(W.COLUMNS_NO_PERMISSION).toBe("Senior admin or above can change the firm's columns.");
-    expect(W.CUSTOM_COLUMN_ARCHIVED).toBe("Archived columns can't be changed. Senior admin or above can bring it back in Settings.");
+  // Changed on purpose (editable views): field create and change are an owner's (lectual 0119), and there is no Settings -> Columns screen to bring an archived column back from.
+  it("are the contract's, with the owner named in the permission line (N5)", () => {
+    expect(W.COLUMNS_NO_PERMISSION).toBe("Only an owner can change columns.");
+    expect(W.CUSTOM_COLUMN_ARCHIVED).toBe("Archived columns can't be changed.");
     expect(W.CUSTOM_COLUMNS_NOT_READY).toBe("Custom columns aren't switched on for your firm yet. Lectual will turn it on.");
     expect(W.CUSTOM_VALUE_CHANGED).toBe("This cell was changed by someone else just now. Refresh and try again.");
     expect(W.CUSTOM_FIELD_CHANGED).toBe("This column was changed by someone else just now. Refresh and try again.");

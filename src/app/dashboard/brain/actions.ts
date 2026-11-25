@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
 import {
   createBrainEntry,
@@ -33,7 +34,7 @@ const BRAIN_PATH = "/dashboard/brain/";
 // and, ultimately, by RLS — this file only shapes form input and turns a
 // thrown error into a friendly ActionState.
 
-export async function createBrainEntryAction(
+export const createBrainEntryAction = previewSafe(async function createBrainEntryAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
@@ -58,7 +59,7 @@ export async function createBrainEntryAction(
 
   revalidatePath(BRAIN_PATH);
   return {};
-}
+}, "state");
 
 /**
  * A stage rule's key is the signal id the Stage Keeper reads, and its stage is one of the firm's live
@@ -99,7 +100,7 @@ async function createStageRule(formData: FormData, titleRaw: string): Promise<Ac
   return {};
 }
 
-export async function updateBrainEntryAction(
+export const updateBrainEntryAction = previewSafe(async function updateBrainEntryAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
@@ -117,9 +118,9 @@ export async function updateBrainEntryAction(
 
   revalidatePath(BRAIN_PATH);
   return {};
-}
+}, "state");
 
-export async function deleteBrainEntryAction(
+export const deleteBrainEntryAction = previewSafe(async function deleteBrainEntryAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
@@ -134,7 +135,7 @@ export async function deleteBrainEntryAction(
 
   revalidatePath(BRAIN_PATH);
   return {};
-}
+}, "state");
 
 // ── Claim library ────────────────────────────────────────────────────────────
 // proposeClaim is open to any staff role except viewer; reviewClaim/deleteClaim
@@ -142,7 +143,7 @@ export async function deleteBrainEntryAction(
 // claim anywhere — this only records the firm's own internal review state
 // (UPL firewall: this page is a compliance aid, not legal advice).
 
-export async function proposeClaimAction(
+export const proposeClaimAction = previewSafe(async function proposeClaimAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
@@ -163,9 +164,9 @@ export async function proposeClaimAction(
 
   revalidatePath(BRAIN_PATH);
   return {};
-}
+}, "state");
 
-export async function reviewClaimAction(
+export const reviewClaimAction = previewSafe(async function reviewClaimAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
@@ -185,9 +186,9 @@ export async function reviewClaimAction(
 
   revalidatePath(BRAIN_PATH);
   return {};
-}
+}, "state");
 
-export async function deleteClaimAction(
+export const deleteClaimAction = previewSafe(async function deleteClaimAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
@@ -202,4 +203,4 @@ export async function deleteClaimAction(
 
   revalidatePath(BRAIN_PATH);
   return {};
-}
+}, "state");

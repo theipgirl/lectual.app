@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { formatDuration, formatWhen, linkLabels, listMeetings, type MeetingFilters } from "@/lib/meetings/read";
 import { listMeetingConnections } from "@/lib/meetings/connection";
 import { PROVIDER_LABEL, isMeetingProvider } from "@/lib/meetings/types";
@@ -28,7 +28,7 @@ export const dynamic = "force-dynamic";
  * succeeded with no rows is "no meetings yet".
  */
 export default async function MeetingsPage({ searchParams }: { searchParams: Promise<{ provider?: string; link?: string }> }) {
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   if (session.kind !== "ok") notFound();
   const { provider: providerRaw, link: linkRaw } = await searchParams;
   const filters: MeetingFilters = {

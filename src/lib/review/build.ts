@@ -2,9 +2,9 @@ import { stageAgeDisplay } from "@/lib/lifecycle/stage-age";
 import { matterDisplayTitle } from "@/lib/matters/display-title";
 import { isOpenMatter } from "@/lib/matters/docket-summary";
 import { stageDisplayName } from "@/lib/matters/list-view";
-import { normalizeStageName } from "@/lib/lawmatics/stage-map";
 import type { MatterWaitingOn } from "@/lib/matters/stage-rules";
 import { newEnquiryStage } from "@/lib/pipeline/new-enquiry";
+import { followUpStageIds } from "@/lib/intake/working";
 import type { ReviewRow, ReviewNextStep } from "./buckets";
 import { summarizeContact, type ContactActivity } from "./contact";
 import type { FirmSenders } from "@/lib/mailbox/firm-sender";
@@ -60,7 +60,7 @@ export type ReviewLeadIn = {
   referral_source?: string | null;
 };
 
-export type ReviewStageIn = { id: string; name: string; category?: string | null; order_index: number | null };
+export type ReviewStageIn = { id: string; name: string; category?: string | null; order_index: number | null; role?: string | null };
 
 export type ReviewTaskIn = {
   id: string;
@@ -121,10 +121,12 @@ export function civilDateIn(instant: Date | string, timeZone: string): string {
  */
 export function reviewLeadStageIds(stages: readonly ReviewStageIn[]): Set<string> {
   const enquiry = newEnquiryStage(stages)?.id ?? null;
+  // Role first (lectual 0119): the stage holding `follow_up`, else every open stage NAMED Follow-Up (the Leads page's same rule).
+  const followUp = followUpStageIds(stages);
   const ids = new Set<string>();
   for (const s of stages) {
     if (s.category !== "open" || s.id === enquiry) continue;
-    if (/^follow ?up\b/.test(normalizeStageName(String(s.name ?? "")))) continue;
+    if (followUp.has(s.id)) continue;
     ids.add(s.id);
   }
   return ids;

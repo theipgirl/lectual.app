@@ -44,7 +44,7 @@ export async function createContact(input: CreateContactInput): Promise<Contact>
   const supabase = await getScopedClient();
   await requireMatterWriteRole(supabase);
 
-  const { data: orgId, error: orgError } = await supabase.rpc("current_org_id");
+  const { data: orgId, error: orgError } = await supabase.rpc("current_org_id", undefined, { get: true });
   if (orgError) throw orgError;
   if (!orgId) throw new ReadableError("No active organization for the current session.");
 

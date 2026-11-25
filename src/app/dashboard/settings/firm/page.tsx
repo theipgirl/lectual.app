@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { hasRole } from "@/lib/auth/roles";
 import { getOrgProfile } from "@/lib/org/profile";
 import { DEFAULT_TIME_ZONE, timeZoneOptions } from "@/lib/org/profile-rules";
@@ -15,7 +15,7 @@ export const metadata: Metadata = { title: pageTitle("Firm profile") };
 export const dynamic = "force-dynamic";
 
 export default async function FirmProfilePage() {
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   if (session.kind !== "ok") notFound();
   let profile = null;
   let loadError = false;

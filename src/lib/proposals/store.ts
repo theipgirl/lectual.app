@@ -171,7 +171,7 @@ function isRole(value: unknown): value is Role {
 }
 
 async function requireRole(supabase: ScopedClient, allowed: Role[], what: string): Promise<Role> {
-  const { data, error } = await supabase.rpc("current_org_role");
+  const { data, error } = await supabase.rpc("current_org_role", undefined, { get: true });
   if (error) throw friendlyProposalError(error, what);
   if (!isRole(data) || !allowed.includes(data)) {
     throw new ProposalError("forbidden", `You don't have permission to ${what}.`);
@@ -190,7 +190,7 @@ export function requireProposalAdminRole(supabase: ScopedClient): Promise<Role> 
 }
 
 async function currentOrgId(supabase: ScopedClient): Promise<string> {
-  const { data, error } = await supabase.rpc("current_org_id");
+  const { data, error } = await supabase.rpc("current_org_id", undefined, { get: true });
   if (error) throw friendlyProposalError(error);
   if (!data) throw new ProposalError("unavailable", "No active organization for the current session.");
   return data;
@@ -955,7 +955,7 @@ export async function deleteProposalFamily(proposalId: string): Promise<DeleteFa
   return runDeleteProposalFamily(
     {
       role: async () => {
-        const { data, error } = await supabase.rpc("current_org_role");
+        const { data, error } = await supabase.rpc("current_org_role", undefined, { get: true });
         if (error) throw new ProposalError("unavailable", "role");
         return isRole(data) ? data : null;
       },

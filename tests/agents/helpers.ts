@@ -31,6 +31,8 @@ export function agentCtx(
     modules?: readonly string[] | null;
     /** The pending-queue reader. Absent = none was wired. */
     listPending?: AgentContext["listPending"];
+    /** The approved-queue reader. Absent = none was wired. */
+    listApproved?: AgentContext["listApproved"];
   },
 ) {
   const { client, log } = fakeAdmin(handler);
@@ -47,6 +49,7 @@ export function agentCtx(
     fetchImpl: opts.fetchImpl,
     mailbox: opts.mailbox,
     listPending: opts.listPending,
+    listApproved: opts.listApproved,
     orgModules: opts.modules === undefined ? ["mailbox"] : opts.modules,
   };
   return { ctx, log, createDraft };

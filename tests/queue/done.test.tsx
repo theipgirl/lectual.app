@@ -124,7 +124,7 @@ describe("copy", () => {
   });
   it("the action never touches the approve path", () => {
     const src = readFileSync("src/app/dashboard/queue/deck/actions.ts", "utf8");
-    const fn = src.slice(src.indexOf("export async function doneCardAction"), src.indexOf("export async function handOffCardAction"));
+    const fn = src.slice(src.indexOf("async function doneCardAction"), src.indexOf("async function handOffCardAction"));
     expect(fn).toContain('intent: "reject"');
     expect(fn).toContain("note: DONE_NOTE");
     expect(fn).not.toMatch(/intent: "approve"|approveResult|draftInMyMailbox|makeProposalLive|generateApprovedDocument|sendFromMyOutlook/);

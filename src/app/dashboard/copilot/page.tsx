@@ -1,6 +1,7 @@
 import { loadIntakeStageIds, withoutIntake } from "@/lib/matters/intake-ids";
 import { aiConfigured } from "@/lib/ai/claude";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { previewingAs, resolveViewSession } from "@/lib/views/view-as";
+import { VIEW_AS_PRIVATE_COPILOT } from "@/lib/ui/words";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { listMatters, listUpcomingDeadlines, summarizeDocket } from "@/lib/matters";
@@ -75,12 +76,23 @@ function statOf<T>(settled: PromiseSettledResult<T>, count: (value: T) => number
  * says so instead of printing a zero.
  */
 export default async function CopilotPage(props?: { searchParams?: Promise<{ c?: string | string[]; q?: string | string[] }> }) {
+  // View as: a teammate's Copilot chats are private to them, and Copilot would answer with the owner's access and save to
+  // the owner's own history, so the page shows the sentence and nothing else (D3).
+  const previewing = await previewingAs();
+  if (previewing) {
+    return (
+      <>
+        <h1 className="lx-sr">Copilot</h1>
+        <EmptyState>{VIEW_AS_PRIVATE_COPILOT(previewing.name)}</EmptyState>
+      </>
+    );
+  }
   const params = (await props?.searchParams) ?? {};
   const openParam = typeof params.c === "string" ? params.c : null;
   // A question typed elsewhere (Today's "Ask Copilot" box) is placed in the input, never sent by itself.
   const prefill = typeof params.q === "string" ? params.q.trim().slice(0, 2000) : "";
   const configured = aiConfigured();
-  const session = configured ? await resolveFirmSession() : null;
+  const session = configured ? await resolveViewSession() : null;
   if (configured && session?.kind !== "ok") return null; // the layout already handled this
 
   let landing: React.ReactNode = null;

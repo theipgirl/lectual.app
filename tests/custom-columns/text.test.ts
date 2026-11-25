@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { cleanText, cutCodePoints, pgBtrim, pgCharLength, sqlLabelOk, sqlOptionsOk } from "@/lib/custom-columns/text";
 import { parseChoicesInput, parseLabelInput } from "@/lib/custom-columns/input";
 import { customCells, firmColumnsBlock, parseField } from "@/lib/custom-columns/rules";
-import { parseSettingsField } from "@/lib/custom-columns/settings-load";
 import { columnsFor, customColumnId } from "@/lib/review/sheet-columns";
 import { choiceRepeated } from "@/lib/ui/words";
 
@@ -127,9 +126,6 @@ describe("F14: a database-valid label and option are drawn on the List, in the c
     expect(customCells([{ key: "l1", kind: "lead", id: "l1", matterType: null }], [f], data, [], "2026-11-02").l1[customColumnId(ID)]).toEqual({ text: option, tone: "value" });
     const block = firmColumnsBlock({ status: "ok", ...data }, { kind: "lead", id: "l1", matterType: null }, [], "2026-11-02");
     expect(block).toMatchObject({ status: "ok", items: [{ label, cell: { text: option } }] });
-  });
-  it("Settings: the row is kept", () => {
-    expect(parseSettingsField({ ...rawField, archived: false, updated_at: "2026-11-01T00:00:00.123456+00:00" })).toMatchObject({ label, options: [option, "Low"] });
   });
 });
 

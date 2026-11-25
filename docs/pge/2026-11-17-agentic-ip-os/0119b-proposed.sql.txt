@@ -1,0 +1,434 @@
+-- =====================================================================================================================
+-- 0119b_editable_views_delta.sql (proposed): DEV ONLY. Brings a database that holds the FIRST copy of 0119 (applied to lectual-dev at
+-- lectual.app c46913f, recorded as 0119_editable_views) to EXACTLY the final 0119 (0119-proposed.sql.txt). NEEDS THE OWNER'S OK.
+-- lectual-prod does NOT run this file: prod gets the final 0119 in one go.
+-- =====================================================================================================================
+-- What changed between the first copy and the final file:
+--   1. crm_view_layout.view_key: 'review_list' is replaced by 'review_list_trademarks' and 'review_list_contracts' (the Weekly review
+--      List has one layout per section).
+--   2. The label rule of crm_view_layout_column_valid, and the invisible-character test of crm_stage_clean_name, are built with chr() so
+--      the stored bodies are pure ASCII (on dev the \u escapes of the first copy were turned into literal invisible characters in
+--      transit). The same for the middle dot and en dash in crm_matter_stage_label_key, crm_matter_stage_add and crm_stage_roles_backfill.
+-- Idempotent once chunk 3 has run: running it all twice is a no-op. (Before chunk 3, pg_get_constraintdef adds ' NOT VALID', so
+-- re-running chunk 1 drops and re-adds the constraint once more: harmless.) Additive, except two guarded constraint swaps (each ONE alter table with drop and add in
+-- the same statement, the form that avoided the Supabase MCP hang for 0107) and one delete of rows that are not expected to exist.
+--
+-- HOW TO APPLY (dev only, after the owner's OK): send the numbered chunks below one at a time with the Supabase MCP execute_sql, in order,
+-- then record it: insert into supabase_migrations.schema_migrations (version, name) values ('0119b', '0119b_editable_views_delta')
+-- (use the version format the dev history already uses). The MCP may hang on the delete in chunk 2 (0093): the delete is inside a guarded
+-- do block and only runs when a review_list row exists, which is not expected, so if it hangs run that chunk in the SQL editor.
+--
+-- DEPLOY ORDER: apply 0119b to dev BEFORE (or together with) deploying the step 3 app code (2e226f4 or later) there. Until 0119b is
+-- applied, dev's CHECK refuses review_list_trademarks / review_list_contracts, so every List layout save fails and an old review_list
+-- row is ignored.
+--
+-- THE review_list ROWS: nothing writes view_key 'review_list' yet (the app writes only the per-section keys), so none is expected.
+-- If any exist, chunk 2 converts each to 'review_list_trademarks' (copying its columns, as a new row) unless that org already has a
+-- 'review_list_trademarks' row, and deletes every 'review_list' row afterwards. (view_key can't be updated in place: 0119's trigger
+-- refuses it.) The new constraint is added NOT VALID first so that the copy can be written, and validated in chunk 3.
+-- =====================================================================================================================
+
+-- chunk 1: the view_key swap, only when the live definition differs (compared with whitespace, parentheses, schema names and ::text
+-- casts removed, so the formatting of pg_get_constraintdef does not matter)
+do $$
+declare
+  v_have text;
+  v_want text := 'CHECK ((view_key = ANY (ARRAY[''review_list_trademarks'', ''review_list_contracts'', ''review_board'', ''matters_list'', ''matters_board'', ''contracts_list'', ''contracts_board'', ''leads_list'', ''leads_board''])))';
+  v_norm text := '[[:space:]()]|::text|public[.]';
+begin
+  select pg_catalog.pg_get_constraintdef(c.oid) into v_have
+    from pg_catalog.pg_constraint c
+   where c.conrelid = 'public.crm_view_layout'::regclass and c.conname = 'crm_view_layout_view_key';
+  if v_have is null
+     or pg_catalog.lower(pg_catalog.regexp_replace(v_have, v_norm, '', 'g')) <> pg_catalog.lower(pg_catalog.regexp_replace(v_want, v_norm, '', 'g')) then
+    execute 'alter table public.crm_view_layout drop constraint if exists crm_view_layout_view_key, '
+         || 'add constraint crm_view_layout_view_key check (view_key in (''review_list_trademarks'', ''review_list_contracts'', ''review_board'', ''matters_list'', ''matters_board'', ''contracts_list'', ''contracts_board'', ''leads_list'', ''leads_board'')) not valid';
+  end if;
+end
+$$;
+
+-- chunk 2: any 'review_list' row becomes 'review_list_trademarks' (unless the org has one), then goes
+do $$
+begin
+  if exists (select 1 from public.crm_view_layout where view_key = 'review_list') then
+    insert into public.crm_view_layout (org_id, view_key, columns)
+    select o.org_id, 'review_list_trademarks', o.columns
+      from public.crm_view_layout o
+     where o.view_key = 'review_list'
+       and not exists (select 1 from public.crm_view_layout t where t.org_id = o.org_id and t.view_key = 'review_list_trademarks');
+    delete from public.crm_view_layout where view_key = 'review_list';
+  end if;
+end
+$$;
+
+-- chunk 3: validate the swapped constraint (a no-op when it is already validated)
+do $$
+begin
+  if exists (select 1 from pg_catalog.pg_constraint c
+              where c.conrelid = 'public.crm_view_layout'::regclass and c.conname = 'crm_view_layout_view_key' and not c.convalidated) then
+    alter table public.crm_view_layout validate constraint crm_view_layout_view_key;
+  end if;
+end
+$$;
+
+-- chunk 4: the columns CHECK, swapped only when its live definition differs from the final one (it normally does not: the label rule
+-- lives in the function in chunk 5, which this constraint calls)
+do $$
+declare
+  v_have text;
+  v_want text := 'CHECK (crm_view_layout_columns_valid(columns))';
+  v_norm text := '[[:space:]()]|public[.]';
+begin
+  select pg_catalog.pg_get_constraintdef(c.oid) into v_have
+    from pg_catalog.pg_constraint c
+   where c.conrelid = 'public.crm_view_layout'::regclass and c.conname = 'crm_view_layout_columns';
+  if v_have is null
+     or pg_catalog.lower(pg_catalog.regexp_replace(v_have, v_norm, '', 'g')) <> pg_catalog.lower(pg_catalog.regexp_replace(v_want, v_norm, '', 'g')) then
+    execute 'alter table public.crm_view_layout drop constraint if exists crm_view_layout_columns, '
+         || 'add constraint crm_view_layout_columns check (public.crm_view_layout_columns_valid(columns))';
+  end if;
+end
+$$;
+
+-- chunk 5: crm_matter_stage_label_key (create or replace: identical to the final 0119; grants are kept)
+create or replace function public.crm_matter_stage_label_key(p_label text)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select pg_catalog.lower(pg_catalog.btrim(pg_catalog.regexp_replace(
+    case when x.s = '' then pg_catalog.btrim(coalesce(p_label, '')) else x.s end, '\s+', ' ', 'g')))
+  from (select pg_catalog.btrim(pg_catalog.regexp_replace(coalesce(p_label, ''), ('^\s*\d+[A-Za-z]?(\s*[.' || pg_catalog.chr(183) || ':)' || pg_catalog.chr(8211) || '-]\s*|\s+)'), '')) as s) x
+$$;
+
+-- chunk 6: crm_view_layout_column_valid (create or replace: identical to the final 0119; grants are kept)
+create or replace function public.crm_view_layout_column_valid(p jsonb)
+returns boolean
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  -- Built with chr() so this body is pure ASCII and survives any transport (dev's first copy had its escapes turned into literal
+  -- invisible characters in transit). Space-like: tab, LF, CR, FF, VT, U+00A0, U+1680, U+2000-200A, U+2028, U+2029, U+202F, U+205F,
+  -- U+3000, U+FEFF. Controls: U+0001-001F, U+007F-009F. Invisible marks: U+200B-200F, U+202A-202E, U+2066-2069.
+  v_space text := '[ ' || pg_catalog.chr(9) || pg_catalog.chr(10) || pg_catalog.chr(13) || pg_catalog.chr(12) || pg_catalog.chr(11)
+                  || pg_catalog.chr(160) || pg_catalog.chr(5760) || pg_catalog.chr(8192) || '-' || pg_catalog.chr(8202)
+                  || pg_catalog.chr(8232) || pg_catalog.chr(8233) || pg_catalog.chr(8239) || pg_catalog.chr(8287)
+                  || pg_catalog.chr(12288) || pg_catalog.chr(65279) || ']';
+  v_ctl   text := '[' || pg_catalog.chr(1) || '-' || pg_catalog.chr(31) || pg_catalog.chr(127) || '-' || pg_catalog.chr(159) || ']';
+  v_inv   text := '[' || pg_catalog.chr(8203) || '-' || pg_catalog.chr(8207) || pg_catalog.chr(8234) || '-' || pg_catalog.chr(8238)
+                  || pg_catalog.chr(8294) || '-' || pg_catalog.chr(8297) || ']';
+begin
+  if pg_catalog.jsonb_typeof(p) is distinct from 'object' then return false; end if;
+  if exists (select 1 from pg_catalog.jsonb_object_keys(p) k where k not in ('key', 'label', 'hidden', 'width')) then return false; end if;
+  if pg_catalog.jsonb_typeof(p -> 'key') is distinct from 'string' then return false; end if;
+  if not ((p ->> 'key') ~ '^[a-z][a-z0-9_]{0,39}$'
+          or (p ->> 'key') ~ '^cf:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') then
+    return false;
+  end if;
+  if pg_catalog.jsonb_typeof(p -> 'hidden') is distinct from 'boolean' then return false; end if;
+  if p ? 'label' and pg_catalog.jsonb_typeof(p -> 'label') <> 'null' then
+    if pg_catalog.jsonb_typeof(p -> 'label') <> 'string'
+       or pg_catalog.char_length(p ->> 'label') not between 1 and 60
+       -- Revised after the step 2 review: the rule is written out character by character, never through the locale-dependent POSIX classes
+       -- (control and space), so the app's parseLayout (src/lib/views/layout/validate.ts) and this CHECK accept exactly the same labels.
+       or (p ->> 'label') ~ ('^' || v_space)
+       or (p ->> 'label') ~ (v_space || '$')
+       or (p ->> 'label') ~ v_ctl
+       or (p ->> 'label') ~ v_inv then
+      return false;
+    end if;
+  end if;
+  if p ? 'width' and pg_catalog.jsonb_typeof(p -> 'width') <> 'null' then
+    if pg_catalog.jsonb_typeof(p -> 'width') <> 'number' or (p ->> 'width') !~ '^[0-9]{1,4}$' then return false; end if;
+    if (p ->> 'width')::int not between 40 and 800 then return false; end if;
+  end if;
+  return true;
+end
+$$;
+
+-- chunk 7: crm_stage_clean_name (create or replace: identical to the final 0119; grants are kept)
+create or replace function public.crm_stage_clean_name(p_name text, p_max int)
+returns text
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v text := pg_catalog.btrim(coalesce(p_name, ''));
+  -- U+200B-200F, U+202A-202E, U+2066-2069, built with chr() so this body is pure ASCII.
+  v_inv text := '[' || pg_catalog.chr(8203) || '-' || pg_catalog.chr(8207) || pg_catalog.chr(8234) || '-' || pg_catalog.chr(8238)
+                || pg_catalog.chr(8294) || '-' || pg_catalog.chr(8297) || ']';
+begin
+  if pg_catalog.char_length(v) not between 1 and p_max or v ~ '[[:cntrl:]]'
+     or v ~ v_inv then
+    raise exception 'stage_bad_name: a stage name is 1 to % characters with no control or invisible characters', p_max using errcode = '22023';
+  end if;
+  return v;
+end
+$$;
+
+-- chunk 8: crm_matter_stage_add (create or replace: identical to the final 0119; grants are kept)
+create or replace function public.crm_matter_stage_add(p_label text, p_position integer, p_is_open boolean default true,
+                                                       p_waiting_on text default 'firm', p_phase text default null)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_org uuid := public.crm_stage_require_owner();
+  v_label text := public.crm_stage_clean_name(p_label, 200);
+  v_ids uuid[];
+  v_id uuid;
+  v_base text;
+  v_code text;
+  v_n int := 1;
+  v_phase_type text;
+  v_max int;
+begin
+  if public.crm_matter_stage_label_key(v_label) = '' then
+    raise exception 'stage_bad_name: a stage name needs at least one letter or digit' using errcode = '22023';
+  end if;
+  if p_waiting_on is null or not (p_waiting_on = any (pg_catalog.enum_range(null::public.crm_matter_waiting_on)::text[])) then
+    raise exception 'matter_stage_bad_waiting_on: a stage waits on the firm, the client, the USPTO or the court' using errcode = '22023';
+  end if;
+  if p_phase is not null then
+    if p_phase not in ('pipeline', 'pre_filing', 'post_filing', 'maintenance', 'inactive') then
+      raise exception 'matter_stage_bad_phase: not a docket phase' using errcode = '22023';
+    end if;
+    select pg_catalog.format_type(a.atttypid, a.atttypmod) into v_phase_type
+      from pg_catalog.pg_attribute a
+     where a.attrelid = 'public.crm_matter_stage'::regclass and a.attname = 'phase' and not a.attisdropped;
+    if v_phase_type is null then
+      raise exception 'matter_stage_phase_unavailable: docket phases are not switched on for this database' using errcode = '23514';
+    end if;
+  end if;
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('crm_matter_stage:' || v_org::text, 0));
+  v_ids := public.crm_matter_stage_ordered_ids(v_org, null);
+  if pg_catalog.cardinality(v_ids) >= 200 then
+    raise exception 'stage_limit: a firm has at most 200 matter stages' using errcode = '23514';
+  end if;
+  if p_position is null or p_position < 0 or p_position > pg_catalog.cardinality(v_ids) then
+    raise exception 'stage_bad_position: no such place in the stage order' using errcode = '22023';
+  end if;
+  if exists (select 1 from public.crm_matter_stage s where s.org_id = v_org
+             and public.crm_matter_stage_label_key(s.label) = public.crm_matter_stage_label_key(v_label)) then
+    raise exception 'stage_name_taken: another stage of this firm already has this name' using errcode = '23505';
+  end if;
+
+  -- The code: never changes after this (see header).
+  v_base := pg_catalog.upper(pg_catalog.left(pg_catalog.regexp_replace(
+              pg_catalog.regexp_replace(v_label, ('^\s*\d+[A-Za-z]?(\s*[.' || pg_catalog.chr(183) || ':)' || pg_catalog.chr(8211) || '-]\s*|\s+)'), ''), '[^A-Za-z0-9]+', '', 'g'), 12));
+  if v_base = '' then
+    v_base := 'STAGE';
+  elsif v_base ~ '^[0-9]' then
+    v_base := 'S' || pg_catalog.left(v_base, 11);
+  end if;
+  v_code := v_base;
+  while exists (select 1 from public.crm_matter_stage where org_id = v_org and code = v_code) loop
+    v_n := v_n + 1;
+    if v_n > 999 then
+      raise exception 'stage_name_taken: too many stages share this name' using errcode = '23505';
+    end if;
+    v_code := v_base || '-' || v_n::text;
+  end loop;
+
+  select coalesce(max(order_index), 0) into v_max from public.crm_matter_stage where org_id = v_org;
+  if v_max >= 1000000000 then
+    raise exception 'stage_order_overflow: the stage order is out of range; ask Lectual' using errcode = '23514';
+  end if;
+  insert into public.crm_matter_stage (org_id, code, label, order_index, is_open, waiting_on)
+  values (v_org, v_code, v_label, v_max + 1,
+          coalesce(p_is_open, true), p_waiting_on::public.crm_matter_waiting_on)
+  returning id into v_id;
+  if p_phase is not null then
+    execute pg_catalog.format('update public.crm_matter_stage set phase = $1::%s where id = $2', v_phase_type) using p_phase, v_id;
+  end if;
+  perform public.crm_matter_stage_renumber(v_org, v_ids[1:p_position] || v_id || v_ids[p_position + 1:]);
+  return v_id;
+end
+$$;
+
+-- chunk 9: crm_stage_roles_backfill (create or replace: identical to the final 0119; grants are kept)
+create or replace function public.crm_stage_roles_backfill(p_org uuid, p_dry_run boolean default false)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_pick jsonb := '{}';          -- role -> stage id (lead)
+  v_mpick jsonb := '{}';         -- role -> stage id (matter)
+  v_ne_name uuid; v_ne_first uuid; v_ne_c uuid;
+  v_fu uuid; v_fu_n int; v_fu_r uuid;
+  v_cs uuid; v_ch_sk uuid; v_ch_r uuid;
+  v_ps_sk uuid; v_ps_r uuid;
+  v_pay_sk uuid; v_won_named uuid; v_won_low uuid;
+  v_cand text; v_n int; v_id uuid; v_ambiguous boolean := false;
+  v_role text; v_label text;
+  v_written jsonb := '[]';
+  v_skipped jsonb := '[]';
+begin
+  -- new_enquiry: newEnquiryStage (open; names by key, no aliases; a name matching two open stages = null, no fallback) ...
+  foreach v_cand in array array['Potential New Client', 'New Lead', 'New Inquiry', 'New Enquiry'] loop
+    select pg_catalog.count(*), (array_agg(s.id))[1] into v_n, v_id from public.crm_stage s
+     where s.org_id = p_org and s.category = 'open' and public.crm_stage_name_key(s.name) = public.crm_stage_name_key(v_cand);
+    if v_n = 1 then v_ne_name := v_id; exit; end if;
+    if v_n > 1 then v_ambiguous := true; exit; end if;
+  end loop;
+  select s.id into v_ne_first from public.crm_stage s where s.org_id = p_org and s.category = 'open'
+   order by s.order_index, s.name, s.id limit 1;
+  -- ... and Reconcile `contacted`. Same open stage; at least one by name (Reconcile's always is).
+  v_ne_c := public.crm_stage_backfill_resolve(p_org, array['Potential New Client', 'New PNC', 'New Inquiry'], true, false);
+  if not v_ambiguous and v_ne_c is not null and v_ne_c = coalesce(v_ne_name, v_ne_first) then
+    v_pick := v_pick || pg_catalog.jsonb_build_object('new_enquiry', v_ne_c);
+  end if;
+
+  -- follow_up: the ONE open ^follow ?up\b stage, and Reconcile `nurture` agrees.
+  select pg_catalog.count(*), (array_agg(s.id))[1] into v_fu_n, v_fu from public.crm_stage s
+   where s.org_id = p_org and s.category = 'open' and public.crm_stage_name_key(s.name) ~ '^follow ?up( |$)';
+  v_fu_r := public.crm_stage_backfill_resolve(p_org, array['Follow-Up', 'Follow Up', 'Nurture'], true, false);
+  if v_fu_n = 1 and v_fu_r = v_fu then
+    v_pick := v_pick || pg_catalog.jsonb_build_object('follow_up', v_fu);
+  end if;
+
+  -- consult_scheduled (one list, three readers).
+  v_cs := public.crm_stage_backfill_resolve(p_org,
+    array['Consultation Scheduled', 'Consult Scheduled', 'Consult Booked', 'Strategy Session Scheduled', 'Discovery Call Scheduled'],
+    true, false);
+  if v_cs is not null then v_pick := v_pick || pg_catalog.jsonb_build_object('consult_scheduled', v_cs); end if;
+
+  -- consult_held: the Stage Keeper (with its fallback to the scheduled stage) and Reconcile must agree.
+  v_ch_sk := coalesce(public.crm_stage_backfill_resolve(p_org,
+    array[('Consult Held ' || pg_catalog.chr(8211) || ' Proposal in Progress'), 'Consult Held', 'Consultation Held', 'Consult Completed'], true, false), v_cs);
+  v_ch_r := public.crm_stage_backfill_resolve(p_org,
+    array[('Consult Held ' || pg_catalog.chr(8211) || ' Proposal in Progress'), 'Consultation Held', 'Consult Held', 'Consultation Completed', 'Consult Completed',
+          'Consultation Complete'], true, false);
+  if v_ch_r is not null and v_ch_r = v_ch_sk then
+    v_pick := v_pick || pg_catalog.jsonb_build_object('consult_held', v_ch_r);
+  end if;
+
+  -- questionnaire_sent (one list).
+  v_id := public.crm_stage_backfill_resolve(p_org, array['Questionnaire Sent', 'Intake Questionnaire Sent', 'Questionnaire'], true, false);
+  if v_id is not null then v_pick := v_pick || pg_catalog.jsonb_build_object('questionnaire_sent', v_id); end if;
+
+  -- proposal_sent: Stage Keeper post-consult-sent and Reconcile proposal_sent agree.
+  v_ps_sk := public.crm_stage_backfill_resolve(p_org,
+    array['Proposal Sent', 'Post Consultation Email Sent', 'Post Consult Email Sent', 'Post Consultation Follow Up'], true, false);
+  v_ps_r := public.crm_stage_backfill_resolve(p_org,
+    array['Proposal Sent', 'Proposal Sent to Client', 'Proposal Sent', 'Post Consultation Email Sent', 'Post Consult Email Sent',
+          'Post Consultation Follow Up'], true, false);
+  if v_ps_sk is not null and v_ps_sk = v_ps_r then
+    v_pick := v_pick || pg_catalog.jsonb_build_object('proposal_sent', v_ps_sk);
+  end if;
+
+  -- follow_up_sent, loe_sent, welcome_sent, opinion_letter_sent (one reader or one shared list each).
+  v_id := public.crm_stage_backfill_resolve(p_org, array['Follow-Up Sent', 'Follow Up Sent', 'Post Consultation Follow Up'], true, false);
+  if v_id is not null then v_pick := v_pick || pg_catalog.jsonb_build_object('follow_up_sent', v_id); end if;
+  v_id := public.crm_stage_backfill_resolve(p_org, array['LOE & Invoice Sent', 'Pending LOE + Payment', 'Engagement Letter Sent'], true, false);
+  if v_id is not null then v_pick := v_pick || pg_catalog.jsonb_build_object('loe_sent', v_id); end if;
+  v_id := public.crm_stage_backfill_resolve(p_org, array['Welcome Email Sent', 'Welcome Sent'], true, false);
+  if v_id is not null then v_pick := v_pick || pg_catalog.jsonb_build_object('welcome_sent', v_id); end if;
+  v_id := public.crm_stage_backfill_resolve(p_org, array['Opinion Letter Sent', 'Search Opinion Sent'], true, false);
+  if v_id is not null then v_pick := v_pick || pg_catalog.jsonb_build_object('opinion_letter_sent', v_id); end if;
+
+  -- signed_loe: Stage Keeper payment-received and the hired sync's wonTargetStage agree, on a won stage.
+  v_pay_sk := public.crm_stage_backfill_resolve(p_org, array['Signed LOE / Deposit Received', 'Deposit Received'], true, false);
+  select s.id into v_won_named from public.crm_stage s
+   where s.org_id = p_org and s.category = 'won' and s.name ~* 'signed loe|deposit received'
+   order by s.order_index, s.name, s.id limit 1;
+  select s.id into v_won_low from public.crm_stage s where s.org_id = p_org and s.category = 'won'
+   order by s.order_index, s.name, s.id limit 1;
+  if v_pay_sk is not null and v_pay_sk = coalesce(v_won_named, v_won_low) then
+    v_pick := v_pick || pg_catalog.jsonb_build_object('signed_loe', v_pay_sk);
+  end if;
+
+  -- lost.
+  v_id := public.crm_stage_backfill_resolve(p_org, array['Lost', 'Lost Lead'], true, false);
+  if v_id is not null then v_pick := v_pick || pg_catalog.jsonb_build_object('lost', v_id); end if;
+
+  -- Matter stages: one stage per label rule, or nothing.
+  select pg_catalog.count(*), (array_agg(s.id))[1] into v_n, v_id from public.crm_matter_stage s
+   where s.org_id = p_org and s.label = 'Signed LOE / Deposit Received';
+  if v_n = 1 then v_mpick := v_mpick || pg_catalog.jsonb_build_object('signed_loe', v_id); end if;
+  foreach v_role in array array['application_filed', 'oa_issued', 'awaiting_registration', 'publication', 'registered', 'abandoned'] loop
+    v_label := case v_role
+      when 'application_filed' then 'Application Filed'
+      when 'oa_issued' then 'OA Issued'
+      when 'awaiting_registration' then 'Awaiting Trademark Registration'
+      when 'publication' then 'Publication for Opposition'
+      when 'registered' then 'Registered'
+      when 'abandoned' then 'Abandoned' end;
+    select pg_catalog.count(*), (array_agg(s.id))[1] into v_n, v_id from public.crm_matter_stage s
+     where s.org_id = p_org and public.crm_matter_stage_label_key(s.label) = public.crm_matter_stage_label_key(v_label);
+    if v_n = 1 then v_mpick := v_mpick || pg_catalog.jsonb_build_object(v_role, v_id); end if;
+  end loop;
+
+  -- One stage, one role: a stage picked by two roles gets neither. Then the category rule, then "never overwrite".
+  for v_role, v_id in select k, (v #>> '{}')::uuid from pg_catalog.jsonb_each(v_pick) as e(k, v) loop
+    if (select pg_catalog.count(*) from pg_catalog.jsonb_each(v_pick) e2(k, v) where (e2.v #>> '{}')::uuid = v_id) > 1 then
+      v_skipped := v_skipped || pg_catalog.jsonb_build_object('table', 'crm_stage', 'role', v_role, 'why', 'stage picked by two roles');
+    elsif not exists (select 1 from public.crm_stage s where s.id = v_id and (
+              (v_role in ('new_enquiry', 'follow_up') and s.category = 'open')
+           or (v_role = 'signed_loe' and s.category = 'won')
+           or (v_role = 'lost' and s.category = 'lost')
+           or v_role not in ('new_enquiry', 'follow_up', 'signed_loe', 'lost'))) then
+      v_skipped := v_skipped || pg_catalog.jsonb_build_object('table', 'crm_stage', 'role', v_role, 'why', 'category');
+    elsif exists (select 1 from public.crm_stage s where s.org_id = p_org and (s.role = v_role or (s.id = v_id and s.role is not null))) then
+      v_skipped := v_skipped || pg_catalog.jsonb_build_object('table', 'crm_stage', 'role', v_role, 'why', 'already set');
+    else
+      v_written := v_written || pg_catalog.jsonb_build_object('table', 'crm_stage', 'role', v_role, 'stage_id', v_id,
+        'name', (select s.name from public.crm_stage s where s.id = v_id));
+      if not p_dry_run then
+        update public.crm_stage set role = v_role where id = v_id and org_id = p_org and role is null;
+      end if;
+    end if;
+  end loop;
+  for v_role, v_id in select k, (v #>> '{}')::uuid from pg_catalog.jsonb_each(v_mpick) as e(k, v) loop
+    if (select pg_catalog.count(*) from pg_catalog.jsonb_each(v_mpick) e2(k, v) where (e2.v #>> '{}')::uuid = v_id) > 1 then
+      v_skipped := v_skipped || pg_catalog.jsonb_build_object('table', 'crm_matter_stage', 'role', v_role, 'why', 'stage picked by two roles');
+    elsif not exists (select 1 from public.crm_matter_stage s where s.id = v_id and (
+              (v_role in ('signed_loe', 'application_filed', 'oa_issued', 'awaiting_registration', 'publication') and s.is_open)
+           or (v_role in ('registered', 'abandoned') and not s.is_open))) then
+      v_skipped := v_skipped || pg_catalog.jsonb_build_object('table', 'crm_matter_stage', 'role', v_role, 'why', 'open / closed');
+    elsif exists (select 1 from public.crm_matter_stage s where s.org_id = p_org and (s.role = v_role or (s.id = v_id and s.role is not null))) then
+      v_skipped := v_skipped || pg_catalog.jsonb_build_object('table', 'crm_matter_stage', 'role', v_role, 'why', 'already set');
+    else
+      v_written := v_written || pg_catalog.jsonb_build_object('table', 'crm_matter_stage', 'role', v_role, 'stage_id', v_id,
+        'name', (select s.label from public.crm_matter_stage s where s.id = v_id));
+      if not p_dry_run then
+        update public.crm_matter_stage set role = v_role where id = v_id and org_id = p_org and role is null;
+      end if;
+    end if;
+  end loop;
+
+  return pg_catalog.jsonb_build_object('org_id', p_org, 'dry_run', p_dry_run, 'written', v_written, 'skipped', v_skipped);
+end
+$$;
+
+-- =====================================================================================================================
+-- VERIFICATION (read-only; run after the chunks)
+-- =====================================================================================================================
+-- V1. The constraint definitions equal the final ones (expect two rows; the first lists exactly the nine keys, the second calls
+--     crm_view_layout_columns_valid):
+--   select conname, convalidated, pg_get_constraintdef(oid) from pg_constraint
+--    where conrelid = 'public.crm_view_layout'::regclass and conname in ('crm_view_layout_view_key', 'crm_view_layout_columns') order by 1;
+-- V2. No function body of 0119 holds a byte above 0x7F (expect zero rows):
+--   select proname from pg_proc
+--    where pronamespace = 'public'::regnamespace
+--      and proname in ('crm_matter_stage_label_key', 'crm_view_layout_column_valid', 'crm_stage_clean_name', 'crm_matter_stage_add',
+--                      'crm_stage_roles_backfill')
+--      and octet_length(prosrc) <> char_length(prosrc);
+--   (Restricted to 0119's five functions: 0035's crm_matter_deadline_confirmation_guard holds non-ASCII on purpose.)
+-- V3. No 'review_list' row is left (expect 0):
+--   select count(*) from public.crm_view_layout where view_key = 'review_list';
+-- V4. The view_key constraint is validated (expect true): select convalidated from pg_constraint where conname = 'crm_view_layout_view_key';
+-- V5. No saved layout already breaks the final column rule (expect zero rows). A CHECK that calls a function does not re-check rows
+--     already in the table, and the first copy's label rule only trimmed plain spaces:
+--   select id, org_id, view_key from public.crm_view_layout where not public.crm_view_layout_columns_valid(columns);
+--   If any come back: nothing is lost, but the owner's next change to that view would be refused. Tell the owner, then either fix the
+--   label by hand (update ... set columns = <cleaned>, rev = rev + 1) with the owner's OK, or delete that layout row so the view
+--   falls back to the standard columns.

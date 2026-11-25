@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { hasRole } from "@/lib/auth/roles";
 import { getScopedClient } from "@/lib/db/scoped-client";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { listConnectionsForViewer, resolveViewSession } from "@/lib/views/view-as";
 import { orgHasModule } from "@/lib/org/modules";
 import { aiConfigured } from "@/lib/ai/claude";
 import { AGENT_DEFS, AGENT_IDS, type AgentId, type Autonomy } from "@/lib/agents/types";
@@ -11,7 +11,6 @@ import { autopilotForRun } from "@/lib/agents/run-now";
 import { loadAgentMoves, type AgentMovesRead } from "@/lib/stage-keeper/read";
 import { readCalendarProbe } from "@/lib/stage-keeper/readiness-read";
 import { AGENT_MOVES_TODAY_HREF } from "@/lib/stage-keeper/moves";
-import { listConnections } from "@/lib/mailbox/connections";
 import { loadActiveQueue } from "@/lib/queue/load";
 import { relativeTime } from "@/lib/relative-time";
 import { AgentControls } from "@/components/agents/AgentControls";
@@ -68,7 +67,7 @@ const STATUS_TONE: Record<string, string> = { ok: "var(--ok)", skipped: "var(--w
 
 export default async function AgentsPage() {
   if (!(await orgHasModule("agents"))) notFound();
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   if (session.kind !== "ok") notFound();
   const canManage = hasRole(session.role, "senior_admin");
 
@@ -118,7 +117,7 @@ export default async function AgentsPage() {
   const hasMailboxModule = await orgHasModule("mailbox");
   const mailbox: ReadinessSource =
     settingsKnown && (isOn("email-intel") || isOn("stage-keeper") || isOn("inbox-summary")) && hasMailboxModule
-      ? await listConnections().then(
+      ? await listConnectionsForViewer().then(
           (r) => (!r.ok ? "unavailable" : r.connections.some((c) => c.status === "active") ? "ok" : "none"),
           () => "unavailable" as const,
         )

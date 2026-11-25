@@ -25,7 +25,7 @@ export async function authorizeReconcile(): Promise<{ ok: true; supabase: Scoped
     return { ok: false, error: MSG.signedOut };
   }
   try {
-    const { data, error } = await supabase.rpc("current_org_role");
+    const { data, error } = await supabase.rpc("current_org_role", undefined, { get: true });
     if (error || !isKnownRole(data)) return { ok: false, error: MSG.roleUnknown };
     if (!canReconcile(data as string)) return { ok: false, error: MSG.notAllowed };
     return { ok: true, supabase };

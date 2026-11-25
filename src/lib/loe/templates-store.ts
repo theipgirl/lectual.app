@@ -115,7 +115,7 @@ export async function getLetterVersion(db: Db, id: string): Promise<VersionRead>
 
 export async function currentOrgId(db: Db): Promise<string | null> {
   try {
-    const { data, error } = await db.rpc("current_org_id");
+    const { data, error } = await db.rpc("current_org_id", undefined, { get: true });
     return !error && typeof data === "string" && data ? data : null;
   } catch {
     return null;

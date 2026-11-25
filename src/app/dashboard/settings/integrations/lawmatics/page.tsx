@@ -2,7 +2,7 @@ import { LAWMATICS_LAST_SYNC_NOT_READY, LAWMATICS_NAME, LAWMATICS_SYNC_NOW, cant
 import { LoadFailedCard, Notice, PageHeader, Pill } from "@/components/ui";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { notFound } from "next/navigation";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { hasRole } from "@/lib/auth/roles";
 import { getLawmaticsConnection, getLawmaticsLastSync } from "@/lib/lawmatics/connection";
 import { relativeTime } from "@/lib/relative-time";
@@ -27,7 +27,7 @@ export const maxDuration = 300;
  * and again in every action, because each action is its own POST.
  */
 export default async function LawmaticsPage() {
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   if (session.kind !== "ok") notFound();
   const canManage = hasRole(session.role, "senior_admin");
   const read = await getLawmaticsConnection();

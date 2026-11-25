@@ -11,6 +11,7 @@ const h = vi.hoisted(() => ({
   phaseError: null as Err,
   otherError: null as Err,
   plainError: null as Err,
+  roleError: null as Err,
   rows: [] as Array<Record<string, unknown>>,
 }));
 
@@ -21,6 +22,7 @@ vi.mock("@/lib/db/scoped-client", () => ({
         h.selects.push(cols);
         const result = () => {
           if (h.otherError) return { data: null, error: h.otherError };
+          if (cols.includes("role") && h.roleError) return { data: null, error: h.roleError };
           if (!cols.includes("phase") && h.plainError) return { data: null, error: h.plainError };
           if (cols.includes("phase") && h.phaseError) return { data: null, error: h.phaseError };
           const keep = cols.split(",").map((c) => c.trim());
@@ -44,6 +46,7 @@ beforeEach(() => {
   h.phaseError = null;
   h.otherError = null;
   h.plainError = null;
+  h.roleError = null;
   h.rows = [{ ...base }];
 });
 
@@ -69,14 +72,15 @@ describe("loadMatterStages", () => {
       expect(r.stages).toHaveLength(1);
       expect(r.stages[0].phase).toBeUndefined();
     }
-    expect(h.selects).toEqual([MATTER_STAGE_COLUMNS, MATTER_STAGE_COLUMNS_NO_PHASE]);
+    // Changed on purpose (stage roles, lectual 0119): the read asks for `role` first; with no phase it keeps role.
+    expect(h.selects).toEqual([`${MATTER_STAGE_COLUMNS}, role`, `${MATTER_STAGE_COLUMNS_NO_PHASE}, role`]);
   });
 
   it("does not guess from message text: a missing-column message with another code is a failed read", async () => {
     h.phaseError = { code: "XX000", message: 'column "phase" does not exist' };
     const r = await loadMatterStages();
     expect(r.status).toBe("unavailable");
-    expect(h.selects).toEqual([MATTER_STAGE_COLUMNS]);
+    expect(h.selects).toEqual([`${MATTER_STAGE_COLUMNS}, role`]);
   });
 
   it("unavailable on any other failure, never 'no phases'", async () => {
@@ -88,6 +92,33 @@ describe("loadMatterStages", () => {
     h.phaseError = { code: "42703", message: "x" };
     h.plainError = { code: "XX000", message: "boom" };
     expect((await loadMatterStages()).status).toBe("unavailable");
+  });
+});
+
+describe("loadMatterStages and the role column (lectual 0119)", () => {
+  it("reads the role when the database has it", async () => {
+    h.rows = [{ ...base, role: "signed_loe" }];
+    const r = await loadMatterStages();
+    expect(r.status).toBe("ok");
+    if (r.status === "ok") expect(r.stages[0].role).toBe("signed_loe");
+    expect(h.selects).toEqual([`${MATTER_STAGE_COLUMNS}, role`]);
+  });
+  it.each(["42703", "PGRST204"])("no role column (%s): reads exactly the old columns, phase kept", async (code) => {
+    h.roleError = { code, message: "x" };
+    const r = await loadMatterStages();
+    expect(r.status).toBe("ok");
+    if (r.status === "ok") {
+      expect(r.stages[0].phase).toBe("pre_filing");
+      expect(r.stages[0].role).toBeUndefined();
+    }
+    expect(h.selects.at(-1)).toBe(MATTER_STAGE_COLUMNS);
+  });
+  it("neither column: the plain read, not-set-up", async () => {
+    h.roleError = { code: "42703", message: "x" };
+    h.phaseError = { code: "42703", message: "x" };
+    const r = await loadMatterStages();
+    expect(r.status).toBe("not-set-up");
+    expect(h.selects.at(-1)).toBe(MATTER_STAGE_COLUMNS_NO_PHASE);
   });
 });
 

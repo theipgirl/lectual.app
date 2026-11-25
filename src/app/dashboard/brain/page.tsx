@@ -1,7 +1,7 @@
 import "./brain.css";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import {
   listBrainEntries,
   listClaims,
@@ -117,7 +117,7 @@ export default async function BrainPage({
   const { tab: tabRaw } = (await searchParams) ?? {};
   // Anything but "claims" is Knowledge.
   const tab: "knowledge" | "claims" = tabRaw === "claims" ? "claims" : "knowledge";
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   // The dashboard layout gates sign-in; a session that isn't ok here fails closed with no explanation.
   if (session.kind !== "ok") notFound();
 

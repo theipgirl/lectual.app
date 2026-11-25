@@ -4,17 +4,22 @@ import { laneLabel, laneLoad, laneLoadText, type Kpis, type Lane } from "@/lib/r
 import { cardSubline, dueText, sentText } from "@/lib/review/format";
 import { openToken } from "@/lib/review/open";
 import { reviewHref, REVIEW_VIEWS, type ReviewParams, type ReviewView } from "@/lib/review/params";
-import { LANE_COUNT_NOTE, LANE_NOBODY_WAITING, LANE_NOTHING_FOR_US, LANE_WAITING_ON_CLIENT, NOTHING_WAITING_ON_YOU, OUR_TURN, WAITING_ON_YOU, WAITING_ON_YOU_PARTIAL, REVIEW_BOARD_VIEW, REVIEW_CARDS_VIEW, REVIEW_SHEET_VIEW } from "@/lib/ui/words";
+import { BOARD_LANES_HIDDEN_LINK, boardLanesHidden, LANE_COUNT_NOTE, LANE_NOBODY_WAITING, LANE_NOTHING_FOR_US, LANE_WAITING_ON_CLIENT, NOTHING_WAITING_ON_YOU, OUR_TURN, WAITING_ON_YOU, WAITING_ON_YOU_PARTIAL, REVIEW_BOARD_VIEW, REVIEW_CARDS_VIEW, REVIEW_SHEET_VIEW } from "@/lib/ui/words";
 import { DoneButton } from "./DoneButton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadFailedLine } from "@/components/ui/LoadFailed";
 import { Pill } from "@/components/ui/Pill";
 import type { PillTone } from "@/lib/ui/tones";
-import { BoardCard, BoardColumn } from "@/components/ui/Board";
+import { BoardCard } from "@/components/ui/Board";
+import { ViewBoard, type BoardColumnSpec } from "@/components/views/board/ViewBoard";
+import { applyBoardLayout } from "@/lib/review/board-layout";
+import type { Layout } from "@/lib/views/layout/types";
 import { DocTag, LastChanged, openHref, Tags, type Common } from "./shared";
 import "@/components/list-page/list-page.css";
 import "./review.css";
 import { ViewToggle } from "@/components/ViewToggle";
+import { ColumnMenu } from "@/components/views/layout/ColumnMenu";
+import { HiddenColumnsMenu } from "@/components/views/layout/HiddenColumnsMenu";
 import type { DeadlineOut } from "@/lib/review/strips";
 import { DEADLINES_COULDNT_LOAD, DEADLINE_UNCONFIRMED, REVIEW_DEADLINES_HEADING, REVIEW_DEADLINES_NONE, REVIEW_DEADLINE_CONFIRMED, deadlineCardMore } from "@/lib/ui/words";
 
@@ -104,63 +109,56 @@ function ReviewCard({ row, bucket, today, members, canWrite, params, waitingOnCl
 /**
  * The board: one column per person (the Board kit's column, wrapping into rows rather than scrolling sideways), each holding two
  * lists, "Our turn" and "Waiting on client". The column says how much the person holds: "Rayn · 12" and, when any, how many of
- * those are overdue or due this week.
+ * those are overdue or due this week. Drawn by the shared Board (`ViewBoard`); the firm's saved layout (`review_board`) orders and
+ * names the people, and says so when it hides one.
  */
-export function ReviewBoard({ lanes, ...common }: Common & { lanes: Lane[] }) {
+export function ReviewBoard({ lanes, layout = null, layoutEdit = null, ...common }: Common & { lanes: Lane[]; /** The firm's saved Board layout; null = the standard order. */ layout?: Layout | null; /** Given only for an owner: each person's lane gets the column menu (rename, hide, move). `rev` is the Board layout's. */ layoutEdit?: { rev: number | null } | null }) {
   if (lanes.length === 0) {
     return <EmptyState title="Nothing needs attention">No records are waiting on us or on a client for this view.</EmptyState>;
   }
+  const { lanes: drawn, hidden, hiddenUnassigned, hiddenLanes } = applyBoardLayout(lanes, layout);
+  const columns: BoardColumnSpec<ReviewRow>[] = drawn.map((lane, at) => {
+    const load = laneLoad(lane, common.today);
+    const split = laneLoadText(load);
+    return {
+      key: lane.key,
+      title: lane.title,
+      count: load.total,
+      countTitle: LANE_COUNT_NOTE,
+      ariaLabel: laneLabel(lane.title, load),
+      className: "rv-person",
+      attrs: { "data-lane": lane.userId ?? "none" },
+      note: split ? <p className="lx-note rv-lane-load" data-lane-load>{split}</p> : undefined,
+      menu: layoutEdit ? <ColumnMenu view="review_board" rev={layoutEdit.rev} columnKey={lane.key} label={lane.title} kind="lane" prevKey={drawn[at - 1]?.key ?? null} nextKey={drawn[at + 1]?.key ?? null} /> : undefined,
+      groups: [
+        { key: "our", heading: `${OUR_TURN} · ${lane.our.length}`, empty: LANE_NOTHING_FOR_US, cards: lane.our, attrs: { "data-half": "our" } },
+        { key: "client", heading: `${LANE_WAITING_ON_CLIENT} · ${lane.client.length}`, empty: LANE_NOBODY_WAITING, cards: lane.client, attrs: { "data-half": "client" } },
+      ],
+    };
+  });
+  const waitingOnClient = new Set(drawn.flatMap((l) => l.client.map((r) => r.key)));
   return (
-    <div className="lx-board rv-board">
-      {lanes.map((lane) => {
-        const id = lane.userId ?? "none";
-        const load = laneLoad(lane, common.today);
-        const split = laneLoadText(load);
-        return (
-          <BoardColumn
-            key={id}
-            className="rv-person"
-            data-lane={id}
-            title={lane.name}
-            headingLevel={2}
-            count={load.total}
-            countTitle={LANE_COUNT_NOTE}
-            ariaLabel={laneLabel(lane.name, load)}
-            bare
-            note={split ? <p className="lx-note rv-lane-load" data-lane-load>{split}</p> : undefined}
-          >
-            <section className="rv-lane-list" data-half="our">
-              <h3 className="rv-lane-head lx-label">
-                {OUR_TURN} · {lane.our.length}
-              </h3>
-              {lane.our.length === 0 ? (
-                <p className="lx-board-empty">{LANE_NOTHING_FOR_US}</p>
-              ) : (
-                <ul className="lx-board-cards">
-                  {lane.our.map((row) => (
-                    <ReviewCard key={row.key} row={row} bucket={bucketOf(row, common.today)} {...common} />
-                  ))}
-                </ul>
-              )}
-            </section>
-            <section className="rv-lane-list" data-half="client">
-              <h3 className="rv-lane-head lx-label">
-                {LANE_WAITING_ON_CLIENT} · {lane.client.length}
-              </h3>
-              {lane.client.length === 0 ? (
-                <p className="lx-board-empty">{LANE_NOBODY_WAITING}</p>
-              ) : (
-                <ul className="lx-board-cards">
-                  {lane.client.map((row) => (
-                    <ReviewCard key={row.key} row={row} bucket={bucketOf(row, common.today)} waitingOnClient {...common} />
-                  ))}
-                </ul>
-              )}
-            </section>
-          </BoardColumn>
-        );
-      })}
-    </div>
+    <>
+      {(hidden > 0 || hiddenUnassigned) && (
+        <p className="lx-note rv-layout-note" role="status">
+          {boardLanesHidden(hidden, hiddenUnassigned)}{" "}
+          <Link href={reviewHref({ ...common.params, view: "sheet", i: 1, open: null })} className="lx-link" scroll={false}>
+            {BOARD_LANES_HIDDEN_LINK}
+          </Link>
+        </p>
+      )}
+      {layoutEdit && hiddenLanes.length > 0 && (
+        <div className="rv-board-tools">
+          <HiddenColumnsMenu groups={[{ view: "review_board", rev: layoutEdit.rev, items: hiddenLanes }]} />
+        </div>
+      )}
+      <ViewBoard
+        className="rv-board"
+        headingLevel={2}
+        columns={columns}
+        renderCard={(row) => <ReviewCard key={row.key} row={row} bucket={bucketOf(row, common.today)} waitingOnClient={waitingOnClient.has(row.key)} {...common} />}
+      />
+    </>
   );
 }
 

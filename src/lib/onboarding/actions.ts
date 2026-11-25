@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { buildTourMeta, isTourOutcome } from "./tour";
 import { buildWelcomeMeta } from "./welcome-deal";
@@ -15,7 +16,7 @@ const NOT_SIGNED_IN = "You are not signed in.";
  * there is no user id or org id argument, and other metadata keys are kept.
  * The flag is a preference; nothing reads it to allow or deny anything.
  */
-export async function markTourSeenAction(outcome: unknown): Promise<MarkTourSeenResult> {
+export const markTourSeenAction = previewSafe(async function markTourSeenAction(outcome: unknown): Promise<MarkTourSeenResult> {
   if (!isTourOutcome(outcome)) return { ok: false, error: NOT_SAVED };
   try {
     const supabase = await getScopedClient();
@@ -35,13 +36,13 @@ export async function markTourSeenAction(outcome: unknown): Promise<MarkTourSeen
   } catch {
     return { ok: false, error: NOT_SAVED };
   }
-}
+}, "state");
 
 /**
  * The owner view's welcome deal: the same shape as `markTourSeenAction`, but its own key (`lectual_welcome`). Session
  * client only, no user or org argument, other metadata keys (the tour's included) are kept untouched.
  */
-export async function markWelcomeSeenAction(outcome: unknown): Promise<MarkTourSeenResult> {
+export const markWelcomeSeenAction = previewSafe(async function markWelcomeSeenAction(outcome: unknown): Promise<MarkTourSeenResult> {
   if (!isTourOutcome(outcome)) return { ok: false, error: NOT_SAVED };
   try {
     const supabase = await getScopedClient();
@@ -61,4 +62,4 @@ export async function markWelcomeSeenAction(outcome: unknown): Promise<MarkTourS
   } catch {
     return { ok: false, error: NOT_SAVED };
   }
-}
+}, "state");

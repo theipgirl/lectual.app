@@ -285,7 +285,7 @@ describe("reviewQueueAction is a thin wrapper", () => {
 
   it("holds no approval logic of its own", () => {
     const src = readFileSync("src/app/dashboard/queue/actions.ts", "utf8");
-    const wrapper = src.slice(src.indexOf("export async function reviewQueueAction"), src.indexOf("export type DismissState"));
+    const wrapper = src.slice(src.indexOf("async function reviewQueueAction"), src.indexOf("export type DismissState"));
     expect(wrapper).toMatch(/runQueueReview\(/);
     expect(wrapper).not.toMatch(/approvalRefusal|approvalBlock|gateLinkedProposal|resolveQueueItem|draftInMyMailbox/);
   });

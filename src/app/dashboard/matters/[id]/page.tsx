@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { MailingAddressCard } from "@/components/loe/MailingAddressCard";
 import { loadSignedAddress } from "@/lib/loe/signed-address";
 import {
@@ -103,7 +103,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function MatterPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   if (session.kind !== "ok") notFound();
 
   // Through RLS, another firm's matter id is simply not found.

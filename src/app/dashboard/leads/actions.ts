@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 // Ported from lectual src/app/(firm)/dashboard/pipeline/actions.ts (paths only changed).
 
 import { revalidatePath } from "next/cache";
@@ -20,7 +21,7 @@ export type MoveStageResult =
  * just the first. This is the server action's whole job: translate that
  * refusal into a friendly message for the UI instead of an unhandled throw.
  */
-export async function moveLeadStageAction(
+export const moveLeadStageAction = previewSafe(async function moveLeadStageAction(
   leadId: string,
   stageId: string,
 ): Promise<MoveStageResult> {
@@ -37,7 +38,7 @@ export async function moveLeadStageAction(
   revalidatePath("/dashboard/intake/");
   revalidatePath(`/dashboard/leads/${leadId}/`);
   return { ok: true };
-}
+}, "state");
 
 export type CreateLeadState = {
   ok?: boolean;
@@ -76,7 +77,7 @@ function readLeadForm(formData: FormData): Record<string, string> {
  * `createLead` re-validates and re-checks the caller's role on its own
  * (defense in depth), and RLS is the real boundary underneath both.
  */
-export async function createLeadAction(
+export const createLeadAction = previewSafe(async function createLeadAction(
   _prev: CreateLeadState,
   formData: FormData,
 ): Promise<CreateLeadState> {
@@ -113,4 +114,4 @@ export async function createLeadAction(
   revalidatePath("/dashboard/intake/");
   revalidatePath("/dashboard/");
   return { ok: true, leadId };
-}
+}, "state");

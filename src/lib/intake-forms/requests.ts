@@ -38,7 +38,7 @@ export function canSendIntakeRequest(role: Role | null | undefined): boolean {
 
 async function requireSenderRole(): Promise<void> {
   const supabase = await getScopedClient();
-  const { data, error } = await supabase.rpc("current_org_role");
+  const { data, error } = await supabase.rpc("current_org_role", undefined, { get: true });
   if (error) throw error;
   if (typeof data !== "string" || !(ROLES as readonly string[]).includes(data) || !canSendIntakeRequest(data as Role)) {
     throw new IntakeRequestError("Your role can view this matter but not send intake questions.");

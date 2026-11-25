@@ -96,7 +96,7 @@ describe("saveViewAction", () => {
   it("takes no user or org argument and uses only the scoped client", () => {
     const src = readFileSync("src/lib/account/view-actions.ts", "utf8");
     expect(src.startsWith('"use server";')).toBe(true);
-    expect(src).toMatch(/export async function saveViewAction\(input: unknown\)/);
+    expect(src).toMatch(/async function saveViewAction\(input: unknown\)/);
     expect(src).not.toMatch(/admin|service/i);
   });
 });

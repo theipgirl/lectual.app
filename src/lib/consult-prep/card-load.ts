@@ -6,6 +6,7 @@ import { activeQueueOrgKey } from "@/lib/queue/org";
 import { activeOrgModulesOrNull } from "@/lib/org/modules";
 import { PREP_SOURCE } from "@/lib/agents/consult-prep/constants";
 import { env } from "@/lib/env";
+import { emailsStarted, parseCutoverAt } from "./cutover";
 import { PREP_BRIEF_KIND, PREP_SEND_SOURCE } from "./keys";
 import { consultPrepCardView, type CardView, type PrepMarker, type Read3, type RecipientsView } from "./card";
 import { loadConsultPrepSetting } from "./recipients-store";
@@ -44,6 +45,7 @@ async function readMarkers(leadIds: readonly string[]): Promise<Read3<PrepMarker
       prepKey: typeof r.payload?.prep_key === "string" ? r.payload.prep_key : null,
       queueItemId: typeof r.payload?.queueItemId === "string" ? r.payload.queueItemId : null,
       at: r.created_at,
+      adopted: r.payload?.adopted === true,
     }));
     return { status: "ok", value };
   } catch {
@@ -127,8 +129,11 @@ export async function loadConsultPrepCard(args: { leadIds: readonly string[]; ad
       sends,
       recipients,
       emailOn: Boolean(env.RESEND_API_KEY?.trim() && env.CONSULT_PREP_FROM?.trim()),
+      emailsStarted: emailsStarted(parseCutoverAt(env.CONSULT_PREP_CUTOVER_AT), Date.now()),
+      cutoverAtMs: parseCutoverAt(env.CONSULT_PREP_CUTOVER_AT),
       adminTier: args.adminTier,
       tz: args.tz,
+      nowMs: Date.now(),
     });
     const brief = view.kind === "prepared" ? await readBrief(view.queueItemId) : ({ status: "none" } as const);
     return { view, brief };

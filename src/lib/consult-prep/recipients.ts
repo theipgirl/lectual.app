@@ -87,3 +87,47 @@ export function validateCcForSave(typed: readonly string[], toAddresses: readonl
 export function splitTypedAddresses(text: string): string[] {
   return text.split(/[\s,;]+/).map((s) => s.trim()).filter(Boolean);
 }
+
+/** The address inside a From header ("The Firm <brief@firm.example>" or a bare address), or null. */
+export function senderAddress(from: string | null | undefined): string | null {
+  if (typeof from !== "string") return null;
+  const m = /<([^<>]+)>\s*$/.exec(from.trim());
+  return bareAddress(m ? m[1] : from);
+}
+
+/**
+ * S2c: the reply-to of a consult prep email (`CONSULT_PREP_REPLY_TO`). The sender (brief@) may not be a real mailbox, so replies go to
+ * one that is, and only ever to the firm. Allowed only when it is a bare address, is not any address of the client the brief is about,
+ * and is either on the SENDER's own domain (a public webmail domain proves nothing there) or passes the Cc rule against this email's To
+ * list (a To member's domain; on a public webmail domain, exactly a member's address). Otherwise null: the email goes without it.
+ */
+export function guardReplyTo(input: { replyTo: string | null | undefined; from: string | null | undefined; to: readonly string[]; clientAddresses: readonly (string | null | undefined)[] }): string | null {
+  const reply = bareAddress(input.replyTo);
+  if (!reply) return null;
+  const client = new Set(input.clientAddresses.map((a) => bareAddress(a)).filter((a): a is string => a !== null));
+  if (client.has(reply)) return null;
+  const sender = senderAddress(input.from);
+  if (sender && !isPublicMailDomain(domainOf(sender)) && domainOf(sender) === domainOf(reply)) return reply;
+  const to = input.to.map((a) => bareAddress(a)).filter((a): a is string => a !== null && !client.has(a));
+  return ccAllowed(reply, new Set(to.map(domainOf)), new Set(to)) ? reply : null;
+}
+
+/**
+ * S2c: the extra, explicit check before a TEST brief goes (on top of `guardRecipients`). The firm's domains are the SENDER's domain
+ * (`CONSULT_PREP_FROM`) and the domains of the firm's own connected mailboxes (`mailbox_connection.email`), never a public webmail
+ * domain. There must be at least one To, and every To and Cc must be on one of those domains, or be exactly one of the firm's mailbox
+ * addresses. Anything else and nothing is sent (a member who signed up with a personal address can't receive a test brief).
+ */
+export function testRecipientsOnFirmDomains(input: { to: readonly string[]; cc: readonly string[]; from: string | null | undefined; firmAddresses: readonly (string | null | undefined)[] }): boolean {
+  if (input.to.length === 0) return false;
+  const mailboxes = new Set(input.firmAddresses.map((a) => bareAddress(a)).filter((a): a is string => a !== null));
+  const firm = new Set([...mailboxes].map(domainOf).filter((d) => !isPublicMailDomain(d)));
+  const sender = senderAddress(input.from);
+  if (sender && !isPublicMailDomain(domainOf(sender))) firm.add(domainOf(sender));
+  for (const raw of [...input.to, ...input.cc]) {
+    const a = bareAddress(raw);
+    if (!a) return false;
+    if (!mailboxes.has(a) && !firm.has(domainOf(a))) return false;
+  }
+  return true;
+}

@@ -19,6 +19,7 @@ import {
 import { field, idOf } from "./jsonapi";
 import { readOriginLookups, type OriginLookups } from "./lead-origin-read";
 import { leadRead } from "@/lib/leads/live";
+import { withRoleFallback } from "@/lib/stages/roles";
 
 /**
  * Hired-matter sync, one firm (Lawmatics -> Lectual). The Lawmatics daily sync (./daily-sync.ts) calls `syncFirm` per
@@ -115,8 +116,13 @@ export async function syncFirm(admin: Admin, orgId: string, client: LawmaticsCli
             .range(a, b),
         ) as unknown as PromiseLike<{ data: PlanLead[] | null; error: unknown }>,
       ),
-      pageAll<PlanStage>((a, b) => admin.from("crm_matter_stage").select("id,label").eq("org_id", orgId).order("order_index", { ascending: true }).range(a, b)),
-      pageAll<LeadStageRef>((a, b) => admin.from("crm_stage").select("id,name,category,order_index").eq("org_id", orgId).order("order_index", { ascending: true }).range(a, b)),
+      // `role` (lectual 0119) is read when the database has it; without the column each page is read again without it.
+      pageAll<PlanStage>((a, b) =>
+        withRoleFallback((r) => admin.from("crm_matter_stage").select(r ? "id,label,is_open,role" : "id,label,is_open").eq("org_id", orgId).order("order_index", { ascending: true }).range(a, b)) as unknown as PromiseLike<{ data: PlanStage[] | null; error: unknown }>,
+      ),
+      pageAll<LeadStageRef>((a, b) =>
+        withRoleFallback((r) => admin.from("crm_stage").select(r ? "id,name,category,order_index,role" : "id,name,category,order_index").eq("org_id", orgId).order("order_index", { ascending: true }).range(a, b)) as unknown as PromiseLike<{ data: LeadStageRef[] | null; error: unknown }>,
+      ),
     ]);
     if (!matters || !leads || !stages) return { ...FAILED };
     // An unreadable lead-stage list only means no lead is moved this run; the matters still sync.

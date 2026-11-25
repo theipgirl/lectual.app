@@ -1472,64 +1472,30 @@ export const COL_UNCONFIRMED_SUFFIX = " · unconfirmed";
 export const proposalsCount = (n: number) => `${n} proposals`;
 export const FEE_FROM_PROPOSAL = "From the accepted proposal";
 export const FEE_FROM_SPREADSHEET = "From the spreadsheet import";
-/** The column chooser (draw-only, kept in this browser). */
-export const COLUMNS_BUTTON = "Columns";
-export const COLUMNS_MENU_LABEL = "Choose columns";
-export const COLUMNS_RESET = "Reset to the spreadsheet's order";
-export const COLUMNS_MOVE_UP = "Move up";
-export const COLUMNS_MOVE_DOWN = "Move down";
-export const COLUMNS_ALWAYS_SHOWN = "Always shown";
-export const COLUMNS_KEPT_HERE = "Kept in this browser only. It changes what you see, not what you may see.";
-export const columnsShow = (header: string) => `Show ${header}`;
-export const columnsMoveUp = (header: string) => `${COLUMNS_MOVE_UP}: ${header}`;
-export const columnsMoveDown = (header: string) => `${COLUMNS_MOVE_DOWN}: ${header}`;
-export const columnsSectionLabel = (section: string) => `${section} columns`;
 /** Firm-defined custom columns (lectual 0115, proposed). Read only until Settings -> Columns exists. */
 export const CUSTOM_COLUMNS_NOT_ON = "Custom columns aren't switched on for your firm yet.";
 export const CUSTOM_FROM_LEAD = "From the lead";
 export const CUSTOM_FROM_MERGED = "From a merged duplicate";
 export const CUSTOM_NO_LONGER_ON_TEAM = "Someone no longer on the team";
 export const FIRM_COLUMNS_HEADING = "Firm columns";
-/** The five kinds of custom column, as the chooser and a header's hover text name them. */
+/** The five kinds of custom column, as a header's hover text names them. */
 export const CUSTOM_KIND_TEXT = "Text";
 export const CUSTOM_KIND_DATE = "Date";
 export const CUSTOM_KIND_MONEY = "Money";
 export const CUSTOM_KIND_CHOICE = "Choice";
 export const CUSTOM_KIND_PERSON = "Person";
 
-/* ── Settings -> Columns and the custom-column writes (Sprint 3; lectual 0115, proposed) ── */
-export const COLUMNS_SETTINGS_NAME = "Columns";
-export const COLUMNS_SETTINGS_SUB =
-  "Your firm's own columns on the Weekly review List. Everyone in the firm sees them, money columns included. A column's kind and section can't change after it's added. Archiving a column keeps its values.";
-export const columnsCount = (n: number) => `${n} of 40 columns`;
+/* ── The firm's own columns and the custom-column writes (lectual 0115; changed from a column's own menu) ── */
 export const COLUMNS_ADD = "Add a column";
-export const COLUMNS_NAME_LABEL = "Name";
 export const COLUMNS_SECTION_LABEL = "Section";
 export const COLUMNS_KIND_LABEL = "Kind";
 export const COLUMNS_CHOICES_LABEL = "Choices (one per line)";
 export const COLUMNS_CHOICES_HINT = "Only for a Choice column";
 /** The List's two sections, and a column that shows in both. */
 export const CUSTOM_SECTION_WORDS = { trademarks: "Trademarks", contracts: "Contracts", both: "Both" } as const;
-export const archiveQuestion = (label: string) => `Archive ${label}? It leaves the List; its values are kept.`;
-export const archivedHeading = (n: number) => `Archived columns (${n})`;
-/** Settings -> Columns lists the first `n` archived columns; there are more (never an error page). */
-export const archivedShownNote = (n: number) => `Showing the first ${n} archived columns.`;
-export const COLUMNS_ARCHIVE = "Archive";
-export const COLUMNS_RESTORE = "Restore";
 export const COLUMNS_RENAME = "Rename";
-export const COLUMNS_EDIT_CHOICES = "Edit choices";
-export const COLUMNS_SAVE_NAME = "Save name";
-export const COLUMNS_SAVE_CHOICES = "Save choices";
-export const columnsRenameLabel = (label: string) => `New name for ${label}`;
-export const columnsChoicesFor = (label: string) => `Choices for ${label}, one per line`;
-export const columnsRestoreLabel = (label: string) => `Restore ${label}`;
-export const columnsArchiveLabel = (label: string) => `Archive ${label}`;
-export const COLUMNS_AT_LIMIT = "Your firm has 40 columns, the most it can have. Archive one to add another.";
-export const COLUMNS_NONE = "No columns yet. Add one below.";
-export const choiceUse = (option: string, n: number) => `${option}: used on ${n} ${n === 1 ? "record" : "records"}`;
-export const COLUMNS_USE_UNCOUNTED = "Couldn't count which choices are in use. Saving still checks.";
-/** The field actions' role gate (the admin tier). It starts with the phrase, as everywhere else in the app. */
-export const COLUMNS_NO_PERMISSION = `${ADMIN_TIER_PHRASE} can change the firm's columns.`;
+/** The field actions' gate: an owner's membership row (lectual 0119 makes field create and change owner-only). */
+export const COLUMNS_NO_PERMISSION = "Only an owner can change columns.";
 
 /** The fixed sentences the custom-column actions and the error mapper answer with. Never any part of a database message. */
 export const CUSTOM_COLUMNS_NOT_READY = `${CUSTOM_COLUMNS_NOT_ON} Lectual will turn it on.`;
@@ -1541,7 +1507,7 @@ export const CUSTOM_VALUE_IMMUTABLE = "A saved value stays with the column and t
 export const CUSTOM_VALUE_ONE_RECORD = "Each saved value is for a single record.";
 export const CUSTOM_FIELD_GONE = "That column couldn't be found. It may have been archived or removed.";
 export const CUSTOM_VALUE_MERGED = "That lead is now part of another lead. Change the value there.";
-export const CUSTOM_COLUMN_ARCHIVED = `Archived columns can't be changed. ${ADMIN_TIER_PHRASE} can bring it back in Settings.`;
+export const CUSTOM_COLUMN_ARCHIVED = "Archived columns can't be changed.";
 export const CUSTOM_WRONG_SECTION = "Wrong part of the List for that column.";
 export const CUSTOM_VALUE_EMPTY = "Clear the cell to remove a value.";
 export const CUSTOM_WRONG_KIND = "That entry isn't the right type for this column.";
@@ -1668,6 +1634,37 @@ export const LAWMATICS_CONSULTS_NOT_READY = notReadyYet("Consults from Lawmatics
 /** Stage suggestion reason for a consult booked in Lawmatics (it may have been booked by the client). */
 export const WHY_LAWMATICS_CONSULT = "This consult was booked in Lawmatics, possibly by the client, so a person decides.";
 
+/** View as (an owner's read-only look at a teammate's view). Spec docs/pge/2026-11-17-agentic-ip-os/spec-owner-view-as.md. */
+export const VIEW_AS_BANNER = (name: string) => `Viewing as ${name} (read-only)`;
+/** The phone banner: one short line. */
+export const VIEW_AS_BANNER_SHORT = (name: string) => `Viewing as ${name} · read-only`;
+export const VIEW_AS_EXIT = "Exit";
+export const VIEW_AS_READ_ONLY = "This is a read-only preview. Nothing was changed.";
+export const VIEW_AS_EXIT_FAILED = "Couldn't leave the preview. Try again, or sign out to end it.";
+export const VIEW_AS_PRIVATE_MAIL = (name: string) => `${name}'s own mailbox is private to them and isn't shown in a preview.`;
+/** A preview whose teammate couldn't be named: personal mailboxes are left out all the same. */
+export const VIEW_AS_PERSONAL_HIDDEN = "Personal mailboxes aren't shown in a preview.";
+export const VIEW_AS_LIVE_MAIL = "Live mail isn't read in a preview. Stored messages are shown.";
+export const VIEW_AS_PRIVATE_OUTLOOK = (name: string) => `${name}'s own Outlook isn't checked in a preview.`;
+export const VIEW_AS_PRIVATE_COPILOT = (name: string) => `${name}'s Copilot chats are private to them and aren't shown in a preview.`;
+export const VIEW_AS_PRIVATE_BELL = (name: string) => `${name}'s notifications are private to them and aren't shown in a preview.`;
+/** A preview whose teammate couldn't be named (the state couldn't be checked, or the team list couldn't be read). */
+export const VIEW_AS_OUTLOOK_UNCHECKED = "Outlook calendars aren't checked in a preview.";
+export const VIEW_AS_ZOOM = "Zoom consults aren't read in a preview.";
+export const VIEW_AS_NOT_ALLOWED = "Only an owner of this firm can view the app as a teammate.";
+export const VIEW_AS_TARGET_GONE = "That person isn't on your team any more.";
+export const VIEW_AS_UNCHECKED = "Couldn't check whether you're viewing as a teammate. Nothing can be changed until you refresh.";
+export const VIEW_AS_LINK = "View as";
+export const VIEW_AS_MENU = "View as a teammate";
+export const VIEW_AS_MENU_HEADER = (name: string) => `Viewing as ${name}`;
+export const VIEW_AS_NOT_READY = notReadyYet("Viewing as a teammate");
+/** Enter failed for a reason that is not one of the above (a read or write that didn't go through). */
+export const VIEW_AS_START_FAILED = "Couldn't start the preview. Try again.";
+/** The target's row could not be read from the team list while previewing. */
+export const VIEW_AS_TEAM_UNREADABLE = "Couldn't load your team. Refresh to try again.";
+/** A hint cookie left behind by a preview that has already ended (closed by the database, or View as not switched on). */
+export const VIEW_AS_STALE = "Your earlier preview has ended.";
+export const VIEW_AS_LEAVE = "Leave preview";
 // Consult prep (auto): the lead page's card, Settings -> Team's recipients, the timeline lines.
 export const CONSULT_PREP_HEADING = "Consult prep";
 export const CONSULT_PREP_NOT_YET = "Not prepared yet: it runs when the lead is in Consultation Scheduled.";
@@ -1678,6 +1675,12 @@ export const CONSULT_PREP_ASK_ADMIN = "An owner or admin can set it in Settings 
 export const CONSULT_PREP_COULDNT_LOAD = "Couldn't load consult prep. Refresh to try again.";
 export const CONSULT_PREP_EMAIL_OFF = "Email isn't switched on for your firm yet. Lectual will turn it on.";
 export const CONSULT_PREP_NOT_EMAILED = "not emailed";
+export const CONSULT_PREP_WAITING_FULL = "not emailed yet: waiting for the full prep";
+/** S2c: Lectual sent nothing because the brief from before the switch-over was already scheduled for this consult. */
+/** S2c: Lectual's consult prep emails have not started yet (the switch-over from the old brief is not done). */
+export const CONSULT_PREP_EMAILS_WAIT = "not emailed: emails start when the switch-over is done";
+export const CONSULT_PREP_SUPERSEDED = "not emailed: the old brief was already scheduled for this consult";
+export const CONSULT_PREP_ADOPTED = "The prep already in Approvals was used.";
 export const CONSULT_PREP_RECIPIENTS_NOW = "Emails now go to the people set in Settings → Team";
 export const CONSULT_PREP_RECIPIENTS_UNREAD = "Who gets consult prep couldn't be read.";
 export const CONSULT_PREP_VIEW_BRIEF = "View the brief";
@@ -1685,7 +1688,7 @@ export const CONSULT_PREP_BRIEF_NOT_KEPT = "The brief isn't kept in Lectual beca
 export const CONSULT_PREP_BRIEF_UNAVAILABLE = "The brief couldn't be loaded. Refresh to try again.";
 export const CONSULT_PREP_BRIEF_MISSING = "The brief is no longer in Approvals.";
 export const CONSULT_PREP_RERUN = "Re-run prep";
-export const CONSULT_PREP_RERUN_CONFIRM = "Re-run prep? It prepares this consult again and emails a new brief to your team. Reminders already scheduled are not repeated.";
+export const CONSULT_PREP_RERUN_CONFIRM = "Re-run prep? It builds a fresh prep for this consult. It is emailed to the people set in Settings → Team when the full prep is ready. Reminders already scheduled are not repeated.";
 export const CONSULT_PREP_RERUN_RUNNING = "Preparing…";
 export const CONSULT_PREP_RERUN_DONE = "Prep re-run. Refresh to see it.";
 export const CONSULT_PREP_RERUN_NOT_ALLOWED = "Only an owner, admin or attorney can re-run consult prep.";
@@ -1693,10 +1696,46 @@ export const CONSULT_PREP_RERUN_OFF = "Consult prep isn't switched on for your f
 export const CONSULT_PREP_RERUN_NOTHING = "There is no consult to prepare for this lead yet.";
 export const CONSULT_PREP_RERUN_FAILED = "Couldn't re-run prep. Nothing was changed. Try again in a minute.";
 export const CONSULT_PREP_TIMELINE_PREP = "Consult prep made";
-export const consultPrepTimelineSend = (kind: "booked" | "24h" | "1h", status: "sent" | "scheduled" | "cancelled" | "failed" | "duplicate"): string => {
+/** S2b: a full-brief build attempt (`started`) and a full brief kept in Approvals (`queued`). */
+export const consultPrepTimelineBuild = (status: unknown): string => (status === "queued" ? "Consult prep: full brief ready" : "Consult prep: full brief started");
+export const consultPrepTimelineSend = (kind: "booked" | "24h" | "1h", status: "sent" | "scheduled" | "cancelled" | "failed" | "duplicate" | "withheld" | "superseded"): string => {
   const what = kind === "booked" ? "Consult prep email" : kind === "24h" ? "Consult prep reminder, a day before" : "Consult prep reminder, an hour before";
-  return `${what}: ${status === "failed" ? "couldn't be sent" : status === "duplicate" ? "already sent by another run" : status}`;
+  return `${what}: ${status === "failed" ? "couldn't be sent" : status === "duplicate" ? "already sent by another run" : status === "withheld" ? "waiting for the full prep" : status === "superseded" ? CONSULT_PREP_SUPERSEDED : status}`;
 };
+// S2c: "Send a test brief" on the lead page's Consult prep card (owner only). The engine's run returns exactly one of the sentences
+// below as its summary (counts and fixed words only), and the action shows it.
+export const CONSULT_PREP_TEST_BUTTON = "Send a test brief";
+export const CONSULT_PREP_TEST_CONFIRM = "Send a test brief? It builds a real prep for this lead's next consult and emails it, marked [TEST], only to the people set in Settings → Team. Nothing is saved in Lectual.";
+export const CONSULT_PREP_TEST_SENT = "Test brief sent to the people set in Settings → Team.";
+export const CONSULT_PREP_TEST_OWNER_ONLY = "Only the firm's owner can send a test brief.";
+export const CONSULT_PREP_TEST_LIMIT = "You've sent 5 test briefs in the last hour. Try again later.";
+export const CONSULT_PREP_TEST_OFF = "Consult prep isn't switched on for your firm, so no test brief was sent.";
+export const CONSULT_PREP_TEST_EMAIL_OFF = "Can't send a test brief: email isn't switched on for your firm yet. Lectual will turn it on.";
+export const CONSULT_PREP_TEST_NO_RECIPIENTS = "Can't send a test brief: no one is set to receive consult prep. Set it in Settings → Team.";
+export const CONSULT_PREP_TEST_RECIPIENTS_UNREAD = "Can't send a test brief: who gets consult prep couldn't be read. Try again in a minute.";
+export const CONSULT_PREP_TEST_OFF_DOMAIN = "Can't send a test brief: someone set to receive it isn't on the firm's email domain. Check Settings → Team.";
+export const CONSULT_PREP_TEST_NOT_BUILT = "Can't send a test brief: the full prep couldn't be built. Try again in a few minutes.";
+export const CONSULT_PREP_TEST_FAILED = "Couldn't send the test brief. Nothing was saved. Try again in a minute.";
+/** The first line of a test brief's body. */
+export const CONSULT_PREP_TEST_FIRST_LINE = "TEST: this is a test of the consult prep email. It is not a real prep, and nothing about it was saved in Lectual.";
+export const CONSULT_PREP_TEST_SUBJECT_PREFIX = "[TEST] ";
+/** Every answer the test run can give (the action shows only one of these). */
+export const CONSULT_PREP_TEST_OUTCOMES: readonly string[] = [
+  CONSULT_PREP_TEST_SENT,
+  CONSULT_PREP_TEST_EMAIL_OFF,
+  CONSULT_PREP_TEST_NO_RECIPIENTS,
+  CONSULT_PREP_TEST_RECIPIENTS_UNREAD,
+  CONSULT_PREP_TEST_OFF_DOMAIN,
+  CONSULT_PREP_TEST_NOT_BUILT,
+  CONSULT_PREP_TEST_FAILED,
+];
+/** The answers given before anything was built: the owner's hourly slot is given back. */
+export const CONSULT_PREP_TEST_REFUSED_BEFORE_BUILD: readonly string[] = [
+  CONSULT_PREP_TEST_EMAIL_OFF,
+  CONSULT_PREP_TEST_NO_RECIPIENTS,
+  CONSULT_PREP_TEST_RECIPIENTS_UNREAD,
+  CONSULT_PREP_TEST_OFF_DOMAIN,
+];
 export const CONSULT_PREP_TEAM_HEADING = "Consult prep emails";
 export const CONSULT_PREP_TEAM_HELP = "When a consult is prepared, the brief is emailed to the people chosen here when it is booked, a day before (if it was booked more than a day ahead) and an hour before. It goes only to the firm, never to a client. Cc addresses must be on the same email domain as someone chosen.";
 export const CONSULT_PREP_TEAM_NONE = "Nobody is chosen yet, so no consult prep emails go out.";
@@ -1707,6 +1746,199 @@ export const CONSULT_PREP_TEAM_INELIGIBLE = "Viewers and social media members ca
 export const CONSULT_PREP_TEAM_CC_FORMAT = "Each Cc must be a plain email address, like info@yourfirm.com.";
 export const CONSULT_PREP_TEAM_CC_DOMAIN = "A Cc address must be on the same email domain as someone chosen above.";
 export const CONSULT_PREP_TEAM_CC_COUNT = "You can add up to 5 Cc addresses.";
+
+/** A List or Board's saved column layout couldn't be read: the standard columns are drawn and this is said once. */
+export const VIEW_LAYOUT_UNAVAILABLE = "Saved column layout couldn't load. Showing the standard columns. Refresh to try again.";
+
+/* ── Changing a view's columns (the owner's header menu; every sentence is fixed, never database text) ── */
+export const LAYOUT_OWNER_ONLY = "Only an owner can change this view.";
+export const LAYOUT_CHANGED = "Someone else changed this view. Refresh to see their change.";
+export const LAYOUT_NOT_READY = notReadyYet("Changing columns");
+export const LAYOUT_SAVE_FAILED = "Couldn't change this view. Nothing was changed. Try again.";
+export const LAYOUT_READ_FAILED = "Couldn't read this view's saved columns, so nothing was changed. Refresh to try again.";
+export const LAYOUT_COLUMN_GONE = "That column isn't in this view any more. Refresh to see the current columns.";
+export const LAYOUT_COLUMN_PINNED = "This column stays where it is and always shows.";
+export const LAYOUT_LAST_COLUMN = "A view needs at least one column showing.";
+export const LAYOUT_TOO_MANY = "A view can have up to 80 columns.";
+export const LAYOUT_COLUMN_TAKEN = "That column is already in this view.";
+export const LAYOUT_NAME_EMPTY = "Type a name for the column.";
+export const LAYOUT_NAME_TOO_LONG = "A column name can be up to 60 characters.";
+export const LAYOUT_NAME_CHARACTERS = "A column name can't have tabs, line breaks or hidden characters.";
+export const LAYOUT_CANT_MOVE = "It can't move any further that way.";
+export const LAYOUT_BAD_WIDTH = "That width isn't valid.";
+export const LAYOUT_PLACE_NOT_SAVED = "The column was added, but its place in the view couldn't be saved. It is at the end for now.";
+export const LAYOUT_SAVED_NOTE = "Saved for everyone in the firm.";
+export const columnMenuLabel = (name: string) => `Column options: ${name}`;
+export const COLUMN_MENU_HIDE = "Hide column";
+export const COLUMN_MENU_LEFT = "Move left";
+export const COLUMN_MENU_RIGHT = "Move right";
+export const COLUMN_MENU_ADD_LEFT = "Add a column to the left";
+export const COLUMN_MENU_ADD_RIGHT = "Add a column to the right";
+export const COLUMN_MENU_SAVE = "Save";
+export const COLUMN_NEW_NAME_LABEL = "Column name";
+export const COLUMN_ADD_SUBMIT = "Add column";
+export const COLUMN_CHANGES_NOTE = "A change here is the firm's view for everyone.";
+export const HIDDEN_COLUMNS_NAME = "Hidden columns";
+export const hiddenColumnsLabel = (n: number) => `Hidden columns (${n})`;
+export const HIDDEN_COLUMN_SHOW = "Show";
+export const hiddenColumnShowLabel = (name: string) => `Show ${name}`;
+export const laneMenuLabel = (name: string) => `Column options for ${name}`;
+export const HIDDEN_FIRM_COLUMN = "A firm column";
+export const COLUMN_MENU_EDIT_CHOICES = "Edit choices";
+export const COLUMN_CHOICES_SAVE = "Save choices";
+export const COLUMN_MENU_ARCHIVE = "Archive column";
+export const COLUMN_ARCHIVE_ASK = "Archive this column? It is removed from the List and from record cards, and its values are kept. Restore isn't available on screen yet.";
+export const COLUMN_ARCHIVE_CONFIRM = "Archive";
+export const FIRM_COLUMN_LABEL_NOT_CLEARED = "Renamed. An older name for this column in the view couldn't be cleared. Refresh to check how it reads.";
+
+/* ── Add a real lead or matter from the bottom of the Weekly review List ── */
+export const ADD_ROW_LEAD_HINT = "This adds a real lead, the same as Leads. It shows in this list once it is past first contact.";
+export const ADD_ROW_FIRST_NAME = "First name";
+export const ADD_ROW_LAST_NAME = "Last name";
+export const ADD_ROW_EMAIL = "Email";
+export const ADD_ROW_BUSINESS = "Business (optional)";
+export const ADD_ROW_SUBMIT = "Add lead";
+export const ADD_ROW_LABEL = "Add to the list";
+export const ADD_ROW_OPEN_MATTER = "Open a matter";
+export const ADD_ROW_ADDED = "Lead added.";
+export const ADD_ROW_OPEN_LEAD = "Open the lead";
+export const ADD_ROW_ANOTHER = "Add another";
+export const ADD_ROW_STAGE_LABEL = "Start in";
+export const ADD_ROW_STAGE_UNREADABLE = "Couldn't load your stages, so the lead will start in your new-enquiry stage.";
+/** The stage list was read but the firm has no open lead stage to start a lead in. */
+export const ADD_ROW_NO_OPEN_STAGE = "Your firm has no open lead stage to start a lead in.";
+export const ADD_ROW_STAGE_REFUSED = "That isn't an open stage of your firm. Pick one from the list.";
+export const ADD_ROW_AFTER = "It is in your new-enquiry stage, so it joins this list once it moves past first contact.";
+export const ADD_ROW_OPEN_LEADS = "Go to Leads";
+export const ADD_ROW_NO_PERMISSION = "You don't have permission to add leads. Ask an attorney or an admin.";
+export const ADD_ROW_FAILED = "Couldn't add this lead. Nothing was added. Try again.";
+
+/**
+ * The firm's Board layout hides some columns: said once above the Board, with a link to the List where those records still show.
+ * Unassigned is counted apart from people ("Unassigned and 2 people's columns are hidden in this firm's layout.").
+ */
+export const boardLanesHidden = (people: number, unassigned: boolean): string => {
+  const person = people === 1 ? "1 person's column" : `${people} people's columns`;
+  if (people > 0 && unassigned) return `Unassigned and ${person} are hidden in this firm's layout.`;
+  if (unassigned) return "The Unassigned column is hidden in this firm's layout.";
+  return `${person} ${people === 1 ? "is" : "are"} hidden in this firm's layout.`;
+};
+export const BOARD_LANES_HIDDEN_LINK = "See them in the List";
+
+/* ── Changing stages from a Board's header (owners; lectual 0119's stage functions). Fixed sentences, never database text. ── */
+export const STAGES_NOT_READY = notReadyYet("Changing stages");
+export const STAGE_OWNER_ONLY = "Only an owner can change stages.";
+export const STAGE_GONE = "That stage isn't on your pipeline any more. Refresh and try again.";
+export const STAGE_NOT_YOURS = "Choose one of your own stages.";
+export const STAGE_NAME_TAKEN = "Another stage already has that name.";
+export const STAGE_NAME_BAD = "A stage name needs at least one letter or number, and no hidden characters.";
+export const STAGE_NAME_EMPTY = "Type a name for the stage.";
+export const stageNameTooLong = (max: number) => `A stage name can be up to ${max} characters.`;
+export const STAGE_PLACE_GONE = "That place in the stage order changed. Refresh and try again.";
+export const STAGE_BAD_CATEGORY = "Choose open, won, lost or nurture.";
+export const STAGE_BAD_OPEN = "Choose open or closed.";
+export const STAGE_BAD_WAITING_ON = "Choose who the stage waits on.";
+export const STAGE_TOO_MANY = "A pipeline can have up to 200 stages.";
+export const STAGE_ORDER_FULL = "The stage order can't take another change. Ask Lectual to tidy it.";
+export const STAGE_TYPE_NOT_EMPTY = "A stage's type changes only while it holds no records. Move them first.";
+export const STAGE_LAST_OPEN = "Your pipeline needs at least one open stage.";
+export const STAGE_LAST_WON = "This is your last won stage. Tick “No won stage: hired clients stay where they are” to go ahead.";
+export const STAGE_HOLDS_ROLE = "Choose which stage takes this stage's role.";
+export const STAGE_ROLE_TAKEN = "That stage already has a role. Choose another.";
+export const STAGE_ROLE_MISFIT = "That stage can't take this role: its type doesn't fit.";
+export const STAGE_RECORDS_CHANGED = "Some records moved since you opened this. Refresh and try again.";
+export const STAGE_NEEDS_DESTINATION = "Choose where this stage's records go.";
+export const STAGE_SAME_DESTINATION = "Records can't move to the stage being deleted.";
+export const STAGE_NO_WON_DESTINATION = "Leads are never moved into a won stage this way.";
+export const STAGE_WON_SOURCE = "Hired clients can only move to another won stage.";
+export const STAGE_OPEN_MISMATCH = "That stage would reopen or close these matters. Tick “Also change open/closed” to go ahead.";
+export const STAGE_BUSY = "Someone else is changing stages. Try again.";
+export const STAGE_CHANGE_FAILED = "Couldn't change the stage. Nothing was changed. Try again.";
+export const STAGE_DELETED_SEQUENCES_NOTE = "The stage was deleted, but taking the moved clients out of their campaigns didn't finish. Check Campaigns.";
+export const stageMenuLabel = (name: string) => `Stage options: ${name}`;
+export const STAGE_MENU_RENAME = "Rename stage";
+export const STAGE_MENU_ADD_LEFT = "Add a stage to the left";
+export const STAGE_MENU_ADD_RIGHT = "Add a stage to the right";
+export const STAGE_MENU_TYPE = "Change type";
+export const STAGE_MENU_OPEN_CLOSED = "Change open/closed";
+export const STAGE_MENU_DELETE = "Delete stage";
+export const STAGE_NAME_LABEL = "Stage name";
+export const STAGE_ADD_SUBMIT = "Add stage";
+export const STAGE_TYPE_LABEL = "Type";
+export const STAGE_TYPE_WORDS: Record<"open" | "won" | "lost" | "nurture", string> = { open: "Open", won: "Won", lost: "Lost", nurture: "Nurture" };
+export const STAGE_OPEN_LABEL = "Open or closed";
+export const STAGE_OPEN_WORDS = { open: "Open", closed: "Closed" } as const;
+export const STAGE_WAITS_ON_LABEL = "Waits on";
+export const STAGE_WAITS_ON_WORDS: Record<"firm" | "client" | "uspto" | "court", string> = { firm: "The firm", client: "The client", uspto: "The USPTO", court: "The court" };
+export const STAGE_WON_WARNING = "A lead a person moves into a won stage opens a matter and leaves its campaigns, as today.";
+export const STAGE_TYPE_ONLY_EMPTY = "The type can change only while the stage holds no records.";
+export const STAGE_CHANGES_NOTE = "A change here is the firm's pipeline for everyone.";
+export const stageDeleteAsk = (name: string) => `Delete the stage “${name}”?`;
+export const stageDeleteHolds = (n: number, kind: "lead" | "matter") =>
+  n === 0 ? `It holds no ${kind === "lead" ? "leads" : "matters"}.` : `It holds ${n} ${kind === "lead" ? (n === 1 ? "lead" : "leads") : n === 1 ? "matter" : "matters"}.`;
+export const stageDeleteMoveTo = (n: number, kind: "lead" | "matter") => `Move ${n === 1 ? `the ${kind}` : `all ${n} ${kind === "lead" ? "leads" : "matters"}`} to`;
+export const STAGE_DELETE_CHOOSE = "Choose a stage";
+export const stageDeleteMerged = (n: number) => (n === 1 ? "One of them is a merged duplicate. It moves too." : `${n} of them are merged duplicates. They move too.`);
+export const STAGE_DELETE_COUNT_WIDER = "This count includes closed matters and any the board's filters hide.";
+export const STAGE_TOO_MANY_RECORDS = "This stage holds too many records to delete here.";
+export const STAGE_PHASE_BAD = "That docket group isn't one this firm uses. Refresh and try again.";
+export const STAGE_DELETE_ALSO_OPEN = "Also change open/closed";
+export const stageRoleAsk = (role: string) => `This stage is your “${role}” stage. Which stage takes that over?`;
+export const STAGE_ROLE_DROP = "Drop the role";
+export const STAGE_NO_WON_TICK = "No won stage: hired clients stay where they are";
+export const STAGE_DELETE_CONFIRM = "Delete stage";
+export const STAGE_HOLDINGS_UNREADABLE = "Couldn't count what this stage holds, so it can't be deleted right now. Refresh to try again.";
+export const STAGE_NO_DESTINATION = "No other stage can take these records. Add one first.";
+/** Plain words for the roles 0119 sets (never typed in the app; shown only when deleting the stage that holds one). */
+export const STAGE_ROLE_WORDS: Record<string, string> = {
+  new_enquiry: "new enquiry",
+  follow_up: "follow-up",
+  consult_scheduled: "consult scheduled",
+  consult_held: "consult held",
+  questionnaire_sent: "questionnaire sent",
+  proposal_sent: "proposal sent",
+  follow_up_sent: "follow-up sent",
+  loe_sent: "engagement letter sent",
+  welcome_sent: "welcome sent",
+  opinion_letter_sent: "opinion letter sent",
+  signed_loe: "signed engagement letter",
+  lost: "lost",
+  application_filed: "application filed",
+  oa_issued: "office action issued",
+  awaiting_registration: "awaiting registration",
+  publication: "publication",
+  registered: "registered",
+  abandoned: "abandoned",
+};
+
+// Editable views, step 5: Matters and Contracts as two views (a List and a Board each), the owner's controls on them.
+export const CONTRACTS_NAME = "Contracts";
+export const MATTER_KIND_NAV = "Kind of matter";
+export const MATTER_BOARD_UNSTAGED_COLUMN = "Not on the docket yet";
+export const MATTER_BOARD_CLOSED_COLUMN = "Closed";
+export const MATTERS_BOARD_HIDDEN_NOTE = (columns: number, matters: number) =>
+  `${columns} ${columns === 1 ? "column is" : "columns are"} hidden in your firm's view (${matters} ${matters === 1 ? "matter" : "matters"}).`;
+export const LEADS_BOARD_HIDDEN_NOTE = (columns: number, leads: number) =>
+  `${columns} ${columns === 1 ? "column is" : "columns are"} hidden in your firm's view (${leads} ${leads === 1 ? "lead" : "leads"}).`;
+export const LEADS_FIRM_COLUMNS_UNAVAILABLE = "Some details couldn't load (your firm's columns). Refresh to try again.";
+export const LEADS_ADD_ROW_HINT = "This adds a real lead, the same as the Add a lead button above. It shows in the set it belongs in.";
+export const MANAGE_STAGES = "Manage stages";
+export const MANAGE_STAGES_INTRO = "Every matter stage the firm has, including closed stages and the intake stages this page leaves out. A change here is the firm's pipeline for everyone.";
+export const MANAGE_STAGES_CLOSED = "Closed stage";
+export const MANAGE_STAGES_INTAKE = "Left out of Matters (before the signed engagement)";
+export const MANAGE_STAGES_OPEN = "Open stage";
+export const manageStagesHolds = (n: number) => `${n} ${n === 1 ? "matter" : "matters"}`;
+export const MANAGE_STAGES_HOLDS_UNKNOWN = "Count couldn't be read";
+export const MANAGE_STAGES_NONE = "There are no matter stages yet.";
+export const MATTERS_OPEN_ROW = "Open a matter";
+export const MATTERS_NONE_YET = "No matters yet";
+export const CONTRACTS_NONE_YET = "No contracts yet";
+export const MATTER_FIRM_COLUMNS_UNAVAILABLE = "Some details couldn't load (your firm's columns). Refresh to try again.";
+export const matterOtherKindHas = (name: string, n: number) => `${name} has ${n}`;
+export const LAYOUT_STAGE_BOARD_HIDE_ONLY = "On this board a column can only be hidden or shown. Rename and move stages from the stage menu.";
+
+// Approvals: an internal briefing has no client recipient to show (the prep-consult skill's address only links the lead).
+export const INTERNAL_BRIEFING_TO = "Internal briefing, not sent to anyone";
 
 // General consult drafter (a non-trademark consult -> a DRAFT flat-fee proposal)
 /** The consult agent's answer for a call that holds no recommended legal work at all (reason `not_trademark`). */

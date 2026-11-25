@@ -173,7 +173,7 @@ describe("the store and the action", () => {
   });
 
   it("the action gates the module, checks the owner, and redirects to the list with the flash", () => {
-    const body = action.slice(action.indexOf("export async function deleteProposalAction"));
+    const body = action.slice(action.indexOf("async function deleteProposalAction"));
     expect(body.indexOf("requireProposalsModule()")).toBeLessThan(body.indexOf("canDeleteProposal("));
     expect(body.indexOf("canDeleteProposal(")).toBeLessThan(body.indexOf("deleteProposalFamily("));
     expect(body).toContain('redirect("/dashboard/proposals/?deleted=1")');

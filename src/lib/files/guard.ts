@@ -48,7 +48,7 @@ export async function authorize(
     return refuse(FILE_MESSAGES.signedOut);
   }
   try {
-    const { data, error } = await supabase.rpc("current_org_role");
+    const { data, error } = await supabase.rpc("current_org_role", undefined, { get: true });
     if (error || !isRole(data)) {
       if (error) logFileFailure("read role", error);
       return refuse(FILE_MESSAGES.roleUnknown);

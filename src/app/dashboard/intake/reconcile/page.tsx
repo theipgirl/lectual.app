@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { listConnectionsForViewer, resolveViewSession } from "@/lib/views/view-as";
 import { getLawmaticsConnection } from "@/lib/lawmatics/connection";
-import { listConnections } from "@/lib/mailbox/connections";
 import { describeAvailability, type ConnectionCheck } from "@/lib/reconcile/availability";
 import { canReconcile } from "@/lib/reconcile/roles";
 import { ListHeader } from "@/components/list-page/ListHeader";
@@ -30,7 +29,7 @@ async function lawmaticsCheck(): Promise<ConnectionCheck> {
 
 async function mailboxCheck(): Promise<ConnectionCheck> {
   try {
-    const read = await listConnections();
+    const read = await listConnectionsForViewer();
     if (!read.ok) return { ok: false };
     return { ok: true, active: read.connections.filter((c) => c.status === "active").length };
   } catch {
@@ -44,7 +43,7 @@ async function mailboxCheck(): Promise<ConnectionCheck> {
  * behind it check the role again on every call.
  */
 export default async function ReconcilePage() {
-  const session = await resolveFirmSession({ signInNext: "/dashboard/intake/reconcile/" });
+  const session = await resolveViewSession({ signInNext: "/dashboard/intake/reconcile/" });
   if (session.kind !== "ok" || !canReconcile(session.role)) notFound();
 
   const [lawmatics, mailboxes] = await Promise.all([lawmaticsCheck(), mailboxCheck()]);

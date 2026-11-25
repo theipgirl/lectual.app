@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
 import { friendlyLeadWriteError } from "@/app/dashboard/leads/errors";
 import { getScopedClient } from "@/lib/db/scoped-client";
@@ -61,7 +62,7 @@ function refresh(leadId: string) {
  * would blank the email, phone and website; this passes ONLY `first_name`, `last_name` and `business_name` (those that
  * were posted) to `updateLead`, the partial patch, which re-checks the role, re-validates and logs `lead_updated`.
  */
-export async function renameLeadAction(_prev: CardActionState, formData: FormData): Promise<CardActionState> {
+export const renameLeadAction = previewSafe(async function renameLeadAction(_prev: CardActionState, formData: FormData): Promise<CardActionState> {
   const leadId = String(formData.get("leadId") ?? "").trim();
   try {
     if (!(await mayWriteLead())) return { error: RECORD_CARD_NO_PERMISSION };
@@ -98,7 +99,7 @@ export async function renameLeadAction(_prev: CardActionState, formData: FormDat
   }
   refresh(leadId);
   return { saved: true };
-}
+}, "state");
 
 /**
  * Adds or removes one of the firm's tags on a lead. The same data-layer calls as the lead page's `applyTagAction` /
@@ -106,7 +107,7 @@ export async function renameLeadAction(_prev: CardActionState, formData: FormDat
  * show "Saved" from the action's own result (those answer `{}`). The tag is read through the scoped client first: one
  * that isn't the firm's reads as missing and nothing is written.
  */
-export async function cardTagAction(_prev: CardActionState, formData: FormData): Promise<CardActionState> {
+export const cardTagAction = previewSafe(async function cardTagAction(_prev: CardActionState, formData: FormData): Promise<CardActionState> {
   const leadId = String(formData.get("leadId") ?? "").trim();
   const tagId = String(formData.get("tagId") ?? "").trim();
   const op = String(formData.get("op") ?? "");
@@ -150,4 +151,4 @@ export async function cardTagAction(_prev: CardActionState, formData: FormData):
   }
   refresh(lead);
   return { saved: true };
-}
+}, "state");

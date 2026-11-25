@@ -139,3 +139,11 @@ describe("valueStore", () => {
     ]);
   });
 });
+
+describe("insertField answers the new id", () => {
+  it("from the insert's own select, or null when the answer carries none", async () => {
+    const row = { org_id: "o", section: "trademarks" as const, label: "Priority", kind: "text" as const, options: [], position: 0 };
+    expect(await fieldStore(recorder({ data: [{ id: ID }], error: null }).client).insertField(row)).toBe(ID);
+    expect(await fieldStore(recorder({ data: [], error: null }).client).insertField(row)).toBeNull();
+  });
+});

@@ -1,8 +1,9 @@
 import Link from "next/link";
+import { cardRecipient } from "@/lib/queue/shown-recipient";
 import { Notice } from "@/components/ui/Notice";
 import { notFound } from "next/navigation";
 import { orgHasModule } from "@/lib/org/modules";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { loadActiveQueue } from "@/lib/queue/load";
 import { loadApprovalRouting } from "@/lib/queue/routing-load";
 import { loadCardState } from "@/lib/queue/card-state";
@@ -141,7 +142,7 @@ const roleName = (m: MemberIdentity) => `${memberName(m)} · ${roleLabel(m.role)
 
 export async function DeckView({ searchParams, initial }: { searchParams: Promise<Search>; initial?: DeckInitial }) {
   if (!(await orgHasModule("role-views"))) notFound();
-  const session = await resolveFirmSession().catch(() => null);
+  const session = await resolveViewSession().catch(() => null);
   if (!session || session.kind !== "ok") notFound();
 
   const params = await searchParams;
@@ -406,7 +407,7 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
         source={deckSource(agentLabel(card.item.agent))}
         tag={tagText(card)}
         title={card.item.headline}
-        recipient={card.item.recipient}
+        recipient={cardRecipient(card.item)}
         opening={draftOpening(card.item)}
         firstStep={card.firstStep}
         checkFirst={card.checkFirst}

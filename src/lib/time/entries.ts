@@ -168,10 +168,13 @@ async function alreadyRunning(
   );
 }
 
-/** The caller's open timer, or null. One row at most — 0056's partial unique index. */
-export async function runningForMe(): Promise<TimeEntry | null> {
+/**
+ * The viewer's open timer, or null. One row at most — 0056's partial unique index. `forUserId` is the VIEWER (View as: the
+ * teammate; crm_time_entry is readable firm-wide); absent, the signed-in caller.
+ */
+export async function runningForMe(forUserId?: string): Promise<TimeEntry | null> {
   const supabase = await getScopedClient();
-  const caller = await callerId(supabase);
+  const caller = forUserId ?? (await callerId(supabase));
   const { data, error } = await supabase
     .from("crm_time_entry")
     .select("*")

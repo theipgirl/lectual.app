@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 // Ported from lectual src/app/(firm)/dashboard/settings/actions.ts (member
 // actions only). The guards — admin gate, no self-change, rank ceilings,
 // never leave the firm ownerless — all live in @/lib/settings and RLS.
@@ -19,7 +20,7 @@ function isRole(value: unknown): value is Role {
   return typeof value === "string" && (ROLES as readonly string[]).includes(value);
 }
 
-export async function setMemberRoleAction(_prev: MemberActionState, formData: FormData): Promise<MemberActionState> {
+export const setMemberRoleAction = previewSafe(async function setMemberRoleAction(_prev: MemberActionState, formData: FormData): Promise<MemberActionState> {
   const userId = String(formData.get("userId") ?? "");
   const roleRaw = String(formData.get("role") ?? "");
   if (!userId) return { error: "Missing member." };
@@ -31,9 +32,9 @@ export async function setMemberRoleAction(_prev: MemberActionState, formData: Fo
   }
   revalidatePath(PATH);
   return { notice: "Role updated." };
-}
+}, "state");
 
-export async function inviteMemberAction(_prev: MemberActionState, formData: FormData): Promise<MemberActionState> {
+export const inviteMemberAction = previewSafe(async function inviteMemberAction(_prev: MemberActionState, formData: FormData): Promise<MemberActionState> {
   const email = String(formData.get("email") ?? "");
   const roleRaw = String(formData.get("role") ?? "");
   if (!email.trim()) return { error: "Enter an email address." };
@@ -53,9 +54,9 @@ export async function inviteMemberAction(_prev: MemberActionState, formData: For
   }
   revalidatePath(PATH);
   return { notice };
-}
+}, "state");
 
-export async function removeMemberAction(_prev: MemberActionState, formData: FormData): Promise<MemberActionState> {
+export const removeMemberAction = previewSafe(async function removeMemberAction(_prev: MemberActionState, formData: FormData): Promise<MemberActionState> {
   const userId = String(formData.get("userId") ?? "");
   if (!userId) return { error: "Missing member." };
   let warning: string | undefined;
@@ -66,4 +67,4 @@ export async function removeMemberAction(_prev: MemberActionState, formData: For
   }
   revalidatePath(PATH);
   return warning ? { warning } : { notice: "Removed and signed out." };
-}
+}, "state");

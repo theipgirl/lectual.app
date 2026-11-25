@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { mockLayoutRead } from "./layout-mock";
 import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -22,6 +23,7 @@ function mock(role: string | null, opts: { roleViews?: boolean } = {}) {
     return ok;
   });
   vi.doMock("@/lib/review/load", () => ({ loadReview: loadSpy }));
+  mockLayoutRead();
   vi.doMock("@/lib/firm/session", () => ({
     resolveFirmSession: vi.fn(async () => {
       order.push("resolveFirmSession");
@@ -83,20 +85,25 @@ describe("the server decides who may see fees", () => {
     expect(order).toEqual(["resolveFirmSession", "loadReview"]);
   });
 
-  it("the same boolean reaches both tables: fee headers for the owner in the read-only List and in the owner's editable Sheet, nowhere else", async () => {
-    // Owner, no role views: the read-only List.
+  it("the same boolean reaches both tables: fee headers for the owner in the read-only List and in the editable List (either look), nowhere else", async () => {
+    // Changed on purpose (the List edits for any role that may edit, not only in the owner view): an owner without role views now gets the
+    // editable List too. The read-only List is what a role that can edit nothing gets, so the viewer stands in for it.
     mock("owner");
-    const readOnly = await render({ view: "sheet" });
-    expect(readOnly).toContain("rv-sheet");
-    expect(readOnly).toContain(">Legal Fee</th>");
-    expect(readOnly).toContain("$1,250.00");
-    // Owner with role views: the editable Sheet.
+    const standard = await render({ view: "sheet" });
+    expect(standard).toContain("rse-tbl");
+    expect(standard).toContain("Legal Fee");
+    expect(standard).toContain("$1,250.00");
+    // Owner with role views: the same editable List in the owner's look.
     vi.resetModules();
     mock("owner", { roleViews: true });
     const editable = await render({ view: "sheet" });
     expect(editable).toContain("rse-tbl");
     expect(editable).toContain("Legal Fee");
     expect(editable).toContain("$1,250.00");
+    // The read-only List: a viewer sees no fee (the server never sent one).
+    vi.resetModules();
+    mock("viewer");
+    expect(await render({ view: "sheet" })).toContain("rv-sheet");
     // Everyone else, in both looks: no fee header, cell or chooser entry, even though the (mocked) loader handed fee data to the page.
     for (const role of ["admin", "attorney", "paralegal", "viewer"]) {
       for (const roleViews of [false, true]) {
@@ -124,16 +131,18 @@ describe("page.tsx source", () => {
     expect(src).toMatch(/const actingAsStaff = session\.kind === "ok" \? session\.actingAsStaff : true;/);
     expect(src).toMatch(/const customMoney = canSeeCustomMoney\(role, actingAsStaff\)/);
     expect(src).toMatch(/const withCustom = params\.view === "sheet"/);
-    expect(src.indexOf("await resolveFirmSession()")).toBeGreaterThan(-1);
-    expect(src.indexOf("await resolveFirmSession()")).toBeLessThan(src.indexOf("await loadReview("));
-    expect(src).not.toMatch(/Promise\.all\(\[loadReview/);
+    // View as (changed on purpose): the page reads the session as the VIEWER sees it; the order is unchanged.
+    expect(src.indexOf("await resolveViewSession()")).toBeGreaterThan(-1);
+    expect(src.indexOf("await resolveViewSession()")).toBeLessThan(src.indexOf("loadReview(new Date()"));
+    // Changed on purpose: the firm's saved layout is read beside the review (one Promise.all), after the session.
+    expect(src).toMatch(/Promise\.all\(\[\s*loadReview\(new Date\(\)/);
     // the role comes from the resolved session, never from the request
     expect(src).not.toMatch(/sp\.(fees|canSeeMoney|withFees)|searchParams\.(fees|canSeeMoney)/);
   });
-  it("passes that same canSeeMoney to the chooser and to SheetView", () => {
+  it("passes that same canSeeMoney to SheetView (the per-person chooser that also took it is gone)", () => {
     expect(src).toMatch(/<SheetView rows=\{shown\} canSeeMoney=\{canSeeMoney\}/);
-    // Nov 23 follow-up: the chooser also gets the real-owner custom money flag (changed on purpose).
-    expect(src.match(/canSeeMoney, canSeeCustomMoney: customMoney, hasNotes: NOTES_PRESENT/g)?.length).toBe(2);
+    // Changed on purpose (Nov 25): the page no longer builds the chooser's column lists; SheetView is the only consumer of both flags.
+    expect(src).not.toContain("ColumnChooser");
     expect(src).toMatch(/canSeeCustomMoney=\{customMoney\}/);
   });
 });

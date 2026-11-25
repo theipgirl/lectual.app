@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { stageDisplayName } from "@/lib/matters/list-view";
 import { notFound, redirect } from "next/navigation";
 import { getScopedClient } from "@/lib/db/scoped-client";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { MailingAddressCard } from "@/components/loe/MailingAddressCard";
 import { loadSignedAddress } from "@/lib/loe/signed-address";
 import { CAN_MOVE_STAGE, CAN_WRITE_LEAD, getLead, listStages } from "@/lib/pipeline";
@@ -25,7 +25,7 @@ import { AssignSelect, EditLeadForm, NoteComposer, ProposalCard, StageSelect } f
 import { LeadTags } from "@/components/leads/LeadExtras";
 import { ConsultPrepCard } from "@/components/leads/ConsultPrepCard";
 import { loadConsultPrepCard } from "@/lib/consult-prep/card-load";
-import { canRerunConsultPrep } from "@/lib/consult-prep/roles";
+import { canRerunConsultPrep, canSendTestBrief } from "@/lib/consult-prep/roles";
 import { canSeeSetup } from "@/lib/setup/roles";
 import { LeadMattersLine } from "@/components/leads/LeadMatters";
 import { loadMattersForLead } from "@/lib/matters/for-lead";
@@ -77,6 +77,8 @@ import { intakeListHref } from "@/lib/intake/list-href";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Notice } from "@/components/ui/Notice";
 import { LoadFailedLine } from "@/components/ui/LoadFailed";
+// "Re-run prep" and "Send a test brief" build a full prep inside this page's server actions (two model calls, the USPTO pull, the files).
+export const maxDuration = 300;
 
 /** Tab title: the lead's name through the scoped getter; "Lead" when the read fails or finds nothing. */
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -112,7 +114,7 @@ export default async function LeadPage({
 }) {
   const { id } = await params;
   const sp = (await searchParams) ?? {};
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   if (session.kind !== "ok") notFound();
 
   // Everything below reads through RLS: another firm's lead id is just "not found".
@@ -372,7 +374,7 @@ export default async function LeadPage({
             <Timeline rows={rows} mediaUrls={voiceUrls} timeZone={tz} undo={{ leadId: lead.id, canMove, currentStageId: lead.current_stage_id }} />
           </section>
 
-          <ConsultPrepCard data={prepCard} leadId={lead.id} canRerun={canRerunConsultPrep(session.role)} adminTier={canSeeSetup(session.role)} />
+          <ConsultPrepCard data={prepCard} leadId={lead.id} canRerun={canRerunConsultPrep(session.role)} adminTier={canSeeSetup(session.role)} canTest={canSendTestBrief(session.role, session.actingAsStaff)} />
 
           <ConsultDetailsSection leadId={lead.id} canWrite={canWrite} timeZone={tz} />
 

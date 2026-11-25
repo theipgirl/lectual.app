@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { orgHasModule } from "@/lib/org/modules";
@@ -117,7 +118,7 @@ function approvedText(send: string | null): string {
  * Yes: the existing approve path, with a receipt of the approved text on the note. It approves only the text the card
  * showed: the sha256 the card posts must match the re-read item (a missing one is refused).
  */
-export async function approveCardAction(rawId: unknown, rawShownSha256?: unknown): Promise<DeckResult> {
+export const approveCardAction = previewSafe(async function approveCardAction(rawId: unknown, rawShownSha256?: unknown): Promise<DeckResult> {
   await gate();
   const id = cardIdOf(rawId);
   if (!id) return { ok: false, error: DECK_FAILED };
@@ -125,10 +126,10 @@ export async function approveCardAction(rawId: unknown, rawShownSha256?: unknown
   if (!shownSha256) return { ok: false, error: DRAFT_CHANGED_REFRESH };
   if (!(await cardCaller())) return { ok: false, error: "You don't have permission to approve or reject client communications." };
   return approveResult(await runQueueReview({ id, intent: "approve", withReceipt: true, requireShown: true, shownSha256 }));
-}
+}, "state");
 
 /** Mark read: an internal briefing is approved (nothing goes to a client). Refused for anything else. */
-export async function markReadCardAction(rawId: unknown): Promise<DeckResult> {
+export const markReadCardAction = previewSafe(async function markReadCardAction(rawId: unknown): Promise<DeckResult> {
   await gate();
   const id = cardIdOf(rawId);
   if (!id) return { ok: false, error: DECK_FAILED };
@@ -137,9 +138,9 @@ export async function markReadCardAction(rawId: unknown): Promise<DeckResult> {
   if (!item) return { ok: false, error: DECK_FAILED };
   if (classifyQueueItem(item) !== "internal_briefing") return { ok: false, error: DECK_NOT_YOURS };
   return approveResult(await runQueueReview({ id, intent: "approve", withReceipt: true }), DECK_MARKED_READ);
-}
+}, "state");
 
-export async function rejectCardAction(rawId: unknown, rawNote: unknown): Promise<DeckResult> {
+export const rejectCardAction = previewSafe(async function rejectCardAction(rawId: unknown, rawNote: unknown): Promise<DeckResult> {
   await gate();
   const id = cardIdOf(rawId);
   if (!id) return { ok: false, error: DECK_FAILED };
@@ -151,7 +152,7 @@ export async function rejectCardAction(rawId: unknown, rawNote: unknown): Promis
   if (outcome.kind === "error") return { ok: false, error: outcome.error };
   revalidate();
   return { ok: true, message: DECK_REJECTED };
-}
+}, "state");
 
 /**
  * Done: the card is handled without approving. It resolves through the SAME reject path as Reject (so the routing rule
@@ -159,7 +160,7 @@ export async function rejectCardAction(rawId: unknown, rawNote: unknown): Promis
  * makes no mailbox draft, changes no proposal link, generates no letter and sends nothing. Lectual staff previewing a
  * firm are refused.
  */
-export async function doneCardAction(rawId: unknown): Promise<DeckResult> {
+export const doneCardAction = previewSafe(async function doneCardAction(rawId: unknown): Promise<DeckResult> {
   await gate();
   const id = cardIdOf(rawId);
   if (!id) return { ok: false, error: DECK_FAILED };
@@ -170,9 +171,9 @@ export async function doneCardAction(rawId: unknown): Promise<DeckResult> {
   if (outcome.kind === "error") return { ok: false, error: outcome.error };
   revalidate();
   return { ok: true, message: DECK_DONE_MESSAGE };
-}
+}, "state");
 
-export async function handOffCardAction(rawId: unknown, rawTarget: unknown, rawNote: unknown): Promise<DeckResult> {
+export const handOffCardAction = previewSafe(async function handOffCardAction(rawId: unknown, rawTarget: unknown, rawNote: unknown): Promise<DeckResult> {
   await gate();
   const id = cardIdOf(rawId);
   if (!id) return { ok: false, error: DECK_FAILED };
@@ -201,9 +202,9 @@ export async function handOffCardAction(rawId: unknown, rawTarget: unknown, rawN
   await noticeHandedTo({ target, actorId: ctx.who.userId, item: ctx.item });
   revalidate();
   return { ok: true, message: DECK_HANDED_OFF };
-}
+}, "state");
 
-export async function laterCardAction(rawId: unknown): Promise<DeckResult> {
+export const laterCardAction = previewSafe(async function laterCardAction(rawId: unknown): Promise<DeckResult> {
   await gate();
   const id = cardIdOf(rawId);
   if (!id) return { ok: false, error: DECK_FAILED };
@@ -216,10 +217,10 @@ export async function laterCardAction(rawId: unknown): Promise<DeckResult> {
   if (!saved.ok) return { ok: false, error: saved.reason === "not-set-up" ? NOT_SWITCHED_ON : DECK_FAILED };
   revalidate();
   return { ok: true, message: DECK_LATER_DONE };
-}
+}, "state");
 
 /** Send back: the colleague holding a handed-off card returns it to the usual approvers. */
-export async function returnCardAction(rawId: unknown, rawNote: unknown): Promise<DeckResult> {
+export const returnCardAction = previewSafe(async function returnCardAction(rawId: unknown, rawNote: unknown): Promise<DeckResult> {
   await gate();
   const id = cardIdOf(rawId);
   if (!id) return { ok: false, error: DECK_FAILED };
@@ -229,14 +230,14 @@ export async function returnCardAction(rawId: unknown, rawNote: unknown): Promis
   if (!sent.ok) return sent;
   revalidate();
   return { ok: true, message: DECK_SENT_BACK };
-}
+}, "state");
 
 /**
  * "Send from Outlook now": pressed by the approver herself, after the approval. Checks, in order: the switch, the
  * caller, the item (approved, a client email, approved by THIS signed-in person), then the caller's own Outlook (the
  * send permission granted), and finally the draft itself (still a draft, addressed to the item's recipient).
  */
-export async function sendDraftNowAction(rawId: unknown, rawDraftId: unknown): Promise<DeckResult> {
+export const sendDraftNowAction = previewSafe(async function sendDraftNowAction(rawId: unknown, rawDraftId: unknown): Promise<DeckResult> {
   await gate();
   const id = cardIdOf(rawId);
   const draftId = typeof rawDraftId === "string" ? rawDraftId : "";
@@ -260,5 +261,5 @@ export async function sendDraftNowAction(rawId: unknown, rawDraftId: unknown): P
   const time = formatTime(new Date(), { tz: await getFirmTimeZone() }) ?? "";
   revalidate();
   return { ok: true, message: deckSentAt(time) };
-}
+}, "state");
 

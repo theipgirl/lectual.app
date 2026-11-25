@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { loadPipeline } from "@/lib/lifecycle/load";
 import { COLUMN_HINT, COLUMN_LABEL, filterCards, groupColumns, type PipelineCard, type PipelineColumn } from "@/lib/lifecycle/columns";
 import { ListHeader } from "@/components/list-page/ListHeader";
@@ -49,7 +49,7 @@ function Card({ c }: { c: PipelineCard }) {
  * never an empty column with a zero.
  */
 export default async function PipelinePage({ searchParams }: { searchParams: Promise<{ q?: string; owner?: string }> }) {
-  const session = await resolveFirmSession({ signInNext: "/dashboard/pipeline/" });
+  const session = await resolveViewSession({ signInNext: "/dashboard/pipeline/" });
   if (session.kind !== "ok") notFound();
   const sp = await searchParams;
   const q = typeof sp.q === "string" ? sp.q.slice(0, 100) : "";

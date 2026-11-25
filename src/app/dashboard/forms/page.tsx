@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { isEventCode } from "@/lib/intake-forms/event-name";
 import { getFirmTimeZone } from "@/lib/org/profile";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { previewingAs, resolveViewSession } from "@/lib/views/view-as";
 import { hasRole } from "@/lib/auth/roles";
 import { canEditIntakeForm, listOrCreateIntakeForms, loadIntakeForm, loadIntakePackages } from "@/lib/intake-forms/store";
 import { intakePackages } from "@/lib/intake-forms/packages";
@@ -75,7 +75,7 @@ export default async function IntakeFormsPage({
   searchParams: Promise<{ form?: string; tab?: string; range?: string; intake?: string; event?: string }>;
 }) {
   const sp = await searchParams;
-  const session = await resolveFirmSession({ signInNext: "/dashboard/forms/" });
+  const session = await resolveViewSession({ signInNext: "/dashboard/forms/" });
   if (session.kind !== "ok") notFound();
 
   const tab = sp.tab === "performance" ? "performance" : sp.tab === "results" ? "results" : "setup";
@@ -90,7 +90,7 @@ export default async function IntakeFormsPage({
 
   if (!sp.form) {
     const [list, statRows, origin, events, timeZone] = await Promise.all([
-      listOrCreateIntakeForms(session.org.name),
+      listOrCreateIntakeForms(session.org.name, { mayCreate: !(await previewingAs()) }),
       loadSubmissionStatRows(null, 30),
       intakeOrigin(),
       loadBoothEventList(),
