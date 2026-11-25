@@ -19,3 +19,4 @@
 .cm-items { display: flex; flex-direction: column; gap: 2px; }
 .cm-group { margin: 6px 8px 2px; }
 .cm-hidden { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.cm-tick span { display: inline-flex; align-items: center; gap: 6px; }

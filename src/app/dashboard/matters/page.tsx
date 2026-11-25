@@ -41,7 +41,10 @@ import {
 } from "@/lib/matters/phase-group";
 import { hiredStageOf } from "@/lib/matters/hired-stage";
 import { searchPlaceholder, BLANK, MATTERS_NAME, OWNER_COLUMN, TEAMMATE, UNASSIGNED, MATTER_GROUPS_NAV, MATTER_GROUP_ALL, MATTER_INTAKE_STAGES, MATTER_INTAKE_SHOW, MATTER_SHOWING_INTAKE, MATTER_BACK_TO_PAST_INTAKE, MATTER_ALL_INTAKE_BODY, MATTER_ALL_INTAKE_TITLE, MATTER_GROUP_EMPTY, MATTER_GROUP_LABEL, MATTER_PHASES_UNAVAILABLE, MATTER_NO_HIRED_STAGE, MATTER_STATUS_NAV, DEADLINE_FLAGS_UNCHECKED, NO_MAINTENANCE_DEADLINE_HINT, NO_OPEN_DEADLINE, NO_OPEN_DEADLINE_HINT } from "@/lib/ui/words";
-import { resolveViewSession } from "@/lib/views/view-as";
+import { inPreview, resolveViewSession } from "@/lib/views/view-as";
+import { loadOwnerState } from "@/lib/views/layout/owner-load";
+import { isOwner } from "@/lib/views/layout/owner";
+import { loadStageHoldings } from "@/lib/stages/holdings";
 import { isRegisteredTrademark, needsDeadlineCheck, noOpenDeadline, noOpenDeadlineHint } from "@/lib/matters/deadline-safety";
 import { loadOpenDeadlineMatterIds } from "@/lib/matters/open-deadlines-read";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
@@ -142,6 +145,17 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
   const stillInIntake = intakeView ? searchMatters(filterBySegment(intakeView.intake, seg, sets), search).length : 0;
   // Phases are on but no signed-engagement stage was found: every intake-phase stage counts as intake. Said, never silent.
   const noHiredStage = grouped && hiredStageOf(stageList) === null;
+
+  // The owner's stage menu on the docket board (spec-editable-views.md 3b): an owner MEMBERSHIP ROW, never in a preview, and only
+  // when the stage list was read. What each stage holds (every matter, any status) is read then, for the delete dialog; a failed
+  // read offers no delete and no open/closed change. Every action asks the row again.
+  const stageOwner = boardView && stageRead.status !== "unavailable" && isOwner(await loadOwnerState()) && !(await inPreview());
+  const stageAdmin = stageOwner
+    ? {
+        all: stageList.map((s) => ({ id: s.id, name: s.label, isOpen: s.is_open, role: s.role ?? null })),
+        holdings: await loadStageHoldings("matter").then((h) => (h.status === "ok" ? h.byStage : null)),
+      }
+    : null;
   const everyMatterInIntake = !showIntake && !!intakeView && all.length > 0 && pastLoe.length === 0;
   const memberName = new Map(members.map((m) => [m.userId, m.displayName ?? m.email ?? TEAMMATE]));
   const leadOptions = leads.map((l) => ({
@@ -274,6 +288,7 @@ export default async function MattersPage({ searchParams }: { searchParams: Prom
           registeredNoDeadlineIds={new Set(shown.filter((m) => noOpenDeadline(m, openDeadlineIds) && isRegisteredTrademark(m)).map((m) => m.id))}
           ownerName={(id) => (id ? memberName.get(id) ?? TEAMMATE : null)}
           cards={cards}
+          stageAdmin={stageAdmin}
         />
         </>
       ) : bands.length === 0 ? (

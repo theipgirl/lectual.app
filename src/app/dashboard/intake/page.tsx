@@ -24,7 +24,7 @@ import {
 } from "@/lib/intake/rows";
 import { loadPendingApprovalsByLead } from "@/lib/queue/lead-pending";
 import type { LeadPendingApprovals } from "@/lib/intake/pending-approvals";
-import { previewingAs, resolveViewSession } from "@/lib/views/view-as";
+import { inPreview, previewingAs, resolveViewSession } from "@/lib/views/view-as";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
 import { loadAgentMoves, type AgentMovesRead } from "@/lib/stage-keeper/read";
@@ -44,6 +44,9 @@ import IntakeWorkspace from "./_components/IntakeWorkspace";
 import "./intake.css";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { loadOwnerState } from "@/lib/views/layout/owner-load";
+import { isOwner } from "@/lib/views/layout/owner";
+import { loadStageHoldings } from "@/lib/stages/holdings";
 
 export const metadata: Metadata = { title: pageTitle(INTAKE_NAME) };
 
@@ -259,6 +262,17 @@ export default async function IntakePage({
   });
   const openRef = parseCardOpen((params as Record<string, string | string[] | undefined>).open);
 
+  // The owner's stage menu on the stage board (spec-editable-views.md 3b): an owner MEMBERSHIP ROW (never the role claim; Lectual
+  // staff acting in a firm are not owners), never in a preview. What each stage holds is read only then, for the delete dialog; a
+  // failed read offers no delete and no type change rather than calling a stage empty. Every action asks the row again.
+  const stageOwner = isOwner(await loadOwnerState()) && !(await inPreview());
+  const stageAdmin = stageOwner
+    ? {
+        all: stages.map((s) => ({ id: s.id, name: s.name, category: s.category, role: s.role ?? null })),
+        holdings: await loadStageHoldings("lead").then((h) => (h.status === "ok" ? h.byStage : null)),
+      }
+    : null;
+
   return (
     <div className="intake-root" data-tour="intake-board">
     <IntakeWorkspace
@@ -286,6 +300,7 @@ export default async function IntakePage({
       showFormsLink={session?.kind === "ok" && canSeeFormsAndProposals(session.role)}
       agentMoves={agentMoves.status === "ok" ? { status: "ok", truncated: agentMoves.truncated } : { status: "unavailable" }}
       stageDecisions={decisions.status === "ok" ? { status: "ok", truncated: decisions.truncated } : { status: "unavailable" }}
+      stageAdmin={stageAdmin}
     />
     {openRef ? <RecordCardHost open={openRef} path="/dashboard/intake/" params={params as Record<string, string | string[] | undefined>} duplicateOf={duplicates[openRef.id]?.leadId ?? null} /> : null}
     </div>

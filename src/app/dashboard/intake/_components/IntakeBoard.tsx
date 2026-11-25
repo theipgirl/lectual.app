@@ -16,6 +16,8 @@ import type { DuplicateOf } from "@/lib/intake/duplicates";
 import type { IntakeCardData } from "@/lib/record-card/intake-cards";
 import type { Lane } from "@/lib/leads/lane";
 import type { ReferralSource } from "@/lib/intake";
+import { neighbours, stageMenuModel, type MenuStage } from "@/lib/stages/menu-model";
+import { StageMenu } from "@/components/views/stages/StageMenu";
 
 /**
  * Both boards, drawn from a `BoardModel` (the pure rules live in board-columns.ts). A column's title is its stage name in
@@ -50,7 +52,10 @@ export default function IntakeBoard({
   movedOut,
   timeZone,
   onCompare,
+  stageAdmin = null,
 }: {
+  /** The owner's stage menu (absent for everyone else): every lead stage and what each holds (null = unreadable). */
+  stageAdmin?: { all: MenuStage[]; holdings: Record<string, string[]> | null } | null;
   group: "stage" | "owner";
   model: BoardModel;
   moveStages: Stage[];
@@ -82,6 +87,15 @@ export default function IntakeBoard({
   const [over, setOver] = useState<string | null>(null);
   const [refused, setRefused] = useState<string | null>(null);
   const emptyCount = model.empty.length;
+  // The stage columns in the order drawn: Move left / right go beside the VISIBLE neighbour, so the move is seen.
+  const stageOrder = group === "stage" ? model.columns.flatMap((c) => (c.drop.kind === "stage" ? [c.drop.stageId] : [])) : [];
+  const menuFor = (column: BoardModel["columns"][number]) => {
+    if (!stageAdmin || group !== "stage" || column.drop.kind !== "stage") return undefined;
+    const stageId = column.drop.stageId;
+    const stage = stageAdmin.all.find((s) => s.id === stageId);
+    if (!stage) return undefined;
+    return <StageMenu model={stageMenuModel({ kind: "lead", stage, all: stageAdmin.all, ...neighbours(stageOrder, stageId), holdings: stageAdmin.holdings })} />;
+  };
 
   function drop(leadId: string, column: BoardModel["columns"][number]) {
     const row = rowById(leadId);
@@ -121,6 +135,7 @@ export default function IntakeBoard({
               </>
             }
             empty={columnEmpty("leads")}
+            menu={menuFor(column)}
             onDragOver={(e) => {
               e.preventDefault();
               setOver(column.key);

@@ -63,6 +63,7 @@ import type { Lane } from "@/lib/leads/lane";
 import AddLeadDialog from "./AddLeadDialog";
 import BulkMoveBar from "./BulkMoveBar";
 import IntakeBoard from "./IntakeBoard";
+import type { MenuStage } from "@/lib/stages/menu-model";
 import IntakeControls from "./IntakeControls";
 import IntakeTable from "./IntakeTable";
 import CompareDialog, { type CompareTarget } from "./CompareDialog";
@@ -106,7 +107,13 @@ export default function IntakeWorkspace({
   now: nowIso,
   timeZone,
   showFormsLink = false,
+  stageAdmin = null,
 }: {
+  /**
+   * The owner's stage menu on the stage board (spec-editable-views.md 3b): every lead stage the firm has (role included) and what
+   * each holds (null = couldn't be read). Absent for everyone but an owner membership row, and in a preview.
+   */
+  stageAdmin?: { all: MenuStage[]; holdings: Record<string, string[]> | null } | null;
   /** `canSeeFormsAndProposals(role)`: offer "Open your intake form" in the empty state. Absent = not offered. */
   showFormsLink?: boolean;
   /** The rows of the server's set: the intake list, or the lost leads when `lostView`. */
@@ -596,6 +603,7 @@ export default function IntakeWorkspace({
             movedOut={movedOut}
             timeZone={timeZone}
             onCompare={openCompare}
+            stageAdmin={lostView ? null : stageAdmin}
           />
         )
       ) : (

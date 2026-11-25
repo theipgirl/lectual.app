@@ -41,6 +41,7 @@ describe("links into /dashboard/matters/ (the list)", () => {
       "src/lib/onboarding/hub-runner.ts": "guided-flow page paths",
       "src/app/dashboard/matters/page.tsx": "its own path for the opened card: the open and close links keep every query key",
       "src/lib/matters/calendar-rows.ts": "last-resort target for a task with no record",
+      "src/lib/stages/actions.ts": "revalidatePath after a stage change, not a link",
     };
     const bad: string[] = [];
     for (const f of files) {

@@ -13,6 +13,8 @@ import { BoardEmptyStages } from "./BoardEmptyStages";
 import { emptyStagesLabel } from "@/lib/intake/board-columns";
 import type { MatterCardData } from "@/lib/record-card/matter-cards";
 import { MatterCardFoot, MatterCardMenu } from "@/components/record-card/MatterBits";
+import { neighbours, stageMenuModel, type MenuStage } from "@/lib/stages/menu-model";
+import { StageMenu } from "@/components/views/stages/StageMenu";
 
 /**
  * The docket as a board: one column per live stage (terminal stages fold into
@@ -38,6 +40,12 @@ export function MatterBoard(props: {
   registeredNoDeadlineIds?: ReadonlySet<string>;
   /** Sprint 10: what each role may do on each card, the open link and the lines. Absent: the plain board, as before. */
   cards?: Record<string, MatterCardData>;
+  /**
+   * The owner's stage menu on each open stage column (spec-editable-views.md 3b): every matter stage the firm has and what each holds
+   * (null = couldn't be read). Absent for everyone but an owner membership row, and in a preview. "Closed" and "Not on the docket
+   * yet" are not stages and get no menu.
+   */
+  stageAdmin?: { all: MenuStage[]; holdings: Record<string, string[]> | null } | null;
 }) {
   const board = buildBoard(props.stages, props.matters);
   const stageOptions = (props.moveStages ?? props.stages).map((s) => ({ id: s.id, label: s.label, phase: s.phase ?? null }));
@@ -97,10 +105,23 @@ export function MatterBoard(props: {
     );
   };
 
-  const column = (key: string, title: string, sub: string | null, matters: Matter[], stale = 0) => (
+  // Move left / right go beside the VISIBLE neighbour: with empty stages folded away, a populated column's neighbours are the other
+  // populated ones, and an empty column's are the other empty ones (drawn together when shown).
+  const populatedOrder = board.open.filter((c) => !props.collapseEmpty || c.matters.length > 0).map((c) => c.stage.id);
+  const emptyOrder = props.collapseEmpty ? board.open.filter((c) => c.matters.length === 0).map((c) => c.stage.id) : [];
+  const menuFor = (stageId: string) => {
+    const admin = props.stageAdmin;
+    const stage = admin?.all.find((s) => s.id === stageId);
+    if (!admin || !stage) return undefined;
+    const order = emptyOrder.includes(stageId) ? emptyOrder : populatedOrder;
+    return <StageMenu model={stageMenuModel({ kind: "matter", stage, all: admin.all, ...neighbours(order, stageId), holdings: admin.holdings })} />;
+  };
+
+  const column = (key: string, title: string, sub: string | null, matters: Matter[], stale = 0, stageId: string | null = null) => (
     <BoardColumn
       key={key}
       title={title}
+      menu={stageId ? menuFor(stageId) : undefined}
       count={`${matters.length}${stale ? ` · ${stale} gone quiet` : ""}${sub ? ` · ${sub}` : ""}`}
       empty={columnEmpty("matters")}
     >
@@ -118,7 +139,7 @@ export function MatterBoard(props: {
           board.closed.flatMap((c) => c.matters),
         )
       : null;
-  const openColumn = (c: (typeof board.open)[number]) => column(c.stage.id, stageDisplayName(c.stage.label), null, c.matters, c.stale);
+  const openColumn = (c: (typeof board.open)[number]) => column(c.stage.id, stageDisplayName(c.stage.label), null, c.matters, c.stale, c.stage.id);
 
   if (props.collapseEmpty) {
     const populated = board.open.filter((c) => c.matters.length > 0);
