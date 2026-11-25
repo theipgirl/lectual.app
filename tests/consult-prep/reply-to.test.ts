@@ -33,13 +33,19 @@ describe("guardReplyTo", () => {
 });
 
 describe("testRecipientsOnFirmDomains (the test brief's explicit check)", () => {
-  it("needs a To, and every address on the sender's or a member's domain, or exactly a member", async () => {
+  it("firm domains are the sender's and the firm's connected mailboxes'; every To and Cc must be on one, or be a firm mailbox", async () => {
     const { testRecipientsOnFirmDomains } = await import("@/lib/consult-prep/recipients");
-    expect(testRecipientsOnFirmDomains({ to: ["rebecca@rpblawfirm.com"], cc: ["info@rpblawfirm.com"], from: FROM })).toBe(true);
-    expect(testRecipientsOnFirmDomains({ to: [], cc: ["info@rpblawfirm.com"], from: FROM })).toBe(false);
-    expect(testRecipientsOnFirmDomains({ to: ["rebecca@rpblawfirm.com"], cc: ["x@elsewhere.example"], from: FROM })).toBe(false);
-    expect(testRecipientsOnFirmDomains({ to: ["rebecca@gmail.com"], cc: ["someone@gmail.com"], from: FROM })).toBe(false);
-    expect(testRecipientsOnFirmDomains({ to: ["rebecca@gmail.com"], cc: [], from: FROM })).toBe(true);
-    expect(testRecipientsOnFirmDomains({ to: ["not an address"], cc: [], from: FROM })).toBe(false);
+    const boxes = ["rebecca@rpblawfirm.com"];
+    expect(testRecipientsOnFirmDomains({ to: ["rebecca@rpblawfirm.com"], cc: ["info@rpblawfirm.com"], from: FROM, firmAddresses: [] })).toBe(true);
+    // the sender is on another domain: the firm's mailboxes carry the domain
+    expect(testRecipientsOnFirmDomains({ to: ["rebecca@rpblawfirm.com"], cc: [], from: "Lectual <prep@lectual.app>", firmAddresses: boxes })).toBe(true);
+    expect(testRecipientsOnFirmDomains({ to: ["rebecca@rpblawfirm.com"], cc: [], from: "Lectual <prep@lectual.app>", firmAddresses: [] })).toBe(false);
+    expect(testRecipientsOnFirmDomains({ to: [], cc: ["info@rpblawfirm.com"], from: FROM, firmAddresses: boxes })).toBe(false);
+    expect(testRecipientsOnFirmDomains({ to: ["rebecca@rpblawfirm.com"], cc: ["x@elsewhere.example"], from: FROM, firmAddresses: boxes })).toBe(false);
+    // a member's personal address is not the firm's, unless it is one of the firm's connected mailboxes (exactly)
+    expect(testRecipientsOnFirmDomains({ to: ["rebecca@gmail.com"], cc: [], from: FROM, firmAddresses: boxes })).toBe(false);
+    expect(testRecipientsOnFirmDomains({ to: ["rebecca@gmail.com"], cc: [], from: FROM, firmAddresses: ["rebecca@gmail.com"] })).toBe(true);
+    expect(testRecipientsOnFirmDomains({ to: ["someone@gmail.com"], cc: [], from: FROM, firmAddresses: ["rebecca@gmail.com"] })).toBe(false);
+    expect(testRecipientsOnFirmDomains({ to: ["not an address"], cc: [], from: FROM, firmAddresses: boxes })).toBe(false);
   });
 });

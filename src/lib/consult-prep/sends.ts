@@ -250,3 +250,15 @@ export function shouldCancel(record: SendRecord, event: EventNow, opts: { twinEx
   if (event.leadId !== parsed.leadId) return true;
   return normalizedStart(event.startsAt) !== normalizedStart(parsed.startsAt);
 }
+
+/**
+ * S2c: a `withheld` or `failed` send record written BEFORE the switch-over is not owed. Those were written while Lectual's emails were
+ * not yet switched on (S2b writes them whether or not a sender is set); honouring them when the switch-over passes would send late
+ * booked emails and start retry builds in a burst. Dropping them from the plan's view means: no booked email for them (one is owed only
+ * to the run that made the prep), and a reminder is planned only by the ordinary rules (its own time still ahead). Returns a new map.
+ */
+export function dropPreCutoverOwed(folded: ReadonlyMap<string, SendRecord>, cutoverAtMs: number | null | undefined): Map<string, SendRecord> {
+  if (typeof cutoverAtMs !== "number" || !Number.isFinite(cutoverAtMs)) return new Map(folded);
+  const stale = (r: SendRecord) => (r.status === "withheld" || r.status === "failed") && !(Date.parse(r.at) >= cutoverAtMs);
+  return new Map([...folded].filter(([, r]) => !stale(r)));
+}

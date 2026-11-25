@@ -13,6 +13,7 @@ import {
   CONSULT_PREP_TEST_LIMIT,
   CONSULT_PREP_TEST_OFF,
   CONSULT_PREP_TEST_OUTCOMES,
+  CONSULT_PREP_TEST_REFUSED_BEFORE_BUILD,
   CONSULT_PREP_TEST_OWNER_ONLY,
   CONSULT_PREP_TEST_SENT,
   CONSULT_PREP_RERUN_DONE,
@@ -66,15 +67,24 @@ export async function sendTestBriefAction(leadId: string): Promise<RerunPrepStat
     const session = await resolveFirmSession();
     if (session.kind !== "ok" || !canSendTestBrief(session.role, session.actingAsStaff)) return { message: CONSULT_PREP_TEST_OWNER_ONLY };
     if (typeof leadId !== "string" || !UUID.test(leadId)) return { message: CONSULT_PREP_TEST_FAILED };
-    if (!testBriefLimiter.allowed(session.user.id)) return { message: CONSULT_PREP_TEST_LIMIT };
-    const lead = await getLead(leadId);
-    if (!lead || lead.merged_into_id || lead.org_id !== session.org.id) return { message: CONSULT_PREP_TEST_FAILED };
-    testBriefLimiter.record(session.user.id);
-    const outcome = await runConsultPrepScoped(productionRunnerDeps(), { orgId: session.org.id, scope: { leadIds: [lead.id], reason: "test" }, trigger: "manual" });
-    if (!outcome) return { message: CONSULT_PREP_TEST_OFF };
-    const said = outcome.status === "ok" ? outcome.result?.summary : null;
-    if (!said || !CONSULT_PREP_TEST_OUTCOMES.includes(said)) return { message: CONSULT_PREP_TEST_FAILED };
-    return { ok: said === CONSULT_PREP_TEST_SENT, message: said };
+    // The slot is taken BEFORE anything is awaited (two quick presses can't both pass the check), and given back when the press is
+    // refused before a build was started: nothing was spent.
+    const key = session.user.id;
+    if (!testBriefLimiter.allowed(key)) return { message: CONSULT_PREP_TEST_LIMIT };
+    testBriefLimiter.record(key);
+    let refusedBeforeBuild = true;
+    try {
+      const lead = await getLead(leadId);
+      if (!lead || lead.merged_into_id || lead.org_id !== session.org.id) return { message: CONSULT_PREP_TEST_FAILED };
+      const outcome = await runConsultPrepScoped(productionRunnerDeps(), { orgId: session.org.id, scope: { leadIds: [lead.id], reason: "test" }, trigger: "manual" });
+      if (!outcome) return { message: CONSULT_PREP_TEST_OFF };
+      const said = outcome.status === "ok" ? outcome.result?.summary : null;
+      refusedBeforeBuild = !!said && CONSULT_PREP_TEST_REFUSED_BEFORE_BUILD.includes(said);
+      if (!said || !CONSULT_PREP_TEST_OUTCOMES.includes(said)) return { message: CONSULT_PREP_TEST_FAILED };
+      return { ok: said === CONSULT_PREP_TEST_SENT, message: said };
+    } finally {
+      if (refusedBeforeBuild) testBriefLimiter.release(key);
+    }
   } catch {
     return { message: CONSULT_PREP_TEST_FAILED };
   }

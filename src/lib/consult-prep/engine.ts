@@ -37,11 +37,12 @@ import {
   CONSULT_PREP_TEST_FIRST_LINE,
   CONSULT_PREP_TEST_NOT_BUILT,
   CONSULT_PREP_TEST_NO_RECIPIENTS,
+  CONSULT_PREP_TEST_OFF_DOMAIN,
   CONSULT_PREP_TEST_RECIPIENTS_UNREAD,
   CONSULT_PREP_TEST_SENT,
   CONSULT_PREP_TEST_SUBJECT_PREFIX,
 } from "@/lib/ui/words";
-import { emailsStarted, lawmaticsReach, type CutoverReach } from "./cutover";
+import { cutoverFor, emailsStarted, lawmaticsReach, type CutoverReach, type LawmaticsConsult } from "./cutover";
 import type { GuardResult } from "./recipients";
 import {
   HOUR_MS,
@@ -49,6 +50,7 @@ import {
   foldSendRecords,
   parseSendRecord,
   planSends,
+  dropPreCutoverOwed,
   recordSlot,
   sendRecordPayload,
   shouldCancel,
@@ -143,7 +145,7 @@ export type PrepDeps = {
   files?: PrepFileStore;
 };
 
-type EventRow = { id: string; org_id: string; lead_id: string | null; starts_at: string; join_url: string | null; is_consult: boolean | null; source: string | null; external_id?: string | null; created_at?: string | null };
+type EventRow = { id: string; org_id: string; lead_id: string | null; starts_at: string; join_url: string | null; is_consult: boolean | null; source: string | null; external_id?: string | null; created_at?: string | null; synced_at?: string | null };
 
 type Candidate = {
   /** The key the marker and the sends carry (a re-run's has its suffix). */
@@ -151,7 +153,8 @@ type Candidate = {
   /** The key without a re-run suffix: what an earlier prep of the same consult used. */
   baseKey: string;
   leadId: string;
-  event: { id: string; startsAt: string; joinUrl: string | null } | null;
+  /** `lawmatics` (S2c): what the switch-over rule needs; null = not a Lawmatics consult (Outlook-only), so the rule does not apply. */
+  event: { id: string; startsAt: string; joinUrl: string | null; lawmatics?: LawmaticsConsult } | null;
   rerun: boolean;
   /** When the consult was booked: the calendar row's own `created_at`, else (a stage-keyed prep) the lead's stage-entered time. Null = not known. */
   bookedAt: string | null;
@@ -242,7 +245,7 @@ async function readCalendar(admin: SupabaseClient, orgId: string, nowMs: number,
   const one = async (source: "lawmatics" | "outlook") => {
     let q = admin
       .from("crm_calendar_event")
-      .select("id, org_id, lead_id, starts_at, join_url, is_consult, source, external_id, created_at")
+      .select("id, org_id, lead_id, starts_at, join_url, is_consult, source, external_id, created_at, synced_at")
       .eq("org_id", orgId)
       .eq("source", source)
       .eq("is_consult", true)
@@ -1079,8 +1082,11 @@ async function runTestBrief(ctx: AgentContext, deps: PrepDeps, leadId: string): 
     if (!g) return done(CONSULT_PREP_TEST_FAILED);
     const guarded = guardRecipients({ to: recipients.to, cc: recipients.cc, clientAddresses: g.clientAddresses });
     if (guarded.to.length === 0) return done(CONSULT_PREP_TEST_NO_RECIPIENTS);
-    // The explicit check: a non-empty list, every address on the firm's own domain(s). Anything else and nothing goes.
-    if (!testRecipientsOnFirmDomains({ to: guarded.to, cc: guarded.cc, from })) return done(CONSULT_PREP_TEST_FAILED);
+    // The explicit check: a non-empty list, every address on the firm's own domain(s) (the sender's, and the firm's connected mailboxes'
+    // when they can be read). Anything else and nothing goes.
+    const boxes = await admin.from("mailbox_connection").select("email").eq("org_id", orgId);
+    const firmAddresses = boxes.error ? [] : ((boxes.data ?? []) as Array<{ email: string | null }>).map((b) => b.email);
+    if (!testRecipientsOnFirmDomains({ to: guarded.to, cc: guarded.cc, from, firmAddresses })) return done(CONSULT_PREP_TEST_OFF_DOMAIN);
     const built = await deps.full(g.facts);
     if (!built.ok) return done(CONSULT_PREP_TEST_NOT_BUILT);
     const text = renderConsultBrief({ ...g.facts, full: built.sections }).text;
@@ -1142,9 +1148,21 @@ export async function runPrep(ctx: AgentContext, rawDeps: PrepDeps, generate: Dr
   const withConsult = new Set(events.map((e) => e.leadId));
   const leadMarkers = await readLeadMarkers(admin, orgId, [...withConsult]);
 
+  // S2c: the switch-over rule applies to a Lawmatics consult (the sync's own `lmsync:` row, or an Outlook event with such a twin):
+  // lawmatics-mcp briefs only those. When Lectual's copy of it was written (the later of created and synced, so a reschedule counts).
+  const isLmsync = (e: EventRow) => e.source === "lawmatics" && typeof e.external_id === "string" && e.external_id.startsWith("lmsync:");
+  const knownSince = (e: EventRow): number | null => {
+    const times = [e.created_at, e.synced_at].map((t) => (t ? Date.parse(t) : Number.NaN)).filter((t) => Number.isFinite(t));
+    return times.length > 0 ? Math.max(...times) : null;
+  };
+  const lawmaticsOf = (e: Ev): LawmaticsConsult => {
+    if (isLmsync(e)) return { knownSinceMs: knownSince(e) };
+    const twin = liveEvents.find((o) => o.id !== e.id && isLmsync(o) && sameLeadSameTime({ leadId: o.leadId, startsAt: o.starts_at }, { leadId: e.leadId, startsAt: e.starts_at }));
+    return twin ? { knownSinceMs: knownSince(twin) } : null;
+  };
   const candidates: Candidate[] = events.map((e) => {
     const base = eventPrepKey(e.leadId, e.id, e.starts_at);
-    return { key: rerunRun ? rerunKey(base, nowMs) : base, baseKey: base, leadId: e.leadId, event: { id: e.id, startsAt: normalizedStart(e.starts_at) ?? e.starts_at, joinUrl: e.join_url }, rerun: rerunRun, bookedAt: e.created_at ?? null };
+    return { key: rerunRun ? rerunKey(base, nowMs) : base, baseKey: base, leadId: e.leadId, event: { id: e.id, startsAt: normalizedStart(e.starts_at) ?? e.starts_at, joinUrl: e.join_url, lawmatics: lawmaticsOf(e) }, rerun: rerunRun, bookedAt: e.created_at ?? null };
   });
 
   let stageUnread = false;
@@ -1338,7 +1356,8 @@ export async function runPrep(ctx: AgentContext, rawDeps: PrepDeps, generate: Dr
       counts.deferred += 1;
       continue;
     }
-    const existing = new Map(folded);
+    // S2c: a withheld or failed row from before the switch-over is not owed (no late booked email, no retry build in a burst).
+    const existing = dropPreCutoverOwed(folded, deps.cutoverAtMs);
     const preppedAt = c.rerun ? undefined : markers.byKey.get(c.key);
     const legacy = !c.rerun && c.event !== null && markers.legacyEvents.has(c.event.id);
     const startMs = c.event ? Date.parse(c.event.startsAt) : null;
@@ -1363,7 +1382,7 @@ export async function runPrep(ctx: AgentContext, rawDeps: PrepDeps, generate: Dr
           preppedAtMs: preppedAt !== undefined ? Date.parse(preppedAt) : nowMs - 24 * HOUR_MS - 1,
           madeNow: false,
           suppressBooked: false,
-          cutover: c.rerun ? null : reach,
+          cutover: cutoverFor(reach, c.event?.lawmatics, { rerun: c.rerun }),
         };
         const adoptedId = markers.adopted.get(c.key);
         // A facts-only 1 h email that has not gone out yet (its time is still ahead). One whose time has passed is already sent: it stays.
@@ -1424,7 +1443,7 @@ export async function runPrep(ctx: AgentContext, rawDeps: PrepDeps, generate: Dr
           if (await cancelOne(ctx, deps, counts, state, record, nowMs)) {
             if (record.quality === "facts") counts.upgraded += 1;
             else counts.adoptedGone += 1;
-            owed = new Map(state.folded);
+            owed = dropPreCutoverOwed(state.folded, deps.cutoverAtMs);
           }
         }
         const plan = planSends({ ...base, brief: full ? "full" : "facts", existing: owed });
@@ -1605,7 +1624,7 @@ export async function runPrep(ctx: AgentContext, rawDeps: PrepDeps, generate: Dr
       // The emails go BEFORE the marker is written: a crash between the two just posts the same keys with the same payload again
       // (Resend dedupes), where a marker with no email would never send the booked email.
       const bookedHeld = !!c.event && stageBookedRecently(records, lead.id, nowMs);
-      const plan = planSends({ prepKey: c.key, startsAtMs: startMs, nowMs, preppedAtMs: nowMs, madeNow: true, suppressBooked: bookedHeld, bookedOnly: c.rerun, brief: adoption || built ? "full" : "facts", cutover: c.rerun ? null : reach, existing });
+      const plan = planSends({ prepKey: c.key, startsAtMs: startMs, nowMs, preppedAtMs: nowMs, madeNow: true, suppressBooked: bookedHeld, bookedOnly: c.rerun, brief: adoption || built ? "full" : "facts", cutover: cutoverFor(reach, c.event?.lawmatics, { rerun: c.rerun }), existing });
       if (mailOpen) {
         await recordWithheld(ctx, counts, state, c, plan.withheld);
         await recordSuperseded(ctx, counts, state, c, plan.superseded);

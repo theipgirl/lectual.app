@@ -52,6 +52,10 @@ type Run = { now?: number; llm?: unknown[]; queue?: boolean; scope?: import("@/l
 
 /** One firm's world, run as many times as a test likes (the database, the sends and the saved files persist across runs). */
 function world(initial: Tables = tables(), failures?: (q: Recorded) => DbError | undefined) {
+  return worldOf(initial, failures);
+}
+
+function worldOf(initial: Tables = tables(), failures?: (q: Recorded) => DbError | undefined) {
   const db = memDb(initial, { failures });
   const sent: InternalMail[] = [];
   const saved = new Map<string, PrepFile[]>();
@@ -379,6 +383,9 @@ describe("S2c: the switch-over", () => {
 
 describe("S2c: the owner's test brief (a real full prep, emailed marked [TEST], nothing written)", () => {
   const TEST = { leadIds: ["lead-1"] as [string], reason: "test" as const };
+  // The firm's connected mailbox puts firm.example among the firm's domains (the sender here is on another one).
+  const boxed = (t: Tables = tables()): Tables => ({ ...t, mailbox_connection: [{ id: "mb-1", org_id: ORG, email: "office@firm.example", status: "active" }] });
+  const world = (t?: Tables) => worldOf(boxed(t));
 
   it("builds through the real builder (two model calls, the firm's packages, both files) and emails it to the firm's recipients only", async () => {
     const w = world();
@@ -436,11 +443,16 @@ describe("S2c: the owner's test brief (a real full prep, emailed marked [TEST], 
     expect(r.calls).toHaveLength(0);
   });
 
-  it("the explicit check counts every chosen member's own address as the firm's (its refusals are pinned in reply-to.test.ts)", async () => {
+  it("a chosen member on an address off the firm's domains fails the explicit check: nothing is built or sent", async () => {
     const w = world();
     const r = await w.run({ scope: TEST, deps: { memberAddresses: async () => ["attorney@firm.example", "other@elsewhere.example"] } });
-    expect(r.result.summary).toBe("Test brief sent to the people set in Settings → Team.");
-    expect(w.sent[0].to.sort()).toEqual(["attorney@firm.example", "other@elsewhere.example"]);
+    expect(r.result.summary).toBe("Can't send a test brief: someone set to receive it isn't on the firm's email domain. Check Settings → Team.");
+    expect(w.sent).toHaveLength(0);
+    expect(r.calls).toHaveLength(0);
+    // without the firm's mailbox to vouch for firm.example (the sender is on lectual.example), even the attorney is refused
+    const bare = worldOf(tables());
+    const b = await bare.run({ scope: TEST });
+    expect(b.result.summary).toMatch(/isn't on the firm's email domain/);
   });
 
   it("email not switched on, no one set, or the setting unreadable: a fixed sentence, no model call, nothing sent", async () => {

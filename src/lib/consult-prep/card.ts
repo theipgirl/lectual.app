@@ -38,6 +38,8 @@ export type CardInputs = {
   emailOn: boolean;
   /** S2c: the switch-over has happened, so real emails go (`emailsStarted`). Absent = started (the rules before S2c). */
   emailsStarted?: boolean;
+  /** S2c: the switch-over instant. A withheld or failed row from before it is not owed any more (the engine's `dropPreCutoverOwed`). */
+  cutoverAtMs?: number | null;
   adminTier: boolean;
   tz: string;
   /** The clock, for "is the owed booked email still due?". Absent: it is taken as still due. */
@@ -88,7 +90,11 @@ export function consultPrepCardView(input: CardInputs): CardView {
     // Append-only rows: the newest per kind is the truth.
     const latest = new Map<string, SendRecord>();
     for (const r of [...mine].sort((a, b) => Date.parse(a.at) - Date.parse(b.at))) latest.set(r.kind, r);
-    const booked = latest.get("booked");
+    // A withheld or failed row from before the switch-over is not owed (the engine never acts on it), so it is not described as pending.
+    const preCutover = (r: SendRecord | undefined) =>
+      !!r && (r.status === "withheld" || r.status === "failed") && typeof input.cutoverAtMs === "number" && !(Date.parse(r.at) >= input.cutoverAtMs);
+    const bookedRow = latest.get("booked");
+    const booked = preCutover(bookedRow) ? undefined : bookedRow;
     let mail: string;
     if (booked && (booked.status === "sent" || booked.status === "scheduled" || booked.status === "duplicate")) {
       // Who received a PAST email is not known from today's setting (it may have changed since), so the card says "emailed" and

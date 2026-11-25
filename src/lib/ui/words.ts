@@ -1716,6 +1716,7 @@ export const CONSULT_PREP_TEST_OFF = "Consult prep isn't switched on for your fi
 export const CONSULT_PREP_TEST_EMAIL_OFF = "Can't send a test brief: email isn't switched on for your firm yet. Lectual will turn it on.";
 export const CONSULT_PREP_TEST_NO_RECIPIENTS = "Can't send a test brief: no one is set to receive consult prep. Set it in Settings → Team.";
 export const CONSULT_PREP_TEST_RECIPIENTS_UNREAD = "Can't send a test brief: who gets consult prep couldn't be read. Try again in a minute.";
+export const CONSULT_PREP_TEST_OFF_DOMAIN = "Can't send a test brief: someone set to receive it isn't on the firm's email domain. Check Settings → Team.";
 export const CONSULT_PREP_TEST_NOT_BUILT = "Can't send a test brief: the full prep couldn't be built. Try again in a few minutes.";
 export const CONSULT_PREP_TEST_FAILED = "Couldn't send the test brief. Nothing was saved. Try again in a minute.";
 /** The first line of a test brief's body. */
@@ -1727,8 +1728,16 @@ export const CONSULT_PREP_TEST_OUTCOMES: readonly string[] = [
   CONSULT_PREP_TEST_EMAIL_OFF,
   CONSULT_PREP_TEST_NO_RECIPIENTS,
   CONSULT_PREP_TEST_RECIPIENTS_UNREAD,
+  CONSULT_PREP_TEST_OFF_DOMAIN,
   CONSULT_PREP_TEST_NOT_BUILT,
   CONSULT_PREP_TEST_FAILED,
+];
+/** The answers given before anything was built: the owner's hourly slot is given back. */
+export const CONSULT_PREP_TEST_REFUSED_BEFORE_BUILD: readonly string[] = [
+  CONSULT_PREP_TEST_EMAIL_OFF,
+  CONSULT_PREP_TEST_NO_RECIPIENTS,
+  CONSULT_PREP_TEST_RECIPIENTS_UNREAD,
+  CONSULT_PREP_TEST_OFF_DOMAIN,
 ];
 export const CONSULT_PREP_TEAM_HEADING = "Consult prep emails";
 export const CONSULT_PREP_TEAM_HELP = "When a consult is prepared, the brief is emailed to the people chosen here when it is booked, a day before (if it was booked more than a day ahead) and an hour before. It goes only to the firm, never to a client. Cc addresses must be on the same email domain as someone chosen.";

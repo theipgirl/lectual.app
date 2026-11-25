@@ -77,6 +77,8 @@ import { intakeListHref } from "@/lib/intake/list-href";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Notice } from "@/components/ui/Notice";
 import { LoadFailedLine } from "@/components/ui/LoadFailed";
+// "Re-run prep" and "Send a test brief" build a full prep inside this page's server actions (two model calls, the USPTO pull, the files).
+export const maxDuration = 300;
 
 /** Tab title: the lead's name through the scoped getter; "Lead" when the read fails or finds nothing. */
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {

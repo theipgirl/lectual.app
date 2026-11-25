@@ -130,6 +130,7 @@ export async function loadConsultPrepCard(args: { leadIds: readonly string[]; ad
       recipients,
       emailOn: Boolean(env.RESEND_API_KEY?.trim() && env.CONSULT_PREP_FROM?.trim()),
       emailsStarted: emailsStarted(parseCutoverAt(env.CONSULT_PREP_CUTOVER_AT), Date.now()),
+      cutoverAtMs: parseCutoverAt(env.CONSULT_PREP_CUTOVER_AT),
       adminTier: args.adminTier,
       tz: args.tz,
       nowMs: Date.now(),

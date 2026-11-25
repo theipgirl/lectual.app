@@ -27,10 +27,14 @@ const SLOTS = [
   { kind: "eod" as const, hour: 20, minute: 0 },
 ];
 
-/** The latest send time lawmatics-mcp can have handed to Resend: `day` for its 24 h briefs, `hour` for its 1 h briefs (exclusive). */
-export type CutoverReach = { day: number; hour: number };
+/**
+ * The latest send time lawmatics-mcp can have handed to Resend: `day` for its 24 h briefs, `hour` for its 1 h briefs (exclusive).
+ * `seenBy`: the earliest moment its LAST run before the switch-over can have fired (that run's slot - 1 h, the earlier of the two
+ * weekday settings). A consult Lectual knew of only after it is one lawmatics-mcp may never have seen, so Lectual briefs it.
+ */
+export type CutoverReach = { day: number; hour: number; seenBy: number };
 
-const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/;
+const ISO_INSTANT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,3})?)?(?:Z|([+-])(\d{2}):(\d{2}))$/;
 
 /**
  * `CONSULT_PREP_CUTOVER_AT` as an instant, or null. Only a full ISO instant WITH a zone ("2026-12-01T15:00:00-05:00",
@@ -39,7 +43,13 @@ const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z
 export function parseCutoverAt(raw: string | null | undefined): number | null {
   if (typeof raw !== "string") return null;
   const v = raw.trim();
-  if (!ISO_INSTANT.test(v)) return null;
+  const m = ISO_INSTANT.exec(v);
+  if (!m) return null;
+  // An impossible date or time (Feb 30, hour 24, an offset past 14 h) is refused: the parts must come back unchanged from a real date.
+  const [y, mo, d, h, mi, sec] = [m[1], m[2], m[3], m[4], m[5], m[6] ?? "0"].map(Number);
+  const wall = new Date(Date.UTC(y, mo - 1, d, h, mi, sec));
+  if (wall.getUTCFullYear() !== y || wall.getUTCMonth() !== mo - 1 || wall.getUTCDate() !== d || wall.getUTCHours() !== h || wall.getUTCMinutes() !== mi || wall.getUTCSeconds() !== sec) return null;
+  if (m[7] && (Number(m[8]) > 14 || Number(m[9]) > 59)) return null;
   const ms = Date.parse(v);
   return Number.isFinite(ms) ? ms : null;
 }
@@ -65,16 +75,18 @@ function reachFor(cutoverMs: number, weekdaysOnly: boolean): CutoverReach {
   let i = -1;
   for (let j = 0; j < slots.length; j += 1) if (slots[j].at <= cutoverMs + EARLY_TICK_MS) i = j;
   // Nine days either side always holds a slot before and after the cutover (a skipped weekend is two days).
-  if (i < 0 || i >= slots.length - 1) return { day: cutoverMs + 7 * 24 * HOUR_MS, hour: cutoverMs + 7 * 24 * HOUR_MS };
+  if (i < 0 || i >= slots.length - 1) return { day: cutoverMs + 7 * 24 * HOUR_MS, hour: cutoverMs + 7 * 24 * HOUR_MS, seenBy: cutoverMs - 7 * 24 * HOUR_MS };
   const next = slots[i + 1].at;
-  return { day: next, hour: slots[i].kind === "morning" ? next + LATE_EOD_GRACE_MS : next };
+  return { day: next, hour: slots[i].kind === "morning" ? next + LATE_EOD_GRACE_MS : next, seenBy: slots[i].at - EARLY_TICK_MS };
 }
 
 /** How far lawmatics-mcp's last runs before `cutoverMs` can have scheduled briefs, under either weekday setting. */
 export function lawmaticsReach(cutoverMs: number): CutoverReach {
   const a = reachFor(cutoverMs, false);
   const b = reachFor(cutoverMs, true);
-  return { day: Math.max(a.day, b.day), hour: Math.max(a.hour, b.hour) };
+  // The reach is the LATER of the two settings (more is left to lawmatics-mcp); `seenBy` the EARLIER (fewer consults count as seen).
+  // Both lean toward the attorney getting a brief: a possible duplicate beats no brief.
+  return { day: Math.max(a.day, b.day), hour: Math.max(a.hour, b.hour), seenBy: Math.min(a.seenBy, b.seenBy) };
 }
 
 /**
@@ -85,6 +97,24 @@ export function lawmaticsReach(cutoverMs: number): CutoverReach {
  *   booked  lawmatics-mcp sends no "booked" email, but the plan's rule is that Lectual sends it only when lawmatics-mcp sent nothing for
  *           this consult: suppressed when either of its briefs was in reach.
  */
+/**
+ * What Lectual knows of a consult for the switch-over rule. `null`: not a Lawmatics consult (an Outlook-only event, which
+ * lawmatics-mcp never briefs): the rule does not apply. Otherwise `knownSinceMs` is when Lectual's copy of the Lawmatics row was
+ * written at its current start (the later of its `created_at` and `synced_at`, so a reschedule counts as new), or null when unknown.
+ */
+export type LawmaticsConsult = { knownSinceMs: number | null } | null;
+
+/**
+ * The reach to apply to one prep's emails, or null for none: a re-run, a stage-keyed prep, an Outlook-only consult, and a consult
+ * Lectual first knew of (at this start) after lawmatics-mcp's last run had fired get no cutover rule. They are Lectual's to brief.
+ * An unknown `knownSinceMs` keeps the time-only rule.
+ */
+export function cutoverFor(reach: CutoverReach | null, consult: LawmaticsConsult | undefined, opts: { rerun?: boolean } = {}): CutoverReach | null {
+  if (!reach || opts.rerun || !consult) return null;
+  if (consult.knownSinceMs !== null && Number.isFinite(consult.knownSinceMs) && consult.knownSinceMs > reach.seenBy) return null;
+  return reach;
+}
+
 export function supersededByCutover(kind: "booked" | "24h" | "1h", startsAtMs: number | null, reach: CutoverReach | null): boolean {
   if (!reach || startsAtMs === null || !Number.isFinite(startsAtMs)) return false;
   const day = startsAtMs - 24 * HOUR_MS < reach.day;

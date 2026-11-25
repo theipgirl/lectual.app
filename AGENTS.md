@@ -2801,6 +2801,13 @@ Nothing goes to a client; no migration, no dependency. Three env vars, all read 
   superseded when start - 24 h < reach.day, a 1h when start - 1 h < reach.hour, the booked one when either (it goes only when lawmatics-mcp sent
   nothing). **Decision:** a per-slot horizon from its schedule, not the plan's flat "start < cutover + 48 h": the flat window would leave consults
   with no 1 h brief from either system (lawmatics-mcp reaches about 16 h, not 48 h), and 48 h is too short for a weekday-only weekend (about 61.5 h).
+  **Only a consult lawmatics-mcp can have seen** (`cutoverFor`): the rule applies to a Lawmatics consult (the sync's `lmsync:` row, or an Outlook
+  event with such a twin; an Outlook-only consult is never left to it) and only when Lectual's copy of the row at its current start (the later of
+  `created_at` and `synced_at`, so a reschedule counts as new) was written by `reach.seenBy`, the earliest moment lawmatics-mcp's last run can have
+  fired (its slot - 1 h, the earlier of the two weekday settings). A consult known later is Lectual's: a possible duplicate beats no brief. An
+  unknown time keeps the time-only rule. **Rows from before the switch-over are not owed** (`dropPreCutoverOwed`): a `withheld` or `failed` send
+  record written before `CONSULT_PREP_CUTOVER_AT` (S2b wrote them with no sender set) is left out of every plan, so no late booked email and no
+  retry build starts from one; a reminder is planned only by the ordinary rules. The card stops calling such a row pending.
   A covered slot gets an append-only send record `status: "superseded"` (once per slot, `recordSuperseded`, no Resend call), which `planSends` treats
   as done, so no later run sends it whatever the clock or env says; it never hides a sent / scheduled / duplicate row. Stage-keyed preps (no consult
   time; lawmatics-mcp briefs only booked events) and a person's re-run (they asked for it; lawmatics-mcp has no booked email to double) are exempt. A
@@ -2816,12 +2823,16 @@ Nothing goes to a client; no migration, no dependency. Three env vars, all read 
 - **"Send a test brief"** (lead page, Consult prep card, `TestBrief.tsx`; owner only: `canSendTestBrief` = role `owner` AND `actingAsStaff === false`,
   so Lectual staff in a firm are refused). Lead page, not Settings: the lead is the consult being prepared, already chosen. `sendTestBriefAction`
   re-resolves the session, reads the lead through the scoped client (must be in the session's firm, not merged), limits 5 an hour per owner in
-  memory (a courtesy limit), and runs consult prep through the runner with scope `{ reason: "test", leadIds: [lead] }` (the assistant must be on;
+  memory (a courtesy limit; the slot is taken before any await and given back when the press is refused before a build,
+  `CONSULT_PREP_TEST_REFUSED_BEFORE_BUILD`), and runs consult prep through the runner with scope `{ reason: "test", leadIds: [lead] }` (the assistant must be on;
   an `agent_run` row records the run, counts only). `runTestBrief` (engine.ts) builds a REAL full prep for the lead's next consult (else its stage
   path) through `deps.full` (two model calls at most, the firm's packages, the USPTO pull, both files) and sends ONE email to the same recipients
-  (`guardRecipients`, then `testRecipientsOnFirmDomains`: a To, every address on the sender's or a member's non-public domain or exactly a member),
+  (`guardRecipients`, then `testRecipientsOnFirmDomains`: a To, and every To and Cc on a FIRM domain, i.e. the sender's (`CONSULT_PREP_FROM`)
+  or a connected `mailbox_connection` address's, never a public webmail one, or exactly a firm mailbox; otherwise `CONSULT_PREP_TEST_OFF_DOMAIN`
+  and nothing is built),
   subject `[TEST] ...`, first line `CONSULT_PREP_TEST_FIRST_LINE`, a fresh idempotency key per press. It ignores the switch-over and writes NOTHING
   (no queue item, marker, send or build record, file). Its answer is one of `CONSULT_PREP_TEST_OUTCOMES` (fixed sentences).
+- The lead page exports `maxDuration = 300`: Re-run prep and the test brief build a full prep inside its server actions.
 - Tests: `tests/consult-prep/{cutover,reply-to,test-brief-action,deps}.test.ts`, the S2c blocks of `tests/agents/consult-prep.test.ts` and
   `tests/agents/consult-prep-full.test.ts`. **Harness change:** both engine harnesses now pass `cutoverAtMs` 60 days before NOW, since emails are
   shut without one. **Not verified:** a live Resend reply-to and attachments on a scheduled email, that `rpblawfirm.com` is verified on lectual-app's

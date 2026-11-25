@@ -2,7 +2,7 @@
 // the engine's fixed sentences back.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { CONSULT_PREP_TEST_FAILED, CONSULT_PREP_TEST_LIMIT, CONSULT_PREP_TEST_OFF, CONSULT_PREP_TEST_OWNER_ONLY, CONSULT_PREP_TEST_SENT } from "@/lib/ui/words";
+import { CONSULT_PREP_TEST_EMAIL_OFF, CONSULT_PREP_TEST_FAILED, CONSULT_PREP_TEST_LIMIT, CONSULT_PREP_TEST_NOT_BUILT, CONSULT_PREP_TEST_OFF, CONSULT_PREP_TEST_OWNER_ONLY, CONSULT_PREP_TEST_SENT } from "@/lib/ui/words";
 
 const LEAD = "8f1c2a3b-0000-4000-8000-000000000001";
 const state = vi.hoisted(() => ({
@@ -78,5 +78,22 @@ describe("who may send a test brief", () => {
     for (let i = 0; i < 5; i += 1) expect((await sendTestBriefAction(LEAD)).ok).toBe(true);
     expect(await sendTestBriefAction(LEAD)).toEqual({ message: CONSULT_PREP_TEST_LIMIT });
     expect(state.scoped).toHaveLength(5);
+  });
+
+  it("the slot is taken before anything is awaited: six presses at once run five", async () => {
+    const results = await Promise.all(Array.from({ length: 6 }, () => sendTestBriefAction(LEAD)));
+    expect(results.filter((r) => r.message === CONSULT_PREP_TEST_LIMIT)).toHaveLength(1);
+    expect(state.scoped).toHaveLength(5);
+  });
+
+  it("a press refused before anything was built gives its slot back; one that built (or tried to) keeps it", async () => {
+    state.outcome = { status: "ok", result: { summary: CONSULT_PREP_TEST_EMAIL_OFF } };
+    for (let i = 0; i < 7; i += 1) expect(await sendTestBriefAction(LEAD)).toEqual({ ok: false, message: CONSULT_PREP_TEST_EMAIL_OFF });
+    state.lead = null;
+    for (let i = 0; i < 3; i += 1) expect(await sendTestBriefAction(LEAD)).toEqual({ message: CONSULT_PREP_TEST_FAILED });
+    state.lead = { id: LEAD, org_id: "org-1", merged_into_id: null };
+    state.outcome = { status: "ok", result: { summary: CONSULT_PREP_TEST_NOT_BUILT } };
+    for (let i = 0; i < 5; i += 1) expect((await sendTestBriefAction(LEAD)).message).toBe(CONSULT_PREP_TEST_NOT_BUILT);
+    expect(await sendTestBriefAction(LEAD)).toEqual({ message: CONSULT_PREP_TEST_LIMIT });
   });
 });

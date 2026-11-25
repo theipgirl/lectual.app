@@ -49,7 +49,7 @@ describe("how far lawmatics-mcp can have scheduled (its slots.ts rules, either w
 });
 
 describe("which Lectual emails that covers", () => {
-  const reach = { day: Z("2026-12-02T01:00:00Z"), hour: Z("2026-12-02T04:00:00Z") };
+  const reach = { day: Z("2026-12-02T01:00:00Z"), hour: Z("2026-12-02T04:00:00Z"), seenBy: Z("2026-12-01T11:30:00Z") };
   it("the 24 h email: only when its send time is before the reach (exclusive)", () => {
     expect(supersededByCutover("24h", reach.day + 24 * HOUR_MS - 1, reach)).toBe(true);
     expect(supersededByCutover("24h", reach.day + 24 * HOUR_MS, reach)).toBe(false);
@@ -199,5 +199,78 @@ describe("emails wait for the switch-over (fail closed)", async () => {
     });
     expect(view.kind === "prepared" && view.lines[0]).toContain(CONSULT_PREP_EMAILS_WAIT);
     expect(CONSULT_PREP_EMAILS_WAIT).toBe("not emailed: emails start when the switch-over is done");
+  });
+});
+
+describe("review fixes", async () => {
+  const { cutoverFor } = await import("@/lib/consult-prep/cutover");
+  const { dropPreCutoverOwed } = await import("@/lib/consult-prep/sends");
+
+  it("parseCutoverAt refuses an impossible date or time", () => {
+    for (const v of ["2026-02-30T10:00:00Z", "2026-11-31T10:00:00-05:00", "2026-12-01T24:00:00Z", "2026-12-01T10:60:00Z", "2026-12-01T10:00:61Z", "2026-12-01T10:00:00+15:00", "2026-12-01T10:00:00-05:75"]) {
+      expect(parseCutoverAt(v), v).toBeNull();
+    }
+    expect(parseCutoverAt("2028-02-29T10:00:00Z")).toBe(Z("2028-02-29T10:00:00Z"));
+  });
+
+  it("the reach says when lawmatics-mcp's last run can first have fired", () => {
+    // Tue Dec 1 2026, 2:30 PM EST: its last run was for 7:30 AM, so it fired no earlier than 6:30 AM.
+    expect(lawmaticsReach(Z("2026-12-01T19:30:00Z")).seenBy).toBe(Z("2026-12-01T11:30:00Z"));
+  });
+
+  it("a consult booked after lawmatics-mcp's last run is Lectual's: booked Tue 10 AM for Tue 6 PM, cut over at 2:30 PM, gets its emails", () => {
+    const reach = lawmaticsReach(Z("2026-12-01T19:30:00Z"));
+    const start = Z("2026-12-01T23:00:00Z"); // Tue 6:00 PM EST
+    const known = { knownSinceMs: Z("2026-12-01T15:00:00Z") }; // Tue 10:00 AM EST
+    expect(cutoverFor(reach, known)).toBeNull();
+    const k = eventPrepKey("lead-1", "ev-1", new Date(start).toISOString());
+    const p = planSends({ prepKey: k, startsAtMs: start, nowMs: Z("2026-12-01T20:00:00Z"), preppedAtMs: Z("2026-12-01T20:00:00Z"), madeNow: true, suppressBooked: false, existing: new Map(), cutover: cutoverFor(reach, known) });
+    expect(p.actions.map((a) => a.kind)).toEqual(["booked", "1h"]);
+    // the same consult known before that run: covered, as before
+    expect(cutoverFor(reach, { knownSinceMs: Z("2026-12-01T11:00:00Z") })).toBe(reach);
+  });
+
+  it("an unknown booking time keeps the time-only rule; an Outlook-only consult (null) and a re-run get none", () => {
+    const reach = lawmaticsReach(Z("2026-12-01T19:30:00Z"));
+    expect(cutoverFor(reach, { knownSinceMs: null })).toBe(reach);
+    expect(cutoverFor(reach, null)).toBeNull();
+    expect(cutoverFor(reach, undefined)).toBeNull();
+    expect(cutoverFor(reach, { knownSinceMs: null }, { rerun: true })).toBeNull();
+    expect(cutoverFor(null, { knownSinceMs: null })).toBeNull();
+  });
+
+  it("withheld and failed rows from before the switch-over are not owed; later ones, and sent or scheduled ones, stay", () => {
+    const k = eventPrepKey("lead-1", "ev-1", "2026-12-04T10:00:00.000Z");
+    const r = (kind: "booked" | "24h" | "1h", status: SendRecord["status"], at: string): [string, SendRecord] => [recordSlot(k, kind), { leadId: "lead-1", prepKey: k, kind, resendId: status === "scheduled" ? "re_1" : null, scheduledFor: null, status, at }];
+    const cut = Z("2026-12-01T19:30:00Z");
+    const folded = new Map([r("booked", "withheld", "2026-12-01T10:00:00Z"), r("24h", "failed", "2026-12-01T19:00:00Z"), r("1h", "scheduled", "2026-12-01T10:00:00Z")]);
+    expect([...dropPreCutoverOwed(folded, cut).values()].map((x) => x.status)).toEqual(["scheduled"]);
+    const later = new Map([r("booked", "withheld", "2026-12-01T20:00:00Z")]);
+    expect(dropPreCutoverOwed(later, cut).size).toBe(1);
+    expect(dropPreCutoverOwed(folded, null).size).toBe(3);
+  });
+
+  it("the card no longer calls a pre-switch-over withheld booked email pending", () => {
+    const k = eventPrepKey("lead-1", "ev-1", "2026-12-08T10:00:00.000Z");
+    const rec: SendRecord = { leadId: "lead-1", prepKey: k, kind: "booked", resendId: null, scheduledFor: null, status: "withheld", at: "2026-12-01T10:00:00Z" };
+    const view = (cutoverAtMs: number | null) =>
+      consultPrepCardView({
+        agents: "on",
+        setting: "on",
+        markers: { status: "ok", value: [{ prepKey: k, queueItemId: "q-1", at: "2026-12-01T10:00:00Z" }] },
+        sends: { status: "ok", value: [rec] },
+        recipients: { status: "ok", value: { names: ["Rebecca"], cc: [] } },
+        emailOn: true,
+        emailsStarted: true,
+        cutoverAtMs,
+        adminTier: true,
+        tz: "America/New_York",
+        nowMs: Z("2026-12-02T10:00:00Z"),
+      });
+    const a = view(Z("2026-12-01T19:30:00Z"));
+    expect(a.kind === "prepared" && a.lines[0]).toContain("· not emailed");
+    expect(a.kind === "prepared" && a.lines[0]).not.toContain("waiting for the full prep");
+    const b = view(null);
+    expect(b.kind === "prepared" && b.lines[0]).toContain("waiting for the full prep");
   });
 });

@@ -9,6 +9,8 @@ export const FEEDBACK_WINDOW_MS = 60 * 60 * 1000;
 export type RateLimiter = {
   allowed: (key: string) => boolean;
   record: (key: string) => void;
+  /** Gives back the newest slot `record` took (a caller that reserved one before an await and was then refused). */
+  release: (key: string) => void;
 };
 
 export function createRateLimiter(opts: { max: number; windowMs: number; now?: () => number }): RateLimiter {
@@ -27,6 +29,12 @@ export function createRateLimiter(opts: { max: number; windowMs: number; now?: (
       const kept = live(key);
       kept.push(now());
       hits.set(key, kept);
+    },
+    release: (key) => {
+      const kept = live(key);
+      kept.pop();
+      if (kept.length === 0) hits.delete(key);
+      else hits.set(key, kept);
     },
   };
 }

@@ -113,21 +113,21 @@ export function guardReplyTo(input: { replyTo: string | null | undefined; from: 
 }
 
 /**
- * S2c: the extra, explicit check before a TEST brief goes (on top of `guardRecipients`): there is at least one To, and every To and Cc
- * is on a firm domain (the sender's own domain, or a domain of one of the firm members the guard kept, never a public webmail domain) or
- * is exactly one of those members' addresses. Anything else and nothing is sent.
+ * S2c: the extra, explicit check before a TEST brief goes (on top of `guardRecipients`). The firm's domains are the SENDER's domain
+ * (`CONSULT_PREP_FROM`) and the domains of the firm's own connected mailboxes (`mailbox_connection.email`), never a public webmail
+ * domain. There must be at least one To, and every To and Cc must be on one of those domains, or be exactly one of the firm's mailbox
+ * addresses. Anything else and nothing is sent (a member who signed up with a personal address can't receive a test brief).
  */
-export function testRecipientsOnFirmDomains(input: { to: readonly string[]; cc: readonly string[]; from: string | null | undefined }): boolean {
-  const to = input.to.map((a) => bareAddress(a)).filter((a): a is string => a !== null);
-  if (to.length === 0 || to.length !== input.to.length) return false;
-  const members = new Set(to);
-  const firm = new Set(to.map(domainOf).filter((d) => !isPublicMailDomain(d)));
+export function testRecipientsOnFirmDomains(input: { to: readonly string[]; cc: readonly string[]; from: string | null | undefined; firmAddresses: readonly (string | null | undefined)[] }): boolean {
+  if (input.to.length === 0) return false;
+  const mailboxes = new Set(input.firmAddresses.map((a) => bareAddress(a)).filter((a): a is string => a !== null));
+  const firm = new Set([...mailboxes].map(domainOf).filter((d) => !isPublicMailDomain(d)));
   const sender = senderAddress(input.from);
   if (sender && !isPublicMailDomain(domainOf(sender))) firm.add(domainOf(sender));
   for (const raw of [...input.to, ...input.cc]) {
     const a = bareAddress(raw);
     if (!a) return false;
-    if (!members.has(a) && !firm.has(domainOf(a))) return false;
+    if (!mailboxes.has(a) && !firm.has(domainOf(a))) return false;
   }
   return true;
 }

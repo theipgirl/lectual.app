@@ -1890,3 +1890,54 @@ describe("S2c: the reply-to (CONSULT_PREP_REPLY_TO)", () => {
     expect(result.summary).not.toMatch(/reply-to/);
   });
 });
+
+describe("S2c review fixes: who lawmatics-mcp really covered", () => {
+  // Cut over at NOW (Fri 8:00 AM EDT): lawmatics-mcp's last run was for 7:30 AM and fired no earlier than 6:30 AM (NOW - 1.5 h).
+  const CUTOVER = { cutoverAtMs: NOW };
+
+  it("a consult Lectual first knew of after that run gets every email (lawmatics-mcp may never have seen it)", async () => {
+    const s = setup({ full: true, tables: { crm_calendar_event: [event("e1", { starts_at: hours(30), created_at: hours(-1), synced_at: hours(-1) })] }, deps: CUTOVER });
+    await s.run();
+    expect(s.sent.map(kindOf)).toEqual(["booked", "24h", "1h"]);
+  });
+
+  it("one known before it stays covered", async () => {
+    const s = setup({ full: true, tables: { crm_calendar_event: [event("e1", { starts_at: hours(30), created_at: hours(-3), synced_at: hours(-3) })] }, deps: CUTOVER });
+    await s.run();
+    expect(s.sent.map(kindOf)).toEqual(["1h"]);
+  });
+
+  it("a consult rescheduled into the window after that run (its row re-synced) gets every email", async () => {
+    const s = setup({ full: true, tables: { crm_calendar_event: [event("e1", { starts_at: hours(30), created_at: hours(-48), synced_at: hours(-1) })] }, deps: CUTOVER });
+    await s.run();
+    expect(s.sent.map(kindOf)).toEqual(["booked", "24h", "1h"]);
+  });
+
+  it("an Outlook-only consult is never left to lawmatics-mcp", async () => {
+    const s = setup({ full: true, tables: { crm_calendar_event: [event("e1", { source: "outlook", external_id: "AAMk-1", starts_at: hours(30) })] }, deps: CUTOVER });
+    await s.run();
+    expect(s.sent.map(kindOf)).toEqual(["booked", "24h", "1h"]);
+    // the same call also in Lawmatics: the Lawmatics row is the one prepped, and it is covered
+    const both = setup({ full: true, tables: { crm_calendar_event: [event("o1", { source: "outlook", external_id: "AAMk-1", starts_at: hours(30) }), event("e1", { starts_at: hours(30) })] }, deps: CUTOVER });
+    await both.run();
+    expect(both.sent.map(kindOf)).toEqual(["1h"]);
+  });
+
+  it("withheld rows written before the switch-over send nothing late: no booked email when it opens", async () => {
+    // Before S2c these rows were written whether or not a sender was set: a facts prep with its booked email withheld.
+    const first = setup({ tables: { crm_calendar_event: [event("e1", { starts_at: hours(50) })] } });
+    await first.run();
+    expect(sendPayloads(first.db).find((p) => p.kind === "booked")?.status).toBe("withheld");
+    const tables = { crm_calendar_event: [event("e1", { starts_at: hours(50) })], crm_activity: first.db.tables.crm_activity };
+    // The switch-over is an hour later; the next run (with a full prep now in Approvals) does not send that booked email.
+    const after = setup({ full: true, tables, deps: { cutoverAtMs: NOW + 3_600_000 }, now: NOW + 2 * 3_600_000 });
+    await after.run();
+    expect(after.sent.map(kindOf)).not.toContain("booked");
+    // its reminders still follow the ordinary rules (their own times are after the switch-over)
+    expect(after.sent.map(kindOf)).toEqual(expect.arrayContaining(["24h", "1h"]));
+    // Control: the same rows written AFTER an earlier switch-over are still owed, and it goes.
+    const control = setup({ full: true, tables, deps: { cutoverAtMs: NOW - 3_600_000 }, now: NOW + 2 * 3_600_000 });
+    await control.run();
+    expect(control.sent.map(kindOf)).toContain("booked");
+  });
+});

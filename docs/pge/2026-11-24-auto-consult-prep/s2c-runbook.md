@@ -1,6 +1,6 @@
 # S2c runbook: switching consult prep emails from lawmatics-mcp to Lectual
 
-Nine steps, in order. Each says what it does, who does it, how to check it, and how to undo it.
+Ten steps, in order. Each says what it does, who does it, how to check it, and how to undo it.
 Nothing here emails a client. Every email goes only to the people chosen in Settings → Team.
 
 ## What the code does (so the steps make sense)
@@ -12,8 +12,11 @@ Nothing here emails a client. Every email goes only to the people chosen in Sett
   the reminders still due (a day before, an hour before). Its "booked" email is not sent late.
 - **No doubles with lawmatics-mcp.** lawmatics-mcp hands its 24 h and 1 h briefs to Resend ahead of time and never cancels them.
   Lectual works out, from lawmatics-mcp's own schedule (7:30 AM and 8:00 PM New York), the latest time it can have scheduled
-  a brief by the switch-over. Lectual sends nothing lawmatics-mcp may already have covered, and records it as
-  "the old brief was already scheduled for this consult". Anything later is Lectual's.
+  a brief by the switch-over. For a Lawmatics consult that Lectual already knew of when lawmatics-mcp's last run fired, Lectual
+  sends nothing lawmatics-mcp may already have covered, and records it as "the old brief was already scheduled for this consult".
+  A consult booked (or rescheduled) after that run, an Outlook-only consult, and anything later are Lectual's.
+- **Old "waiting" rows don't flood.** Rows written before the switch-over that say an email was held back or failed are ignored
+  when it opens: no late "booked" emails, no burst of rebuilds.
 - **Reply-to.** `CONSULT_PREP_REPLY_TO` goes on every email, but only if it is on the sender's domain or a recipient's domain.
 - **"Send a test brief"** (lead page, Consult prep card, owner only) builds a real full prep for that lead's next consult and
   emails it, marked `[TEST]`, to the Settings → Team people only. It ignores the switch-over and saves nothing.
@@ -29,9 +32,14 @@ Who: Taylor (with Rebecca for the settings).
 - **Sending domain.** In the Resend dashboard of the account that owns lectual-app's `RESEND_API_KEY`: Domains →
   `rpblawfirm.com` shows **Verified**. Second check: Emails → a recent worksheet email from `events@rpblawfirm.com` shows
   Delivered (same key, same domain). If the domain is not there, stop: `brief@rpblawfirm.com` would be refused.
+- **Read lawmatics-mcp's schedule.** Vercel → lawmatics-mcp → Settings → Environment Variables (Production): note the values of
+  `BRIEF_TIMEZONE`, `BRIEF_HOUR`, `EOD_HOUR` and `BRIEF_WEEKDAYS_ONLY` (none is secret). Unset means the defaults: New York,
+  7 (the 7:30 AM run), 20 (the 8:00 PM run), not weekdays-only. Lectual assumes the defaults and allows for either weekday setting.
+  If the zone or either hour is set to something else, stop and tell the developer before step 6.
 - **Pick the switch-over time.** A weekday, between 9:00 AM and 6:00 PM New York, not Friday evening to Monday morning.
-  Inside that window lawmatics-mcp's reach is at most about 16 hours. Within an hour of 7:30 AM or 8:00 PM, or over a weekend,
-  the reach jumps to the next slot (up to Monday 7:30 AM), and more consults go without Lectual's own emails.
+  Inside that window lawmatics-mcp's reach is at most about 16 hours. Within an hour BEFORE 7:30 AM or 8:00 PM (from 6:30 AM, or
+  from 7:00 PM) the next run may already have fired early, so its reach jumps to the slot after it (11:00 PM, or 7:30 AM next day).
+  Over a weekend it reaches to Monday 7:30 AM. Either way more consults are left to lawmatics-mcp.
 
 Check: all four are true. Undo: nothing to undo.
 
@@ -79,9 +87,28 @@ Who: Rebecca presses it; Taylor checks it.
 If it fails, the card says why in one sentence (email not switched on, no one set, the full prep couldn't be built). Fix and press
 again. Do not go on to step 6 until a good test has arrived.
 
+The test only goes to members on the firm's email domain (the sender's, or a connected mailbox's). A member who signed up with a
+personal address makes it refuse; that is on purpose.
+
 Undo: nothing to undo (nothing was saved).
 
 ## 6. Set the switch-over time
+
+Before setting it, count the old rows that will be ignored (Supabase SQL editor, lectual-prod; read only):
+
+```sql
+select payload->>'kind' as kind, payload->>'status' as status, count(*)
+from crm_activity
+where type = 'ai_insight'
+  and payload->>'source' = 'consult-prep-send'
+  and payload->>'status' in ('withheld', 'failed')
+group by 1, 2
+order by 1, 2;
+```
+
+Each of these was written before the switch-over. Once it passes, Lectual does not send for them (their reminders still follow the
+normal rules). The count is for the record; nothing needs fixing.
+
 
 Who: Taylor, in Vercel → lectual-app → Production.
 
@@ -105,13 +132,34 @@ Who: Taylor.
 3. Both before the time set in step 6.
 
 What happens to briefs lawmatics-mcp already scheduled: they still go out. They sit on the rpblawfirm.com Resend account and
-nothing cancels them. That is intended: those are exactly the consults Lectual leaves alone. Rebecca gets lawmatics-mcp's
-version for them, once, not two.
+nothing cancels them. For a consult Lectual already knew of before lawmatics-mcp's last run, Lectual leaves those emails to it, so
+Rebecca gets lawmatics-mcp's version once, not two. A consult booked after that run gets Lectual's own emails instead (lawmatics-mcp
+may never have seen it); if lawmatics-mcp did see it, that one consult may get both, which beats getting neither.
+
+**A reschedule after the switch-over can give two briefs:** lawmatics-mcp's brief for the OLD time still fires, and Lectual briefs
+the new time.
 
 Check: lawmatics-mcp's next cron JSON shows the consult brief pass as `disabled`
 (`/api/cron/morning-brief?dry=1` with the cron secret). Undo: see step 9.
 
-## 8. Verify
+## 8. Switch-over day check
+
+Who: Taylor, at the end of the switch-over day and the next morning.
+
+- List the consults of the next three days (Supabase SQL editor, lectual-prod; read only; RPB's org id in place of `<org>`):
+
+```sql
+select lead_id, starts_at, created_at, synced_at
+from crm_calendar_event
+where org_id = '<org>' and is_consult and lead_id is not null
+  and starts_at between now() and now() + interval '3 days'
+order by starts_at;
+```
+
+- Open each lead's page. On the Consult prep card, a consult booked that day should read "emailed" (or show its reminders). If it
+  has no brief (Rebecca got nothing from either system), press **Re-run prep**: a re-run always sends its own email.
+
+## 9. Verify
 
 Who: Taylor.
 
@@ -128,7 +176,7 @@ Who: Taylor.
   - the Resend dashboard for lectual-app's key: the emails and the scheduled ones.
 - For two or three days, check that no consult got both a lawmatics-mcp brief and a Lectual brief for the same slot.
 
-## 9. Rollback
+## 10. Rollback
 
 Who: Taylor.
 
@@ -140,7 +188,10 @@ Who: Taylor.
   them by hand in the Resend dashboard of lectual-app's key.
 
 **Bring lawmatics-mcp back:**
-- First stop Lectual's emails (above), or both will send.
+- First stop Lectual's emails (above), AND cancel the ones Lectual has already scheduled, or both systems will send:
+  switch the Consult prep assistant off, then either cancel the scheduled emails by hand in the Resend dashboard of lectual-app's
+  key, or wait until the 5 AM agents run has passed (about 5:23 AM New York; it cancels every one still scheduled). The agents job
+  can't be run by hand at another hour: its route only works in its 5 AM hour.
 - lawmatics-mcp → Production: `CONSULT_PREP_ENABLED` = `true` (or delete it). Redeploy. It schedules from its next run.
 
 **Undo the code:** revert the merge on `main` and redeploy lectual-app. Its records stay. They do nothing without the code.
