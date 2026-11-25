@@ -7,6 +7,17 @@ Newest section first. Tick an item when it is done; don't delete it.
 
 Recap: `docs/recaps/2026-11-17-marketing-site-redesign-mockups.md` (round three). Omi cross-check: still the open item "Review the new website".
 
+### Taylor, after go-live (Nov 25): the new page is live at lectual.app/firms/
+- [ ] Open https://lectual.app/firms/ on your own laptop and phone (Safari and Firefox were never tested; the glass bar and top blur depend on a browser feature that differs there).
+- [ ] Decide on the "licensed attorney approves" wording. The page says every client-facing draft waits for a licensed attorney; in the product an admin who is not an attorney can approve, and a stalled follow-up can be routed to any staff member. Ask Rebecca.
+- [ ] The page shows a client signing the engagement letter on the proposal page. That needs lectual migration 0106 on lectual-prod (it is on dev only). Apply it, or soften the copy.
+- [ ] SharePoint, Google Drive and ChatGPT are shown as connections and are not built (your call on Nov 25: show all ten as they are). Gmail is mail only.
+- [ ] Check each company's brand rules for the ten connector logos.
+- [ ] Have Rebecca read the deadlines section's wording.
+- [ ] In Vercel Analytics, confirm visits to /firms/ are being counted (the page now loads analytics with its own snippet).
+- [ ] "Apply for private beta" still opens an email to taylor@theipgirl.com, as the old page did. Say if you want a form instead.
+- [ ] Omi: "Review the new website" (Oct 12) can be closed once you have looked at the live page.
+
 ### Taylor, after the statement moved (Nov 25, late)
 - [ ] Scroll the hero into "Lectual acts." and on into "What makes Lectual different?" and say if the hold feels right (it is on screen for about 1,300px of scroll on a laptop).
 - [ ] Say whether the empty paper between the overnight scene and the workspace section (about 270px on desktop) should be tightened now the statement is gone from there.

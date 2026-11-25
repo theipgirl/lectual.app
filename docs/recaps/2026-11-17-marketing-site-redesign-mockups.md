@@ -293,7 +293,43 @@ reviewed by the orchestrator; a reply was posted in the comment thread.
   lines measure 10.7:1 or better at 1440. Not checked: Safari, a real phone, contrast at other
   widths. The sky's frame timing was not retuned for the longer pin.
 
-## Recommendation on Astro (not decided)
+## Go-live (Nov 25): Horizon is lectual.app/firms/
+
+Taylor: "go ahead and make this live on lectual.app". Done the same day, in `theipgirl/lectual`
+(the repo that serves lectual.app), on `main` at `bbf413a`. Decision recorded in that repo's
+`brain/decisions.md` as 2026-11-25-01.
+
+- **How it is built:** the approved page is served as one standalone HTML document by a route
+  handler at `/firms/`, assembled from `src/marketing/horizon/parts/*.html` by
+  `scripts/build-horizon.mjs`. It stays in the Next.js app (not Astro) but outside the React
+  tree, so its styles and scroll scripts cannot affect the rest of the site. Sky frames, the
+  animation library and the logos are files under `public/marketing/horizon/`; nothing loads
+  from another site except Google Fonts.
+- **Live-site changes to the approved page:** real title and sharing tags; "Log in" goes to
+  `/sign-in/`; the closing "Apply for private beta" button opens the same email link the old
+  page used; footer links point at real sections and pages; five "Mockup" leftovers removed.
+  No other copy changed.
+- **Who did what:** a builder ported it and ran build, lint, tests and a screen-by-screen
+  comparison with the approved page (no visible differences). An independent reviewer read the
+  change: no blockers, two fixes made (a stricter test that the page loads nothing from other
+  sites; the founder front door's link no longer downloads the page three times). The
+  orchestrator checked two Vercel previews, fast-forwarded `main`, and checked production.
+- **Checked on production:** `/firms/` returns the page on desktop and phone widths with no
+  errors and no sideways scroll; `/firms` redirects to `/firms/`; `/` still redirects to
+  `/pathset/`; sign-in, the blog, the sky images and scripts load; the nav's Apply button
+  scrolls to the closing section; the front door's firm link loads the page once.
+- **Taylor's call at go-live:** show all ten connections as they are, with no "coming soon"
+  labels (asked and answered in the session).
+- **Left for Taylor (reviewer's wording points, not changed):** "a licensed attorney approves"
+  is stated as an absolute though the product lets a non-attorney admin approve and routes some
+  follow-ups to any staff member; the page shows engagement-letter signing, which needs
+  migration 0106 on production.
+- **Not checked:** Safari, Firefox, a real phone; a signed-in firm member being redirected to
+  the dashboard (same code as the old page, not exercised); whether analytics is counting visits.
+- **Roll back, if ever needed:** in Vercel, promote the previous `main` deployment
+  (commit `80f87cf`), or revert the three commits on `main`.
+
+## Recommendation on Astro (settled at go-live: the page stayed in the Next.js app)
 
 Stay on Next.js for this redesign. The loader, pin scrolling and micro-animations are the same
 GSAP code in either framework, and the mockups are plain HTML, CSS and GSAP, so they port to
