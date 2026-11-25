@@ -12,7 +12,7 @@ Sources: the Nov 17 working session with Caitlyn, the Nov 23 team meeting (Caitl
 | What is "add a row"? | **A real lead or matter.** Never a free-form line. |
 | Who may change a view's structure? | **Owners and Caitlyn.** |
 | Order | **Weekly review (List and Board) first, then Matters and Contracts, then Leads.** |
-| Caitlyn's role | **Stays senior admin**, plus the new right below. |
+| Caitlyn's role | **Senior admin**, plus the new right below (Taylor, in chat Nov 25: "yes sr admin"). Her membership is OWNER on prod today (director, Nov 25); changing it is a prod write that needs Taylor's OK and is not part of this build. |
 | Settings -> Columns | **Removed.** Editing happens on the view itself. |
 
 Still open (default chosen; Taylor can overrule before the build):
@@ -41,9 +41,14 @@ Still open (default chosen; Taylor can overrule before the build):
 
 - The firm's own columns live in **Settings -> Columns** (`src/app/dashboard/settings/columns/page.tsx`, `src/lib/custom-columns/`), admin tier
   only, and only add columns to the Weekly review List. No rename of built-in columns, no add row, no move, nothing on Boards, Leads or Matters.
-- Their tables are the **lectual 0115 proposal, applied nowhere**, so nothing there can be saved.
+- Their tables are **lectual 0115, applied to lectual-dev and lectual-prod on 2026-11-23** (with 0116; the 0115 file is on lectual's
+  claude/gracious-darwin-rceoyv branch, 0086dc0, not lectual main). RPB has no firm column yet (0 `crm_custom_field` rows).
 - The Weekly review List is editable in place (`SheetEditTable`) **only in the owner view** (`viewFor(...) === "owner"`, `review/page.tsx`).
-  Caitlyn moved from owner to senior admin on Nov 24, which most likely took it away. She also saw no change while she was owner: to be checked.
+  Director's read-only check (prod, Nov 25): Caitlyn's membership is OWNER, `role-views` is on for RPB and her view preference is unset, so she
+  lands in the owner view and should get that editable List today. What she asked for is still missing there: the List edits CELLS (status,
+  next step, owner, source, notes, the firm's own columns) but cannot rename a column, add a row, or move columns for the firm; adding a column
+  means leaving for Settings; and the Boards, Matters, Contracts and Leads have none of it. Once she is senior admin she would lose even the cell
+  editing, because it is tied to the owner view.
 
 ## The design
 
@@ -76,10 +81,11 @@ Still open (default chosen; Taylor can overrule before the build):
 
 ### 3. Storage (one lectual migration, proposal first)
 
-- Rework the 0115 proposal rather than add a second one:
+- 0115 is applied, so this is a NEW migration on top of it (next free number in lectual), additive only:
   - `crm_view_layout`: one row per firm and view (`review_list`, `review_board`, `matters_list`, `matters_board`, `contracts_list`,
     `contracts_board`, `leads_list`, `leads_board`), a jsonb of columns in order: key, label, hidden, width.
-  - The firm's own columns and their values: 0115's field and value tables, kept, now used by every List, not only the Weekly review.
+  - The firm's own columns and their values: 0115's field and value tables, kept as they are, now used by every List, not only the Weekly
+    review (if a field needs to say which views it belongs to, that is an added column, never a rewrite of 0115).
   - `crm_org_member.can_shape_views boolean default false` (owners pass by rule), writable only by an owner, through 0116's
     owner/self-write guard pattern.
 - RLS on `org_id = current_org_id()`; layout writes need `can_shape_views` or owner. Isolation cases for every new table, in lectual's
