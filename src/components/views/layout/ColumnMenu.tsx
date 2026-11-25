@@ -60,7 +60,8 @@ export type ColumnMenuProps = {
   allowAdd?: boolean;
   /** The List section the header is in: where a new column starts out (Trademarks, Contracts). */
   section?: CustomSection;
-  kind?: "column" | "lane";
+  /** `stage`: a stage column of a Matters or Contracts Board: only Hide (its name and place are the stage's own, changed from its stage menu). */
+  kind?: "column" | "lane" | "stage";
   /** The visible columns either side (null: none, or the pinned one). Move left and right go BESIDE these, so the move is seen. */
   prevKey?: string | null;
   nextKey?: string | null;
@@ -88,7 +89,7 @@ export function ColumnMenu({ view, rev, columnKey, label, pinned = false, allowA
   const id = useId();
   const moneyHintId = `${id}-money`;
   const change = useLayoutChange(view, rev);
-  const aria = kind === "lane" ? laneMenuLabel(label) : columnMenuLabel(label);
+  const aria = kind === "lane" || kind === "stage" ? laneMenuLabel(label) : columnMenuLabel(label);
 
   // `close` touches no ref: it is called from the items drawn in render. Focus goes back to the button when the panel was dismissed by
   // Esc or by a click inside it (the panel's own onClick raises the flag, as the shared Popover does), not by a click elsewhere.
@@ -244,7 +245,7 @@ export function ColumnMenu({ view, rev, columnKey, label, pinned = false, allowA
             <>
               {/* Only the items are the menu: the note and the error below are outside it. */}
               <div role="menu" aria-label={aria} className="cm-items">
-                {menuItems({ pinned, allowAdd, hasPrev: prevKey !== null, hasNext: nextKey !== null, firm }).map((id) => {
+                {menuItems({ pinned, allowAdd, hasPrev: prevKey !== null, hasNext: nextKey !== null, firm, hideOnly: kind === "stage" }).map((id) => {
                   switch (id) {
                     case "rename":
                       return <Fragment key={id}>{item(COLUMNS_RENAME, () => setMode("rename"))}</Fragment>;

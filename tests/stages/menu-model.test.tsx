@@ -139,10 +139,13 @@ describe("the menu is drawn only where the page hands it", () => {
 
   it("the pages hand it only to an owner membership row outside a preview, and the Leads board only on the stage board", () => {
     const root = process.cwd();
-    for (const file of ["src/app/dashboard/intake/page.tsx", "src/app/dashboard/matters/page.tsx"]) {
-      const src = readFileSync(path.join(root, file), "utf8");
-      expect(src, file).toMatch(/isOwner\(await loadOwnerState\(\)\) && !\(await inPreview\(\)\)/);
-    }
+    const intake = readFileSync(path.join(root, "src/app/dashboard/intake/page.tsx"), "utf8");
+    expect(intake).toMatch(/isOwner\(await loadOwnerState\(\)\) && !\(await inPreview\(\)\)/);
+    // Matters reads the owner row and the preview flag ONCE, beside its other reads (the layout menus need them too), and joins them.
+    const matters = readFileSync(path.join(root, "src/app/dashboard/matters/page.tsx"), "utf8");
+    expect(matters).toMatch(/loadOwnerState\(\),\s*inPreview\(\)/);
+    expect(matters).toMatch(/const ownerNow = isOwner\(ownerRead\) && !previewing;/);
+    expect(matters).toMatch(/const stageOwner = boardView && stageRead\.status !== "unavailable" && ownerNow;/);
     const board = readFileSync(path.join(root, "src/app/dashboard/intake/_components/IntakeBoard.tsx"), "utf8");
     expect(board).toContain('group !== "stage"');
   });

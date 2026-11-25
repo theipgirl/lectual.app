@@ -7,7 +7,8 @@
  */
 export type MenuItemId = "rename" | "hide" | "left" | "right" | "add-left" | "add-right" | "choices" | "archive";
 
-export function menuItems({ pinned, allowAdd, hasPrev = true, hasNext = true, firm = null }: { pinned: boolean; allowAdd: boolean; hasPrev?: boolean; hasNext?: boolean; firm?: { kind: string } | null }): MenuItemId[] {
+export function menuItems({ pinned, allowAdd, hasPrev = true, hasNext = true, firm = null, hideOnly = false }: { pinned: boolean; allowAdd: boolean; hasPrev?: boolean; hasNext?: boolean; firm?: { kind: string } | null; /** A stage column on a Matters or Contracts Board: the layout only hides it (its name and place are the stage's own). */ hideOnly?: boolean }): MenuItemId[] {
+  if (hideOnly) return ["hide"];
   const items: MenuItemId[] = ["rename"];
   if (!pinned) {
     items.push("hide");

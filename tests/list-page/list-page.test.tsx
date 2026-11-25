@@ -138,8 +138,9 @@ describe("Leads and Matters share the pattern", () => {
     expect(read("src/app/dashboard/intake/_components/IntakeTable.tsx")).toContain('className="ix-row"');
     expect(read("src/app/dashboard/intake/_components/IntakeTable.tsx")).toContain("<SheetCard");
     expect(read("src/app/dashboard/intake/_components/IntakeTable.tsx")).toContain("<SheetTable");
-    expect(matters).toContain('className="lp-row"');
-    expect(matters).toContain("<Pill");
+    // The Matters List now draws through the shared ViewTable: its row class and pills live in MatterListTable.
+    expect(read("src/components/matters/MatterListTable.tsx")).toContain('"lp-row"');
+    expect(read("src/components/matters/MatterListTable.tsx")).toContain("<Pill");
     expect(read("src/app/dashboard/intake/_components/IntakeCard.tsx")).toContain("ix-card");
     expect(read("src/components/matters/MatterBoard.tsx")).toContain("<BoardCard");
   });

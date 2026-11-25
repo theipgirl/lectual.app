@@ -1,12 +1,13 @@
 import Link from "next/link";
-import { BoardCard, BoardColumn, Pill } from "@/components/ui";
-import { NO_MAINTENANCE_DEADLINE_HINT, NO_OPEN_DEADLINE, NO_OPEN_DEADLINE_HINT, columnEmpty } from "@/lib/ui/words";
+import { BoardCard, Pill } from "@/components/ui";
+import { NO_MAINTENANCE_DEADLINE_HINT, NO_OPEN_DEADLINE, NO_OPEN_DEADLINE_HINT, MATTERS_BOARD_HIDDEN_NOTE, MATTER_BOARD_CLOSED_COLUMN, MATTER_BOARD_UNSTAGED_COLUMN, columnEmpty } from "@/lib/ui/words";
 import type { Matter } from "@/lib/matters";
 import type { MatterStage } from "@/lib/matters/stages";
 import { buildBoard } from "@/lib/matters/board";
 import { matterLabel } from "@/lib/matters/docket-summary";
 import { stageAge } from "@/lib/matters/worklist";
 import { matterCardId, reviewHref, stageDisplayName } from "@/lib/matters/list-view";
+import { CLOSED_COLUMN_KEY, UNSTAGED_COLUMN_KEY, splitHiddenColumns, stageColumnKey } from "@/lib/matters/views";
 import { MoveMenu } from "./MoveMenu";
 import { MovedCardScroller } from "./MovedCardScroller";
 import { BoardEmptyStages } from "./BoardEmptyStages";
@@ -15,6 +16,10 @@ import type { MatterCardData } from "@/lib/record-card/matter-cards";
 import { MatterCardFoot, MatterCardMenu } from "@/components/record-card/MatterBits";
 import { neighbours, stageMenuModel, type MenuStage } from "@/lib/stages/menu-model";
 import { StageMenu } from "@/components/views/stages/StageMenu";
+import { ViewBoard, type BoardColumnSpec } from "@/components/views/board/ViewBoard";
+import { ColumnMenu } from "@/components/views/layout/ColumnMenu";
+import { HiddenColumnsMenu } from "@/components/views/layout/HiddenColumnsMenu";
+import type { Layout, ViewKey } from "@/lib/views/layout/types";
 
 /**
  * The docket as a board: one column per live stage (terminal stages fold into
@@ -46,6 +51,13 @@ export function MatterBoard(props: {
    * yet" are not stages and get no menu.
    */
   stageAdmin?: { all: MenuStage[]; holdings: Record<string, string[]> | null; merged?: Record<string, number> | null } | null;
+  /**
+   * The firm's saved layout of this Board (`matters_board` / `contracts_board`). It decides ONE thing: which columns are hidden. The
+   * order and the names of stage columns are the stages' own (the stage menu changes those), so no second ordering exists.
+   */
+  layout?: Layout | null;
+  /** Given only for an owner whose saved layout was read: the column menu (Hide) on each column and the "Hidden columns" control. */
+  layoutEdit?: { view: ViewKey; rev: number | null } | null;
 }) {
   const board = buildBoard(props.stages, props.matters);
   const stageOptions = (props.moveStages ?? props.stages).map((s) => ({ id: s.id, label: s.label, phase: s.phase ?? null }));
@@ -105,78 +117,85 @@ export function MatterBoard(props: {
     );
   };
 
+  type Col = { key: string; title: string; sub: string | null; matters: Matter[]; stale: number; stageId: string | null };
+  const unstaged: Col[] = board.unstaged.length > 0 ? [{ key: UNSTAGED_COLUMN_KEY, title: MATTER_BOARD_UNSTAGED_COLUMN, sub: null, matters: board.unstaged, stale: 0, stageId: null }] : [];
+  const closed: Col[] =
+    board.closedCount > 0
+      ? [{ key: CLOSED_COLUMN_KEY, title: MATTER_BOARD_CLOSED_COLUMN, sub: board.closed.map((c) => c.stage.label).join(", "), matters: board.closed.flatMap((c) => c.matters), stale: 0, stageId: null }]
+      : [];
+  const opens: Col[] = board.open.map((c) => ({ key: stageColumnKey(c.stage.id), title: stageDisplayName(c.stage.label), sub: null, matters: c.matters, stale: c.stale, stageId: c.stage.id }));
+  // The firm's layout hides columns; a hidden column's matters are counted in one line, never silently gone.
+  const { shown: drawn, hidden } = splitHiddenColumns([...unstaged, ...opens, ...closed], props.layout);
+  const hiddenMatters = hidden.reduce((n, c) => n + c.matters.length, 0);
+
   // Move left / right go beside the VISIBLE neighbour: with empty stages folded away, a populated column's neighbours are the other
   // populated ones, and an empty column's are the other empty ones (drawn together when shown).
-  const populatedOrder = board.open.filter((c) => !props.collapseEmpty || c.matters.length > 0).map((c) => c.stage.id);
-  const emptyOrder = props.collapseEmpty ? board.open.filter((c) => c.matters.length === 0).map((c) => c.stage.id) : [];
-  const menuFor = (stageId: string, shown: number) => {
+  const stageCols = drawn.filter((c) => c.stageId !== null);
+  const populatedOrder = stageCols.filter((c) => !props.collapseEmpty || c.matters.length > 0).map((c) => c.stageId as string);
+  const emptyOrder = props.collapseEmpty ? stageCols.filter((c) => c.matters.length === 0).map((c) => c.stageId as string) : [];
+  const stageMenuFor = (stageId: string, shown: number) => {
     const admin = props.stageAdmin;
     const stage = admin?.all.find((s) => s.id === stageId);
-    if (!admin || !stage) return undefined;
+    if (!admin || !stage) return null;
     const order = emptyOrder.includes(stageId) ? emptyOrder : populatedOrder;
     return <StageMenu model={stageMenuModel({ kind: "matter", stage, all: admin.all, ...neighbours(order, stageId), holdings: admin.holdings, shown })} />;
   };
 
-  const column = (key: string, title: string, sub: string | null, matters: Matter[], stale = 0, stageId: string | null = null) => (
-    <BoardColumn
-      key={key}
-      title={title}
-      menu={stageId ? menuFor(stageId, matters.length) : undefined}
-      count={`${matters.length}${stale ? ` · ${stale} gone quiet` : ""}${sub ? ` · ${sub}` : ""}`}
-      empty={columnEmpty("matters")}
-    >
-      {matters.map(card)}
-    </BoardColumn>
-  );
+  const spec = (c: Col): BoardColumnSpec<Matter> => {
+    const stageMenu = c.stageId ? stageMenuFor(c.stageId, c.matters.length) : null;
+    const columnMenu = props.layoutEdit ? <ColumnMenu view={props.layoutEdit.view} rev={props.layoutEdit.rev} columnKey={c.key} label={c.title} kind="stage" /> : null;
+    return {
+      key: c.key,
+      title: c.title,
+      count: `${c.matters.length}${c.stale ? ` · ${c.stale} gone quiet` : ""}${c.sub ? ` · ${c.sub}` : ""}`,
+      menu: stageMenu || columnMenu ? <>{columnMenu}{stageMenu}</> : undefined,
+      groups: [{ key: "cards", empty: columnEmpty("matters"), cards: c.matters }],
+    };
+  };
+  const board_ = (cols: readonly Col[]) => <ViewBoard columns={cols.map(spec)} renderCard={card} role="region" aria-label="Docket board" />;
 
-  const unstaged = board.unstaged.length > 0 ? column("unstaged", "Not on the docket yet", null, board.unstaged) : null;
-  const closed =
-    board.closedCount > 0
-      ? column(
-          "closed",
-          "Closed",
-          board.closed.map((c) => c.stage.label).join(", "),
-          board.closed.flatMap((c) => c.matters),
-        )
-      : null;
-  const openColumn = (c: (typeof board.open)[number]) => column(c.stage.id, stageDisplayName(c.stage.label), null, c.matters, c.stale, c.stage.id);
+  const hiddenBar =
+    hidden.length > 0 ? (
+      <div className="lx-board-hidden">
+        <p role="status" className="lx-note lx-state-line">
+          {MATTERS_BOARD_HIDDEN_NOTE(hidden.length, hiddenMatters)}
+        </p>
+        {props.layoutEdit && <HiddenColumnsMenu groups={[{ view: props.layoutEdit.view, rev: props.layoutEdit.rev, items: hidden.map((c) => ({ key: c.key, label: c.title })) }]} />}
+      </div>
+    ) : null;
 
   if (props.collapseEmpty) {
-    const populated = board.open.filter((c) => c.matters.length > 0);
-    const empty = board.open.filter((c) => c.matters.length === 0);
-    const body = (
-      <>
-        <MovedCardScroller />
-        {unstaged}
-        {populated.map(openColumn)}
-        {closed}
-      </>
-    );
+    const populated = drawn.filter((c) => c.stageId === null || c.matters.length > 0);
+    const empty = drawn.filter((c) => c.stageId !== null && c.matters.length === 0);
     if (empty.length === 0) {
       return (
-        <div className="lx-board" role="region" aria-label="Docket board">
-          {body}
-        </div>
+        <>
+          {hiddenBar}
+          <MovedCardScroller />
+          {board_(populated)}
+        </>
       );
     }
-    const names = empty.map((c) => stageDisplayName(c.stage.label));
+    const names = empty.map((c) => c.title);
     return (
-      <BoardEmptyStages
-        labelHidden={emptyStagesLabel(empty.length, false, names)}
-        labelShown={emptyStagesLabel(empty.length, true, names)}
-        empty={empty.map(openColumn)}
-      >
-        {body}
-      </BoardEmptyStages>
+      <>
+        {hiddenBar}
+        <MovedCardScroller />
+        <BoardEmptyStages
+          labelHidden={emptyStagesLabel(empty.length, false, names)}
+          labelShown={emptyStagesLabel(empty.length, true, names)}
+          collapsed={board_(populated)}
+          expanded={board_([...populated, ...empty])}
+        />
+      </>
     );
   }
 
   return (
-    <div className="lx-board" role="region" aria-label="Docket board">
+    <>
+      {hiddenBar}
       <MovedCardScroller />
-      {unstaged}
-      {board.open.map(openColumn)}
-      {closed}
-    </div>
+      {board_(drawn)}
+    </>
   );
 }

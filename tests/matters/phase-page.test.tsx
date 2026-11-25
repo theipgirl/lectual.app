@@ -13,6 +13,8 @@ const st = (id: string, label: string, phase: string | null | undefined, order: 
   ({ id, code: id, label, order_index: order, is_open: open, waiting_on: "firm", ...(phase === undefined ? {} : { phase }) }) as MatterStage;
 const S = {
   a: st("sa", "New client", "pipeline", 1),
+  // The firm's signed-engagement stage: the Matters page draws from here on. (A firm with none cuts nothing: see below.)
+  hired: st("sh", "Signed LOE / Deposit Received", "pipeline", 1.5),
   b: st("sb", "Questionnaire", "pre_filing", 2),
   b2: st("sb2", "Balance received", "pre_filing", 3),
   c: st("sc", "Published", "post_filing", 4),
@@ -37,7 +39,7 @@ const m = (type: string, stage: MatterStage | null, o: Partial<Matter> = {}) =>
 
 type Read = { status: "ok" | "not-set-up"; stages: MatterStage[] } | { status: "unavailable"; error: unknown };
 
-async function render(opts: { matters: Matter[]; read: Read; params?: { group?: string; seg?: string; view?: string; q?: string; intake?: string } }) {
+async function render(opts: { matters: Matter[]; read: Read; params?: { group?: string; seg?: string; view?: string; q?: string; intake?: string; kind?: string } }) {
   vi.resetModules();
   vi.doMock("@/lib/matters", async (orig) => ({ ...(await orig<typeof import("@/lib/matters")>()), listMatters: vi.fn(async () => opts.matters) }));
   vi.doMock("@/lib/pipeline", async (orig) => ({ ...(await orig<typeof import("@/lib/pipeline")>()), listLeads: vi.fn(async () => []) }));
@@ -46,6 +48,8 @@ async function render(opts: { matters: Matter[]; read: Read; params?: { group?: 
   vi.doMock("@/lib/org/modules", () => ({ orgHasModule: vi.fn(async () => false) }));
   vi.doMock("@/lib/matters/stages", () => ({ listMatterStages: vi.fn(async () => []), loadMatterStages: vi.fn(async () => opts.read) }));
   vi.doMock("@/lib/firm/session", () => ({ resolveFirmSession: vi.fn(async () => ({ kind: "ok", role: "attorney" })) }));
+  // The firm's saved layout isn't switched on in these fixtures (a failed read is its own, separate test).
+  vi.doMock("@/lib/views/layout/load", () => ({ loadViewLayout: vi.fn(async () => ({ status: "not-set-up" })) }));
   vi.doMock("@/components/matters/MatterForms", () => ({ NewMatterForm: () => null }));
   vi.doMock("@/app/dashboard/matters/[id]/actions", () => ({ updateMatterStageAction: vi.fn() }));
   vi.doMock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
@@ -68,6 +72,8 @@ const sample = () => (n = 0, [
   m("BL", null),
   m("LIT", null),
   m("BL", S.none),
+  // A trademark on a stage with no phase: the Matters view's "Matters" group.
+  m("TM", S.none),
 ]);
 const ok: Read = { status: "ok", stages: Object.values(S) };
 
@@ -80,7 +86,11 @@ describe("phase groups on the Matters page", () => {
     expect(nav).not.toContain(">Intake<");
     expect(nav).toMatch(/>Pre-filing<span class="lp-chip-count">2</);
     expect(nav).toMatch(/>Post-filing<span class="lp-chip-count">3</);
-    expect(nav).toMatch(/>Matters<span class="lp-chip-count">3</);
+    // Contracts are their own view now: the "Matters" group holds the trademarks on a stage with no phase.
+    expect(nav).toMatch(/>Matters<span class="lp-chip-count">1</);
+    const kinds = html.slice(html.indexOf('aria-label="Kind of matter"'), html.indexOf("</nav>", html.indexOf('aria-label="Kind of matter"')));
+    expect(kinds).toMatch(/aria-current="page"[^>]*>Matters<span class="lp-chip-count">6</);
+    expect(kinds).toMatch(/href="\/dashboard\/matters\/?\?kind=contracts"[^>]*>Contracts<span class="lp-chip-count">3</);
     const status = html.slice(html.indexOf('aria-label="Filter matters"'));
     for (const label of ["Open", "Unassigned", "Closed"]) expect(status).toContain(`>${label}`);
   });
@@ -96,7 +106,7 @@ describe("phase groups on the Matters page", () => {
 
   it("falls back to All when Pre-filing is empty for the status, and links agree", async () => {
     n = 0;
-    const onlyPost = [m("TM", S.c), m("BL", null)];
+    const onlyPost = [m("TM", S.c), m("TM", S.none)];
     const html = await render({ matters: onlyPost, read: ok });
     expect(groupNav(html)).toMatch(/aria-current="page"[^>]*>All</);
     expect(html).toContain("Mk1z");
@@ -114,9 +124,8 @@ describe("phase groups on the Matters page", () => {
     expect(groupNav(intake)).toMatch(/aria-current="page"[^>]*>Pre-filing/);
     expect(intake).not.toContain("Mk1z<");
     const other = await render({ matters: sample(), read: ok, params: { group: "other" } });
-    expect(other).toContain("Mk8z");
-    expect(other).toContain("Mk9z");
-    expect(other).toContain("Mk10z");
+    expect(other).toContain("Mk11z");
+    expect(other).not.toContain("Mk8z");
     expect(other).not.toContain("Mk3z<");
     const bad = await render({ matters: sample(), read: ok, params: { group: "nope" } });
     expect(groupNav(bad)).toMatch(/aria-current="page"[^>]*>Pre-filing/);
@@ -145,12 +154,13 @@ describe("phase groups on the Matters page", () => {
     const all = sample();
     const html = await render({ matters: all, read: ok, params: { group: "all" } });
     const nav = groupNav(html);
-    expect(nav).toMatch(/aria-current="page"[^>]*>All<span class="lp-chip-count">8</);
+    expect(nav).toMatch(/aria-current="page"[^>]*>All<span class="lp-chip-count">6</);
     expect(nav.lastIndexOf(">All<")).toBeGreaterThan(nav.lastIndexOf(">Matters<"));
-    for (let i = 3; i <= 10; i++) expect(html.split(`Mk${i}z<`).length - 1).toBe(1);
-    for (const i of [1, 2]) expect(html).not.toContain(`Mk${i}z<`);
+    for (const i of [3, 4, 5, 6, 7, 11]) expect(html.split(`Mk${i}z<`).length - 1).toBe(1);
+    // the intake matters are cut, and the contracts (8 to 10) are the Contracts view's
+    for (const i of [1, 2, 8, 9, 10]) expect(html).not.toContain(`Mk${i}z<`);
     const status = html.slice(html.indexOf('aria-label="Filter matters"'));
-    expect(status).toMatch(/>Open<span class="lp-chip-count">8</);
+    expect(status).toMatch(/>Open<span class="lp-chip-count">6</);
   });
 
   it("matters in intake stages are named in one quiet line with a Show them link, not silently dropped", async () => {
@@ -202,14 +212,14 @@ describe("phase groups on the Matters page", () => {
     expect(html).toMatch(/\?intake=1&amp;seg=unassigned">Show them<\/a>/);
   });
 
-  it("phases with no signed-engagement stage say so in one quiet warn line; with one, nothing is said", async () => {
+  it("a firm with no signed-engagement stage is never cut: every matter shows and nothing new is said (never hide on a guess)", async () => {
     n = 0;
-    const without = await render({ matters: sample(), read: ok });
-    expect(without).toContain("No signed-engagement stage was found");
-    n = 0;
-    const hired = st("sh", "Signed LOE / Deposit Received", "pipeline", 1.5);
-    const withIt = await render({ matters: sample(), read: { status: "ok", stages: [...Object.values(S), hired] } });
-    expect(withIt).not.toContain("No signed-engagement stage was found");
+    const { hired: _hired, ...noHired } = S;
+    void _hired;
+    const html = await render({ matters: sample(), read: { status: "ok", stages: Object.values(noHired) }, params: { group: "all", view: "table" } });
+    expect(html).not.toContain("in intake stages");
+    expect(html).not.toContain("No signed-engagement stage was found");
+    for (const i of [1, 2, 3, 4, 5, 6, 7, 11]) expect(html).toContain(`Mk${i}z`);
   });
 
   it("when every matter is in an intake stage the empty state says so, not 'match these filters'", async () => {
@@ -220,12 +230,20 @@ describe("phase groups on the Matters page", () => {
     expect(html).toContain("2 matters are in intake stages");
   });
 
-  it("a contract (non-filing type) on an intake stage is hidden by the stage's phase, and counted", async () => {
+  it("a contract is not on the Matters view at all, and the Contracts view is never cut by the signed-engagement line", async () => {
     n = 0;
-    const html = await render({ matters: [m("BL", S.a), m("BL", null)], read: ok, params: { group: "all" } });
-    expect(html).not.toContain("Mk1z<");
-    expect(html).toContain("Mk2z");
-    expect(html).toContain("1 matter is in intake stages");
+    const list = () => (n = 0, [m("BL", S.a), m("BL", null), m("TM", S.c)]);
+    const matters = await render({ matters: list(), read: ok, params: { group: "all", view: "table" } });
+    expect(matters).toContain("Mk3z");
+    expect(matters).not.toContain("Mk1z<");
+    expect(matters).not.toContain("Mk2z<");
+    expect(matters).not.toContain("in intake stages");
+    const contracts = await render({ matters: list(), read: ok, params: { kind: "contracts", view: "table" } });
+    expect(contracts).toContain("Mk1z");
+    expect(contracts).toContain("Mk2z");
+    expect(contracts).not.toContain("Mk3z<");
+    expect(contracts).not.toContain("in intake stages");
+    expect(contracts).not.toContain("Matter group");
   });
 
   it("the board draws no intake-phase column or card, and the Move menu offers no intake stage", async () => {
@@ -238,7 +256,7 @@ describe("phase groups on the Matters page", () => {
 
   it("the stage's name never decides: a pipeline stage named 'Filed' is intake, a pre_filing one named 'Intake review' is drawn", async () => {
     n = 0;
-    const tricky = [st("x1", "Intake review", "pre_filing", 1), st("x2", "Filed", "pipeline", 2)];
+    const tricky = [st("x1", "Intake review", "pre_filing", 1), st("x2", "Filed", "pipeline", 2), st("x3", "Signed LOE / Deposit Received", "pipeline", 3)];
     const html = await render({ matters: [m("TM", tricky[0]), m("TM", tricky[1])], read: { status: "ok", stages: tricky }, params: { group: "all" } });
     expect(html).toContain("Mk1z");
     expect(html).not.toContain("Mk2z<");
@@ -309,8 +327,9 @@ describe("a firm without phases sees today's page", () => {
     expect(html).not.toContain("Pre-filing");
     expect(html).not.toContain("Can&#x27;t show the Intake");
     expect(html).toContain("Mk1z");
-    expect(html).toContain("Mk8z");
     expect(html).not.toContain('name="group"');
+    // a contract is on the Contracts view
+    expect(await render({ matters: sample(), read, params: { kind: "contracts" } })).toContain("Mk8z");
   });
 
   it("board view draws every stage as before (empty ones included, no empty-stages row)", async () => {

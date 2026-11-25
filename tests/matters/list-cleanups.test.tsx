@@ -70,6 +70,7 @@ async function render(opts: { queue: unknown; matters: Matter[]; view?: string; 
   vi.doMock("@/lib/org/modules", () => ({ orgHasModule: vi.fn(async () => false) }));
   vi.doMock("@/lib/matters/stages", () => ({ listMatterStages: vi.fn(async () => [stage]), loadMatterStages: vi.fn(async () => ({ status: "ok", stages: [stage] })) }));
   vi.doMock("@/lib/firm/session", () => ({ resolveFirmSession: vi.fn(async () => ({ kind: "ok", role: "attorney" })) }));
+  vi.doMock("@/lib/views/layout/load", () => ({ loadViewLayout: vi.fn(async () => ({ status: "not-set-up" })) }));
   vi.doMock("@/components/matters/MatterForms", () => ({ NewMatterForm: () => null }));
   vi.doMock("@/app/dashboard/matters/[id]/actions", () => ({ updateMatterStageAction: vi.fn() }));
   vi.doMock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
@@ -103,7 +104,8 @@ describe("F5: Matters list", () => {
     expect(html).toContain(">Filed<");
     expect(html).not.toContain("3. Filed");
     expect(html).not.toContain("<th>Status</th>");
-    expect(html).toContain('<th class="num">In stage</th>');
+    // The List draws through the shared ViewTable: a header cell is named by the column's fixed key.
+    expect(html).toMatch(/<th scope="col" data-column="in_stage">In stage<\/th>/);
     expect(html).toContain("On hold");
     expect(html).toMatch(/<a [^>]*href="\/dashboard\/queue\/q9\/?"[^>]*>Review<\/a>/);
     expect(html).toContain("2d");

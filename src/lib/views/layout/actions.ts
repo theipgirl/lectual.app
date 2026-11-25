@@ -11,6 +11,9 @@ import { fieldDepsFor } from "@/lib/custom-columns/field-deps";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { reviewBoardBase, reviewListBase } from "@/lib/review/layout-base";
 import { REVIEW_LIST_VIEWS, isReviewListView, sectionOfListView } from "@/lib/review/layout";
+import { MATTER_LIST_VIEWS, isMatterBoardView, isMatterListView, matterBoardBase, matterListColumns, sectionOfMatterView } from "@/lib/matters/views";
+import { loadMatterStages } from "@/lib/matters/stages";
+import { MATTER_BOARD_CLOSED_COLUMN, MATTER_BOARD_UNSTAGED_COLUMN } from "@/lib/ui/words";
 import type { CustomColumnField } from "@/lib/review/sheet-columns";
 import { addColumn, type AddColumnResult } from "./add-column";
 import { changeFirmColumn, type FirmColumnResult } from "./firm-column";
@@ -27,8 +30,15 @@ import type { ViewKey } from "./types";
  */
 
 const REVIEW_PATH = "/dashboard/review/";
+const MATTERS_PATH = "/dashboard/matters/";
 
-/** The columns an owner has for a view. Only the Weekly review's two views exist so far; any other view has none to change yet. */
+/** A layout change is the firm's view for everyone: both pages that draw layouts are redrawn. */
+const revalidateViews = () => {
+  revalidatePath(REVIEW_PATH);
+  revalidatePath(MATTERS_PATH);
+};
+
+/** The columns an owner has for a view: the Weekly review's List and Board, and the Matters and Contracts List and Board. Any other view has none to change yet. */
 async function baseFor(view: ViewKey): Promise<LayoutBase | null> {
   if (isReviewListView(view)) {
     try {
@@ -37,6 +47,25 @@ async function baseFor(view: ViewKey): Promise<LayoutBase | null> {
     } catch (e) {
       // The firm's own columns aren't switched on: the List is the spreadsheet's columns alone. Any other failure is "couldn't read".
       return isMissingTable(e) ? { defaults: reviewListBase([], sectionOfListView(view)) } : null;
+    }
+  }
+  if (isMatterListView(view)) {
+    const kind = sectionOfMatterView(view);
+    try {
+      const db = (await getScopedClient()) as unknown as StoreClient;
+      return { defaults: matterListColumns((await fieldStore(db).readLiveFields()) as CustomColumnField[], kind, true) };
+    } catch (e) {
+      return isMissingTable(e) ? { defaults: matterListColumns([], kind, true) } : null;
+    }
+  }
+  if (isMatterBoardView(view)) {
+    // The Board's columns are the firm's own matter stages (every OPEN one) and the two fixed columns. Only "hidden" is ever saved.
+    try {
+      const read = await loadMatterStages();
+      if (read.status === "unavailable") return null;
+      return { defaults: matterBoardBase(read.stages, MATTER_BOARD_UNSTAGED_COLUMN, MATTER_BOARD_CLOSED_COLUMN) };
+    } catch {
+      return null;
     }
   }
   if (view === "review_board") {
@@ -61,7 +90,7 @@ function saveDeps(): SaveDeps {
     base: baseFor,
     insert: async (view, orgId, columns) => layoutStore((await getScopedClient()) as unknown as LayoutWriteClient).insert(view, orgId, columns),
     update: async (view, columns, rev) => layoutStore((await getScopedClient()) as unknown as LayoutWriteClient).update(view, columns, rev),
-    revalidate: () => revalidatePath(REVIEW_PATH),
+    revalidate: revalidateViews,
   };
 }
 
@@ -80,7 +109,7 @@ export const addColumnAction = previewSafe(async function addColumnAction(input:
     },
     { view: input?.view, rev: input?.rev, relativeTo: input?.relativeTo, side: input?.side, label: input?.label, section: input?.section, kind: input?.kind, choices: input?.choices },
   );
-  revalidatePath(REVIEW_PATH);
+  revalidateViews();
   return result;
 }, "state");
 
@@ -95,7 +124,7 @@ export const firmColumnAction = previewSafe(async function firmColumnAction(inpu
       update: (i) => updateField(fields, i),
       clearLabels: async (key) => {
         let all = true;
-        for (const view of Object.values(REVIEW_LIST_VIEWS)) {
+        for (const view of [...Object.values(REVIEW_LIST_VIEWS), ...MATTER_LIST_VIEWS]) {
           const read = await deps.read(view);
           if (read.status === "not-set-up") continue;
           if (read.status !== "ok") {
@@ -110,6 +139,6 @@ export const firmColumnAction = previewSafe(async function firmColumnAction(inpu
     },
     { op: input?.op, key: input?.key, label: input?.label, choices: input?.choices },
   );
-  revalidatePath(REVIEW_PATH);
+  revalidateViews();
   return result;
 }, "state");

@@ -1880,3 +1880,20 @@ export const STAGE_ROLE_WORDS: Record<string, string> = {
   registered: "registered",
   abandoned: "abandoned",
 };
+
+// Editable views, step 5: Matters and Contracts as two views (a List and a Board each), the owner's controls on them.
+export const CONTRACTS_NAME = "Contracts";
+export const MATTER_KIND_NAV = "Kind of matter";
+export const MATTER_BOARD_UNSTAGED_COLUMN = "Not on the docket yet";
+export const MATTER_BOARD_CLOSED_COLUMN = "Closed";
+export const MATTERS_BOARD_HIDDEN_NOTE = (columns: number, matters: number) =>
+  `${columns} ${columns === 1 ? "column is" : "columns are"} hidden in your firm's view (${matters} ${matters === 1 ? "matter" : "matters"}).`;
+export const MANAGE_STAGES = "Manage stages";
+export const MANAGE_STAGES_INTRO = "Every matter stage the firm has, including closed stages and the intake stages this page leaves out. A change here is the firm's pipeline for everyone.";
+export const MANAGE_STAGES_CLOSED = "Closed stage";
+export const MANAGE_STAGES_INTAKE = "Left out of Matters (before the signed engagement)";
+export const MANAGE_STAGES_OPEN = "Open stage";
+export const manageStagesHolds = (n: number) => `${n} ${n === 1 ? "matter" : "matters"}`;
+export const MANAGE_STAGES_HOLDS_UNKNOWN = "Count couldn't be read";
+export const MANAGE_STAGES_NONE = "There are no matter stages yet.";
+export const MATTERS_OPEN_ROW = "Open a matter";

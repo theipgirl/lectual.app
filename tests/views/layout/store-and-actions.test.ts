@@ -102,9 +102,42 @@ describe("the actions, wired", () => {
     expect(board.map((c) => c.key)).toEqual(["u11111111111141118111111111111111", "unassigned"]);
     expect(board[1].label).toBe("Nobody yet");
   });
+  it("the Matters and Contracts Lists write their own layout over their own columns (built-ins; a firm column only when it fits)", async () => {
+    const { changeLayoutAction } = await import("@/lib/views/layout/actions");
+    expect(await changeLayoutAction("matters_list", { op: "hide", key: "notes" }, null)).toEqual({ ok: true, rev: 1 });
+    const [view, org, cols] = h.inserts[0] as [string, string, { key: string; hidden: boolean }[]];
+    expect([view, org]).toEqual(["matters_list", "org-1"]);
+    expect(cols.map((c) => c.key)).toEqual(["matter", "type", "stage", "in_stage", "owner", "next_step", "notes"]);
+    expect(cols.find((c) => c.key === "notes")!.hidden).toBe(true);
+    // a column the List doesn't have is refused, and the pinned one can't be hidden
+    h.inserts = [];
+    expect((await changeLayoutAction("contracts_list", { op: "hide", key: "serial" }, null)).ok).toBe(false);
+    expect((await changeLayoutAction("contracts_list", { op: "hide", key: "matter" }, null)).ok).toBe(false);
+    expect(h.inserts).toEqual([]);
+  });
+  it("the Matters and Contracts Boards save only what the stage columns can have: a hide of a real stage column", async () => {
+    vi.doMock("@/lib/matters/stages", () => ({
+      loadMatterStages: async () => ({ status: "ok", stages: [{ id: "aaaaaaaa-0000-4000-8000-000000000001", label: "Open it", is_open: true }, { id: "aaaaaaaa-0000-4000-8000-000000000002", label: "Done", is_open: false }] }),
+    }));
+    const { changeLayoutAction } = await import("@/lib/views/layout/actions");
+    expect(await changeLayoutAction("matters_board", { op: "hide", key: "st_aaaaaaaa000040008000000000000001" }, null)).toEqual({ ok: true, rev: 1 });
+    const cols = (h.inserts[0] as [string, string, { key: string; hidden: boolean }[]])[2];
+    // the two fixed columns and one per OPEN stage (a closed stage is folded into Closed and has no column of its own)
+    expect(cols.map((c) => c.key)).toEqual(["not_on_docket", "st_aaaaaaaa000040008000000000000001", "closed"]);
+    expect(cols.find((c) => c.key.startsWith("st_"))!.hidden).toBe(true);
+    h.inserts = [];
+    expect((await changeLayoutAction("contracts_board", { op: "hide", key: "st_ffffffff000040008000000000000009" }, null)).ok).toBe(false);
+    expect(h.inserts).toEqual([]);
+  });
+  it("a failed stage read refuses a Board change with a sentence and writes nothing", async () => {
+    vi.doMock("@/lib/matters/stages", () => ({ loadMatterStages: async () => ({ status: "unavailable", error: new Error("x") }) }));
+    const { changeLayoutAction } = await import("@/lib/views/layout/actions");
+    expect((await changeLayoutAction("matters_board", { op: "hide", key: "closed" }, null)).ok).toBe(false);
+    expect(h.inserts).toEqual([]);
+  });
   it("a view with no columns to change yet answers a sentence, writes nothing", async () => {
     const { changeLayoutAction } = await import("@/lib/views/layout/actions");
-    expect(await changeLayoutAction("matters_list", { op: "hide", key: "x" }, null)).toEqual({ ok: false, error: "Couldn't read this view's saved columns, so nothing was changed. Refresh to try again." });
+    expect(await changeLayoutAction("leads_list", { op: "hide", key: "x" }, null)).toEqual({ ok: false, error: "Couldn't read this view's saved columns, so nothing was changed. Refresh to try again." });
     expect(h.inserts).toEqual([]);
   });
 });

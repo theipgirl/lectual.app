@@ -1,2 +1,11 @@
 /* Matters list. Tokens only. The row's title link covers the whole row (.lx-rowlink::after), so a link in the sub-line sits above it. */
 .lp-root .mt-sub a { position: relative; z-index: 1; }
+
+/* Manage stages (owner): every matter stage in a list, each with the stage menu. Tokens only. */
+.lp-root .lx-manage-stages { list-style: none; margin: 0; padding: 0 18px 14px; display: grid; gap: 4px; }
+.lp-root .lx-manage-stage { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 6px 0; border-top: 1px solid var(--line); }
+.lp-root .lx-manage-name { font-weight: 500; flex: 1 1 200px; }
+.lp-root [data-manage-stages] > .lx-note { padding: 0 18px 8px; margin: 0; }
+/* Hidden columns of a Board: one quiet line with the owner's control beside it. */
+.lp-root .lx-board-hidden { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.lp-root .lx-list-add { padding: 10px 0 0; }
