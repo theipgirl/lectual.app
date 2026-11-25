@@ -56,6 +56,7 @@ const ALLOW: Allow[] = [
   { file: /^src\/lib\/(lawmatics\/stage-map|reconcile\/milestones)\.ts$/, rules: ["PNC"], reason: "names of stages in the firm's Lawmatics account, matched as data" },
   { file: /^src\/lib\/intake\/(sheet-import|sheet-sections)\.ts$/, rules: ["PNC"], reason: "the firm's own spreadsheet vocabulary (an 'PNC' opener / section name), matched as data" },
   { file: /^src\/lib\/(agents\/prompts|ai)\//, rules: ["schema"], reason: "JSON schema for the model, not text for a person" },
+  { file: /^src\/lib\/consult-prep\/compose\.ts$/, rules: ["scope"], reason: "the consult brief's 'Scope and engagement' section (S2b): 'scope' is the legal term for what an engagement covers, not the OAuth sense" },
   { file: /^src\/lib\/consult-prep\/judge\/prompt\.ts$/, rules: ["schema", "scope"], reason: "model instructions for the consult brief judge ('scope' is the legal term, 'schema' the JSON format), not text for a person" },
   { file: /^src\/lib\/agents\/(prompt|policy|[a-z-]+\/prompt)/, rules: ["schema", "scope"], reason: "model instructions, not text for a person" },
   { file: /^src\/app\/api\/cron\//, rules: ["setting name"], reason: "JSON for the scheduler (Vercel cron) when its own setting is missing, never drawn to a firm" },

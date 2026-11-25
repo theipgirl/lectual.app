@@ -2711,7 +2711,64 @@ Nothing here sends to a client, adds a migration or a dependency, or calls Lawma
   - **D8:** `withheld` is counted only when a new row is written; the card says "waiting for the full prep" only while the owed booked email is still due (`nowMs`, same cutoff as the plan) and otherwise "not emailed". The Re-run confirm text now says it builds a fresh prep and that it is emailed to the people set in Settings when the full prep is ready.
   - **Assertions changed on purpose:** `tests/agents/consult-prep.test.ts` "Approvals unreadable on a later run" (was: nothing sent, whole prep skipped) is replaced by the D2 tests above; `tests/consult-prep/adopt.test.ts` "is true when all three headings are there" now has content under each heading (bare headings are no longer full). Words: `CONSULT_PREP_RERUN_CONFIRM`.
 - **Not verified / not done:** a live Lawmatics (`/custom_fields` shape, option labels), a real Approvals queue (the linking of a skill's BRIEFING to a lead), a real browser, a real Resend. The Re-run button's confirm text is not changed.
-  S2b (the full build, the attachments, saving the files) and S2c (cutover, sender, switching lawmatics-mcp off) are not built.
+  S2b's full build is now wired (see "S2b" below); S2c (cutover, sender, switching lawmatics-mcp off) is not built.
+
+### S2b: the full brief, its two files, saved to Documents & files (no schema; spec `docs/pge/2026-11-24-auto-consult-prep/sprint-2b.md`)
+P1 (USPTO, `uspto/`), P2 (judgment, `judge/`) and P3 (packages PDF, `pdf/`) are the parts; P4 wires them. Nothing goes to a client; the emails are
+still only to the firm's own people through the recipients guard, and the sender is still unset, so nothing is emailed to anyone until S2c.
+- **One builder** (`full.ts`, `buildFullPrep(facts, firm, deps)`, never throws): the firm's package list (`client_proposal_setting.pricing` through
+  `normalisePackages`, read org-fenced by `readFirmForBrief`; a firm that never saved a setting gets NO list, never `normalisePackages`' made-up default)
+  -> call 1 (route + USPTO plan) -> the USPTO knockout (`searchUspto`, trademark path with a confirmed mark) -> call 2 (judgment) -> `finalizeJudgment`
+  (every model string scrubbed, the package lines from the firm's list) -> `composeFullSections` (`compose.ts`) -> the two files. At most TWO model calls,
+  both through the run's `ctx.llm` with `agent: "consult-prep"` (Sonnet through `agentModel`; a third is refused in code, `MAX_MODEL_CALLS`). The budget is
+  checked before each call (`ctx.timeLeftMs`, `BUILD_RESERVE_MS` kept back; call 1 only with `MIN_START_MS` left for the whole build, call 2 only with
+  `MIN_JUDGE_MS`). `AGENT_POLICY` leads both prompts and record data is inert (P2). Failure codes: the model's (`timeout`, `error`, `invalid`, `refused`,
+  `truncated`), `budget`, `uspto`, `packages`, `unexpected`.
+- **Decision: a USPTO outage alone blocks "full"** on the trademark path (lawmatics-mcp sent its judgment with a "USPTO unavailable" line). A risk read made
+  without the knockout it reads is thinner than the full prep, and the rule is that booked and 24 h carry the full prep or wait for it (the 1 h still goes,
+  marked "facts only"). The judgment call is not spent when the pull failed. "Nothing to search" (no confirmed mark) is NOT an outage: that is the full prep.
+- **The brief** (`brief.ts`, `BriefFacts.full`): the facts brief's sections with the judgment placed in the skill's order: header, Heads-up (nature,
+  flags), Client snapshot (+ the model's summary line), What they need, Mark(s) (+ "As submitted"), Lawmatics answers, the client's words, files, prior
+  contact, then Likely classes — preliminary, USPTO knockout, Preliminary risk read — preliminary, Package recommendation (settled: the firm's prices in a
+  box; else Held with no amount) on the trademark path, or Scope and engagement (and Dispute snapshot) on the general path, then "Questions for the attorney".
+  The "next update" line is gone from a full brief. Every price printed comes from the firm's list; a price the model wrote is "[amount removed]".
+- **Full, honestly.** The trademark-path full brief passes `isFullBrief` (each of the three sections has a heading and content). **Decision (general path):**
+  `isFullBrief` is unchanged, so a general brief found in Approvals is still not adopted (the skill-adoption test's rule stands) and Lectual builds its own;
+  a general brief THIS assistant built is read as full only through its own marker (`full: true`) with `isFullGeneralBrief` (a "Scope and engagement"
+  section and a "Questions for ..." section, each with content), in `stillAdoptable(..., { built: true })`.
+- **Status.** A new prep that adopted nothing, and every person's re-run, builds the full brief. Built: the BRIEFING queued is the full text, the plan is
+  `full` (booked now, 24 h and 1 h as S2a plans them), and the marker carries `full: true`, `queueItemId` and `attach` (the files' CODES). A failure: the
+  facts brief is queued as before, booked and 24 h are withheld, the 1 h is facts only, and it is counted by reason. **Retry:** a later run, for a prep with
+  no full brief whose booked / 24 h is still owed or whose facts-only 1 h is still waiting at Resend, and only with a queue and Approvals read, builds the
+  full prep again; built, it queues a second BRIEFING, writes a `full` marker for the same key (the card shows the newest item), sends what is owed with the
+  files, and the facts 1 h is cancelled and planned again (S2a's upgrade). With no queue a full brief can't be kept for a later email: the build-time
+  emails carry it, a later run's emails are facts only, and no retry is attempted. Reminders of a built prep read the full text back from Approvals.
+- **The two files** (`attachments.ts`), each optional (a failure never holds the brief or an email back): the USPTO site's own export workbook
+  (`searchUsptoSite` on the mark, then `buildUsptoXlsx` with the firm's calendar date and an image budget clipped to the run's time left) and the packages
+  PDF (`buildPackagesSpec` with the grounded, capped, class-number-free marks from `capPdfMarks`, the firm's name, zone, list and slug, then
+  `renderPackagesPdf`). General path: none. Their codes go on the marker (`built`, `none`, `skipped`, `unavailable`, `failed`, `budget`, a PDF error code).
+- **Email attachments** (`internal-mail.ts`, still the only file that names Resend, gains `attachments` as name + base64): every email of a built prep
+  carries the files, and its body ends with "Attachments" lines saying what this email carries or why a file is missing (fixed sentences, `missingLine`;
+  the stored brief never claims a file). A file over 15 MB, or past 25 MB in all, is not attached and is said to be too large (Resend's limit is 40 MB with
+  base64). A later run's email reads the saved copies back (`files.load`); a copy that can't be read is named. **Refused with files** (a 4xx other than 409
+  and 429): posted ONCE more without them under `<key>:noatt`, and the body names each file as refused. Whether Resend keeps the key of a refused request
+  is NOT verified, so the re-post never reuses it; a refused request was not accepted, so the re-post cannot double a delivered email. An adopted prep
+  (a person's or the skill's) carries no files and no Attachments lines (decision: default no; its files would belong to another build).
+- **Saved to Documents & files** (`save-files.ts`, `prepFileStore(ctx.admin, orgId)`: the ONE service-role `crm_file` write and storage upload; the client
+  is the run's own, nothing imported for it). The org is the LEAD ROW's (re-read live and org-fenced; a merged or foreign lead saves nothing); the path is
+  `buildStoragePath` (`{org}/lead/{lead}/{file}.{ext}`), the type `checkFileName`'s, the size the real byte count, the row exactly the scoped flow's
+  columns; object first, then the row (a refused row removes the object), then a `file_uploaded` activity carrying `source: consult-prep`, `prep_key` and
+  `kind`. **Once per prep key:** those activity rows are what "done" is read from; a kind already saved for the key is skipped, and reminders never save.
+  A re-run's key saves its own. No bucket or no table is `skipped`; an unreadable done-check saves nothing. Never throws into the run; counts only.
+- **Counts only** in the summary (`full preps built`, failures by reason in words, emails re-sent without attachments, files saved / skipped / not saved),
+  `agent_run`, logs and errors: never a name, mark, file name or brief text. `next.config.ts` traces the PDF fonts for `/dashboard/**` and `/api/cron/**`
+  (Run now, the stage hook's `after()` in any page that moves a lead, the mail sync's Stage Keeper).
+- **Tests:** `tests/consult-prep/{full-build,save-files,attachments}.test.ts`, `tests/agents/consult-prep-full.test.ts`, the attachments block of
+  `tests/consult-prep/internal-mail.test.ts`. Engine tests without a `full` dep run exactly as S2a (the builder is a dependency; production wires it in
+  `deps.ts`). **Existing assertion changed:** `tests/ui/no-build-words.test.ts` gains an allow-list entry for `compose.ts` ("scope" is the legal term).
+- **NOT verified:** a live Resend with attachments (the `attachments` body shape, a `scheduled_at` email with attachments, what Resend does with a
+  refused request's idempotency key), a live model (Sonnet on the two structured calls), a live USPTO (both endpoints and the mark images), a real
+  `client-files` bucket upload and download from the service role, Vercel's tracing of the fonts for the new route globs, a real browser.
 
 ## Rail: Forms and Proposals for the admin tier only (no schema)
 **Superseded (Taylor, Nov 2026):** intake is shown them too, through one predicate; see "Forms and Proposals: shown to the admin tier and intake" below.
