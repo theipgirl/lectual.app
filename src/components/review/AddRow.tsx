@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useActionState, useState } from "react";
+import { INTAKE_LIST_PATH } from "@/lib/intake/list-href";
 import { addLeadFromReviewAction, type AddLeadState } from "@/app/dashboard/review/actions";
 import {
   ADD_A_LEAD,
@@ -74,7 +75,7 @@ export function AddLeadForm({ onAnother, onCancel }: { onAnother: () => void; on
           <Link href={`/dashboard/leads/${state.leadId}/`} className="lx-link">
             {ADD_ROW_OPEN_LEAD}
           </Link>
-          <Link href="/dashboard/intake/" className="lx-link">
+          <Link href={INTAKE_LIST_PATH} className="lx-link">
             {ADD_ROW_OPEN_LEADS}
           </Link>
           <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" onClick={onAnother}>

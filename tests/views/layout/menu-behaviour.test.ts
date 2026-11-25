@@ -32,6 +32,6 @@ describe("Add a lead", () => {
     const done = add.slice(add.indexOf("state.saved && state.leadId"), add.indexOf("return (\n    <form"));
     expect(done).toContain("ADD_ROW_AFTER");
     expect(done).toContain("ADD_ROW_OPEN_LEAD");
-    expect(done).toContain('href="/dashboard/intake/"');
+    expect(done).toContain("href={INTAKE_LIST_PATH}");
   });
 });

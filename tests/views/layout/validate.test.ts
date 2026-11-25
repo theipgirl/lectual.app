@@ -79,7 +79,9 @@ describe("labels: the same rule as 0119's CHECK (edge whitespace and C1 controls
     const { readFileSync } = await import("node:fs");
     const sql = readFileSync("docs/pge/2026-11-17-agentic-ip-os/0119-proposed.sql.txt", "utf8");
     expect(sql).toContain("Revised after the step 2 review");
-    for (const needle of ["u00A0", "u1680", "u2000-", "u200A", "u2028", "u2029", "u202F", "u205F", "u3000", "uFEFF", "u0001-", "u007F-", "u009F"]) expect(sql, needle).toContain(needle);
+    // Changed on purpose (final 0119): the sets are built with chr() so the body is pure ASCII: U+00A0, 1680, 2000-200A, 2028, 2029, 202F, 205F, 3000, FEFF; U+0001-001F, 007F-009F.
+    const chr = (n: number) => `pg_catalog.chr(${n})`;
+    for (const n of [160, 5760, 8192, 8202, 8232, 8233, 8239, 8287, 12288, 65279, 1, 31, 127, 159, 8203, 8207, 8234, 8238, 8294, 8297]) expect(sql, String(n)).toContain(chr(n));
     const fn = sql.slice(sql.indexOf("function public.crm_view_layout_column_valid"), sql.indexOf("function public.crm_view_layout_columns_valid"));
     expect(fn).not.toContain("[[:cntrl:]]");
   });
