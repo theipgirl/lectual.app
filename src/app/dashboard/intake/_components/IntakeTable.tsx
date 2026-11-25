@@ -38,8 +38,6 @@ import { ShowingCount } from "@/components/ui/ShowingCount";
 import { Pill } from "@/components/ui/Pill";
 import { MEANING_TONE } from "@/lib/ui/tones";
 import {
-  NEXT_STEP,
-  OWNER_COLUMN,
   LEADS_ACTIONS_SR,
   LEADS_COMPARE_OPEN,
   LEADS_DUPLICATE,
