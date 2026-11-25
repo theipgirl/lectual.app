@@ -2,6 +2,8 @@
 -- PROPOSAL ONLY. NOT A MIGRATION OF THIS REPO. NOT APPLIED ANYWHERE (not lectual-dev, not lectual-prod).
 -- =====================================================================================================================
 -- 0119_editable_views.sql (proposed): firm-wide view layouts, stage roles, and owner-only stage functions.
+-- Revised after the step 2 review: the layout label CHECK now refuses leading / trailing Unicode whitespace and C1 controls explicitly,
+-- the same rule as lectual.app's parseLayout (see crm_view_layout_column_valid).
 --
 -- This file is a draft for the `lectual` repo (theipgirl/lectual), where migrations live (lectual.app AGENTS.md: "No migrations
 -- in this repo"). To use it: copy it to `lectual/supabase/migrations/0119_editable_views.sql` (first-merged-wins numbering: 0108,
@@ -88,7 +90,9 @@
 --     key     required. A built-in column key, ^[a-z][a-z0-9_]{0,39}$ (the app's fixed keys; the database does not know which keys a
 --             view has: an unknown built-in key is the app's to ignore), or `cf:<uuid>` naming one of THIS firm's crm_custom_field rows
 --             (archived allowed; the trigger refuses another firm's or a missing id, view_layout_unknown_field, 23503). Keys distinct.
---     label   optional. null or absent = the column's own name; else 1..60 characters, trimmed, no control characters. A rename is the
+--     label   optional. null or absent = the column's own name; else 1..60 characters, with no leading or trailing Unicode whitespace
+--             (space, tab, line breaks, U+00A0, U+1680, U+2000-200A, U+2028/2029, U+202F, U+205F, U+3000, U+FEFF), no C1 or C0
+--             control (U+0000-001F, U+007F-009F, written out) and no invisible direction mark. A rename is the
 --             label only: data, filters and rules keep reading the key.
 --     hidden  required boolean.
 --     width   optional. null or absent = default; else a whole number of pixels 40..800.
@@ -374,8 +378,11 @@ begin
   if p ? 'label' and pg_catalog.jsonb_typeof(p -> 'label') <> 'null' then
     if pg_catalog.jsonb_typeof(p -> 'label') <> 'string'
        or pg_catalog.char_length(p ->> 'label') not between 1 and 60
-       or (p ->> 'label') <> pg_catalog.btrim(p ->> 'label')
-       or (p ->> 'label') ~ '[[:cntrl:]]'
+       -- Revised after the step 2 review: the rule is written out character by character, never through the locale-dependent POSIX classes
+       -- (control and space), so the app's parseLayout (src/lib/views/layout/validate.ts) and this CHECK accept exactly the same labels.
+       or (p ->> 'label') ~ '^[ \t\n\r\f\v\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF]'
+       or (p ->> 'label') ~ '[ \t\n\r\f\v\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF]$'
+       or (p ->> 'label') ~ '[\u0001-\u001F\u007F-\u009F]'
        or (p ->> 'label') ~ '[\u200B-\u200F\u202A-\u202E\u2066-\u2069]' then
       return false;
     end if;

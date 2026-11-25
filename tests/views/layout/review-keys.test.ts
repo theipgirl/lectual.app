@@ -118,9 +118,19 @@ describe("the Board's layout names people", () => {
     const out = applyBoardLayout(lanes, [c(laneKey(A), { hidden: true }), c(laneKey(B))]);
     expect(out.lanes.map((l) => l.title)).toEqual(["Bo"]);
     expect(out.hidden).toBe(1);
+    expect(out.hiddenUnassigned).toBe(false);
     // Everything hidden: the standard lanes are drawn and nothing is claimed hidden.
     const all = applyBoardLayout(lanes, [c(laneKey(A), { hidden: true }), c(laneKey(B), { hidden: true })]);
     expect(all.lanes).toHaveLength(2);
     expect(all.hidden).toBe(0);
+    expect(all.hiddenUnassigned).toBe(false);
+  });
+
+  it("Unassigned is counted apart from people", () => {
+    const lanes = [lane(A, "Ana"), lane(B, "Bo"), lane(null, "Unassigned")];
+    const out = applyBoardLayout(lanes, [c(laneKey(A)), c(UNASSIGNED_LANE_KEY, { hidden: true }), c(laneKey(B), { hidden: true })]);
+    expect(out.lanes.map((l) => l.title)).toEqual(["Ana"]);
+    expect(out).toMatchObject({ hidden: 1, hiddenUnassigned: true });
+    expect(applyBoardLayout(lanes, [c(UNASSIGNED_LANE_KEY, { hidden: true }), c(laneKey(A))])).toMatchObject({ hidden: 0, hiddenUnassigned: true });
   });
 });

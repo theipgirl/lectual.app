@@ -82,6 +82,7 @@
   .lp-root:not(.rv-owner) .rv-sheet thead th { position: sticky; top: 0; z-index: 2; }
 }
 .rv-owner .rv-sheet-note { margin: 0; font-size: var(--fs-1); line-height: 1.45; color: var(--muted); }
+/* The layout's colgroup widths (a firm's saved width) win over these th widths once an owner's read-only List exists. */
 /* Sheet column widths (match the editable Sheet's defaults, by column id): Client never squeezes; a table wider than its card scrolls sideways inside it. */
 @media (min-width: 641px) {
   .rv-owner .sheet-tbl.rv-sheet { table-layout: fixed; }

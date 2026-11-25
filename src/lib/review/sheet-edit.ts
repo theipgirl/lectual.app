@@ -428,6 +428,14 @@ export function colWidth(sizes: Pick<SheetSizes, "cols">, col: SizedColumn): num
   return sizes.cols[col] ?? (isCustomColumnId(col) ? CUSTOM_COL_WIDTH : DEFAULT_COL_WIDTHS[col]);
 }
 
+/**
+ * The width a column is DRAWN at: this viewer's own resize, else the firm's saved layout width, else the default (null = flexible).
+ * The header's grip and the table's column group both start from this, so an arrow-key resize begins where the column is.
+ */
+export function drawnWidth(sizes: Pick<SheetSizes, "cols">, col: SizedColumn, layoutWidth?: number | null): number | null {
+  return sizes.cols[col] ?? layoutWidth ?? colWidth(NO_SIZES, col);
+}
+
 /** The narrowest the table may get before it scrolls sideways inside its card (flexible Next step counted at its minimum). */
 export function sheetMinWidth(sizes: Pick<SheetSizes, "cols">, columns: readonly SizedColumn[] = SHEET_EDIT_COLUMNS): number {
   let total = 0;

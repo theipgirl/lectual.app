@@ -4,7 +4,7 @@ import { laneLabel, laneLoad, laneLoadText, type Kpis, type Lane } from "@/lib/r
 import { cardSubline, dueText, sentText } from "@/lib/review/format";
 import { openToken } from "@/lib/review/open";
 import { reviewHref, REVIEW_VIEWS, type ReviewParams, type ReviewView } from "@/lib/review/params";
-import { boardLanesHidden, LANE_COUNT_NOTE, LANE_NOBODY_WAITING, LANE_NOTHING_FOR_US, LANE_WAITING_ON_CLIENT, NOTHING_WAITING_ON_YOU, OUR_TURN, WAITING_ON_YOU, WAITING_ON_YOU_PARTIAL, REVIEW_BOARD_VIEW, REVIEW_CARDS_VIEW, REVIEW_SHEET_VIEW } from "@/lib/ui/words";
+import { BOARD_LANES_HIDDEN_LINK, boardLanesHidden, LANE_COUNT_NOTE, LANE_NOBODY_WAITING, LANE_NOTHING_FOR_US, LANE_WAITING_ON_CLIENT, NOTHING_WAITING_ON_YOU, OUR_TURN, WAITING_ON_YOU, WAITING_ON_YOU_PARTIAL, REVIEW_BOARD_VIEW, REVIEW_CARDS_VIEW, REVIEW_SHEET_VIEW } from "@/lib/ui/words";
 import { DoneButton } from "./DoneButton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadFailedLine } from "@/components/ui/LoadFailed";
@@ -114,7 +114,7 @@ export function ReviewBoard({ lanes, layout = null, ...common }: Common & { lane
   if (lanes.length === 0) {
     return <EmptyState title="Nothing needs attention">No records are waiting on us or on a client for this view.</EmptyState>;
   }
-  const { lanes: drawn, hidden } = applyBoardLayout(lanes, layout);
+  const { lanes: drawn, hidden, hiddenUnassigned } = applyBoardLayout(lanes, layout);
   const columns: BoardColumnSpec<ReviewRow>[] = drawn.map((lane) => {
     const load = laneLoad(lane, common.today);
     const split = laneLoadText(load);
@@ -136,7 +136,14 @@ export function ReviewBoard({ lanes, layout = null, ...common }: Common & { lane
   const waitingOnClient = new Set(drawn.flatMap((l) => l.client.map((r) => r.key)));
   return (
     <>
-      {hidden > 0 && <p className="lx-note rv-layout-note" role="status">{boardLanesHidden(hidden)}</p>}
+      {(hidden > 0 || hiddenUnassigned) && (
+        <p className="lx-note rv-layout-note" role="status">
+          {boardLanesHidden(hidden, hiddenUnassigned)}{" "}
+          <Link href={reviewHref({ ...common.params, view: "sheet", i: 1, open: null })} className="lx-link" scroll={false}>
+            {BOARD_LANES_HIDDEN_LINK}
+          </Link>
+        </p>
+      )}
       <ViewBoard
         className="rv-board"
         headingLevel={2}

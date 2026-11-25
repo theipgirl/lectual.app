@@ -41,10 +41,47 @@ describe("cleanLabel: what a person may name a column", () => {
     for (const x of ["", "   ", null, undefined, 4]) expect(cleanLabel(x), String(x)).toEqual({ ok: false, reason: "empty" });
   });
   it("refuses control characters (a tab and a newline included) and the invisible direction marks the database refuses", () => {
-    const bad = ["a\tb", "a\nb", "a\u0000b", "a\u007fb", "a\u0085b", "a​b", "a‏b", "a‪b", "a‮b", "a⁦b", "a⁩b"];
+    const bad = ["a\tb", "a\nb", "a\u0000b", "a\u007fb", "a\u0085b", "a\u200Bb", "a\u200Fb", "a\u202Ab", "a\u202Eb", "a\u2066b", "a\u2069b"];
     for (const x of bad) expect(cleanLabel(x), JSON.stringify(x)).toEqual({ ok: false, reason: "characters" });
     // Just outside the ranges: allowed.
-    for (const x of ["a‐b", "a b", "a⁥b", "a b"]) expect(cleanLabel(x), JSON.stringify(x)).toMatchObject({ ok: true });
+    for (const x of ["a‐b", "a\u202Fb", "a⁥b", "a\u200Ab"]) expect(cleanLabel(x), JSON.stringify(x)).toMatchObject({ ok: true });
+  });
+});
+
+describe("labels: the same rule as 0119's CHECK (edge whitespace and C1 controls written out)", () => {
+  const ch = (n: number) => String.fromCodePoint(n);
+  const edge = [0x20, 0x09, 0x0a, 0x0d, 0x0b, 0x0c, 0xa0, 0x1680, ...Array.from({ length: 11 }, (_, i) => 0x2000 + i), 0x2028, 0x2029, 0x202f, 0x205f, 0x3000, 0xfeff];
+  it("a stored label with any of them at either end is unreadable; typed ones are trimmed first", () => {
+    for (const n of edge) {
+      const lead = ch(n) + "Name";
+      const trail = "Name" + ch(n);
+      expect(parseLayoutColumn({ key: "status", label: lead, hidden: false }), `lead ${n.toString(16)}`).toBeNull();
+      expect(parseLayoutColumn({ key: "status", label: trail, hidden: false }), `trail ${n.toString(16)}`).toBeNull();
+      // Tab and the line breaks are controls (refused outright); the others are trimmed off what a person typed.
+      const typed = cleanLabel(lead);
+      if (n === 0x09 || n === 0x0a || n === 0x0d || n === 0x0b || n === 0x0c) expect(typed, n.toString(16)).toEqual({ ok: false, reason: "characters" });
+      else expect(typed, n.toString(16)).toEqual({ ok: true, label: "Name" });
+    }
+  });
+  it("the same characters INSIDE a label are fine (except the controls)", () => {
+    for (const n of [0xa0, 0x1680, 0x2003, 0x202f, 0x205f, 0x3000, 0xfeff]) expect(parseLayoutColumn({ key: "status", label: "A" + ch(n) + "B", hidden: false }), n.toString(16)).not.toBeNull();
+  });
+  it("every C1 control (U+0080-009F) is refused anywhere, typed or stored", () => {
+    for (let n = 0x80; n <= 0x9f; n++) {
+      expect(cleanLabel("a" + ch(n) + "b"), n.toString(16)).toEqual({ ok: false, reason: "characters" });
+      expect(parseLayoutColumn({ key: "status", label: "a" + ch(n) + "b", hidden: false }), n.toString(16)).toBeNull();
+    }
+  });
+  it("a label that is only whitespace is empty", () => {
+    expect(cleanLabel(ch(0xa0) + ch(0x3000))).toEqual({ ok: false, reason: "empty" });
+  });
+  it("the proposal's CHECK names the same sets", async () => {
+    const { readFileSync } = await import("node:fs");
+    const sql = readFileSync("docs/pge/2026-11-17-agentic-ip-os/0119-proposed.sql.txt", "utf8");
+    expect(sql).toContain("Revised after the step 2 review");
+    for (const needle of ["u00A0", "u1680", "u2000-", "u200A", "u2028", "u2029", "u202F", "u205F", "u3000", "uFEFF", "u0001-", "u007F-", "u009F"]) expect(sql, needle).toContain(needle);
+    const fn = sql.slice(sql.indexOf("function public.crm_view_layout_column_valid"), sql.indexOf("function public.crm_view_layout_columns_valid"));
+    expect(fn).not.toContain("[[:cntrl:]]");
   });
 });
 

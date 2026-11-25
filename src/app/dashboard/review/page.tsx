@@ -19,7 +19,7 @@ import { ReviewCardAside } from "@/components/review/ReviewCardExtras";
 import { RecordCardHost } from "@/components/record-card/RecordCardHost";
 import { loadRecordCard } from "@/lib/record-card/load";
 import { cardEdits } from "@/lib/record-card/rules";
-import { resolveViewSession } from "@/lib/views/view-as";
+import { inPreview, resolveViewSession } from "@/lib/views/view-as";
 import { NO_PREVIEW, previewFor, viewFor } from "@/lib/views";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import { CAN_MOVE_STAGE, CAN_WRITE_LEAD } from "@/lib/pipeline/leads";
@@ -73,10 +73,12 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   // Lectual staff acting inside the firm never see them, even with an owner role claim (Taylor, Nov 23).
   const actingAsStaff = session.kind === "ok" ? session.actingAsStaff : true;
   const customMoney = canSeeCustomMoney(role, actingAsStaff);
-  const load = await loadReview(new Date(), { withFees, withCustom, notes, customMoney });
-  // The firm's saved column layout for the view being drawn (the List's or the Board's; Cards has none). A layout that is missing or
-  // can't be read draws the standard columns (never an empty table); only a failed read says so.
-  const layoutRead = params.view === "sheet" ? await loadViewLayout("review_list") : params.view === "board" ? await loadViewLayout("review_board") : null;
+  // The firm's saved column layout for the view being drawn (the List's or the Board's; Cards has none), read beside the review itself.
+  // A layout that is missing or can't be read draws the standard columns (never an empty table); only a failed read says so.
+  const [load, layoutRead] = await Promise.all([
+    loadReview(new Date(), { withFees, withCustom, notes, customMoney }),
+    params.view === "sheet" ? loadViewLayout("review_list") : params.view === "board" ? loadViewLayout("review_board") : Promise.resolve(null),
+  ]);
   const layout = savedLayoutOf(layoutRead);
   const layoutSaid = layoutNote(layoutRead);
   const userId = session.kind === "ok" ? session.user.id : null;
@@ -122,7 +124,8 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   // edits keep today's role gates. Each permission comes from the role re-resolved above, and every action behind a cell checks it again.
   // A role that can edit nothing gets the read-only List. The stage lists are read only for a role that can move one.
   let sheetPerms: SheetPerms | null = null;
-  if (params.view === "sheet") {
+  // While an owner previews a teammate nothing can be saved (every action refuses), so the List is the read-only one.
+  if (params.view === "sheet" && !(await inPreview())) {
     const writeLead = !!role && CAN_WRITE_LEAD.includes(role);
     const moveLead = writeLead && !!role && CAN_MOVE_STAGE.includes(role);
     if (canWrite || writeLead || writeCustom) {

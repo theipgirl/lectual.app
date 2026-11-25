@@ -7,9 +7,12 @@ import { LABEL_MAX, LAYOUT_MAX_COLUMNS, LAYOUT_MIN_COLUMNS, VIEW_KEYS, WIDTH_MAX
 
 const BUILTIN_KEY = /^[a-z][a-z0-9_]{0,39}$/;
 const CF_KEY = /^cf:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-/** Control characters (POSIX `[[:cntrl:]]`, C1 included) and the invisible direction marks the database refuses. */
+/** C0 and C1 controls, written out (0119 does not rely on a locale's `[[:cntrl:]]`), and the invisible direction marks the database refuses. */
 const CONTROL = /[\u0000-\u001f\u007f-\u009f]/;
-const INVISIBLE = /[​-‏‪-‮⁦-⁩]/;
+/** Whitespace a label may not start or end with: the same characters 0119's CHECK names (JavaScript's own trim set). */
+const SPACE = "[ \\t\\n\\r\\f\\v\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]";
+const EDGE_SPACE = new RegExp(`^${SPACE}|${SPACE}$`);
+const INVISIBLE = /[\u200B-\u200F\u202A-\u202E\u2066-\u2069]/;
 const ALLOWED_KEYS = new Set(["key", "label", "hidden", "width"]);
 
 export const isViewKey = (x: unknown): x is ViewKey => typeof x === "string" && (VIEW_KEYS as readonly string[]).includes(x);
@@ -29,7 +32,7 @@ const length = (s: string): number => Array.from(s).length;
 export function cleanLabel(raw: unknown): { ok: true; label: string } | { ok: false; reason: "empty" | "too-long" | "characters" } {
   if (typeof raw !== "string") return { ok: false, reason: "empty" };
   if (CONTROL.test(raw) || INVISIBLE.test(raw)) return { ok: false, reason: "characters" };
-  const label = raw.trim();
+  const label = raw.replace(new RegExp(`^${SPACE}+|${SPACE}+$`, "g"), "");
   if (label === "") return { ok: false, reason: "empty" };
   if (length(label) > LABEL_MAX) return { ok: false, reason: "too-long" };
   return { ok: true, label };
@@ -39,7 +42,7 @@ export function cleanLabel(raw: unknown): { ok: true; label: string } | { ok: fa
 function validStoredLabel(x: unknown): x is string {
   if (typeof x !== "string") return false;
   const c = cleanLabel(x);
-  return c.ok && c.label === x;
+  return c.ok && c.label === x && !EDGE_SPACE.test(x);
 }
 
 const validWidth = (x: unknown): x is number => typeof x === "number" && Number.isInteger(x) && x >= WIDTH_MIN && x <= WIDTH_MAX;

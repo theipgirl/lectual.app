@@ -35,7 +35,8 @@ describe("ViewTable: one List, read-only and editable", () => {
     const some = renderToStaticMarkup(<ViewTable columns={cols} rows={rows} cell={cell} />);
     expect(some).toContain('<colgroup><col/><col/><col style="width:260px"/></colgroup>');
     const over = renderToStaticMarkup(<ViewTable columns={cols} rows={rows} cell={cell} widthOf={(c) => (c.key === "status" ? 111 : null)} fixed />);
-    expect(over).toContain('<colgroup><col/><col style="width:111px"/><col style="width:260px"/></colgroup>');
+    // widthOf decides alone: its null for Notes is flexible, so the column's own 260 is not drawn.
+    expect(over).toContain('<colgroup><col/><col style="width:111px"/><col/></colgroup>');
     expect(over).toContain("sheet-fixed");
   });
 
@@ -88,5 +89,13 @@ describe("ViewBoard: one Board for people lanes and stage columns", () => {
     expect(html).toContain('<p class="lx-board-empty">No matters here.</p>');
     expect(html).not.toContain("rv-lane-head");
     expect(html).toContain('role="region"');
+  });
+});
+
+describe("ViewTable widthOf", () => {
+  it("when given it decides alone: null is flexible, not the column's own width", () => {
+    const html = renderToStaticMarkup(<ViewTable columns={cols} rows={rows} cell={cell} widthOf={() => null} />);
+    expect(html).not.toContain("<colgroup");
+    expect(html).not.toContain("width:260px");
   });
 });

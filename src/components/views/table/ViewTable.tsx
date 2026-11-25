@@ -55,7 +55,7 @@ export function ViewTable<R extends ListRowBase>({
   /** The narrowest the table gets before it scrolls sideways inside its card. */
   minWidth?: number;
   canEditCells?: boolean;
-  /** The width a column is drawn at; defaults to the column's own `width`. Null/absent = flexible. */
+  /** The width a column is drawn at; when given it decides alone (null = flexible). Absent: the column's own `width`. */
   widthOf?: (column: ListColumn) => number | null | undefined;
   /** The header cell's content (an editable List adds its pencil and resize grip). Default: the label. */
   renderHead?: (column: ListColumn) => ReactNode;
@@ -63,7 +63,8 @@ export function ViewTable<R extends ListRowBase>({
   emptyText?: string;
   rowClass?: (row: R) => string | undefined;
 }) {
-  const width = (c: ListColumn): number | null => widthOf?.(c) ?? c.width ?? null;
+  // A caller's `widthOf` decides alone: its null means flexible (no width), not "fall back to the column's own".
+  const width = (c: ListColumn): number | null => (widthOf ? (widthOf(c) ?? null) : (c.width ?? null));
   // A column group only where a width is in force: a table with no widths keeps the plain markup.
   const grouped = fixed || columns.some((c) => width(c) !== null);
   return (

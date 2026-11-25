@@ -25,6 +25,7 @@ import {
   MIN_COL,
   NEXT_MIN_WIDTH,
   colWidth,
+  drawnWidth,
   MIN_ROW,
   NO_SIZES,
   SHEET_SIZES_KEY,
@@ -354,11 +355,13 @@ export function SheetEditTable({
     document.addEventListener("pointermove", onMove);
     document.addEventListener("pointerup", onUp);
   };
+  /** The firm's saved width for a column, from the layout the page applied (the same in both sections). */
+  const layoutWidthOf = (col: SizedColumn): number | null => [...drawnBy.trademarks, ...drawnBy.contracts].find((c) => sizeKeyOf(c.id) === col)?.width ?? null;
   const colKey = (col: SizedColumn) => (e: ReactKeyboardEvent<HTMLSpanElement>) => {
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
     e.preventDefault();
     const th = (e.currentTarget as HTMLElement).closest("th");
-    const now = sizes.cols[col] ?? th?.getBoundingClientRect().width ?? colWidth(NO_SIZES, col) ?? NEXT_MIN_WIDTH;
+    const now = drawnWidth(sizes, col, layoutWidthOf(col)) ?? th?.getBoundingClientRect().width ?? NEXT_MIN_WIDTH;
     const next = { ...sizes, cols: { ...sizes.cols, [col]: clampSize(now + (e.key === "ArrowRight" ? 16 : -16), MIN_COL, MAX_COL) } };
     setSizes(next);
     writeSizes(next);
@@ -421,7 +424,7 @@ export function SheetEditTable({
           return { col, typed, locked, active };
         };
         /** A column's drawn width: this viewer's own resize, else the firm's saved width, else the default (null = flexible). */
-        const widthFor = (id: ColumnId, layoutWidth: number | null | undefined): number | null => sizes.cols[sizeKeyOf(id)] ?? layoutWidth ?? colWidth(NO_SIZES, sizeKeyOf(id));
+        const widthFor = (id: ColumnId, layoutWidth: number | null | undefined): number | null => drawnWidth(sizes, sizeKeyOf(id), layoutWidth);
         const listColumns = drawn.map((c) => ({ ...listColumnOf(c), headClass: headState(c).locked ? "rse-lock-th" : undefined }));
         const tableRows = sec.rows.map((raw) => {
                   const row = shownRow(raw, state);

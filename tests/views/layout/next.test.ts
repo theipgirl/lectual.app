@@ -83,7 +83,7 @@ describe("insertColumn", () => {
     expect(insertColumn(base(), { key: "status" }, "mark", "left")).toEqual({ ok: false, reason: "key-taken" });
     expect(insertColumn(base(), { key: "Bad Key" }, "mark", "left")).toEqual({ ok: false, reason: "bad-key" });
     expect(insertColumn(base(), { key: FIELD }, "nope", "left")).toEqual({ ok: false, reason: "unknown-column" });
-    expect(insertColumn(base(), { key: FIELD, label: "a‮b" }, "mark", "left")).toEqual({ ok: false, reason: "label-characters" });
+    expect(insertColumn(base(), { key: FIELD, label: "a\u202Eb" }, "mark", "left")).toEqual({ ok: false, reason: "label-characters" });
     const full = Array.from({ length: LAYOUT_MAX_COLUMNS }, (_, i) => c(`c${i}`));
     expect(insertColumn(full, { key: FIELD }, "c0", "right")).toEqual({ ok: false, reason: "too-many" });
   });

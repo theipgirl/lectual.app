@@ -119,7 +119,9 @@ describe("the Weekly review Board draws the firm's saved layout of people", () =
     mockLayoutRead({ status: "ok", rev: 1, layout: [col(laneKey("u-sam"), { label: "Sam (paralegal)" }), col(laneKey(A), { hidden: true })] });
     const html = decode(await renderPage({}));
     expect(html).toContain("Sam (paralegal)");
-    expect(html).toMatch(/1 person's column is hidden by this view's layout\./);
+    expect(html).toContain("1 person's column is hidden in this firm's layout.");
+    // The List, where those records still show, is one link away (the same review URL, view=sheet).
+    expect(html).toMatch(/<a class="lx-link" href="[^"]*view=sheet[^"]*">See them in the List<\/a>/);
     expect(layoutSpy).toHaveBeenCalledWith("review_board");
   });
 
@@ -136,3 +138,29 @@ describe("the Weekly review Board draws the firm's saved layout of people", () =
 function rowsForBoard() {
   return rows.map((r, i) => ({ ...r, waiting: "us", nextStep: { id: `00000000-0000-4000-8000-00000000010${i}`, title: "Call", dueDate: "2026-11-20", assigneeId: i === 0 ? "u-reb" : "u-sam" } }));
 }
+
+describe("View as: a preview draws the read-only List (every save would be refused)", () => {
+  it("an owner previewing a writing teammate gets no editors, no save line; outside a preview the same role gets them", async () => {
+    mockPage({ load, role: "paralegal" });
+    vi.doMock("@/lib/views/view-as", async (importOriginal) => ({ ...(await importOriginal<object>()), inPreview: async () => true }));
+    const previewing = await renderPage({ view: "sheet" });
+    expect(previewing).toContain('class="rv-sheets"');
+    expect(previewing).not.toContain("rse-tbl");
+    expect(previewing).not.toContain("rse-status-wrap");
+    vi.resetModules();
+    vi.doUnmock("@/lib/views/view-as");
+    mockPage({ load, role: "paralegal" });
+    expect(await renderPage({ view: "sheet" })).toContain("rse-tbl");
+  });
+});
+
+describe("the hidden-lane sentence", () => {
+  it("counts Unassigned apart from people", async () => {
+    const { boardLanesHidden } = await import("@/lib/ui/words");
+    expect(boardLanesHidden(2, true)).toBe("Unassigned and 2 people's columns are hidden in this firm's layout.");
+    expect(boardLanesHidden(1, true)).toBe("Unassigned and 1 person's column are hidden in this firm's layout.");
+    expect(boardLanesHidden(0, true)).toBe("The Unassigned column is hidden in this firm's layout.");
+    expect(boardLanesHidden(1, false)).toBe("1 person's column is hidden in this firm's layout.");
+    expect(boardLanesHidden(3, false)).toBe("3 people's columns are hidden in this firm's layout.");
+  });
+});
