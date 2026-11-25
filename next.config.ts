@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 import { clientLinkHosts } from "./src/lib/proposals/client-link-config";
 
+// The packages PDF's fonts and licences (read with fs by src/lib/consult-prep/pdf/fonts.ts).
+const PACKAGES_PDF_ASSETS = "./src/lib/consult-prep/pdf/assets/**/*";
+
 const nextConfig: NextConfig = {
   // Matches lectual: the magic-link callback and every redirect in the ported
   // auth code are written with trailing slashes.
@@ -13,6 +16,11 @@ const nextConfig: NextConfig = {
     "/p/*": ["./src/lib/loe/fonts/**", "./public/brand/rpb-logo-oxblood.png"],
     // Sprint 6: the staff Download and "Try again" (filing the signed letter) build the same PDF from the proposal page's actions.
     "/dashboard/proposals/*": ["./src/lib/loe/fonts/**", "./public/brand/rpb-logo-oxblood.png"],
+    // Automatic consult prep: the packages PDF (src/lib/consult-prep/pdf) reads its fonts with fs. Built by the agents run, the
+    // Lawmatics daily sync's prep pass and the lead page's Re-run prep.
+    "/api/cron/agents": [PACKAGES_PDF_ASSETS],
+    "/api/cron/lawmatics-matters": [PACKAGES_PDF_ASSETS],
+    "/dashboard/leads/*": [PACKAGES_PDF_ASSETS],
   },
   experimental: {
     // The stage reconciliation screen posts an intake sheet (up to 5 MB, see
