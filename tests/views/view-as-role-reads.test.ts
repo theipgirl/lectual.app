@@ -87,7 +87,6 @@ const AUTHORIZE: Record<string, { counts: Counts; why: string }> = {
   "src/lib/pipeline/consult-outcome.ts": { counts: { resolveCurrentRole: 1 }, why: "a consult outcome write" },
   "src/lib/pipeline/leads.ts": { counts: { resolveCurrentRole: 2, requireLeadWriteRole: 2, "rpc:current_org_role": 1 }, why: "lead writes and stage moves" },
   "src/lib/pipeline/notes.ts": { counts: { resolveCurrentRole: 1 }, why: "a note write" },
-  "src/lib/prep-consult/generate.ts": { counts: { resolveCurrentRole: 1 }, why: "a prep draft (queue write)" },
   "src/lib/proposals/store.ts": { counts: { "rpc:current_org_role": 2 }, why: "proposal writes (:174 requireRole) and the delete path" },
   "src/lib/queue/card-moves.ts": { counts: { resolveFirmSession: 2 }, why: "hand off / send back writes" },
   "src/lib/queue/make-draft.ts": { counts: { resolveFirmSession: 3 }, why: "the Outlook draft write" },

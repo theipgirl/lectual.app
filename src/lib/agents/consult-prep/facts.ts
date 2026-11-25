@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { boothItem, mergeAnswerItems, scoreLine, submissionItem, type AnswerItem, type AnswerPair, type FormRef } from "@/lib/answers/items";
 import { scrubJudgmentContent } from "@/lib/prep-consult/prep-consult";
 import { classifyEmail } from "@/lib/intake/email-match";
-import { chunk, IN_CHUNK, civilDay, leadLabel, text, whenInZone } from "../shared";
+import { chunk, IN_CHUNK, leadLabel, text } from "../shared";
 
 /**
  * The facts card behind a consult heads-up: what the firm already has on the lead, laid out for the
@@ -35,6 +35,8 @@ export type LeadFacts = {
   referralSource: string | null;
   referralDetail: string | null;
   stage: string | null;
+  /** The lead's Lawmatics prospect id, when linked. */
+  lawmaticsId: string | null;
 };
 
 export type AnswerBlock = { label: string; at: string; pairs: AnswerPair[]; score: string | null };
@@ -65,7 +67,7 @@ export async function readLeadFacts(admin: SupabaseClient, orgId: string, leadId
   const { data, error } = await admin
     // live-guard: reads the lead a calendar consult is linked to; calendar events move to the keeper in the merge
     .from("crm_lead")
-    .select("id, first_name, last_name, business_name, email, phone, practice_area, mark_text, referral_source, referral_detail, current_stage_id")
+    .select("id, first_name, last_name, business_name, email, phone, practice_area, mark_text, referral_source, referral_detail, current_stage_id, lawmatics_id")
     .eq("org_id", orgId)
     .eq("id", leadId)
     .maybeSingle();
@@ -90,6 +92,7 @@ export async function readLeadFacts(admin: SupabaseClient, orgId: string, leadId
     referralSource: data.referral_source ?? null,
     referralDetail: data.referral_detail ?? null,
     stage,
+    lawmaticsId: (data.lawmatics_id as string | null | undefined) ?? null,
   };
 }
 
@@ -205,102 +208,64 @@ export async function readMeetingHistory(admin: SupabaseClient, orgId: string, l
   }
 }
 
-// ── the card ─────────────────────────────────────────────────────────────────
+// ── files ────────────────────────────────────────────────────────────────────
 
-export type CardInput = {
-  lead: LeadFacts;
-  startsAt: string;
-  joinUrl: string | null;
-  tz: string;
-  answers: AnswersRead;
-  mail: MailRead;
-  meetings: MeetingsRead;
+export type FileLine = { name: string; type: string; at: string };
+export type FilesRead = { state: "ok"; files: FileLine[]; more: number } | { state: "not-set-up" } | { state: "unavailable" };
+
+const FILE_ROWS = 15;
+
+const MIME_WORD: Record<string, string> = {
+  "application/pdf": "PDF",
+  "image/png": "image",
+  "image/jpeg": "image",
+  "image/heic": "image",
+  "image/gif": "image",
+  "image/webp": "image",
+  "text/plain": "text",
+  "text/csv": "spreadsheet",
+  "application/msword": "Word document",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "Word document",
+  "application/vnd.ms-excel": "spreadsheet",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "spreadsheet",
 };
+
+/**
+ * The files uploaded on the lead and on leads merged into it: file name, type word and upload date ONLY. The file's
+ * contents are never read and no storage path or download link is selected. Every statement names the firm.
+ */
+export async function readLeadFiles(admin: SupabaseClient, orgId: string, leadId: string, mergedIds: readonly string[] = []): Promise<FilesRead> {
+  try {
+    const ids = [leadId, ...mergedIds];
+    const base = admin.from("crm_file").select("file_name, mime, created_at").eq("org_id", orgId);
+    const { data, error } = await (ids.length > 1 ? base.in("lead_id", ids) : base.eq("lead_id", leadId))
+      .order("created_at", { ascending: false })
+      .limit(FILE_ROWS + 1);
+    if (error) return MISSING_TABLE.has(error.code ?? "") ? { state: "not-set-up" } : { state: "unavailable" };
+    const rows = (data ?? []) as Array<{ file_name: string; mime: string | null; created_at: string }>;
+    return {
+      state: "ok",
+      files: rows.slice(0, FILE_ROWS).map((r) => ({ name: r.file_name, type: MIME_WORD[r.mime ?? ""] ?? "file", at: r.created_at })),
+      more: Math.max(0, rows.length - FILE_ROWS),
+    };
+  } catch {
+    return { state: "unavailable" };
+  }
+}
+
+// ── small helpers ────────────────────────────────────────────────────────────
 
 const safe = (value: string | null | undefined): string | null => {
   const flat = (value ?? "").replace(/\s+/g, " ").trim();
   return flat ? scrubJudgmentContent(flat) : null;
 };
 
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-
 function clip(value: string): string {
   return value.length > ANSWER_CHARS ? `${value.slice(0, ANSWER_CHARS - 1)}…` : value;
 }
 
-/** The marker line that opens the client's own words. Everything from here to the next section is theirs, shown as written. */
-export const CLIENT_WORDS_HEADING = "In the client's words";
-
 export function cardName(lead: LeadFacts): string {
   return leadLabel({ first_name: lead.firstName, last_name: lead.lastName, business_name: lead.businessName }, "the client");
-}
-
-/**
- * The card text. The returned `ownWording` is the same card without the client's-words block: the
- * part the judgment guard checks, because it is the system's own wording and the record's values.
- */
-export function renderFactsCard(input: CardInput): { body: string; ownWording: string } {
-  const { lead, tz } = input;
-  const head: string[] = [`Consult heads-up for ${safe(cardName(lead)) ?? "the client"}`, ""];
-  head.push(`Consult: ${whenInZone(input.startsAt, tz)}${input.joinUrl ? `, join: ${input.joinUrl}` : ""}`, "");
-
-  head.push("Lead on file");
-  const rows: Array<[string, string | null]> = [
-    ["Name", safe(`${lead.firstName ?? ""} ${lead.lastName ?? ""}`)],
-    ["Business", safe(lead.businessName)],
-    ["Practice area", safe(lead.practiceArea)],
-    ["Mark", safe(lead.markText)],
-    ["Stage", safe(lead.stage)],
-    ["Source", safe([lead.referralSource, lead.referralDetail].filter(Boolean).join(", "))],
-    ["Email", safe(lead.email)],
-    ["Phone", safe(lead.phone)],
-  ];
-  for (const [label, value] of rows) head.push(`- ${label}: ${value ?? "not on file"}`);
-
-  const tail: string[] = [""];
-  tail.push(`Mail on file${input.mail.state === "ok" ? ` (${plural(input.mail.summary.received + input.mail.summary.sent, "message", "messages")})` : " (could not be read)"}`);
-  if (input.mail.state !== "ok") {
-    tail.push("Couldn't be read: the mail history did not answer.");
-  } else {
-    const m = input.mail.summary;
-    if (m.received + m.sent === 0) {
-      tail.push("No mail on file yet.");
-    } else {
-      tail.push(`- ${plural(m.received, "message", "messages")} received and ${plural(m.sent, "message", "messages")} sent`);
-      if (m.newestReceived) tail.push(`- Newest received: ${civilDay(new Date(m.newestReceived), tz)}`);
-      for (const subject of m.subjects) tail.push(`- Subject: ${safe(subject)}`);
-      if (m.withheld > 0) tail.push(`- ${plural(m.withheld, "message", "messages")} not shown because the subject reads as sensitive`);
-    }
-  }
-
-  tail.push("", `Earlier meetings${input.meetings.state === "ok" ? ` (${input.meetings.meetings.length})` : " (could not be read)"}`);
-  if (input.meetings.state !== "ok") {
-    tail.push("Couldn't be read: the meeting list did not answer.");
-  } else if (input.meetings.meetings.length === 0) {
-    tail.push("No earlier meetings on file.");
-  } else {
-    for (const m of input.meetings.meetings) tail.push(`- ${safe(m.title)}, ${m.at ? civilDay(new Date(m.at), tz) : "date not recorded"}, ${m.source}`);
-  }
-
-  tail.push("", "Prepared by the Consult prep agent from what is on file. Nothing in it was sent to anyone.");
-
-  // The client's own words, as written.
-  const words: string[] = ["", CLIENT_WORDS_HEADING];
-  if (input.answers.state !== "ok") {
-    words.push("Couldn't be read: the intake and assessment answers did not answer.");
-  } else if (input.answers.blocks.length === 0) {
-    words.push("No intake or assessment answers on file.");
-  } else {
-    for (const block of input.answers.blocks) {
-      words.push(`${block.label}, ${civilDay(new Date(block.at), tz)}${block.score ? `, ${block.score}` : ""}`);
-      for (const pair of block.pairs.slice(0, ANSWER_PAIR_CAP)) words.push(`Q: ${pair.question}`, `A: ${clip(pair.answer)}`);
-      if (block.pairs.length > ANSWER_PAIR_CAP) words.push(`and ${block.pairs.length - ANSWER_PAIR_CAP} more answers`);
-    }
-  }
-
-  const ownWording = [...head, ...tail].join("\n");
-  const body = [...head, ...words, ...tail].join("\n");
-  return { body, ownWording };
 }
 
 /** What the client-prep email may know: the lead's own stated interest, with refusable fragments withheld. */

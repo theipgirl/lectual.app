@@ -12,10 +12,12 @@ import { pageTitle } from "@/lib/ui/page-title";
 import { inviteFormOpen } from "@/lib/team/invite-open";
 import { ADMIN_TIER_PHRASE, canSeeSetup } from "@/lib/setup/roles";
 import { VIEW_AS_LINK, VIEW_AS_NOT_ALLOWED, VIEW_AS_NOT_READY, VIEW_AS_START_FAILED, VIEW_AS_TARGET_GONE, VIEW_AS_EXIT_FAILED } from "@/lib/ui/words";
-import { DEADLINE_ALERTS_NONE_CHOSEN, DEADLINE_ALERTS_UNCHECKED, DEADLINE_ALERTS_SETTINGS_HEADING, DEADLINE_ALERTS_SETTINGS_HELP, TEAM_NAME } from "@/lib/ui/words";
+import { CONSULT_PREP_TEAM_HEADING, CONSULT_PREP_TEAM_HELP, CONSULT_PREP_TEAM_NONE, CONSULT_PREP_TEAM_UNCHECKED, DEADLINE_ALERTS_NONE_CHOSEN, DEADLINE_ALERTS_UNCHECKED, DEADLINE_ALERTS_SETTINGS_HEADING, DEADLINE_ALERTS_SETTINGS_HELP, TEAM_NAME } from "@/lib/ui/words";
 import { canReceiveDeadlineAlerts } from "@/lib/today/deadline-alerts";
 import { loadRecipientSetting } from "@/lib/today/deadline-alerts-store";
 import { DeadlineAlertsForm } from "@/components/settings/DeadlineAlertsForm";
+import { ConsultPrepEmailsForm } from "@/components/settings/ConsultPrepEmailsForm";
+import { loadConsultPrepSetting } from "@/lib/consult-prep/recipients-store";
 import "@/components/settings/deadline-alerts.css";
 
 export const metadata: Metadata = { title: pageTitle(TEAM_NAME) };
@@ -64,6 +66,8 @@ export default async function TeamPage(props?: { searchParams?: Promise<{ notice
   // Deadline alerts (PGE Sprint 3): every member sees who gets them; only the admin tier changes the list.
   const alerts = loadError ? ({ status: "unavailable" } as const) : await loadRecipientSetting();
   const canSetAlerts = canSeeSetup(session.role);
+  // Consult prep emails (automatic consult prep): the same shape, its own firm note.
+  const prepSetting = loadError ? ({ status: "unavailable" } as const) : await loadConsultPrepSetting();
 
   return (
     <>
@@ -149,6 +153,30 @@ export default async function TeamPage(props?: { searchParams?: Promise<{ notice
           </ul>
         )}
         {alerts.status === "ok" && !canSetAlerts && <p className="lx-note" style={{ margin: 0 }}>{ADMIN_TIER_PHRASE} can change who gets them.</p>}
+      </section>
+
+      <section className="lx-card lx-dl-alerts" aria-labelledby="team-consult-prep">
+        <h2 id="team-consult-prep" className="lx-h2">
+          {CONSULT_PREP_TEAM_HEADING}
+        </h2>
+        <p className="lx-note" style={{ margin: 0 }}>{CONSULT_PREP_TEAM_HELP}</p>
+        {prepSetting.status !== "ok" ? (
+          <LoadFailedLine role="alert" refresh={false}>{CONSULT_PREP_TEAM_UNCHECKED}</LoadFailedLine>
+        ) : canSetAlerts ? (
+          <ConsultPrepEmailsForm
+            members={members.filter((m) => canReceiveDeadlineAlerts(m.role)).map((m) => ({ userId: m.userId, name: m.displayName ?? m.email ?? "Teammate", role: ROLE_LABEL[m.role] ?? m.role, chosen: prepSetting.userIds.includes(m.userId) }))}
+            cc={prepSetting.cc}
+          />
+        ) : prepSetting.userIds.length === 0 ? (
+          <p className="lx-note" style={{ margin: 0 }}>{CONSULT_PREP_TEAM_NONE}</p>
+        ) : (
+          <ul className="lx-dl-alerts-names">
+            {members.filter((m) => prepSetting.userIds.includes(m.userId)).map((m) => (
+              <li key={m.userId}>{m.displayName ?? m.email ?? "Teammate"}</li>
+            ))}
+          </ul>
+        )}
+        {prepSetting.status === "ok" && !canSetAlerts && <p className="lx-note" style={{ margin: 0 }}>{ADMIN_TIER_PHRASE} can change who gets them.</p>}
       </section>
 
       <RoleTable />

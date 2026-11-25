@@ -17,6 +17,7 @@ import { usableEvidenceDate } from "./evidence-date";
 import { newEnquiryStage } from "./new-enquiry";
 import { notifyAssigned } from "@/lib/notifications/producers";
 import { leadRead } from "@/lib/leads/live";
+import { scheduleConsultPrepOnEntry } from "@/lib/consult-prep/hook";
 
 export type Lead = Database["public"]["Tables"]["crm_lead"]["Row"];
 
@@ -408,6 +409,14 @@ export async function moveLeadStage(
   // regress the stage move it's attached to.
   try {
     await runRules("stage_changed", { leadId: id, stageId });
+  } catch {
+    // swallow: the stage move already succeeded.
+  }
+
+  // Automatic consult prep (lectual.app only): a lead entering the firm's consult stage is prepped, after the response.
+  // The hook decides whether this IS the consult stage; it never throws into, delays or changes the move.
+  try {
+    scheduleConsultPrepOnEntry({ leadId: id, toStageId: stageId });
   } catch {
     // swallow: the stage move already succeeded.
   }

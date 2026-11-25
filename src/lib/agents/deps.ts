@@ -26,6 +26,10 @@ export function productionRunnerDeps(): RunnerDeps {
         return null;
       }
     },
+    cancelScheduledWhenOff: async (orgId) => {
+      const { cancelPrepSendsWhenOff } = await import("@/lib/consult-prep/off");
+      await cancelPrepSendsWhenOff({ admin, fetchImpl: undefined }, orgId);
+    },
     mailbox: root ? { admin, root, credentials: providerCredentials } : undefined,
   };
 }

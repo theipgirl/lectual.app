@@ -105,19 +105,23 @@ describe("deep-link targets, built with a UUID, are exactly the existing places"
   });
 
   it("the anchors exist exactly once, on the lead page and the matter page", () => {
-    const lead = readFileSync(path.join(root, "src/app/dashboard/leads/[id]/page.tsx"), "utf8");
+    // The lead page places the Consult prep card, which owns the anchor (once); the page itself carries none.
+    const leadPage = readFileSync(path.join(root, "src/app/dashboard/leads/[id]/page.tsx"), "utf8");
+    const lead = readFileSync(path.join(root, "src/components/leads/ConsultPrepCard.tsx"), "utf8");
     const matter = readFileSync(path.join(root, "src/app/dashboard/matters/[id]/page.tsx"), "utf8");
     const count = (src: string, id: string) => src.split(`id="${id}"`).length - 1;
     expect(count(lead, PREP_CONSULT_ANCHOR)).toBe(1);
+    expect(count(leadPage, PREP_CONSULT_ANCHOR)).toBe(0);
+    expect(leadPage.split("<ConsultPrepCard").length - 1).toBe(1);
     expect(count(matter, CLIENT_UPDATES_ANCHOR)).toBe(1);
     expect(PREP_CONSULT_ANCHOR).toBe("prep-consult");
     expect(CLIENT_UPDATES_ANCHOR).toBe("client-updates");
   });
 
-  it("the anchor on the lead page is on the Prep this consult panel, and on the matter page on Client updates", () => {
-    const lead = readFileSync(path.join(root, "src/app/dashboard/leads/[id]/page.tsx"), "utf8");
+  it("the anchor on the lead page is on the Consult prep card, and on the matter page on Client updates", () => {
+    const lead = readFileSync(path.join(root, "src/components/leads/ConsultPrepCard.tsx"), "utf8");
     const matter = readFileSync(path.join(root, "src/app/dashboard/matters/[id]/page.tsx"), "utf8");
-    expect(lead).toMatch(/<details id="prep-consult"[^>]*>\s*<summary>Prep this consult<\/summary>/);
+    expect(lead).toMatch(/<section id="prep-consult"[^>]*>\s*<h2[^>]*>\s*\{CONSULT_PREP_HEADING\}/);
     expect(matter).toMatch(/<section id="client-updates"[^>]*>\s*<h2[^>]*>\s*Client updates/);
   });
 });
@@ -126,7 +130,7 @@ describe("which firm and which role", () => {
   it("each skill needs the module its destination needs", () => {
     const need = Object.fromEntries(SKILLS.map((s) => [s.slug, s.module]));
     expect(need).toEqual({
-      "prep-consult": "agent-toolkit",
+      "prep-consult": "agents",
       "engagement-letter": "document-center",
       "welcome-client": "agent-toolkit",
       "filing-follow-up": "agent-toolkit",
@@ -143,7 +147,9 @@ describe("which firm and which role", () => {
     expect(skillAvailable(letters, ["agent-toolkit", "document-center"])).toBe(true);
     expect(skillAvailable(meetings, ["agent-toolkit"])).toBe(false);
     expect(skillAvailable(meetings, ["agent-toolkit", "agents"])).toBe(true);
-    expect(skillAvailable(skillBySlug("prep-consult")!, ["agent-toolkit"])).toBe(true);
+    // Consult prep lands on the lead page's Consult prep card, which needs Assistants (no longer Shortcuts).
+    expect(skillAvailable(skillBySlug("prep-consult")!, ["agent-toolkit"])).toBe(false);
+    expect(skillAvailable(skillBySlug("prep-consult")!, ["agents"])).toBe(true);
   });
 
   it("the run roles are the lead and matter write roles, and nobody else", () => {

@@ -15,6 +15,8 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }))
 
 const root = path.resolve(__dirname, "../..");
 const page = readFileSync(path.join(root, "src/app/dashboard/leads/[id]/page.tsx"), "utf8");
+// The Consult prep card (automatic consult prep) owns the prep-consult anchor and its tour hook; the page places the card.
+const prepCard = readFileSync(path.join(root, "src/components/leads/ConsultPrepCard.tsx"), "utf8");
 const css = readFileSync(path.join(root, "src/components/leads/lead-page.css"), "utf8");
 const NOW = Date.parse("2026-10-27T12:00:00Z");
 
@@ -28,7 +30,7 @@ describe("F1: lead page order", () => {
       "<NeedsAttentionCard>",
       "<ComposerTabs",
       'data-tour="lead-timeline"',
-      'id="prep-consult"',
+      "<ConsultPrepCard",
       "<ConsultDetailsSection",
       "<LinkedMeetings",
       "<LeadProposalsCard",
@@ -104,8 +106,12 @@ describe("F3: rare forms are collapsed and anchors kept", () => {
   });
   it("keeps each anchor and data-tour token exactly once", () => {
     for (const token of ['id="prep-consult"', 'data-tour="lead-prep"', 'data-tour="lead-timeline"', 'tour="lead-head"']) {
-      expect(page.split(token).length - 1).toBe(1);
+      // The anchor and the tour hook are on the card component, once; the page itself places the card and carries neither.
+      const onCard = token === 'id="prep-consult"' || token === 'data-tour="lead-prep"';
+      expect((onCard ? prepCard : page).split(token).length - 1).toBe(1);
+      if (onCard) expect(page.split(token).length - 1).toBe(0);
     }
+    expect(page.split("<ConsultPrepCard").length - 1).toBe(1);
   });
   it("the by-hand consult details form is a closed details", () => {
     const src = readFileSync(path.join(root, "src/components/leads/ConsultDetailsSection.tsx"), "utf8");

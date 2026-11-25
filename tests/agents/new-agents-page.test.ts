@@ -98,7 +98,8 @@ describe("Agents page: the three new cards (V1)", () => {
       expect(c).toContain("Run now");
       expect(c).toContain("lx-agent-foot");
       // the hint under the autonomy control says what Draft does for this agent
-      expect(c).toMatch(/nothing is sent/i);
+      // (Consult prep also emails its brief to the firm's own team, so its hint says nothing goes to a client.)
+      expect(c).toMatch(id === "consult-prep" ? /nothing goes to a client/i : /nothing is sent/i);
       expect(c).not.toMatch(/style="[^"]*(color|background):/); // no inline restyle beyond what the older cards carry
       // no class the older cards do not also use
       for (const cls of shape(c)) expect(shape(old).concat(["lx-pill", "lx-pill-ok", "lx-pill-warn", "lx-pill-risk", "off"])).toContain(cls);
@@ -109,7 +110,7 @@ describe("Agents page: the three new cards (V1)", () => {
     const { html } = await render({ settings: [off("morning-brief"), off("consult-prep"), off("inbox-summary")] });
     const text = (name: string) => decode(card(html, name).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
     expect(text("Morning brief")).toMatchInlineSnapshot(`"Autonomy Suggest Draft Act Writes the internal briefing and a follow-up email draft for each stalled lead. Everything waits in Approvals; nothing is sent. Run now Switch the assistant on first. Morning brief Reads · Leads, matters, consults and Approvals Writes the attorney a daily briefing into Approvals: today's consults, leads waiting on a reply, stage suggestions, stalled leads, deadlines in the next 7 and 30 days and the Approvals count. For up to five stalled leads a day it also drafts a follow-up email. It only drafts: an attorney reviews and sends everything. Off"`);
-    expect(text("Consult prep")).toContain("Reads · Outlook consults and the lead record");
+    expect(text("Consult prep")).toContain("Reads · Consults, the lead record and Lawmatics");
     expect(text("Inbox summary")).toContain("Reads · Connected mailboxes");
   });
 });
@@ -131,9 +132,9 @@ describe("Agents page: readiness drives each new card (D3)", () => {
     expect(html).not.toContain("on but blocked");
   });
 
-  it("no Mailboxes module: inbox-summary and consult-prep need it; morning-brief does not", async () => {
+  it("no Mailboxes module: inbox-summary needs it; morning-brief and consult-prep do not (a Lawmatics consult needs no mailbox)", async () => {
     const out = await labels({ modules: ["agents"] });
-    expect(out).toEqual({ "morning-brief": "On · not run yet", "consult-prep": "Needs the Mailboxes feature", "inbox-summary": "Needs the Mailboxes feature" });
+    expect(out).toEqual({ "morning-brief": "On · not run yet", "consult-prep": "On · not run yet", "inbox-summary": "Needs the Mailboxes feature" });
   });
 
   it("no active mailbox: only inbox-summary is waiting", async () => {
@@ -149,16 +150,16 @@ describe("Agents page: readiness drives each new card (D3)", () => {
     expect(out["consult-prep"]).toBe("On · not run yet");
   });
 
-  it("no calendar events: only consult-prep is waiting", async () => {
+  it("no Outlook calendar events: nothing is waiting (consult prep also reads Lawmatics consults and the consult stage)", async () => {
     const out = await labels({ calendar: "empty" });
-    expect(out["consult-prep"]).toBe("On · waiting for calendar events");
+    expect(out["consult-prep"]).toBe("On · not run yet");
     expect(out["inbox-summary"]).toBe("On · not run yet");
     expect(out["morning-brief"]).toBe("On · not run yet");
   });
 
-  it("an unreadable calendar: only consult-prep says it couldn't check, and no raw error reaches the page", async () => {
+  it("an unreadable Outlook calendar does not block consult prep, and no raw error reaches the page", async () => {
     const { html } = await render({ settings: [on("consult-prep"), on("inbox-summary")], calendar: "error" });
-    expect(decode(footText(card(html, "Consult prep")))).toBe("On · couldn't check the calendar");
+    expect(decode(footText(card(html, "Consult prep")))).toBe("On · not run yet");
     expect(decode(footText(card(html, "Inbox summary")))).toBe("On · not run yet");
     expect(html).not.toContain("planted-secret");
   });

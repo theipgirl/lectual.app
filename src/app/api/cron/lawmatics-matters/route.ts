@@ -3,6 +3,7 @@ import { env } from "@/lib/env";
 import { cronAuthorized } from "@/lib/cron-auth";
 import { LAWMATICS_FULL_RUN_HOUR, NOT_THIS_HOUR, shouldRunNow } from "@/lib/cron/ny-hour";
 import { runLawmaticsDailySync, WALL_BUDGET_MS } from "@/lib/lawmatics/daily-sync";
+import { consultPrepAfterSync } from "@/lib/consult-prep/trigger";
 
 export const maxDuration = 300;
 
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
   if (hour === null) return NextResponse.json(NOT_THIS_HOUR);
   const mode = hour === LAWMATICS_FULL_RUN_HOUR ? "full" : "daytime";
   try {
-    const s = await runLawmaticsDailySync({ mode, budgetMs: WALL_BUDGET_MS });
+    const s = await runLawmaticsDailySync({ mode, budgetMs: WALL_BUDGET_MS, afterConsults: consultPrepAfterSync });
     return NextResponse.json({
       ok: true,
       mode: s.mode,
@@ -43,6 +44,7 @@ export async function GET(req: NextRequest) {
       hired: s.hired,
       prospects: s.prospects,
       consults: s.consults,
+      consultPrep: s.consultPrep,
     });
   } catch {
     return NextResponse.json({ ok: false, reason: "connection read failed" }, { status: 500 });

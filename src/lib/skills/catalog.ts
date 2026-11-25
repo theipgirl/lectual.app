@@ -61,11 +61,11 @@ export const SKILLS: readonly Skill[] = [
   {
     slug: "prep-consult",
     name: "Prep a consult",
-    does: "Drafts an internal heads-up for the attorney and a short email telling the client what to have ready for the call, from the facts on the lead's record. It never picks classes, a package or a price.",
-    reads: "A lead: contact details, intake answers and the booked consult",
+    does: "Prepares the consult on its own when the lead is in Consultation Scheduled: the facts on the lead's record, their answers and their Lawmatics intake, emailed to your team and kept on the lead's page. It never picks classes, a package or a price.",
+    reads: "A lead: contact details, intake answers, Lawmatics intake and the booked consult",
     picks: ["lead"],
-    module: "agent-toolkit",
-    lands: "the lead's page, at Prep this consult",
+    module: "agents",
+    lands: "the lead's page, at Consult prep",
     href: (_kind, id) => `${leadPage(id)}#${PREP_CONSULT_ANCHOR}`,
   },
   {
