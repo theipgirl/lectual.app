@@ -1731,3 +1731,129 @@ describe("S2a: Lawmatics picklist values print as their labels", () => {
     expect(briefs(createDraft)[0].draftBody as string).toContain("- Source: Booth, UGW 2026");
   });
 });
+
+describe("S2c: the switch-over from lawmatics-mcp's brief (CONSULT_PREP_CUTOVER_AT)", () => {
+  // NOW is Fri Sep 25 2026, 8:00 AM EDT. Cut over then, lawmatics-mcp's last run is the 7:30 AM one: it can have scheduled 24 h briefs
+  // until 8:00 PM (NOW + 12 h) and 1 h briefs until 11:00 PM (NOW + 15 h).
+  const CUTOVER = { cutoverAtMs: NOW };
+  const at = (h: number): Tables => ({ crm_calendar_event: [event("e1", { starts_at: hours(h) })] });
+  const statuses = (db: { tables: Tables }) => sendPayloads(db).map((p) => [p.kind, p.status]);
+
+  it("outside the window (the consult in 50 h): every email goes as before", async () => {
+    const s = setup({ full: true, tables: at(50), deps: CUTOVER });
+    await s.run();
+    expect(s.sent.map(kindOf)).toEqual(["booked", "24h", "1h"]);
+    expect(sendPayloads(s.db).some((p) => p.status === "superseded")).toBe(false);
+  });
+
+  it("partly inside (the consult in 30 h): lawmatics-mcp had its 24 h brief, so no booked and no 24 h; the 1 h at 29 h still goes", async () => {
+    const s = setup({ full: true, tables: at(30), deps: CUTOVER });
+    const result = await s.run();
+    expect(s.sent.map(kindOf)).toEqual(["1h"]);
+    expect(statuses(s.db)).toEqual([
+      ["booked", "superseded"],
+      ["24h", "superseded"],
+      ["1h", "scheduled"],
+    ]);
+    expect(result.summary).toMatch(/2 emails not sent: the old brief was already scheduled for those consults before the switch-over\./);
+    for (const row of sendRows(s.db).filter((r) => (r.payload as { status: string }).status === "superseded")) {
+      expect(Object.keys(row.payload as object).sort()).toEqual(["kind", "prep_key", "resend_id", "scheduled_for", "source", "status"]);
+    }
+  });
+
+  it("wholly inside (the consult in 10 h): no Lectual email at all, but the prep is still built, queued and marked", async () => {
+    const s = setup({ tables: at(10), deps: CUTOVER });
+    const result = await s.run();
+    expect(s.sent).toHaveLength(0);
+    expect(briefs(s.createDraft)).toHaveLength(1);
+    expect(markers(s.db)).toHaveLength(2); // the brief and the client-prep draft
+    expect(statuses(s.db)).toEqual([
+      ["booked", "superseded"],
+      ["1h", "superseded"],
+    ]);
+    expect(result.itemsIn).toBe(1);
+  });
+
+  it("the boundary is exclusive: a consult whose 24 h time is exactly the reach gets its 24 h email", async () => {
+    const s = setup({ full: true, tables: at(36), deps: CUTOVER });
+    await s.run();
+    expect(s.sent.map(kindOf)).toEqual(["booked", "24h", "1h"]);
+    const just = setup({ full: true, tables: { crm_calendar_event: [event("e1", { starts_at: new Date(NOW + 36 * 3_600_000 - 1000).toISOString() })] }, deps: CUTOVER });
+    await just.run();
+    expect(just.sent.map(kindOf)).toEqual(["1h"]);
+  });
+
+  it("is recorded once and never sent later: not on the next run, nor after the window has passed, nor with the setting removed", async () => {
+    const first = setup({ full: true, tables: at(30), deps: CUTOVER });
+    await first.run();
+    const rows = sendRows(first.db).length;
+    for (const [now, deps] of [
+      [NOW + 2 * 3_600_000, CUTOVER],
+      [NOW + 20 * 3_600_000, CUTOVER],
+      [NOW + 3 * 3_600_000, { cutoverAtMs: null }],
+    ] as const) {
+      const again = setup({ full: true, tables: { ...at(30), crm_activity: first.db.tables.crm_activity }, deps, now });
+      await again.run();
+      expect(again.sent).toHaveLength(0);
+      expect(sendRows(again.db)).toHaveLength(rows);
+    }
+  });
+
+  it("unset or invalid (null) is no cutover rule", async () => {
+    const s = setup({ full: true, tables: at(30), deps: { cutoverAtMs: null } });
+    await s.run();
+    expect(s.sent.map(kindOf)).toEqual(["booked", "24h", "1h"]);
+  });
+
+  it("a reschedule INTO the window: the old reminders are cancelled and the new time's are covered by lawmatics-mcp", async () => {
+    const first = setup({ full: true, tables: at(50), deps: CUTOVER });
+    await first.run();
+    const again = setup({ full: true, tables: { ...at(30), crm_activity: first.db.tables.crm_activity }, deps: CUTOVER, now: NOW + 60_000 });
+    await again.run();
+    expect(again.cancelled.map((c) => c.id).sort()).toEqual(["re_2", "re_3"]);
+    expect(again.sent.map(kindOf)).toEqual(["1h"]);
+  });
+
+  it("a reschedule OUT of the window: the new time is a new key, and gets every email", async () => {
+    const first = setup({ full: true, tables: at(10), deps: CUTOVER });
+    await first.run();
+    expect(first.sent).toHaveLength(0);
+    const again = setup({ full: true, tables: { ...at(50), crm_activity: first.db.tables.crm_activity }, deps: CUTOVER, now: NOW + 60_000 });
+    await again.run();
+    expect(again.sent.map(kindOf)).toEqual(["booked", "24h", "1h"]);
+  });
+
+  it("a stage-keyed prep (no consult time, nothing lawmatics-mcp briefs) is unaffected", async () => {
+    const stageLead = leadRow("lead-1", { current_stage_id: "s-consult", stage_entered_at: ago(1) });
+    const s = setup({ full: true, tables: { crm_calendar_event: [], crm_lead: [stageLead], crm_activity: [{ id: "chg", org_id: ORG, lead_id: "lead-1", type: "stage_changed", created_at: ago(1), payload: { to_stage_id: "s-consult" } }] }, deps: CUTOVER });
+    await s.run();
+    expect(s.sent.map(kindOf)).toEqual(["booked"]);
+    expect(sendPayloads(s.db).map((p) => p.status)).toEqual(["sent"]);
+  });
+});
+
+describe("S2c: the reply-to (CONSULT_PREP_REPLY_TO)", () => {
+  it("every email carries it when it is a firm address", async () => {
+    const s = setup({ full: true, tables: { crm_calendar_event: [event("e1", { starts_at: hours(50) })] }, deps: { mail: { apiKey: "re_key", from: "prep@lectual.example", replyTo: "info@firm.example" } } });
+    await s.run();
+    expect(s.sent).toHaveLength(3);
+    for (const m of s.sent) expect(m.replyTo).toBe("info@firm.example");
+  });
+
+  it("an address that isn't the firm's, or is the client's, is left off and counted; the email still goes", async () => {
+    for (const replyTo of ["someone@elsewhere.example", "dana@client.example"]) {
+      const s = setup({ full: true, tables: { crm_calendar_event: [event("e1", { starts_at: hours(50) })] }, deps: { mail: { apiKey: "re_key", from: "prep@lectual.example", replyTo } } });
+      const result = await s.run();
+      expect(s.sent).toHaveLength(3);
+      for (const m of s.sent) expect(m.replyTo).toBeUndefined();
+      expect(result.summary).toMatch(/without the reply-to address/);
+    }
+  });
+
+  it("unset: no reply-to, and nothing said", async () => {
+    const s = setup({ full: true, tables: { crm_calendar_event: [event("e1", { starts_at: hours(50) })] } });
+    const result = await s.run();
+    for (const m of s.sent) expect(m.replyTo).toBeUndefined();
+    expect(result.summary).not.toMatch(/reply-to/);
+  });
+});

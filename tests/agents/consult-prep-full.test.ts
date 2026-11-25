@@ -48,7 +48,7 @@ function model(...outputs: Array<unknown>) {
   return { llm, calls };
 }
 
-type Run = { now?: number; llm?: unknown[]; queue?: boolean; scope?: import("@/lib/agents/types").RunScope; mailOut?: (m: InternalMail) => Promise<InternalMailResult>; full?: boolean; withBuilder?: boolean };
+type Run = { now?: number; llm?: unknown[]; queue?: boolean; scope?: import("@/lib/agents/types").RunScope; mailOut?: (m: InternalMail) => Promise<InternalMailResult>; full?: boolean; withBuilder?: boolean; deps?: Partial<PrepDeps> };
 
 /** One firm's world, run as many times as a test likes (the database, the sends and the saved files persist across runs). */
 function world(initial: Tables = tables(), failures?: (q: Recorded) => DbError | undefined) {
@@ -104,6 +104,7 @@ function world(initial: Tables = tables(), failures?: (q: Recorded) => DbError |
       memberAddresses: async (ids) => ids.map((id) => `${id.replace("u-", "")}@firm.example`),
       ...(r.withBuilder === false ? {} : { full: builder }),
       files,
+      ...r.deps,
     };
     const result = await runConsultPrep(ctx, deps);
     return { result, calls: m.calls, log: made.log, createDraft: made.createDraft, builder };
@@ -345,5 +346,31 @@ describe("consult prep builds the full brief (S2b)", () => {
     expect(oneHour.text).toContain("USPTO search results workbook not attached: the saved copy couldn't be read for this email.");
     expect(oneHour.text).toContain("Packages PDF not attached: the saved copy couldn't be read for this email.");
     expect(oneHour.text).not.toContain("could not be built");
+  });
+});
+
+describe("S2c: the switch-over", () => {
+  it("a consult lawmatics-mcp already briefed is still BUILT, queued, marked and its files saved; only the emails are left out", async () => {
+    // NOW + 30 h: lawmatics-mcp (cut over at NOW, Fri 8 AM EDT) had its 24 h brief; Lectual's 1 h email (29 h) is past its reach.
+    const w = world();
+    const { calls } = await w.run({ deps: { cutoverAtMs: NOW } });
+    expect(calls).toHaveLength(2);
+    expect(w.items).toHaveLength(1);
+    expect(w.markers()[0].payload).toMatchObject({ full: true });
+    expect(w.files.save).toHaveBeenCalledTimes(1);
+    expect(w.sends().map((p) => [p.kind, p.status])).toEqual([
+      ["booked", "superseded"],
+      ["24h", "superseded"],
+      ["1h", "scheduled"],
+    ]);
+  });
+
+  it("a person's re-run is exempt: they asked for that email, and lawmatics-mcp sends no booked email it could double", async () => {
+    const w = world();
+    await w.run({ deps: { cutoverAtMs: NOW } });
+    await w.run({ now: NOW + 60_000, scope: { leadIds: ["lead-1"], reason: "rerun" }, deps: { cutoverAtMs: NOW } });
+    const last = w.sent.at(-1)!;
+    expect(last.idempotencyKey).toMatch(/:rerun:\d+:booked$/);
+    expect(w.sends().filter((p) => String(p.prep_key).includes(":rerun:")).map((p) => p.status)).toEqual(["sent"]);
   });
 });

@@ -9,6 +9,8 @@ import { readFirmStyle } from "@/lib/agents/shared";
 import type { PrepDeps } from "./engine";
 import { buildFullPrep, readFirmForBrief, type FirmForBrief } from "./full";
 import { prepFileStore } from "./save-files";
+import { bareAddress } from "./recipients";
+import { parseCutoverAt } from "./cutover";
 
 /**
  * Production wiring for a consult prep run. Tests hand the engine their own `PrepDeps`.
@@ -39,7 +41,9 @@ export function defaultPrepDeps(ctx: Pick<AgentContext, "admin" | "orgId" | "sig
         }
       : {}),
     files: prepFileStore(admin, orgId),
-    mail: { apiKey: env.RESEND_API_KEY?.trim() || null, from: env.CONSULT_PREP_FROM?.trim() || null },
+    // S2c: the reply-to (a bare address, anything else ignored) and the switch-over instant (a full ISO instant with a zone, else ignored).
+    mail: { apiKey: env.RESEND_API_KEY?.trim() || null, from: env.CONSULT_PREP_FROM?.trim() || null, replyTo: bareAddress(env.CONSULT_PREP_REPLY_TO) },
+    cutoverAtMs: parseCutoverAt(env.CONSULT_PREP_CUTOVER_AT),
     mailOut: (m) => sendInternalMail({ ...m, fetchImpl: ctx.fetchImpl, label: "consult-prep" }),
     mailCancel: (c) => cancelInternalMail({ ...c, fetchImpl: ctx.fetchImpl, label: "consult-prep" }),
     prospects: {

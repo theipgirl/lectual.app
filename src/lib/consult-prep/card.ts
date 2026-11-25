@@ -11,6 +11,7 @@ import {
   CONSULT_PREP_RECIPIENTS_NOW,
   CONSULT_PREP_RECIPIENTS_UNREAD,
   CONSULT_PREP_SET_IN_TEAM,
+  CONSULT_PREP_SUPERSEDED,
   CONSULT_PREP_WAITING_FULL,
 } from "@/lib/ui/words";
 
@@ -90,6 +91,9 @@ export function consultPrepCardView(input: CardInputs): CardView {
       // Who received a PAST email is not known from today's setting (it may have changed since), so the card says "emailed" and
       // shows the setting as what it is: the current one.
       mail = "emailed";
+    } else if (booked?.status === "superseded") {
+      // S2c: lawmatics-mcp's own brief was already scheduled for this consult before the switch-over; Lectual sends none of its emails.
+      mail = CONSULT_PREP_SUPERSEDED;
     } else if (booked?.status === "failed") {
       mail = "the email couldn't be sent and will be tried again";
     } else if (booked?.status === "withheld" && bookedStillOwed({ ...newest, at: madeAt ?? newest.at }, input.nowMs)) {

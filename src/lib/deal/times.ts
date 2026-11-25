@@ -40,7 +40,7 @@ function offsetAt(at: Date, timeZone: string): number {
 }
 
 /** The instant a wall-clock time on a calendar date in `timeZone` happens. A time skipped by a DST jump lands just after it. */
-function zonedInstant(year: number, month: number, day: number, hour: number, minute: number, timeZone: string): Date {
+export function zonedInstant(year: number, month: number, day: number, hour: number, minute: number, timeZone: string): Date {
   const wall = Date.UTC(year, month - 1, day, hour, minute);
   let guess = wall - offsetAt(new Date(wall), timeZone);
   // A second pass settles the offset when the guess crossed a DST change.

@@ -1,0 +1,95 @@
+import { zonedInstant } from "@/lib/deal/times";
+
+/**
+ * S2c: the switch-over from lawmatics-mcp's pre-consult brief to Lectual's (pure; no clock, no env: the caller passes both in).
+ *
+ * lawmatics-mcp hands each 24 h and 1 h brief to Resend with `scheduled_at` ahead of time and never cancels one. Setting its
+ * `CONSULT_PREP_ENABLED=false` stops NEW schedules only, and Lectual cannot cancel the old ones (they sit on another Resend
+ * account). So for the briefs lawmatics-mcp may already have handed over, Lectual sends nothing: `CONSULT_PREP_CUTOVER_AT` is
+ * the moment lawmatics-mcp is switched off, and `lawmaticsReach` works out, from its own slot rules, the latest send time it can
+ * have scheduled by then.
+ *
+ * lawmatics-mcp's rules (its `src/consult-brief/slots.ts`, read for this): two runs a day, 7:30 AM and 8:00 PM in
+ * America/New_York (weekend slots dropped when its BRIEF_WEEKDAYS_ONLY is "true"). A run acts for slot S when it fires up to 1 h
+ * before S (EARLY_TICK_MS). It schedules only send times in [S, N), N being the next slot, plus, for a MORNING run only, 1 h briefs
+ * in [N, N + 3 h) (LATE_EOD_GRACE_MS). Everything else it sends at once, i.e. before it was switched off. So the furthest it can
+ * reach is N (24 h briefs) and N + 3 h (1 h briefs, after a morning slot) of the last slot it could act for: the latest slot at or
+ * before cutover + 1 h. Its weekday setting is not known here, so both settings are worked out and the later reach wins (it only
+ * differs from Friday evening to Monday morning).
+ */
+
+export const LAWMATICS_TZ = "America/New_York";
+const HOUR_MS = 3_600_000;
+const EARLY_TICK_MS = HOUR_MS;
+const LATE_EOD_GRACE_MS = 3 * HOUR_MS;
+const SLOTS = [
+  { kind: "morning" as const, hour: 7, minute: 30 },
+  { kind: "eod" as const, hour: 20, minute: 0 },
+];
+
+/** The latest send time lawmatics-mcp can have handed to Resend: `day` for its 24 h briefs, `hour` for its 1 h briefs (exclusive). */
+export type CutoverReach = { day: number; hour: number };
+
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/;
+
+/**
+ * `CONSULT_PREP_CUTOVER_AT` as an instant, or null. Only a full ISO instant WITH a zone ("2026-12-01T15:00:00-05:00",
+ * "2026-12-01T20:00:00Z") counts: a date alone or a time with no zone would be read in the server's zone, so it is ignored.
+ */
+export function parseCutoverAt(raw: string | null | undefined): number | null {
+  if (typeof raw !== "string") return null;
+  const v = raw.trim();
+  if (!ISO_INSTANT.test(v)) return null;
+  const ms = Date.parse(v);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+type Slot = { kind: "morning" | "eod"; at: number };
+
+function slotsAround(cutoverMs: number, weekdaysOnly: boolean): Slot[] {
+  const c = new Date(cutoverMs);
+  const out: Slot[] = [];
+  for (let d = -9; d <= 9; d += 1) {
+    const day = new Date(Date.UTC(c.getUTCFullYear(), c.getUTCMonth(), c.getUTCDate() + d));
+    const wd = day.getUTCDay();
+    if (weekdaysOnly && (wd === 0 || wd === 6)) continue;
+    for (const s of SLOTS) {
+      out.push({ kind: s.kind, at: zonedInstant(day.getUTCFullYear(), day.getUTCMonth() + 1, day.getUTCDate(), s.hour, s.minute, LAWMATICS_TZ).getTime() });
+    }
+  }
+  return out.sort((a, b) => a.at - b.at);
+}
+
+function reachFor(cutoverMs: number, weekdaysOnly: boolean): CutoverReach {
+  const slots = slotsAround(cutoverMs, weekdaysOnly);
+  let i = -1;
+  for (let j = 0; j < slots.length; j += 1) if (slots[j].at <= cutoverMs + EARLY_TICK_MS) i = j;
+  // Nine days either side always holds a slot before and after the cutover (a skipped weekend is two days).
+  if (i < 0 || i >= slots.length - 1) return { day: cutoverMs + 7 * 24 * HOUR_MS, hour: cutoverMs + 7 * 24 * HOUR_MS };
+  const next = slots[i + 1].at;
+  return { day: next, hour: slots[i].kind === "morning" ? next + LATE_EOD_GRACE_MS : next };
+}
+
+/** How far lawmatics-mcp's last runs before `cutoverMs` can have scheduled briefs, under either weekday setting. */
+export function lawmaticsReach(cutoverMs: number): CutoverReach {
+  const a = reachFor(cutoverMs, false);
+  const b = reachFor(cutoverMs, true);
+  return { day: Math.max(a.day, b.day), hour: Math.max(a.hour, b.hour) };
+}
+
+/**
+ * Is this Lectual email one lawmatics-mcp may already have covered? Only an EVENT-keyed prep (a stage-keyed one has no consult time and
+ * lawmatics-mcp briefs only booked consults) and only a kind it could have scheduled:
+ *   24h     its own 24 h brief went out, or is waiting at Resend: start - 24 h < reach.day
+ *   1h      likewise: start - 1 h < reach.hour
+ *   booked  lawmatics-mcp sends no "booked" email, but the plan's rule is that Lectual sends it only when lawmatics-mcp sent nothing for
+ *           this consult: suppressed when either of its briefs was in reach.
+ */
+export function supersededByCutover(kind: "booked" | "24h" | "1h", startsAtMs: number | null, reach: CutoverReach | null): boolean {
+  if (!reach || startsAtMs === null || !Number.isFinite(startsAtMs)) return false;
+  const day = startsAtMs - 24 * HOUR_MS < reach.day;
+  const hour = startsAtMs - HOUR_MS < reach.hour;
+  if (kind === "24h") return day;
+  if (kind === "1h") return hour;
+  return day || hour;
+}

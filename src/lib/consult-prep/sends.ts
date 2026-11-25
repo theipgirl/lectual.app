@@ -1,4 +1,5 @@
 import { parsePrepKey, normalizedStart } from "./keys";
+import { supersededByCutover, type CutoverReach } from "./cutover";
 
 /**
  * The three emails of an event-keyed prep, and what a run owes (pure; the clock is passed in).
@@ -17,8 +18,10 @@ export const SEND_KINDS: readonly SendKind[] = ["booked", "24h", "1h"];
  * `duplicate`: Resend answered 409 (the same key is already handled by another run). It counts as done and never as a failure.
  * `withheld`: the email is OWED but was not sent because the prep only has the facts brief (S2a: an email carries a full brief). It is
  * not done: a later run that has a full brief sends it while it is still due. Written once per slot; no Resend call is behind it.
+ * `superseded` (S2c): NOT sent, and never owed again, because lawmatics-mcp may already have scheduled its own brief for this consult before
+ * it was switched off (`cutover.ts`). It counts as done. Written once per slot; no Resend call is behind it.
  */
-export type SendStatus = "sent" | "scheduled" | "cancelled" | "failed" | "duplicate" | "withheld";
+export type SendStatus = "sent" | "scheduled" | "cancelled" | "failed" | "duplicate" | "withheld" | "superseded";
 
 /** `full`: the class, risk and package prep (adopted from Approvals, or S2b's own build). `facts`: S1's facts-only brief. */
 export type BriefQuality = "full" | "facts";
@@ -62,7 +65,8 @@ export type SendRecord = {
 export const recordSlot = (prepKey: string, kind: SendKind): string => `${prepKey}|${kind}`;
 
 const isKind = (v: unknown): v is SendKind => v === "booked" || v === "24h" || v === "1h";
-const isStatus = (v: unknown): v is SendStatus => v === "sent" || v === "scheduled" || v === "cancelled" || v === "failed" || v === "duplicate" || v === "withheld";
+const isStatus = (v: unknown): v is SendStatus =>
+  v === "sent" || v === "scheduled" || v === "cancelled" || v === "failed" || v === "duplicate" || v === "withheld" || v === "superseded";
 
 /** A `crm_activity` row that may be a send record. Anything that is not exactly one is null. */
 export function parseSendRecord(row: { lead_id?: string | null; created_at?: string | null; payload?: unknown }): SendRecord | null {
@@ -114,17 +118,23 @@ export function foldSendRecords(records: readonly SendRecord[]): Map<string, Sen
     if (have && r.status === "duplicate" && have.status === "failed" && !have.noResponse) continue;
     // A `withheld` row (nothing was sent) never hides a row that says an email was sent, scheduled, handled elsewhere or failed.
     if (have && r.status === "withheld" && have.status !== "cancelled") continue;
+    // A `superseded` row (nothing was sent) never hides a row that says an email was sent, scheduled or handled elsewhere.
+    if (have && r.status === "superseded" && (have.status === "sent" || have.status === "scheduled" || have.status === "duplicate")) continue;
     if (have && (r.status === "failed" || r.status === "duplicate") && have.resendId && (have.status === "sent" || have.status === "scheduled")) continue;
     if (!have || Date.parse(r.at) >= Date.parse(have.at) || !Number.isFinite(Date.parse(have.at))) out.set(slot, r);
   }
   return out;
 }
 
-const done = (r: SendRecord | undefined): boolean => !!r && (r.status === "sent" || r.status === "scheduled" || r.status === "duplicate");
+const done = (r: SendRecord | undefined): boolean => !!r && (r.status === "sent" || r.status === "scheduled" || r.status === "duplicate" || r.status === "superseded");
 
 export type SendAction = { kind: SendKind; mode: "now" } | { kind: SendKind; mode: "schedule"; at: string };
-/** `withheld`: what would have been sent but for a facts-only brief (the caller writes a `withheld` record for each, once). */
-export type SendPlan = { actions: SendAction[]; owedLater: SendKind[]; withheld: SendKind[] };
+/**
+ * `withheld`: what would have been sent but for a facts-only brief (the caller writes a `withheld` record for each, once).
+ * `superseded`: what would have been sent (or withheld) but lawmatics-mcp may already have covered it (S2c; the caller writes a
+ * `superseded` record for each, once, and it is never owed again).
+ */
+export type SendPlan = { actions: SendAction[]; owedLater: SendKind[]; withheld: SendKind[]; superseded: SendKind[] };
 
 export type PlanInput = {
   prepKey: string;
@@ -144,6 +154,11 @@ export type PlanInput = {
    * goes out either way, marked, so the person never walks in with nothing. Absent = `full` (the rules before S2a).
    */
   brief?: BriefQuality;
+  /**
+   * S2c: how far lawmatics-mcp can have scheduled its own briefs before it was switched off (`lawmaticsReach` of
+   * `CONSULT_PREP_CUTOVER_AT`). Absent or null = no cutover rule. A person's re-run passes null (they asked for that email).
+   */
+  cutover?: CutoverReach | null;
   existing: ReadonlyMap<string, SendRecord>;
 };
 
@@ -155,7 +170,10 @@ export function planSends(input: PlanInput): SendPlan {
   const actions: SendAction[] = [];
   const owedLater: SendKind[] = [];
   const withheld: SendKind[] = [];
+  const superseded: SendKind[] = [];
   const full = (input.brief ?? "full") === "full";
+  // Applied only where the plan would otherwise send or withhold a slot, so a record is written only for an email that was really due.
+  const covered = (kind: SendKind) => supersededByCutover(kind, input.startsAtMs, input.cutover ?? null);
   const get = (kind: SendKind) => input.existing.get(recordSlot(input.prepKey, kind));
   const start = input.startsAtMs;
 
@@ -166,12 +184,13 @@ export function planSends(input: PlanInput): SendPlan {
     // 24 h time, nor long after a stage-keyed prep was made.
     const late = !input.madeNow && (start !== null ? input.nowMs >= start - 24 * HOUR_MS : input.nowMs - input.preppedAtMs > STAGE_BOOKED_OWED_MS);
     if (!late) {
-      if (full) actions.push({ kind: "booked", mode: "now" });
+      if (covered("booked")) superseded.push("booked");
+      else if (full) actions.push({ kind: "booked", mode: "now" });
       else withheld.push("booked");
     }
   }
 
-  if (start === null || input.bookedOnly) return { actions, owedLater, withheld };
+  if (start === null || input.bookedOnly) return { actions, owedLater, withheld, superseded };
   const reminders: Array<[SendKind, number, boolean]> = [
     ["24h", start - 24 * HOUR_MS, start - input.preppedAtMs > 24 * HOUR_MS],
     ["1h", start - HOUR_MS, true],
@@ -182,7 +201,14 @@ export function planSends(input: PlanInput): SendPlan {
       // Its time has passed: nothing more is owed for it, except a withheld 24h, which a full brief still sends until 2 h before the start.
       // A 24h that is owed (withheld, or failed and never retried) is retried while it is still inside its window, whatever its status.
       const status = get(kind)?.status;
-      if (kind === "24h" && (status === "withheld" || status === "failed") && input.nowMs < start - REMINDER_24H_CUTOFF_MS && full) actions.push({ kind, mode: "now" });
+      if (kind === "24h" && (status === "withheld" || status === "failed") && input.nowMs < start - REMINDER_24H_CUTOFF_MS) {
+        if (covered(kind)) superseded.push(kind);
+        else if (full) actions.push({ kind, mode: "now" });
+      }
+      continue;
+    }
+    if (covered(kind)) {
+      superseded.push(kind);
       continue;
     }
     if (kind === "24h" && !full) {
@@ -192,7 +218,7 @@ export function planSends(input: PlanInput): SendPlan {
     if (at - input.nowMs <= SCHEDULE_HORIZON_MS) actions.push({ kind, mode: "schedule", at: new Date(at).toISOString() });
     else owedLater.push(kind);
   }
-  return { actions, owedLater, withheld };
+  return { actions, owedLater, withheld, superseded };
 }
 
 /** True when a stage-keyed prep of this lead sent (or scheduled) its booked email in the last 7 days. */

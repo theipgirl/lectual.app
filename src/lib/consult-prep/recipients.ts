@@ -87,3 +87,27 @@ export function validateCcForSave(typed: readonly string[], toAddresses: readonl
 export function splitTypedAddresses(text: string): string[] {
   return text.split(/[\s,;]+/).map((s) => s.trim()).filter(Boolean);
 }
+
+/** The address inside a From header ("The Firm <brief@firm.example>" or a bare address), or null. */
+export function senderAddress(from: string | null | undefined): string | null {
+  if (typeof from !== "string") return null;
+  const m = /<([^<>]+)>\s*$/.exec(from.trim());
+  return bareAddress(m ? m[1] : from);
+}
+
+/**
+ * S2c: the reply-to of a consult prep email (`CONSULT_PREP_REPLY_TO`). The sender (brief@) may not be a real mailbox, so replies go to
+ * one that is, and only ever to the firm. Allowed only when it is a bare address, is not any address of the client the brief is about,
+ * and is either on the SENDER's own domain (a public webmail domain proves nothing there) or passes the Cc rule against this email's To
+ * list (a To member's domain; on a public webmail domain, exactly a member's address). Otherwise null: the email goes without it.
+ */
+export function guardReplyTo(input: { replyTo: string | null | undefined; from: string | null | undefined; to: readonly string[]; clientAddresses: readonly (string | null | undefined)[] }): string | null {
+  const reply = bareAddress(input.replyTo);
+  if (!reply) return null;
+  const client = new Set(input.clientAddresses.map((a) => bareAddress(a)).filter((a): a is string => a !== null));
+  if (client.has(reply)) return null;
+  const sender = senderAddress(input.from);
+  if (sender && !isPublicMailDomain(domainOf(sender)) && domainOf(sender) === domainOf(reply)) return reply;
+  const to = input.to.map((a) => bareAddress(a)).filter((a): a is string => a !== null && !client.has(a));
+  return ccAllowed(reply, new Set(to.map(domainOf)), new Set(to)) ? reply : null;
+}
