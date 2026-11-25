@@ -2874,3 +2874,36 @@ Spec `docs/pge/2026-11-17-agentic-ip-os/spec-editable-views.md` (build step 3 an
   agree); Edit choices (Choice kind); Archive, with a confirm saying there is no Restore on screen yet. Add a column is refused for any view but the two List keys, before the field is made.
 - **Databases:** `0119-proposed.sql.txt` is the FINAL 0119 for a fresh prod apply (pure ASCII, characters built with `chr()`); `0119b-proposed.sql.txt` is the dev-only delta from the first copy applied
   to lectual-dev at c46913f. Neither is applied by this repo; prod needs the owner's OK. `tests/views/layout/sql-proposal-text.test.ts` pins them.
+
+## Editable views, step 4: stage roles and the owner's stage menu (needs lectual 0119, NOT applied to prod; spec `spec-editable-views.md` 3b)
+- **Role first, name as the fallback** (`src/lib/stages/roles.ts`, pure). Order everywhere: firm brain `stage_mapping` entry (where the rule has one) ->
+  the ONE stage holding the role -> today's name rule -> today's fallback. A role is trusted only on a stage its category (lead: `new_enquiry` /
+  `follow_up` open, `signed_loe` won, `lost` lost) or open/closed state (matter: `registered` / `abandoned` closed, the rest open) allows, and only when
+  exactly one stage holds it; otherwise the name rule runs, byte for byte as before. Readers: `newEnquiryStage` (`new_enquiry`), Stage Keeper
+  `stageForSignal` (`SIGNAL_ROLES`), Reconcile `stageForMilestone` (`MILESTONE_ROLES`; `contacted` = `new_enquiry`, `declined` = `lost`, `nurture` =
+  `follow_up`), the hired sync's `wonTargetStage` (lead `signed_loe`, won only) and TM matter stage plus the Matters past-signed-LOE cut (`hiredStageOf`,
+  matter `signed_loe`), the Follow-Up boundary (`followUpStageIds`: the role holder alone, else every open stage NAMED Follow-Up; Working rule and the
+  Weekly review's `reviewLeadStageIds`) and the USPTO compare (`compareStatusToStage(read, label, role)`). Nothing in the app writes a role.
+- **Reads:** `role` is hand-added (optional) on both stage Row types. `listStages` selects `*`; every explicit stage select asks for `role` through
+  `withRoleFallback` and reads again without it on 42703 / PGRST204 (by code). `loadMatterStages` tries `phase + role`, `role`, `phase`, plain, in that
+  order. The Stage Keeper and the hired sync keep their service-role client; only their select changed.
+- **The owner's stage menu** (`StageMenu`, on each stage column of the Leads stage board and each open stage column of the Matters board; "Closed" and "Not on
+  the docket yet" get none): drawn only for an owner MEMBERSHIP ROW (`loadOwnerState`) and never while previewing; the Leads board keeps its own board (not
+  moved onto `ViewBoard`), the menu is the column's `menu` slot. Rename, Move left / right (beside the visible neighbour), Add a stage left / right (lead:
+  name + category with the won warning; matter: label + open/closed + who it waits on, the neighbour's phase), Change type (only while the stage holds
+  nothing AND its holdings were read), Delete. Rules for what is offered: `src/lib/stages/menu-model.ts` (pure).
+- **Delete:** the page reads, for owners only, every stage's record ids (`loadStageHoldings`: live leads, merged left out; matters of any status; paged; a
+  failed read offers no delete and no type change, never "empty"). The dialog shows the count and sends exactly those ids back (`p_expected_ids`); the
+  database refuses when they changed ("Some records moved since you opened this. Refresh and try again."). Destinations: lead open / lost / nurture (from a
+  won stage only another won stage); matter the same open/closed unless "Also change open/closed" is ticked. A role holder asks which stage takes the role
+  ("Drop the role" where 0119 allows: never `new_enquiry`, lead `signed_loe` only on the last won stage, matter `signed_loe` never); the last won stage needs
+  the "No won stage" tick; the last open stage is not offered.
+- **One action** (`changeStageAction`, `src/lib/stages/actions.ts`, `previewSafe`; logic `manage.ts`, deps injected): owner row first (before any read),
+  positions worked out from the firm's stage list read through the scoped client (the browser sends "beside X, on this side", never a position), one call to
+  the 0119 function through the scoped client, ONE retry on 40P01 / 55P03 then `STAGE_BUSY`, every 0119 prefix mapped to a fixed sentence (`errors.ts`),
+  PGRST202 / 42883 = `notReadyYet("Changing stages")`. After a lead-stage delete, the moved leads get the sequence stop a person's move into that destination
+  gets (only a won destination stops them, `stopLeadSequencesAsStaff`, reason `client`); NO `stage_changed` automation rule runs and no matter handoff (a won
+  destination is only reachable from a won stage). A stop that didn't finish is said (`STAGE_DELETED_SEQUENCES_NOTE`); the delete stands.
+- **Working rule:** a `stage_changed` row with `payload.stage_deleted` is never a person's work (`REAL_ACTIVITY_FILTER` and the JS both skip it). The Stage
+  Keeper's "a person moved this lead in 7 days" guard still counts such a row (unchanged on purpose: it only makes the agent suggest instead of move).
+- **Not verified:** any database (0119's functions and role column were never called from this app), a real browser (fixed panel placement, focus, phone width).
