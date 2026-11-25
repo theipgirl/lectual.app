@@ -2912,6 +2912,41 @@ Spec `docs/pge/2026-11-17-agentic-ip-os/spec-editable-views.md` (build step 3 an
   matter role). More than 5,000 ids is refused with `STAGE_TOO_MANY_RECORDS`. The Matters dialog says when its count (every matter, closed and filtered-out
   included) differs from the column. The sequence stop runs in chunks of 80 lead ids (`stopInChunks`) and is ok only when every chunk is. A change
   revalidates the boards, Reconcile, the Weekly review, Pipeline and the lead / matter pages (`/[id]`, "page").
-- **Not built yet (step 5):** closed matter stages (folded into "Closed") and intake-phase matter stages the Matters board hides have no stage menu. The USPTO
+- **Closed and intake matter stages** (folded into "Closed" / left off the Matters page) are reached from "Manage stages" (step 5, below). The USPTO
   compare's role argument has no caller yet.
 - **Not verified:** any database (0119's functions and role column were never called from this app), a real browser (fixed panel placement, focus, phone width).
+
+## Editable views, step 5: Matters and Contracts as two views (needs lectual 0119 for saved layouts and stage changes; NOT applied to prod; spec `spec-editable-views.md` item 4)
+`/dashboard/matters/` is two views over one docket, each with a List and a Board drawn through the shared `ViewTable` / `ViewBoard` with the firm's own layout.
+- **URL shape (least disruption):** `?kind=contracts` is Contracts; no `kind` (every old address) is Matters/Trademarks (`parseMatterKind`, `src/lib/matters/views.ts`). A chip row
+  ("Kind of matter": Matters N, Contracts N) switches; switching starts the other view fresh (its phase group and intake line are Matters-only), keeping the status chip, search and view.
+  `view=table` / no `view` keep their meaning. Layout keys `matters_list` / `matters_board` / `contracts_list` / `contracts_board` (already in `VIEW_KEYS`).
+- **The split is the Weekly review's own type rule** (`isTrademarkRow`): TM, CR, PATENT and no type are Matters; every other type is Contracts. One place; a test compares every type.
+- **Matters shows only matters past the signed engagement**: `pastLoeView` / `intakeStageIds` (role `signed_loe` first, then the exact label, `hiredStageOf`). Pre-filing / Post-filing / "Matters" stay the
+  existing phase-group chips on the Matters view. Contracts is never cut and has no phase chips (its board shows stages with no filing phase plus any stage holding a contract, empty ones folded).
+  **Changed on purpose: a firm with NO signed-engagement stage now cuts NOTHING** (`intakeStageIds` is empty; before, every pipeline-phase stage was intake and a warning said so, which hid records
+  on a guess). The warning and `MATTER_NO_HIRED_STAGE` are gone; Today and Copilot's counts follow the same helper.
+- **List:** `MatterListTable` (one per band) over the layout. Built-in keys `matter` (pinned link), `type`, `stage`, `in_stage`, `owner`, `next_step`, `notes`, then the firm's own columns that fit the
+  kind's section (`cf:` keys; Money only for a real owner). The card's menu is the last column and is not in the layout. Cells reuse the record card's `StagePick` / `OwnerPick` / `NextStepLine` (their own
+  role gates) and the Weekly review's `NotesCell` (`MATTER_WRITE_ROLES`, never in a preview); **firm columns are read-only cells** (typed on the matter's card, which already has the editor).
+  Reads (`list-extras.ts`, scoped client, List only): the firm's fields and values for the shown matters (a matter also shows its lead's value, as on the review) and each matter's newest plain note,
+  asked for only while the Notes column is visible. Each is three-state; a failed one is "couldn't load" in the cell, never empty. Layout read three-state: unreadable = standard columns + one note,
+  not set up = silent.
+- **Board layout hides only.** The Board's columns are stages (`st_<id without dashes>`), plus `not_on_docket` and `closed`. A saved `matters_board` / `contracts_board` layout decides which columns are
+  hidden; **order and names are the stages' own** (the stage menu moves and renames the stage itself, for everyone and for every rule), so no second ordering of one pipeline exists. A hidden column's
+  matters are counted in one line for everyone; the owner gets Show. Never every column hidden. The column menu on a stage column is Hide only (`ColumnMenu kind="stage"`). This is narrower than the spec's
+  "hide / move / rename on the Board"; moving and renaming a stage column is the stage menu.
+- **Owner controls** (owner membership row, never the claim; never while previewing; only when the layout was READ; every action asks again): the column menu on each List header (rename, hide, move beside,
+  add a firm column, firm-column Edit choices / Archive: `addColumnAction` / `firmColumnAction` accept the two Matters/Contracts Lists, `changeLayoutAction`'s `baseFor` has the four keys; a layout change
+  revalidates the review and Matters pages), "Hidden columns" in the toolbar, and on the Board the Hide menu plus the step-4 `StageMenu` on each open stage column.
+- **Manage stages** (`ManageStages`, a closed `<details>` above the Board, owners only, never in a preview, Matters and Contracts boards alike): EVERY matter stage in pipeline order, the closed ones and the intake
+  stages the Matters view leaves out included, each with its state ("Open stage" / "Closed stage" / "Left out of Matters"), its matter count (holdings; unread = "Count couldn't be read", never 0) and the
+  SAME `StageMenu` (rename, move, add, change open/closed, delete with a move) over the same `changeStageAction`.
+- **Add row:** "Open a matter" under the List (a second `OpenMatterButton`, only for `MATTER_WRITE_ROLES`, hidden in a preview) opens the existing open-a-matter panel. No new form.
+- **Kept:** the four chips, search, `MovedCardScroller`, the move menus, deadlines tags, Review pills, the record card.
+- **Existing assertions changed on purpose:** `phase-page` (the sample now has a signed-engagement stage and contracts live on the Contracts view; the no-hired-stage case says nothing and cuts nothing), `phase-group`
+  and `role-first` (no hired stage = no intake stage), the list-page / review-fixes / list-cleanups source and markup pins (the List's row, width and header markup moved into `MatterListTable` / `ViewTable`),
+  the board-default and matters-links allow-lists (`layout/actions.ts` revalidates the Matters path), `menu-model` (the page joins the owner row and preview flag it reads once), `add-column` and `store-and-actions`
+  (the two Lists now take columns; the Boards save hides only).
+- **Not verified:** a real browser (the Hide menu and Manage stages panels use fixed placement; the stacked cards under 640px with a firm's own columns; the unified List header menus repeated on each band),
+  any database (0119's layout table and stage functions were never called from this app), and a firm with firm columns on Contracts end to end. A firm's own columns are not typed in the List cells.

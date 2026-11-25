@@ -59,12 +59,18 @@ describe("stacked cards under 640px (V1)", () => {
 
   it("each of the five tables carries the stack class and a data-label on its cells", () => {
     const sources: [string, string[]][] = [
-      ["src/app/dashboard/matters/page.tsx", ["Type", "Stage", "In stage", "Owner"]],
       ["src/app/dashboard/documents/page.tsx", ["Matter", "Status", "Updated"]],
       ["src/app/dashboard/queue/page.tsx", ["Client", "From", "Status", "Queued"]],
       ["src/components/proposal-list/ProposalsTable.tsx", ["Client", "Status", "Client response", "Fees"]],
       ["src/app/dashboard/intake/_components/IntakeTable.tsx", ["Stage", "Temperature", "Source"]],
     ];
+    // The Matters List draws through the shared ViewTable (its SheetTable carries the stack class); each cell's label is the column's
+    // drawn name (the firm's own, when it renamed it), so the stacked card says what the header says.
+    const matters = read("src/components/matters/MatterListTable.tsx");
+    expect(matters).toContain("<ViewTable");
+    expect(read("src/components/views/table/ViewTable.tsx")).toContain("<SheetTable");
+    expect(read("src/components/ui/SheetTable.tsx")).toContain("lx-stack");
+    expect(matters.match(/data-label=\{label\}/g)!.length).toBeGreaterThanOrEqual(5);
     for (const [file, labels] of sources) {
       const src = read(file);
       // A table on the sheet table kit gets the stack class from <SheetTable>.

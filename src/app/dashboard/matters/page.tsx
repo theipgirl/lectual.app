@@ -4,7 +4,6 @@ import { listLeads } from "@/lib/pipeline";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { loadActiveQueue } from "@/lib/queue/load";
 import { orgHasModule } from "@/lib/org/modules";
-import { matterLabel } from "@/lib/matters/docket-summary";
 import {
   BAND_COPY,
   SEGMENTS,
@@ -12,7 +11,6 @@ import {
   groupIntoBands,
   isSegment,
   searchMatters,
-  stageAge,
   type SegmentKey,
 } from "@/lib/matters/worklist";
 import { EmptyState, LoadFailedCard, Notice, SheetCard } from "@/components/ui";
@@ -40,7 +38,7 @@ import {
   parseGroupChoice,
   phaseGroupCounts,
 } from "@/lib/matters/phase-group";
-import { searchPlaceholder, BLANK, MATTERS_NAME, OWNER_COLUMN, TEAMMATE, UNASSIGNED, MATTER_GROUPS_NAV, MATTER_GROUP_ALL, MATTER_INTAKE_STAGES, MATTER_INTAKE_SHOW, MATTER_SHOWING_INTAKE, MATTER_BACK_TO_PAST_INTAKE, MATTER_ALL_INTAKE_BODY, MATTER_ALL_INTAKE_TITLE, MATTER_GROUP_EMPTY, MATTER_GROUP_LABEL, MATTER_PHASES_UNAVAILABLE, MATTER_STATUS_NAV, CONTRACTS_NAME, MATTER_KIND_NAV, HIDDEN_FIRM_COLUMN, DEADLINE_FLAGS_UNCHECKED, NO_MAINTENANCE_DEADLINE_HINT, NO_OPEN_DEADLINE, NO_OPEN_DEADLINE_HINT } from "@/lib/ui/words";
+import { searchPlaceholder, MATTERS_NAME, TEAMMATE, MATTER_GROUPS_NAV, MATTER_GROUP_ALL, MATTER_INTAKE_STAGES, MATTER_INTAKE_SHOW, MATTER_SHOWING_INTAKE, MATTER_BACK_TO_PAST_INTAKE, MATTER_ALL_INTAKE_BODY, MATTER_ALL_INTAKE_TITLE, MATTER_GROUP_EMPTY, MATTER_GROUP_LABEL, MATTER_PHASES_UNAVAILABLE, MATTER_STATUS_NAV, CONTRACTS_NAME, MATTER_KIND_NAV, HIDDEN_FIRM_COLUMN, DEADLINE_FLAGS_UNCHECKED } from "@/lib/ui/words";
 import { inPreview, resolveViewSession } from "@/lib/views/view-as";
 import { loadOwnerState } from "@/lib/views/layout/owner-load";
 import { isOwner } from "@/lib/views/layout/owner";
@@ -55,18 +53,15 @@ import { MATTER_VIEW_KEYS, drawnMatterColumns, filterByMatterKind, matterListCol
 import { loadMatterListExtras } from "@/lib/matters/list-extras";
 import { canSeeCustomMoney, customCells } from "@/lib/custom-columns/rules";
 import { civilDateIn } from "@/lib/review/build";
-import { isRegisteredTrademark, needsDeadlineCheck, noOpenDeadline, noOpenDeadlineHint } from "@/lib/matters/deadline-safety";
+import { isRegisteredTrademark, needsDeadlineCheck, noOpenDeadline } from "@/lib/matters/deadline-safety";
 import { loadOpenDeadlineMatterIds } from "@/lib/matters/open-deadlines-read";
 import { MATTER_WRITE_ROLES } from "@/lib/matters/matters";
 import { matterIdsNeedingReview } from "./list-utils";
 import { MATTERS_LIST_VALUE, mattersViewFromParam } from "@/lib/matters/list-href";
 import { sortStagesByOrder } from "@/lib/matters/board";
-import { LIST_CHIPS, mattersSubtitle, reviewHref, reviewItemByMatter, stageDisplayName, statusNote } from "@/lib/matters/list-view";
+import { LIST_CHIPS, mattersSubtitle, reviewItemByMatter } from "@/lib/matters/list-view";
 import { OPEN_MATTER_PANEL_ID, OpenMatterButton } from "@/components/matters/OpenMatterButton";
-import { MATTER_TYPE_LABEL } from "./labels";
 import { RecordCardHost } from "@/components/record-card/RecordCardHost";
-import { NextStepLine, OwnerPick, StagePick } from "@/components/record-card/controls";
-import { MatterCardMenu } from "@/components/record-card/MatterBits";
 import { buildMatterCards } from "@/lib/record-card/matter-cards";
 import { parseCardOpen } from "@/lib/record-card/open";
 import { loadOpenSteps } from "@/lib/record-card/steps-read";
