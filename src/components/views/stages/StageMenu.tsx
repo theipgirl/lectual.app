@@ -1,5 +1,6 @@
 "use client";
 
+import { panelPlace } from "@/lib/views/layout/panel-place";
 import { Fragment, useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
@@ -97,7 +98,7 @@ export function StageMenu({ model }: { model: StageMenuModel }) {
       return close();
     }
     const rect = trigger.current?.getBoundingClientRect();
-    if (rect) setPlace({ top: rect.bottom + 4, left: Math.max(8, Math.min(rect.left, window.innerWidth - PANEL_WIDTH - 8)) });
+    if (rect) setPlace(panelPlace(rect, { width: window.innerWidth, height: window.innerHeight }, PANEL_WIDTH));
     setName(stage.name);
     setCategory(kind === "lead" ? (stage.category ?? "open") : stage.isOpen === false ? "closed" : "open");
     setAlsoFlip(false);

@@ -1,5 +1,6 @@
 "use client";
 
+import { panelPlace } from "@/lib/views/layout/panel-place";
 import { Fragment, useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { popoverClaimsKey } from "@/lib/ui/dialog-keys";
@@ -106,8 +107,7 @@ export function ColumnMenu({ view, rev, columnKey, label, pinned = false, allowA
     }
     const rect = trigger.current?.getBoundingClientRect();
     if (rect) {
-      const left = Math.max(8, Math.min(rect.left, window.innerWidth - PANEL_WIDTH - 8));
-      setPlace({ top: rect.bottom + 4, left });
+      setPlace(panelPlace(rect, { width: window.innerWidth, height: window.innerHeight }, PANEL_WIDTH));
     }
     setName(label);
     setChoices(firm?.options.join("\n") ?? "");
