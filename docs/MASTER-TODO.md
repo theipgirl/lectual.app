@@ -3,6 +3,33 @@
 One list across sessions. Each session adds its action items here and checks them against Omi.
 Newest section first. Tick an item when it is done; don't delete it.
 
+## 2026-11-26: RPB ops call (Nov 25) and Ketrone (recap: docs/recaps/2026-11-25-rpb-ops-call-and-ketrone.md)
+
+Omi cross-check: no open Omi items match these (Omi's open items are all from Oct 9-12; nothing recorded since). Not added to Omi.
+
+### Taylor
+- [ ] Fix Outlook "needs admin approval" for RPB: Microsoft 365 Global Admin (ask Dawn) grants tenant consent for Lectual; Caitlyn reconnects.
+- [ ] By Fri Nov 28: send the team login + Connect Outlook steps, due before Monday, with a help window (~12-2 Fri).
+- [ ] Limit the team's view to Weekly review + Matters for now.
+- [ ] Mon Nov 30, 10:30-12:00: intro (30 min), then the weekly review in Lectual on screen while Rain checks the spreadsheet. Record it.
+- [ ] Fathom: check your Pro account; connect Zoom calendar for invites (Dawn). Decide Zoom-only vs Fathom.
+- [ ] Meet Caitlyn: KPI view; consolidate Today / Approvals / Weekly review.
+- [ ] Meet Dawn + Caitlyn: file organization, SharePoint links on cards.
+
+### Others (from the call)
+- [ ] Caitlyn: pre-filing notes to Rebecca; contracts/GC board in the SOP; amend-the-LOE path.
+- [ ] Rebecca: review the nurture sequence; send Caitlyn the M&A templates; paralegal assessment due Fri.
+- [ ] Dawn: move Monday's meeting to 10:30-12:00; why Fathom isn't joining.
+
+### Build list (from the call + Ketrone; not started)
+- [ ] New work for an existing client: "New matter" from the client, plus a proposal that amends the LOE dated X (same practice area, no new LOE);
+      payment moves it to the working board. Optional agent that pre-fills it from consult notes or client mail.
+- [ ] Client page: every lead, matter, proposal and file for one client across Trademarks / Contracts / GC.
+- [ ] Link SharePoint / OneDrive / Drive files to a card (files stay where they are).
+- [ ] Redline intake for GC clients: redline + request + clean copy, triaged and routed with a due time.
+- [ ] Conflict check on intake / new matter.
+- [ ] Matter numbers for billing.
+
 ## 2026-11-25: due today (deposit), contract line items, four package options (lectual.app#35, #36, #37 merged and live)
 
 ### Built
