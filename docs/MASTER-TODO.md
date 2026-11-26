@@ -7,6 +7,10 @@ Newest section first. Tick an item when it is done; don't delete it.
 
 Recap: `docs/recaps/2026-11-17-marketing-site-redesign-mockups.md` (round three). Omi cross-check: still the open item "Review the new website".
 
+### Taylor, after the logo and font change (Nov 26)
+- [ ] Look at https://lectual.app/firms/ again: the logo and every headline are now Instrument Serif, as on lectual.app, and "Lectual acts." plays between "What makes Lectual different?" and "While the firm sleeps".
+- [ ] The mockup link (Lectual Horizon) is now behind the live page: it still shows the old typeface and the old place for "Lectual acts." Comment on the live page from here on, or ask for the mockup to be brought up to date.
+
 ### Taylor, after go-live (Nov 25): the new page is live at lectual.app/firms/
 - [ ] Open https://lectual.app/firms/ on your own laptop and phone (Safari and Firefox were never tested; the glass bar and top blur depend on a browser feature that differs there).
 - [ ] Decide on the "licensed attorney approves" wording. The page says every client-facing draft waits for a licensed attorney; in the product an admin who is not an attorney can approve, and a stalled follow-up can be routed to any staff member. Ask Rebecca.

@@ -329,6 +329,32 @@ Taylor: "go ahead and make this live on lectual.app". Done the same day, in `the
 - **Roll back, if ever needed:** in Vercel, promote the previous `main` deployment
   (commit `80f87cf`), or revert the three commits on `main`.
 
+## After go-live (Nov 26): logo and font match lectual.app; the statement moves again
+
+Taylor, on the live page: "the logo and font should be the same as on lecual.app", then "the
+Lectual acts part should be tween what makes lectual different and while the firm sleeps".
+Both shipped to `lectual.app/firms/` the same day (`theipgirl/lectual` `main` at `ff43d6a`;
+decision 2026-11-26-01 in its `brain/decisions.md`).
+
+- **Logo and headlines:** lectual.app's front page sets "Lectual" and its headlines in
+  Instrument Serif; the firms page used Newsreader. The wordmark and every headline are now
+  Instrument Serif (the nav wordmark copies the front page's rule exactly). Body text (Geist)
+  and small labels (Geist Mono) already matched. Because the new face is about a quarter
+  narrower, headline sizes went up roughly 10% and letter spacing was loosened so nothing reads
+  smaller; a few headlines break differently (none ends on a single word).
+- **Statement:** "A legal CRM remembers. Lectual acts." now plays after the three
+  differentiators and before the overnight scene, still dark. The hero hands straight into
+  "What makes Lectual different?" again.
+- **Fix found in review:** stopping the scroll mid hand-off showed two window screens on top of
+  each other. Window views now switch at a set point with a short fade, so one view shows at a time.
+- **Who did what:** one builder made the change and the fix; the orchestrator reviewed desktop
+  and phone walk-throughs, checked the Vercel preview, fast-forwarded `main`, and checked production.
+- **Checked on production:** the page loads Instrument Serif, Geist and Geist Mono and no
+  Newsreader; no errors or sideways scroll on desktop and phone widths; the three sections
+  appear in the new order.
+- **Not checked:** Safari, Firefox, a real phone; the feel of the 220ms window switch in a real
+  browser. The mockup artifact was not updated and is now behind the live page.
+
 ## Recommendation on Astro (settled at go-live: the page stayed in the Next.js app)
 
 Stay on Next.js for this redesign. The loader, pin scrolling and micro-animations are the same
