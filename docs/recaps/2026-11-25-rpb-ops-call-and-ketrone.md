@@ -66,6 +66,24 @@ approvals, drafting from the firm's templates, Outlook sync). The ideas that ans
 
 Not worth copying: Arabic / UAE law research, their self-reported benchmarks, Word add-in (later, if redlines grow).
 
+
+## From HelloCounsel (hellocounsel.ai, read Nov 26)
+
+AI agents for plaintiff firms (personal injury, mass torts, workers' comp, SSD): an AI receptionist that answers calls, intake, case opening,
+medical records and client check-ins. Agents call, fax, email and work in portals, and log everything in the firm's case system (Litify,
+Filevine, MyCase, SmartAdvocate, Lawmatics, Zoom among the listed). Priced per completed task, not per seat; no public prices. Most of it
+(medical records, adjusters, fax) doesn't fit an IP firm. What does:
+
+| HelloCounsel idea | Use in Lectual | Call item it answers |
+|---|---|---|
+| Case opening: "check what the file is missing and follow up until it's complete" | After the LOE is paid, a checklist of what the filing still needs (owner entity, goods, 1(a)/1(b), first-use date, specimen, logo file); drafts the client request for approval | Moving cleanly from intake to the matters board |
+| Client status questions answered from the case file, the rest escalated with context | Draft a reply to "where is my trademark?" from the matter's stage and deadlines, into Approvals (never sent, no advice) | Fewer one-off status emails for Rain |
+| Every attempt logged; a person is tasked only when action is needed | Same principle for the monthly filing update and follow-ups: timeline entry for each, a task only when someone must act | Card stays current without manual tracking |
+| Pay per completed task, not per seat | Pricing idea for Lectual | Lectual's own pricing |
+| Go-live after reviewing the firm's systems, live in under two weeks | Matches the RPB rollout; worth a written onboarding checklist | Monday training |
+
+Later, not now: an answering agent for calls (RPB's call volume doesn't justify it yet).
+
 ## Action items
 
 ### Taylor
