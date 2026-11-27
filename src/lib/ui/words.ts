@@ -1958,7 +1958,7 @@ export const TEAM_APPROVALS_HEADING = "Your approvals";
 export const TEAM_APPROVALS_NONE = "Nothing is waiting for you.";
 export const TEAM_APPROVALS_FAILED = "Couldn't load your approvals.";
 export const TEAM_APPROVALS_NOT_CONNECTED = "No approval queue is connected for your firm yet.";
-export const TEAM_APPROVALS_OPEN = "Open approvals";
+export const TEAM_APPROVALS_OPEN = "Open your cards";
 export function teamApprovalsWaiting(count: number): string {
   return `${count} waiting for you`;
 }

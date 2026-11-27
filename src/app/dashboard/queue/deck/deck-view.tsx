@@ -152,11 +152,11 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
   const at = parseAtParam(params.at);
   const dealNow = (Array.isArray(params.deal) ? params.deal[0] : params.deal) === "now";
   const viewer = { userId: session.user.id, role: session.role };
-  // The dialog is mounted only in the owner shell, so the opener is drawn only there (the layout's own computation).
+  // The dialog is mounted only in a deck shell (owner and team), so the opener is drawn only there (the layout's own computation).
   const actingAsStaff = session.actingAsStaff ?? false;
   const canChangeDealTimes =
-    shellFor(viewFor({ role: session.role, preview: actingAsStaff ? previewFor(session.user.user_metadata, session.org.id) : NO_PREVIEW, firmHasRoleViews: true, actingAsStaff })).variant === "owner";
-  // Stamps "the deck was opened" (clears the deal-ready dot): only after a real queue load (below), only in the owner's shell,
+    shellFor(viewFor({ role: session.role, preview: actingAsStaff ? previewFor(session.user.user_metadata, session.org.id) : NO_PREVIEW, firmHasRoleViews: true, actingAsStaff })).deck;
+  // Stamps "the deck was opened" (clears the deal-ready dot): only after a real queue load (below), only in a deck shell,
   // never for Lectual staff acting inside a firm (the action refuses them too).
   const seenMark = !actingAsStaff && canChangeDealTimes ? <DeckSeenMark /> : null;
 

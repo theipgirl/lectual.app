@@ -42,16 +42,24 @@ describe("the Change deal times opener", () => {
     state.role = "owner";
     expect(await render({ view })).toContain("Change deal times");
   });
+  it.each(["cards", "list", "board"])("is drawn for the team roles, who set their own times (%s)", async (view) => {
+    for (const role of ["attorney", "paralegal", "senior_admin", "admin", "intake", "law_clerk", "clerk"]) {
+      state.role = role;
+      expect(await render({ view })).toContain("Change deal times");
+    }
+  });
   it.each(["cards", "list", "board"])("is not drawn for a role in the technician view (%s)", async (view) => {
-    for (const role of ["attorney", "paralegal", "senior_admin"]) {
+    for (const role of ["viewer", "social_media"]) {
       state.role = role;
       expect(await render({ view })).not.toContain("Change deal times");
     }
   });
-  it("is not drawn when the queue can't be read, unless the owner view", async () => {
+  it("is drawn when the queue can't be read, in a deck view; not in the technician view", async () => {
     state.loads.pending = { status: "unavailable", items: [] };
-    state.role = "attorney";
+    state.role = "viewer";
     expect(await render()).not.toContain("Change deal times");
+    state.role = "attorney";
+    expect(await render()).toContain("Change deal times");
     state.role = "owner";
     expect(await render()).toContain("Change deal times");
   });
