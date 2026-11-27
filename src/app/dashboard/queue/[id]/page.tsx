@@ -120,7 +120,7 @@ export default async function QueueItemPage({
   const mayApprove = canApproveItem(routeArgs);
   const refusal = approvalRefusal(routeArgs);
   const drafterMember = view.drafter ? (view.members ?? []).find((m) => m.userId === view.drafter) : undefined;
-  const outcome = outcomeText(justResolved, send, isDoneItem(item), drafterMember ? memberName(drafterMember) : null);
+  const outcome = outcomeText(justResolved, send, isDoneItem(item), drafterMember ? memberName(drafterMember) : null, item.type);
   const resolved = item.status !== "pending";
 
   // Handed to the viewer right now? Additive: read only while pending, shown only when the events were READ and the

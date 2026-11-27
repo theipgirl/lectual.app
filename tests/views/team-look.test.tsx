@@ -35,7 +35,7 @@ describe("team view: the owner's look, none of its behaviours", () => {
     for (const l of ["Today", "Weekly review", "Matters", "Approvals"]) expect(html).toContain(l);
     for (const gone of ["More", "Reports", "Settings", "lx-rail-chev"]) expect(html, gone).not.toContain(gone);
     expect((html.match(/class="lx-rail-item/g) ?? []).length).toBe(4);
-    // Owner-only behaviour: the deal-ready dot is never drawn for the look alone, even when a nudge were passed.
+    // The deck behaviours are the `deck` flag's, never the look's: the dot is not drawn for the look alone (tests/views/team-deck.test.tsx covers deck).
     expect(html).not.toContain("is-ready");
     expect(html).not.toContain("lx-ready-dot");
     expect(html).not.toContain("deal is ready");
@@ -60,7 +60,7 @@ describe("team view: the owner's look, none of its behaviours", () => {
     expect(bar).toContain('class="lx-mbar lx-mbar--owner"');
   });
 
-  it("account menu: the owner layout, Settings and help reachable, no deal times; the technician menu is unchanged", () => {
+  it("account menu: the owner layout, Settings and help reachable, no deal times without the deck flag; the technician menu is unchanged", () => {
     const team = renderToStaticMarkup(createElement(AccountMenu, { ...menuProps, settingsInMenu: true, look: "team" }));
     expect(team).toContain("lx-am-head");
     expect(team).toMatch(/href="\/dashboard\/settings\/?"/);
@@ -89,8 +89,9 @@ describe("team view: the owner's look, none of its behaviours", () => {
   it("the layout reads `look` for drawing and `variant` for behaviour", () => {
     const src = readFileSync(path.join(process.cwd(), "src/app/dashboard/layout.tsx"), "utf8");
     expect(src).toContain("!shell.look && <SectionLabel />");
-    expect(src).toContain('shell.variant === "owner" ? loadDealNudge');
-    expect(src).toContain('shell.variant === "owner" && <DealTimesDialog');
+    expect(src).toContain("shell.deck ? loadDealNudge");
+    expect(src).toContain("shell.deck && <DealTimesDialog");
+    expect(src).toContain("guideFor(shell.variant)");
     expect(src).not.toMatch(/shell\.look === "owner"[^\n]*(loadDealNudge|DealTimesDialog|WelcomeDeal)/);
   });
 });

@@ -1,5 +1,17 @@
 import type { QueueItem } from "@/lib/queue/api";
-import { BLANK, DECK_CHIP_DONE, DONE_OUTCOME_TEXT, FROM_THEIR_EMAILS, PASS_FAILED, passedToDrafter } from "@/lib/ui/words";
+import {
+  APPROVED_CLIENT_EMAIL_NO_DRAFT,
+  APPROVED_DRAFT_CHECK_OUTLOOK,
+  APPROVED_DRAFT_FAILED_OUTLOOK,
+  APPROVED_QUEUE_DRAFTED_FIRM,
+  BLANK,
+  DECK_CHIP_DONE,
+  DECK_DRAFT_IN_OUTLOOK,
+  DONE_OUTCOME_TEXT,
+  FROM_THEIR_EMAILS,
+  PASS_FAILED,
+  passedToDrafter,
+} from "@/lib/ui/words";
 import { formatDayTime } from "@/lib/ui/dates";
 import type { PillTone } from "@/lib/ui/tones";
 import { isDoneItem } from "@/lib/queue/done";
@@ -72,19 +84,22 @@ export function outcomeText(
   done?: boolean,
   /** Sprint 4: the drafter's name, for "passed to <name>". */
   drafterName?: string | null,
+  /** The item's type: a client email is never "not emailed". */
+  itemType?: string,
 ): { tone: "ok" | "warn" | "risk"; text: string } | null {
   if (resolved === "reject" && done) return { tone: "ok", text: DONE_OUTCOME_TEXT };
   if (resolved === "reject") return { tone: "risk", text: "Rejected. The note goes back to the drafting assistant — nothing was sent." };
   if (resolved !== "approve") return null;
   switch (send) {
     case "drafted":
-      return { tone: "ok", text: "Approved and drafted in the firm's Outlook. Open Drafts there and press Send — nothing has reached the client yet." };
-    case "mailbox-google":
+      // The queue drafted it in the firm's mailbox (it should not, for a client email): say whose mailbox it is.
+      return { tone: "warn", text: APPROVED_QUEUE_DRAFTED_FIRM };
     case "mailbox-microsoft":
-      return {
-        tone: "ok",
-        text: `Approved and drafted in your ${send === "mailbox-google" ? "Gmail" : "Outlook"}. Open Drafts there and press Send — nothing has reached the client yet.`,
-      };
+      return { tone: "ok", text: `Approved. ${DECK_DRAFT_IN_OUTLOOK} Open Drafts there and press Send — nothing has reached the client yet.` };
+    case "mailbox-google":
+      return { tone: "ok", text: "Approved and drafted in your Gmail. Open Drafts there and press Send — nothing has reached the client yet." };
+    case "mailbox-uncertain":
+      return { tone: "warn", text: `${APPROVED_DRAFT_CHECK_OUTLOOK} The approved text is below.` };
     case "sent":
       return { tone: "ok", text: "Approved and sent from the firm's mailbox." };
     case "passed":
@@ -92,9 +107,11 @@ export function outcomeText(
     case "pass-failed":
       return { tone: "risk", text: PASS_FAILED };
     case "manual":
+      if (itemType === "CLIENT_EMAIL") return { tone: "warn", text: APPROVED_CLIENT_EMAIL_NO_DRAFT };
       return { tone: "warn", text: "Approved. This type isn't emailed — file or deliver it the usual way." };
-    case "failed":
     case "mailbox-failed":
+      return { tone: "risk", text: `${APPROVED_DRAFT_FAILED_OUTLOOK} The approved text is below.` };
+    case "failed":
       return { tone: "risk", text: "Approved, but the draft couldn't be created — nothing reached a mailbox. Send this one yourself and check the mailbox connection." };
     default:
       return { tone: "warn", text: "Approved. No mailbox is connected for drafting, so nothing has gone out — send it yourself." };

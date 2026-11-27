@@ -111,6 +111,23 @@ async function attemptColumnMissing(supabase: Awaited<ReturnType<typeof getScope
   }
 }
 
+/**
+ * Approver drafts (Nov 27): is lectual 0112 (passing an approved email to "Drafts go to") on this database? `no` only when
+ * the read says its `attempt` column is missing; `unknown` for any other failure. Before 0112 a pass falls back to the
+ * approver's own Outlook, so the approve path checks the approver's Outlook first exactly when this is `no`. The table
+ * itself missing (42P01 / PGRST205, `isNotSetUpError`, as `recordCardEvent` reads it) is `no` too.
+ */
+export async function passingSwitchedOn(): Promise<"yes" | "no" | "unknown"> {
+  try {
+    const supabase = await getScopedClient();
+    const { error } = await supabase.from("queue_card_event").select("attempt").limit(1);
+    if (!error) return "yes";
+    return isMissingColumn(error) || isNotSetUpError(error) ? "no" : "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
 export type RecordResult = { ok: true } | { ok: false; reason: "not-set-up" | "failed" | "conflict" };
 
 /**

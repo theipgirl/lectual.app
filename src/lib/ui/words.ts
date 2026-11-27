@@ -296,7 +296,7 @@ export const DECK_HAND_NOTE_LABEL = "Note for them (optional)";
 export const deckHolding = (seconds: number) => `Approving in ${seconds}…`;
 export const DECK_UNDO = "Undo";
 export const DECK_HOLD_NOTE = "Nothing happens until the countdown ends. Once approved, it can't be un-approved here.";
-export const DECK_DRAFT_IN_OUTLOOK = "Draft is in Outlook. Nothing is sent until someone presses Send.";
+export const DECK_DRAFT_IN_OUTLOOK = "Draft is in your Outlook.";
 export const DECK_DRAFT_IN_GMAIL = "Draft is in Gmail. Nothing is sent until someone presses Send.";
 export const DECK_OPEN_DRAFT = "Open the draft";
 export const DECK_SEND_NOW = "Send from Outlook now";
@@ -758,6 +758,21 @@ export const MAKE_DRAFT_NOT_OUTLOOK = "Only a Gmail mailbox is connected. Connec
 export const MAKE_DRAFT_NEEDS_PERMISSION = "Reconnect your Outlook and allow it to save drafts.";
 export const MAKE_DRAFT_OUTLOOK_UNREAD = "Couldn't check your Outlook. Refresh to try again.";
 export const CONNECT_OUTLOOK_LINK = "Connect Outlook";
+/* Approver drafts (Nov 27): an approved client email is drafted in the APPROVER's own Outlook. Checked before approving. */
+export const APPROVER_NO_OUTLOOK = "Connect your own Outlook before you approve client emails. Nothing was approved.";
+export const APPROVER_NOT_OUTLOOK = "Only a Gmail mailbox is connected. Connect your own Outlook before you approve client emails. Nothing was approved.";
+export const APPROVER_NEEDS_PERMISSION = "Reconnect your Outlook and allow it to save drafts, then approve again. Nothing was approved.";
+export const APPROVER_REAUTH = "Your Outlook needs to be reconnected before you approve client emails. Nothing was approved.";
+export const APPROVER_NO_RECIPIENT = "This email has no recipient. Add one before approving. Nothing was approved.";
+export const APPROVER_OUTLOOK_UNREAD = "Couldn't check your Outlook, so nothing was approved. Refresh to try again.";
+/** After approving: the one Graph draft in the approver's Outlook failed for certain. */
+export const APPROVED_DRAFT_FAILED_OUTLOOK = "Approved, but the draft couldn't be made in your Outlook. Nothing was sent.";
+/** After approving: Graph may or may not have made the draft (a 5xx, a timeout). Never retried automatically. */
+export const APPROVED_DRAFT_CHECK_OUTLOOK = "Approved. Check your Outlook Drafts before trying again. Nothing was sent.";
+/** After approving: the queue drafted it in the firm's mailbox although asked not to. No second draft is made. */
+export const APPROVED_QUEUE_DRAFTED_FIRM = "Approved. The approval queue made the draft in the firm's mailbox, not yours, so no second draft was made. Nothing is sent until someone presses Send.";
+/** A client email approved with no draft made (an older approval). Never "This type isn't emailed". */
+export const APPROVED_CLIENT_EMAIL_NO_DRAFT = "Approved. No draft was made, so nothing was sent. Copy the approved text to send it yourself.";
 export const DRAFTED_IN_OUTLOOK = "Drafted in your Outlook.";
 /** The approve outcome when the email was passed to the drafter. */
 export const passedToDrafter = (name: string) => `Approved and passed to ${name}, who makes the draft in their own Outlook. Nothing has reached the client yet.`;
@@ -1969,7 +1984,7 @@ export const TEAM_APPROVALS_HEADING = "Your approvals";
 export const TEAM_APPROVALS_NONE = "Nothing is waiting for you.";
 export const TEAM_APPROVALS_FAILED = "Couldn't load your approvals.";
 export const TEAM_APPROVALS_NOT_CONNECTED = "No approval queue is connected for your firm yet.";
-export const TEAM_APPROVALS_OPEN = "Open approvals";
+export const TEAM_APPROVALS_OPEN = "Open your cards";
 export function teamApprovalsWaiting(count: number): string {
   return `${count} waiting for you`;
 }

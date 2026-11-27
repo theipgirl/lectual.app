@@ -104,7 +104,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const viewerMeta = viewAs ? {} : user.user_metadata;
   const [queue, nudge] = await Promise.all([
     mineQueue(allQueue, { userId: viewerId, role: viewerRoleNow }),
-    shell.variant === "owner" ? loadDealNudge(allQueue, { userId: viewerId, role: viewerRoleNow }, parseDealTimes(viewerMeta), parseDeckSeen(viewerMeta)) : Promise.resolve(null),
+    shell.deck ? loadDealNudge(allQueue, { userId: viewerId, role: viewerRoleNow }, parseDealTimes(viewerMeta), parseDeckSeen(viewerMeta)) : Promise.resolve(null),
   ]);
   const dealReady = nudge && nudge.ready ? dealReadyLine(nudge.label, nudge.count) : null;
   const railPinned = railIsPinned(cookieStore.get(RAIL_PIN_COOKIE)?.value);
@@ -149,6 +149,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           viewMenu={viewMenu}
           settingsInMenu={shell.settingsInMenu}
           variant={shell.variant}
+          deck={shell.deck}
           look={shell.look}
           viewAsLink={viewAsLink}
           previewing={viewAs ? { name: viewAs.targetName } : undefined}
@@ -165,6 +166,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           showReports={shell.showReports}
           tree={shell.tree}
           variant={shell.variant}
+          deck={shell.deck}
           look={shell.look}
           dealReady={dealReady}
         />
@@ -182,6 +184,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         reports={shell.showReports}
         more={shell.showMore}
         variant={shell.variant}
+        deck={shell.deck}
         look={shell.look}
         dealReady={dealReady}
       />
@@ -195,7 +198,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <FeedbackTrailRecorder />
           <FeedbackDialog />
           <NoShowNotices />
-          {shell.variant === "owner" && <DealTimesDialog current={parseDealTimes(user.user_metadata)} zoneLabel={friendlyZoneLabel(await getFirmTimeZone())} />}
+          {shell.deck && <DealTimesDialog current={parseDealTimes(user.user_metadata)} zoneLabel={friendlyZoneLabel(await getFirmTimeZone())} />}
           <YourNameDialog currentFullName={typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name : null} />
           {/* One first-sign-in guide, never both: the owner shell draws the welcome deal, every other shell the tour. */}
           {guideFor(shell.variant) === "welcome" ? (

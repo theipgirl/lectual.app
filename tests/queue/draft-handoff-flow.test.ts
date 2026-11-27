@@ -25,6 +25,9 @@ const state = vi.hoisted(() => ({
   notify: vi.fn(),
   cardState: null as unknown,
   access: "ready" as string,
+  prep: null as unknown,
+  prepCalls: 0,
+  passing: "yes" as string,
 }));
 const EMAIL: Record<string, string> = {};
 
@@ -49,13 +52,17 @@ vi.mock("@/components/queue/stale-warning", () => ({ staleWarning: vi.fn(() => n
 vi.mock("@/lib/consult-proposal/link", () => ({ gateLinkedProposal: vi.fn(async () => ({ ok: true, proposal: null })), makeProposalLive: vi.fn(async () => ({ ok: true })) }));
 vi.mock("@/lib/documents/approve-hook", () => ({ generateApprovedDocument: vi.fn(async () => undefined) }));
 vi.mock("@/lib/mailbox/my-mailbox", () => ({
-  draftInMyMailbox: (...a: unknown[]) => state.draftMine(...a),
+  prepareMyOutlookDraft: vi.fn(async () => {
+    state.prepCalls += 1;
+    return state.prep;
+  }),
   draftInMyOwnOutlook: (...a: unknown[]) => state.draftOwnOutlook(...a),
   myOutlookDraftAccess: vi.fn(async (posted?: unknown) => (posted && posted !== "conn-rayn" ? "not-yours" : state.access)),
 }));
 vi.mock("@/lib/queue/card-state", () => ({
   recordCardEvent: (...a: unknown[]) => state.record(...a),
   loadCardState: vi.fn(async () => state.cardState),
+  passingSwitchedOn: vi.fn(async () => state.passing),
 }));
 vi.mock("@/lib/notifications/core", () => ({ notify: (...a: unknown[]) => state.notify(...a) }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -81,7 +88,10 @@ beforeEach(() => {
   state.routed = routed({}, RAYN);
   state.resolve.mockReset().mockResolvedValue({ status: "approved", send: "none" });
   state.save.mockReset().mockResolvedValue(undefined);
-  state.draftMine.mockReset().mockResolvedValue({ provider: "microsoft", email: "r@example.com", webLink: "https://outlook.office.com/d/1", id: "AAMk-1" });
+  state.draftMine.mockReset().mockResolvedValue({ ok: true, webLink: "https://outlook.office.com/d/1", id: "AAMk-1" });
+  state.prep = { ok: true, draft: (...a: unknown[]) => state.draftMine(...a) };
+  state.prepCalls = 0;
+  state.passing = "yes";
   state.draftOwnOutlook.mockReset().mockResolvedValue({ ok: true, id: "AAMk-2", webLink: "https://outlook.office.com/d/2" });
   state.record.mockReset().mockResolvedValue({ ok: true });
   state.notify.mockReset().mockResolvedValue(undefined);
@@ -158,6 +168,23 @@ describe("Acceptance 10: before lectual 0112 (the event is refused)", () => {
     expect(state.notify).not.toHaveBeenCalled();
   });
 
+  it("approver drafts: before 0112 (the probe reads it missing) the approver's own Outlook is checked BEFORE anything; not ready = nothing done", async () => {
+    state.passing = "no";
+    state.prep = { ok: false, reason: "no-mailbox" };
+    const out = await runQueueReview({ id: "q1", intent: "approve" });
+    expect(out).toEqual({ kind: "error", error: "Connect your own Outlook before you approve client emails. Nothing was approved.", connect: "/dashboard/settings/integrations/" });
+    expect(state.save).not.toHaveBeenCalled();
+    expect(state.resolve).not.toHaveBeenCalled();
+    expect(state.record).not.toHaveBeenCalled();
+    expect(state.draftMine).not.toHaveBeenCalled();
+  });
+
+  it("approver drafts: with 0112 on, a pass never checks or uses the approver's Outlook (the drafter's is theirs to check)", async () => {
+    state.passing = "yes";
+    await runQueueReview({ id: "q1", intent: "approve" });
+    expect(state.prepCalls).toBe(0);
+  });
+
   it("MUST 1(d): a draft_to refused before 0112 (either constraint, read as not-set-up) never becomes pass-failed or writes a marker", async () => {
     state.record.mockResolvedValue({ ok: false, reason: "not-set-up" });
     const out = await runQueueReview({ id: "q1", intent: "approve" });
@@ -193,17 +220,17 @@ describe("Item 6 and acceptance 4: unchanged paths", () => {
     state.item = qitem({ id: "q1", agent: ROUTINE_MARKER.client_reminder.agent, headline: "Reminder", draft_body: BODY });
     state.routed = routed({ client_reminder: RAYN }, RAYN);
     const out = await runQueueReview({ id: "q1", intent: "approve" });
-    expect(out).toEqual({ kind: "resolved", intent: "approve", send: "mailbox-microsoft", webLink: "https://outlook.office.com/d/1", draftId: "AAMk-1", provider: "microsoft" });
+    expect(out).toEqual({ kind: "resolved", intent: "approve", send: "mailbox-microsoft", webLink: "https://outlook.office.com/d/1", draftId: "AAMk-1", provider: "microsoft", itemType: "CLIENT_EMAIL" });
     expect(state.record).not.toHaveBeenCalled();
     expect(state.resolve.mock.calls[0][0]).toMatchObject({ skipMailboxDraft: true });
     expect(state.draftMine).toHaveBeenCalledTimes(1);
   });
 
-  it("no drafter set: today's outcome, no handoff key, no skip flag (S7 adds only the re-read final body)", async () => {
+  it("no drafter set (approver drafts, changed on purpose): the approver's own Outlook, no handoff key, and the queue is asked not to draft", async () => {
     state.routed = routed({}, null);
     const out = await runQueueReview({ id: "q1", intent: "approve" });
-    expect(out).toEqual({ kind: "resolved", intent: "approve", send: "mailbox-microsoft", webLink: "https://outlook.office.com/d/1", draftId: "AAMk-1", provider: "microsoft" });
-    expect(state.resolve.mock.calls[0][0]).toEqual({ orgKey: "firm-key", id: "q1", action: "approve", resolvedBy: "rebecca@example.com", finalBody: BODY });
+    expect(out).toEqual({ kind: "resolved", intent: "approve", send: "mailbox-microsoft", webLink: "https://outlook.office.com/d/1", draftId: "AAMk-1", provider: "microsoft", itemType: "CLIENT_EMAIL" });
+    expect(state.resolve.mock.calls[0][0]).toEqual({ orgKey: "firm-key", id: "q1", action: "approve", resolvedBy: "rebecca@example.com", finalBody: BODY, skipMailboxDraft: true });
     expect(state.record).not.toHaveBeenCalled();
   });
 

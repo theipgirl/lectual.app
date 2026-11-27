@@ -205,7 +205,7 @@ describe("wiring", () => {
   it("the layout and Today give the rule the stored stamp; the technician shell never reads it", () => {
     const layout = readFileSync("src/app/dashboard/layout.tsx", "utf8");
     // View as (changed on purpose): the stamp is the viewer's; a preview has none (the teammate's account can't be read).
-    expect(layout).toMatch(/shell\.variant === "owner" \? loadDealNudge\([^\n]*parseDeckSeen\(viewerMeta\)/);
+    expect(layout).toMatch(/shell\.deck \? loadDealNudge\([^\n]*parseDeckSeen\(viewerMeta\)/);
     expect(layout).toContain("const viewerMeta = viewAs ? {} : user.user_metadata;");
     expect(readFileSync("src/components/today/OwnerToday.tsx", "utf8")).toMatch(/seen: parseDeckSeen\(metadata\)/);
   });

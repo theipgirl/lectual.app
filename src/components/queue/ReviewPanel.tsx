@@ -5,7 +5,7 @@ import "./review.css";
 import { reviewQueueAction, type ReviewState } from "@/app/dashboard/queue/actions";
 import { Markdown } from "@/components/markdown/Markdown";
 import { Notice } from "@/components/ui/Notice";
-import { SAVING } from "@/lib/ui/words";
+import { CONNECT_OUTLOOK_LINK, SAVING } from "@/lib/ui/words";
 // The pure module only: this component ships to the browser.
 import { auditDraft, removeInternalNotes, type AuditContext } from "@/lib/queue/hygiene";
 
@@ -196,10 +196,18 @@ export function ReviewPanel(props: {
       {state.error && (
         <Notice tone="risk" role="alert">
           {state.error}
+          {state.connect ? (
+            <>
+              {" "}
+              <a className="lx-link" href={state.connect}>
+                {CONNECT_OUTLOOK_LINK}
+              </a>
+            </>
+          ) : null}
         </Notice>
       )}
       <p className="lx-note lx-review-foot">
-        Approving creates a draft in your mail client — you still press Send. Nothing reaches a client on its own. The original draft is kept alongside your edits.
+        Approving a client email creates a draft in your own Outlook — you still press Send. Nothing reaches a client on its own. The original draft is kept alongside your edits.
       </p>
     </form>
   );

@@ -68,12 +68,15 @@ vi.mock("@/lib/queue/api", () => ({
     return { send: "none" };
   }),
 }));
-vi.mock("@/lib/mailbox/my-mailbox", () => ({
-  draftInMyMailbox: vi.fn(async () => {
+vi.mock("@/lib/mailbox/my-mailbox", () => {
+  // Approver drafts: the approver's own Outlook is prepared before anything, then ONE draft after the resolve.
+  const draftMine = vi.fn(async () => {
     calls.push("mailbox");
-    return { provider: "gmail" };
-  }),
-}));
+    return { ok: true, id: "d-1", webLink: null };
+  });
+  return { draftMine, prepareMyOutlookDraft: vi.fn(async () => ({ ok: true, draft: draftMine })) };
+});
+vi.mock("@/lib/firm/session", () => ({ resolveFirmSession: vi.fn(async () => ({ kind: "ok", actingAsStaff: false })) }));
 
 const approver = { value: true };
 const sendFails = { value: false };
@@ -90,7 +93,8 @@ vi.mock("@/lib/proposals/store", async (orig) => ({
 import { reviewQueueAction } from "@/app/dashboard/queue/actions";
 import { sendProposal } from "@/lib/proposals/store";
 import { resolveQueueItem } from "@/lib/queue/api";
-import { draftInMyMailbox } from "@/lib/mailbox/my-mailbox";
+import * as myMailbox from "@/lib/mailbox/my-mailbox";
+const draftInMyMailbox = (myMailbox as unknown as { draftMine: ReturnType<typeof vi.fn> }).draftMine;
 
 function proposalRow(status: string): Row {
   return {

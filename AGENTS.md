@@ -2160,7 +2160,7 @@ Draw-only, like the owner view: every page and action keeps its own role and fea
 - **Rail** (`TEAM_TREE`, through the one `drawnNav` seam, so it is a filter of `visibleNav`: a section the role or firm lacks never appears): exactly Today, Weekly review, Matters and Approvals.
   **No More row, no Reports row, no Settings row** (the firm owner's decision: "remove More entirely"; `shellFor('team')`: `showReports: false`, `showSettings: false`, `showMore: false`). Settings is in the
   account menu (`settingsInMenu`), which is how a team member reaches Connect Outlook. **Hide only:** no page, action or read changed, so Mail, Meetings, Intake, Calendar and the rest still open by URL or from
-  an in-page link for anyone their own gate allows. Approvals opens the person's own list (Mine is the default for a staff role), not the deck; its rail count is `mineQueue`.
+  an in-page link for anyone their own gate allows. Approvals opens the person's own approval DECK (Nov 27, below); its rail count is `mineQueue`.
 - **Phone bar:** Today, Review, Matters, Approvals, and NO More button or sheet (`MobileBar` takes `more`, default true; the team view passes `shell.showMore` = false; owner and technician draw More as before).
   **Look:** the owner's pill bar (see "Team look" below); the tour, not the welcome deal, is the first-sign-in guide.
 - **Tour and Getting started:** the tour's rail steps come from the drawn slugs, so they never mention a hidden row. Hub flows are chosen from `visibleNav` (not the drawn list); the one flow aimed at a row the team rail no
@@ -2170,10 +2170,10 @@ Draw-only, like the owner view: every page and action keeps its own role and fea
   `ShellSpec.look` (`"owner"` | `"team"` | undefined) is separate from `ShellSpec.variant` (`"owner"` only for the owner view), and **a behaviour must read `variant`, never `look`**. `Rail`, `MobileBar` and `AccountMenu`
   take both props; the layout passes both. Team adds `lx-rail--team` / `lx-mbar--team` / `lx-top--team` marker classes beside the owner classes. **Audit of every owner flag (Nov 27):**
   - Styling, now also for team (`look`): `Rail` class `lx-rail--owner` and the kid icons; `MobileBar` class `lx-mbar--owner`; layout header class `lx-top--owner` and hiding `SectionLabel`; `AccountMenu`'s owner layout branch.
-  - Behaviour, still the owner's alone (`variant === "owner"`): the deal-ready nudge read (`loadDealNudge`) and `dealReady` on the rail dot and phone bar; `MobileBar`'s open sheet taking the active tile; the rail kicker "Owner view";
-    `AccountMenu`'s "Deal times" item and its "Show tips again" replaying the welcome deal; `DealTimesDialog`; `guideFor` / `shouldShowWelcomeDeal` (team keeps the tour); `deck-view.tsx`'s `canChangeDealTimes` (`shellFor(...).variant`).
+  - Behaviour, still the owner's alone (`variant === "owner"`): `MobileBar`'s open sheet taking the active tile; the rail kicker "Owner view"; `AccountMenu`'s "Show tips again" replaying the welcome deal; `guideFor` / `shouldShowWelcomeDeal` (team keeps the tour).
+  - Deck behaviours, the owner's AND team's since Nov 27 (`ShellSpec.deck`, not `variant`): the deal-ready nudge read (`loadDealNudge`) and `dealReady` on the rail dot and phone bar; `AccountMenu`'s "Deal times" item; `DealTimesDialog`; `deck-view.tsx`'s `canChangeDealTimes` (`shellFor(...).deck`).
   - By view id, not a flag: `src/app/dashboard/page.tsx` (`view === "owner"` -> `OwnerToday`, `view === "team"` -> `TeamToday`); `review/page.tsx`'s `owner` (the Weekly review board look is `viewFor(...) === "owner"`: team keeps the page as it was);
-    `railTreeFor`, `drawnNav` (Approvals opens the deck only for owner).
+    `railTreeFor`, `drawnNav` (Approvals opens the deck for owner and team).
   - CSS: `queue/review.css` phone approval-item layout was `:has(.lx-top--owner)`; it is now `:has(.lx-top--owner:not(.lx-top--team))`, so a team member's approval page is unchanged. The `.lx-rail--owner` deal-dot rules only match when a dot is drawn, which team never has.
   - Not owner flags: `role === "owner"` checks, `isOwner`, Intake `group === "owner"` (assignee grouping) and `boothVariant` are unrelated.
   Tests: `tests/views/team-look.test.tsx`.
@@ -2188,9 +2188,19 @@ Draw-only, like the owner view: every page and action keeps its own role and fea
   - **Proposals out** (kept, conditional): only when the firm has the Proposals feature AND the role is in `PROPOSAL_STAFF_WRITE_ROLES` (`teamSeesProposals`; no read otherwise). Every team role is in that list today, so it is the feature gate that decides; a role outside it never reads.
   - **This week strip** (kept): it is not owner-specific (consults + deadlines, plus proposal last days only when Proposals out is shown).
   - **Ask Copilot** (kept, only with AI on): the same GET form; the page never sends the question.
-  - **Dropped, owner-only:** the cards hero and deal times (the deck is the owner's), KPI tiles and counts across the firm (waiting on you / overdue / our turn / new leads), "This month" and "Hours saved", assistant run status and the Autopilot control ("couldn't finish its last run"), the docket bands, the
+  - **Dropped, owner-only:** the cards hero, KPI tiles and counts across the firm (waiting on you / overdue / our turn / new leads), "This month" and "Hours saved", assistant run status and the Autopilot control ("couldn't finish its last run"), the docket bands, the
     get-set-up and Getting started cards (admin setup), "Needs you" firm-wide rows (hot leads, quotes, payments, connections), unconfirmed-dates review (`OwnerNeedsReview`) and returning clients (`OwnerCameBack`; firm-wide, can be added later).
   Tests: `tests/today/team-today.test.tsx`.
+- **Approvals opens the deck (Nov 27, the firm owner's decision; no schema).** Team Approvals (rail and phone bar) goes to `DECK_PATH` through the same `deckItem` helper the owner uses (`also` keeps the list path lighting it), and team Today's
+  "Your approvals" card links there too ("Open your cards"). **`ShellSpec.deck`** (true for owner and team, false for technician) is the one flag for the deck behaviours; `Rail`, `MobileBar` and `AccountMenu` take a `deck` prop (default: the owner `variant`, so older
+  callers are unchanged). Viewer and social_media stay in the technician shell: no deck in their nav, no deal dot, no Deal times item (they can still open the deck URL as before; the gate is unchanged).
+  - **Cards:** `buildDeck` was already role-agnostic: the person's own `mineItems` they may decide (`canApproveItem`) plus items handed to them. A non-approver never gets a Yes on an attorney-only item (it is on their deck only if handed to them, with no Yes, Edit and Send back only);
+    an item routed to them in Settings -> Approvals is a normal Yes card. No gate or rule changed; staff-preview (`actingAsStaff`) refusals stay.
+  - **Deal times were already per person, no migration of data:** `user_metadata.lectual_deal_times = { v: 1, times }` on the person's OWN account (`person-times.ts`, `saveDealTimesAction` through `getScopedClient` + `auth.updateUser`, merged, no user argument; `readMyDealTimes`; the layout and deck page parse the viewer's own
+    metadata; malformed or unreadable = `DEFAULT_DEAL_TIMES`). Only the dialog's mounting and opener were owner-only; they now follow `shell.deck`. An owner's saved times are the same key and are honoured unchanged. One person's save never reads or writes another's.
+  - **Deal-ready dot / nudge and the "Deal times" menu item** are drawn for team, computed for the viewer's own deck (`loadDealNudge` uses the viewer's id, role and times; the deck-seen stamp is the viewer's own metadata).
+  - **Welcome deal: NOT adopted for team; the tour stays.** The welcome deal REPLACES the tour (one guide, never both), and the tour is the only guide that points at the rail, the bell, the account menu and Copilot (its steps come from the drawn slugs). The welcome deal is four owner-written cards about the owner's
+    Yes-pile and board. Adopting it would drop that coverage. The tour's Approvals step wording is unchanged and still true. `guideFor` still reads `variant`.
 - **Lectual staff preview:** `previewableRoles()` lists every role whose view is live, so "Preview a view" offers the team roles too. Firm members still have no switch.
 - Tests: `tests/views/team-view.test.ts` (the rail and phone bar are exactly the four rows, no More or Reports, owner and technician unchanged).
 
@@ -2594,6 +2604,41 @@ their own click). Contract: `docs/pge/2026-11-17-agentic-ip-os/sprint-4.md`. App
   - **If lawmatics-mcp ever normalises `final_body`** (trims, re-wraps, changes line endings), the stored text stops hashing to the `draft_to` /
     receipt hash and EVERY Make-draft is refused ("changed after it was approved"): it fails closed, never drafts other text (pinned by a test).
 
+
+## Approver drafts (Nov 27, no schema)
+The firm owner's decision: an approved CLIENT_EMAIL is drafted in the APPROVER's own Outlook, never the firm mailbox. lawmatics-mcp main 3a02854
+(deployed Nov 27) honours `mailbox_draft: false`, which lifts Sprint 4's SHIP BLOCKER above. Approving still never sends.
+- **Every client-email approve** (item page, owner and team deck, lead-page Yes; all through `runQueueReview`) resolves with `mailbox_draft: false`, whatever
+  the plan (`clientEmail` in `review-core.ts`). Other types (BRIEFING Mark read, ENGAGEMENT_LETTER, ...) are unchanged: no Outlook check, no flag, no draft.
+- **Order in `runQueueReview`:** role -> item re-read (pending) -> routing + `approvalRefusal` -> Lectual staff previewing refused (`DECK_PREVIEW_ONLY`) ->
+  plan (`approvePlan`) -> **the approver's Outlook** (`prepareMyOutlookDraft`, `my-mailbox.ts`: the caller's scoped read, `user_id` = session user, personal,
+  active, Microsoft, `Mail.ReadWrite` via `hasDraftScope`, then a fresh token; refresh failing = `reauth`) -> linked-proposal gate -> shown-text, hygiene, stale
+  checks -> save edit -> proposal live -> resolve (`mailbox_draft: false`) -> ONE Graph POST with that token (the prepared `draft` refuses a second call).
+  Not ready = a fixed sentence (`APPROVER_*` in `words.ts`) plus `connect: INTEGRATIONS_PATH` (none for "couldn't check"); nothing is saved, made live or
+  resolved. The deck card, the item page's ReviewPanel and the lead page's NeedsYourYes draw the `Connect Outlook` link.
+- **After the resolve:** ok -> `mailbox-microsoft` ("Draft is in your Outlook."); a definite refusal (4xx, reauth, no token) -> `mailbox-failed`
+  (`APPROVED_DRAFT_FAILED_OUTLOOK`, the approved text returned as `approvedText`, shown on the deck; the item page shows the approved body); a 5xx, timeout
+  or unreadable reply -> `mailbox-uncertain` (`APPROVED_DRAFT_CHECK_OUTLOOK`). Never retried automatically. If the queue still answers `send: "drafted"` /
+  `"sent"`, no second draft is made and the page says the queue drafted it in the firm's mailbox (`APPROVED_QUEUE_DRAFTED_FIRM` /
+  `LEAD_STEP_DRAFT_IN_QUEUE_MAILBOX` / `QUEUE_DRAFTED_ANYWAY` on a pass). Its link is read from lawmatics-mcp's real field, `draft.webLink`
+  (`sendResult.webLink` kept as a fallback). A `manual` client email never says "This type isn't emailed" (`APPROVED_CLIENT_EMAIL_NO_DRAFT`).
+- **"Drafts go to" stays an override** (`pass`): the drafter's personal connection is invisible to the approver under RLS, and no service-role read or
+  migration was added, so the drafter's readiness is NOT checked at approve time; the draft_to / "Make the draft in my Outlook" path (which checks the
+  drafter's own Outlook on their click) is unchanged. What IS blocked: before lectual 0112 (`passingSwitchedOn()` reads 0112's `attempt` column as missing)
+  a pass falls back to the approver's own Outlook, so the approver is checked first then. With 0112 on (or the probe unreadable) a pass checks no Outlook.
+  If the probe says on but the draft_to is still refused as not set up, the fallback prepares the approver's Outlook at that moment and a not-ready
+  approver reads `mailbox-failed` (never a draft elsewhere).
+- **Follow-ups (Nov 27):** a client email with no recipient is refused first (`APPROVER_NO_RECIPIENT`, nothing saved or resolved). Only a real
+  `reauth` from the token refresh asks to reconnect; a token-endpoint 5xx, a network drop or sign-in not switched on is "couldn't check" (no link).
+  `passingSwitchedOn()` is also `no` when `queue_card_event` itself is missing (42P01 / PGRST205). **A client-email resolve that throws** (timeout,
+  5xx) re-reads the item: approved with `resolved_by` = this session's address -> the one draft is made as normal; decided by anyone else ->
+  `ALREADY_DECIDED`, no draft; still pending -> the usual "didn't go through"; the re-read failing too -> `mailbox-uncertain` with the approved text
+  ("Check your Outlook Drafts..."). The lead page shows the approved text on a failed or uncertain draft, and a client email the queue drafted in the
+  firm's mailbox is a warning there.
+- A routing read that fails = the approver's own Outlook (never the firm mailbox). Hand-offs don't change whose mailbox: whoever presses Yes.
+- "Send from Outlook now" (`mySendAccess` / `sendFromMyOutlook`) now looks at the same row the draft went to (the caller's own Outlook), not their first mailbox.
+- Tests: `tests/queue/approver-drafts.test.ts`, plus `draft-own-outlook`, `draft-handoff-flow`, `deck-actions`, `deck-card`, `lead-step/actions`. NOT verified:
+  a real Graph draft, the deployed lawmatics-mcp response, a real browser.
 
 ## Automatic consult prep (S1, no schema; contract `docs/pge/2026-11-24-auto-consult-prep/`)
 A lead entering the firm's consult stage, a consult from the Lawmatics sync, or a person's Re-run starts a prep for ONE consult: a FACTS-ONLY brief (no model writes it), queued as an internal BRIEFING,

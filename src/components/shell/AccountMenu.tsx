@@ -34,7 +34,9 @@ type Props = {
   settingsInMenu?: boolean;
   /** "owner" draws the owner view's menu (the AccountMenu board); absent is today's menu, unchanged. */
   variant?: "owner";
-  /** The owner-style look only (the team view): the same menu layout, without the owner's own items (deal times) or the welcome deal. */
+  /** The deck behaviours (the Deal times item). Default: the owner variant. */
+  deck?: boolean;
+  /** The owner-style look only (the team view): the same menu layout, without the welcome deal; Deal times only with `deck`. */
   look?: "owner" | "team";
   /** A real owner on a database with View as: one "View as a teammate" line, linking to Team. */
   viewAsLink?: boolean;
@@ -54,6 +56,7 @@ export function AccountMenu({
   viewMenu,
   settingsInMenu = false,
   variant,
+  deck,
   look,
   viewAsLink = false,
   previewing,
@@ -177,7 +180,7 @@ export function AccountMenu({
               Your name
             </button>
 
-            {variant === "owner" && (
+            {(deck ?? variant === "owner") && (
               <button
                 type="button"
                 role="menuitem"

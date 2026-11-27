@@ -87,7 +87,7 @@ export function DealTimesDialogView({ first, second, zoneLabel, error, saving, o
   );
 }
 
-/** Mounted once in the OWNER view's dashboard layout; the deck header and the account menu open it with SHOW_DEAL_TIMES_EVENT. */
+/** Mounted once in a deck shell's dashboard layout (owner and team views, never under View as); the deck header and the account menu open it with SHOW_DEAL_TIMES_EVENT. */
 export function DealTimesDialog({ current, zoneLabel }: { current: DealTimesPair; zoneLabel: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);

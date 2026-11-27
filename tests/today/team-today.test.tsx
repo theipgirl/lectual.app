@@ -83,8 +83,8 @@ describe("Team Today", () => {
     expect(html).toContain("1 waiting for you");
     expect(html).toContain("Call the client");
     expect(html).toContain("1 day overdue");
-    expect(html).toContain('href="/dashboard/queue/"');
-    expect(html).not.toContain("/dashboard/queue/deck/");
+    expect(html).toContain('href="/dashboard/queue/deck/"');
+    expect(html).not.toContain('href="/dashboard/queue/"');
   });
 
   it("omits every owner-only piece", async () => {

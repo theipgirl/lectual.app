@@ -7,7 +7,7 @@ import { DECK_OPEN_DRAFT, LEAD_PAGE_OPEN_IN_APPROVALS } from "@/lib/ui/words";
  * to the notice, the editor closes and Yes, Edit and Not this stay.
  */
 export type Mode = "idle" | "editing" | "rejecting" | "sending-back";
-export type Outcome = { ok: true; message: string; webLink?: string | null; warn?: boolean } | { ok: false; error: string };
+export type Outcome = { ok: true; message: string; webLink?: string | null; warn?: boolean; text?: string } | { ok: false; error: string; connect?: string | null };
 export type CardState = { mode: Mode; body: string; outcome: Outcome | null };
 export type ActionKind = "edit" | "yes" | "not-this" | "send-back";
 
@@ -15,7 +15,7 @@ const httpsOnly = (href: string | null | undefined): string | null => (href && /
 
 /** The notice a success puts above the card. The approval link is built from the item's id captured BEFORE the card can swap. */
 export function noticeFor(kind: ActionKind, r: Extract<Outcome, { ok: true }>, itemId: string): StepNotice {
-  if (kind === "yes" && r.warn) return { tone: "warn", message: r.message, href: `/dashboard/queue/${encodeURIComponent(itemId)}/`, hrefLabel: LEAD_PAGE_OPEN_IN_APPROVALS };
+  if (kind === "yes" && r.warn) return { tone: "warn", message: r.message, href: `/dashboard/queue/${encodeURIComponent(itemId)}/`, hrefLabel: LEAD_PAGE_OPEN_IN_APPROVALS, ...(r.text ? { text: r.text } : {}) };
   const web = kind === "yes" ? httpsOnly(r.webLink) : null;
   return { tone: "ok", message: r.message, href: web, hrefLabel: DECK_OPEN_DRAFT };
 }
