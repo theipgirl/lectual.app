@@ -97,6 +97,17 @@ Pro is a six-month program by application; no public price (up to 3 users, unlim
 | Document extraction ("no manual data entry") | Read uploaded files for filing facts (owner entity, first-use date, goods) to fill the filing checklist, a person confirms |
 | Per-tier caps (presentations, e-signs, users) as the price lever | Pricing idea for Lectual tiers |
 
+### Tax Maverick homepage (re-read Nov 27): how they sell, useful for Lectual's own pitch
+- Positioning: "operating system" for firm owners = methodology (pricing, packaging, presenting) + community + AI software. Lectual could pitch
+  the same three: RPB's proven IP intake-to-filing playbook + a firm-owner community + the software.
+- Seven growth stages by revenue (Emerging <$100K to Enterprise $5-10M), each with one "wall" (commitment, confidence, consistency, the owner,
+  leadership, infrastructure, transferable value). A firm finds its stage, then the offer. Lectual could map IP firms the same way.
+- "Five walls": hidden revenue, the pricing conversation, team execution, the new-client trap (sell to the book you have first), scale before systems.
+  The new-client trap fits Lectual: renewals, Section 8/9 dates, new classes and new marks for existing clients.
+- Two ways in: a two-day live Zoom bootcamp (learn it) and a six-month program by application (run it), sold on a call. No public prices.
+- Security page: TLS + AES-256, role-based access, audit logs, monitoring; no named certification, nothing on AI training. Lectual should have its
+  own page: firm-by-firm isolation, nothing sent without a person's approval, the firm's own Lawmatics/LawPay/Outlook connections, no training on firm data.
+
 All client-facing output stays a firm draft that a person approves; nothing reads as Lectual giving legal advice.
 
 ## Action items
