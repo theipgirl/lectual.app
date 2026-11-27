@@ -2157,14 +2157,18 @@ The firm owner, relayed Nov 26: RPB's whole team starts on Lectual Monday, and n
 Draw-only, like the owner view: every page and action keeps its own role and feature gate, so a hidden page still opens by URL for anyone already allowed.
 - **`team` is a LIVE view** (`LIVE_VIEWS`, behind the same `role-views` switch). `ROLE_VIEW`: admin, senior_admin, attorney, intake, paralegal, law_clerk and clerk -> `team`;
   owner stays `owner`; viewer and social_media keep the technician shell. **Admin moved from the owner view to the team view (Nov 26)**, replacing the Nov 17 decision.
-- **Rail** (`TEAM_TREE`, through the one `drawnNav` seam, so it is a filter of `visibleNav`: a section the role or firm lacks never appears): Today, Weekly review, Matters,
-  Approvals, then More (a menu on a collapsed rail, like the owner's, not a link to Mail) holding every other row the technician rail shows (`TEAM_MORE_SLUGS`: Mail, Meetings, Campaigns, Calendar, Intake, Forms, Proposals, Pipeline, Documents,
-  Copilot, Assistants, Shortcuts, Firm notes). No Settings row; Settings is in the account menu (`settingsInMenu`, the same flag the owner variant uses). The one Reports row (to `/dashboard/reports/`) sits at the foot of the rail and the phone More sheet ends with a Reports group, each drawn only when a report is visible (`shellFor('team').showReports`, `moreSections(..., { reports: true })`); the owner view has none. Approvals opens the person's own list (Mine is the default for a staff role), not the deck; its rail count is `mineQueue`.
-- **Phone bar:** Today, Review, Matters, Approvals, More; the More sheet is the rail's More list. **Look:** the technician look (no `variant`), so the tour (not the welcome deal) is
-  the first-sign-in guide. The tour and Getting started read the drawn rows / `data-tour` hooks the More kids still carry; `tests/views/team-view-guides.test.tsx` checks it per team role.
+- **Rail** (`TEAM_TREE`, through the one `drawnNav` seam, so it is a filter of `visibleNav`: a section the role or firm lacks never appears): exactly Today, Weekly review, Matters and Approvals.
+  **No More row, no Reports row, no Settings row** (the firm owner's decision: "remove More entirely"; `shellFor('team')`: `showReports: false`, `showSettings: false`, `showMore: false`). Settings is in the
+  account menu (`settingsInMenu`), which is how a team member reaches Connect Outlook. **Hide only:** no page, action or read changed, so Mail, Meetings, Intake, Calendar and the rest still open by URL or from
+  an in-page link for anyone their own gate allows. Approvals opens the person's own list (Mine is the default for a staff role), not the deck; its rail count is `mineQueue`.
+- **Phone bar:** Today, Review, Matters, Approvals, and NO More button or sheet (`MobileBar` takes `more`, default true; the team view passes `shell.showMore` = false; owner and technician draw More as before).
+  **Look:** the technician look (no `variant`), so the tour (not the welcome deal) is the first-sign-in guide.
+- **Tour and Getting started:** the tour's rail steps come from the drawn slugs, so they never mention a hidden row. Hub flows are chosen from `visibleNav` (not the drawn list); the one flow aimed at a row the team rail no
+  longer draws is Leads' (`nav-intake`). It is kept on purpose: the runner finds no element and `placePopover` with no rect centers the card (same as under 768px, where the rail is hidden), and the flow's
+  later steps open `/dashboard/intake/` themselves. `tests/views/team-view-guides.test.tsx` checks, per team role, that every tour target is drawn and every hub `nav-*` target is drawn or in the known-hidden list and centers.
 - **Today is the technician Today** (`OwnerToday` is chosen only for `owner`).
 - **Lectual staff preview:** `previewableRoles()` lists every role whose view is live, so "Preview a view" offers the team roles too. Firm members still have no switch.
-- Tests: `tests/views/team-view.test.ts` (every technician rail route stays reachable from the team rail or its More, for every team role and several module sets).
+- Tests: `tests/views/team-view.test.ts` (the rail and phone bar are exactly the four rows, no More or Reports, owner and technician unchanged).
 
 ## Handed to you, Send back, and the bell (Phase 2 item 2, technician shell, no schema, needs lectual 0103)
 No new rail row and no My cards page in today's shell. Additive only: with no card handed to the viewer, the Approvals page and the approval page render exactly as before.

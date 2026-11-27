@@ -158,23 +158,17 @@ export const OWNER_BAR_LABEL: Record<string, string> = { "": "Today", queue: APP
 export const OWNER_MORE_GROUPS: readonly { label: string; slugs: readonly string[] }[] = [{ label: MORE_NAME, slugs: ["intake", "forms", "matters", "calendar"] }];
 
 /**
- * The team view (Nov 26): Today, Weekly review, Matters and the person's own Approvals, then More holding every other
- * section the role and firm already show in the technician rail. No Reports or Settings row (Settings is in the account
- * menu). Approvals keeps its own list (Mine is the default for a staff role), never the deck.
+ * The team view (Nov 26; More removed the same week, the firm owner's decision): Today, Weekly review, Matters and the
+ * person's own Approvals, and nothing else. No More row, no Reports row and no Settings row (Settings is in the account
+ * menu). Hide only: every other page still opens by URL or from an in-page link for anyone its own gate allows.
+ * Approvals keeps its own list (Mine is the default for a staff role), never the deck.
  */
 export const TEAM_MAIN_SLUGS = ["", "review", "matters", "queue"] as const;
-export const TEAM_MORE_SLUGS = ["mail", "meetings", "campaigns", "calendar", "intake", "forms", "quotes", "proposals", "pipeline", "documents", "copilot", "agents", "skills", "brain"] as const;
-export const TEAM_TREE: readonly (readonly RailNode[])[] = [
-  TEAM_MAIN_SLUGS.map((slug) => ({ slug })),
-  [{ label: MORE_NAME, icon: "M5 12h.01M12 12h.01M19 12h.01", kids: TEAM_MORE_SLUGS }],
-];
+export const TEAM_TREE: readonly (readonly RailNode[])[] = [TEAM_MAIN_SLUGS.map((slug) => ({ slug }))];
 
-/** The team phone bar: Today, Review, Matters, Approvals, then More. */
+/** The team phone bar: Today, Review, Matters, Approvals. No More button and no sheet. */
 export const TEAM_BAR = ["", "review", "matters", "queue"] as const;
 export const TEAM_BAR_LABEL: Record<string, string> = { "": "Today", review: REVIEW_SHORT_NAME, matters: "Matters", queue: APPROVALS_NAME };
-
-/** The team phone bar's More sheet: the same rows as the rail's More. */
-export const TEAM_MORE_GROUPS: readonly { label: string; slugs: readonly string[] }[] = [{ label: MORE_NAME, slugs: TEAM_MORE_SLUGS }];
 
 /**
  * What the rail, phone bar and tour are handed, from what `visibleNav` already allowed. A filter only: it never adds
@@ -184,7 +178,7 @@ export const TEAM_MORE_GROUPS: readonly { label: string; slugs: readonly string[
 export function drawnNav(items: NavItem[], view: ViewId): NavItem[] {
   if (view === "technician" || !isLiveView(view)) return items;
   const bySlug = new Map(items.map((i) => [i.slug, i]));
-  if (view === "team") return [...TEAM_MAIN_SLUGS, ...TEAM_MORE_SLUGS].flatMap((slug) => {
+  if (view === "team") return TEAM_MAIN_SLUGS.flatMap((slug) => {
     const item = bySlug.get(slug);
     return item ? [item] : [];
   });
@@ -216,6 +210,8 @@ export type ShellSpec = {
   moreGroups: readonly { label: string; slugs: readonly string[] }[] | undefined;
   showSettings: boolean;
   showReports: boolean;
+  /** Only the team view sets this (false): no More button or sheet on the phone bar. Absent = drawn, as before. */
+  showMore?: boolean;
   /** Settings is a link in the account menu (the owner rail has no Settings row). */
   settingsInMenu: boolean;
   /** The owner's colours and compact top bar. */
@@ -240,9 +236,10 @@ export function shellFor(view: ViewId): ShellSpec {
       view,
       tree: TEAM_TREE,
       bar: { slugs: TEAM_BAR, labels: TEAM_BAR_LABEL },
-      moreGroups: TEAM_MORE_GROUPS,
+      moreGroups: [],
       showSettings: false,
-      showReports: true,
+      showReports: false,
+      showMore: false,
       settingsInMenu: true,
       variant: undefined,
     };

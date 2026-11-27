@@ -10,11 +10,13 @@ import { visibleNav } from "@/lib/nav";
 import { drawnNav, shellFor } from "@/lib/views";
 import { tourSteps } from "@/lib/onboarding/tour";
 import { visibleFlows } from "@/lib/onboarding/hub";
+import { placePopover } from "@/lib/onboarding/engine";
 import type { Role } from "@/lib/auth/roles";
 
 const ALL = ["mailbox", "agents", "proposals", "document-center", "agent-toolkit", "role-views"];
 const TEAM_ROLES: Role[] = ["admin", "senior_admin", "attorney", "intake", "paralegal", "law_clerk", "clerk"];
 
+const HIDDEN_FOR_TEAM = ["nav-intake"];
 const tokensOf = (html: string) => new Set([...html.matchAll(/data-tour="([^"]*)"/g)].flatMap((m) => m[1].split(" ")));
 
 describe("tour and Getting started on the team rail", () => {
@@ -31,9 +33,17 @@ describe("tour and Getting started on the team rail", () => {
           if (step.target?.startsWith("nav-")) expect(tokens, `tour ${step.id}`).toContain(step.target);
         }
         for (const flow of visibleFlows({ role, modules, aiConfigured: true, outlookConnectable: true })) {
-          for (const step of flow.steps) if (step.target.startsWith("nav-")) expect(tokens, `hub ${flow.id}/${step.id}`).toContain(step.target);
+          // A hub step aimed at a rail row the team rail does not draw (Leads: nav-intake) is not blocked: the runner finds no element
+          // and `placePopover` centers the card. So the only rule is that every such target is one of the known hidden rows.
+          for (const step of flow.steps) {
+            if (!step.target.startsWith("nav-") || tokens.has(step.target)) continue;
+            expect(HIDDEN_FOR_TEAM, `hub ${flow.id}/${step.id}`).toContain(step.target);
+            expect(placePopover({ rect: null, viewport: { width: 1280, height: 800 }, size: { width: 320, height: 200 }, side: step.side }).mode).toBe("center");
+          }
         }
         expect(html).not.toContain("Settings");
+        expect(html).not.toContain("nav-intake");
+        expect(html).not.toContain("More");
       });
     }
   }

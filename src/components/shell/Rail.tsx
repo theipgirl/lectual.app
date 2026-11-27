@@ -103,7 +103,7 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
   return (
     <div ref={slot} className={`lx-rail-slot${pinned ? " is-pinned" : ""}`}>
       <nav
-        className={`lx-rail${pinned ? " is-pinned" : ""}${variant === "owner" ? " lx-rail--owner" : tree !== undefined ? " lx-rail--team" : ""}`}
+        className={`lx-rail${pinned ? " is-pinned" : ""}${variant === "owner" ? " lx-rail--owner" : ""}`}
         aria-label="Sections"
         data-tour="rail"
         onKeyDown={(e) => closeRailOnEscape(e.key, e.currentTarget, document.activeElement as HTMLElement | null)}

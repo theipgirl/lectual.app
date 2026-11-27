@@ -24,14 +24,10 @@
 /* The More row: its dots are heavier than the other icons, and it is tinted while the rail is collapsed. */
 .lx-rail--owner .lx-rail-item:has(+ .lx-rail-kids) svg { stroke-width: 2.5; }
 .lx-rail--owner:not(:hover):not(.is-pinned):not(:has(:focus-visible)) .lx-rail-item:has(+ .lx-rail-kids) { background: var(--hover-on-deep); color: var(--cream); }
-.lx-rail--owner .lx-rail-chev,
-.lx-rail--team .lx-rail-chev { display: flex; flex: 0 0 auto; opacity: 0; transition: opacity 0.14s; }
+.lx-rail--owner .lx-rail-chev { display: flex; flex: 0 0 auto; opacity: 0; transition: opacity 0.14s; }
 .lx-rail--owner:hover .lx-rail-chev,
 .lx-rail--owner:has(:focus-visible) .lx-rail-chev,
-.lx-rail--owner.is-pinned .lx-rail-chev,
-.lx-rail--team:hover .lx-rail-chev,
-.lx-rail--team:has(:focus-visible) .lx-rail-chev,
-.lx-rail--team.is-pinned .lx-rail-chev { opacity: 1; }
+.lx-rail--owner.is-pinned .lx-rail-chev { opacity: 1; }
 .lx-rail--owner .lx-rail-kid { color: var(--on-deep-2); }
 .lx-rail--owner .lx-rail-kid:hover { color: var(--cream); }
 .lx-rail--owner .lx-rail-kid.is-active,
