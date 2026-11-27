@@ -131,11 +131,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
           {staffInsideFirm(org.name)}
         </div>
       )}
-      <header className={shell.variant === "owner" ? "lx-top lx-top--owner" : "lx-top"}>
+      <header className={shell.look ? `lx-top lx-top--owner${shell.look === "team" ? " lx-top--team" : ""}` : "lx-top"}>
         <div className="lx-wordmark" title={org.name}>
           <FirmWordmark org={org} />
         </div>
-        {shell.variant !== "owner" && <SectionLabel />}
+        {!shell.look && <SectionLabel />}
         <div className="lx-top-spacer" />
         {viewAs ? <PreviewBell name={viewAs.targetName} /> : <NotificationBell />}
         <AccountMenu
@@ -149,6 +149,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           viewMenu={viewMenu}
           settingsInMenu={shell.settingsInMenu}
           variant={shell.variant}
+          look={shell.look}
           viewAsLink={viewAsLink}
           previewing={viewAs ? { name: viewAs.targetName } : undefined}
         />
@@ -164,6 +165,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           showReports={shell.showReports}
           tree={shell.tree}
           variant={shell.variant}
+          look={shell.look}
           dealReady={dealReady}
         />
         <div className="lx-content">
@@ -180,6 +182,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         reports={shell.showReports}
         more={shell.showMore}
         variant={shell.variant}
+        look={shell.look}
         dealReady={dealReady}
       />
       {previewing ? (

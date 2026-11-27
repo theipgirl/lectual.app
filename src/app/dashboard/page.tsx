@@ -49,6 +49,7 @@ import { Notice } from "@/components/ui/Notice";
 import { PageHeader } from "@/components/ui/PageHeader";
 import "@/components/today/today.css";
 import { OwnerToday } from "@/components/today/OwnerToday";
+import { TeamToday } from "@/components/today/TeamToday";
 import { NO_PREVIEW, previewFor, viewFor } from "@/lib/views";
 import { intakeListHref } from "@/lib/intake/list-href";
 import { mattersListHref } from "@/lib/matters/list-href";
@@ -90,6 +91,10 @@ export default async function TodayPage() {
   });
   if (view === "owner") {
     return <OwnerToday userId={session.user.id} role={session.role} email={session.user.email} metadata={session.user.user_metadata} />;
+  }
+  // The team view's Today (non-owner staff, role views on) is its own simple page, chosen before any technician read too.
+  if (view === "team") {
+    return <TeamToday userId={session.user.id} role={session.role} email={session.user.email} metadata={session.user.user_metadata} />;
   }
   const now = new Date();
   // The Deadlines card (PGE Sprint 3) reads on its own, started now so it runs beside every other read on this page.

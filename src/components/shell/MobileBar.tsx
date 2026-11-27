@@ -25,8 +25,10 @@ type Props = {
   groups?: readonly MoreGroup[];
   /** Append the Reports group to a view's own groups (the team view; the owner view does not). */
   reports?: boolean;
-  /** The owner view's colours. */
+  /** The owner view: its colours AND its behaviours (the deal-ready dot, the open sheet taking the tile). */
   variant?: "owner";
+  /** The owner-style look only (the team view): the same pill bar, none of the owner's behaviours. */
+  look?: "owner" | "team";
   /** Draw the More sheet open to start with (default closed). Used by the design harness. */
   initialOpen?: boolean;
 };
@@ -74,7 +76,7 @@ export function MoreSheet({ sections, onClose }: { sections: MoreSection[]; onCl
  * keeps the queue's three states. Hiding an entry is a courtesy; every page
  * still checks its own gate.
  */
-export function MobileBar({ items, queueStatus, pendingCount, counts, dealReady = null, bar: barSpec, groups, reports = false, more = true, variant, initialOpen = false }: Props) {
+export function MobileBar({ items, queueStatus, pendingCount, counts, dealReady = null, bar: barSpec, groups, reports = false, more = true, variant, look, initialOpen = false }: Props) {
   const pathname = usePathname() ?? "/dashboard/";
   const [open, setOpen] = useState(initialOpen);
   const lastPath = useRef(pathname);
@@ -96,7 +98,7 @@ export function MobileBar({ items, queueStatus, pendingCount, counts, dealReady 
 
   return (
     <>
-      <nav className={`lx-mbar${variant === "owner" ? " lx-mbar--owner" : ""}`} aria-label="Main">
+      <nav className={`lx-mbar${variant === "owner" || look !== undefined ? " lx-mbar--owner" : ""}${look === "team" ? " lx-mbar--team" : ""}`} aria-label="Main">
         {bar.map((item) => {
           const count = railCountFor(item.countKey, queueStatus, pendingCount, counts);
           const ready = variant === "owner" && item.countKey === "queue" ? dealReady : null;
