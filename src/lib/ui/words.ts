@@ -144,6 +144,17 @@ export const SIGN_IN_CONFIRM_TITLE = "Sign in to Lectual";
 export const SIGN_IN_CONFIRM_BODY = "Press the button to finish signing in. This step keeps email security scanners from using up your link.";
 export const SIGN_IN_CONFIRM_BUTTON = "Sign in";
 export const SIGN_IN_ERROR_FALLBACK = "That sign-in didn't work. Enter your email to get a new link.";
+/**
+ * The three statements under the sign-in form and the lines on its sky panel. Each is already said on lectual.app/firms/;
+ * they are product statements, never testimonials, and nothing here names a customer, a person or a certification.
+ */
+export const SIGN_IN_TRUST_CHIPS = ["Isolated tenant per firm", "Attorney-gated actions", "Flat fees only"] as const;
+export const SIGN_IN_PANEL_LINES = [
+  "Agents draft. An attorney approves.",
+  "A legal CRM remembers. Lectual acts.",
+  "Nothing goes out until an attorney approves it.",
+  "Every deadline, on the matter it belongs to.",
+] as const;
 
 /** Plain permission wording (was "scope"). */
 export const NEEDS_CALENDAR_PERMISSION = "Needs permission to read the calendar. Reconnect.";

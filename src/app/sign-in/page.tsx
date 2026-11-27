@@ -5,7 +5,7 @@ import LoginForm from "./LoginForm";
 import HashErrorNotice from "./HashErrorNotice";
 import { signInErrorMessage } from "@/lib/auth/sign-in-errors";
 import { SIGN_IN_INVITED_HELP, SIGN_IN_NOT_INVITED } from "@/lib/ui/words";
-import { NOT_A_LAW_FIRM_DISCLAIMER } from "@/lib/legal/disclaimer";
+import SignInShell from "./SignInShell";
 
 export const metadata: Metadata = { title: "Sign in — Lectual" };
 
@@ -28,39 +28,17 @@ export default async function SignInPage({
   }
 
   return (
-    <main style={{ minHeight: "100dvh", display: "grid", placeItems: "center", padding: 24 }}>
-      <div className="lx-card" style={{ width: "100%", maxWidth: 420, padding: 32, display: "grid", gap: 18 }}>
-        <div>
-          <div className="lx-label">Lectual</div>
-          <h1 className="lx-h1" style={{ fontSize: 34 }}>
-            Sign in to your firm
-          </h1>
-        </div>
-        {error && (
-          <p
-            role="alert"
-            style={{
-              margin: 0,
-              fontSize: 14,
-              lineHeight: 1.5,
-              color: "var(--wine)",
-              background: "rgba(142,39,51,.07)",
-              border: "1px solid rgba(142,39,51,.3)",
-              borderRadius: 9,
-              padding: "10px 12px",
-            }}
-          >
-            {signInErrorMessage(error)}
-          </p>
-        )}
-        <HashErrorNotice serverError={Boolean(error)} />
-        <p style={{ margin: 0, fontSize: 14 }}>{SIGN_IN_INVITED_HELP}</p>
-        <LoginForm next={safeNext} />
-        <p style={{ margin: 0, fontSize: 14 }}>{SIGN_IN_NOT_INVITED}</p>
-        <p className="lx-note" style={{ margin: 0, fontSize: 12 }}>
-          {NOT_A_LAW_FIRM_DISCLAIMER}
+    <SignInShell>
+      <h1 className="lx-si-h1">Sign in to your firm</h1>
+      <p className="lx-si-sub">{SIGN_IN_INVITED_HELP}</p>
+      {error && (
+        <p role="alert" className="lx-si-alert">
+          {signInErrorMessage(error)}
         </p>
-      </div>
-    </main>
+      )}
+      <HashErrorNotice serverError={Boolean(error)} />
+      <LoginForm next={safeNext} />
+      <p className="lx-si-quiet">{SIGN_IN_NOT_INVITED}</p>
+    </SignInShell>
   );
 }

@@ -15,7 +15,7 @@ function ResendButton({ pending }: { pending: boolean }) {
     return () => clearInterval(timer);
   }, []);
   return (
-    <button type="submit" className="lx-btn" disabled={pending || secondsLeft > 0}>
+    <button type="submit" className="lx-si-btn" disabled={pending || secondsLeft > 0}>
       {pending ? "Sending…" : secondsLeft > 0 ? `Resend in ${secondsLeft}s` : "Resend the link"}
     </button>
   );
@@ -25,13 +25,13 @@ function ResendButton({ pending }: { pending: boolean }) {
 function CodeForm({ email, next }: { email: string; next: string }) {
   const [state, action, pending] = useActionState<CodeState, FormData>(verifySignInCode, {});
   return (
-    <form action={action} style={{ display: "grid", gap: 8 }}>
+    <form action={action} className="lx-si-form">
       <input type="hidden" name="email" value={email} />
       <input type="hidden" name="next" value={next} />
-      <label htmlFor="code" style={{ fontSize: 14, fontWeight: 500 }}>
+      <label htmlFor="code" className="lx-si-label">
         {SIGN_IN_CODE_LABEL}
       </label>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+      <div className="lx-si-code-row">
         <input
           id="code"
           name="code"
@@ -40,15 +40,14 @@ function CodeForm({ email, next }: { email: string; next: string }) {
           maxLength={9}
           pattern="[0-9 -]*"
           placeholder="123456"
-          className="lx-input"
-          style={{ maxWidth: 160 }}
+          className="lx-si-input"
         />
-        <button type="submit" className="lx-btn lx-btn-pri" disabled={pending}>
+        <button type="submit" className="lx-si-btn lx-si-btn-pri" disabled={pending}>
           {pending ? "Signing in…" : "Sign in with code"}
         </button>
       </div>
       {state.error && (
-        <p role="alert" style={{ margin: 0, color: "var(--wine)", fontSize: 14 }}>
+        <p role="alert" className="lx-si-err">
           {state.error}
         </p>
       )}
@@ -66,28 +65,28 @@ export default function LoginForm({ next }: { next: string }) {
 
   if (confirmed) {
     return (
-      <div style={{ display: "grid", gap: 10 }}>
-        <p role="status" style={{ margin: 0, color: "var(--ok)", fontWeight: 500, fontSize: 15 }}>
+      <div className="lx-si-sent">
+        <p role="status" className="lx-si-sent-head">
           We sent a link to {state.email}.
         </p>
-        <p style={{ margin: 0, fontSize: 14 }}>{SIGN_IN_SPAM_HINT}</p>
+        <p className="lx-si-note">{SIGN_IN_SPAM_HINT}</p>
         <CodeForm email={state.email ?? ""} next={next} />
         {(state.sends ?? 0) > 1 && !state.error && (
-          <p role="status" style={{ margin: 0, fontSize: 14 }}>
+          <p role="status" className="lx-si-note">
             Sent again.
           </p>
         )}
         {state.error && (
-          <p role="alert" style={{ margin: 0, color: "var(--wine)", fontSize: 14 }}>
+          <p role="alert" className="lx-si-err">
             {state.error}
           </p>
         )}
-        <form action={action} style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+        <form action={action} className="lx-si-row">
           <input type="hidden" name="next" value={next} />
           <input type="hidden" name="email" value={state.email ?? ""} />
           <input type="hidden" name="resend" value="1" />
           <ResendButton key={state.round ?? 0} pending={pending} />
-          <button type="button" className="lx-btn" onClick={() => setDismissedFor(state.round ?? null)}>
+          <button type="button" className="lx-si-btn" onClick={() => setDismissedFor(state.round ?? null)}>
             Use a different address
           </button>
         </form>
@@ -96,9 +95,9 @@ export default function LoginForm({ next }: { next: string }) {
   }
 
   return (
-    <form action={action} style={{ display: "grid", gap: 10 }}>
+    <form action={action} className="lx-si-form">
       <input type="hidden" name="next" value={next} />
-      <label htmlFor="email" style={{ fontSize: 15, fontWeight: 500 }}>
+      <label htmlFor="email" className="lx-si-label">
         Work email
       </label>
       <input
@@ -108,13 +107,13 @@ export default function LoginForm({ next }: { next: string }) {
         required
         autoComplete="email"
         placeholder="you@yourfirm.com"
-        className="lx-input"
+        className="lx-si-input"
       />
-      <button type="submit" className="lx-btn lx-btn-pri" disabled={pending} style={{ height: 42 }}>
+      <button type="submit" className="lx-si-btn lx-si-btn-pri" disabled={pending}>
         {pending ? "Sending…" : "Email me a sign-in link"}
       </button>
       {state.error && (
-        <p role="alert" style={{ margin: 0, color: "var(--wine)", fontSize: 14 }}>
+        <p role="alert" className="lx-si-err">
           {state.error}
         </p>
       )}
