@@ -113,7 +113,7 @@ describe("resolveViewer swaps only 'whose view'", () => {
     for (const firmHasRoleViews of [true, false]) {
       for (const role of ROLES) {
         const asTeammate = viewFor({ role, preview: NO_PREVIEW, firmHasRoleViews, actingAsStaff: false });
-        expect(asTeammate).toBe(!firmHasRoleViews ? "technician" : role === "owner" || role === "admin" ? "owner" : "technician");
+        expect(asTeammate).toBe(!firmHasRoleViews ? "technician" : role === "owner" ? "owner" : role === "viewer" || role === "social_media" ? "technician" : "team");
         const mods = ["mailbox", "agents", "proposals", "role-views"];
         expect(drawnNav(visibleNav(mods, role), asTeammate).map((i) => i.slug)).toEqual(drawnNav(visibleNav(mods, role), viewFor({ role, preview: NO_PREVIEW, firmHasRoleViews, actingAsStaff: false })).map((i) => i.slug));
       }

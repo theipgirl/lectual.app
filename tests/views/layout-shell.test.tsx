@@ -41,7 +41,7 @@ import { SectionLabel } from "@/components/shell/SectionLabel";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { WelcomeDeal } from "@/components/onboarding/WelcomeDeal";
 import { mobileBarItems, moreSections, railGroups, visibleNav } from "@/lib/nav";
-import { DECK_PATH } from "@/lib/views";
+import { DECK_PATH, previewableRoles } from "@/lib/views";
 
 function findAll(node: ReactNode, type: unknown, out: ReactElement[] = []): ReactElement[] {
   if (Array.isArray(node)) node.forEach((n) => findAll(n, type, out));
@@ -167,7 +167,14 @@ describe("switch on", () => {
     ]) {
       const m = await mount(session(role, [...MODULES, "role-views"], meta, { org: { id: "11111111-1111-4111-8111-111111111111", name: "Hartwell IP", slug: "h", modules: [...MODULES, "role-views"] } }));
       expect(m.menu.props.viewMenu).toBeUndefined();
-      expect(m.rail.props.variant).toBe(role === "owner" || role === "admin" ? "owner" : undefined);
+      expect(m.rail.props.variant).toBe(role === "owner" ? "owner" : undefined);
+      // Everyone but the owner is on the team view: its tree, no Settings row, a Reports row, Settings in the menu, today's colours and tour.
+      if (role !== "owner") {
+        expect(m.rail.props).toMatchObject({ showSettings: false, showReports: true });
+        expect(m.rail.props.items.map((i: { slug: string }) => i.slug).slice(0, 4)).toEqual(["", "review", "matters", "queue"]);
+        expect(m.menu.props).toMatchObject({ settingsInMenu: true });
+        expect(m.tour).toBeTruthy();
+      }
     }
   });
 
@@ -179,17 +186,17 @@ describe("switch on", () => {
   it("Lectual staff see today's shell by default, with the switch", async () => {
     const m = await mount(staffIn(FIRM_A));
     expect(m.rail.props.variant).toBeUndefined();
-    expect(m.menu.props.viewMenu).toEqual({ pref: "technician", previewRoles: ["owner", "admin"] });
+    expect(m.menu.props.viewMenu).toEqual({ pref: "technician", previewRoles: previewableRoles() });
   });
 
   it("a staff preview applies in the firm it was chosen in, never in another", async () => {
     const meta = { lectual_view_preview: { [FIRM_A]: "as:owner" } };
     const a = await mount(staffIn(FIRM_A, meta));
     expect(a.rail.props.variant).toBe("owner");
-    expect(a.menu.props.viewMenu).toEqual({ pref: "as:owner", previewRoles: ["owner", "admin"] });
+    expect(a.menu.props.viewMenu).toEqual({ pref: "as:owner", previewRoles: previewableRoles() });
     const b = await mount(staffIn(FIRM_B, meta));
     expect(b.rail.props.variant).toBeUndefined();
-    expect(b.menu.props.viewMenu).toEqual({ pref: "technician", previewRoles: ["owner", "admin"] });
+    expect(b.menu.props.viewMenu).toEqual({ pref: "technician", previewRoles: previewableRoles() });
   });
 
   it("Lectual staff in a firm without role views get no switch", async () => {
@@ -218,7 +225,7 @@ describe("account menu", () => {
   });
 
   it("staff see the View group: Technician view current by default, a preview chip, the firm-only sentence", () => {
-    const html = menu({ viewMenu: { pref: "technician", previewRoles: ["owner", "admin"] } });
+    const html = menu({ viewMenu: { pref: "technician", previewRoles: previewableRoles() } });
     expect(html).toMatch(/role="menuitemradio" aria-checked="true"[^>]*><span>Technician view<\/span><span class="lx-pill lx-pill-ox">Showing<\/span>/);
     expect(html).toContain("Preview a view");
     expect(html).toMatch(/role="menuitemradio" aria-checked="false" class="lx-am-chip"[^>]*>Owner</);
@@ -227,7 +234,7 @@ describe("account menu", () => {
   });
 
   it("a staff preview marks its chip and the owner menu carries the switch", () => {
-    const html = menu({ variant: "owner", settingsInMenu: true, viewMenu: { pref: "as:owner", previewRoles: ["owner", "admin"] } });
+    const html = menu({ variant: "owner", settingsInMenu: true, viewMenu: { pref: "as:owner", previewRoles: previewableRoles() } });
     expect(html).toMatch(/role="menuitemradio" aria-checked="true" class="lx-am-chip"[^>]*>Owner</);
     expect(html).toMatch(/role="menuitemradio" aria-checked="false"[^>]*><span>Technician view<\/span>/);
   });

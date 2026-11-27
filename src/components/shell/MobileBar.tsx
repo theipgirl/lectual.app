@@ -21,6 +21,8 @@ type Props = {
   bar?: MobileBarSpec;
   /** A view's own More sheet groups (default: the rail's groups plus Reports). */
   groups?: readonly MoreGroup[];
+  /** Append the Reports group to a view's own groups (the team view; the owner view does not). */
+  reports?: boolean;
   /** The owner view's colours. */
   variant?: "owner";
   /** Draw the More sheet open to start with (default closed). Used by the design harness. */
@@ -70,7 +72,7 @@ export function MoreSheet({ sections, onClose }: { sections: MoreSection[]; onCl
  * keeps the queue's three states. Hiding an entry is a courtesy; every page
  * still checks its own gate.
  */
-export function MobileBar({ items, queueStatus, pendingCount, counts, dealReady = null, bar: barSpec, groups, variant, initialOpen = false }: Props) {
+export function MobileBar({ items, queueStatus, pendingCount, counts, dealReady = null, bar: barSpec, groups, reports = false, variant, initialOpen = false }: Props) {
   const pathname = usePathname() ?? "/dashboard/";
   const [open, setOpen] = useState(initialOpen);
   const lastPath = useRef(pathname);
@@ -84,7 +86,7 @@ export function MobileBar({ items, queueStatus, pendingCount, counts, dealReady 
   }, [pathname]);
 
   const bar = mobileBarItems(items, pathname, barSpec);
-  const sections = moreSections(items, pathname, groups, barSpec);
+  const sections = moreSections(items, pathname, groups, barSpec, { reports });
 
   // The owner's open sheet takes the active tile (PhoneBar board); the page you are on is still named by aria-current.
   const sheetOwnsTile = variant === "owner" && open;

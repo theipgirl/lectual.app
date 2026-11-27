@@ -61,6 +61,8 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
   const [flyout, setFlyout] = useState(initialFlyout);
   const slot = useRef<HTMLDivElement>(null);
   const owner = variant === "owner";
+  // A view's own tree (owner or team) has a More row that opens a menu on a collapsed rail instead of navigating to its first kid.
+  const moreMenu = tree !== undefined;
 
   // The owner's collapsed More menu closes on Escape and on a pointer-down outside it.
   useEffect(() => {
@@ -101,7 +103,7 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
   return (
     <div ref={slot} className={`lx-rail-slot${pinned ? " is-pinned" : ""}`}>
       <nav
-        className={`lx-rail${pinned ? " is-pinned" : ""}${variant === "owner" ? " lx-rail--owner" : ""}`}
+        className={`lx-rail${pinned ? " is-pinned" : ""}${variant === "owner" ? " lx-rail--owner" : tree !== undefined ? " lx-rail--team" : ""}`}
         aria-label="Sections"
         data-tour="rail"
         onKeyDown={(e) => closeRailOnEscape(e.key, e.currentTarget, document.activeElement as HTMLElement | null)}
@@ -136,8 +138,8 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
                     <Link
                       href={entry.href}
                       onClick={(e) => {
-                        // The owner's More row, on a collapsed rail nobody is pointing at: open its menu instead of the first list.
-                        if (owner && entry.kids.length > 0 && !e.currentTarget.closest(".lx-rail")?.matches(":hover, :has(:focus-visible), .is-pinned")) {
+                        // A view's More row, on a collapsed rail nobody is pointing at: open its menu instead of the first list.
+                        if (moreMenu && entry.kids.length > 0 && !e.currentTarget.closest(".lx-rail")?.matches(":hover, :has(:focus-visible), .is-pinned")) {
                           e.preventDefault();
                           setFlyout((o) => !o);
                           return;
@@ -161,7 +163,7 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
                       <span className="lx-rail-label">{entry.label}</span>
                       {ready && <span className="lx-ready-dot" aria-hidden="true" />}
                       {count && <span className={`lx-rail-count${count === "!" ? " is-alert" : ""}`}>{count}</span>}
-                      {owner && entry.kids.length > 0 && (
+                      {moreMenu && entry.kids.length > 0 && (
                         <span className="lx-rail-chev">
                           <GlyphIcon name="chevron-down" size={13} />
                         </span>
@@ -229,7 +231,7 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
         </Link>
         )}
       </nav>
-      {owner && flyout && moreEntry && (
+      {moreMenu && flyout && moreEntry && (
         <div className="lx-rail-flyout" role="menu" aria-label={MORE_NAME}>
           <span className="lx-rail-flyout-label">{MORE_NAME}</span>
           {moreEntry.kids.map((kid) => (
