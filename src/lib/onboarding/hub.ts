@@ -132,7 +132,7 @@ const FLOWS: readonly CatalogFlow[] = [
         target: "nav-intake",
         side: "right",
         title: "Intake lives here",
-        body: "Every lead the firm is working starts in Intake. Open it from the rail whenever you want the list.",
+        body: "Every lead the firm is working starts in Intake. This is where the list lives.",
       },
       {
         id: "list",
