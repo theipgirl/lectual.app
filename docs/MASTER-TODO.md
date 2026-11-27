@@ -7,6 +7,19 @@ Newest section first. Tick an item when it is done; don't delete it.
 
 Recap: `docs/recaps/2026-11-17-marketing-site-redesign-mockups.md` (round three). Omi cross-check: still the open item "Review the new website".
 
+### Taylor, after the phone pass, the application form, the sign-in screens and the share card (Nov 27)
+Recap: round nine. Omi cross-check (Nov 27): "Review the new website" (Oct 12) is still open; "Update the launch deck with the team's latest meeting notes" (Oct 9) is still open and is about content, which this restyle did not change.
+- [x] Share card for lectual.app/firms/ is live (1200x630, wordmark and headline on the sky).
+- [ ] Re-scrape the link where it was already shared so the new card shows: LinkedIn Post Inspector, Facebook Sharing Debugger.
+- [ ] Open the /firms/ preview link on your own phone (it was only tested in phone emulation) and say what to change.
+- [ ] OK to apply migration 0120 (`beta_application`) to lectual-prod. Until then the application form must not go live.
+- [ ] Send a Lectual-branded booking link for the "book a 20-minute intro call" step after applying (the Cal.com account found is branded Of Course Creatives, so it was not used).
+- [ ] Look at both sign-in previews; OK to ship the workspace one from lectual.app `main`.
+- [ ] Decide whether to add real Google / Microsoft sign-in later (the reference had those buttons; none exist in the app).
+- [ ] Pitch deck: read the wording changes ("Agents" became "Assistants" on the cover, solution and insight slides; the cover subtitle is now "For solo and boutique trademark, patent, and copyright firms."). Facts left alone that look out of date: the [__] placeholders on traction, model and market; "Pre-seed" on the cover vs. the $50K ask; "two plans" on go-to-market vs. three on the model slide; the closing contact is taylor@theipgirl.com.
+- [ ] Optional: share cards for `/`, `/pathset/` and `/sign-in/` (no image today; `/sign-in/` shares an old description).
+- [x] "Apply for private beta" opens an email: replaced by a form (on preview).
+
 ### Taylor, after the logo and font change (Nov 26)
 - [ ] Look at https://lectual.app/firms/ again: the logo and every headline are now Instrument Serif, as on lectual.app, and "Lectual acts." plays between "What makes Lectual different?" and "While the firm sleeps".
 - [ ] The mockup link (Lectual Horizon) is now behind the live page: it still shows the old typeface and the old place for "Lectual acts." Comment on the live page from here on, or ask for the mockup to be brought up to date.

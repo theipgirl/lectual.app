@@ -355,6 +355,53 @@ decision 2026-11-26-01 in its `brain/decisions.md`).
 - **Not checked:** Safari, Firefox, a real phone; the feel of the 220ms window switch in a real
   browser. The mockup artifact was not updated and is now behind the live page.
 
+## Round nine (Nov 26 to 27): sign-in screens, the beta application form, a phone pass, the pitch deck, the share card
+
+Taylor's asks, in her words: "we need to have the login look like [a reference screenshot]", "we need a solution for the
+apply for beta", "can we look at mobile and optimize it better, I think it could be more dynamic", "we also need to update
+the pitch deck to match this", then "can you fix the social share also" (for `lectual.app/firms/` only) and, on the sign-in
+screens, "make the button the lectual color not the burgundy".
+
+**Live now**
+- **Share card for `lectual.app/firms/`** (lectual `main` at `cbe0223`, Nov 27). The link preview used a portrait photo of
+  sky with no words. It is now a 1200x630 card: the sunset sky, the "Lectual" wordmark, "Agents draft. An attorney approves."
+  and the one-line description. The page description was trimmed from 166 to 155 characters ("Assistants draft every step;"
+  became "Assistants draft;") so previews do not cut it off. Checked on the live site as Facebook's, X's and LinkedIn's
+  scrapers. The first production build failed on a Google font download inside Vercel's build (nothing in the change); a
+  rebuild of the same commit went through. Platforms cache old cards, so an already-shared link needs a re-scrape.
+- **Pitch deck v2** was restyled in place on Nov 26 (Instrument Serif, Geist, Geist Mono; the site's paper, ink and sky; no
+  blue; the "not a law firm" line on every slide). Taylor looked at it and said "the pitch deck is fine". A restart cut the
+  builder off before it re-checked its last three small fixes on screen; they are published.
+
+**Built and on preview links, not live** (lectual branch `claude/peaceful-darwin-14ov7e`; workspace branch of the same name)
+- **Phone pass on `/firms/`.** Under 900px wide every section now has its own moment: the hero's product views are a swipe
+  strip; the three differentiators play in one held window; the overnight scene is a running clock with cards landing on a
+  stack and a Yes the visitor can tap; the six workspace cards are a swipe carousel whose demos play when a card is current;
+  the firm-brain sources feed the circle and the ten connections come forward out of the sky; the deadline timeline draws
+  itself; trust cards swipe. Desktop is unchanged (pixel-compared per section). No scroll-jacking and no pinned sections on
+  phones. Checked only in phone emulation (iPhone 14, Pixel 7, 360 and 430 wide, 768 tablet).
+- **Apply for private beta is a form** in the closing section: name, work email, firm, size, practice areas, an optional
+  "What do you use today?", a consent tick, and the line "Lectual is software, not a law firm. Applying does not create an
+  attorney-client relationship." It posts to `/firms/apply/`, which saves the application (lectual migration 0120,
+  `beta_application`: service role only, no policies) and emails a notice to info@lectual.app from noreply@lectual.app
+  through a send-only Resend key stored on the Vercel project. A test application on the preview was saved in lectual-dev
+  and the notice was delivered. The "book a 20-minute intro call" step after sending stays hidden until a Lectual booking
+  link is set (`BETA_APPLY_CALL_URL`). "Log in" now opens the firm workspace; Contact is info@lectual.app.
+- **Sign-in screens**, both in the reference's two-column layout: wordmark top left, a centred form under a round sky
+  porthole, a large rounded sky panel on the right with four product lines. Buttons are Lectual's ink (#1B1815), not
+  burgundy. `app.lectual.app/sign-in/` keeps the email link and the 6-digit code; `lectual.app/sign-in/` also stops showing
+  raw `?error=` text and uses fixed sentences. No Google or Microsoft buttons: that kind of sign-in does not exist yet.
+
+**What still needs Taylor before it goes live:** her look at the previews on a real phone; her OK to apply migration 0120 to
+lectual-prod (the form answers "try again later" in production without it); her OK to ship the workspace sign-in from the
+workspace repo's `main`.
+
+**Found, not fixed (her call was `/firms/` only):** `/`, `/pathset/` and its pages have a title and description but no share
+image at all, and `/sign-in/` shares the old description "The IP decision engine that qualifies founders…".
+
+**Not verified here:** Safari, Firefox, a real iPhone or Android phone, a screen reader, the link-sent and firm-branded
+sign-in states against a real database (drawn from the components), the deck in the Slides viewer after the last fixes.
+
 ## Recommendation on Astro (settled at go-live: the page stayed in the Next.js app)
 
 Stay on Next.js for this redesign. The loader, pin scrolling and micro-animations are the same
