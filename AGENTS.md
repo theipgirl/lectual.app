@@ -2152,6 +2152,21 @@ Four bugs the owner hit on a draft's edit page (`/dashboard/proposals/<id>/`). N
   (`src/lib/proposals/quoted-mark.ts`) wraps a brand name in “ ” on the CLIENT page only (card heading, fee labels, review panel, receipt, editor preview); the letter,
   Exhibit A, agreement text, `packageLineTitle` (staff page, Lawmatics note), emails and stored content stay plain (pinned by `tests/client-proposal/sign-and-address-fields.test.tsx`).
 
+## Team view (Nov 26, no schema)
+The firm owner, relayed Nov 26: RPB's whole team starts on Lectual Monday, and non-owner staff first see only Today, Weekly review, Matters and their own Approvals.
+Draw-only, like the owner view: every page and action keeps its own role and feature gate, so a hidden page still opens by URL for anyone already allowed.
+- **`team` is a LIVE view** (`LIVE_VIEWS`, behind the same `role-views` switch). `ROLE_VIEW`: admin, senior_admin, attorney, intake, paralegal, law_clerk and clerk -> `team`;
+  owner stays `owner`; viewer and social_media keep the technician shell. **Admin moved from the owner view to the team view (Nov 26)**, replacing the Nov 17 decision.
+- **Rail** (`TEAM_TREE`, through the one `drawnNav` seam, so it is a filter of `visibleNav`: a section the role or firm lacks never appears): Today, Weekly review, Matters,
+  Approvals, then More holding every other row the technician rail shows (`TEAM_MORE_SLUGS`: Mail, Meetings, Campaigns, Calendar, Intake, Forms, Proposals, Pipeline, Documents,
+  Copilot, Assistants, Shortcuts, Firm notes). No Reports or Settings row; Settings is in the account menu (`settingsInMenu`, the same flag the owner variant uses). Reports are reached from
+  their sections' own pages; the Reports index has no team row. Approvals opens the person's own list (Mine is the default for a staff role), not the deck; its rail count is `mineQueue`.
+- **Phone bar:** Today, Review, Matters, Approvals, More; the More sheet is the rail's More list. **Look:** the technician look (no `variant`), so the tour (not the welcome deal) is
+  the first-sign-in guide. The tour and Getting started read the drawn rows / `data-tour` hooks the More kids still carry; `tests/views/team-view-guides.test.tsx` checks it per team role.
+- **Today is the technician Today** (`OwnerToday` is chosen only for `owner`).
+- **Lectual staff preview:** `previewableRoles()` lists every role whose view is live, so "Preview a view" offers the team roles too. Firm members still have no switch.
+- Tests: `tests/views/team-view.test.ts` (every technician rail route stays reachable from the team rail or its More, for every team role and several module sets).
+
 ## Handed to you, Send back, and the bell (Phase 2 item 2, technician shell, no schema, needs lectual 0103)
 No new rail row and no My cards page in today's shell. Additive only: with no card handed to the viewer, the Approvals page and the approval page render exactly as before.
 - **Approvals page:** for the pending tab only, the card events are read (`loadCardState`); `handedToViewer` / `showHandedPill` (`src/lib/queue/handed.ts`, pure) draw a "Handed to you" marker on those rows and a "Handed to you (N)" pill beside the who-pills (`?who=handed`) ONLY when the read was `ok` AND at least one card is handed to the viewer. Not set up or unavailable = nothing drawn, never "none handed"; `?who=handed` with no pill is the default page. The queue's three states are untouched.

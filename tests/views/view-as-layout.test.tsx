@@ -129,19 +129,24 @@ describe("while previewing a teammate", () => {
     expect(m.one(Rail)!.props.variant).toBeUndefined();
   });
 
-  it("role views on: an admin teammate gets the owner shell; a paralegal the technician shell", async () => {
+  it("role views on: an owner teammate gets the owner shell; an admin or paralegal the team shell; a viewer the technician shell", async () => {
     const mods = [...MODULES, "role-views"];
-    const admin = await mount(mods, previewing(mods, "admin"));
-    expect(admin.one(Rail)!.props.variant).toBe("owner");
-    const para = await mount(mods, previewing(mods, "paralegal"));
-    expect(para.one(Rail)!.props.variant).toBeUndefined();
+    const owner = await mount(mods, previewing(mods, "owner"));
+    expect(owner.one(Rail)!.props.variant).toBe("owner");
+    for (const role of ["admin", "paralegal"]) {
+      const team = await mount(mods, previewing(mods, role));
+      expect(team.one(Rail)!.props.variant).toBeUndefined();
+      expect(team.one(Rail)!.props.showSettings).toBe(false);
+    }
+    const viewer = await mount(mods, previewing(mods, "viewer"));
+    expect(viewer.one(Rail)!.props.showSettings).toBe(true);
   });
 
   it("Mine and the deal dot are the teammate's, with the firm's default deal times", async () => {
     const mods = [...MODULES, "role-views"];
-    await mount(mods, previewing(mods, "admin"));
-    expect(mineQueue.mock.calls[0][1]).toEqual({ userId: DANA, role: "admin" });
-    expect(loadDealNudge.mock.calls[0][1]).toEqual({ userId: DANA, role: "admin" });
+    await mount(mods, previewing(mods, "owner"));
+    expect(mineQueue.mock.calls[0][1]).toEqual({ userId: DANA, role: "owner" });
+    expect(loadDealNudge.mock.calls[0][1]).toEqual({ userId: DANA, role: "owner" });
   });
 
   it("tour, welcome deal, runner and the dialogs are closed; Copilot's launcher is absent; the bell is muted", async () => {
