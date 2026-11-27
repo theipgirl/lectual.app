@@ -14,6 +14,7 @@ import { civilInZone } from "@/lib/today/outcomes";
 import { loadTodayConsults, type TodayConsultsResult } from "@/lib/calendar/consult-sources";
 import { consultDepsForViewer } from "@/lib/calendar/consult-deps-view";
 import { consultPreview } from "@/lib/views/view-as";
+import { DECK_PATH } from "@/lib/views";
 import { loadOwnerDeadlines, loadOwnerProposals } from "@/lib/today/owner-load";
 import { deadlineChip, deadlineParts, proposalTone, weekdayDate, weekStrip, OWNER_PROPOSALS_SHOWN, OWNER_DEADLINES_SHOWN } from "@/lib/today/owner-rules";
 import { TEAM_STEPS_SHOWN, teamNextSteps, teamSeesProposals, type TeamStep } from "@/lib/today/team-rules";
@@ -147,7 +148,7 @@ export async function TeamToday({
             ) : (
               <p className="ot-row-title">{teamApprovalsWaiting(queue.items.length)}</p>
             )}
-            <Link href="/dashboard/queue/" className="lx-link ot-more">
+            <Link href={DECK_PATH} className="lx-link ot-more">
               {TEAM_APPROVALS_OPEN}
             </Link>
           </section>

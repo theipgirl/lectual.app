@@ -69,7 +69,7 @@ export function DeckFrame({
   /** The deal that is open now ("7:00 AM"), null before the first. */
   dealLabel?: string | null;
   dealNowHref: string;
-  /** True only in the owner view, where the dialog is mounted. */
+  /** True only in a deck view (owner or team), where the dialog is mounted. */
   canChangeDealTimes?: boolean;
   /** "6 left · about 8 min", "All decided", "Can't show". */
   meta?: string | null;

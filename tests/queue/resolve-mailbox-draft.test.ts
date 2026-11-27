@@ -31,10 +31,11 @@ describe("resolveQueueItem: mailbox_draft", () => {
     expect("mailbox_draft" in (await bodyFor({ skipMailboxDraft: false }))).toBe(false);
   });
 
-  it("the review path sets skipMailboxDraft only for the pass and self plans", async () => {
+  it("approver drafts (changed on purpose): the review path sets skipMailboxDraft for EVERY client-email approve, whatever the plan", async () => {
     const { readFileSync } = await import("node:fs");
     const src = readFileSync("src/lib/queue/review-core.ts", "utf8");
-    expect(src).toContain('...(plan === "pass" || plan === "self" ? { skipMailboxDraft: true } : {})');
+    expect(src).toContain("...(clientEmail ? { skipMailboxDraft: true } : {})");
+    expect(src).toContain('clientEmail = intent === "approve" && target.type === "CLIENT_EMAIL"');
     expect(src.match(/skipMailboxDraft/g)).toHaveLength(1);
   });
 });

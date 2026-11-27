@@ -44,8 +44,12 @@ describe("1. a saved edit does not end the card", () => {
 describe("2. a failed-draft approval is a warning with a link, not a green success", () => {
   const r = (send: string | null) => ({ kind: "resolved" as const, intent: "approve" as const, send, webLink: null, draftId: null, provider: null });
   it("warns for failed, mailbox-failed and no draft made; not for a draft, manual, sent or a letter", () => {
-    for (const s of ["failed", "mailbox-failed", "unexpected"]) expect(afterYesWarns(r(s), "CLIENT_EMAIL"), s).toBe(true);
-    for (const s of ["mailbox-microsoft", "mailbox-google", "drafted", "manual", "sent"]) expect(afterYesWarns(r(s), "CLIENT_EMAIL"), s).toBe(false);
+    // Approver drafts (changed on purpose): an uncertain draft and a client email with no draft ("manual") warn too.
+    // Approver drafts (changed on purpose): a client email the queue drafted in the FIRM's mailbox warns too.
+    for (const s of ["failed", "mailbox-failed", "mailbox-uncertain", "manual", "drafted", "unexpected"]) expect(afterYesWarns(r(s), "CLIENT_EMAIL"), s).toBe(true);
+    for (const s of ["mailbox-microsoft", "mailbox-google", "sent"]) expect(afterYesWarns(r(s), "CLIENT_EMAIL"), s).toBe(false);
+    expect(afterYesWarns(r("drafted"), "BRIEFING")).toBe(false);
+    expect(afterYesWarns(r("manual"), "ENGAGEMENT_LETTER")).toBe(false);
     expect(afterYesWarns(r(null), "ENGAGEMENT_LETTER")).toBe(false);
   });
   it("the notice is a warn with the approval link, built from the captured id", () => {
@@ -58,6 +62,12 @@ describe("2. a failed-draft approval is a warning with a link, not a green succe
     expect(html).toContain('href="/dashboard/queue/q-7/"');
     expect(html).not.toContain("_blank");
   });
+  it("approver drafts: a failed draft's notice shows the approved text to copy", () => {
+    const n = noticeFor("yes", { ok: true, message: W.APPROVED_DRAFT_FAILED_OUTLOOK, warn: true, text: "Hi Ana, approved words" }, "q-7");
+    const html = renderToStaticMarkup(<TopCardFrame initial={n}>x</TopCardFrame>);
+    expect(html).toContain("Hi Ana, approved words");
+    expect(html).toContain(W.APPROVED_TEXT_LABEL);
+  });
   it("the action reports warn from the core's own send state", async () => {
     const d = {
       staffPreview: async () => null, caller: async () => ({ userId: ME, role: "attorney" as Role }),
@@ -66,7 +76,7 @@ describe("2. a failed-draft approval is a warning with a link, not a green succe
       closerLook: async () => ({ reasons: [], linkNotLive: false }), handoff: async () => ({ status: "unknown" as const }), sendBack: async () => ({ ok: true as const }),
       review: async () => r("mailbox-failed"), revalidate: () => {},
     };
-    expect(await runLeadStepYes(d, LEAD, "q-1", "c".repeat(64))).toMatchObject({ ok: true, warn: true, message: W.LEAD_STEP_APPROVED_DRAFT_FAILED });
+    expect(await runLeadStepYes(d, LEAD, "q-1", "c".repeat(64))).toMatchObject({ ok: true, warn: true, message: W.APPROVED_DRAFT_FAILED_OUTLOOK });
     // 7: a stale draft says this page's own sentence, never a confirmation box
     const stale = await runLeadStepYes({ ...d, review: async () => ({ kind: "error" as const, error: "Status changed. Tick the confirmation box to approve it anyway, or reject it." }) }, LEAD, "q-1", "c".repeat(64));
     expect(stale).toEqual({ ok: false, error: W.LEAD_PAGE_STALE_DRAFT });

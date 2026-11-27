@@ -8,12 +8,13 @@ import { QUEUE_EDIT_ROLES, resolveQueueRole } from "@/lib/queue/roles";
 import { approvalRefusal } from "@/lib/queue/routing";
 import { loadApprovalRouting, type RoutingLoad } from "@/lib/queue/routing-load";
 import { approvePlan, draftToNote, type ApprovePlan } from "@/lib/queue/draft-handoff";
-import { recordCardEvent } from "@/lib/queue/card-state";
+import { passingSwitchedOn, recordCardEvent } from "@/lib/queue/card-state";
 import { cardCaller, staffPreviewRefusal } from "@/lib/queue/card-moves";
 import { cardNoticePayload } from "@/lib/queue/handed";
 import { notify } from "@/lib/notifications/core";
 import { NOTIFICATION_KIND_FOR } from "@/lib/notifications/kinds";
-import { draftInMyMailbox } from "@/lib/mailbox/my-mailbox";
+import { prepareMyOutlookDraft, type ApproverOutlook } from "@/lib/mailbox/my-mailbox";
+import { INTEGRATIONS_PATH } from "@/lib/setup/routes";
 import type { Role } from "@/lib/auth/roles";
 import { checkDraftStaleness, stalenessRequiresConfirm } from "@/lib/queue/stale";
 import { staleWarning } from "@/components/queue/stale-warning";
@@ -22,7 +23,15 @@ import { gateLinkedProposal, makeProposalLive } from "@/lib/consult-proposal/lin
 import { approvalBlock, auditDraft } from "@/lib/queue/hygiene";
 import { loadAuditContext } from "@/lib/queue/audit-context";
 import { shownTextMatches } from "@/lib/queue/shown-text";
-import { DRAFT_CHANGED_REFRESH } from "@/lib/ui/words";
+import {
+  APPROVER_NEEDS_PERMISSION,
+  APPROVER_NO_OUTLOOK,
+  APPROVER_NO_RECIPIENT,
+  APPROVER_NOT_OUTLOOK,
+  APPROVER_OUTLOOK_UNREAD,
+  APPROVER_REAUTH,
+  DRAFT_CHANGED_REFRESH,
+} from "@/lib/ui/words";
 
 /**
  * The approve / save / reject core, moved out of `reviewQueueAction` so the approval deck can call it and get a
@@ -35,8 +44,9 @@ import { DRAFT_CHANGED_REFRESH } from "@/lib/ui/words";
  *  · An email carrying a proposal link needs the linked-proposal gate; a body with banner text, a placeholder or
  *    another signer's name is refused (`approvalBlock`); a stale draft needs the explicit confirm.
  *  · An edit is saved BEFORE resolving, so it survives a failed resolve. Rejecting needs a note.
- *  · Approving never sends: a client email becomes a DRAFT (the queue's own channel, else the approver's own
- *    mailbox). A person presses Send.
+ *  · Approving never sends: a client email becomes a DRAFT in the APPROVER's own Outlook (Approver drafts, Nov 27).
+ *    The queue is always asked not to draft it (`mailbox_draft: false`), and the approver's Outlook is checked, with a
+ *    fresh token, BEFORE anything is saved, made live or resolved. A person presses Send.
  *  · Sprint 4: with "Drafts go to" set to someone OTHER than the approver, a client email is approved exactly as before,
  *    but NO mailbox draft is made anywhere (the queue is asked not to draft, and the approver's own mailbox is not
  *    used): one `draft_to` card event passes it to the drafter, who makes the draft in their OWN Outlook on their own
@@ -68,7 +78,12 @@ export type ReviewInput = {
 };
 
 export type ReviewOutcome =
-  | { kind: "error"; error: string }
+  | {
+      kind: "error";
+      error: string;
+      /** Approver drafts: where to connect or reconnect Outlook, when that is what blocked the approve. */
+      connect?: string | null;
+    }
   | { kind: "saved" }
   | {
       kind: "resolved";
@@ -87,9 +102,53 @@ export type ReviewOutcome =
        * (nothing passed and no draft made anywhere), `queue-drafted` (the queue drafted it although asked not to).
        */
       handoff?: { status: "passed" | "not-switched-on" | "failed" | "queue-drafted"; drafter: string };
+      /** The approved item's type (`CLIENT_EMAIL`, `BRIEFING`, ...), so a page never calls a client email "not emailed". */
+      itemType?: string;
+      /** The approved text, when the draft in the approver's Outlook failed or may have failed, so the page can show it. */
+      approvedText?: string;
     };
 
 const FAILED = "That didn't go through. Nothing was sent. Refresh to try again.";
+
+/** Approver drafts: the approver's Outlook isn't ready, so nothing is approved. A fixed sentence, plus the connect link. */
+export function approverOutlookBlock(reason: Extract<ApproverOutlook, { ok: false }>["reason"]): Extract<ReviewOutcome, { kind: "error" }> {
+  switch (reason) {
+    case "no-mailbox":
+      return { kind: "error", error: APPROVER_NO_OUTLOOK, connect: INTEGRATIONS_PATH };
+    case "not-outlook":
+      return { kind: "error", error: APPROVER_NOT_OUTLOOK, connect: INTEGRATIONS_PATH };
+    case "needs-permission":
+      return { kind: "error", error: APPROVER_NEEDS_PERMISSION, connect: INTEGRATIONS_PATH };
+    case "reauth":
+      return { kind: "error", error: APPROVER_REAUTH, connect: INTEGRATIONS_PATH };
+    default:
+      return { kind: "error", error: APPROVER_OUTLOOK_UNREAD, connect: null };
+  }
+}
+
+/**
+ * After a client-email resolve threw: was it approved anyway? `mine` = approved and `resolved_by` is this session's own
+ * address; `other` = decided by someone else (or rejected); `pending` = not resolved; `unknown` = the re-read failed.
+ */
+async function resolveAfterThrow(qKey: string, id: string, resolvedBy: string): Promise<"mine" | "other" | "pending" | "unknown"> {
+  let again: Awaited<ReturnType<typeof getQueueItem>>;
+  try {
+    again = await getQueueItem(qKey, id);
+  } catch {
+    return "unknown";
+  }
+  if (again.status === "pending") return "pending";
+  if (again.status === "approved" && (again.resolved_by ?? "").trim().toLowerCase() === resolvedBy.trim().toLowerCase()) return "mine";
+  return "other";
+}
+
+async function prepareOutlookSafely(): Promise<ApproverOutlook> {
+  try {
+    return await prepareMyOutlookDraft();
+  } catch {
+    return { ok: false, reason: "unavailable" };
+  }
+}
 
 /** The first 12 hex characters of the text's sha256: a receipt of exactly what was approved. */
 export function approvalReceipt(text: string): string {
@@ -152,6 +211,8 @@ export async function runQueueReview(input: ReviewInput): Promise<ReviewOutcome>
   let routed: RoutingLoad | null = null;
   let plan: ApprovePlan = "today";
   let passOrgId: string | null = null;
+  let clientEmail = false;
+  let outlook: Extract<ApproverOutlook, { ok: true }> | null = null;
   if (intent === "approve" || intent === "reject") {
     let target: Awaited<ReturnType<typeof getQueueItem>>;
     try {
@@ -174,16 +235,30 @@ export async function runQueueReview(input: ReviewInput): Promise<ReviewOutcome>
 
     // Sprint 4: who makes the mailbox draft. Only a routing that was READ and names a drafter other than the approver
     // passes it on; anything else (no drafter, a failed read, not a client email) is today's path, unchanged.
+    clientEmail = intent === "approve" && target.type === "CLIENT_EMAIL";
+    if (clientEmail) {
+      // Lectual staff viewing as the firm: no own Outlook here and no membership for a draft_to. Refused before anything.
+      const preview = await staffPreviewRefusal();
+      if (preview) return { kind: "error", error: preview };
+      // No recipient means no draft can be addressed: refused before anything is saved, made live or resolved.
+      if (!target.recipient?.trim()) return { kind: "error", error: APPROVER_NO_RECIPIENT };
+    }
     if (intent === "approve" && routed.status === "ok") {
       plan = approvePlan({ approverId: caller.userId, drafter: routed.drafter, itemType: target.type });
       if (plan === "pass") {
-        // Lectual staff viewing as the firm have no membership: the fold would drop their draft_to. Refused before anything.
-        const preview = await staffPreviewRefusal();
-        if (preview) return { kind: "error", error: preview };
         const who = await cardCaller();
         if (!who || who.userId !== caller.userId) return { kind: "error", error: FAILED };
         passOrgId = who.orgId;
       }
+    }
+    // Approver drafts (Nov 27): whose Outlook gets the draft. The approver's, unless "Drafts go to" passes it to someone
+    // else (`pass`), whose own Outlook can't be checked from here (a personal connection is visible only to its owner):
+    // they make the draft on their own click. Before lectual 0112 a pass falls back to the approver's own Outlook, so
+    // the approver is checked then too. Checked, with a fresh token, BEFORE anything is saved, made live or resolved.
+    if (clientEmail && (plan !== "pass" || (await passingSwitchedOn()) === "no")) {
+      const ready = await prepareOutlookSafely();
+      if (!ready.ok) return approverOutlookBlock(ready.reason);
+      outlook = ready;
     }
   }
 
@@ -267,38 +342,55 @@ export async function runQueueReview(input: ReviewInput): Promise<ReviewOutcome>
 
       // The text that was re-read and re-classified is sent as the final body on EVERY approve, so an edit a colleague
       // saves after the re-read is never what gets approved (or drafted).
-      const resolved = await resolveQueueItem({
-        orgKey: qKey,
-        id,
-        action: "approve",
-        resolvedBy,
-        ...(approvalNote ? { note: approvalNote } : {}),
-        finalBody: approvedText,
-        // A drafter is set: the queue must not draft it in any mailbox. On `pass` nobody's mailbox gets it now; on `self`
-        // the only draft is the drafter's own personal one, below. lawmatics-mcp honours it only from e738c24 (not yet deployed).
-        ...(plan === "pass" || plan === "self" ? { skipMailboxDraft: true } : {}),
-      });
+      let resolved: Awaited<ReturnType<typeof resolveQueueItem>>;
+      try {
+        resolved = await resolveQueueItem({
+          orgKey: qKey,
+          id,
+          action: "approve",
+          resolvedBy,
+          ...(approvalNote ? { note: approvalNote } : {}),
+          finalBody: approvedText,
+          // Approver drafts: a client email is NEVER drafted by the queue (in the firm's mailbox); the approver's own Outlook
+          // gets it below, or the drafter's on their own click. lawmatics-mcp honours this from its main 3a02854.
+          ...(clientEmail ? { skipMailboxDraft: true } : {}),
+        });
+      } catch (err) {
+        // A client email whose resolve threw (a timeout, a 5xx) may still have been approved by the queue. Never leave an
+        // approved email with no draft and a "didn't go through": re-read it and decide.
+        if (!clientEmail) throw err;
+        const after = await resolveAfterThrow(qKey, id, resolvedBy);
+        if (after === "pending") throw err;
+        if (after === "other") return { kind: "error", error: ALREADY_DECIDED };
+        if (after === "unknown") {
+          console.error("[queue] resolve threw and the re-read failed:", err instanceof Error ? err.name : typeof err);
+          return { kind: "resolved", intent: "approve", send: "mailbox-uncertain", webLink: null, draftId: null, provider: null, itemType: item.type, approvedText };
+        }
+        // Approved by this session (mailbox_draft false was sent): carry on to the one draft, exactly as after a resolve.
+        resolved = { status: "approved", send: "manual" };
+      }
       sendStatus = resolved.send;
-      webLink = resolved.sendResult?.webLink ?? null;
+      // lawmatics-mcp returns the draft link at `draft.webLink`; `sendResult.webLink` is the older shape.
+      webLink = resolved.draft?.webLink ?? resolved.sendResult?.webLink ?? null;
 
-      // No channel on the queue side: draft it in the approver's own mailbox.
+      // ONE Graph POST with the approver's token taken before the resolve. Never retried automatically: a definite refusal
+      // is `mailbox-failed`, a maybe (5xx, timeout) is `mailbox-uncertain` ("check your Drafts").
       const draftInOwnMailbox = async () => {
-        try {
-          const made = await draftInMyMailbox({
-            to: item.recipient,
-            subject: item.subject ?? item.headline,
-            body: approvedText,
-          });
-          if (made) {
-            sendStatus = `mailbox-${made.provider}`;
-            webLink = made.webLink ?? null;
-            draftId = made.id ?? null;
-            provider = made.provider;
-          }
-        } catch (err) {
-          // The name only: a provider error object can carry addresses or message text.
-          console.error("[queue] mailbox draft failed:", err instanceof Error ? err.name : typeof err);
+        const ready = outlook ?? (await prepareOutlookSafely());
+        if (!ready.ok) {
           sendStatus = "mailbox-failed";
+          return;
+        }
+        const made = await ready.draft({ to: item.recipient, subject: item.subject ?? item.headline, body: approvedText });
+        if (made.ok) {
+          sendStatus = "mailbox-microsoft";
+          webLink = made.webLink ?? null;
+          draftId = made.id ?? null;
+          provider = "microsoft";
+        } else {
+          // The reason only: a provider error can carry addresses or message text.
+          console.error("[queue] approver draft failed:", made.reason);
+          sendStatus = made.reason === "uncertain" ? "mailbox-uncertain" : "mailbox-failed";
         }
       };
       let handoff: { status: "passed" | "not-switched-on" | "failed" | "queue-drafted"; drafter: string } | undefined;
@@ -325,9 +417,10 @@ export async function runQueueReview(input: ReviewInput): Promise<ReviewOutcome>
             await recordCardEvent({ orgId: passOrgId, queueItemId: id, kind: "pass_failed" });
           }
         }
-      } else if (item.type === "CLIENT_EMAIL" && sendStatus !== "drafted" && sendStatus !== "sent") {
+      } else if (clientEmail && sendStatus !== "drafted" && sendStatus !== "sent") {
         await draftInOwnMailbox();
       }
+      const draftMissing = sendStatus === "mailbox-failed" || sendStatus === "mailbox-uncertain";
 
       // Document Center: an approved letter draft becomes a real .docx now. Best-effort, wrapped again so a docx bug
       // can never turn a successful approval into a failed submission.
@@ -336,7 +429,17 @@ export async function runQueueReview(input: ReviewInput): Promise<ReviewOutcome>
       } catch (err) {
         console.error("[document-center] post-approve hook threw unexpectedly:", err instanceof Error ? err.name : typeof err);
       }
-      return { kind: "resolved", intent: "approve", send: sendStatus, webLink, draftId, provider, ...(handoff ? { handoff } : {}) };
+      return {
+        kind: "resolved",
+        intent: "approve",
+        send: sendStatus,
+        webLink,
+        draftId,
+        provider,
+        itemType: item.type,
+        ...(handoff ? { handoff } : {}),
+        ...(draftMissing ? { approvedText } : {}),
+      };
     }
 
     if (intent === "reject") {

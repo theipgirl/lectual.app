@@ -149,7 +149,7 @@ describe("the layout wires it for the owner shell only", () => {
   it("asks loadDealNudge only inside the owner branch and passes dealReady to both", async () => {
     const { readFileSync } = await import("node:fs");
     const src = readFileSync("src/app/dashboard/layout.tsx", "utf8");
-    expect(src).toMatch(/shell\.variant === "owner" \? loadDealNudge\(allQueue/);
+    expect(src).toMatch(/shell\.deck \? loadDealNudge\(allQueue/);
     expect(src.match(/dealReady=\{dealReady\}/g)).toHaveLength(2);
   });
 });

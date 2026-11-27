@@ -161,7 +161,7 @@ export const OWNER_MORE_GROUPS: readonly { label: string; slugs: readonly string
  * The team view (Nov 26; More removed the same week, the firm owner's decision): Today, Weekly review, Matters and the
  * person's own Approvals, and nothing else. No More row, no Reports row and no Settings row (Settings is in the account
  * menu). Hide only: every other page still opens by URL or from an in-page link for anyone its own gate allows.
- * Approvals keeps its own list (Mine is the default for a staff role), never the deck.
+ * Approvals opens the person's own approval DECK (firm owner, Nov 27), like the owner's; the list path still lights it.
  */
 export const TEAM_MAIN_SLUGS = ["", "review", "matters", "queue"] as const;
 export const TEAM_TREE: readonly (readonly RailNode[])[] = [TEAM_MAIN_SLUGS.map((slug) => ({ slug }))];
@@ -169,6 +169,11 @@ export const TEAM_TREE: readonly (readonly RailNode[])[] = [TEAM_MAIN_SLUGS.map(
 /** The team phone bar: Today, Review, Matters, Approvals. No More button and no sheet. */
 export const TEAM_BAR = ["", "review", "matters", "queue"] as const;
 export const TEAM_BAR_LABEL: Record<string, string> = { "": "Today", review: REVIEW_SHORT_NAME, matters: "Matters", queue: APPROVALS_NAME };
+
+/** The Approvals row opening the deck; the list and each item's page still belong to the section (`also`). */
+function deckItem(item: NavItem): NavItem {
+  return { ...item, href: DECK_PATH, also: [...(item.also ?? []), "/dashboard/queue/"] };
+}
 
 /**
  * What the rail, phone bar and tour are handed, from what `visibleNav` already allowed. A filter only: it never adds
@@ -180,13 +185,14 @@ export function drawnNav(items: NavItem[], view: ViewId): NavItem[] {
   const bySlug = new Map(items.map((i) => [i.slug, i]));
   if (view === "team") return TEAM_MAIN_SLUGS.flatMap((slug) => {
     const item = bySlug.get(slug);
-    return item ? [item] : [];
+    if (!item) return [];
+    return [slug === "queue" ? deckItem(item) : item];
   });
   return OWNER_SLUGS.flatMap((slug) => {
     const item = bySlug.get(slug);
     if (!item) return [];
     // The deck is the owner's Approvals; the list and each item's page still belong to the section.
-    if (slug === "queue") return [{ ...item, href: DECK_PATH, also: [...(item.also ?? []), "/dashboard/queue/"] }];
+    if (slug === "queue") return [deckItem(item)];
     // The owner's words (OwnerRail board): one "Proposals" row, and "Matters" under More (not the technician's "All matters").
     if (slug === "proposals" || slug === "quotes") return [{ ...item, label: PROPOSALS_NAME, railLabel: PROPOSALS_NAME }];
     if (slug === "matters" || slug === "intake") return [{ ...item, railLabel: item.label }];
@@ -214,8 +220,14 @@ export type ShellSpec = {
   showMore?: boolean;
   /** Settings is a link in the account menu (the owner rail has no Settings row). */
   settingsInMenu: boolean;
-  /** The owner's BEHAVIOURS as well as its look: deal dot, deal times, the welcome deal. Only the owner view sets it. */
+  /** The owner's own behaviours: the welcome deal and its kicker. Only the owner view sets it (the deck behaviours are `deck`). */
   variant: "owner" | undefined;
+  /**
+   * The approval DECK behaviours: Approvals opens the deck, the deal-ready dot and nudge read, the "Deal times" menu item and
+   * dialog, and the deck's own deal-times opener. The owner and team views set it (each person's own deck and own deal times);
+   * the technician view never does. Separate from `variant` so the team view gets the deck without the owner's welcome deal.
+   */
+  deck: boolean;
   /**
    * The light owner-style LOOK (colours, widths, compact top bar, no section label) and nothing else. The owner and team
    * views set it; a behaviour must never read it (read `variant`). `team` also marks the team view's own CSS exceptions.
@@ -234,6 +246,7 @@ export function shellFor(view: ViewId): ShellSpec {
       showReports: false,
       settingsInMenu: true,
       variant: "owner",
+      deck: true,
       look: "owner",
     };
   }
@@ -248,10 +261,11 @@ export function shellFor(view: ViewId): ShellSpec {
       showMore: false,
       settingsInMenu: true,
       variant: undefined,
+      deck: true,
       look: "team",
     };
   }
-  return { view: "technician", tree: undefined, bar: undefined, moreGroups: undefined, showSettings: true, showReports: true, settingsInMenu: false, variant: undefined, look: undefined };
+  return { view: "technician", tree: undefined, bar: undefined, moreGroups: undefined, showSettings: true, showReports: true, settingsInMenu: false, variant: undefined, deck: false, look: undefined };
 }
 
 /** What the account menu's View group draws. Absent unless the person may switch (Lectual staff in a firm with role views). */

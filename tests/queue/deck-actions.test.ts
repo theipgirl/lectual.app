@@ -147,6 +147,26 @@ describe("every action re-checks the caller", () => {
     expect(await A.approveCardAction("q1", SHA)).toEqual({ ok: false, error: "Only an attorney can approve this kind of message." });
   });
 
+  it("approver drafts: an Outlook refusal comes back with its connect link; nothing else is said", async () => {
+    state.core.mockResolvedValue({ kind: "error", error: "Connect your own Outlook before you approve client emails. Nothing was approved.", connect: "/dashboard/settings/integrations/" });
+    expect(await A.approveCardAction("q1", SHA)).toEqual({ ok: false, error: "Connect your own Outlook before you approve client emails. Nothing was approved.", connect: "/dashboard/settings/integrations/" });
+  });
+
+  it("approver drafts: a failed or uncertain draft says so with the approved text; the queue's firm-mailbox draft is never 'your Outlook'", async () => {
+    const base = { kind: "resolved", intent: "approve", webLink: null, draftId: null, provider: null, itemType: "CLIENT_EMAIL", approvedText: "Hi Ana" };
+    state.core.mockResolvedValue({ ...base, send: "mailbox-failed" });
+    expect(await A.approveCardAction("q1", SHA)).toEqual({ ok: true, message: "Approved, but the draft couldn't be made in your Outlook. Nothing was sent.", draft: null, text: "Hi Ana" });
+    state.core.mockResolvedValue({ ...base, send: "mailbox-uncertain" });
+    expect(await A.approveCardAction("q1", SHA)).toEqual({ ok: true, message: "Approved. Check your Outlook Drafts before trying again. Nothing was sent.", draft: null, text: "Hi Ana" });
+    state.core.mockResolvedValue({ ...base, approvedText: undefined, send: "drafted", webLink: "https://outlook/firm" });
+    const queued = await A.approveCardAction("q1", SHA);
+    expect(queued).toMatchObject({ ok: true, draft: null });
+    expect(queued.ok && queued.message).toMatch(/firm's mailbox/);
+    state.core.mockResolvedValue({ ...base, approvedText: undefined, send: "manual" });
+    const manual = await A.approveCardAction("q1", SHA);
+    expect(manual.ok && manual.message).not.toMatch(/isn't emailed/);
+  });
+
   it("Yes without the hash of the text shown (or a malformed one) is refused and the core is never called", async () => {
     for (const bad of [undefined, null, "", "abc", "A".repeat(64), 42]) {
       expect(await A.approveCardAction("q1", bad)).toEqual({ ok: false, error: "The draft changed. Refresh to see it." });

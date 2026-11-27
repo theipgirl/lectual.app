@@ -37,12 +37,12 @@ describe("the team view", () => {
     expect(viewMenuFor({ preview: NO_PREVIEW, firmHasRoleViews: true, actingAsStaff: false })).toBeUndefined();
   });
 
-  it("rail: exactly Today, Weekly review, Matters, Approvals; no More, Reports or Settings; Approvals keeps its own list", () => {
+  it("rail: exactly Today, Weekly review, Matters, Approvals; no More, Reports or Settings; Approvals opens the deck, the list path still lights it", () => {
     const drawn = drawnNav(visibleNav(ALL, "paralegal"), "team");
     const groups = railGroups(drawn, "/dashboard/queue/", railTreeFor("team")!);
     expect(groups.map((g) => g.map((e) => e.label))).toEqual([["Today", "Weekly review", "Matters", "Approvals"]]);
     const queue = groups[0][3];
-    expect(queue).toMatchObject({ href: "/dashboard/queue/", active: true, countKey: "queue" });
+    expect(queue).toMatchObject({ href: "/dashboard/queue/deck/", active: true, countKey: "queue" });
     const shell = shellFor("team");
     const html = renderToStaticMarkup(createElement(Rail, { items: drawn, queueStatus: "ok", pendingCount: 0, counts: {}, initialPinned: false, tree: shell.tree, showSettings: shell.showSettings, showReports: shell.showReports }));
     for (const gone of ["More", "Reports", "Settings", "lx-rail-chev", "lx-rail--team", "/dashboard/reports"]) expect(html, gone).not.toContain(gone);

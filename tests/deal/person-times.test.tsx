@@ -211,9 +211,9 @@ describe("the dialog and where it is opened", () => {
     expect(html).toContain('role="alert"');
     expect(html).toContain(DEAL_TIMES_APART);
   });
-  it("is mounted only in the owner view of the layout, and opened from the menu and the deck header", () => {
+  it("is mounted only in a deck view (owner or team) of the layout, and opened from the menu and the deck header", () => {
     const layout = fs.readFileSync("src/app/dashboard/layout.tsx", "utf8");
-    expect(layout).toMatch(/shell\.variant === "owner" && <DealTimesDialog/);
+    expect(layout).toMatch(/shell\.deck && <DealTimesDialog/);
     expect(fs.readFileSync("src/components/shell/AccountMenu.tsx", "utf8")).toMatch(/requestDealTimesDialog\(window/);
     expect(fs.readFileSync("src/components/deck/DeckFrame.tsx", "utf8")).toMatch(/<DealTimesButton/);
   });

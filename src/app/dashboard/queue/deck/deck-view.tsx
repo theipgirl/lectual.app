@@ -3,7 +3,7 @@ import { cardRecipient } from "@/lib/queue/shown-recipient";
 import { Notice } from "@/components/ui/Notice";
 import { notFound } from "next/navigation";
 import { orgHasModule } from "@/lib/org/modules";
-import { resolveViewSession } from "@/lib/views/view-as";
+import { inPreview, resolveViewSession } from "@/lib/views/view-as";
 import { loadActiveQueue } from "@/lib/queue/load";
 import { loadApprovalRouting } from "@/lib/queue/routing-load";
 import { loadCardState } from "@/lib/queue/card-state";
@@ -152,11 +152,14 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
   const at = parseAtParam(params.at);
   const dealNow = (Array.isArray(params.deal) ? params.deal[0] : params.deal) === "now";
   const viewer = { userId: session.user.id, role: session.role };
-  // The dialog is mounted only in the owner shell, so the opener is drawn only there (the layout's own computation).
+  // The dialog is mounted only in a deck shell (owner and team), so the opener is drawn only there (the layout's own computation).
+  // Under View as (or a preview that couldn't be checked) the layout mounts ReadOnlyPreview, not the dialog: no opener then.
   const actingAsStaff = session.actingAsStaff ?? false;
+  const previewing = await inPreview();
   const canChangeDealTimes =
-    shellFor(viewFor({ role: session.role, preview: actingAsStaff ? previewFor(session.user.user_metadata, session.org.id) : NO_PREVIEW, firmHasRoleViews: true, actingAsStaff })).variant === "owner";
-  // Stamps "the deck was opened" (clears the deal-ready dot): only after a real queue load (below), only in the owner's shell,
+    !previewing &&
+    shellFor(viewFor({ role: session.role, preview: actingAsStaff ? previewFor(session.user.user_metadata, session.org.id) : NO_PREVIEW, firmHasRoleViews: true, actingAsStaff })).deck;
+  // Stamps "the deck was opened" (clears the deal-ready dot): only after a real queue load (below), only in a deck shell,
   // never for Lectual staff acting inside a firm (the action refuses them too).
   const seenMark = !actingAsStaff && canChangeDealTimes ? <DeckSeenMark /> : null;
 

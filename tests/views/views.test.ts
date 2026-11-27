@@ -168,7 +168,7 @@ describe("drawnNav", () => {
   });
 
   it("shellFor: the technician view uses every default", () => {
-    expect(shellFor("technician")).toEqual({ view: "technician", tree: undefined, bar: undefined, moreGroups: undefined, showSettings: true, showReports: true, settingsInMenu: false, variant: undefined });
+    expect(shellFor("technician")).toEqual({ view: "technician", tree: undefined, bar: undefined, moreGroups: undefined, showSettings: true, showReports: true, settingsInMenu: false, variant: undefined, deck: false, look: undefined });
     expect(railTreeFor("technician")).toBeNull();
   });
 });

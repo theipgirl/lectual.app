@@ -20,6 +20,8 @@ import { Notice } from "@/components/ui/Notice";
 import { HoldToast } from "./HoldToast";
 import { HandOffPicker, type HandOffPerson } from "./HandOffPicker";
 import {
+  APPROVED_TEXT_LABEL,
+  CONNECT_OUTLOOK_LINK,
   DECK_BACK,
   DECK_CANCEL,
   DECK_CHOICE_DEFAULT,
@@ -301,6 +303,14 @@ export function ApprovalCard(props: ApprovalCardProps) {
       {result && !result.ok && (
         <Notice tone="risk" role="alert">
           {result.error}
+          {result.connect ? (
+            <>
+              {" "}
+              <a className="lx-link" href={result.connect}>
+                {CONNECT_OUTLOOK_LINK}
+              </a>
+            </>
+          ) : null}
         </Notice>
       )}
 
@@ -365,7 +375,17 @@ export function ApprovalCard(props: ApprovalCardProps) {
               )}
             </>
           ) : (
-            <p className="dk-after-msg">{result.message}</p>
+            <>
+              <p className="dk-after-msg">{result.message}</p>
+              {result.text ? (
+                <div className="dk-after-text">
+                  <p className="dk-after-note">{APPROVED_TEXT_LABEL}</p>
+                  <pre className="lx-handed-text" style={{ whiteSpace: "pre-wrap" }}>
+                    {result.text}
+                  </pre>
+                </div>
+              ) : null}
+            </>
           )}
           <div className="dk-after-actions">
             <a className="dk-after-next" href={props.afterHref}>
