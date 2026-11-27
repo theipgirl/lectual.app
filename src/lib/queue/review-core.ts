@@ -26,6 +26,7 @@ import { shownTextMatches } from "@/lib/queue/shown-text";
 import {
   APPROVER_NEEDS_PERMISSION,
   APPROVER_NO_OUTLOOK,
+  APPROVER_NO_RECIPIENT,
   APPROVER_NOT_OUTLOOK,
   APPROVER_OUTLOOK_UNREAD,
   APPROVER_REAUTH,
@@ -123,6 +124,22 @@ export function approverOutlookBlock(reason: Extract<ApproverOutlook, { ok: fals
     default:
       return { kind: "error", error: APPROVER_OUTLOOK_UNREAD, connect: null };
   }
+}
+
+/**
+ * After a client-email resolve threw: was it approved anyway? `mine` = approved and `resolved_by` is this session's own
+ * address; `other` = decided by someone else (or rejected); `pending` = not resolved; `unknown` = the re-read failed.
+ */
+async function resolveAfterThrow(qKey: string, id: string, resolvedBy: string): Promise<"mine" | "other" | "pending" | "unknown"> {
+  let again: Awaited<ReturnType<typeof getQueueItem>>;
+  try {
+    again = await getQueueItem(qKey, id);
+  } catch {
+    return "unknown";
+  }
+  if (again.status === "pending") return "pending";
+  if (again.status === "approved" && (again.resolved_by ?? "").trim().toLowerCase() === resolvedBy.trim().toLowerCase()) return "mine";
+  return "other";
 }
 
 async function prepareOutlookSafely(): Promise<ApproverOutlook> {
@@ -223,6 +240,8 @@ export async function runQueueReview(input: ReviewInput): Promise<ReviewOutcome>
       // Lectual staff viewing as the firm: no own Outlook here and no membership for a draft_to. Refused before anything.
       const preview = await staffPreviewRefusal();
       if (preview) return { kind: "error", error: preview };
+      // No recipient means no draft can be addressed: refused before anything is saved, made live or resolved.
+      if (!target.recipient?.trim()) return { kind: "error", error: APPROVER_NO_RECIPIENT };
     }
     if (intent === "approve" && routed.status === "ok") {
       plan = approvePlan({ approverId: caller.userId, drafter: routed.drafter, itemType: target.type });
@@ -323,17 +342,33 @@ export async function runQueueReview(input: ReviewInput): Promise<ReviewOutcome>
 
       // The text that was re-read and re-classified is sent as the final body on EVERY approve, so an edit a colleague
       // saves after the re-read is never what gets approved (or drafted).
-      const resolved = await resolveQueueItem({
-        orgKey: qKey,
-        id,
-        action: "approve",
-        resolvedBy,
-        ...(approvalNote ? { note: approvalNote } : {}),
-        finalBody: approvedText,
-        // Approver drafts: a client email is NEVER drafted by the queue (in the firm's mailbox); the approver's own Outlook
-        // gets it below, or the drafter's on their own click. lawmatics-mcp honours this from its main 3a02854.
-        ...(clientEmail ? { skipMailboxDraft: true } : {}),
-      });
+      let resolved: Awaited<ReturnType<typeof resolveQueueItem>>;
+      try {
+        resolved = await resolveQueueItem({
+          orgKey: qKey,
+          id,
+          action: "approve",
+          resolvedBy,
+          ...(approvalNote ? { note: approvalNote } : {}),
+          finalBody: approvedText,
+          // Approver drafts: a client email is NEVER drafted by the queue (in the firm's mailbox); the approver's own Outlook
+          // gets it below, or the drafter's on their own click. lawmatics-mcp honours this from its main 3a02854.
+          ...(clientEmail ? { skipMailboxDraft: true } : {}),
+        });
+      } catch (err) {
+        // A client email whose resolve threw (a timeout, a 5xx) may still have been approved by the queue. Never leave an
+        // approved email with no draft and a "didn't go through": re-read it and decide.
+        if (!clientEmail) throw err;
+        const after = await resolveAfterThrow(qKey, id, resolvedBy);
+        if (after === "pending") throw err;
+        if (after === "other") return { kind: "error", error: ALREADY_DECIDED };
+        if (after === "unknown") {
+          console.error("[queue] resolve threw and the re-read failed:", err instanceof Error ? err.name : typeof err);
+          return { kind: "resolved", intent: "approve", send: "mailbox-uncertain", webLink: null, draftId: null, provider: null, itemType: item.type, approvedText };
+        }
+        // Approved by this session (mailbox_draft false was sent): carry on to the one draft, exactly as after a resolve.
+        resolved = { status: "approved", send: "manual" };
+      }
       sendStatus = resolved.send;
       // lawmatics-mcp returns the draft link at `draft.webLink`; `sendResult.webLink` is the older shape.
       webLink = resolved.draft?.webLink ?? resolved.sendResult?.webLink ?? null;

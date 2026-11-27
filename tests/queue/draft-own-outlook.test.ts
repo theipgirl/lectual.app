@@ -18,6 +18,7 @@ const state = vi.hoisted(() => ({
   noAttemptColumn: false,
   selects: [] as string[],
   tokenFails: false,
+  tokenError: null as unknown,
 }));
 
 vi.mock("server-only", () => ({}));
@@ -72,6 +73,7 @@ vi.mock("@/lib/db/admin", () => ({
 vi.mock("@/lib/mailbox/config", () => ({ rootKeyOrNull: () => Buffer.alloc(32), providerCredentials: () => null }));
 vi.mock("@/lib/mailbox/sync", () => ({
   freshAccessToken: vi.fn(async () => {
+    if (state.tokenError) throw state.tokenError;
     if (state.tokenFails) throw Object.assign(new Error("refresh refused"), { code: "reauth" });
     return "token";
   }),
@@ -87,6 +89,7 @@ beforeEach(() => {
   state.adminReads = [];
   state.filters = [];
   state.tokenFails = false;
+  state.tokenError = null;
   state.create.mockReset().mockResolvedValue({ id: "AAMk-2", webLink: "https://outlook.office.com/d/2" });
 });
 
@@ -161,6 +164,20 @@ describe("approver drafts: prepareMyOutlookDraft (the approve path's one check a
     state.scopedError = null;
     state.rows = [{ id: "conn-rayn", org_id: "org-1", provider: "microsoft", scopes: ["Mail.ReadWrite"] }];
     state.tokenFails = true;
+    expect(await prepareMyOutlookDraft()).toEqual({ ok: false, reason: "reauth" });
+    expect(state.create).not.toHaveBeenCalled();
+  });
+
+  it("only a real reauth asks to reconnect: a token-endpoint 5xx, a network drop or sign-in not switched on is unavailable", async () => {
+    for (const err of [
+      Object.assign(new Error("x"), { code: "refresh-failed" }),
+      new TypeError("fetch failed"),
+      Object.assign(new Error("Microsoft sign-in isn't switched on yet."), { code: "refresh-failed" }),
+    ]) {
+      state.tokenError = err;
+      expect(await prepareMyOutlookDraft()).toEqual({ ok: false, reason: "unavailable" });
+    }
+    state.tokenError = Object.assign(new Error("dead"), { code: "reauth" });
     expect(await prepareMyOutlookDraft()).toEqual({ ok: false, reason: "reauth" });
     expect(state.create).not.toHaveBeenCalled();
   });

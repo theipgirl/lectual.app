@@ -45,8 +45,10 @@ describe("2. a failed-draft approval is a warning with a link, not a green succe
   const r = (send: string | null) => ({ kind: "resolved" as const, intent: "approve" as const, send, webLink: null, draftId: null, provider: null });
   it("warns for failed, mailbox-failed and no draft made; not for a draft, manual, sent or a letter", () => {
     // Approver drafts (changed on purpose): an uncertain draft and a client email with no draft ("manual") warn too.
-    for (const s of ["failed", "mailbox-failed", "mailbox-uncertain", "manual", "unexpected"]) expect(afterYesWarns(r(s), "CLIENT_EMAIL"), s).toBe(true);
-    for (const s of ["mailbox-microsoft", "mailbox-google", "drafted", "sent"]) expect(afterYesWarns(r(s), "CLIENT_EMAIL"), s).toBe(false);
+    // Approver drafts (changed on purpose): a client email the queue drafted in the FIRM's mailbox warns too.
+    for (const s of ["failed", "mailbox-failed", "mailbox-uncertain", "manual", "drafted", "unexpected"]) expect(afterYesWarns(r(s), "CLIENT_EMAIL"), s).toBe(true);
+    for (const s of ["mailbox-microsoft", "mailbox-google", "sent"]) expect(afterYesWarns(r(s), "CLIENT_EMAIL"), s).toBe(false);
+    expect(afterYesWarns(r("drafted"), "BRIEFING")).toBe(false);
     expect(afterYesWarns(r("manual"), "ENGAGEMENT_LETTER")).toBe(false);
     expect(afterYesWarns(r(null), "ENGAGEMENT_LETTER")).toBe(false);
   });
@@ -59,6 +61,12 @@ describe("2. a failed-draft approval is a warning with a link, not a green succe
     expect(html).toContain("lx-banner-warn");
     expect(html).toContain('href="/dashboard/queue/q-7/"');
     expect(html).not.toContain("_blank");
+  });
+  it("approver drafts: a failed draft's notice shows the approved text to copy", () => {
+    const n = noticeFor("yes", { ok: true, message: W.APPROVED_DRAFT_FAILED_OUTLOOK, warn: true, text: "Hi Ana, approved words" }, "q-7");
+    const html = renderToStaticMarkup(<TopCardFrame initial={n}>x</TopCardFrame>);
+    expect(html).toContain("Hi Ana, approved words");
+    expect(html).toContain(W.APPROVED_TEXT_LABEL);
   });
   it("the action reports warn from the core's own send state", async () => {
     const d = {

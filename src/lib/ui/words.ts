@@ -752,6 +752,7 @@ export const APPROVER_NO_OUTLOOK = "Connect your own Outlook before you approve 
 export const APPROVER_NOT_OUTLOOK = "Only a Gmail mailbox is connected. Connect your own Outlook before you approve client emails. Nothing was approved.";
 export const APPROVER_NEEDS_PERMISSION = "Reconnect your Outlook and allow it to save drafts, then approve again. Nothing was approved.";
 export const APPROVER_REAUTH = "Your Outlook needs to be reconnected before you approve client emails. Nothing was approved.";
+export const APPROVER_NO_RECIPIENT = "This email has no recipient. Add one before approving. Nothing was approved.";
 export const APPROVER_OUTLOOK_UNREAD = "Couldn't check your Outlook, so nothing was approved. Refresh to try again.";
 /** After approving: the one Graph draft in the approver's Outlook failed for certain. */
 export const APPROVED_DRAFT_FAILED_OUTLOOK = "Approved, but the draft couldn't be made in your Outlook. Nothing was sent.";

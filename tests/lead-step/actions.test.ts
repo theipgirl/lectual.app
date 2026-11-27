@@ -176,8 +176,15 @@ describe("the after-Yes sentence comes from the approve core's own result", () =
   it("approver drafts: the lead page's Yes passes an Outlook refusal on with its connect link, and a failed draft warns", async () => {
     const refused = deps({ review: vi.fn(async () => ({ kind: "error" as const, error: W.APPROVER_NO_OUTLOOK, connect: "/dashboard/settings/integrations/" })) });
     expect(await runLeadStepYes(refused, LEAD, ITEM, SHA)).toEqual({ ok: false, error: W.APPROVER_NO_OUTLOOK, connect: "/dashboard/settings/integrations/" });
-    const failed = deps({ review: vi.fn(async () => resolved({ send: "mailbox-failed", provider: null, webLink: null, draftId: null })) });
-    expect(await runLeadStepYes(failed, LEAD, ITEM, SHA)).toEqual({ ok: true, message: W.APPROVED_DRAFT_FAILED_OUTLOOK, webLink: null, warn: true });
+    const failed = deps({ review: vi.fn(async () => resolved({ send: "mailbox-failed", provider: null, webLink: null, draftId: null, approvedText: "Hi Ana" })) });
+    expect(await runLeadStepYes(failed, LEAD, ITEM, SHA)).toEqual({ ok: true, message: W.APPROVED_DRAFT_FAILED_OUTLOOK, webLink: null, warn: true, text: "Hi Ana" });
+    const unsure = deps({ review: vi.fn(async () => resolved({ send: "mailbox-uncertain", provider: null, webLink: null, draftId: null, approvedText: "Hi Ana" })) });
+    expect(await runLeadStepYes(unsure, LEAD, ITEM, SHA)).toEqual({ ok: true, message: W.APPROVED_DRAFT_CHECK_OUTLOOK, webLink: null, warn: true, text: "Hi Ana" });
+    const firm = deps({ review: vi.fn(async () => resolved({ send: "drafted", provider: null, webLink: null, draftId: null })) });
+    expect(await runLeadStepYes(firm, LEAD, ITEM, SHA)).toMatchObject({ ok: true, message: W.LEAD_STEP_DRAFT_IN_QUEUE_MAILBOX, warn: true });
+    // The notice above the card carries the approved text to copy.
+    const { noticeFor } = await import("@/components/leads/lead-step-card");
+    expect(noticeFor("yes", { ok: true, message: "m", warn: true, text: "Hi Ana" }, "q-1")).toMatchObject({ tone: "warn", text: "Hi Ana" });
   });
 
   it("Sprint 4 S4: passed to the drafter reads passedToDrafter(name) with no warning; a failed pass reads PASS_FAILED as a warning", async () => {

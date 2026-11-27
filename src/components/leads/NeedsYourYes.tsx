@@ -284,8 +284,13 @@ export function NeedsYourYes({ leadId, view, initial }: { leadId: string; view: 
         </Notice>
       )}
       {outcome && outcome.ok && !say && (
-        <Notice tone="ok" role="status">
+        <Notice tone={outcome.warn ? "warn" : "ok"} role="status">
           {outcome.message}
+          {outcome.text ? (
+            <pre className="lx-handed-text" style={{ whiteSpace: "pre-wrap" }}>
+              {outcome.text}
+            </pre>
+          ) : null}
         </Notice>
       )}
 

@@ -29,7 +29,7 @@ async function openMailboxToken(root: Buffer, id: string, orgId: string): Promis
 
 /**
  * Can "Send from Outlook now" be offered to this person? Only when the deployment asks for the send permission, and the
- * mailbox `draftInMyMailbox` would use (the caller's own first active personal connection, found by their scoped read)
+ * mailbox an approved client email is drafted in (the caller's own personal, active Outlook, found by their scoped read)
  * is Microsoft AND its stored scopes granted it. Any failed read is `unavailable`, never "ready".
  */
 export type MySendAccess = "ready" | "switched-off" | "no-mailbox" | "not-outlook" | "needs-permission" | "unavailable";
@@ -149,8 +149,10 @@ export async function prepareMyOutlookDraft(): Promise<ApproverOutlook> {
   let accessToken: string | null;
   try {
     accessToken = await openMailboxToken(root, mine.row.id, mine.row.org_id);
-  } catch {
-    return { ok: false, reason: "reauth" };
+  } catch (err) {
+    // Only a dead refresh token (a real `reauth`) asks the person to reconnect. A network or 5xx failure at the token
+    // endpoint, or sign-in not switched on for the deployment, is "couldn't check" (no connect link).
+    return { ok: false, reason: (err as { code?: unknown } | null)?.code === "reauth" ? "reauth" : "unavailable" };
   }
   if (!accessToken) return { ok: false, reason: "no-mailbox" };
   const token = accessToken;
@@ -184,7 +186,7 @@ export type OwnOutlookDraft =
  * Make one DRAFT in the caller's OWN Outlook Drafts (never sends; `createMailboxDraft` posts to /me/messages, which
  * leaves the message in Drafts). The connection is the caller's scoped read, re-read on every call; `postedConnectionId`,
  * if the browser sent one, must be that same id (another person's id is refused, never used). Its stored scopes must
- * allow a draft. The sealed token is read by id AND the org the scoped read returned, exactly as `draftInMyMailbox` does.
+ * allow a draft. The sealed token is read by id AND the org the scoped read returned, exactly as `prepareMyOutlookDraft` does.
  */
 export async function draftInMyOwnOutlook(args: { draft: DraftInput; postedConnectionId?: unknown }): Promise<OwnOutlookDraft> {
   const root = rootKeyOrNull();
@@ -215,7 +217,7 @@ export async function draftInMyOwnOutlook(args: { draft: DraftInput; postedConne
  * The mailboxes this person may search for the stage reconciliation screen: the ones RLS shows them
  * (their own personal mailboxes plus the firm's shared ones) that are active. The sealed tokens are
  * read only when a search actually needs one, by connection id AND the org the scoped read returned,
- * exactly as draftInMyMailbox does. Read-only: nothing here writes a message.
+ * exactly as prepareMyOutlookDraft does. Read-only: nothing here writes a message.
  */
 export async function searchableMailboxAccess(): Promise<{ ok: true; items: SearchableMailbox[] } | { ok: false }> {
   // Not configured is "can't tell", never "no mailbox is connected".

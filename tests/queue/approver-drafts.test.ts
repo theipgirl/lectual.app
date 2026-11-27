@@ -26,6 +26,8 @@ const state = vi.hoisted(() => ({
   passing: "yes" as string,
   record: vi.fn(),
   order: [] as string[],
+  reread: null as unknown,
+  resolveThrew: false,
 }));
 
 vi.mock("@/lib/db/scoped-client", () => ({
@@ -40,9 +42,23 @@ vi.mock("@/lib/queue/org", () => ({ activeQueueOrgKey: vi.fn(async () => "firm-k
 vi.mock("@/lib/queue/roles", async (orig) => ({ ...(await orig<object>()), resolveQueueRole: vi.fn(async (_s: unknown, allowed: string[]) => (allowed.includes(state.role) ? state.role : null)) }));
 vi.mock("@/lib/queue/routing-load", () => ({ loadApprovalRouting: vi.fn(async () => state.routed) }));
 vi.mock("@/lib/queue/api", () => ({
-  getQueueItem: vi.fn(async () => state.item),
+  getQueueItem: vi.fn(async () => {
+    if (state.reread && state.resolveThrew) {
+      if (state.reread === "throw") throw new Error("queue down");
+      return state.reread;
+    }
+    return state.item;
+  }),
   saveQueueEdit: (...a: unknown[]) => (state.order.push("save"), state.save(...a)),
-  resolveQueueItem: (...a: unknown[]) => (state.order.push("resolve"), state.resolve(...a)),
+  resolveQueueItem: async (...a: unknown[]) => {
+    state.order.push("resolve");
+    try {
+      return await state.resolve(...a);
+    } catch (err) {
+      state.resolveThrew = true;
+      throw err;
+    }
+  },
 }));
 vi.mock("@/lib/queue/stale", () => ({ checkDraftStaleness: vi.fn(async () => ({ status: "fresh" })), stalenessRequiresConfirm: vi.fn(() => false) }));
 vi.mock("@/components/queue/stale-warning", () => ({ staleWarning: vi.fn(() => null) }));
@@ -90,6 +106,8 @@ beforeEach(() => {
   state.prepCalls = 0;
   state.passing = "yes";
   state.order = [];
+  state.reread = null;
+  state.resolveThrew = false;
 });
 
 describe("the approver's Outlook is checked first; not ready = nothing done", () => {
@@ -214,5 +232,76 @@ describe("pages draw the refusal with its link, and the new outcomes", () => {
     expect(outcomeText("approve", "drafted")?.text).toContain("firm's mailbox");
     expect(outcomeText("approve", "manual", false, null, "CLIENT_EMAIL")?.text).not.toMatch(/isn't emailed/);
     expect(outcomeText("approve", "manual", false, null, "ENGAGEMENT_LETTER")?.text).toMatch(/isn't emailed/);
+  });
+});
+
+describe("no recipient", () => {
+  it.each([null, "", "   "])("a client email with recipient %j is refused before anything; no Outlook check, no draft", async (recipient) => {
+    state.item = qitem({ id: "q1", draft_body: BODY, recipient: recipient as never });
+    const out = await runQueueReview({ id: "q1", intent: "approve", body: `${BODY}\n` });
+    expect(out).toEqual({ kind: "error", error: "This email has no recipient. Add one before approving. Nothing was approved." });
+    expect(state.prepCalls).toBe(0);
+    expect(state.save).not.toHaveBeenCalled();
+    expect(state.live).not.toHaveBeenCalled();
+    expect(state.resolve).not.toHaveBeenCalled();
+    expect(state.draft).not.toHaveBeenCalled();
+  });
+});
+
+describe("a resolve that throws (timeout, 5xx) never leaves an approved email silently undrafted", () => {
+  const approved = (by: string) => ({ ...(qitem({ id: "q1", draft_body: BODY }) as object), status: "approved", resolved_by: by });
+  beforeEach(() => {
+    state.resolve.mockRejectedValue(new Error("timeout"));
+  });
+
+  it("approved by this session: the one draft is made and the normal outcome comes back", async () => {
+    state.reread = approved("Rebecca@Example.com");
+    const out = await runQueueReview({ id: "q1", intent: "approve" });
+    expect(out).toMatchObject({ kind: "resolved", intent: "approve", send: "mailbox-microsoft", draftId: "AAMk-1" });
+    expect(state.draft).toHaveBeenCalledTimes(1);
+  });
+
+  it("approved by this session, but the draft fails uncertainly: mailbox-uncertain with the approved text", async () => {
+    state.reread = approved("rebecca@example.com");
+    state.draft.mockResolvedValue({ ok: false, reason: "uncertain" });
+    expect(await runQueueReview({ id: "q1", intent: "approve" })).toMatchObject({ kind: "resolved", send: "mailbox-uncertain", approvedText: BODY });
+  });
+
+  it("approved by someone else: the already-decided sentence, no draft", async () => {
+    state.reread = approved("rayn@example.com");
+    expect(await runQueueReview({ id: "q1", intent: "approve" })).toEqual({ kind: "error", error: "This card was already decided." });
+    expect(state.draft).not.toHaveBeenCalled();
+  });
+
+  it("still pending: didn't go through, nothing was sent, no draft", async () => {
+    state.reread = { ...(qitem({ id: "q1", draft_body: BODY }) as object), status: "pending" };
+    expect(await runQueueReview({ id: "q1", intent: "approve" })).toEqual({ kind: "error", error: "That didn't go through. Nothing was sent. Refresh to try again." });
+    expect(state.draft).not.toHaveBeenCalled();
+  });
+
+  it("the re-read fails too: the uncertain outcome with the approved text, never 'didn't go through'", async () => {
+    state.reread = "throw";
+    const out = await runQueueReview({ id: "q1", intent: "approve" });
+    expect(out).toMatchObject({ kind: "resolved", send: "mailbox-uncertain", approvedText: BODY, draftId: null });
+    expect(state.draft).not.toHaveBeenCalled();
+  });
+
+  it("another type whose resolve throws keeps the plain failure (no re-read decision)", async () => {
+    state.item = qitem({ id: "q1", type: "BRIEFING", draft_body: "Internal", recipient: null });
+    state.reread = approved("rebecca@example.com");
+    expect(await runQueueReview({ id: "q1", intent: "approve" })).toEqual({ kind: "error", error: "That didn't go through. Nothing was sent. Refresh to try again." });
+  });
+});
+
+describe("the pass fallback when the probe was wrong", () => {
+  it("probe says on, the draft_to is refused as not set up, the late-prepared Outlook fails: mailbox-failed with the approved text", async () => {
+    state.routed = routed(RAYN);
+    state.passing = "yes";
+    state.record.mockResolvedValue({ ok: false, reason: "not-set-up" });
+    state.prep = { ok: false, reason: "no-mailbox" };
+    const out = await runQueueReview({ id: "q1", intent: "approve" });
+    expect(state.prepCalls).toBe(1);
+    expect(out).toMatchObject({ kind: "resolved", send: "mailbox-failed", approvedText: BODY, handoff: { status: "not-switched-on", drafter: RAYN } });
+    expect(state.draft).not.toHaveBeenCalled();
   });
 });

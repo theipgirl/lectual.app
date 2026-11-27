@@ -97,7 +97,7 @@ export type LeadStepActionDeps = {
   revalidate: (leadId: string) => void;
 };
 
-export type YesResult = { ok: true; message: string; webLink: string | null; warn: boolean } | { ok: false; error: string; connect?: string | null };
+export type YesResult = { ok: true; message: string; webLink: string | null; warn: boolean; text?: string } | { ok: false; error: string; connect?: string | null };
 export type NotThisResult = { ok: true; message: string } | { ok: false; error: string };
 /** No "may say yes now" in the answer: the page is revalidated and recomputes it from the re-read item. */
 export type EditResult = { ok: true; message: string } | { ok: false; error: string };
@@ -153,6 +153,8 @@ export function afterYesWarns(outcome: Extract<ReviewOutcome, { kind: "resolved"
   if (send === "failed" || send === "mailbox-failed" || send === "mailbox-uncertain") return true;
   // A client email approved with no draft made: a warning, never "this type isn't emailed".
   if (send === "manual" && itemType === "CLIENT_EMAIL") return true;
+  // Approver drafts: a client email the queue drafted in the firm's mailbox is a warning (it should be in the approver's Outlook).
+  if (send === "drafted" && itemType === "CLIENT_EMAIL") return true;
   if (send === "mailbox-microsoft" || send === "mailbox-google" || send === "drafted" || send === "manual" || send === "sent") return false;
   return !DOCUMENT_QUEUE_TYPES.has(itemType);
 }
@@ -234,7 +236,8 @@ export async function runLeadStepYes(deps: LeadStepActionDeps, rawLeadId: unknow
   deps.revalidate(leadId);
   const drafterId = outcome.handoff?.drafter ?? null;
   const drafter = drafterId && c.routing.status === "ok" ? c.routing.members.find((m) => m.userId === drafterId) : undefined;
-  return { ok: true, message: afterYesSentence(outcome, c.item.type, null, drafter ? memberName(drafter) : null), webLink: outcome.webLink, warn: afterYesWarns(outcome, c.item.type) };
+  const text = (outcome.send === "mailbox-failed" || outcome.send === "mailbox-uncertain") && outcome.approvedText ? { text: outcome.approvedText } : {};
+  return { ok: true, message: afterYesSentence(outcome, c.item.type, null, drafter ? memberName(drafter) : null), webLink: outcome.webLink, warn: afterYesWarns(outcome, c.item.type), ...text };
 }
 
 export async function runLeadStepNotThis(deps: LeadStepActionDeps, rawLeadId: unknown, rawItemId: unknown, rawReason: unknown): Promise<NotThisResult> {

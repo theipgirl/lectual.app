@@ -2628,6 +2628,13 @@ The firm owner's decision: an approved CLIENT_EMAIL is drafted in the APPROVER's
   a pass falls back to the approver's own Outlook, so the approver is checked first then. With 0112 on (or the probe unreadable) a pass checks no Outlook.
   If the probe says on but the draft_to is still refused as not set up, the fallback prepares the approver's Outlook at that moment and a not-ready
   approver reads `mailbox-failed` (never a draft elsewhere).
+- **Follow-ups (Nov 27):** a client email with no recipient is refused first (`APPROVER_NO_RECIPIENT`, nothing saved or resolved). Only a real
+  `reauth` from the token refresh asks to reconnect; a token-endpoint 5xx, a network drop or sign-in not switched on is "couldn't check" (no link).
+  `passingSwitchedOn()` is also `no` when `queue_card_event` itself is missing (42P01 / PGRST205). **A client-email resolve that throws** (timeout,
+  5xx) re-reads the item: approved with `resolved_by` = this session's address -> the one draft is made as normal; decided by anyone else ->
+  `ALREADY_DECIDED`, no draft; still pending -> the usual "didn't go through"; the re-read failing too -> `mailbox-uncertain` with the approved text
+  ("Check your Outlook Drafts..."). The lead page shows the approved text on a failed or uncertain draft, and a client email the queue drafted in the
+  firm's mailbox is a warning there.
 - A routing read that fails = the approver's own Outlook (never the firm mailbox). Hand-offs don't change whose mailbox: whoever presses Yes.
 - "Send from Outlook now" (`mySendAccess` / `sendFromMyOutlook`) now looks at the same row the draft went to (the caller's own Outlook), not their first mailbox.
 - Tests: `tests/queue/approver-drafts.test.ts`, plus `draft-own-outlook`, `draft-handoff-flow`, `deck-actions`, `deck-card`, `lead-step/actions`. NOT verified:
