@@ -13,11 +13,11 @@ import { validateContent } from "@/lib/proposals/validate";
 import { loeIssues } from "@/lib/loe/validate";
 import type { ApprovedLetter } from "@/lib/proposals/loe-snapshot";
 import type { PackageOffer, ProposalContent, Selection } from "@/lib/proposals/types";
-import { sevetri } from "./fixture";
-import { danielle, ESSENTIAL, ENHANCED, CONCIERGE, OPTIONS } from "./danielle-fixture";
-import { sevetriCustom, S_OPTIONS } from "./sevetri-custom-fixture";
+import { callum } from "./fixture";
+import { renata, ESSENTIAL, ENHANCED, CONCIERGE, OPTIONS } from "./renata-fixture";
+import { callumCustom, S_OPTIONS } from "./callum-custom-fixture";
 import { fold, WORD_OPTIONS, DESIGN_OPTIONS } from "./mark-fixture";
-import { faithe } from "./general-fixture";
+import { imogen } from "./general-fixture";
 
 /** Sprint 3 D1/D2/F1/F2/F3: ONE description of a proposal, built by the one builder. */
 
@@ -28,7 +28,7 @@ const pkg = ({ includes: _i, custom_discount: _c, ...p }: PackageOffer) => {
 };
 
 function firmPricing(over: Record<string, unknown> = {}) {
-  const s = sevetri();
+  const s = callum();
   return {
     ...pkg(CONCIERGE),
     packages: [pkg(ESSENTIAL), pkg(ENHANCED), pkg(CONCIERGE)],
@@ -63,13 +63,13 @@ const errorsOf = (c: ProposalContent) => validateContent(c).filter((i) => i.leve
 
 /* ───────────────────────── the three fixtures, from specs ───────────────────────── */
 
-const SEVETRI_SPEC: TrademarkDraftSpec = {
+const CALLUM_SPEC: TrademarkDraftSpec = {
   kind: "trademark",
   madeBy: "person",
-  client: { fullName: "Sevetri Wilson", firstName: "Sevetri", company: "Prosperall" },
-  recommendation: sevetri().recommendation,
+  client: { fullName: "Callum Ferreira", firstName: "Callum", company: "Larkmoor" },
+  recommendation: callum().recommendation,
   package: "Concierge",
-  names: sevetri().names.map(
+  names: callum().names.map(
     (nm): DraftBrand => ({
       id: nm.id,
       name: nm.name,
@@ -82,12 +82,12 @@ const SEVETRI_SPEC: TrademarkDraftSpec = {
   ),
 };
 
-const DANIELLE_SPEC: TrademarkDraftSpec = {
+const RENATA_SPEC: TrademarkDraftSpec = {
   kind: "trademark",
   madeBy: "person",
-  client: { fullName: "Danielle Milton", firstName: "Danielle" },
+  client: { fullName: "Renata Ostrowski", firstName: "Renata" },
   package: "Concierge",
-  names: danielle().names.map(
+  names: renata().names.map(
     (nm): DraftBrand => ({
       id: nm.id,
       name: nm.name,
@@ -99,32 +99,32 @@ const DANIELLE_SPEC: TrademarkDraftSpec = {
   ),
 };
 
-const FAITHE_SPEC: GeneralDraftSpec = {
+const IMOGEN_SPEC: GeneralDraftSpec = {
   kind: "general",
   madeBy: "person",
-  client: { fullName: "Faithe Williams", firstName: "Faithe" },
+  client: { fullName: "Imogen Pellegrino", firstName: "Imogen" },
   general: {
-    matterTitle: faithe().general!.matter_title,
-    summary: faithe().general!.summary,
-    items: faithe().general!.items.map((i) => ({ id: i.id, label: i.label, hours: i.hours, hourlyRate: i.rate_cents })),
+    matterTitle: imogen().general!.matter_title,
+    summary: imogen().general!.summary,
+    items: imogen().general!.items.map((i) => ({ id: i.id, label: i.label, hours: i.hours, hourlyRate: i.rate_cents })),
     flatFee: 50_000,
-    excludes: faithe().general!.excludes,
-    termsNote: faithe().general!.terms_note,
+    excludes: imogen().general!.excludes,
+    termsNote: imogen().general!.terms_note,
   },
 };
 
 describe("F1: buildDraftContent reproduces the existing fixtures", () => {
-  it("Sevetri: two brands, a package per mark, equals the fixture where it defines content", () => {
-    const content = built(SEVETRI_SPEC);
-    const expected = sevetriCustom();
+  it("Callum: two brands, a package per mark, equals the fixture where it defines content", () => {
+    const content = built(CALLUM_SPEC);
+    const expected = callumCustom();
     // The fixture's one custom discount is data the firm's list never carries; everything else is the fixture's.
     expect(stripMeta(content)).toEqual({ ...expected, packages: expected.packages!.map(({ custom_discount: _c, ...p }) => { void _c; return p; }) });
     expect(errorsOf(content)).toEqual([]);
   });
 
-  it("Danielle: a package per brand, 10% off one brand: names, packages, pricing and client equal the fixture", () => {
-    const content = built(DANIELLE_SPEC);
-    const expected = danielle();
+  it("Renata: a package per brand, 10% off one brand: names, packages, pricing and client equal the fixture", () => {
+    const content = built(RENATA_SPEC);
+    const expected = renata();
     expect(content.names).toEqual(expected.names);
     expect(content.packages).toEqual(expected.packages);
     expect(content.pricing).toEqual(expected.pricing);
@@ -133,8 +133,8 @@ describe("F1: buildDraftContent reproduces the existing fixtures", () => {
     expect(errorsOf(content)).toEqual([]);
   });
 
-  it("Danielle quotes the pinned figures", () => {
-    const content = built(DANIELLE_SPEC);
+  it("Renata quotes the pinned figures", () => {
+    const content = built(RENATA_SPEC);
     const pick = (f: string, c: string): Selection => ({ ...defaultSelection(content), packages: { fold: f, ci: c } });
     const of = (sel: Selection, id: string) => quoteProposal(content, sel).names.find((x) => x.id === id)!;
     for (const [p, legal] of [["Essential", 360_000], ["Enhanced", 407_500], ["Concierge", 495_000]] as const) expect(of(pick(p, "Enhanced"), "fold").legal_cents).toBe(legal);
@@ -161,9 +161,9 @@ describe("F1: buildDraftContent reproduces the existing fixtures", () => {
     expect(quoteProposal(content, defaultSelection(content)).legal_total_cents).toBe(quoteProposal(f, defaultSelection(f)).legal_total_cents);
   });
 
-  it("Faithe: the flat-fee proposal equals the fixture's content, fee $500, and validates", () => {
-    const content = built(FAITHE_SPEC);
-    expect(stripMeta(content)).toEqual(faithe());
+  it("Imogen: the flat-fee proposal equals the fixture's content, fee $500, and validates", () => {
+    const content = built(IMOGEN_SPEC);
+    expect(stripMeta(content)).toEqual(imogen());
     expect(errorsOf(content)).toEqual([]);
     expect(quoteProposal(content, {}).legal_total_cents).toBe(50_000);
   });
@@ -201,12 +201,12 @@ describe("F2: a package the firm doesn't have is refused, with the list", () => 
         : v && typeof v === "object"
           ? Object.entries(v).flatMap(([k, x]) => [...(/price|cents|base|per_?class|fee/i.test(k) ? [[...path, k].join(".")] : []), ...scan(x, [...path, k])])
           : [];
-    expect(scan(SEVETRI_SPEC)).toEqual([]);
-    expect(scan(DANIELLE_SPEC)).toEqual([]);
+    expect(scan(CALLUM_SPEC)).toEqual([]);
+    expect(scan(RENATA_SPEC)).toEqual([]);
   });
 
   it("a price smuggled onto a spec never reaches the content: package numbers come only from the firm's list", () => {
-    const sneaky = { ...DANIELLE_SPEC, base_cents: 1, pricing: { base_cents: 1 }, names: DANIELLE_SPEC.names!.map((x) => ({ ...x, price_override: { base_cents: 1 } })) } as unknown as ProposalDraftSpec;
+    const sneaky = { ...RENATA_SPEC, base_cents: 1, pricing: { base_cents: 1 }, names: RENATA_SPEC.names!.map((x) => ({ ...x, price_override: { base_cents: 1 } })) } as unknown as ProposalDraftSpec;
     const content = built(sneaky);
     expect(content.pricing.base_cents).toBe(495_000);
     expect(content.names.every((x) => x.price_override === undefined)).toBe(true);
@@ -215,19 +215,19 @@ describe("F2: a package the firm doesn't have is refused, with the list", () => 
 
 describe("F3: the firm's approved letter", () => {
   it("attaches the letter through withLoeSnapshot, and the Sprint 2 check passes", () => {
-    const content = built(DANIELLE_SPEC, firm({ letter: LETTER }));
+    const content = built(RENATA_SPEC, firm({ letter: LETTER }));
     expect(content.loe).toEqual({ kind: "trademark", template_id: "t-1", template_version: 2, title: "Engagement letter", body: LETTER.body });
     expect(loeIssues(content.loe, "trademark")).toEqual([]);
   });
 
   it("adds no loe key when the firm has none", () => {
-    expect("loe" in built(DANIELLE_SPEC, firm({ letter: null }))).toBe(false);
+    expect("loe" in built(RENATA_SPEC, firm({ letter: null }))).toBe(false);
   });
 
   it("a general spec gets only a general-kind letter; a trademark letter is not attached to it", () => {
-    expect(built(FAITHE_SPEC, firm({ letter: GENERAL_LETTER })).loe?.kind).toBe("general");
-    expect("loe" in built(FAITHE_SPEC, firm({ letter: LETTER }))).toBe(false);
-    expect("loe" in built(DANIELLE_SPEC, firm({ letter: GENERAL_LETTER }))).toBe(false);
+    expect(built(IMOGEN_SPEC, firm({ letter: GENERAL_LETTER })).loe?.kind).toBe("general");
+    expect("loe" in built(IMOGEN_SPEC, firm({ letter: LETTER }))).toBe(false);
+    expect("loe" in built(RENATA_SPEC, firm({ letter: GENERAL_LETTER }))).toBe(false);
   });
 });
 
@@ -307,9 +307,9 @@ describe("D2: flat-fee specs", () => {
   });
 
   it("a trademark spec carrying flat-fee fields is refused, and so is a flat-fee spec carrying brands", () => {
-    const withGeneral = { ...DANIELLE_SPEC, general: FAITHE_SPEC.general } as unknown as ProposalDraftSpec;
+    const withGeneral = { ...RENATA_SPEC, general: IMOGEN_SPEC.general } as unknown as ProposalDraftSpec;
     expect(buildDraftContent(withGeneral, firm(), newId)).toMatchObject({ ok: false });
-    const withNames = { ...FAITHE_SPEC, names: DANIELLE_SPEC.names } as unknown as ProposalDraftSpec;
+    const withNames = { ...IMOGEN_SPEC, names: RENATA_SPEC.names } as unknown as ProposalDraftSpec;
     expect(buildDraftContent(withNames, firm(), newId)).toMatchObject({ ok: false });
   });
 
@@ -329,7 +329,7 @@ describe("the builder is pure and keeps the checks it was given", () => {
   });
 
   it("returns the spec's checks (source and field path) and, since Sprint 5, stores them on the content for the checklist", () => {
-    const r: DraftResult = buildDraftContent({ ...DANIELLE_SPEC, checks: [{ text: "Confirm the second brand's classes", source: "consult", path: "names[1].classes" }] }, firm(), newId);
+    const r: DraftResult = buildDraftContent({ ...RENATA_SPEC, checks: [{ text: "Confirm the second brand's classes", source: "consult", path: "names[1].classes" }] }, firm(), newId);
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.checks).toEqual([{ text: "Confirm the second brand's classes", source: "consult", path: "names[1].classes" }]);
@@ -344,7 +344,7 @@ describe("the builder is pure and keeps the checks it was given", () => {
   });
 
   it("a whole-proposal credit becomes an adjustment", () => {
-    const c = built({ ...DANIELLE_SPEC, credits: [{ label: "Consult credit", kind: "amount", value: 10_000 }] });
+    const c = built({ ...RENATA_SPEC, credits: [{ label: "Consult credit", kind: "amount", value: 10_000 }] });
     expect(c.adjustments).toHaveLength(1);
     expect(c.adjustments[0]).toMatchObject({ label: "Consult credit", kind: "amount", value: 10_000 });
   });

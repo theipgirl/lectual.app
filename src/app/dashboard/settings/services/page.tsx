@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { hasRole } from "@/lib/auth/roles";
 import { listServiceItems } from "@/lib/quotes/service-library";
 import type { ServiceItemRow } from "@/lib/quotes/types";
@@ -7,7 +7,8 @@ import { NewServiceItemForm, ServiceItemRowEditor } from "@/components/quotes/Se
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
-import { SERVICE_LIBRARY_READ_ONLY } from "@/lib/ui/words";
+import { SERVICE_LIBRARY_READ_ONLY, noneYet } from "@/lib/ui/words";
+import { EmptyState, LoadFailedCard, PageHeader } from "@/components/ui";
 
 export const metadata: Metadata = { title: pageTitle("Service library") };
 
@@ -30,7 +31,7 @@ export const dynamic = "force-dynamic";
  * drop out of the builder's picker, which reads active items only.
  */
 export default async function ServiceLibraryPage() {
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   if (session.kind !== "ok") notFound();
   const canEdit = hasRole(session.role, "senior_admin");
   const canRead = hasRole(session.role, "attorney");
@@ -49,28 +50,20 @@ export default async function ServiceLibraryPage() {
 
   return (
     <>
-      <div>
-        <div className="lx-label">Settings</div>
-        <h1 className="lx-h1">Service library</h1>
-        <p className="lx-sub">
-          Your standing offerings and their default prices. A quote copies an item&apos;s values when it is added, so
-          changing a price here never changes a quote that was already built.
-        </p>
-      </div>
+      <PageHeader
+        title="Service library"
+        sub={
+          <>
+            Your standing offerings and their default prices. A quote copies an item&apos;s values when it is added, so
+            changing a price here never changes a quote that was already built.
+          </>
+        }
+      />
 
       {!canRead ? (
-        <div className="lx-card lx-empty-card">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            Restricted
-          </h2>
-          <p className="lx-note" style={{ margin: 0 }}>
-            {`${ADMIN_TIER_PHRASE} can manage the service library. Ask one of them for access.`}
-          </p>
-        </div>
+        <EmptyState title="Restricted">{`${ADMIN_TIER_PHRASE} can manage the service library. Ask one of them for access.`}</EmptyState>
       ) : loadError ? (
-        <div role="alert" className="lx-banner lx-banner-risk">
-          The service library couldn&apos;t be loaded. Refresh to try again.
-        </div>
+        <LoadFailedCard role="alert" what="the service library" />
       ) : (
         <>
           {canEdit ? (
@@ -79,18 +72,12 @@ export default async function ServiceLibraryPage() {
               <NewServiceItemForm />
             </details>
           ) : (
-            <p className="lx-note" style={{ margin: 0 }}>
-              {SERVICE_LIBRARY_READ_ONLY}
-            </p>
+            <p className="lx-note" style={{ margin: 0 }}>{SERVICE_LIBRARY_READ_ONLY}</p>
           )}
-          <section className="lx-card" style={{ padding: 18, display: "grid", gap: 8 }}>
-            <h2 className="lx-h2" style={{ fontSize: 23 }}>
-              Services
-            </h2>
+          <section className="lx-card lx-pad" style={{ display: "grid", gap: 8 }}>
+            <h2 className="lx-h2">Services</h2>
             {active.length === 0 ? (
-              <p className="lx-note" style={{ margin: 0 }}>
-                No services yet.{canEdit ? " Add your standing offerings above so quotes are built by picking, not retyping." : ""}
-              </p>
+              <p className="lx-note" style={{ margin: 0 }}>{noneYet("services", canEdit ? "Add your standing offerings above so quotes are built by picking, not retyping." : undefined)}</p>
             ) : (
               <ul className="lx-list">
                 {active.map((item) => (

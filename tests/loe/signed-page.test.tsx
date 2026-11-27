@@ -12,7 +12,7 @@ import { acceptedProposalRow, FINGERPRINT, WRONG_FINGERPRINT, signedTrademark } 
 const ID = "44444444-4444-4444-8444-444444444444";
 const SIGNED_OK: SignatureRead = {
   status: "ok",
-  signature: { id: "sig-1", signerName: "Sevetri Wilson", signedAt: "2026-11-12T19:14:00.000Z", fingerprint: FINGERPRINT, entityName: "Prosperall Inc.", signerTitle: "Founder", templateVersion: 3 },
+  signature: { id: "sig-1", signerName: "Callum Ferreira", signedAt: "2026-11-12T19:14:00.000Z", fingerprint: FINGERPRINT, entityName: "Larkmoor Inc.", signerTitle: "Founder", templateVersion: 3 },
 };
 
 type Extra = {
@@ -73,7 +73,7 @@ describe("P4b / P5b: a signed version on the staff page", () => {
     expect(html).toContain("Signed by client");
     expect(html).not.toContain("Accepted by client");
     expect(html).toContain('data-signed-card="signed"');
-    expect(html).toContain("Sevetri Wilson");
+    expect(html).toContain("Callum Ferreira");
     // Review item 7: the signed time names its zone.
     expect(html).toContain("Signed November 12, 2026 at 2:14 PM EST");
     expect(html).toContain(FINGERPRINT);
@@ -134,7 +134,7 @@ describe("P4b / P5b: a signed version on the staff page", () => {
       expect(html, role).not.toContain("Download the signed letter");
       expect(html, role).not.toContain(FINGERPRINT);
       // The card never makes "Signed by <name> on ..." up from the snapshot for a role that should have been able to read the row.
-      expect(html, role).not.toContain("Signed by Sevetri Wilson on");
+      expect(html, role).not.toContain("Signed by Callum Ferreira on");
     }
   });
 
@@ -174,7 +174,7 @@ describe("P5d: roles and another firm", () => {
       const html = await render(signed(), { role, steps: [step({ step: "signed_loe_upload", outcome: "failed", reason: "HTTP 500" })] });
       expect(signatureReads, role).toBe(0);
       expect(html, role).toContain('data-signed-card="summary"');
-      expect(html, role).toContain("Signed by Sevetri Wilson on November 12, 2026 at 2:14 PM EST");
+      expect(html, role).toContain("Signed by Callum Ferreira on November 12, 2026 at 2:14 PM EST");
       expect(html, role).not.toContain("Download the signed letter");
       expect(html, role).not.toContain(FINGERPRINT);
       expect(html, role).not.toContain("Fingerprint");
@@ -191,7 +191,7 @@ describe("P5d: roles and another firm", () => {
     const html = await render(signed(), { role: "viewer", signature: { status: "none" } });
     expect(signatureReads).toBe(0);
     expect(html).toContain('data-signed-card="summary"');
-    expect(html).toContain("Signed by Sevetri Wilson on November 12, 2026 at 2:14 PM EST");
+    expect(html).toContain("Signed by Callum Ferreira on November 12, 2026 at 2:14 PM EST");
   });
 
   it("review item 11: a paralegal and an owner are asked, and get the signer, the fingerprint and the Download", async () => {

@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
 import { enrollLead, listLeadEnrollments, stopEnrollment } from "@/lib/automation/drips";
 import { MANUAL_STOP_REASONS, isStopReason } from "@/lib/campaigns/stops";
@@ -23,7 +24,7 @@ export type LeadSequenceState = { error?: string; message?: string };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Lane select on the lead page: "" clears it. */
-export async function setLeadLaneAction(_prev: LeadSequenceState, formData: FormData): Promise<LeadSequenceState> {
+export const setLeadLaneAction = previewSafe(async function setLeadLaneAction(_prev: LeadSequenceState, formData: FormData): Promise<LeadSequenceState> {
   const leadId = String(formData.get("leadId") ?? "");
   const raw = String(formData.get("lane") ?? "");
   if (!UUID.test(leadId)) return { error: "Missing lead." };
@@ -31,10 +32,10 @@ export async function setLeadLaneAction(_prev: LeadSequenceState, formData: Form
   const result = await setLaneAction(leadId, isLane(raw) ? raw : null);
   if (!result.ok) return { error: result.error };
   return { message: raw ? "Temperature saved." : "Temperature cleared." };
-}
+}, "state");
 
 /** "Stop sequence" on one of the lead's enrollments, with the reason a person picked. */
-export async function stopLeadSequenceAction(_prev: LeadSequenceState, formData: FormData): Promise<LeadSequenceState> {
+export const stopLeadSequenceAction = previewSafe(async function stopLeadSequenceAction(_prev: LeadSequenceState, formData: FormData): Promise<LeadSequenceState> {
   const leadId = String(formData.get("leadId") ?? "");
   const enrollmentId = String(formData.get("enrollmentId") ?? "");
   const reason = String(formData.get("reason") ?? "manual");
@@ -52,14 +53,14 @@ export async function stopLeadSequenceAction(_prev: LeadSequenceState, formData:
   }
   revalidatePath(`/dashboard/leads/${leadId}`);
   return { message: "Campaign stopped." };
-}
+}, "state");
 
 /**
  * Cold lane's next step: enroll in the firm's chosen nurture campaign. The
  * campaign id is read from the firm's own profile server-side, never from the
  * form, and enrollLead refuses a lead who is already a client.
  */
-export async function addToNurtureAction(_prev: LeadSequenceState, formData: FormData): Promise<LeadSequenceState> {
+export const addToNurtureAction = previewSafe(async function addToNurtureAction(_prev: LeadSequenceState, formData: FormData): Promise<LeadSequenceState> {
   const leadId = String(formData.get("leadId") ?? "");
   if (!UUID.test(leadId)) return { error: "Missing lead." };
   try {
@@ -73,4 +74,4 @@ export async function addToNurtureAction(_prev: LeadSequenceState, formData: For
   }
   revalidatePath(`/dashboard/leads/${leadId}`);
   return { message: "Added to nurture. Its emails draft into the approval queue — nothing sends on its own." };
-}
+}, "state");

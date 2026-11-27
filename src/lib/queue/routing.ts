@@ -20,6 +20,10 @@ export const QUEUE_KINDS = [
   "opinion_letter",
   "internal_briefing",
   "partnership_other",
+  "filing_receipt",
+  "uspto_notice",
+  "client_reminder",
+  "client_request",
   "client_email_other",
 ] as const;
 export type QueueKind = (typeof QUEUE_KINDS)[number];
@@ -77,6 +81,34 @@ export const KIND_INFO: Record<QueueKind, KindInfo> = {
     help: "Partner and referral follow-ups that are not about a client matter.",
     attorneyOnly: false,
   },
+  filing_receipt: {
+    label: "Filing receipts",
+    short: "Filing receipt",
+    rowWord: "client email",
+    help: "The filing receipt sent to a client after a filing. Facts only, so a team member can clear it.",
+    attorneyOnly: false,
+  },
+  uspto_notice: {
+    label: "USPTO publication and registration notices",
+    short: "USPTO notice",
+    rowWord: "client email",
+    help: "Telling a client what the USPTO recorded (publication, registration). Facts only, so a team member can clear it.",
+    attorneyOnly: false,
+  },
+  client_reminder: {
+    label: "Form and payment reminders",
+    short: "Reminder",
+    rowWord: "client email",
+    help: "Reminding a client about a form to fill in or a payment. A team member can clear it.",
+    attorneyOnly: false,
+  },
+  client_request: {
+    label: "Requests for information",
+    short: "Request to client",
+    rowWord: "client email",
+    help: "Asking a client for something the firm needs from them. A team member can clear it.",
+    attorneyOnly: false,
+  },
   client_email_other: {
     label: "Other client emails",
     short: "Client email",
@@ -126,6 +158,31 @@ export function flagsLegalAdvice(text: string | null | undefined): boolean {
   return LEGAL_ADVICE_PHRASES.some((re) => re.test(text));
 }
 
+/**
+ * The routine kinds (decision 15) are reached ONLY through these exact (agent, type) markers, which the drafting paths
+ * that make them set on purpose. A headline, a subject or any other text never makes an item routine: the same headline
+ * from another agent stays `client_email_other` (attorney-only). `flagsLegalAdvice` still wins over every marker.
+ * A drafting path that makes one of these imports its marker from here (`ROUTINE_MARKER.uspto_notice.agent`), so the
+ * pair is written in one place.
+ */
+export const ROUTINE_MARKER = {
+  filing_receipt: { agent: "filing-receipt", type: "CLIENT_EMAIL" },
+  uspto_notice: { agent: "uspto-watcher", type: "CLIENT_EMAIL" },
+  client_reminder: { agent: "client-reminder", type: "CLIENT_EMAIL" },
+  client_request: { agent: "client-request", type: "CLIENT_EMAIL" },
+} as const satisfies Partial<Record<QueueKind, { agent: string; type: string }>>;
+export type RoutineKind = keyof typeof ROUTINE_MARKER;
+export const ROUTINE_KINDS = Object.keys(ROUTINE_MARKER) as RoutineKind[];
+
+/** The routine kind an item's exact (agent, type) marker names, else null. Exact, case-sensitive string equality only. */
+export function routineKindOf(item: Pick<RoutableItem, "agent" | "type">): RoutineKind | null {
+  for (const kind of ROUTINE_KINDS) {
+    const m = ROUTINE_MARKER[kind];
+    if (item.agent === m.agent && item.type === m.type) return kind;
+  }
+  return null;
+}
+
 function bodyOf(item: RoutableItem): string {
   return `${item.final_body ?? item.draft_body ?? ""}`;
 }
@@ -152,6 +209,9 @@ export function classifyQueueItem(item: RoutableItem): QueueKind {
   if (item.type === "CLIENT_EMAIL") {
     // A proposal link makes it a post-consult email whatever else it looks like, so an edit cannot smuggle one into a follow-up.
     if (PROPOSAL_LINK.test(bodyOf(item))) return "post_consult_email";
+    // The routine kinds: the exact marker only, never the headline.
+    const routine = routineKindOf(item);
+    if (routine) return routine;
     if (item.agent === "morning-brief" && /^follow-up for a stalled lead/i.test(headline)) return "stalled_followup";
     if (item.agent === "welcome-client") return "welcome_email";
     if (item.agent === "post-consult") return "post_consult_email";
@@ -199,6 +259,8 @@ export function parseApprovalRouting(raw: unknown, members: readonly RoutingMemb
   if (raw === null || raw === undefined) return { routing, dropped };
   if (typeof raw !== "object" || Array.isArray(raw)) return { routing, dropped: 1 };
   for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    // "Drafts go to" shares this jsonb; it is read by `parseDrafter`, not counted here.
+    if (key === DRAFTER_KEY) continue;
     if (!isQueueKind(key) || typeof value !== "string" || !UUID.test(value) || routingChoiceError(key, value, members)) {
       dropped += 1;
       continue;
@@ -208,9 +270,43 @@ export function parseApprovalRouting(raw: unknown, members: readonly RoutingMemb
   return { routing, dropped };
 }
 
-/** The pricing jsonb with only `approval_routing` replaced; every other key is kept as it was. */
-export function withApprovalRouting(pricing: Record<string, unknown>, routing: ApprovalRouting): Record<string, unknown> {
-  return { ...pricing, approval_routing: { ...routing } };
+/**
+ * The pricing jsonb with only `approval_routing` replaced; every other key is kept as it was. `drafter`: a user id sets
+ * "Drafts go to", null removes it, and leaving it out keeps the one already stored (so a routing-only save never drops it).
+ */
+export function withApprovalRouting(pricing: Record<string, unknown>, routing: ApprovalRouting, drafter?: string | null): Record<string, unknown> {
+  const stored = pricing.approval_routing;
+  const kept = drafter === undefined && stored && typeof stored === "object" && !Array.isArray(stored) ? (stored as Record<string, unknown>)[DRAFTER_KEY] : undefined;
+  const next = drafter === undefined ? (typeof kept === "string" ? kept : null) : drafter;
+  return { ...pricing, approval_routing: { ...routing, ...(next ? { [DRAFTER_KEY]: next } : {}) } };
+}
+
+/* ─────────────────────────────── drafts go to ─────────────────────────────── */
+
+/**
+ * "Drafts go to" (decision 3b): one member whose OWN Outlook gets the approved client emails as drafts, made on their own
+ * click. Stored beside the routing as `approval_routing.drafter`. Validated like routing: a current member in a staff role.
+ */
+export const DRAFTER_KEY = "drafter";
+
+/** Members who may be the drafter: staff roles (they can prepare drafts), never a viewer or social media. */
+export const eligibleDrafters = (members: readonly RoutingMember[]): RoutingMember[] => members.filter((m) => QUEUE_EDIT_ROLES.includes(m.role));
+
+/** Why `memberId` can't be the drafter, as a sentence; null when they can. */
+export function drafterChoiceError(memberId: string, members: readonly RoutingMember[]): string | null {
+  const member = members.find((m) => m.userId === memberId);
+  if (!member) return "A person you picked isn't on your team any more. Refresh the page.";
+  if (!eligibleDrafters(members).includes(member)) return `Drafts can't go to ${memberName(member)}.`;
+  return null;
+}
+
+/** The stored drafter, when it still names a valid member; `dropped` when something was stored and isn't valid any more. */
+export function parseDrafter(raw: unknown, members: readonly RoutingMember[]): { drafter: string | null; dropped: boolean } {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { drafter: null, dropped: false };
+  const value = (raw as Record<string, unknown>)[DRAFTER_KEY];
+  if (value === undefined || value === null) return { drafter: null, dropped: false };
+  if (typeof value !== "string" || !UUID.test(value) || drafterChoiceError(value, members)) return { drafter: null, dropped: true };
+  return { drafter: value, dropped: false };
 }
 
 export type Owner = { kind: "person"; userId: string } | { kind: "default" };

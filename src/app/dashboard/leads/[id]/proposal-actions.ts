@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { CAN_WRITE_LEAD } from "@/lib/pipeline/leads";
@@ -23,7 +24,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * session, the lead-writing role, the `proposals` module and the proposal staff
  * roles.
  */
-export async function draftProposalFromTranscriptAction(_prev: PasteProposalState, formData: FormData): Promise<PasteProposalState> {
+export const draftProposalFromTranscriptAction = previewSafe(async function draftProposalFromTranscriptAction(_prev: PasteProposalState, formData: FormData): Promise<PasteProposalState> {
   const session = await resolveFirmSession();
   if (session.kind !== "ok" || !CAN_WRITE_LEAD.includes(session.role)) return { error: "Your role can't draft client email." };
   const refused = await gateStaffAction();
@@ -38,6 +39,7 @@ export async function draftProposalFromTranscriptAction(_prev: PasteProposalStat
 
   const supabase = await getScopedClient();
   const { data: lead } = await supabase
+    // live-guard: reads one lead's name for a proposal draft started from its (live) page
     .from("crm_lead")
     .select("id, first_name, last_name, business_name, email")
     .eq("id", leadId)
@@ -52,4 +54,4 @@ export async function draftProposalFromTranscriptAction(_prev: PasteProposalStat
     matterId: null,
   });
   return done.ok ? { ok: true, notice: done.notice, href: done.href } : { error: done.error };
-}
+}, "state");

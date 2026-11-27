@@ -18,6 +18,7 @@
  */
 
 import type { Role } from "@/lib/auth/roles";
+import { formatMoney } from "@/lib/ui/format";
 
 /** Who may mark a version paid, undo it, or retry a step. A subset of the staff write roles. */
 export const PROPOSAL_PAID_ROLES: Role[] = ["owner", "admin", "senior_admin", "intake"];
@@ -271,7 +272,7 @@ function addedClassesSuffix(payload: Record<string, unknown>): string {
   const n = payload.added_classes;
   const total = payload.legal_total_cents;
   if (typeof n !== "number" || !Number.isInteger(n) || n < 1) return "";
-  const dollars = typeof total === "number" && Number.isFinite(total) ? `; legal fee now $${(total / 100).toLocaleString("en-US", { minimumFractionDigits: total % 100 === 0 ? 0 : 2, maximumFractionDigits: 2 })}` : "";
+  const dollars = typeof total === "number" && Number.isFinite(total) ? `; legal fee now ${formatMoney(total)}` : "";
   return ` (${n} ${n === 1 ? "class" : "classes"} added by the client${dollars})`;
 }
 

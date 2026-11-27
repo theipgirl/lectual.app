@@ -1,4 +1,5 @@
 import type { getScopedClient } from "@/lib/db/scoped-client";
+import { leadRead } from "@/lib/leads/live";
 
 type ScopedClient = Awaited<ReturnType<typeof getScopedClient>>;
 
@@ -24,8 +25,12 @@ export async function bumpLeadLastTouch(
   at: Date = new Date(),
 ): Promise<boolean> {
   try {
-    const update = supabase.from("crm_lead").update({ last_activity_at: at.toISOString() }).eq("id", leadId);
-    const { error } = await (orgId ? update.eq("org_id", orgId) : update);
+    // A merged lead (lectual 0107) is skipped: the update matches no row instead of tripping its guard. Its history is
+    // read on the keeper, whose own last touch is not moved by a row filed on the merged lead.
+    const { error } = await leadRead(({ live }) => {
+      const update = live(supabase.from("crm_lead").update({ last_activity_at: at.toISOString() }).eq("id", leadId));
+      return orgId ? update.eq("org_id", orgId) : update;
+    });
     if (error) {
       console.error(`[touch] failed to bump last touch for lead=${leadId}`, error);
       return false;

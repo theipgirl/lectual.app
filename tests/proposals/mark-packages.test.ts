@@ -20,11 +20,11 @@ import { acceptanceHeadline, acceptanceNoteBody } from "@/lib/proposals/accept-f
 import { LOE_REFUSAL_TEXT, loeInputFromAcceptedProposal } from "@/lib/proposals/loe-adapter";
 import { parseName } from "@/lib/proposal-editor/form";
 import type { ProposalContent, ProposalPricing, Selection } from "@/lib/proposals/types";
-import { sevetri } from "./fixture";
-import { danielle, ENHANCED, ESSENTIAL, CONCIERGE } from "./danielle-fixture";
+import { callum } from "./fixture";
+import { renata, ENHANCED, ESSENTIAL, CONCIERGE } from "./renata-fixture";
 import { DESIGN_OPTIONS, WORD_OPTIONS, fold } from "./mark-fixture";
 
-/** The Fold with the design mark ticked or not, and the two marks' picks. */
+/** The Pleat with the design mark ticked or not, and the two marks' picks. */
 function sel(design: boolean, word?: unknown, logo?: unknown): Selection {
   const c = fold();
   const picks: Record<string, unknown> = {};
@@ -163,8 +163,8 @@ describe("validateContent: mark-level choices", () => {
     expect(paths(badDefault)).toContain("names[0].marks[1].package_choice.default");
 
     const many = fold();
-    many.packages = [...many.packages!, { ...ESSENTIAL, package: "Extra" }];
-    many.names[0].marks[0].package_choice = { options: ["Essential", "Enhanced", "Concierge", "Extra"], default: "Essential" };
+    many.packages = [...many.packages!, { ...ESSENTIAL, package: "Extra" }, { ...ESSENTIAL, package: "More" }];
+    many.names[0].marks[0].package_choice = { options: ["Essential", "Enhanced", "Concierge", "Extra", "More"], default: "Essential" };
     expect(paths(many)).toContain("names[0].marks[0].package_choice.options");
 
     const none = fold();
@@ -176,7 +176,7 @@ describe("validateContent: mark-level choices", () => {
     expect(paths(own)).toContain("names[0].price_override");
 
     const clash = fold();
-    clash.names.push({ ...sevetri().names[0], id: "fold-word2" });
+    clash.names.push({ ...callum().names[0], id: "fold-word2" });
     clash.names[0].marks[0].id = "fold-word2";
     expect(paths(clash)).toContain("names[0].marks[0].package_choice");
   });
@@ -201,7 +201,7 @@ describe("publicContent, the snapshot and the editor", () => {
   function form(extra: Record<string, string | string[]>): FormData {
     const f = new FormData();
     f.set("nameId", "fold");
-    f.set("name", "The Fold");
+    f.set("name", "The Pleat");
     f.set("mark.0.id", "fold-word");
     f.set("mark.0.kind", "word");
     f.set("mark.0.desc", "Protects the words.");
@@ -232,7 +232,7 @@ describe("publicContent, the snapshot and the editor", () => {
       { pkgFields: "1", pkgChoice: "on", pkgOption: "Essential", "mark.0.pkgChoice": "on", "mark.0.pkgOption": "Essential" },
       { pkgFields: "1", overrideBase: "100", "mark.0.pkgChoice": "on", "mark.0.pkgOption": "Essential" },
       { pkgFields: "1", "mark.0.pkgChoice": "on" },
-      { pkgFields: "1", "mark.0.pkgChoice": "on", "mark.0.pkgOption": ["A", "B", "C", "D"] },
+      { pkgFields: "1", "mark.0.pkgChoice": "on", "mark.0.pkgOption": ["A", "B", "C", "D", "E"] },
       { pkgFields: "1", "mark.0.pkgChoice": "on", "mark.0.pkgOption": "Essential", "mark.0.pkgDefault": "Concierge" },
     ];
     for (const extra of bad) expect(parseName(form(extra), fold(), rand).ok).toBe(false);
@@ -253,16 +253,16 @@ describe("what was chosen, named downstream", () => {
   const firm: ProposalPricing[] = [{ ...ESSENTIAL }, { ...ENHANCED }, { ...CONCIERGE }];
 
   it("the receipt / staff line names the package per mark", () => {
-    expect(packageLineTitle(snapshot.quote.names[0])).toBe("The Fold — word mark, Enhanced; design mark, Essential");
+    expect(packageLineTitle(snapshot.quote.names[0])).toBe("The Pleat — word mark, Enhanced; design mark, Essential");
     expect(snapshot.selection.packages).toEqual({ "fold-word": "Enhanced", "fold-logo": "Essential" });
   });
 
   it("the accept notice and the Lawmatics note name the package per mark", () => {
-    expect(chosenPackagesText(quote.names)).toBe("The Fold — word mark, Enhanced; design mark, Essential");
-    expect(acceptanceHeadline({ clientName: "Danielle Milton", packageName: chosenPackagesText(quote.names), legalTotalCents: quote.legal_total_cents })).toBe(
-      "Danielle Milton accepted The Fold — word mark, Enhanced; design mark, Essential · legal $5,470",
+    expect(chosenPackagesText(quote.names)).toBe("The Pleat — word mark, Enhanced; design mark, Essential");
+    expect(acceptanceHeadline({ clientName: "Renata Ostrowski", packageName: chosenPackagesText(quote.names), legalTotalCents: quote.legal_total_cents })).toBe(
+      "Renata Ostrowski accepted The Pleat — word mark, Enhanced; design mark, Essential · legal $5,470",
     );
-    expect(acceptanceNoteBody(snapshot, "Danielle Milton").body).toContain("- The Fold — word mark, Enhanced; design mark, Essential: Word mark + Logo mark");
+    expect(acceptanceNoteBody(snapshot, "Renata Ostrowski").body).toContain("- The Pleat — word mark, Enhanced; design mark, Essential: Word mark + Logo mark");
   });
 
   it("the LOE adapter: two marks on different packages is 'Choose the LOE template', never a guess", () => {
@@ -306,18 +306,18 @@ try {
 }
 
 describe("old content prices byte for byte as before", () => {
-  it.skipIf(oldPricing === null)("sevetri, danielle and a mixed selection quote exactly as the pre-Spec 7 engine did", async () => {
+  it.skipIf(oldPricing === null)("callum, renata and a mixed selection quote exactly as the pre-Spec 7 engine did", async () => {
     const dir = mkdtempSync(join(tmpdir(), "spec7-pricing-"));
     const file = join(dir, "pricing-before.ts");
     writeFileSync(file, oldPricing!);
     const before = (await import(/* @vite-ignore */ file)) as typeof import("@/lib/proposals/pricing");
     const cases: Array<[ProposalContent, Selection]> = [];
-    const s = sevetri();
+    const s = callum();
     cases.push([s, before.defaultSelection(s)]);
     cases.push([s, Object.fromEntries(Object.keys(before.defaultSelection(s)).map((k, i) => [k, i % 2 === 0]))]);
-    const d = danielle();
+    const d = renata();
     for (const p of WORD_OPTIONS) cases.push([d, { ...before.defaultSelection(d), packages: { fold: p, ci: "Essential" } }]);
-    const disc = danielle();
+    const disc = renata();
     disc.names[0].discount_pct = 15;
     cases.push([disc, before.defaultSelection(disc)]);
     for (const [content, selection] of cases) {
@@ -329,7 +329,7 @@ describe("old content prices byte for byte as before", () => {
   });
 
   it("no mark-level key on a quote without mark choices", () => {
-    const c = sevetri();
+    const c = callum();
     for (const n of quoteProposal(c, defaultSelection(c)).names) {
       for (const m of n.marks) expect(Object.keys(m)).toEqual(["id", "kind", "desc", "second", "price_cents"]);
     }

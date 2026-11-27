@@ -166,7 +166,7 @@ export type ProposalMark = {
   preselected: boolean;
   /**
    * Spec 7: the client picks THIS mark's package on /p/<token> (word mark on one package, the design mark on another).
-   * Same rules as `ProposalName.package_choice` (1 to 3 names from `content.packages`, the default one of them). A brand
+   * Same rules as `ProposalName.package_choice` (1 to 4 names from `content.packages`, the default one of them). A brand
    * name uses either its own `package_choice` or mark-level choices, never both. Picked in `selection.packages[<mark id>]`.
    */
   package_choice?: { options: string[]; default: string };
@@ -202,7 +202,7 @@ export type ProposalName = {
   /** The client may add up to `max` (0..10) more open classes to this brand name on /p/<token> (Spec 3). */
   client_add?: { max: number };
   /**
-   * Spec 6: the client picks this brand name's package on /p/<token>. `options` are 1 to 3 names from
+   * Spec 6: the client picks this brand name's package on /p/<token>. `options` are 1 to 4 names from
    * `content.packages`, in the order shown; `default` is one of them and is what a missing or unknown pick means.
    * Never together with `price_override`.
    */
@@ -292,6 +292,13 @@ export type GeneralItem = {
   rate_cents?: number;
   /** A value in cents, >= 0, used when hours x rate is not given. */
   value_cents?: number;
+  /** A paragraph shown under the item's heading on the client page, before its bullet points: 1..600 characters of plain text. */
+  intro?: string;
+  /**
+   * Bullet points shown under the item on the client page: 0..12 lines, each 1..300 characters of plain text. A bullet carries
+   * its own hours in its words ("Drafting ... (2.5 hours)."); nothing adds them up.
+   */
+  details?: string[];
 };
 
 /**
@@ -356,7 +363,19 @@ export const MAX_CONTENT_CHECKS = 12;
 export const MAX_CHECK_TEXT = 300;
 export type ContentCheck = { text: string; source: CheckSource; /** A `validateContent` path, e.g. `pay_url` or `names[0].discount_pct`. */ path: string };
 
+/**
+ * How the LEGAL fee is paid: `due_now_pct` (a whole 1..100) of it today, the rest later (`balance_note` says when, 1..120
+ * characters, e.g. "upon delivery of the agreements"). The figures are `due-today.ts#dueToday`; USPTO fees are never part of
+ * it. Absent, or 100, = the whole fee is due now, exactly as before.
+ */
+export type PaymentTerms = { due_now_pct: number; balance_note?: string };
+
+/** The most packages a brand name's (Spec 6) or a mark's (Spec 7) `package_choice` may offer. */
+export { MAX_PACKAGE_CHOICE_OPTIONS } from "./package-choice-limit";
+
 export type ProposalContent = {
+  /** A deposit: the part of the legal fee due today and when the balance is due. Both kinds. Absent = all due now. */
+  payment_terms?: PaymentTerms;
   /** Sprint 5: things to check, shown in the editor's "Ready to send?" list. Staff-only; `publicContent` never returns it; never blocks. */
   checks?: ContentCheck[];
   /** Sprint 3: who made this draft. Staff-only. */
@@ -466,7 +485,7 @@ export type ProposalEditedPayload = {
 export type ProposalChange = {
   /** Stable path, e.g. "pricing.base_cents" or "names[p].marks[p-word].desc". */
   path: string;
-  /** Readable label, e.g. "Concierge base price" or "Prosperall: Word mark description". */
+  /** Readable label, e.g. "Concierge base price" or "Larkmoor: Word mark description". */
   label: string;
   /** How the renderer should format before/after. */
   format: "cents" | "pct" | "text" | "bool" | "count";
@@ -495,6 +514,10 @@ export type AcceptedSnapshot = {
   agreement?: AcceptedAgreement;
   /** Schema 2 only: what the letter was merged with, so "Read it again" and the signed PDF rebuild exactly what was signed. */
   signing?: AcceptedSigning;
+  /** The deposit terms the client accepted, when the proposal had any below 100%. Absent on older snapshots. */
+  payment_terms?: PaymentTerms;
+  /** With `payment_terms`: the legal fee due today, cents (`dueToday`). Absent on older snapshots: readers fall back to `quote.legal_total_cents`. */
+  due_now_cents?: number;
 };
 
 export type AcceptedAgreement = {
@@ -619,7 +642,7 @@ export { DEFAULT_PROPOSAL_PRICING } from "./package-list";
 export const DEFAULT_OFFICE_ACTION_NOTE =
   "If a substantive office action is issued, your package includes Rebecca's strategy review. The response itself is quoted separately, and we will get your approval before any work begins.";
 
-/** RPB's "What your package includes" table (from the Sevetri example). */
+/** RPB's "What your package includes" table (from the Callum example). */
 export const DEFAULT_PROPOSAL_INCLUDES: ProposalInclude[] = [
   { label: "Classes included", included: "Your choice (up to 3)", highlight: true },
   { label: "Preliminary Consultation Strategy Call", value: "$450", included: "✓" },

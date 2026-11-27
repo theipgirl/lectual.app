@@ -11,14 +11,17 @@ import { loadReviewedConsult, type ConsultDb, type ReviewedConsultRead } from "@
 import { insertAgentProposal, recordConsultDraftEvent } from "@/lib/proposals/agent-create";
 import { normalisePackages } from "@/lib/proposals/package-list";
 import type { ProposalsDbClient } from "@/lib/proposals/store";
-import { standardProposalPricing } from "@/lib/proposals/types";
+import { isGeneralContent, standardProposalPricing } from "@/lib/proposals/types";
+import { quoteProposal } from "@/lib/proposals/pricing";
+import { formatDollars } from "@/lib/proposal-editor/events";
 import type { ValidationIssue } from "@/lib/proposals/validate";
 import { clientLinkUrl, resolveClientLinkOrigin } from "@/lib/proposals/client-link-origin";
 import { draftProposalFromConsult } from "./draft";
-import { renderProposalEmail } from "./email";
+import { renderGeneralProposalEmail, renderProposalEmail } from "./email";
 import { describeConsultFailure, logConsultFailure, type ConsultStage } from "./failure";
 import { CONSULT_PROPOSAL_SOURCE, firmSignatureName, firmTeamSignOff, pasteHash } from "./shared";
 import { MAX_PASTED_TRANSCRIPT_CHARS, type ConsultLead, type ConsultSource } from "./types";
+import { PROPOSAL_SETTINGS_NAME } from "@/lib/ui/words";
 
 /**
  * One consult -> one DRAFT proposal + one approval-queue email, tied together.
@@ -223,10 +226,10 @@ async function runStages(input: ConsultProposalRunInput, progress: Progress): Pr
     .maybeSingle();
   if (settingErr) logDbError("settings", settingErr);
   if (settingErr) return refuse("unavailable", "Couldn't read the proposal settings. Nothing was drafted. Try again shortly.");
-  if (!setting) return refuse("no_settings", "Your firm hasn't set up its proposal prices yet (Settings, then Client proposals), so nothing was drafted.");
+  if (!setting) return refuse("no_settings", `Your firm hasn't set up its proposal prices yet (Settings, then ${PROPOSAL_SETTINGS_NAME}), so nothing was drafted.`);
   const approvers = (setting as Row).approver_user_ids;
   if (!Array.isArray(approvers) || approvers.length === 0) {
-    return refuse("no_approvers", "Your firm hasn't named a proposal approver yet (Settings, then Client proposals), so nothing was drafted.");
+    return refuse("no_approvers", `Your firm hasn't named a proposal approver yet (Settings, then ${PROPOSAL_SETTINGS_NAME}), so nothing was drafted.`);
   }
 
   const [{ data: org }, { data: profile }] = await Promise.all([
@@ -304,7 +307,8 @@ async function runStages(input: ConsultProposalRunInput, progress: Progress): Pr
   // NOT written into the stored reviewer notes: text stored there would keep saying so after the letter was attached.
   let letterRead: ApprovedRead;
   try {
-    letterRead = await getApprovedLetter(db as unknown as SupabaseClient<Database>, "trademark", orgId);
+    // The letter of the draft's own kind: a flat-fee draft (a non-trademark call) takes the firm's general letter.
+    letterRead = await getApprovedLetter(db as unknown as SupabaseClient<Database>, isGeneralContent(draft.content) ? "general" : "trademark", orgId);
   } catch {
     letterRead = { status: "unavailable" };
   }
@@ -351,7 +355,22 @@ async function runStages(input: ConsultProposalRunInput, progress: Progress): Pr
   const staffUrl = `${origin}/dashboard/proposals/${proposal.id}/`;
   let email: { subject: string; body: string };
   try {
-    email = renderProposalEmail(draft, { proposalUrl, signOff: teamSignOff });
+    if (isGeneralContent(draft.content)) {
+      // A flat-fee draft: the general email, its fee from the quote. With no fee set yet the email says nothing about
+      // a fee (the draft's reviewer notes say so), never a made-up one.
+      const fee = quoteProposal(draft.content, {}).legal_total_cents;
+      email = renderGeneralProposalEmail({
+        firstName: draft.content.client.first_name,
+        matterTitle: draft.content.general?.matter_title ?? "",
+        summary: draft.content.general?.summary ?? null,
+        feeText: fee > 0 ? formatDollars(fee) : null,
+        firmName,
+        proposalUrl,
+        signOff: teamSignOff,
+      });
+    } else {
+      email = renderProposalEmail(draft, { proposalUrl, signOff: teamSignOff });
+    }
   } catch (err) {
     logConsultFailure("email", err);
     await withdrawQuietly(db, orgId, proposal.id);

@@ -17,6 +17,9 @@ import { LoeSideAction } from "./LoeSideAction";
 import { LoeSignPanel } from "./LoeSignPanel";
 import { LoeStepBar } from "./LoeStepBar";
 import { saveDetailsInBackground, showsSavedNote, useLoeFlow } from "./loe-flow";
+import { depositOf, DueTodayRows, PayToday } from "./DueToday";
+import { DUE_TODAY_BAR, FEE_SUMMARY_COLUMNS, FEE_SUMMARY_HEADING, FLAT_FEE_TOTAL_LABEL } from "@/lib/loe/client-words";
+import { feeSummary, itemDetails, itemIntro, sectionFigures, splitDetailHours, usesWorkSections } from "@/lib/proposals/general-sections";
 import { brandForSlug, formatCivilDate, money, paragraphs, richSegments, safeHttpsUrl, type ProposalBrand } from "./format";
 import "./proposal.css";
 
@@ -56,6 +59,13 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
   );
   const g = content.general;
   const items = quote.general?.items ?? [];
+  // Numbered sections (an intro or bullet points on some piece of work); without either, the one-line list as before.
+  const sections = usesWorkSections(content);
+  const sourceItems = g?.items ?? [];
+  const summary = sections ? feeSummary(quote, money) : null;
+  // A deposit: part of the flat fee today, the balance later. Null = the whole fee due now, drawn exactly as before.
+  const deposit = depositOf(content, quote);
+  const payNowText = money(deposit ? deposit.split.due_now_cents : quote.legal_total_cents);
   const valueOverFee = generalValueOverFee(quote);
   const excludes = (g?.excludes ?? []).filter((l) => typeof l === "string" && l.trim());
   const firstName = content.client?.first_name?.trim() || "";
@@ -218,6 +228,54 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
                   ))
                 : null}
 
+              {sections ? (
+                <div className="cp-card">
+                  <h3>What we&rsquo;ll do</h3>
+                  <ol className="cp-work-secs">
+                    {items.map((it, i) => {
+                      const figures = sectionFigures(it, money);
+                      const intro = itemIntro(sourceItems[i]);
+                      const details = itemDetails(sourceItems[i]);
+                      return (
+                        <li key={i} className="cp-work-sec">
+                          <p className="cp-work-head">
+                            <b>{`${i + 1}. ${it.label}`}</b>
+                            {figures ? <span className="cp-num">{` ${figures}`}</span> : null}
+                          </p>
+                          {intro
+                            ? paragraphs(intro).map((p, j) => (
+                                <p key={j} className="cp-work-intro">
+                                  {p}
+                                </p>
+                              ))
+                            : null}
+                          {details.length > 0 ? (
+                            <table className="cp-work-lines">
+                              <thead className="cp-sr-only">
+                                <tr>
+                                  <th scope="col">Task</th>
+                                  <th scope="col">Estimated hours</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {details.map((d, j) => {
+                                  const line = splitDetailHours(d);
+                                  return (
+                                    <tr key={j}>
+                                      <td>{line.text}</td>
+                                      <td className="cp-num">{line.hours ?? ""}</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          ) : null}
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </div>
+              ) : (
               <div className="cp-card">
                 <h3>What we&rsquo;ll do</h3>
                 <ul className="cp-work">
@@ -229,7 +287,7 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
                   ))}
                 </ul>
               </div>
-
+              )}
               {excludes.length > 0 ? (
                 <div className="cp-card">
                   <h3>Not included</h3>
@@ -274,6 +332,38 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
               </div>
               <div className="cp-panel-b" aria-live="polite">
                 <div className="cp-lines">
+                  {summary ? (
+                    <div className="cp-grp cp-fee-sum cp-fee-sum-side">
+                      <h3>{FEE_SUMMARY_HEADING}</h3>
+                      <table className="cp-fee-tbl">
+                        <thead>
+                          <tr>
+                            {FEE_SUMMARY_COLUMNS.map((c) => (
+                              <th key={c} scope="col">
+                                {c}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {summary.rows.map((r, i) => (
+                            <tr key={i}>
+                              <td>{r.label}</td>
+                              <td className="cp-num">{r.hours}</td>
+                              <td className="cp-num">{r.fees}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr>
+                            <th scope="row">{summary.total.label}</th>
+                            <td className="cp-num">{summary.total.hours}</td>
+                            <td className="cp-num">{summary.total.fees}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  ) : null}
                   {valueOverFee ? (
                     <div className="cp-grp">
                       <div className="cp-ln">
@@ -305,6 +395,9 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
                 </div>
 
                 <div className="cp-tot">
+                  {deposit ? (
+                    <DueTodayRows deposit={deposit} totalLabel={FLAT_FEE_TOTAL_LABEL} />
+                  ) : (
                   <div className="cp-row">
                     <div className="cp-l">
                       <b>Flat fee due now</b>
@@ -312,6 +405,7 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
                     </div>
                     <div className="cp-big cp-num">{money(quote.legal_total_cents)}</div>
                   </div>
+                  )}
                 </div>
 
                 {loeOn ? (
@@ -328,7 +422,8 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
                     signable={loeFlow.signable}
                     pending={pending}
                     error={error}
-                    legalTotalText={money(quote.legal_total_cents)}
+                    legalTotalText={payNowText}
+                    payToday={<PayToday deposit={deposit} />}
                     onContinue={() => {
                       if (loeFlow.step === 2) saveDetailsInBackground(onSaveDetails, loeFlow.detailsOk, loeFlow.cleaned);
                       loeFlow.setStep(loeFlow.step === 1 ? 2 : 3);
@@ -355,6 +450,7 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
                           : " We will send your payment link by email."}
                       </p>
                     </div>
+                    {finalPayUrl ? <PayToday deposit={deposit} /> : null}
                     {finalPayUrl ? (
                       <a className="cp-btn" href={finalPayUrl} target="_blank" rel="noopener noreferrer">
                         Pay my fee
@@ -382,7 +478,7 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
                       </p>
                     ) : null}
                     <p className="cp-paynote">
-                      You&rsquo;ll pay <b className="cp-num">{money(quote.legal_total_cents)}</b>{" "}
+                      You&rsquo;ll pay <b className="cp-num">{payNowText}</b>{" "}
                       through our secure client portal. Once it&rsquo;s received, we&rsquo;ll send your engagement agreement for review and
                       signature.
                     </p>
@@ -403,9 +499,15 @@ export function GeneralProposalDocument(props: ProposalDocumentProps) {
       {accepted && !loeOn ? null : (
         <div className="cp-bar">
           <div className="cp-bar-in">
+            {deposit ? (
+              <span>
+                {DUE_TODAY_BAR} <b className="cp-num">{payNowText}</b>
+              </span>
+            ) : (
             <span>
               Flat fee due now <b className="cp-num">{money(quote.legal_total_cents)}</b>
             </span>
+            )}
             <a href="#cp-review">{accepted ? "Your receipt" : "Review and accept"}</a>
           </div>
         </div>

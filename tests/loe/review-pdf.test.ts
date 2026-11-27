@@ -15,7 +15,7 @@ import { reviewLetterPdf, signedLetterPdf } from "@/lib/proposals/public-letter"
 import { REVIEW_COPY_MARK, PDF_MESSAGES } from "@/lib/loe/client-words";
 import { REVIEW_PDF_PER_TOKEN } from "@/lib/loe/review-limit";
 import { defaultSelection } from "@/lib/proposals/pricing";
-import { sevetri } from "../proposals/fixture";
+import { callum } from "../proposals/fixture";
 import { twoBrandPerMark, withLoe } from "./loe-fixtures";
 import { NOW, browserSigning, world } from "../proposals/signing-world";
 import { TEST_DETAILS, fullLetterBlocks, paragraphText, squash } from "./full-letter-fixture";
@@ -48,15 +48,15 @@ describe("the review-copy PDF action", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(Buffer.from(r.base64, "base64").subarray(0, 5).toString()).toBe("%PDF-");
-    expect(r.filename).toMatch(/^Sevetri-Wilson-engagement-letter-review-copy\.pdf$/);
+    expect(r.filename).toMatch(/^Callum-Ferreira-engagement-letter-review-copy\.pdf$/);
     const raw = await getDocumentProxy(new Uint8Array(Buffer.from(r.base64, "base64")));
     expect((await extractText(raw, { mergePages: true })).text).toContain(REVIEW_COPY_MARK);
     const text = await textOf(r.base64);
     // Compared with all whitespace removed: where a bold lead-in ends a line, text extraction may join it to the next word.
     const bare = (t: string) => t.replace(/\s+/g, "");
-    for (const b of fullLetterBlocks({ typedName: "Sevetri Wilson", dateText: "October 20, 2026" })) expect(bare(text)).toContain(bare(paragraphText(b)));
+    for (const b of fullLetterBlocks({ typedName: "Callum Ferreira", dateText: "October 20, 2026" })) expect(bare(text)).toContain(bare(paragraphText(b)));
     expect(text).toContain("Exhibit A: Fee Structure and Estimated Costs");
-    expect(text).toContain("The Fold");
+    expect(text).toContain("The Pleat");
     // Nothing was written.
     expect(w.calls.filter((c) => c.op !== "select")).toHaveLength(0);
     expect(w.rpcCalls).toHaveLength(0);
@@ -95,7 +95,7 @@ describe("the review-copy PDF action", () => {
 
   it("refuses a proposal with no letter", async () => {
     const token = freshToken();
-    const w = world({ token, content: sevetri() });
+    const w = world({ token, content: callum() });
     expect(await reviewLetterPdf(token, undefined, undefined, TEST_DETAILS, NOW, { db: w.db })).toEqual({ ok: false, message: PDF_MESSAGES.not_open });
   });
 
@@ -141,17 +141,17 @@ describe("the review-copy PDF action", () => {
 describe("the signed PDF", () => {
   it("is rebuilt from the stored snapshot and holds the letter, the exhibit, the signer, the time and the fingerprint", async () => {
     const w = world();
-    const b = await browserSigning(w.db, { typedName: "Sevetri Wilson" });
+    const b = await browserSigning(w.db, { typedName: "Callum Ferreira" });
     const accepted = await acceptPublicProposal("T".repeat(43), b.selection, NOW, w.db, undefined, b.signing);
     expect(accepted.ok).toBe(true);
     const r = await signedLetterPdf("T".repeat(43), new Date("2026-10-21T12:00:00Z"), { db: w.db });
     if (!r.ok) throw new Error(r.message);
-    expect(r.filename).toBe("Sevetri-Wilson-engagement-letter-signed.pdf");
+    expect(r.filename).toBe("Callum-Ferreira-engagement-letter-signed.pdf");
     const raw = await getDocumentProxy(new Uint8Array(Buffer.from(r.base64, "base64")));
     const full = squash((await extractText(raw, { mergePages: true })).text);
     const text = await textOf(r.base64);
-    for (const bl of fullLetterBlocks({ typedName: "Sevetri Wilson", dateText: "October 20, 2026" })) expect(text).toContain(squash(paragraphText(bl)));
-    expect(full).toContain("Signed electronically by Sevetri Wilson on October 20, 2026 at 11:00 AM");
+    for (const bl of fullLetterBlocks({ typedName: "Callum Ferreira", dateText: "October 20, 2026" })) expect(text).toContain(squash(paragraphText(bl)));
+    expect(full).toContain("Signed electronically by Callum Ferreira on October 20, 2026 at 11:00 AM");
     expect(full).toMatch(/Fingerprint \(sha256\): [0-9a-f]{64}/);
     expect(full).not.toContain(REVIEW_COPY_MARK);
   });
@@ -159,8 +159,8 @@ describe("the signed PDF", () => {
   it("refuses when there is nothing signed (a live proposal, an unknown token, a proposal with no letter)", async () => {
     const live = world();
     expect(await signedLetterPdf("T".repeat(43), NOW, { db: live.db })).toEqual({ ok: false, message: PDF_MESSAGES.not_signed });
-    const plain = world({ content: sevetri(), proposal: { status: "accepted", accepted_snapshot: null } });
+    const plain = world({ content: callum(), proposal: { status: "accepted", accepted_snapshot: null } });
     expect((await signedLetterPdf("T".repeat(43), NOW, { db: plain.db })).ok).toBe(false);
-    expect(defaultSelection(sevetri())).toBeTruthy();
+    expect(defaultSelection(callum())).toBeTruthy();
   });
 });

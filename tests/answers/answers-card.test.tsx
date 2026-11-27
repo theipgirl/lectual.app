@@ -132,7 +132,7 @@ describe("booth scorecards (F3)", () => {
 
   it("shows event code, track, score, band, temperature, gaps and labelled answers for a Business card", () => {
     const html = render({ booth: ok([completed({ "1": "business", "2": "no", "5": "applied" })]) });
-    expect(html).toContain("Booth · urban-golf-2026 · Oct 17, 3:03 PM · Finished · Score 40/100 (Partially protected)");
+    expect(html).toContain("Scored assessment · urban-golf-2026 · Oct 17, 3:03 PM · Finished · Score 40/100 (Partially protected)");
     expect(html).toContain("urban-golf-2026 · Business");
     expect(html).toContain("Temperature (staff only)");
     expect(html).toContain("Warm");
@@ -161,11 +161,11 @@ describe("booth scorecards (F3)", () => {
     const html = render({
       booth: ok([boothItem({ id: "b2", event_code: "story2profit-2026", track: null, score: null, band: null, temperature: null, answers: {}, gaps: [], created_at: "2026-10-18T10:00:00Z", completed_at: null })]),
     });
-    expect(html).toContain("Booth · story2profit-2026 · Oct 18, 10:00 AM · Didn't finish");
+    expect(html).toContain("Scored assessment · story2profit-2026 · Oct 18, 10:00 AM · Didn't finish");
     expect(html).not.toContain("Score ");
     expect(html).not.toContain("Temperature (staff only)");
     expect(html).toContain("Track not recorded");
-    expect(html).toContain("They gave contact details at the booth and didn't finish the card.");
+    expect(html).toContain("They gave contact details and didn't finish the assessment.");
   });
 
   it("says no answers were recorded for a finished card whose answers are empty", () => {
@@ -209,7 +209,7 @@ describe("requests and order (F4)", () => {
     // booth finished Oct 20, then the unfinished intake started Oct 19, then the intake finished Oct 18, then the request Oct 12.
     expect(order).toEqual(["booth", "submission", "submission", "request"]);
     const at = (needle: string) => html.indexOf(needle);
-    expect(at("Booth · ugw")).toBeLessThan(at("Oct 19, 3:00 PM"));
+    expect(at("Scored assessment · ugw")).toBeLessThan(at("Oct 19, 3:00 PM"));
     expect(at("Oct 19, 3:00 PM")).toBeLessThan(at("Oct 18, 3:04 PM"));
     expect(at("Oct 18, 3:04 PM")).toBeLessThan(at("Intake questions sent to the client"));
   });
@@ -235,26 +235,26 @@ describe("states (F5)", () => {
 
   it("with a failed source and the others empty, still doesn't say there are no answers", () => {
     const html = render({ submissions: ok([]), booth: { status: "unavailable" } });
-    expect(html).toContain("Couldn't load answers: Booth scorecards");
+    expect(html).toContain("Couldn't load answers: Scored assessments");
     expect(html).not.toContain(EMPTY_LINE);
   });
 
   it("with every source failing, shows the warning with no items and no empty line", () => {
     const html = render({ submissions: { status: "unavailable" }, booth: { status: "unavailable" }, requests: { status: "unavailable" } });
-    expect(html).toContain("Couldn't load answers: Intake submissions, Booth scorecards, Questions sent to the client");
+    expect(html).toContain("Couldn't load answers: Intake submissions, Scored assessments, Questions sent to the client");
     expect(html).not.toContain("<details");
     expect(html).not.toContain(EMPTY_LINE);
   });
 
   it("gives a missing table its own quiet line, not the empty line", () => {
     const html = render({ submissions: ok([]), booth: { status: "unconfigured" } });
-    expect(html).toContain("Booth scorecards aren't switched on for your firm yet. Lectual will turn them on.");
+    expect(html).toContain("Scored assessments aren't switched on for your firm yet. Lectual will turn them on.");
     expect(html).not.toContain(EMPTY_LINE);
     expect(html).not.toContain("Couldn't load answers");
   });
 
   it("says when a source was cut at its row cap", () => {
-    expect(render({ submissions: ok([finishedIntake], true) })).toContain("Showing the latest 200 intake submissions.");
+    expect(render({ submissions: ok([finishedIntake], true) })).toContain("Showing 200 of 200+ intake submissions.");
   });
 
   it("labels the temperature as staff only and never uses raw HTML", () => {

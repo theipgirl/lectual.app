@@ -71,6 +71,7 @@ for (let i = 0; i < 23; i++) addMatter("BL", null);
 addMatter("LIT", null);
 
 const MINE: Record<string, StageRow[]> = { crm_matter_stage: stageRows, crm_matter: matterRows };
+// live-guard: a design-harness table list for sample data, not a database read
 const EXTRA = ["crm_drip_enrollment", "crm_meeting", "crm_calendar_event", "client_proposal", "crm_lead", "queue_card_event"];
 
 async function withMatterData<T>(fn: () => Promise<T>): Promise<T> {
@@ -91,7 +92,7 @@ async function withMatterData<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 const RELEASE = "<style>.lx-app{height:auto!important;min-height:0!important;overflow:visible!important}.lx-main,.lx-content,.lx-page{overflow:visible!important;height:auto!important}</style>";
-const VIEWS = [["list", {}], ["board", { view: "board" }]] as const;
+const VIEWS = [["list", { view: "table" }], ["board", { view: "board" }]] as const;
 const GROUPS = [["pre", {}], ["intake", { group: "intake" }], ["post", { group: "post" }], ["other", { group: "other" }], ["all", { group: "all" }]] as const;
 
 const mk = (id: string, title: string, shell: "tech" | "owner", viewport: "desktop" | "phone", search: Record<string, string>): Screen => ({
@@ -121,3 +122,18 @@ export const screens: Screen[] = [
     ),
   ),
 ];
+
+/** For the record-card screens: the sample data and the first matter's id, so the opened card can be drawn over the same docket. */
+/** Applies the sample tables and hands back the way to put them back (the opened card reads after the page function returns). */
+export function applyMatterData(): () => void {
+  const keys = [...new Set([...Object.keys(MINE), ...EXTRA])];
+  const saved = keys.map((k) => [k, Object.getOwnPropertyDescriptor(tables, k)] as const);
+  for (const k of keys) Object.defineProperty(tables, k, { configurable: true, enumerable: true, value: MINE[k] ?? (tables as Record<string, StageRow[]>)[k] ?? [], writable: true });
+  return () => {
+    for (const [k, d] of saved) {
+      if (d) Object.defineProperty(tables, k, d);
+      else delete (tables as Record<string, unknown>)[k];
+    }
+  };
+}
+export const firstMatterId = String((matterRows[0] as { id: string }).id);

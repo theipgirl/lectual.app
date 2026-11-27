@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 // "Documents & files" (lectual 0097): request an upload, confirm it, delete it.
 // The browser uploads straight to storage in between, with a signed URL this file
 // mints. Every call goes through the caller's scoped client (RLS and the storage
@@ -51,22 +52,24 @@ async function guarded<T extends { ok: boolean }>(where: string, run: () => Prom
  * advisory: it neither widens nor narrows what is accepted. The MIME returned
  * is the mapped one, and the upload must send it as its content type.
  */
-export async function requestUploadAction(
+export const requestUploadAction = previewSafe(async function requestUploadAction(
   parent: FileParentInput,
   fileName: string,
   _browserMime: string,
   size: number,
 ): Promise<RequestUploadResult> {
   return guarded("request upload", async () => {
-    const target = parseParent(parent);
+    let target = parseParent(parent);
     if (!target) return refuse(FILE_MESSAGES.notFound);
 
     const supabase = await getScopedClient();
     const who = await authorize(supabase, FILE_UPLOAD_ROLES, FILE_MESSAGES.cantUpload);
     if (!who.ok) return who;
 
-    const org = await loadParentOrg(supabase, target);
-    if (!org.ok) return org;
+    const resolved = await loadParentOrg(supabase, target);
+    if (!resolved.ok) return resolved;
+    const org = resolved;
+    target = resolved.parent;
 
     const type = checkFileName(typeof fileName === "string" ? fileName : "");
     if (!type.ok) return refuse(type.error);
@@ -83,7 +86,7 @@ export async function requestUploadAction(
     }
     return { ok: true as const, fileId, signedUrl: data.signedUrl, token: data.token, mime: type.mime };
   }) as Promise<RequestUploadResult>;
-}
+}, "state");
 
 /**
  * Step 3, after the browser's direct upload. Takes no path, org or MIME from the
@@ -92,9 +95,9 @@ export async function requestUploadAction(
  * the scoped storage client that the object is really there (storing its real
  * size). Then it inserts the crm_file row and logs a `file_uploaded` activity.
  */
-export async function confirmUploadAction(parent: FileParentInput, fileId: string, fileName: string): Promise<ConfirmUploadResult> {
+export const confirmUploadAction = previewSafe(async function confirmUploadAction(parent: FileParentInput, fileId: string, fileName: string): Promise<ConfirmUploadResult> {
   return guarded("confirm upload", async () => {
-    const target = parseParent(parent);
+    let target = parseParent(parent);
     if (!target) return refuse(FILE_MESSAGES.notFound);
     if (!isUuid(fileId)) return refuse(FILE_MESSAGES.badUpload);
 
@@ -102,8 +105,10 @@ export async function confirmUploadAction(parent: FileParentInput, fileId: strin
     const who = await authorize(supabase, FILE_UPLOAD_ROLES, FILE_MESSAGES.cantUpload);
     if (!who.ok) return who;
 
-    const org = await loadParentOrg(supabase, target);
-    if (!org.ok) return org;
+    const resolved = await loadParentOrg(supabase, target);
+    if (!resolved.ok) return resolved;
+    const org = resolved;
+    target = resolved.parent;
 
     const type = checkFileName(typeof fileName === "string" ? fileName : "");
     if (!type.ok) return refuse(type.error);
@@ -139,6 +144,7 @@ export async function confirmUploadAction(parent: FileParentInput, fileId: strin
       // The unique path (or id) means this exact file is already on the record.
       if (insertError.code === "23505") {
         revalidatePath(parentPath(target));
+        revalidatePath("/dashboard/review/");
         return { ok: true as const, fileId, alreadySaved: true as const };
       }
       logFileFailure("save file row", insertError);
@@ -157,9 +163,10 @@ export async function confirmUploadAction(parent: FileParentInput, fileId: strin
       payload: { file_id: fileId, file_name: type.name, size_bytes: sizeBytes },
     });
     revalidatePath(parentPath(target));
+    revalidatePath("/dashboard/review/");
     return { ok: true as const, fileId };
   }) as Promise<ConfirmUploadResult>;
-}
+}, "state");
 
 /**
  * Deletes a stored file: owner, admin and senior_admin only, role resolved on
@@ -168,7 +175,7 @@ export async function confirmUploadAction(parent: FileParentInput, fileId: strin
  * delete after the object is gone says so (a retry succeeds, because an object
  * that is already gone counts as removed).
  */
-export async function deleteFileAction(fileId: string): Promise<DeleteFileResult> {
+export const deleteFileAction = previewSafe(async function deleteFileAction(fileId: string): Promise<DeleteFileResult> {
   return guarded("delete file", async () => {
     if (!isUuid(fileId)) return refuse(FILE_MESSAGES.fileNotFound);
 
@@ -205,6 +212,8 @@ export async function deleteFileAction(fileId: string): Promise<DeleteFileResult
 
     const parent = row.lead_id ? { kind: "lead" as const, id: row.lead_id } : row.matter_id ? { kind: "matter" as const, id: row.matter_id } : null;
     if (parent) revalidatePath(parentPath(parent));
+    // The Weekly review's opened card lists the file and counts it on the row ("N documents").
+    revalidatePath("/dashboard/review/");
     return { ok: true as const };
   }) as Promise<DeleteFileResult>;
-}
+}, "state");

@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     return new NextResponse(null, { status: 401 });
   }
   // Two vercel.json entries per job (EST and EDT); only the tick in this job's New York hour works.
-  if (!shouldRunNow("agents", new Date())) return NextResponse.json(NOT_THIS_HOUR);
+  if (shouldRunNow("agents", new Date()) === null) return NextResponse.json(NOT_THIS_HOUR);
   if (!aiConfigured()) {
     return NextResponse.json({ ok: false, reason: "ANTHROPIC_API_KEY is not configured" }, { status: 503 });
   }

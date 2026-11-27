@@ -36,7 +36,7 @@ async function workspace(over: Partial<IntakeFormRecord> = {}, canEdit = true) {
   );
 }
 
-const head = (html: string) => html.slice(html.indexOf('class="lx-page-head ifm-head"'), html.indexOf('<nav class="ifm-tabs"'));
+const head = (html: string) => html.slice(html.indexOf('class="lx-page-head lx-head ifm-head"'), html.indexOf('<nav class="lx-tabs"'));
 const share = (html: string) => html.slice(html.indexOf('id="ifm-sec-share"'));
 
 describe("builder header (12.2)", () => {
@@ -74,7 +74,7 @@ describe("builder header (12.2)", () => {
 describe("names (12.3)", () => {
   it("has the tabs Setup, Results, Performance and no Form setup", async () => {
     const html = await workspace();
-    const nav = html.slice(html.indexOf('<nav class="ifm-tabs"'), html.indexOf("</nav>", html.indexOf('<nav class="ifm-tabs"')));
+    const nav = html.slice(html.indexOf('<nav class="lx-tabs"'), html.indexOf("</nav>", html.indexOf('<nav class="lx-tabs"')));
     expect([...nav.matchAll(/>([^<]+)<\/a>/g)].map((m) => m[1])).toEqual(["Setup", "Results", "Performance"]);
     expect(html).not.toContain("Form setup");
   });
@@ -131,7 +131,7 @@ describe("the list (12.7 to 12.10)", () => {
 
   it("is called Forms, with Results and Performance actions", async () => {
     const html = await list();
-    expect(html).toContain('<h1 class="lx-h1">Forms</h1>');
+    expect(html).toContain('<h1 class="lx-h1" data-tour="forms-head">Forms</h1>');
     expect(html).not.toContain("Intake forms");
     expect(html).toContain(">Results<");
     expect(html).toContain(">Performance<");

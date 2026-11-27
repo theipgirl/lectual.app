@@ -6,12 +6,12 @@ import { LegacyProposals } from "@/components/proposal-list/LegacyProposals";
 const RPB = "11111111-1111-1111-1111-111111111111";
 
 describe("earlier proposals (pages made before the builder)", () => {
-  it("lists Sevetri's page for RPB with its link unchanged", () => {
+  it("lists Callum's page for RPB with its link unchanged", () => {
     const items = legacyProposalsFor(RPB);
-    expect(items.map((p) => p.url)).toEqual(["https://proposals.rpblawfirm.com/prosperall-ojvfsf5ivxlu/"]);
+    expect(items.map((p) => p.url)).toEqual(["https://proposals.rpblawfirm.com/larkmoor-ojvfsf5ivxlu/"]);
     const html = renderToStaticMarkup(<LegacyProposals items={items} />);
-    expect(html).toContain('href="https://proposals.rpblawfirm.com/prosperall-ojvfsf5ivxlu/"');
-    expect(html).toContain("Sevetri Wilson");
+    expect(html).toContain('href="https://proposals.rpblawfirm.com/larkmoor-ojvfsf5ivxlu/"');
+    expect(html).toContain("Callum Ferreira");
     expect(html).toContain("aren&#x27;t tracked here");
   });
 

@@ -75,7 +75,7 @@ describe("the rail is built from the glossary", () => {
 describe("one place for each name", () => {
   const files = [...walk("src/app"), ...walk("src/components"), ...walk("src/lib")].filter((f) => f !== "src/lib/ui/words.ts");
   // Names that are also ordinary words are only held to it when the whole literal is the name.
-  const EXACT = [W.MOVED_AUTOMATICALLY, W.NOT_RATED, W.COPY_VIEW_LINK, W.OUR_TURN, W.FROM_THEIR_EMAILS, W.AUTOMATIC_STAGE_MOVES, W.FIRST_READ, W.ASSISTANTS_PAUSED, W.AI_TOOLS_GROUP, W.FIRM_NOTES_NAME, W.SHORTCUTS_NAME, W.FEATURES_NAME];
+  const EXACT = [W.MOVED_AUTOMATICALLY, W.NOT_RATED, W.COPY_VIEW_LINK, W.OUR_TURN, W.FROM_THEIR_EMAILS, W.AUTOMATIC_STAGE_MOVES, W.FIRST_READ, W.ASSISTANTS_PAUSED, W.AI_TOOLS_GROUP, W.FIRM_NOTES_NAME, W.SHORTCUTS_NAME, W.FEATURES_NAME, W.LAST_CONTACT, W.ADD_A_LEAD, W.ADD_TO_TIMELINE, W.PROPOSAL_SETTINGS_NAME];
 
   it("no second whole-string copy of a glossary name outside words.ts", () => {
     const hits: string[] = [];
@@ -84,5 +84,31 @@ describe("one place for each name", () => {
       for (const s of strings) if (EXACT.includes(s.text.trim())) hits.push(`${file}:${s.line}\t${s.text}`);
     }
     expect(hits, hits.join("\n")).toEqual([]);
+  });
+});
+
+describe("View as sentences (spec 'Private places')", () => {
+  it("are the ones the spec wrote, with no build words", () => {
+    expect(W.VIEW_AS_BANNER("Dana Lee")).toBe("Viewing as Dana Lee (read-only)");
+    expect(W.VIEW_AS_EXIT).toBe("Exit");
+    expect(W.VIEW_AS_READ_ONLY).toBe("This is a read-only preview. Nothing was changed.");
+    expect(W.VIEW_AS_EXIT_FAILED).toBe("Couldn't leave the preview. Try again, or sign out to end it.");
+    expect(W.VIEW_AS_PRIVATE_MAIL("Dana")).toBe("Dana's own mailbox is private to them and isn't shown in a preview.");
+    expect(W.VIEW_AS_LIVE_MAIL).toBe("Live mail isn't read in a preview. Stored messages are shown.");
+    expect(W.VIEW_AS_PRIVATE_OUTLOOK("Dana")).toBe("Dana's own Outlook isn't checked in a preview.");
+    expect(W.VIEW_AS_PRIVATE_COPILOT("Dana")).toBe("Dana's Copilot chats are private to them and aren't shown in a preview.");
+    expect(W.VIEW_AS_PRIVATE_BELL("Dana")).toBe("Dana's notifications are private to them and aren't shown in a preview.");
+    expect(W.VIEW_AS_ZOOM).toBe("Zoom consults aren't read in a preview.");
+    expect(W.VIEW_AS_NOT_ALLOWED).toBe("Only an owner of this firm can view the app as a teammate.");
+    expect(W.VIEW_AS_TARGET_GONE).toBe("That person isn't on your team any more.");
+    expect(W.VIEW_AS_UNCHECKED).toBe("Couldn't check whether you're viewing as a teammate. Nothing can be changed until you refresh.");
+    expect(W.VIEW_AS_LINK).toBe("View as");
+    expect(W.VIEW_AS_MENU).toBe("View as a teammate");
+    expect(W.VIEW_AS_NOT_READY).toBe(W.notReadyYet("Viewing as a teammate"));
+    expect(W.VIEW_AS_OUTLOOK_UNCHECKED).toBe("Outlook calendars aren't checked in a preview.");
+    expect(W.VIEW_AS_STALE).toBe("Your earlier preview has ended.");
+    expect(W.VIEW_AS_LEAVE).toBe("Leave preview");
+    const all = [W.VIEW_AS_BANNER("X"), W.VIEW_AS_READ_ONLY, W.VIEW_AS_EXIT_FAILED, W.VIEW_AS_PRIVATE_MAIL("X"), W.VIEW_AS_LIVE_MAIL, W.VIEW_AS_PRIVATE_OUTLOOK("X"), W.VIEW_AS_PRIVATE_COPILOT("X"), W.VIEW_AS_PRIVATE_BELL("X"), W.VIEW_AS_ZOOM, W.VIEW_AS_NOT_ALLOWED, W.VIEW_AS_TARGET_GONE, W.VIEW_AS_UNCHECKED, W.VIEW_AS_START_FAILED, W.VIEW_AS_TEAM_UNREADABLE, W.VIEW_AS_NOT_READY];
+    for (const s of all) expect(s).not.toMatch(/impersonat|session|\bRLS\b|migration|database|token/i);
   });
 });

@@ -83,12 +83,12 @@ describe("the Client response cell merges Accepted, Opened and Paid", () => {
 });
 
 describe("the Fees cell merges the two fees", () => {
-  it("two lines, '$4,075.00 at signing' and '$700.00 at filing', in Geist tabular figures", () => {
+  it("two lines, '$4,075 at signing' and '$700 at filing', in Geist tabular figures", () => {
     const out = table([view()]);
-    expect(out).toContain('<span class="pq-fee-n">$4,075.00</span> <span class="pq-fee-l">at signing</span>');
-    expect(out).toContain('<span class="pq-fee-n">$700.00</span> <span class="pq-fee-l">at filing</span>');
+    expect(out).toContain('<span class="pq-fee-n">$4,075</span> <span class="pq-fee-l">at signing</span>');
+    expect(out).toContain('<span class="pq-fee-n">$700</span> <span class="pq-fee-l">at filing</span>');
     const css = readFileSync("src/app/dashboard/proposals/proposals.css", "utf8");
-    expect(css).toMatch(/\.pq-fee \{ font-family: var\(--sans\); font-variant-numeric: tabular-nums; font-size: 14px;/);
+    expect(css).toMatch(/\.pq-fee \{ font-family: var\(--sans\); font-variant-numeric: tabular-nums; font-size: var\(--fs-2\);/);
     expect(css).not.toMatch(/\.pq-fee[^}]*var\(--mono\)/);
   });
   it("a flat-fee row has no filing line at all", () => {
@@ -101,24 +101,25 @@ describe("the Fees cell merges the two fees", () => {
 describe("the blocked reason is said once, in Status", () => {
   it("Status carries it (clamped, with a title) and the Proposal cell's quiet line is the update time", () => {
     const v = view({ status: "draft", blocking_issue: "Add the pay link before creating the link.", expires_on: null });
-    expect(v.activityLine).toBe("Updated 5d ago");
+    expect(v.activityLine).toBe("Updated 5 days ago");
     const out = table([v]);
     expect(out.match(/Add the pay link before creating the link\./g)).toHaveLength(2); // the text and its title, both in the Status cell
     const status = out.split('class="wrap pq-c-status"')[1].split("</td>")[0];
-    expect(status).toContain('class="pq-mono pq-sub pq-status-sub" title="Add the pay link before creating the link."');
+    expect(status).toContain('class="pq-meta pq-sub pq-status-sub" title="Add the pay link before creating the link."');
     const css = readFileSync("src/app/dashboard/proposals/proposals.css", "utf8");
     expect(css).toMatch(/\.pq-status-sub \{[^}]*-webkit-line-clamp: 2/);
   });
   it("other rows keep their last-activity line in the Proposal cell", () => {
-    expect(view(ACCEPTED, { paid: new Map() }).activityLine).toBe("Accepted by the client · 6d ago");
+    expect(view(ACCEPTED, { paid: new Map() }).activityLine).toBe("Accepted by the client · 6 days ago");
   });
 });
 
 describe("the Status pill never wraps", () => {
-  it("is one line, with a column sized for ACCEPTED BY CLIENT", () => {
+  it("is one line (the shared pill), with a column sized for ACCEPTED BY CLIENT", () => {
     const css = readFileSync("src/app/dashboard/proposals/proposals.css", "utf8");
-    expect(css).toMatch(/td\.pq-c-status \.pq-pill \{[^}]*white-space: nowrap/);
-    expect(css).toMatch(/\.pq-th-status \{ width: 176px; \}/);
+    // The shared Pill is one line (white-space: nowrap in globals); the column is a share of the fixed table.
+    expect(readFileSync("src/app/globals.css", "utf8")).toMatch(/\.lx-pill,\s*\.lp-pill \{[^}]*white-space: nowrap/);
+    expect(css).toMatch(/\.pq-tbl \.pq-col-status \{ width: 19%; \}/);
   });
 });
 

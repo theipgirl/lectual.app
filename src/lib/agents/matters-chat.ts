@@ -1,4 +1,5 @@
 import "server-only";
+import { MAX_PACKAGE_CHOICE_OPTIONS } from "@/lib/proposals/package-choice-limit";
 import type {
   BetaContentBlockParam,
   BetaMessageParam,
@@ -30,6 +31,7 @@ import {
   type MatterDeadline,
 } from "@/lib/matters";
 import { summarizeDocket } from "@/lib/matters/docket-summary";
+import { loadIntakeStageIds, withoutIntake } from "@/lib/matters/intake-ids";
 import { listLeads, type Lead } from "@/lib/pipeline";
 import { confirmationContext, withConfirmation, DRAFT_PROPOSAL_TOOL, type ConfirmationContext } from "@/lib/copilot/draft-proposal";
 import {
@@ -355,7 +357,9 @@ function buildTools(
       inputSchema: { type: "object", properties: {} },
       execute: async () => {
         const all = await loadMatters();
-        const { open, stalled } = summarizeDocket(all);
+        // Counted the way the Matters page draws them: a matter still in an intake stage is not an open matter. A failed
+        // stage read (null) counts every matter, as before the rule.
+        const { open, stalled } = summarizeDocket(withoutIntake(all, await loadIntakeStageIds()));
         const shown = stalled.slice(0, 15);
         const byId = new Map(all.map((m) => [m.id, m]));
         shown.forEach((s) => {
@@ -441,7 +445,7 @@ function buildTools(
                   type: "object",
                   description: "The user wants the client to choose among packages for this brand name",
                   properties: {
-                    options: { type: "array", minItems: 1, maxItems: 3, items: { type: "string", minLength: 1 }, description: "Package names, as the user said them" },
+                    options: { type: "array", minItems: 1, maxItems: MAX_PACKAGE_CHOICE_OPTIONS, items: { type: "string", minLength: 1 }, description: "Package names, as the user said them" },
                     start: { type: "string", description: "The package the choice starts on; one of the options" },
                   },
                   required: ["options"],
@@ -450,8 +454,8 @@ function buildTools(
                   type: "object",
                   description: "The user wants a package chosen for each mark of this brand name",
                   properties: {
-                    word: { type: "object", properties: { options: { type: "array", minItems: 1, maxItems: 3, items: { type: "string" } }, start: { type: "string" } }, required: ["options"] },
-                    logo: { type: "object", properties: { options: { type: "array", minItems: 1, maxItems: 3, items: { type: "string" } }, start: { type: "string" } }, required: ["options"] },
+                    word: { type: "object", properties: { options: { type: "array", minItems: 1, maxItems: MAX_PACKAGE_CHOICE_OPTIONS, items: { type: "string" } }, start: { type: "string" } }, required: ["options"] },
+                    logo: { type: "object", properties: { options: { type: "array", minItems: 1, maxItems: MAX_PACKAGE_CHOICE_OPTIONS, items: { type: "string" } }, start: { type: "string" } }, required: ["options"] },
                   },
                 },
                 discountPercent: { type: "integer", minimum: 0, maximum: 50, description: "A whole percent off this brand name, only when the user gave one" },

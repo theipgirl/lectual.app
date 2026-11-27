@@ -99,6 +99,70 @@ Recap: `docs/recaps/2026-11-17-marketing-site-redesign-mockups.md`. Omi cross-ch
 - [ ] Write the short design for the chosen direction, then build it in `theipgirl/lectual` `src/app/(marketing)/` on a branch (no deploy without Taylor's OK).
 - [ ] Check the chosen mockup in Safari, with a trackpad, with reduced motion and with JavaScript off before building on it.
 
+## 2026-11-25: due today (deposit), contract line items, four package options (lectual.app#35, #36, #37 merged and live)
+
+### Built
+- [x] #35: "Due today" for a deposit (e.g. 50% now, 50% upon deliverables) on trademark and flat-fee proposals; work items as numbered sections
+      with an intro and bullets; up to four package options per brand name.
+- [x] #36: bullets show their dots on the client page and in the editor.
+- [x] #37: each bullet is a line-item row with its hours on the right; the Legal Fee Summary sits in "Review and accept".
+
+### Taylor
+- [ ] Annick contract draft v2 (https://app.lectual.app/dashboard/proposals/c2eeb0ce-d282-4f7d-8d5e-b3cf5739b574/): check the preview,
+      set the pay link, Save and create link. Total $3,465, due today $1,732.50.
+- [ ] Annick trademark draft v2 (https://app.lectual.app/dashboard/proposals/daaa4fe6-f4f7-474d-8646-480879f0d171/): Black Friday, Essential,
+      Enhanced or Concierge per mark, 50% due today. Check, Save and create link.
+- [ ] Send Annick the contract email with the deposit sentence (your send, from Outlook).
+- [ ] Tell Claude the two Black Friday pay links, or choose: two proposals now, or build a pay link per package. (Tabled: pay link per package
+      is on the build list below.)
+- [x] GC agent (lectual.app#38): a non-trademark consult now drafts a flat-fee proposal + email for approval. Fees only from Rebecca's own
+      words on the call; otherwise a "Set the flat fee" check blocks the link.
+- [ ] Add credits to the Anthropic account behind ANTHROPIC_API_KEY (lectual-app on Vercel), then re-run "Draft the proposal" on that consult.
+- [ ] Kika Wise (Black Box Franchising): follow-up reply-all draft is in info@ Drafts. Review and send.
+
+## 2026-11-24: Annick Charles proposal (Black Friday), next proposal-maker build list
+
+### Done for Annick (lectual-prod, draft c4f59d2f)
+- [x] "Black Friday Bundle" added to RPB's package list (Settings, Proposals, Packages): $3,997 per brand name, word + logo mark, up to 2 classes
+      each, USPTO fees separate, with the offer's "what's included" rows. REMOVE IT FROM SETTINGS ON DEC 1.
+- [x] Annick's three brand names offer Black Friday Bundle (starts selected), Enhanced or Concierge. Engagement letter removed from her draft.
+
+### Taylor
+- [ ] Annick: set the regular pay link, decide the last day (bundle ends Nov 30, proposal says Dec 4), check the preview, Save and create link.
+- [ ] Dec 1: delete "Black Friday Bundle" from Settings, Proposals, Packages.
+
+### Next proposal-maker build (tabled)
+- [ ] A pay link per package (e.g. the Black Friday Lawmatics form beside the regular pay link); the client page shows the link for what they chose,
+      and both when brand names are on different packages.
+- [ ] A package that expires on a date (offer ends Nov 30) and drops off the client page after it.
+- [ ] Bundle pricing shown as one price for word + logo (today the logo mark shows $0 under the bundle).
+- [ ] Meetings import more often than once a day (Zoom transcripts arrive after the call).
+- [ ] Approved client emails: choose which mailbox each kind is drafted in (Settings, Approvals).
+
+## 2026-11-16: Anthony Harris proposal without the letter; Adobe Sign question
+
+### Taylor
+- [ ] Review Anthony Harris's draft v6 (same offer as live v5, no engagement letter), then "Save and create link". The same client link then shows v6
+      and v5 is replaced. Leave the Engagement letter switch off.
+- [ ] Anthony reached "Your details" on v5 on Nov 16; saving his address to Lawmatics was blocked (no single Lawmatics record matched his lead).
+      Link his lead to his Lawmatics matter if he has one.
+- [ ] Adobe Sign: Rebecca checks for an API Applications menu in her Adobe Sign account and sends the plan name; you answer pay-before-or-after
+      countersign, signing inside the page or by Adobe email, and whether a typed name is enough. Then Claude writes the design.
+
+## 2026-11-13: merged #33 (package notes), #34 (sign fields, address inputs, quoted marks); test proposal on lectual-prod
+
+### Taylor
+- [x] Merge lectual.app#33 (each package's own notes show in "What's included") and #34 (sign name and "I agree" required, real address
+      fields with a US state list, brand names in quotation marks on the client page). Both merged Nov 13.
+- [ ] Run the test: draft 813f42e6 (lead "51.glee.snowmen", Lawmatics matter 19989543) at
+      app.lectual.app/dashboard/proposals/813f42e6-3564-4952-948a-987e214b636f/. Replace the pay link (copied from Anthony's), Save and create link,
+      then open the link as the client: choose, details, sign, pay.
+- [ ] Tell Claude when the test is signed. Claude checks lectual-prod for the signature row and the timeline steps, and you check matter 19989543 in
+      Lawmatics for the address, the acceptance note and the signed letter PDF.
+- [ ] After the test: delete the test proposal (owner, More, Delete proposal) and say whether to remove test lead 4065b888.
+- [ ] Re-check the includes table: edits made before the 20:33 UTC deploy on Nov 12 weren't saved. Edit and Save again, then pick each package in
+      the preview (it shows only the chosen package's column).
+
 ## 2026-11-12 (night): merged #29, #30, #31; letter version 2 waiting for approval
 
 ### Taylor
@@ -194,7 +258,7 @@ Spec: `docs/specs/2026-11-12-proposal-loe-and-builder-design.md`
 
 ### Dawn / the firm
 
-- [ ] Sevetri Wilson's engagement letter still needs its fee chart filled by hand. The app can't fill it for a multi-brand, per-mark proposal until this is built.
+- [ ] Callum Ferreira's engagement letter still needs its fee chart filled by hand. The app can't fill it for a multi-brand, per-mark proposal until this is built.
 
 ### Claude, next session
 

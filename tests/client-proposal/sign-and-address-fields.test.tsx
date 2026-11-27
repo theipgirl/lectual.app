@@ -93,18 +93,18 @@ describe("step 2 is a real address form", () => {
 });
 
 describe("the stored values and the agreement are unchanged", () => {
-  const filled: SignerDetails = { ...emptyDetails(), client_name: "Sevetri Wilson", street: "123 Main St", street2: "Suite 4", city: "Miami", region: "FL", postal: "33101", country: "United States" };
+  const filled: SignerDetails = { ...emptyDetails(), client_name: "Callum Ferreira", street: "123 Main St", street2: "Suite 4", city: "Miami", region: "FL", postal: "33101", country: "United States" };
   it("the same values give the same address block and address json as before", () => {
     expect(addressBlock(filled)).toBe("123 Main St\nSuite 4\nMiami, FL 33101\nUnited States");
     expect(addressJson(filled)).toEqual({ street: "123 Main St", street2: "Suite 4", city: "Miami", region: "FL", postal: "33101", country: "United States" });
   });
   it("a state typed as free text and the same code picked from the list agree", () => {
-    const a = pageAgreement({ body: fullLetterBody(), details: { ...filled, region: "FL" }, typedName: "Sevetri Wilson", dateText: "November 12, 2026", clientEmail: "s@example.com", exhibit: exhibitFor() });
+    const a = pageAgreement({ body: fullLetterBody(), details: { ...filled, region: "FL" }, typedName: "Callum Ferreira", dateText: "November 12, 2026", clientEmail: "s@example.com", exhibit: exhibitFor() });
     expect(a?.text).toContain("Miami, FL 33101\nUnited States");
   });
   it("the required rule is exactly as it was", () => {
-    expect(canSign({ typedName: "Sevetri Wilson", agree: true, details: filled })).toBe(true);
-    expect(canSign({ typedName: "Sevetri Wilson", agree: true, details: { ...filled, region: "" } })).toBe(false);
+    expect(canSign({ typedName: "Callum Ferreira", agree: true, details: filled })).toBe(true);
+    expect(canSign({ typedName: "Callum Ferreira", agree: true, details: { ...filled, region: "" } })).toBe(false);
   });
 });
 
@@ -120,7 +120,7 @@ describe("step 3: both fields are plainly required", () => {
   });
 
   const base: LoeSideActionProps = {
-    mode: "live", step: 3, accepted: false, firstName: "Sevetri", signedLine: null, payUrl: null, opened: false, canContinue: true, detailsOk: true,
+    mode: "live", step: 3, accepted: false, firstName: "Callum", signedLine: null, payUrl: null, opened: false, canContinue: true, detailsOk: true,
     signable: false, pending: false, error: null, legalTotalText: "$4,075", onContinue: noop, onBack: noop, onSign: noop, onReadLetter: noop,
   };
   it("the sign button is disabled and described by the reason until a name is typed and the box ticked", () => {
@@ -141,13 +141,13 @@ describe("step 3: both fields are plainly required", () => {
   });
   it("the page's canSign needs a typed name that is non-empty after cleaning, and the tick", () => {
     for (const name of ["", "   ", "\t", "<>"]) expect(canSign({ typedName: name, agree: true, details: TEST_DETAILS }), JSON.stringify(name)).toBe(false);
-    expect(canSign({ typedName: "Sevetri Wilson", agree: false, details: TEST_DETAILS })).toBe(false);
-    expect(canSign({ typedName: "Sevetri Wilson", agree: true, details: TEST_DETAILS })).toBe(true);
+    expect(canSign({ typedName: "Callum Ferreira", agree: false, details: TEST_DETAILS })).toBe(false);
+    expect(canSign({ typedName: "Callum Ferreira", agree: true, details: TEST_DETAILS })).toBe(true);
   });
   it("the server still refuses a missing name or tick", () => {
     expect(checkSigning({ typedName: "   ", agree: true, details: TEST_DETAILS })).toEqual({ ok: false, reason: "name_required" });
-    expect(checkSigning({ typedName: "Sevetri Wilson", agree: false, details: TEST_DETAILS })).toEqual({ ok: false, reason: "agree_required" });
-    expect(checkSigning({ typedName: "Sevetri Wilson", agree: "yes", details: TEST_DETAILS })).toEqual({ ok: false, reason: "agree_required" });
+    expect(checkSigning({ typedName: "Callum Ferreira", agree: false, details: TEST_DETAILS })).toEqual({ ok: false, reason: "agree_required" });
+    expect(checkSigning({ typedName: "Callum Ferreira", agree: "yes", details: TEST_DETAILS })).toEqual({ ok: false, reason: "agree_required" });
   });
 });
 
@@ -164,7 +164,7 @@ describe("the brand name in quotation marks is display only", () => {
     <ProposalDocument
       content={withLoe(twoBrandPerMark())}
       title="Trademark Proposal"
-      clientName="Sevetri Wilson"
+      clientName="Callum Ferreira"
       expiresOn="2026-12-01"
       firm={{ name: "RPB Law", slug: "rpb-law" }}
       mode="live"
@@ -173,16 +173,16 @@ describe("the brand name in quotation marks is display only", () => {
     />,
   );
   it("step 1 shows the quoted name in the card heading and the review line", () => {
-    expect(html).toContain("“The Fold”</h3>");
-    expect(html).toContain("<h3>“The Fold” —");
+    expect(html).toContain("“The Pleat”</h3>");
+    expect(html).toContain("<h3>“The Pleat” —");
   });
   it("Exhibit A and the agreement text keep the plain name, byte for byte", () => {
     const exhibit = exhibitFor();
     const lines = exhibitLines(exhibit).join("\n");
-    expect(lines).toContain("The Fold");
+    expect(lines).toContain("The Pleat");
     expect(lines).not.toMatch(/[“”]/);
-    expect(exhibit.groups.map((g) => g.title)).toEqual(["The Fold", "The Confidence Interval"]);
-    const a = pageAgreement({ body: fullLetterBody(), details: TEST_DETAILS, typedName: "Sevetri Wilson", dateText: "November 12, 2026", clientEmail: "s@example.com", exhibit });
+    expect(exhibit.groups.map((g) => g.title)).toEqual(["The Pleat", "The Margin Note"]);
+    const a = pageAgreement({ body: fullLetterBody(), details: TEST_DETAILS, typedName: "Callum Ferreira", dateText: "November 12, 2026", clientEmail: "s@example.com", exhibit });
     expect(a).not.toBeNull();
     expect(a!.text).toBe(agreementText(a!.blocks, exhibit));
     // Pinned: a change to the words of a signed letter would break the rebuild check on letters already signed.
@@ -190,4 +190,4 @@ describe("the brand name in quotation marks is display only", () => {
   });
 });
 
-const PINNED_SHA = "e5b347f500bb408ec8a1567b25de88ed6f875892ca501eba08c24c3c162dff2b";
+const PINNED_SHA = "3c53b92543a5636a9f8b4ab79d9d28a1099cbcf858b0d6b1c87f65ee8ae58b25";

@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { refresh } from "next/cache";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { resolveFirmSession } from "@/lib/firm/session";
@@ -22,7 +23,7 @@ const DELETE_CHAT_MESSAGES = {
   failed: "The chat couldn't be deleted. Try again.",
 } as const;
 
-export async function deleteChatAction(id: string): Promise<DeleteChatResult> {
+export const deleteChatAction = previewSafe(async function deleteChatAction(id: string): Promise<DeleteChatResult> {
   try {
     const session = await resolveFirmSession();
     if (session.kind !== "ok") return { ok: false, error: DELETE_CHAT_MESSAGES.signedOut };
@@ -37,9 +38,9 @@ export async function deleteChatAction(id: string): Promise<DeleteChatResult> {
   } catch {
     return { ok: false, error: DELETE_CHAT_MESSAGES.failed };
   }
-}
+}, "state");
 
 /** Asks the page to re-read the history list after a chat is saved. Reads and writes nothing. */
-export async function refreshHistoryAction(): Promise<void> {
+export const refreshHistoryAction = previewSafe(async function refreshHistoryAction(): Promise<void> {
   refresh();
-}
+}, "redirect");

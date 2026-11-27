@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { TemperatureResult } from "@/lib/intake/temperature";
+import "@/app/dashboard/intake/leads.css";
 
 /**
  * "Long-Term Nurture suggested", as text and a link. Nothing here moves a lead:
@@ -23,22 +24,11 @@ export function LtnSuggestion({
   const href = target === "sequences" ? "#sequences-heading" : `/dashboard/leads/${leadId}/`;
   return (
     <span
-      style={{
-        display: "inline-block",
-        minWidth: 0,
-        maxWidth: "100%",
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        verticalAlign: "bottom",
-        fontSize: "var(--lp-meta, 13px)",
-        lineHeight: 1.4,
-        color: "var(--mute)",
-        whiteSpace: "normal",
-      }}
+      className="ix-ltn"
       title="Unbooked by day 10. Moving the lead is your call; nothing changes by itself."
     >
       Long-Term Nurture suggested{" "}
-      <Link href={href} style={{ color: "var(--ox)", textDecoration: "underline" }}>
+      <Link href={href} className="ix-ltn-link">
         {target === "sequences" ? "See campaigns" : "Open lead"}
       </Link>
     </span>

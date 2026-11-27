@@ -1,0 +1,139 @@
+-- PROPOSAL ONLY. NOT A MIGRATION OF THIS REPO. NOT APPLIED ANYWHERE (not lectual-dev, not lectual-prod).
+-- =====================================================================================================================
+-- 0118_lawmatics_last_sync.sql (proposed): "last successful run" for lectual.app's Lawmatics daily sync.
+--
+-- This file is a draft for the `lectual` repo (theipgirl/lectual), where migrations live (lectual.app AGENTS.md: "No migrations
+-- in this repo"). To use it: copy it to `lectual/supabase/migrations/0118_lawmatics_last_sync.sql` (first-merged-wins numbering:
+-- 0108 and 0110-0117 are spoken for in this plan; renumber if 0118 is taken too), review it there, add the isolation cases at the end
+-- of this file to tests/tenant-isolation.test.ts, run the PRE-APPLY CHECKS below on lectual-dev, apply to lectual-dev, run the cases
+-- there, then do the same on lectual-prod only with the owner's OK. Apply to BOTH projects (lectual AGENTS.md, "Database").
+--
+-- Contract: docs/pge/2026-11-17-agentic-ip-os/spec-lawmatics-daily-sync.md, "The cutoff and 'last successful run'".
+-- Checked against lectual migration 0077 (lawmatics_connection) and this repo's code (src/lib/lawmatics/daily-sync.ts,
+-- src/lib/lawmatics/connection.ts), NOT a live database.
+--
+-- Depends on: 0077 (lawmatics_connection: id, org_id unique, status 'active' | 'invalid' | 'revoked', token_enc with no column
+-- grant for authenticated, members read, owner/admin/senior_admin write; the column grants are listed per column there).
+--
+-- WHAT IT ADDS
+--   lawmatics_connection.last_sync_at timestamptz null: the START time of the last COMPLETE prospect step of the Lawmatics daily
+--   sync for that firm (both /prospects and /contacts read completely, includes kept, inside its budget, nobody left over the
+--   per-run limit, no failed write). The sync's cutoff is max(2026-11-01, last_sync_at - 2 days); null = 2026-11-01.
+--   No new table, so no new tenant table and no new isolation table: the 0077 cases cover the row. Two small cases are added
+--   below for the column itself (a signed-in caller cannot write it; a member reads only their own firm's value).
+--
+-- WHO WRITES IT
+--   Only the service-role runner (lectual.app src/lib/lawmatics/daily-sync.ts, `writeLastSync`), fenced on the connection's id AND
+--   org_id. The firm's admin tier may update other columns of the row under 0077's policy, and 0077 grants insert / update / delete
+--   to `authenticated` at TABLE level (0077 line 76), which a column-level revoke cannot narrow: Postgres checks the table grant
+--   first. So the rule is a BEFORE INSERT OR UPDATE trigger, 0116's pattern: a caller that is not trusted may not set the column on
+--   insert (it must stay null) and may not change it on update (OLD vs NEW, `is distinct from`). Trusted = `current_user` is
+--   `service_role`, or the table's owner or a member of it (`pg_has_role(current_user, relowner, 'MEMBER')`; superusers are), or the
+--   change arrives from inside a referential action (`pg_trigger_depth() > 1`). The function is SECURITY INVOKER on purpose, so
+--   `current_user` is the caller's own role. Refusal: 42501 with the stable prefix `lawmatics_last_sync_service_only`. No grant
+--   is changed for the other columns, so nothing 0077 allows today breaks (connect, reconnect, disconnect, the manual importer's
+--   `recordLawmaticsOutcome`, the daily sync's `invalid` write).
+--   lectual.app reads it with the scoped client for the Settings line "Last complete daily sync ..." (`getLawmaticsLastSync`).
+--
+-- WITHOUT IT (today)
+--   The read answers 42703 (Postgres) / PGRST204 (PostgREST) and the app treats that as "not set up": the cutoff is 2026-11-01 on
+--   every run, nothing is written, and Settings says "Showing the last daily sync isn't switched on for your firm yet. Lectual will
+--   turn it on." Matching by lawmatics_id and email means a prospect seen before is never created twice. Known limit: a lead a
+--   person DELETES comes back on the next run while its prospect is after the cutoff (always, until this is applied).
+--
+-- IDEMPOTENT AND ADDITIVE: `add column if not exists`, a column grant, a trigger function (`create or replace`), a trigger created
+-- only when missing, comments. No drop of anything that exists, no delete, no rewrite of a row. One Supabase MCP `apply_migration`
+-- should be safe (see lectual AGENTS.md 0093 for what hangs it); if it hangs, apply the statements in order with `execute_sql`.
+--
+-- -- PRE-APPLY CHECKS (read only; run on lectual-dev, then on lectual-prod) ---------------------------------------------
+--   1. The column is absent, and the table is 0077's:
+--        select column_name, data_type, is_nullable from information_schema.columns
+--         where table_schema = 'public' and table_name = 'lawmatics_connection' order by ordinal_position;
+--      Expect: no last_sync_at.
+--   2. The status CHECK is 0077's:
+--        select conname, pg_get_constraintdef(oid) from pg_constraint where conrelid = 'public.lawmatics_connection'::regclass;
+--      Expect status in ('active','invalid','revoked') and the "revoked keeps no token" CHECK.
+--   3. Column grants for authenticated today (none of them should be token_enc):
+--        select column_name, privilege_type from information_schema.column_privileges
+--         where table_schema = 'public' and table_name = 'lawmatics_connection' and grantee = 'authenticated' order by 1, 2;
+--   4. Nothing named 0118 in supabase_migrations.schema_migrations on either project, and the highest number there (first-merged-wins).
+--
+-- -------------------------------------------------------------------------------------------------------------------------
+
+alter table public.lawmatics_connection
+  add column if not exists last_sync_at timestamptz null;
+
+comment on column public.lawmatics_connection.last_sync_at is
+  'Start time of the last complete daily-sync prospect step (lectual.app src/lib/lawmatics/daily-sync.ts). Written only by the service role, fenced on id and org_id (trigger lawmatics_connection_last_sync_guard). Null = no complete run yet (the sync then plans from 2026-11-01).';
+
+-- Read, like the other non-secret columns.
+grant select (last_sync_at) on public.lawmatics_connection to authenticated;
+
+-- Only a trusted role writes it. SECURITY INVOKER: current_user must be the caller's own role for the trust test.
+create or replace function public.lawmatics_connection_last_sync_guard()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_owner oid;
+begin
+  -- A referential action (a firm delete cascading) is never a person setting the cutoff.
+  if pg_trigger_depth() > 1 then
+    return new;
+  end if;
+  if current_user = 'service_role' then
+    return new;
+  end if;
+  select c.relowner into v_owner from pg_catalog.pg_class c where c.oid = tg_relid;
+  if v_owner is not null and pg_catalog.pg_has_role(current_user, v_owner, 'MEMBER') then
+    return new;
+  end if;
+  if tg_op = 'INSERT' then
+    if new.last_sync_at is not null then
+      raise exception 'lawmatics_last_sync_service_only: only the daily sync sets the last complete run'
+        using errcode = '42501';
+    end if;
+  elsif new.last_sync_at is distinct from old.last_sync_at then
+    raise exception 'lawmatics_last_sync_service_only: only the daily sync sets the last complete run'
+      using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.lawmatics_connection_last_sync_guard() from public, anon, authenticated;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_catalog.pg_trigger
+     where tgrelid = 'public.lawmatics_connection'::regclass
+       and tgname = 'lawmatics_connection_last_sync_guard'
+       and not tgisinternal
+  ) then
+    create trigger lawmatics_connection_last_sync_guard
+      before insert or update on public.lawmatics_connection
+      for each row execute function public.lawmatics_connection_last_sync_guard();
+  end if;
+end;
+$$;
+
+comment on function public.lawmatics_connection_last_sync_guard() is
+  'lectual 0118: refuses (42501 lawmatics_last_sync_service_only) any signed-in insert that sets, or update that changes, lawmatics_connection.last_sync_at. Trusted: service_role, the table owner, referential actions.';
+
+-- -- ISOLATION CASES (add to lectual tests/tenant-isolation.test.ts, in the 0077 block; they fail until this is applied) --------
+--   1. Firm A's owner selects `last_sync_at` from lawmatics_connection: gets firm A's row only (one row), never firm B's; firm B's
+--      member gets firm B's only. A viewer of firm A reads firm A's value (members read the connection, 0077).
+--   2. Firm A's owner, admin and senior_admin each try `update lawmatics_connection set last_sync_at = now()` on their own row:
+--      42501 with `lawmatics_last_sync_service_only` for every one of them (the trigger; 0077's table-level UPDATE grant would
+--      otherwise allow it), and the stored value is unchanged. The same update that ALSO changes `last_error` is refused whole.
+--   2b. Firm A's admin updates `last_error` (or reconnects: token_enc, status) WITHOUT touching last_sync_at: allowed, as under 0077.
+--   2c. A signed-in insert of a connection row with `last_sync_at` set: 42501 lawmatics_last_sync_service_only; with it null: as 0077.
+--   3. A signed-in caller of firm A trying the same update on firm B's row: 0 rows or 42501, and firm B's value unchanged.
+--   4. The service role updates `last_sync_at` fenced on id and org_id: 1 row; on a wrong org_id: 0 rows.
+--   5. anon selects lawmatics_connection: nothing (0077's anon revoke still holds).
+--   6. `select token_enc` by authenticated is still permission denied (the grant above names only last_sync_at).
+--   7. Deleting firm A (one statement, service role) still removes its connection row (the trigger is not on DELETE).
+--   8. Pin: `public.lawmatics_connection_last_sync_guard` is SECURITY INVOKER (`prosecdef = false`), and `has_function_privilege`
+--      for authenticated and anon on it is false.

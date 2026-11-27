@@ -3,13 +3,16 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { classLock } from "@/lib/proposals/class-lock";
 import { DEFAULT_CLIENT_ADD, DEFAULT_CLIENT_ENTRY_PROMPT, MAX_CLIENT_ADD } from "@/lib/proposals/client-classes";
-import { MARK_KIND_DEFAULT_DESC, MARK_KIND_LABEL, MARK_KINDS, type MarkKind, type ProposalInclude } from "@/lib/proposals/types";
+import { MARK_KIND_DEFAULT_DESC, MARK_KIND_LABEL, MARK_KINDS, MAX_PACKAGE_CHOICE_OPTIONS, type MarkKind, type ProposalInclude } from "@/lib/proposals/types";
 import { addNameAction, removeNameAction } from "@/app/dashboard/proposals/[id]/actions";
 import { fieldId, sectionId } from "@/lib/proposal-editor/checklist";
 import { EDITOR_WORDS } from "@/lib/proposal-editor/vocabulary";
+import { InlineConfirm } from "@/components/ui/InlineConfirm";
+import { yesVerb, OPTIONAL } from "@/lib/ui/words";
 import { ActionForm, IssueList, Outcome, type ShownIssue } from "./ActionForm";
 import { ExpiryField } from "./ExpiryField";
 import { IncludesFields } from "./IncludesFields";
+import { PaymentTermsFields } from "./PaymentTermsFields";
 import { newRowId, useRows, type Keyed } from "./rows";
 import { useUnsaved } from "./UnsavedGuard";
 
@@ -38,7 +41,7 @@ function Section({ id, title, hint, children }: { id: string; title: string; hin
   return (
     <section className="lx-card pe-card" id={id} aria-label={title}>
       <header className="pe-card-head">
-        <h2 className="pe-h">{title}</h2>
+        <h2 className="lx-h3">{title}</h2>
         {hint && <p className="lx-note pe-hint">{hint}</p>}
       </header>
       {children}
@@ -68,7 +71,7 @@ export function WhoSection({ editable, issues, values }: Editable & { issues: Sh
             <input className="lx-input" id={fieldId.clientEmail} name="clientEmail" type="email" maxLength={320} defaultValue={values.clientEmail} />
           </label>
           <label className="lx-field">
-            <span className="lx-label">Company (optional)</span>
+            <span className="lx-label">Company<span className="lx-optional"> {OPTIONAL}</span></span>
             <input className="lx-input" id={fieldId.company} name="company" maxLength={200} defaultValue={values.company} />
           </label>
           <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
@@ -104,7 +107,7 @@ export function MessageSection({
               <textarea className="lx-input" id={fieldId.recommendation} name="recommendation" rows={3} maxLength={4000} defaultValue={values.recommendation} />
             </label>
             <label className="lx-field">
-              <span className="lx-label">Office action note (optional)</span>
+              <span className="lx-label">Office action note<span className="lx-optional"> {OPTIONAL}</span></span>
               <textarea className="lx-input" id={fieldId.officeActionNote} name="officeActionNote" rows={3} maxLength={4000} defaultValue={values.officeActionNote} />
               <span className="lx-note">The substantive office action response is never part of a package; this note says it is quoted separately.</span>
             </label>
@@ -136,6 +139,7 @@ export function FeesSection({
   customHelp,
   includes,
   packageIncludes = null,
+  paymentTerms,
 }: Editable & {
   issues: ShownIssue[];
   general?: boolean;
@@ -153,6 +157,8 @@ export function FeesSection({
   includes?: ProposalInclude[];
   /** The offered packages' own rows (`editorPackageIncludes`): when given, these are the tables the client sees, and the single table is not offered. */
   packageIncludes?: { package: string; includes: ProposalInclude[] }[] | null;
+  /** "Due today" (a deposit) beside the pay link. Trademark drafts only: a flat-fee draft has it in "Matter and flat fee". */
+  paymentTerms?: { dueNowPct: string; balanceNote: string };
 }) {
   return (
     <Section id={sectionId.fees} title="Fees and payment" hint="Totals are always worked out from the package, never typed. Packages are edited in Settings → Proposals.">
@@ -171,6 +177,7 @@ export function FeesSection({
             </label>
           )}
         </div>
+        {!general && paymentTerms ? <PaymentTermsFields values={paymentTerms} /> : null}
         {!general && pricing && hasBrandPackage && (
           <>
             <input type="hidden" name="package" value={pricing.package} />
@@ -407,12 +414,15 @@ export function NameCard({
   return (
     <section className="lx-card pe-card pe-brand" id={fieldId.brand(index)} aria-label={`Brand name ${value.name}`}>
       <header className="pe-card-head pe-card-head-row">
-        <h3 className="pe-h">{value.name || "Brand name"}</h3>
+        <h3 className="lx-h3">{value.name || "Brand name"}</h3>
         {editable && (
           // The remove button belongs to a small form OUTSIDE the editor's one form (see `BrandForms`), by `form=`.
-          <button type="submit" form={removeFormId(value.id)} className="lx-btn lx-btn-ghost lx-btn-sm">
-            Remove brand name
-          </button>
+          <InlineConfirm
+            label="Remove brand name"
+            question={`Remove ${value.name || "this brand name"} and its marks and classes?`}
+            confirmLabel={yesVerb("remove")}
+            onConfirm={() => (document.getElementById(removeFormId(value.id)) as HTMLFormElement | null)?.requestSubmit()}
+          />
         )}
       </header>
 
@@ -584,7 +594,7 @@ export function NameCard({
                 <>
                   <input type="hidden" name={`${p}pkgChoice`} value="on" />
                   <span className="lx-note" id={`pe-pkg-${value.id}`}>
-                    Tick 1 to 3 packages. The client picks one for this brand name, and it is priced at that package&rsquo;s prices.
+                    Tick 1 to {MAX_PACKAGE_CHOICE_OPTIONS}{" "}packages. The client picks one for this brand name, and it is priced at that package&rsquo;s prices.
                   </span>
                   <div className="pe-pkg-options" role="group" aria-describedby={`pe-pkg-${value.id}`}>
                     {list.map((x) => (
@@ -649,11 +659,11 @@ export function NameCard({
           <summary className="pe-adv-sum">{EDITOR_WORDS.advancedBrand}</summary>
           <div className="pe-adv-body lx-form-grid">
             <label className="lx-field">
-              <span className="lx-label">What it is (optional)</span>
+              <span className="lx-label">What it is<span className="lx-optional"> {OPTIONAL}</span></span>
               <input className="lx-input" name={`${p}what`} maxLength={200} defaultValue={value.what} placeholder="Your company name" />
             </label>
             <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
-              <span className="lx-label">Note on this brand’s card (optional)</span>
+              <span className="lx-label">Note on this brand’s card<span className="lx-optional"> {OPTIONAL}</span></span>
               <textarea className="lx-input" name={`${p}note`} rows={2} maxLength={2000} defaultValue={value.note} />
               <span className="lx-note">Wrap words in **double asterisks** for bold. Nothing else is formatted.</span>
             </label>
@@ -717,7 +727,7 @@ function MarkPackageChoice({ prefix, label, saved, firmPackages }: { prefix: str
       {on ? (
         <>
           <span className="lx-note" id={noteId}>
-            Tick 1 to 3 packages. This mark is priced at the package the client picks; a second mark still gets that package&rsquo;s second-mark discount.
+            Tick 1 to {MAX_PACKAGE_CHOICE_OPTIONS}{" "}packages. This mark is priced at the package the client picks; a second mark still gets that package&rsquo;s second-mark discount.
           </span>
           <div className="pe-pkg-options" role="group" aria-describedby={noteId}>
             {firmPackages.map((x) => (
@@ -758,7 +768,7 @@ export function BrandsSection({ children, editable, issues }: Editable & { child
   return (
     <section className="lx-card pe-card" id={sectionId.brands} aria-label="What we're protecting">
       <header className="pe-card-head">
-        <h2 className="pe-h">What we&rsquo;re protecting</h2>
+        <h2 className="lx-h3">What we&rsquo;re protecting</h2>
         <p className="lx-note pe-hint">One card per brand name, with its marks, classes and package.</p>
       </header>
       <IssueList issues={issues} />
@@ -767,7 +777,7 @@ export function BrandsSection({ children, editable, issues }: Editable & { child
         <div className="pe-add-name">
           <label className="lx-field" style={{ flex: 1, minWidth: 220 }}>
             <span className="lx-label">Add a brand name</span>
-            <input className="lx-input" form={ADD_NAME_FORM_ID} name="name" maxLength={200} placeholder="e.g. Prosperall" />
+            <input className="lx-input" form={ADD_NAME_FORM_ID} name="name" maxLength={200} placeholder="e.g. Larkmoor" />
           </label>
           <button type="submit" form={ADD_NAME_FORM_ID} className="lx-btn lx-btn-sec">
             Add brand name
@@ -795,7 +805,7 @@ export function BrandForms({ proposalId, updatedAt, names, editable }: { proposa
         )}
       </ActionForm>
       {names.map((n) => (
-        <ActionForm key={n.id} action={removeNameAction} id={removeFormId(n.id)} confirm={`Remove ${n.name || "this brand name"} and its marks and classes?`}>
+        <ActionForm key={n.id} action={removeNameAction} id={removeFormId(n.id)}>
           {({ state, pending }) => (
             <>
               <Hidden values={{ proposalId, updatedAt, nameId: n.id }} />

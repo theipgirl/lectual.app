@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildDraft, confirmationContext, draftRef, parseDraftRequest, type DraftRequest } from "@/lib/copilot/draft-proposal";
 import { newDraftSink, runDraftProposal, type DraftProposalDeps } from "@/lib/agents/copilot-draft-proposal";
-import { faithe } from "../proposals/general-fixture";
+import { imogen } from "../proposals/general-fixture";
 import { defaultSelection, quoteProposal } from "@/lib/proposals/pricing";
 import { validateContent } from "@/lib/proposals/validate";
 import type { Lead } from "@/lib/pipeline";
@@ -101,10 +101,10 @@ describe("F7: a flat-fee request", () => {
     excludes: ["Litigation or arbitration"],
   };
 
-  it("builds a general draft shaped like the Faithe fixture and quotes the fee", () => {
-    const { draft } = build({ lead: "Faithe Williams", matter: MATTER });
+  it("builds a general draft shaped like the Imogen fixture and quotes the fee", () => {
+    const { draft } = build({ lead: "Imogen Pellegrino", matter: MATTER });
     const c = draft.content;
-    const f = faithe();
+    const f = imogen();
     expect(c.kind).toBe("general");
     expect(c.made_by).toBe("copilot");
     expect(c.names).toEqual([]);
@@ -119,7 +119,7 @@ describe("F7: a flat-fee request", () => {
   });
 
   it("I3: the summary lists matter, work with hours and fee, and has no USPTO or class wording", () => {
-    const { draft } = build({ lead: "Faithe Williams", matter: MATTER });
+    const { draft } = build({ lead: "Imogen Pellegrino", matter: MATTER });
     expect(draft.summary).toContain("- Matter: Management agreement");
     expect(draft.summary).toContain("- Work: Review both management agreements (1 hr at $500/hr)");
     expect(draft.summary).toContain("- Flat fee: $500");
@@ -135,7 +135,7 @@ describe("F7: a flat-fee request", () => {
   });
 
   it("F6: the title, an item's label, hours, rate and the fee each change the ref", () => {
-    const base = build({ lead: "Faithe", matter: MATTER }).ref;
+    const base = build({ lead: "Imogen", matter: MATTER }).ref;
     const items = (i: number, over: Record<string, unknown>) => MATTER.items.map((it, k) => (k === i ? { ...it, ...over } : it));
     for (const m of [
       { ...MATTER, title: "Another matter" },
@@ -144,7 +144,7 @@ describe("F7: a flat-fee request", () => {
       { ...MATTER, items: items(0, { hourlyRate: 400 }) },
       { ...MATTER, fee: 600 },
     ]) {
-      expect(build({ lead: "Faithe", matter: m }).ref).not.toBe(base);
+      expect(build({ lead: "Imogen", matter: m }).ref).not.toBe(base);
     }
   });
 });

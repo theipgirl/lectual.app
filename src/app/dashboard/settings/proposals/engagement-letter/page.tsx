@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { EngagementLetterSettings } from "@/components/loe/EngagementLetterSettings";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { letterLogoForSlug } from "@/lib/loe/letter-logo";
 import { loadLetterPage } from "@/lib/loe/page-load";
 import { pageTitle } from "@/lib/ui/page-title";
@@ -21,7 +21,7 @@ export default async function EngagementLetterPage() {
   await requireProposalsModule();
   const model = await loadLetterPage();
   // The firm's own logo above the preview (RPB only today); a failed session read just means no logo.
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   const logo = session.kind === "ok" ? letterLogoForSlug(session.org.slug) : null;
   return <EngagementLetterSettings model={model} logo={logo} />;
 }

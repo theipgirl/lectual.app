@@ -9,7 +9,7 @@ const resolveFirmSession = vi.fn();
 vi.mock("@/lib/firm/session", () => ({ resolveFirmSession: (...a: unknown[]) => resolveFirmSession(...a) }));
 vi.mock("@/lib/queue/load", () => ({ loadActiveQueue: async () => ({ status: "ok", items: [] }) }));
 vi.mock("@/lib/nav-counts", () => ({ loadRailCounts: async () => ({}) }));
-vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }) }));
+vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }), headers: async () => new Headers() }));
 vi.mock("next/navigation", () => ({
   redirect: (to: string) => {
     throw new Error(`redirect:${to}`);
@@ -185,7 +185,7 @@ describe("styling and sources", () => {
     const pages: Record<string, string> = {
       "lead-head": "src/app/dashboard/leads/[id]/page.tsx",
       "lead-timeline": "src/app/dashboard/leads/[id]/page.tsx",
-      "lead-prep": "src/app/dashboard/leads/[id]/page.tsx",
+      "lead-prep": "src/components/leads/ConsultPrepCard.tsx", // moved with the Consult prep card
       "matter-head": "src/app/dashboard/matters/[id]/page.tsx",
       "matter-deadlines": "src/app/dashboard/matters/[id]/page.tsx",
       "matter-aside": "src/app/dashboard/matters/[id]/page.tsx",
@@ -195,8 +195,12 @@ describe("styling and sources", () => {
       "agents-head": "src/app/dashboard/agents/page.tsx",
       "setup-head": "src/app/dashboard/settings/setup/page.tsx",
       "proposal-new-head": "src/app/dashboard/proposals/new/page.tsx",
-      "team-head": "src/app/dashboard/settings/team/page.tsx",
+      "team-head": "src/components/settings/TeamForms.tsx",
     };
-    for (const [token, file] of Object.entries(pages)) expect(readFileSync(file, "utf8"), token).toContain(`data-tour="${token}"`);
+    for (const [token, file] of Object.entries(pages)) {
+      // The hook is either written out or handed to PageHeader's `tour` prop, which draws it on the h1.
+      const text = readFileSync(file, "utf8");
+      expect(text.includes(`data-tour="${token}"`) || text.includes(` tour="${token}"`), token).toBe(true);
+    }
   });
 });

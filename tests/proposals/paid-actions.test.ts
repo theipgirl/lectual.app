@@ -98,10 +98,10 @@ describe.each(ACTIONS)("%s: the gate comes first", (_name, run, flow) => {
   });
 
   it("turns a thrown flow into a fixed sentence, never the error's text", async () => {
-    (flow as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("relation client_proposal_event does not exist for sevetri@example.com"));
+    (flow as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("relation client_proposal_event does not exist for callum@example.com"));
     const r = await run();
     expect(r.error).toBeTruthy();
-    expect(r.error).not.toContain("sevetri@example.com");
+    expect(r.error).not.toContain("callum@example.com");
     expect(r.error).not.toContain("relation");
   });
 });

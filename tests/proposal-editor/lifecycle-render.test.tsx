@@ -34,9 +34,8 @@ describe("Lifecycle", () => {
     const html = render();
     expect(html).not.toContain("Save and create link");
     expect(html).not.toMatch(/Approve|Mark as sent|Back to draft|Client link|Ask .* to create the link/);
-    // Sprint 1: the menu is named for what it holds ("Withdraw"), not "More"; its confirm is closed in a static render.
-    expect(html).toContain(">Withdraw<");
-    expect(html).not.toContain(">More<");
+    // The menu is the shared "More"; its confirm is closed in a static render.
+    expect(html).toContain(">More<");
     expect(html).not.toContain("Withdraw this version?");
   });
 
@@ -54,8 +53,7 @@ describe("Lifecycle", () => {
     expect(html).toMatch(/<a [^>]*href="https:\/\/proposals\.example\.com\/p\/tok123\/"[^>]*>\s*Open/);
     expect(html).toContain(`value="${URL_}"`);
     expect(html).toContain("Start a new version");
-    expect(html).toContain(">Withdraw<");
-    expect(html).not.toContain(">More<");
+    expect(html).toContain('data-more-items="withdraw"');
     expect(html).not.toMatch(/Revise|Turn on the link|Edit again/);
   });
 

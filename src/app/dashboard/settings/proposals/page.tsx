@@ -1,4 +1,4 @@
-import { currentRole } from "@/lib/auth/current-role";
+import { viewerRole } from "@/lib/views/view-as";
 import { listMemberDirectory, type MemberIdentity } from "@/lib/members/directory";
 import { getProposalSettings } from "@/lib/proposals/store";
 import { PROPOSAL_ADMIN_ROLES, standardProposalPricing } from "@/lib/proposals/types";
@@ -13,9 +13,10 @@ import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
 import Link from "next/link";
-import { LETTER_SETTINGS_LINK, LETTER_SETTINGS_LINK_NOTE } from "@/lib/ui/words";
+import { LETTER_SETTINGS_LINK, LETTER_SETTINGS_LINK_NOTE, PROPOSAL_SETTINGS_NAME } from "@/lib/ui/words";
+import { EmptyState, LoadFailedCard, PageHeader } from "@/components/ui";
 
-export const metadata: Metadata = { title: pageTitle("Proposal settings") };
+export const metadata: Metadata = { title: pageTitle(PROPOSAL_SETTINGS_NAME) };
 
 export const dynamic = "force-dynamic";
 
@@ -31,32 +32,26 @@ export const dynamic = "force-dynamic";
  */
 export default async function ProposalSettingsPage() {
   await requireProposalsModule();
-  const role = await currentRole();
+  const role = await viewerRole();
   const isAdmin = !!role && PROPOSAL_ADMIN_ROLES.includes(role);
 
   const head = (
-    <div>
-      <div className="lx-label">Settings</div>
-      <h1 className="lx-h1">Client proposals</h1>
-      <p className="lx-sub">
-        Who may create client links, the packages and prices a new proposal starts from, and the included items. No link opens for a client until one of the named people
-        has created it.
-      </p>
-    </div>
+    <PageHeader
+      title={PROPOSAL_SETTINGS_NAME}
+      sub={
+        <>
+          Who may create client links, the packages and prices a new proposal starts from, and the included items. No link opens for a client until one of the named people
+          has created it.
+        </>
+      }
+    />
   );
 
   if (!isAdmin) {
     return (
       <>
         {head}
-        <div className="lx-card lx-empty-card">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            Restricted
-          </h2>
-          <p className="lx-note" style={{ margin: 0 }}>
-            {ADMIN_TIER_PHRASE} can manage the proposal settings. Anyone on the team can open the proposals themselves.
-          </p>
-        </div>
+        <EmptyState title="Restricted">{ADMIN_TIER_PHRASE} can manage the proposal settings. Anyone on the team can open the proposals themselves.</EmptyState>
       </>
     );
   }
@@ -74,9 +69,7 @@ export default async function ProposalSettingsPage() {
     return (
       <>
         {head}
-        <div role="alert" className="lx-banner lx-banner-risk">
-          We couldn&apos;t load the proposal settings. Refresh to try again.
-        </div>
+        <LoadFailedCard role="alert" what="the proposal settings" />
       </>
     );
   }
@@ -99,7 +92,7 @@ export default async function ProposalSettingsPage() {
         <div className="pe-card-head-row">
           <div className="pe-card-head">
             <h2 className="pe-h">{LETTER_SETTINGS_LINK}</h2>
-            <p className="lx-note pe-hint">{LETTER_SETTINGS_LINK_NOTE}</p>
+            <p className="lx-note pe-hint" style={{ margin: 0 }}>{LETTER_SETTINGS_LINK_NOTE}</p>
           </div>
           <Link className="lx-btn lx-btn-sec lx-btn-sm" href="/dashboard/settings/proposals/engagement-letter/">
             Open

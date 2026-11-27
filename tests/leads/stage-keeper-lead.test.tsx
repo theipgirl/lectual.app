@@ -208,8 +208,9 @@ const lead = {
 function mockPage(opts: { role: string; activity: unknown[] }) {
   vi.doMock("@/lib/db/scoped-client", () => ({
     getScopedClient: vi.fn(async () => ({
-      from: () => {
-        const q = { select: () => q, eq: () => q, order: () => q, limit: async () => ({ data: opts.activity, error: null }) };
+      // crm_lead answers no merged leads (M5's merged-set read); the rest is the activity.
+      from: (table: string) => {
+        const q = { select: () => q, eq: () => q, order: () => q, limit: async () => ({ data: table === "crm_lead" ? [] : opts.activity, error: null }) };
         return q;
       },
     })),

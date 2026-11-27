@@ -1,6 +1,7 @@
 import { DIRECT_LABEL, NO_CAMPAIGN_LABEL, groupBySource } from "@/lib/intake-forms/where-from";
 import { RESULT_ROW_LIMIT } from "@/lib/intake-forms/load-results";
 import { notReadyYet } from "@/lib/ui/words";
+import { SheetScroll, SheetTable } from "@/components/ui/SheetTable";
 
 /**
  * Results → "Where they came from". Three states like the other blocks: the
@@ -29,11 +30,12 @@ function Body({ state }: { state: WhereFromState }) {
   const w = groupBySource(state.rows);
   return (
     <>
-      <table className="ifr-where-table">
+      <SheetScroll>
+      <SheetTable className="ifr-where-table">
         <thead>
           <tr>
             <th scope="col">Source</th>
-            <th scope="col">People</th>
+            <th scope="col" className="num">People</th>
           </tr>
         </thead>
         <tbody>
@@ -42,10 +44,11 @@ function Body({ state }: { state: WhereFromState }) {
           ))}
           <tr>
             <th scope="row">{DIRECT_LABEL}</th>
-            <td>{w.direct.toLocaleString("en-US")}</td>
+            <td className="num" data-label="People">{w.direct.toLocaleString("en-US")}</td>
           </tr>
         </tbody>
-      </table>
+      </SheetTable>
+      </SheetScroll>
       <p className="ifm-help">{`${w.total.toLocaleString("en-US")} ${w.total === 1 ? "person" : "people"} in this range.`}</p>
       {state.capped && <p className="ifm-help">{`This covers the latest ${RESULT_ROW_LIMIT.toLocaleString("en-US")} people in this range.`}</p>}
     </>
@@ -57,12 +60,12 @@ function SourceRows({ group }: { group: ReturnType<typeof groupBySource>["groups
     <>
       <tr>
         <th scope="row">{group.label}</th>
-        <td>{group.count.toLocaleString("en-US")}</td>
+        <td className="num" data-label="People">{group.count.toLocaleString("en-US")}</td>
       </tr>
       {group.campaigns.map((c) => (
         <tr key={c.campaign ?? "none"} className="ifr-where-sub">
           <th scope="row">{c.campaign ?? NO_CAMPAIGN_LABEL}</th>
-          <td>{c.count.toLocaleString("en-US")}</td>
+          <td className="num" data-label="People">{c.count.toLocaleString("en-US")}</td>
         </tr>
       ))}
     </>

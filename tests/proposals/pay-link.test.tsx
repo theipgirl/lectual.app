@@ -7,7 +7,7 @@ import { CreateDraftForm, StartBlankForm } from "@/components/proposal-editor/St
 import { FeesSection } from "@/components/proposal-editor/Sections";
 import { SettingsForm } from "@/components/proposal-editor/SettingsForm";
 import { validateContent } from "@/lib/proposals/validate";
-import { sevetri } from "./fixture";
+import { callum } from "./fixture";
 
 /** Sprint 25 A: the pay link is a plain input on each proposal; nothing copies the firm default into one. */
 
@@ -92,7 +92,7 @@ describe("A3: the existing-proposal editor", () => {
 
 describe("A4: approval still refuses a missing link", () => {
   it("says to add the pay link", () => {
-    const issues = validateContent(sevetri(), { forApproval: true, pay_url: null });
+    const issues = validateContent(callum(), { forApproval: true, pay_url: null });
     expect(issues.some((i) => i.path === "pay_url" && i.message === "Add the pay link before creating the link.")).toBe(true);
   });
 });

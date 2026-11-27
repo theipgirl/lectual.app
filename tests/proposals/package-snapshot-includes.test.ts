@@ -8,7 +8,7 @@ import { describe, it, expect } from "vitest";
 import { withPackageSnapshot } from "@/lib/proposals/package-snapshot";
 import { defaultSelection, quoteProposal } from "@/lib/proposals/pricing";
 import type { PackageOffer, ProposalContent, ProposalInclude } from "@/lib/proposals/types";
-import { danielle, ESSENTIAL, ENHANCED, CONCIERGE } from "./danielle-fixture";
+import { renata, ESSENTIAL, ENHANCED, CONCIERGE } from "./renata-fixture";
 
 const rows = (pkg: string): ProposalInclude[] => [
   { label: "Comprehensive search", included: pkg === "Essential" ? "Knockout only" : "Full", highlight: true },
@@ -17,7 +17,7 @@ const rows = (pkg: string): ProposalInclude[] => [
 
 /** A proposal whose snapshot has each package's own rows, stored in the proposal's order (not the firm's). */
 function withRows(order: PackageOffer[]): ProposalContent {
-  const c = danielle();
+  const c = renata();
   c.packages = order.map((p) => ({ ...p, includes: rows(p.package) }));
   return c;
 }

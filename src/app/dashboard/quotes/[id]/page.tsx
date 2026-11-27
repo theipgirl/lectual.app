@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { hasRole } from "@/lib/auth/roles";
 import { getSiteOrigin } from "@/lib/site-origin";
 import { loadQuote } from "@/lib/quotes/load";
@@ -33,14 +32,29 @@ import { PURPOSE_LABEL, firmPaymentSummary, type FirmPaymentSummary } from "@/li
 import { getLawPayConnection } from "@/lib/payments/lawpay-connection";
 import { listLawPayMappings } from "@/lib/payments/accounts";
 import { lawPayDeploymentMode } from "@/lib/payments/lawpay-config";
-import { formatCents } from "@/lib/quotes/money";
+import { moneyFor } from "@/lib/quotes/staff-money";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { LoadFailedCard } from "@/components/ui/LoadFailed";
+import { PROPOSALS_NAME, notReadyPlural } from "@/lib/ui/words";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { orgHasModule } from "@/lib/org/modules";
 import "../quotes.css";
 import type { Metadata } from "next";
-import { pageTitle } from "@/lib/ui/page-title";
+import { recordPageTitle } from "@/lib/ui/page-title";
 
-export const metadata: Metadata = { title: pageTitle("Quote") };
+/** Tab title: the quote's own title, for a role that may open it; "Quote" for anyone else or when the read fails or finds nothing. */
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  return {
+    title: await recordPageTitle(async () => {
+      const session = await resolveViewSession();
+      if (session.kind !== "ok" || !hasRole(session.role, "attorney")) return null;
+      const read = await loadQuote(id);
+      return read.status === "ok" ? read.quote?.title?.trim() || null : null;
+    }, "Quote"),
+  };
+}
 
 export const dynamic = "force-dynamic";
 
@@ -70,26 +84,15 @@ export const dynamic = "force-dynamic";
  */
 export default async function QuoteBuilderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   if (session.kind !== "ok" || !hasRole(session.role, "attorney")) return <QuotesRestricted title="Quote" />;
 
   const load = await loadQuote(id);
   if (load.status !== "ok") {
     return (
       <>
-        <Link href="/dashboard/quotes/" className="lx-back">
-          ← Quotes &amp; proposals
-        </Link>
-        <div className="lx-card lx-empty-card">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            {load.status === "unconfigured" ? "Quotes aren't switched on for your firm yet" : "This quote couldn't be loaded"}
-          </h2>
-          <p className="lx-note" style={{ margin: 0 }}>
-            {load.status === "unconfigured"
-              ? "Lectual will turn them on."
-              : "Can't show this right now. Refresh to try again."}
-          </p>
-        </div>
+        <PageHeader title="Quote" back={{ href: "/dashboard/quotes/", label: PROPOSALS_NAME }} />
+        {load.status === "unconfigured" ? <EmptyState>{notReadyPlural("Quotes")}</EmptyState> : <LoadFailedCard what="this quote" />}
       </>
     );
   }
@@ -246,9 +249,9 @@ function paymentSummaryPill(summary: FirmPaymentSummary | null, currency: string
     case "nothing_due":
       return { tone: "mute", text: "Nothing due at signing" };
     case "unpaid":
-      return { tone: "warn", text: `${formatCents(summary.dueCents, currency)} due at signing` };
+      return { tone: "warn", text: `${moneyFor(summary.dueCents, currency)} due at signing` };
     case "part_paid":
-      return { tone: "warn", text: `${formatCents(summary.receivedCents, currency)} of ${formatCents(summary.dueCents, currency)} received` };
+      return { tone: "warn", text: `${moneyFor(summary.receivedCents, currency)} of ${moneyFor(summary.dueCents, currency)} received` };
     case "paid":
       return { tone: "ok", text: summary.via === "card" ? "Paid by card (authorised)" : "Paid (recorded)" };
     case "needs_reconciling":

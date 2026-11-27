@@ -1,10 +1,10 @@
 import { GENERAL_PRICING_STUB, type ProposalContent } from "@/lib/proposals/types";
 
 /**
- * Spec 9's first real case: Faithe Williams. Review both management agreements and all correspondence and evidence,
+ * Spec 9's first real case: Imogen Pellegrino. Review both management agreements and all correspondence and evidence,
  * then draft a notice of non-renewal and termination. Value 2.5 hrs x $500/hr = $1,250; the fee charged is $500 flat.
  */
-export function faithe(): ProposalContent {
+export function imogen(): ProposalContent {
   return {
     kind: "general",
     general: {
@@ -19,8 +19,8 @@ export function faithe(): ProposalContent {
       excludes: ["Litigation or arbitration"],
       terms_note: "Limited to the work above. Anything further depending on how they respond: we'll talk first and agree a plan.",
     },
-    client: { first_name: "Faithe", full_name: "Faithe Williams" },
-    greeting: "Hi Faithe, thank you again for meeting with us. Your proposal is outlined below for your review and acceptance.",
+    client: { first_name: "Imogen", full_name: "Imogen Pellegrino" },
+    greeting: "Hi Imogen, thank you again for meeting with us. Your proposal is outlined below for your review and acceptance.",
     pricing: { ...GENERAL_PRICING_STUB },
     names: [],
     adjustments: [],

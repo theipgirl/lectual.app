@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { canSwitchView, prefAllowed, VIEW_PREVIEW_KEY, viewPrefValue, withPreview } from "@/lib/views";
@@ -15,7 +16,7 @@ export type SaveViewResult = { ok: true; pref: string } | { ok: false; error: st
  * Same pattern as saveFullNameAction: the session's client only, every other metadata key kept, fixed sentences.
  * The preview decides only what is drawn; every page and action keeps its own gate.
  */
-export async function saveViewAction(input: unknown): Promise<SaveViewResult> {
+export const saveViewAction = previewSafe(async function saveViewAction(input: unknown): Promise<SaveViewResult> {
   try {
     const session = await resolveFirmSession();
     if (session.kind === "signed-out") return { ok: false, error: VIEW_NOT_SIGNED_IN };
@@ -42,4 +43,4 @@ export async function saveViewAction(input: unknown): Promise<SaveViewResult> {
   } catch {
     return { ok: false, error: VIEW_NOT_SAVED };
   }
-}
+}, "state");

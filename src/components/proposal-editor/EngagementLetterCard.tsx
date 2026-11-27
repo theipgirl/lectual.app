@@ -5,8 +5,9 @@ import { downloadSignedLetterStaffAction } from "@/app/dashboard/proposals/[id]/
 import { retryUploadAction } from "@/app/dashboard/proposals/[id]/paid-actions";
 import { saveBase64Pdf } from "@/components/client-proposal/download-pdf";
 import type { SignedCardView } from "@/lib/loe/signed-card";
-import { SIGNED_CARD_HEADING, SIGNED_DOWNLOAD, SIGNED_DOWNLOADING, SIGNED_ADDRESS_HEADING, SIGNED_FILING_HEADING, SIGNED_FINGERPRINT_LABEL, SIGNED_FROM_STORED_TEXT, SIGNED_TRY_AGAIN } from "@/lib/ui/words";
+import { SIGNED_CARD_HEADING, SIGNED_DOWNLOAD, SIGNED_DOWNLOADING, SIGNED_ADDRESS_HEADING, SIGNED_FILING_HEADING, SIGNED_FINGERPRINT_LABEL, SIGNED_FROM_STORED_TEXT, SIGNED_TRY_AGAIN, SAVING } from "@/lib/ui/words";
 import { ActionForm, Outcome } from "./ActionForm";
+import { Pill } from "@/components/ui/Pill";
 
 /**
  * The staff proposal page's "Engagement letter" card for an ACCEPTED version that carries a letter. It draws what `buildSignedCard`
@@ -19,7 +20,7 @@ export function EngagementLetterCard({ proposalId, view }: { proposalId: string;
   return (
     <section className="lx-card pe-signed" aria-label={SIGNED_CARD_HEADING} data-signed-card={view.kind}>
       <header className="pe-card-head">
-        <h2 className="pe-h">{SIGNED_CARD_HEADING}</h2>
+        <h2 className="lx-h3">{SIGNED_CARD_HEADING}</h2>
       </header>
       {view.kind === "signed" ? <SignedBody proposalId={proposalId} view={view} /> : (
         <p className="lx-note" role="status">
@@ -57,7 +58,7 @@ function SignedBody({ proposalId, view }: { proposalId: string; view: Extract<Si
       <div className="pe-signed-filing" data-filing={view.filing.state}>
         <span className="lx-label">{SIGNED_FILING_HEADING}</span>
         <span className="pe-signed-actions">
-          <span className={`lx-pill lx-pill-${view.filing.tone}`}>{filingPill(view.filing.state)}</span>
+          <Pill tone={view.filing.tone}>{filingPill(view.filing.state)}</Pill>
           <span className="pe-step-text">{view.filing.text}</span>
         </span>
         {view.filing.retry ? (
@@ -67,7 +68,7 @@ function SignedBody({ proposalId, view }: { proposalId: string; view: Extract<Si
                 <input type="hidden" name="proposalId" value={proposalId} />
                 <input type="hidden" name="step" value="signed_loe_upload" />
                 <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
-                  {pending ? "Trying…" : SIGNED_TRY_AGAIN}
+                  {pending ? SAVING : SIGNED_TRY_AGAIN}
                 </button>
                 <Outcome state={state} pending={pending} />
               </>
@@ -78,7 +79,7 @@ function SignedBody({ proposalId, view }: { proposalId: string; view: Extract<Si
       <div className="pe-signed-filing pe-signed-address" data-address={view.address.state}>
         <span className="lx-label">{SIGNED_ADDRESS_HEADING}</span>
         <span className="pe-signed-actions">
-          <span className={`lx-pill lx-pill-${view.address.tone}`}>{filingPill(view.address.state, "Added", "Not added")}</span>
+          <Pill tone={view.address.tone}>{filingPill(view.address.state, "Added", "Not added")}</Pill>
           <span className="pe-step-text">{view.address.text}</span>
         </span>
         {view.address.retry ? (
@@ -88,7 +89,7 @@ function SignedBody({ proposalId, view }: { proposalId: string; view: Extract<Si
                 <input type="hidden" name="proposalId" value={proposalId} />
                 <input type="hidden" name="step" value="address_to_lawmatics" />
                 <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
-                  {pending ? "Trying…" : SIGNED_TRY_AGAIN}
+                  {pending ? SAVING : SIGNED_TRY_AGAIN}
                 </button>
                 <Outcome state={state} pending={pending} />
               </>

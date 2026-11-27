@@ -55,7 +55,7 @@ function render(leads: Lead[], params: IntakeSearchParams = {}, reads: Reads = {
       intakeStages={intakeStages(STAGES)}
       members={MEMBERS}
       initialFilters={parseIntakeFilters(params)}
-      initialViewState={parseIntakeViewState(params)}
+      initialViewState={parseIntakeViewState({ view: "table", ...params })}
       time={{ weekStartIso: NOW.toISOString(), byLeadId: {}, running: null }}
       now={NOW.toISOString()}
       {...(reads as object)}
@@ -107,7 +107,7 @@ describe("one note for the side reads that did not land", () => {
 
   it("leaves the chips that depend on a failed read off, exactly as before", () => {
     const html = render([lead("a", "Ana")], {}, { pendingApprovals: bad, agentMoves: bad, stageDecisions: bad });
-    expect(html).not.toContain("Needs attorney");
+    expect(html).not.toContain("Awaiting approval");
     expect(html).not.toContain('aria-label="Filter by automatic moves"');
     expect(html).not.toContain("Needs a stage decision");
   });
@@ -146,10 +146,14 @@ describe("the arrows, the temperature words and the copy button", () => {
 });
 
 describe("empty states", () => {
+  // Changed on purpose: the intake-form link is drawn only for a role shown Forms (canSeeFormsAndProposals, passed as showFormsLink).
   it("no leads: the plain sentence, an Add lead button and a link to the intake form", () => {
-    const html = render([]);
+    const html = render([], {}, { showFormsLink: true } as Reads);
     expect(html).toContain(NO_LEADS_YET);
     expect(html).toMatch(/data-empty="none"[\s\S]*Add a lead[\s\S]*href="\/dashboard\/forms\/?"[^>]*>Open your intake form/);
+    const without = render([]);
+    expect(without).toContain("Add a lead");
+    expect(without).not.toContain("Open your intake form");
   });
 
   it("filtered to nothing: the sentence and a Clear filters button", () => {
@@ -172,7 +176,7 @@ describe("the table starts on the first screen (768px tall)", () => {
   it("above the table there is only the header, one toolbar row and two chip rows (the sets, then the filters)", () => {
     const html = render([lead("a", "Ana")]);
     const above = html.slice(0, html.indexOf('class="lp-panel"'));
-    expect(above.match(/class="lp-header"/g)).toHaveLength(1);
+    expect(above.match(/class="lx-page-head lx-head lp-header"/g)).toHaveLength(1);
     expect(above.match(/class="lp-toolbar"/g)).toHaveLength(1);
     expect(above.match(/class="ix-sets"/g)).toHaveLength(1);
     expect(above.match(/class="ix-filters"/g)).toHaveLength(1);
@@ -186,8 +190,9 @@ describe("the table starts on the first screen (768px tall)", () => {
   it("the shared stylesheet stacks no strips: the header, toolbar and chips are compact rows", () => {
     const css = readFileSync("src/components/list-page/list-page.css", "utf8");
     expect(css).toMatch(/\.lp-root \{[^}]*gap: var\(--lp-gap\)/);
-    expect(css).toMatch(/\.lp-chip \{[^}]*height: 32px/);
-    expect(css).toMatch(/\.lp-search \.lx-input \{[^}]*height: 36px/);
+    const globals = readFileSync("src/app/globals.css", "utf8");
+    expect(globals).toMatch(/\.lp-chip, \.lx-chips a \{[^}]*height: var\(--ctl-h\)/);
+    expect(globals).toMatch(/\.lp-search \.lx-input \{[^}]*height: var\(--ctl-h\)/);
     expect(css).toContain("--lp-row-h: 46px");
   });
 });

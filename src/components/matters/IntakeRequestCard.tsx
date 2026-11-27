@@ -3,6 +3,12 @@
 import { useState, useTransition } from "react";
 import { createIntakeRequestAction, revokeIntakeRequestAction } from "@/app/dashboard/matters/[id]/intake-request-actions";
 import { intakeRequestUrl } from "@/lib/intake-forms/request-links";
+import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
+import { formatDay } from "@/lib/ui/dates";
+import { Notice, Pill } from "@/components/ui";
+import { toneFor, type PillTone } from "@/lib/ui/tones";
+import { BLANK, SAVING } from "@/lib/ui/words";
+import "./matter-page.css";
 
 /**
  * "Send intake questions": makes a private link to the firm's intake
@@ -13,17 +19,15 @@ import { intakeRequestUrl } from "@/lib/intake-forms/request-links";
 
 type Row = { id: string; token: string; status: "sent" | "completed" | "revoked"; sentAt: string; completedAt: string | null };
 
-const STATUS: Record<Row["status"], { label: string; cls: string }> = {
-  sent: { label: "Waiting", cls: "lx-pill-warn" },
-  completed: { label: "Answered", cls: "lx-pill-ok" },
-  revoked: { label: "Withdrawn", cls: "lx-pill-mute" },
+const STATUS: Record<Row["status"], { label: string; tone: PillTone }> = {
+  sent: { label: "Waiting", tone: toneFor("needsPerson") },
+  completed: { label: "Answered", tone: toneFor("done") },
+  revoked: { label: "Withdrawn", tone: toneFor("neutral") },
 };
 
-function day(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-
-export function IntakeRequestCard(props: { matterId: string; origin: string; requests: Row[]; formReady: boolean; canSend: boolean }) {
+export function IntakeRequestCard(props: { matterId: string; origin: string; requests: Row[]; formReady: boolean; canSend: boolean; /** The firm's time zone, for the dates. */ tz?: string }) {
+  const tz = props.tz ?? DEFAULT_TIME_ZONE;
+  const day = (iso: string) => formatDay(iso, { tz }) ?? BLANK;
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [fresh, setFresh] = useState<string | null>(null);
@@ -55,38 +59,38 @@ export function IntakeRequestCard(props: { matterId: string; origin: string; req
     <section className="lx-card lx-aside">
       <div className="lx-label">Intake questions</div>
       {!props.formReady ? (
-        <p className="lx-note" style={{ margin: 0 }}>
+        <p className="lx-note">
           Set up your intake questions in Intake → Forms, then send them to a client from here.
         </p>
       ) : props.canSend ? (
         <>
-          <p className="lx-note" style={{ margin: 0 }}>
+          <p className="lx-note">
             Makes a private link to your intake questions. Nothing is emailed; copy the link and send it to the client yourself.
           </p>
-          <button type="button" className="lx-btn lx-btn-sec lx-btn-sm" style={{ justifySelf: "start" }} onClick={create} disabled={pending}>
-            {pending ? "Working…" : "Create intake link"}
+          <button type="button" className="lx-btn lx-btn-sec lx-btn-sm mx-self-start" onClick={create} disabled={pending}>
+            {pending ? SAVING : "Create intake link"}
           </button>
         </>
       ) : null}
       {fresh && (
-        <div style={{ display: "grid", gap: 6 }}>
+        <div className="mx-grid-6">
           <input className="lx-input" readOnly value={intakeRequestUrl(props.origin, fresh)} onFocus={(e) => e.currentTarget.select()} aria-label="Link to send the client" />
-          <button type="button" className="lx-btn lx-btn-pri lx-btn-sm" style={{ justifySelf: "start" }} onClick={() => copy(fresh)}>
+          <button type="button" className="lx-btn lx-btn-pri lx-btn-sm mx-self-start" onClick={() => copy(fresh)}>
             {copied === fresh ? "Copied" : "Copy link"}
           </button>
         </div>
       )}
       {error && (
-        <p className="lx-banner lx-banner-risk" role="alert" style={{ margin: 0 }}>
+        <Notice tone="risk" role="alert">
           {error}
-        </p>
+        </Notice>
       )}
       {props.requests.length > 0 && (
-        <ul className="lx-list" style={{ display: "grid", gap: 8 }}>
+        <ul className="lx-list mx-grid">
           {props.requests.map((r) => (
-            <li key={r.id} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              <span className={`lx-pill ${STATUS[r.status].cls}`}>{STATUS[r.status].label}</span>
-              <span className="lx-note" style={{ flex: 1, minWidth: 100 }}>
+            <li key={r.id} className="mx-row">
+              <Pill tone={STATUS[r.status].tone}>{STATUS[r.status].label}</Pill>
+              <span className="lx-note mx-flex-1">
                 {r.status === "completed" && r.completedAt ? `Answered ${day(r.completedAt)}` : `Made ${day(r.sentAt)}`}
               </span>
               {r.status === "sent" && props.canSend && (

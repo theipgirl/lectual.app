@@ -1,4 +1,6 @@
 import type { ProposalStatus } from "@/lib/proposals/types";
+import { MAX_PACKAGE_CHOICE_OPTIONS } from "@/lib/proposals/package-choice-limit";
+import { SAVING } from "@/lib/ui/words";
 
 /**
  * The one place the proposal maker's lifecycle words live (Sprint 27).
@@ -30,14 +32,14 @@ export const LETTER_UNREADABLE_SENTENCE = "Couldn't check the firm's engagement 
 
 export const BUTTON_WORDS = {
   createLink: "Save and create link",
-  creatingLink: "Creating link…",
+  creatingLink: SAVING,
   turnOnLink: "Turn on the link",
-  turningOnLink: "Turning on…",
+  turningOnLink: SAVING,
   editAgain: "Edit again",
   startNewVersion: "Start a new version",
   withdraw: "Withdraw",
   save: "Save",
-  saving: "Saving…",
+  saving: SAVING,
   preview: "Preview as the client",
 } as const;
 
@@ -61,6 +63,26 @@ export const EDITOR_WORDS = {
   closePreview: "Close",
   previewShownFullWidth: "Shown full width.",
 } as const;
+
+/** A deposit on the fee ("Due today"), in the editor and on the staff proposal page. */
+export const PAYMENT_TERMS_WORDS = {
+  dueNowLabel: "Due today (%)",
+  dueNowHint: "Blank = the full amount is due today.",
+  balanceLabel: "Balance due",
+  balancePlaceholder: "e.g. upon delivery of the agreements",
+  balanceHint: "The client reads \"Balance due\" and these words; blank reads \"later\". USPTO fees are never part of the deposit.",
+  badPct: "Due today: enter a whole percent from 1 to 100, or leave it blank for the full amount.",
+  noteTooLong: "Balance due: keep it to 120 characters.",
+  notePlain: "Balance due: use plain text.",
+  noteWithoutPct: "Balance due: set the part due today first.",
+  workIntroLabel: "Intro (optional)",
+  workDetailsLabel: "Details (one per line)",
+} as const;
+
+/** "Due today $1,732.50 · Balance $1,732.50" on the staff proposal page. */
+export function dueTodayStaffLine(dueNow: string, balance: string): string {
+  return `Due today ${dueNow} · Balance ${balance}`;
+}
 
 /** "Check these 3 things" (assistant drafts). */
 export function checkTheseHeading(n: number): string {
@@ -136,10 +158,10 @@ export const NEW_OFFER_WORDS = {
   per: "Choice is made",
   perBrand: "Per brand name",
   perMark: "Per mark",
-  options: "Packages offered (up to 3)",
+  options: `Packages offered (up to ${MAX_PACKAGE_CHOICE_OPTIONS})`,
   start: "Starts on",
   tooLarge: "These settings are too large to save. Remove some included items first.",
-  tooMany: "Offer at most 3 packages.",
+  tooMany: `Offer at most ${MAX_PACKAGE_CHOICE_OPTIONS} packages.`,
   needsOne: "Pick at least one package to offer.",
 } as const;
 

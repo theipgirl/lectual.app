@@ -1,6 +1,8 @@
 import type { Direction, Waiting } from "./waiting";
-import type { ContactType } from "./contact";
+import type { ContactKind } from "./contact";
 import type { ProposalExpiryTag } from "./proposal-expiry";
+import type { LastChange } from "./last-changed";
+import { reviewOpenCounts } from "@/lib/ui/words";
 
 /**
  * The weekly review's sections. Pure: rows in, buckets out. A row is in exactly ONE section, the
@@ -30,7 +32,10 @@ export type ReviewRow = {
   kind: ReviewKind;
   id: string;
   href: string;
+  /** The person's name first (a lead's company stands in only when there is no person's name). */
   client: string;
+  /** A lead's company, when the person's name leads and the company is a different thing. */
+  company?: string | null;
   mark: string | null;
   stageLabel: string | null;
   /** The current stage's id (the matter's docket stage, or the lead's pipeline stage), when known. */
@@ -48,19 +53,53 @@ export type ReviewRow = {
   /** false when the activity read failed: last contact is unknown, not "none". */
   contactKnown: boolean;
   /** YYYY-MM-DD in the firm's zone, and the timeline type it came from. */
-  lastContact: { date: string; type: ContactType } | null;
+  lastContact: { date: string; type: ContactKind } | null;
   waiting: Waiting | null;
   lastDirection: Direction | null;
   /** YYYY-MM-DD in the firm's zone of the newest OUTBOUND contact (we emailed / called). Null = none recorded or unreadable (see `contactKnown`). */
   lastOutbound?: string | null;
+  /** What that newest outbound contact was: an email we sent or a call we logged. */
+  lastOutboundType?: ContactKind | null;
   /** Where the lead / matter came from (`referral_source`), if recorded. */
   source?: string | null;
   nextStep: ReviewNextStep | null;
   /** The nearest open USPTO deadline (matters only). */
   deadline: { dueDate: string; title: string | null } | null;
+  /** A filed trademark with no open deadline (PGE Sprint 3). A tag only, never a bucket. False when the deadlines could not be read. */
+  noOpenDeadline?: boolean;
+  /**
+   * A registered mark (docket phase maintenance, its stage closed on the docket) admitted ONLY because no Section 8 / Section 9
+   * deadline is open (Taylor, Nov 23). It takes the ordinary bucket rules (overdue, this week, needs a next step, quiet, else On track)
+   * and its `noOpenDeadline` tag says why it is here. It is never waiting on the USPTO (build sets its waiting from the mail and
+   * approvals only), and the sub-line counts it apart ("N open · M registered").
+   */
+  registeredNoDeadline?: true;
+  /** Every open deadline of the matter, soonest first (the Deadlines strip). Absent on a lead and when the read failed. */
+  openDeadlines?: { id: string; title: string; dueDate: string; confirmed: boolean }[];
   /** A live proposal's expiry, drawn as a tag only. Never moves a row between sections. Absent = none, or the read failed. */
   proposalExpiry?: ProposalExpiryTag | null;
+  /** Stored files plus (matters, Document Center firms) generated letters. Absent = not counted or the count failed: never drawn as 0. */
+  documentCount?: number | null;
+  /** The newest change of the record (who, when). `undefined` = the read failed (no line is drawn); `null` = read, and no change row. */
+  lastChange?: LastChange | null;
+  /** `crm_matter.serial_number` (matters only; null = none recorded). Absent on a lead. */
+  serialNumber?: string | null;
+  /** YYYY-MM-DD on the firm's day of `opened_at` (matter) or `created_at` (lead). */
+  startDate?: string | null;
+  /** The `MATTER_TYPE_LABELS` label of a matter's type. Absent on a lead and when the type is unknown. */
+  practiceArea?: string | null;
+  /**
+   * The earliest OPEN `office_action_response` deadline of a matter. `null` = none open. Absent = the deadlines read failed
+   * (the cell says so) or the row is a lead (the cell is a plain dash).
+   */
+  officeActionDue?: { dueDate: string; confirmed: boolean } | null;
+  /** Owner-only fee facts, present only when the page asked for fees and the reads worked. Absent = not asked, or a read failed. */
+  fees?: ReviewFees;
 };
+
+/** A fee cell: proposal money is formatted by `formatCents`, the spreadsheet ledger's is verbatim. `null` = nothing recorded. */
+export type FeeCell = { text: string; from: "proposal" | "spreadsheet" } | null;
+export type ReviewFees = { legal: FeeCell; legalDue: string | null; gov: FeeCell; govDue: string | null };
 
 export const BUCKET_KEYS = ["overdue", "week", "needs", "quiet", "uspto", "track"] as const;
 export type BucketKey = (typeof BUCKET_KEYS)[number];
@@ -143,5 +182,7 @@ export function reviewSubline(b: ReviewBuckets): string {
   if (b.counts.needs) parts.push(`${b.counts.needs} ${b.counts.needs === 1 ? "needs" : "need"} a next step`);
   if (b.counts.quiet) parts.push(`${b.counts.quiet} quiet 14+ days`);
   const attention = parts.length ? parts.join(" · ") : "Nothing needs attention";
-  return `${b.total} open · ${attention}`;
+  // Admitted registered marks are counted apart (Taylor, Nov 23): "N open · M registered", M only when there are some.
+  const registered = BUCKET_KEYS.reduce((n, k) => n + b.sections[k].filter((r) => r.registeredNoDeadline).length, 0);
+  return `${reviewOpenCounts(b.total - registered, registered)} · ${attention}`;
 }

@@ -70,3 +70,12 @@ describe("a failed read behind a protection turns the filter off", () => {
     expect(sinceSuspended([])).toBe(false);
   });
 });
+
+describe("PGE Sprint 3 review item 2: a filed TM with no open deadline is never hidden by the since filter", () => {
+  it("noOpenDeadline keeps an untouched-since-January row on the page", () => {
+    const flagged = old({ noOpenDeadline: true });
+    expect(isOlderThanSince(flagged)).toBe(false);
+    expect(applyReviewFilters([flagged], P, null)).toHaveLength(1);
+    expect(isOlderThanSince(old({ noOpenDeadline: false }))).toBe(true);
+  });
+});

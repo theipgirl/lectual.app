@@ -18,7 +18,7 @@ export function PersonSwitch({ status, who, counts, mineEnabled, handed }: { sta
     ...(handed ? [{ key: "handed", label: handedPillLabel(handed.count) }] : []),
   ];
   return (
-    <nav aria-label="Whose approvals" className="lx-segs" data-queue-who>
+    <nav aria-label="Whose approvals" className="vs-switch" data-queue-who>
       {pills.map((p) => (
         <Link key={p.key} href={href(p.key)} prefetch={false} aria-current={p.key === current ? "page" : undefined}>
           {p.label}

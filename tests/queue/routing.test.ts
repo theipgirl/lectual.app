@@ -29,6 +29,10 @@ const SAMPLES: Record<QueueKind, ReturnType<typeof qitem>> = {
   opinion_letter: qitem({ agent: "document-center", type: "OPINION_LETTER", headline: "Opinion letter DRAFT — Ana — ACME" }),
   internal_briefing: qitem({ agent: "morning-brief", type: "BRIEFING", headline: "Morning brief for Oct 28", recipient: null }),
   partnership_other: qitem({ agent: "staff", headline: "Partnership follow-up: Acme Co" }),
+  filing_receipt: qitem({ agent: "filing-receipt", headline: "Filing receipt for ACME" }),
+  uspto_notice: qitem({ agent: "uspto-watcher", headline: "Your mark was published" }),
+  client_reminder: qitem({ agent: "client-reminder", headline: "Reminder: your intake form" }),
+  client_request: qitem({ agent: "client-request", headline: "We need your specimen" }),
   client_email_other: qitem({ agent: "something-new", headline: "Hello" }),
 };
 

@@ -19,6 +19,7 @@ import { addedClassCount } from "./client-classes";
 import { chosenPackagesText, packageLineTitle } from "./name-package";
 import { RESET_EVENT_TYPE, stepPayload, stepSucceeded, type ProposalStep, type StepEventInput, type StepPayload } from "./paid";
 import { MARK_KIND_LABEL, isGeneralContent, type AcceptedSnapshot } from "./types";
+import { leadRead } from "@/lib/leads/live";
 
 /**
  * What happens after a client accepts on `/p/<token>` (Sprint 19). It runs in `after()`,
@@ -114,7 +115,7 @@ export function acceptanceNoteBody(snapshot: AcceptedSnapshot, clientName: strin
   const allClasses = (content.names ?? []).flatMap((n) => n.classes ?? []);
   const addedIds = new Set(allClasses.filter((c) => c.client_added === true && snapshot.selection?.[c.id] === true).map((c) => c.id));
   const describedIds = new Set(allClasses.filter((c) => c.client_entry === true && c.client_added !== true && snapshot.selection?.[c.id] === true).map((c) => c.id));
-  // Spec 6: a brand name priced under a package the client chose names it ("The Fold — Enhanced"); firm text only.
+  // Spec 6: a brand name priced under a package the client chose names it ("The Pleat — Enhanced"); firm text only.
   const pkg = text(chosenPackagesText(quote.names)) || text(content.pricing?.package) || "Proposal";
   const lines: string[] = [`${text(clientName) || "The client"} accepted this proposal. Accepted ${snapshot.accepted_at}.`, `Package: ${pkg}`];
   for (const n of (Array.isArray(quote.names) ? quote.names : []).filter((x) => x.included)) {
@@ -200,6 +201,7 @@ export async function resolveNoteTarget(db: LookupDb, input: NoteTargetInput): P
       if (id) return { ok: true, notableType: "Prospect", notableId: id };
     }
     if (input.leadId) {
+      // live-guard: reads the Lawmatics id of a proposal's own lead (the record the note belongs to); the email match is live
       const { data, error } = await db.from("crm_lead").select("lawmatics_id").eq("id", input.leadId).eq("org_id", input.orgId).maybeSingle();
       if (error) return { ok: false, reason: "unreadable" };
       const id = lawmaticsIdOf(data);
@@ -207,12 +209,13 @@ export async function resolveNoteTarget(db: LookupDb, input: NoteTargetInput): P
     }
     const email = text(input.clientEmail).toLowerCase();
     if (!email) return { ok: false, reason: "none" };
-    const { data, error } = await db
-      .from("crm_lead")
-      .select("id, email, lawmatics_id")
-      .eq("org_id", input.orgId)
-      .ilike("email", escapeLike(email))
-      .limit(10);
+    // Live leads only (lectual 0107): a merged lead and its keeper sharing an address is one person, not two.
+    const { data, error } = await leadRead(({ live }) =>
+      live(db.from("crm_lead").select("id, email, lawmatics_id"))
+        .eq("org_id", input.orgId)
+        .ilike("email", escapeLike(email))
+        .limit(10),
+    );
     if (error) return { ok: false, reason: "unreadable" };
     const matches = (Array.isArray(data) ? data : []).filter(
       (r) => isObject(r) && typeof r.email === "string" && r.email.trim().toLowerCase() === email && lawmaticsIdOf(r),

@@ -1,10 +1,20 @@
 import "server-only";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { getProposalSettings, saveProposalSettings } from "@/lib/proposals/store";
-import { parseApprovalRouting, withApprovalRouting, type ApprovalRouting, type RoutingMember } from "@/lib/queue/routing";
+import { parseApprovalRouting, parseDrafter, withApprovalRouting, type ApprovalRouting, type RoutingMember } from "@/lib/queue/routing";
 
 export type RoutingLoad =
-  | { status: "ok"; routing: ApprovalRouting; members: RoutingMember[]; dropped: number; settingsExist: boolean }
+  | {
+      status: "ok";
+      routing: ApprovalRouting;
+      members: RoutingMember[];
+      dropped: number;
+      settingsExist: boolean;
+      /** "Drafts go to": a current staff member's user id, else null (none set, or the stored one is no longer valid). */
+      drafter?: string | null;
+      /** A drafter was stored but no longer names a valid member. */
+      drafterDropped?: boolean;
+    }
   | { status: "failed" };
 
 /**
@@ -15,8 +25,10 @@ export async function loadApprovalRouting(): Promise<RoutingLoad> {
   try {
     const [settings, directory] = await Promise.all([getProposalSettings(), listMemberDirectory()]);
     const members: RoutingMember[] = directory.map((m) => ({ userId: m.userId, role: m.role, displayName: m.displayName, email: m.email }));
-    const { routing, dropped } = parseApprovalRouting((settings?.pricing ?? {}).approval_routing, members);
-    return { status: "ok", routing, members, dropped, settingsExist: settings !== null };
+    const raw = (settings?.pricing ?? {}).approval_routing;
+    const { routing, dropped } = parseApprovalRouting(raw, members);
+    const { drafter, dropped: drafterDropped } = parseDrafter(raw, members);
+    return { status: "ok", routing, members, dropped, settingsExist: settings !== null, drafter, drafterDropped };
   } catch {
     return { status: "failed" };
   }
@@ -27,12 +39,12 @@ export async function loadApprovalRouting(): Promise<RoutingLoad> {
  * pricing key are written back as they were. A missing row is created with no approvers. Throws when the read fails
  * (never writes over settings it could not see).
  */
-export async function saveApprovalRouting(routing: ApprovalRouting): Promise<void> {
+export async function saveApprovalRouting(routing: ApprovalRouting, drafter?: string | null): Promise<void> {
   const existing = await getProposalSettings();
   await saveProposalSettings({
     approverUserIds: existing?.approver_user_ids ?? [],
     defaultPayUrl: existing?.default_pay_url ?? null,
     notifyEmail: existing?.notify_email ?? null,
-    pricing: withApprovalRouting(existing?.pricing ?? {}, routing),
+    pricing: withApprovalRouting(existing?.pricing ?? {}, routing, drafter),
   });
 }

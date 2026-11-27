@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
 import { callerHasRole } from "@/lib/auth/current-role";
 import {
@@ -85,7 +86,7 @@ function revalidateQuote(quoteId: string): void {
 // ── Header ───────────────────────────────────────────────────────────────
 
 /** Title, intro and expiry. New in lectual.app — see `updateQuoteDetails`. */
-export async function updateDetailsAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const updateDetailsAction = previewSafe(async function updateDetailsAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   if (!(await callerHasRole("attorney"))) return NOT_ENTITLED;
 
   const quoteId = String(formData.get("quoteId") ?? "");
@@ -109,7 +110,7 @@ export async function updateDetailsAction(_prev: ActionState, formData: FormData
 
   revalidateQuote(quoteId);
   return { saved: true };
-}
+}, "state");
 
 // ── Lines ────────────────────────────────────────────────────────────────
 
@@ -138,7 +139,7 @@ function signedCents(kind: string, raw: string): number | null {
 
 /** A one-off line a library item doesn't cover, placed in a package, in every
  * package, or as an add-on. */
-export async function addLineAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const addLineAction = previewSafe(async function addLineAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   if (!(await callerHasRole("attorney"))) return NOT_ENTITLED;
 
   const quoteId = String(formData.get("quoteId") ?? "");
@@ -164,11 +165,11 @@ export async function addLineAction(_prev: ActionState, formData: FormData): Pro
 
   revalidateQuote(quoteId);
   return { saved: true };
-}
+}, "state");
 
 /** Inline edit of a line's label and/or amount — the builder's table. Only the
  * fields posted are changed. */
-export async function editLineAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const editLineAction = previewSafe(async function editLineAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   if (!(await callerHasRole("attorney"))) return NOT_ENTITLED;
 
   const quoteId = String(formData.get("quoteId") ?? "");
@@ -196,7 +197,7 @@ export async function editLineAction(_prev: ActionState, formData: FormData): Pr
 
   revalidateQuote(quoteId);
   return { saved: true };
-}
+}, "state");
 
 /**
  * The Charged pill: move a line between signing and filing. A government fee
@@ -204,7 +205,7 @@ export async function editLineAction(_prev: ActionState, formData: FormData): Pr
  * and if something calls it anyway the store's `assertLineKindChargeAt` (and
  * then 0068's CHECK) refuses.
  */
-export async function setChargeAtAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const setChargeAtAction = previewSafe(async function setChargeAtAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   if (!(await callerHasRole("attorney"))) return NOT_ENTITLED;
 
   const quoteId = String(formData.get("quoteId") ?? "");
@@ -221,9 +222,9 @@ export async function setChargeAtAction(_prev: ActionState, formData: FormData):
 
   revalidateQuote(quoteId);
   return { saved: true };
-}
+}, "state");
 
-export async function deleteLineAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const deleteLineAction = previewSafe(async function deleteLineAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   if (!(await callerHasRole("attorney"))) return NOT_ENTITLED;
 
   const quoteId = String(formData.get("quoteId") ?? "");
@@ -238,11 +239,11 @@ export async function deleteLineAction(_prev: ActionState, formData: FormData): 
 
   revalidateQuote(quoteId);
   return {};
-}
+}, "state");
 
 /** Click a service-library item: COPY it onto the quote, in the package being
  * edited (or every package, or as an add-on). */
-export async function applyServiceItemAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const applyServiceItemAction = previewSafe(async function applyServiceItemAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   if (!(await callerHasRole("attorney"))) return NOT_ENTITLED;
 
   const quoteId = String(formData.get("quoteId") ?? "");
@@ -259,13 +260,13 @@ export async function applyServiceItemAction(_prev: ActionState, formData: FormD
 
   revalidateQuote(quoteId);
   return { saved: true };
-}
+}, "state");
 
 // ── Packages and add-ons ─────────────────────────────────────────────────
 
 /** Offer or withhold a whole package. The store refuses to withhold the last
  * offered one. */
-export async function setPackageOfferedAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const setPackageOfferedAction = previewSafe(async function setPackageOfferedAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   if (!(await callerHasRole("attorney"))) return NOT_ENTITLED;
 
   const quoteId = String(formData.get("quoteId") ?? "");
@@ -281,10 +282,10 @@ export async function setPackageOfferedAction(_prev: ActionState, formData: Form
 
   revalidateQuote(quoteId);
   return { saved: true };
-}
+}, "state");
 
 /** Offer or withhold one add-on. */
-export async function setAddOnOfferedAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const setAddOnOfferedAction = previewSafe(async function setAddOnOfferedAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   if (!(await callerHasRole("attorney"))) return NOT_ENTITLED;
 
   const quoteId = String(formData.get("quoteId") ?? "");
@@ -300,9 +301,9 @@ export async function setAddOnOfferedAction(_prev: ActionState, formData: FormDa
 
   revalidateQuote(quoteId);
   return { saved: true };
-}
+}, "state");
 
-export async function renamePackageAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const renamePackageAction = previewSafe(async function renamePackageAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   if (!(await callerHasRole("attorney"))) return NOT_ENTITLED;
 
   const quoteId = String(formData.get("quoteId") ?? "");
@@ -318,9 +319,9 @@ export async function renamePackageAction(_prev: ActionState, formData: FormData
 
   revalidateQuote(quoteId);
   return { saved: true };
-}
+}, "state");
 
-export async function duplicatePackageAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const duplicatePackageAction = previewSafe(async function duplicatePackageAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   if (!(await callerHasRole("attorney"))) return NOT_ENTITLED;
 
   const quoteId = String(formData.get("quoteId") ?? "");
@@ -336,9 +337,9 @@ export async function duplicatePackageAction(_prev: ActionState, formData: FormD
 
   revalidateQuote(quoteId);
   return { saved: true };
-}
+}, "state");
 
-export async function deletePackageAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const deletePackageAction = previewSafe(async function deletePackageAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   if (!(await callerHasRole("attorney"))) return NOT_ENTITLED;
 
   const quoteId = String(formData.get("quoteId") ?? "");
@@ -353,11 +354,11 @@ export async function deletePackageAction(_prev: ActionState, formData: FormData
 
   revalidateQuote(quoteId);
   return { saved: true };
-}
+}, "state");
 
 // ── Lifecycle ────────────────────────────────────────────────────────────
 
-export async function sendQuoteAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const sendQuoteAction = previewSafe(async function sendQuoteAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   if (!(await callerHasRole("attorney"))) return NOT_ENTITLED;
 
   const quoteId = String(formData.get("quoteId") ?? "");
@@ -371,9 +372,9 @@ export async function sendQuoteAction(_prev: ActionState, formData: FormData): P
 
   revalidateQuote(quoteId);
   return { saved: true };
-}
+}, "state");
 
-export async function withdrawQuoteAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const withdrawQuoteAction = previewSafe(async function withdrawQuoteAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   if (!(await callerHasRole("attorney"))) return NOT_ENTITLED;
 
   const quoteId = String(formData.get("quoteId") ?? "");
@@ -388,7 +389,7 @@ export async function withdrawQuoteAction(_prev: ActionState, formData: FormData
 
   revalidateQuote(quoteId);
   return { saved: true };
-}
+}, "state");
 
 // ── Engagement terms ─────────────────────────────────────────────────────
 
@@ -523,7 +524,7 @@ async function writeTermsBody(quoteId: string, termsBody: string | null): Promis
 /** Saves the engagement terms exactly as the attorney typed them. Empty means
  * NO terms — stored as null, and `/q/[token]` then presents a proposal with no
  * engagement letter rather than an empty "Engagement terms" heading. */
-export async function saveTermsAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const saveTermsAction = previewSafe(async function saveTermsAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   if (!(await callerHasRole("attorney"))) return NOT_ENTITLED;
 
   const quoteId = String(formData.get("quoteId") ?? "");
@@ -543,7 +544,7 @@ export async function saveTermsAction(_prev: ActionState, formData: FormData): P
 
   revalidateQuote(quoteId);
   return { saved: true };
-}
+}, "state");
 
 /**
  * Generates the engagement letter from THIS quote's own lines and saves it as
@@ -561,7 +562,7 @@ export async function saveTermsAction(_prev: ActionState, formData: FormData): P
  * `buildEngagementTerms` is pure and AI-free. Nothing on this path asks a model
  * to write a fee term.
  */
-export async function generateTermsAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const generateTermsAction = previewSafe(async function generateTermsAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   if (!(await callerHasRole("attorney"))) return NOT_ENTITLED;
 
   const quoteId = String(formData.get("quoteId") ?? "");
@@ -617,7 +618,7 @@ export async function generateTermsAction(_prev: ActionState, formData: FormData
 
   revalidateQuote(quoteId);
   return {};
-}
+}, "state");
 
 /**
  * The firm's own display name, for the "This agreement is between …" line.
@@ -647,7 +648,7 @@ async function firmNameFor(
  * form fields with no default (src/lib/payments/manual.ts). attorney+, like
  * every action here; RLS (crm_payment insert, staff tier) underneath.
  */
-export async function recordPaymentAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const recordPaymentAction = previewSafe(async function recordPaymentAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   if (!(await callerHasRole("attorney"))) return NOT_ENTITLED;
   const quoteId = String(formData.get("quoteId") ?? "");
   if (!quoteId) return { error: "Missing quote." };
@@ -668,14 +669,14 @@ export async function recordPaymentAction(_prev: ActionState, formData: FormData
   if (!result.ok) return { error: result.reason };
   revalidateQuote(quoteId);
   return { saved: true };
-}
+}, "state");
 
 /**
  * Resolve a LawPay attempt left pending (LawPay gave no clear answer). Admin
  * tier: correcting a money record is supervisory (0068's crm_payment update
  * policy), so this checks senior_admin, not attorney.
  */
-export async function reconcilePaymentAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const reconcilePaymentAction = previewSafe(async function reconcilePaymentAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   if (!(await callerHasRole("senior_admin"))) return { error: "Only owners and admins can resolve a payment." };
   const quoteId = String(formData.get("quoteId") ?? "");
   const paymentId = String(formData.get("paymentId") ?? "");
@@ -686,4 +687,4 @@ export async function reconcilePaymentAction(_prev: ActionState, formData: FormD
   if (!result.ok) return { error: result.reason };
   revalidateQuote(quoteId);
   return { saved: true };
-}
+}, "state");

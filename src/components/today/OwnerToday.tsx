@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PageHeader } from "@/components/ui/PageHeader";
 import type { Role } from "@/lib/auth/roles";
 import { aiConfigured } from "@/lib/ai/claude";
 import { orgHasModule } from "@/lib/org/modules";
@@ -11,15 +12,24 @@ import { parseDealTimes } from "@/lib/deal/person-times";
 import { dealNudge, parseDeckSeen } from "@/lib/deal/nudge";
 import { loadDeckSummary, type DeckSummary } from "@/lib/queue/deck-summary";
 import { loadTodayConsults, type TodayConsultsResult } from "@/lib/calendar/consult-sources";
-import { liveConsultDeps } from "@/lib/calendar/consult-sources-live";
+import { consultDepsForViewer } from "@/lib/calendar/consult-deps-view";
+import { consultPreview } from "@/lib/views/view-as";
 import { loadOwnerDeadlines, loadOwnerNeedsReview, loadOwnerProposals } from "@/lib/today/owner-load";
 import { cardsHero, deadlineChip, deadlineParts, proposalTone, weekdayDate, OWNER_PROPOSALS_SHOWN, OWNER_DEADLINES_SHOWN, weekStrip } from "@/lib/today/owner-rules";
 import { DECK_PATH } from "@/lib/views";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Notice } from "@/components/ui/Notice";
+import { Pill } from "@/components/ui/Pill";
+import { formatDay } from "@/lib/ui/dates";
+import type { PillTone } from "@/lib/ui/tones";
 import { AddNameLink } from "@/components/account/AddNameLink";
 import { OwnerNeedsReview } from "@/components/today/owner/OwnerNeedsReview";
 import { OwnerConsults } from "@/components/today/owner/OwnerConsults";
+import { OwnerCameBack } from "@/components/today/owner/OwnerCameBack";
+import { loadCameBack } from "@/lib/today/came-back";
 import { WeekStrip } from "@/components/today/owner/WeekStrip";
 import { CopilotBox } from "@/components/today/owner/CopilotBox";
+import { DeadlineAlertsCard, loadDeadlineAlerts } from "@/components/today/DeadlineAlertsCard";
 import "@/components/today/owner/owner-today.css";
 import {
   OWNER_CARDS_HEADING,
@@ -44,9 +54,13 @@ import {
   OWNER_WEEK_HEADING,
 } from "@/lib/ui/words";
 
+/** "Tuesday, Nov 17": the weekday word, then the shared day format in the firm's zone. */
 function longDate(now: Date, tz: string): string {
-  return new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "long", month: "long", day: "numeric" }).format(now);
+  return formatDay(now, { tz, now, weekday: "long" }) ?? "";
 }
+
+/** The owner view's own tone words ("plain") onto the shared pill tones. */
+const pillTone = (tone: "risk" | "warn" | "plain"): PillTone => (tone === "plain" ? "mute" : tone);
 
 function greeting(hour: number): string {
   return hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening";
@@ -73,17 +87,23 @@ export async function OwnerToday({
   metadata?: Record<string, unknown> | null;
   now?: Date;
 }) {
+  // The Deadlines card (PGE Sprint 3) reads on its own, started now so it runs beside every other read on this page.
+  const alertsP = loadDeadlineAlerts(userId, now);
+  // Returning clients (the Lawmatics daily sync's "came back" rows): never throws, three states.
+  const cameBackP = loadCameBack(now);
   const [hasProposals, tz] = await Promise.all([orgHasModule("proposals").catch(() => false), getFirmTimeZone()]);
   const dealTimes = parseDealTimes(metadata);
   const [deckS, consultsS, deadlinesS, reviewS, proposalsS, membersS] = await Promise.allSettled([
     loadDeckSummary({ userId, role }, dealTimes, now),
-    loadTodayConsults(now, tz, liveConsultDeps),
+    loadTodayConsults(now, tz, await consultDepsForViewer(await consultPreview())),
     loadOwnerDeadlines(now, tz),
     loadOwnerNeedsReview(now, tz),
     hasProposals ? loadOwnerProposals(now, tz) : Promise.resolve(null),
     listMemberDirectory(),
   ]);
 
+  const alertsData = await alertsP;
+  const cameBack = await cameBackP;
   // loadDeckSummary never throws; a rejection would be a bug, shown as unavailable.
   const deck: DeckSummary = deckS.status === "fulfilled" ? deckS.value : { status: "unavailable" };
   const consults: TodayConsultsResult | null = consultsS.status === "fulfilled" ? consultsS.value : null;
@@ -110,17 +130,20 @@ export async function OwnerToday({
 
   return (
     <div className="ot-page">
-      <div className="ot-top">
-        <h1 className="ot-h1">
-          Good {greeting(hourInZone(now, tz))}
-          {greetingSuffix(firstName)}.
-        </h1>
-        <p className="ot-date">{longDate(now, tz)}</p>
-        {!firstName && <AddNameLink />}
-      </div>
+      <PageHeader
+        className="ot-top"
+        title={
+          <>
+            Good {greeting(hourInZone(now, tz))}
+            {greetingSuffix(firstName)}.
+          </>
+        }
+        sub={longDate(now, tz)}
+        actions={!firstName ? <AddNameLink /> : undefined}
+      />
 
       <section className="ot-hero" aria-labelledby="ot-cards-h" data-state={hero.state}>
-        <h2 id="ot-cards-h" className="ot-eyebrow ot-only-narrow">
+        <h2 id="ot-cards-h" className="lx-label ot-only-narrow">
           {OWNER_CARDS_HEADING}
         </h2>
         {hero.big !== null ? (
@@ -147,23 +170,23 @@ export async function OwnerToday({
           </p>
         )}
         {hero.canStart && (
-          <Link href={DECK_PATH} className="ot-start">
+          <Link href={DECK_PATH} className="lx-btn lx-btn-cream ot-start">
             {OWNER_CARDS_START}
           </Link>
         )}
       </section>
 
-      <section className="ot-card ot-week-card" aria-labelledby="ot-week-h">
+      <section className="lx-card ot-card ot-week-card" aria-labelledby="ot-week-h">
         <div className="ot-card-head">
-          <h2 id="ot-week-h" className="ot-card-title">
+          <h2 id="ot-week-h" className="lx-h3">
             {OWNER_WEEK_HEADING}
           </h2>
-          <span className="ot-sub">
+          <span className="ot-count">
             <span className="ot-only-narrow">
               <span className="ot-key ot-key-consult" /> {OWNER_WEEK_KEY_CONSULT} <span className="ot-key ot-key-deadline" /> {OWNER_WEEK_KEY_DEADLINE}
             </span>
             <span className="ot-only-wide">
-              <Link href="/dashboard/calendar/" className="ot-link">
+              <Link href="/dashboard/calendar/" className="lx-link">
                 {OWNER_WEEK_OPEN_CALENDAR}
               </Link>
             </span>
@@ -171,9 +194,9 @@ export async function OwnerToday({
         </div>
         <WeekStrip days={week} />
         {weekNote && (
-          <p className="ot-sub ot-note" role="alert">
+          <Notice tone="warn" role="alert">
             {weekNote}
-          </p>
+          </Notice>
         )}
       </section>
 
@@ -182,36 +205,35 @@ export async function OwnerToday({
           {consults ? (
             <OwnerConsults result={consults} timeZone={tz} today={today} />
           ) : (
-            <section className="ot-card" aria-labelledby="ot-consults-h">
-              <h2 id="ot-consults-h" className="ot-card-title">
+            <section className="lx-card ot-card" aria-labelledby="ot-consults-h">
+              <h2 id="ot-consults-h" className="lx-h3">
                 {OWNER_CONSULTS_HEADING}
               </h2>
-              <p className="ot-sub ot-note" role="alert">
+              <Notice tone="warn" role="alert">
                 {OWNER_CONSULTS_FAILED}
-              </p>
+              </Notice>
             </section>
           )}
+          <OwnerCameBack read={cameBack} />
         </div>
 
         {proposals !== null && (
           <div className="ot-col-proposals">
-            <section className="ot-card" aria-labelledby="ot-proposals-h">
+            <section className="lx-card ot-card" aria-labelledby="ot-proposals-h">
               <div className="ot-card-head">
-                <h2 id="ot-proposals-h" className="ot-card-title">
+                <h2 id="ot-proposals-h" className="lx-h3">
                   {OWNER_PROPOSALS_HEADING}
                 </h2>
                 {Array.isArray(proposals) && proposals.length > 0 && (
-                  <span className="ot-sub">
-                    {proposals.length}
-                  </span>
+                  <span className="ot-count">{proposals.length}</span>
                 )}
               </div>
               {proposals === undefined ? (
-                <p className="ot-sub ot-note" role="alert">
+                <Notice tone="warn" role="alert">
                   {OWNER_PROPOSALS_FAILED}
-                </p>
+                </Notice>
               ) : proposals.length === 0 ? (
-                <p className="ot-sub ot-empty">{OWNER_PROPOSALS_NONE}</p>
+                <EmptyState variant="line">{OWNER_PROPOSALS_NONE}</EmptyState>
               ) : (
                 proposals.slice(0, OWNER_PROPOSALS_SHOWN).map((p) => {
                   const opens = ownerProposalOpens(p.opens);
@@ -226,13 +248,13 @@ export async function OwnerToday({
                           {opens ? ` \u00b7 ${opens}` : ""}
                         </span>
                       </div>
-                      <span className={`ot-pill ot-pill-${proposalTone(p, today)}`}>{p.expiry}</span>
+                      <Pill tone={pillTone(proposalTone(p, today))}>{p.expiry}</Pill>
                     </div>
                   );
                 })
               )}
               {Array.isArray(proposals) && proposals.length > OWNER_PROPOSALS_SHOWN && (
-                <Link href="/dashboard/proposals/" className="ot-link ot-more">
+                <Link href="/dashboard/proposals/" className="lx-link ot-more">
                   {ownerSeeAll(proposals.length)}
                 </Link>
               )}
@@ -241,19 +263,20 @@ export async function OwnerToday({
         )}
 
         <div className="ot-col-deadlines">
-          <section className="ot-card" aria-labelledby="ot-deadlines-h">
+          <DeadlineAlertsCard data={alertsData} userId={userId} />
+          <section className="lx-card ot-card" aria-labelledby="ot-deadlines-h">
             <div className="ot-card-head">
-              <h2 id="ot-deadlines-h" className="ot-card-title">
+              <h2 id="ot-deadlines-h" className="lx-h3">
                 {OWNER_DEADLINES_HEADING}
               </h2>
-              {deadlines !== null && deadlines.length > 0 && <span className="ot-sub">{deadlines.length}</span>}
+              {deadlines !== null && deadlines.length > 0 && <span className="ot-count">{deadlines.length}</span>}
             </div>
             {deadlines === null ? (
-              <p className="ot-sub ot-note" role="alert">
+              <Notice tone="warn" role="alert">
                 {OWNER_DEADLINES_FAILED}
-              </p>
+              </Notice>
             ) : deadlines.length === 0 ? (
-              <p className="ot-sub ot-empty">{OWNER_DEADLINES_NONE}</p>
+              <EmptyState variant="line">{OWNER_DEADLINES_NONE}</EmptyState>
             ) : (
               deadlines.slice(0, OWNER_DEADLINES_SHOWN).map((d) => {
                 const chip = deadlineChip(d, today);
@@ -269,13 +292,13 @@ export async function OwnerToday({
                         {weekdayDate(d.dueDate)}
                       </span>
                     </div>
-                    <span className={`ot-pill ot-pill-${chip.tone}`}>{chip.text}</span>
+                    <Pill tone={pillTone(chip.tone)}>{chip.text}</Pill>
                   </div>
                 );
               })
             )}
             {deadlines !== null && deadlines.length > OWNER_DEADLINES_SHOWN && (
-              <Link href="/dashboard/calendar/" className="ot-link ot-more">
+              <Link href="/dashboard/calendar/" className="lx-link ot-more">
                 {ownerSeeAll(deadlines.length)}
               </Link>
             )}

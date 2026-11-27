@@ -7,8 +7,8 @@ import { withPackageSnapshot } from "@/lib/proposals/package-snapshot";
 import { proposalActionError } from "@/app/dashboard/proposals/errors";
 import { FeesSection } from "@/components/proposal-editor/Sections";
 import type { ProposalContent, ProposalInclude, ProposalRow } from "@/lib/proposals/types";
-import { CONCIERGE, ENHANCED, ESSENTIAL, danielle } from "../proposals/danielle-fixture";
-import { sevetri } from "../proposals/fixture";
+import { CONCIERGE, ENHANCED, ESSENTIAL, renata } from "../proposals/renata-fixture";
+import { callum } from "../proposals/fixture";
 
 vi.mock("next/font/google", () => ({ Bodoni_Moda: () => ({ variable: "b" }), Source_Serif_4: () => ({ variable: "s" }) }));
 
@@ -29,7 +29,7 @@ const FIRM_ROWS: ProposalInclude[] = [
 ];
 
 function withRows(): ProposalContent {
-  const c = danielle();
+  const c = renata();
   c.packages = [ESSENTIAL, ENHANCED, CONCIERGE].map((p) => ({ ...p, includes: FIRM_ROWS.map((r) => ({ ...r })) }));
   return c;
 }
@@ -39,7 +39,7 @@ const SETTING = { packages: [ESSENTIAL, ENHANCED, CONCIERGE].map((p) => ({ ...p,
 function row(content: ProposalContent): ProposalRow {
   return {
     id: "p1", org_id: "o", family_id: "p1", version: 1, public_token: "t".repeat(43), lead_id: null, matter_id: null,
-    client_name: "Danielle Milton", client_email: "d@example.com", title: "Trademark Proposal", status: "draft", content,
+    client_name: "Renata Ostrowski", client_email: "d@example.com", title: "Trademark Proposal", status: "draft", content,
     expires_on: "2026-12-10", pay_url: null, source: "manual", created_by: null, updated_by: null, approved_by: null, approved_at: null,
     sent_at: null, accepted_at: null, superseded_at: null, withdrawn_at: null, accepted_selection: null, accepted_snapshot: null,
     created_at: UPDATED, updated_at: UPDATED,
@@ -63,7 +63,7 @@ function deps(r: ProposalRow, over: Partial<SaveDraftDeps> = {}): SaveDraftDeps 
 function form(content: ProposalContent, extra: Record<string, string>): FormData {
   const f = new FormData();
   const base: Record<string, string> = {
-    proposalId: "p1", updatedAt: UPDATED, fullName: "Danielle Milton", firstName: "Danielle", clientEmail: "d@example.com", title: "Trademark Proposal",
+    proposalId: "p1", updatedAt: UPDATED, fullName: "Renata Ostrowski", firstName: "Renata", clientEmail: "d@example.com", title: "Trademark Proposal",
     greeting: "Hi", package: "Concierge", base: "4950", includedClasses: "3", perClass: "825", secondMarkPct: "20", govPerClass: "350", adjFields: "1",
   };
   content.names.forEach((n, b) => {
@@ -112,7 +112,7 @@ const saved = (d: SaveDraftDeps) => (d.update as ReturnType<typeof vi.fn>).mock.
 
 describe("the single 'what the package includes' table (no package rows)", () => {
   it("a changed item name, cell and highlight reach the one updateProposal call", async () => {
-    const c = sevetri();
+    const c = callum();
     const r = row(c);
     const d = deps(r);
     const res = await runSaveDraft(
@@ -131,7 +131,7 @@ describe("the single 'what the package includes' table (no package rows)", () =>
 describe("packages with their own rows: the editor edits the table the client sees", () => {
   it("the editor offers one table per offered package, exactly when the client page shows the comparison", async () => {
     const { includesComparison } = await import("@/components/client-proposal/ProposalDocument");
-    for (const c of [withRows(), danielle(), sevetri()]) {
+    for (const c of [withRows(), renata(), callum()]) {
       expect(editorPackageIncludes(c) !== null, JSON.stringify(c.packages?.map((p) => p.includes?.length))).toBe(includesComparison(c) !== null);
     }
     expect(editorPackageIncludes(withRows())?.map((p) => p.package)).toEqual(["Essential", "Enhanced", "Concierge"]);
@@ -228,7 +228,7 @@ describe("the editor's includes inputs all belong to the one editor form", () =>
   });
 
   it("without package rows: the single table and its marker, inside the form", () => {
-    const html = fees(sevetri());
+    const html = fees(callum());
     expect(html).toContain('name="incFields"');
     expect(html).not.toContain('name="pkgIncFields"');
     const end = html.indexOf("</form>");

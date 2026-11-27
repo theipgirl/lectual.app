@@ -2,6 +2,8 @@
 
 import { useActionState } from "react";
 import { saveMinutesPerTaskAction, type AgentActionState } from "@/app/dashboard/agents/actions";
+import { SavedNote } from "@/components/ui/SavedNote";
+import { SAVING } from "@/lib/ui/words";
 import { AGENT_DEFS, AGENT_IDS, type AgentId } from "@/lib/agents/types";
 import { DEFAULT_MINUTES_PER_TASK, MAX_MINUTES_PER_TASK, TASK_UNIT } from "@/lib/agents/autopilot-rules";
 
@@ -34,7 +36,7 @@ export function MinutesPerTaskForm(props: { minutes: Record<AgentId, number>; ca
       {props.canManage && (
         <div>
           <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
-            {pending ? "Saving…" : "Save estimate"}
+            {pending ? SAVING : "Save estimate"}
           </button>
         </div>
       )}
@@ -43,7 +45,7 @@ export function MinutesPerTaskForm(props: { minutes: Record<AgentId, number>; ca
           {state.error}
         </span>
       )}
-      {state.ok && <span className="lx-note">Saved.</span>}
+      <SavedNote show={!!state.ok} />
     </form>
   );
 }

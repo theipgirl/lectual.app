@@ -57,7 +57,7 @@ async function render(opts: Opts = {}) {
 beforeEach(() => vi.resetModules());
 
 describe("D2: the picker on New document", () => {
-  it("shows the Leads | Matters switch, a search box, the 8 most recent rows and 'Showing 8 of 23.'", async () => {
+  it("shows the Leads | Matters switch, a search box, the 8 most recent rows and 'Showing 8 of 23'", async () => {
     const html = await render({ matters: Array.from({ length: 23 }, (_, i) => matter(i + 1)) });
     expect(html).toContain("Who is this for?");
     expect(html).toContain('aria-label="Kind of record"');
@@ -65,7 +65,7 @@ describe("D2: the picker on New document", () => {
     expect(html).toContain("Matters");
     expect(html).toContain('aria-label="Search matters"');
     expect((html.match(/href="\/dashboard\/documents\/new\/matter-\d+\/"/g) ?? []).length).toBe(8);
-    expect(html).toContain("Showing 8 of 23.");
+    expect(html).toContain("Showing 8 of 23");
     expect(html).toContain('action="/dashboard/documents/new/"');
   });
 
@@ -79,7 +79,7 @@ describe("D2: the picker on New document", () => {
     const html = await render({ matters: [matter(1), matter(2, { status: "closed" })] });
     expect(html).toContain("MARK1");
     expect(html).not.toContain("MARK2");
-    expect(html).toContain("Showing 1 of 1.");
+    expect(html).toContain("Showing 1 of 1");
   });
 
   it("a failed matters read is its own alert, never 'No matches'; the other kind still works", async () => {
@@ -160,8 +160,8 @@ describe("D1/D4: reuse and gates", () => {
     }
     const files = (dir: string): string[] => readdirSync(dir).flatMap((n) => (statSync(join(dir, n)).isDirectory() ? files(join(dir, n)) : [join(dir, n)]));
     const copies = files("src").filter((f) => /showingLine|Showing \$\{/.test(read(f)));
-    // The picker's own two files and the Skills picker (an older, separate card); nothing under documents.
-    expect(copies.sort()).toEqual(["src/components/proposal-editor/WhoIsThisFor.tsx", "src/components/skills/SkillPicker.tsx", "src/lib/proposals/new-picker.ts"]);
+    // The picker's own two files; nothing under documents. (The Skills picker now draws the shared ShowingCount, design rollout item 14.)
+    expect(copies.sort()).toEqual(["src/components/proposal-editor/WhoIsThisFor.tsx", "src/lib/proposals/new-picker.ts"]);
   });
 
   it("the module gate is still the segment layout's, and reads go through the scoped helpers only", () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { sevetri } from "./fixture";
+import { callum } from "./fixture";
 
 /**
  * `listProposals` carries the first approval-blocking message for draft and
@@ -21,7 +21,7 @@ const base = {
   accepted_at: null,
   accepted_snapshot: null,
   updated_at: "2026-10-19T12:00:00Z",
-  content: sevetri(),
+  content: callum(),
   client_email: "ana@example.com",
   pay_url: "https://pay.example/x",
 };

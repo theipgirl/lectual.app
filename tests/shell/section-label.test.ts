@@ -17,7 +17,7 @@ describe("sectionLabelFor (F17)", () => {
     ["/dashboard/queue/abc/", "Approvals"],
     ["/dashboard/settings/modules/", "Settings"],
     ["/dashboard/intake/", "Intake"],
-    ["/dashboard/proposals/new/", "Client proposals"],
+    ["/dashboard/proposals/new/", "Proposals"],
     ["/dashboard/matters/m1/", "Matters"],
   ])("%s -> %s", (pathname, label) => {
     expect(sectionLabelFor(pathname)).toBe(label);

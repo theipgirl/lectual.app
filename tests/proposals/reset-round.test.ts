@@ -90,7 +90,7 @@ describe("acceptance follow-ups after a reset", () => {
     return fakeFollowupDb(
       {
         client_proposal: [
-          { id: P, org_id: "org-1", family_id: "fam-1", status: "accepted", client_name: "Sevetri Wilson", client_email: null, lead_id: null, matter_id: null, accepted_snapshot: snapshot },
+          { id: P, org_id: "org-1", family_id: "fam-1", status: "accepted", client_name: "Callum Ferreira", client_email: null, lead_id: null, matter_id: null, accepted_snapshot: snapshot },
         ],
         client_proposal_setting: [{ org_id: "org-1", approver_user_ids: ["u-appr1"] }],
         crm_org_member: [{ org_id: "org-1", user_id: "u-appr1", role: "owner" }],

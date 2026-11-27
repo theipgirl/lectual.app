@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
 import { getAdminClient } from "@/lib/db/admin";
 import { resolveFirmSession } from "@/lib/firm/session";
@@ -41,7 +42,7 @@ function refresh() {
   revalidatePath("/dashboard/meetings/");
 }
 
-export async function connectFathomAction(_prev: MeetingsSettingsState, formData: FormData): Promise<MeetingsSettingsState> {
+export const connectFathomAction = previewSafe(async function connectFathomAction(_prev: MeetingsSettingsState, formData: FormData): Promise<MeetingsSettingsState> {
   const session = await adminSession();
   if (!session) return { error: `${ADMIN_TIER_PHRASE} can connect Fathom.` };
   const root = rootKeyOrNull();
@@ -56,9 +57,9 @@ export async function connectFathomAction(_prev: MeetingsSettingsState, formData
   if (!saved.ok) return { error: saved.reason };
   refresh();
   return { ok: true, notice: saved.reconnected ? "Fathom key replaced." : "Fathom connected. Import your recent meetings below." };
-}
+}, "state");
 
-export async function disconnectMeetingSourceAction(_prev: MeetingsSettingsState, formData: FormData): Promise<MeetingsSettingsState> {
+export const disconnectMeetingSourceAction = previewSafe(async function disconnectMeetingSourceAction(_prev: MeetingsSettingsState, formData: FormData): Promise<MeetingsSettingsState> {
   const provider = formData.get("provider");
   if (!isMeetingProvider(provider)) return { error: "Unknown connection." };
   if (!(await adminSession())) return { error: `${ADMIN_TIER_PHRASE} can disconnect ${PROVIDER_LABEL[provider]}.` };
@@ -66,9 +67,9 @@ export async function disconnectMeetingSourceAction(_prev: MeetingsSettingsState
   if (!result.ok) return { error: result.reason };
   refresh();
   return { ok: true, notice: `${PROVIDER_LABEL[provider]} disconnected. Meetings already imported stay.` };
-}
+}, "state");
 
-export async function importNowAction(_prev: MeetingsSettingsState, formData: FormData): Promise<MeetingsSettingsState> {
+export const importNowAction = previewSafe(async function importNowAction(_prev: MeetingsSettingsState, formData: FormData): Promise<MeetingsSettingsState> {
   const provider = formData.get("provider");
   if (!isMeetingProvider(provider)) return { error: "Unknown connection." };
   const session = await adminSession();
@@ -103,4 +104,4 @@ export async function importNowAction(_prev: MeetingsSettingsState, formData: Fo
     notice: `Imported: ${parts.join(", ")}.${out.truncated ? " There were more than one run reads; the rest follow on the next run." : ""}`,
     sync: { kind: "imported", inserted },
   };
-}
+}, "state");

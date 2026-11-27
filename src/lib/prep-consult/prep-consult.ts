@@ -118,6 +118,6 @@ export function assertNoJudgmentContent(text: string, where: string): void {
  * action still surfaces this as a friendly message — while remaining its own
  * subclass so a judgment-boundary trip (a defect in the prompt or the
  * model's output, never something the caller can fix by re-typing the form)
- * is identifiable in logs/tests as its own thing. See prep-consult/generate.ts.
+ * is identifiable in logs/tests as its own thing.
  */
 export class JudgmentBoundaryError extends PrepConsultFlowError {}

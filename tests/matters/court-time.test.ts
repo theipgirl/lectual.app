@@ -7,6 +7,9 @@ import {
   toCourtDateTimeLocal,
 } from "../../src/lib/matters/court-time";
 
+/** A fixed "now", so a hearing this year reads without its year. */
+const NOW = new Date("2026-11-17T12:00:00Z");
+
 describe("court time", () => {
   it("uses the zone every county in the docket sits in", () => {
     expect(COURT_TIME_ZONE).toBe("America/New_York");
@@ -20,7 +23,7 @@ describe("court time", () => {
     const stored = "2026-08-25T14:00:00+00:00";
 
     it("shows a stored instant at the time the court will call it", () => {
-      expect(formatCourtDateTime(stored)).toBe("Aug 25, 2026, 10:00 AM EDT");
+      expect(formatCourtDateTime(stored, NOW)).toBe("Aug 25, 10:00 AM EDT");
     });
 
     it("loads that instant into the form as the court's wall clock", () => {
@@ -31,7 +34,7 @@ describe("court time", () => {
       const iso = courtWallClockToUtcIso(2026, 8, 25, 10, 0);
       expect(iso).toBe("2026-08-25T14:00:00.000Z");
       expect(toCourtDateTimeLocal(iso)).toBe("2026-08-25T10:00");
-      expect(formatCourtDateTime(iso)).toBe("Aug 25, 2026, 10:00 AM EDT");
+      expect(formatCourtDateTime(iso, NOW)).toBe("Aug 25, 10:00 AM EDT");
     });
   });
 

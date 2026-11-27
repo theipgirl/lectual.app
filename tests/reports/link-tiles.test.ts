@@ -67,7 +67,7 @@ describe("report link tiles hide unbuilt sections (F12)", () => {
     mockCommon();
     const { loadCommunicationReport } = await import("@/lib/reports/communication");
     const report = await loadCommunicationReport(period, { hasMailbox: true, hasAgents: true });
-    expect(labels(report.links)).toEqual(["My Mail", "Approvals", "Campaigns"]);
+    expect(labels(report.links)).toEqual(["Mail", "Approvals", "Campaigns"]);
   });
 
   it("no report link points at an unbuilt section", async () => {

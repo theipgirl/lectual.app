@@ -111,7 +111,7 @@ describe("Your name dialog and account menu", () => {
     const src = fs.readFileSync("src/components/account/YourNameDialog.tsx", "utf8");
     expect(src).toContain("tourKeyAction");
     expect(src).toContain("focusRestoreTarget");
-    expect(src).toContain("fb-dialog");
+    expect(src).toContain("<Dialog");
   });
 
   it("the layout mounts the dialog with the current full name", () => {

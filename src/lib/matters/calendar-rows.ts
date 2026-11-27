@@ -1,6 +1,7 @@
 import { deadlineKindLabel, deadlineNeedsReview } from "./deadline-rules";
 import type { UpcomingDeadline } from "./deadlines";
 import type { Task } from "./tasks";
+import { mattersListHref } from "./list-href";
 
 /**
  * Docket deadline + task due-date merge: the two sources that are dated by
@@ -34,7 +35,7 @@ export function civilDaysBetween(from: string, to: string): number {
 export function taskHref(task: Task): string {
   if (task.matter_id) return `/dashboard/matters/${task.matter_id}`;
   if (task.lead_id) return `/dashboard/leads/${task.lead_id}`;
-  return "/dashboard/matters";
+  return mattersListHref();
 }
 
 /** One line in a calendar-shaped list — a docket date or a task due date. */

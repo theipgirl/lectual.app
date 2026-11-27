@@ -30,6 +30,9 @@ const PUBLIC_MAIL_DOMAINS: ReadonlySet<string> = new Set([
   "zoho.com",
 ]);
 
+/** True for a public webmail domain (gmail.com and the like): its domain says nothing about who is on it. The ONE list. */
+export const isPublicMailDomain = (domain: string): boolean => PUBLIC_MAIL_DOMAINS.has(domain.trim().toLowerCase());
+
 export type FirmSenders = { addresses: ReadonlySet<string>; domains: ReadonlySet<string> };
 
 export const NO_FIRM_SENDERS: FirmSenders = { addresses: new Set(), domains: new Set() };
@@ -72,3 +75,33 @@ export function effectiveDirection(
 ): "inbound" | "outbound" {
   return stored === "inbound" && isFirmSender(from, senders) ? "outbound" : stored;
 }
+
+/**
+ * The sync's one relabel: a message read from a mailbox but SENT by the firm (a cc from support@ into
+ * info@) is outbound before cadence and activity typing. Returns the same array contents, with a new
+ * object only for a message that changes; every other message is left untouched. Sender only, pure.
+ */
+export function relabelFirmSent<T extends { direction: "inbound" | "outbound"; from: { address: string | null } }>(
+  messages: ReadonlyArray<T>,
+  senders: FirmSenders,
+): T[] {
+  return messages.map((m) => {
+    const direction = effectiveDirection(m.direction, m.from?.address, senders);
+    return direction === m.direction ? m : { ...m, direction };
+  });
+}
+
+/**
+ * Mail from the USPTO (TMOfficialNotices@uspto.gov, TEAS@uspto.gov, any *.uspto.gov). It is inbound, but it is
+ * never "the client replied": the sync stores it with `party: "uspto"` and readers treat it as contact with no
+ * direction. Sender address only.
+ */
+export function isUsptoSender(from: string | null | undefined): boolean {
+  const address = addressOf(from);
+  if (!address) return false;
+  const domain = address.slice(address.lastIndexOf("@") + 1);
+  return domain === "uspto.gov" || domain.endsWith(".uspto.gov");
+}
+
+/** The `party` value stored on a USPTO message's activity payload. */
+export const USPTO_PARTY = "uspto" as const;

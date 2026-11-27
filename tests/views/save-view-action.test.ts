@@ -66,7 +66,7 @@ describe("saveViewAction", () => {
 
   it("refuses a view that is not live and anything malformed", async () => {
     resolveFirmSession.mockResolvedValue(ok("owner", true));
-    for (const bad of ["as:attorney", undefined, null, "", "auto", "owner", 3, { kind: "auto" }]) expect(await saveViewAction(bad)).toEqual({ ok: false, error: VIEW_NOT_SAVED });
+    for (const bad of ["as:viewer", undefined, null, "", "auto", "owner", 3, { kind: "auto" }]) expect(await saveViewAction(bad)).toEqual({ ok: false, error: VIEW_NOT_SAVED });
     expect(updateUser).not.toHaveBeenCalled();
   });
 
@@ -96,7 +96,7 @@ describe("saveViewAction", () => {
   it("takes no user or org argument and uses only the scoped client", () => {
     const src = readFileSync("src/lib/account/view-actions.ts", "utf8");
     expect(src.startsWith('"use server";')).toBe(true);
-    expect(src).toMatch(/export async function saveViewAction\(input: unknown\)/);
+    expect(src).toMatch(/async function saveViewAction\(input: unknown\)/);
     expect(src).not.toMatch(/admin|service/i);
   });
 });

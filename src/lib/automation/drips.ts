@@ -8,6 +8,7 @@ import { stopLeadSequences } from "@/lib/campaigns/stop";
 import { sessionUserId } from "@/lib/campaigns/stop-staff";
 import type { StopDb } from "@/lib/campaigns/stop-db";
 import { ReadableError } from "@/lib/ui/readable-error";
+import { keeperForWrite } from "@/lib/leads/live";
 
 
 export type DripSequence = Database["public"]["Tables"]["crm_drip_sequence"]["Row"];
@@ -259,11 +260,14 @@ export async function findClientLeads(leadIds: readonly string[]): Promise<Clien
  * can't be read, nothing is enrolled either — the same fail-closed rule the
  * advance() guard follows.
  */
-export async function enrollLead(leadId: string, sequenceId: string): Promise<DripEnrollment> {
+export async function enrollLead(givenLeadId: string, sequenceId: string): Promise<DripEnrollment> {
   const supabase = await getScopedClient();
   await requireAutomationStaffRole(supabase);
+  // A page opened before a merge (lectual 0107) enrolls the KEEPER; an unreadable pointer refuses with a fixed sentence.
+  const leadId = await keeperForWrite(supabase, givenLeadId);
 
   const { data: lead, error: leadError } = await supabase
+    // live-guard: a merged lead id was followed to its keeper by keeperForWrite just above
     .from("crm_lead")
     .select("org_id, first_name, last_name, business_name")
     .eq("id", leadId)

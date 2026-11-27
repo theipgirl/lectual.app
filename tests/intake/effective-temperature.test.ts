@@ -83,12 +83,12 @@ describe("no lane: the derivation decides", () => {
     const l = lead({ last_activity_at: daysBefore(6), ai_summary: "HOT — filing this month" });
     const result = effectiveTemperature(l, STAGES, NOW);
     expect(result.value).toBe("warm");
-    expect(result.reason).toBe("Last touch 6 days ago · Triage: filing this month");
+    expect(result.reason).toBe("Last contact 6 days ago · Triage: filing this month");
   });
 
   it("does not append anything for an ai_summary that carries no lane", () => {
     const l = lead({ last_activity_at: daysBefore(6), ai_summary: "Enriched from website" });
-    expect(effectiveTemperature(l, STAGES, NOW).reason).toBe("Last touch 6 days ago");
+    expect(effectiveTemperature(l, STAGES, NOW).reason).toBe("Last contact 6 days ago");
   });
 
   it("does not take its value from the triage suggestion", () => {

@@ -49,7 +49,7 @@ describe("the side column is exactly as tall as what is visible", () => {
   });
 
   it("on wide screens .lx-page is a size container and the column is 100cqh of it", () => {
-    const wide = mediaBlock("min-width: 1081px");
+    const wide = mediaBlock("min-width: 901px");
     expect(wide).toMatch(/\.lx-page:has\([^)]*\.pe-side\)\s*\{[^}]*container-type:\s*size/);
     expect(wide).toMatch(/\.pe-side\s*\{[^}]*max-height:\s*100cqh/);
   });
@@ -66,9 +66,10 @@ describe("no scroller inside a scroller", () => {
     expect(rule).not.toMatch(/overflow/);
   });
 
-  it("the full-width preview's body is the only scroller while it is open", () => {
-    expect(topRule(".pe-xp-body")).toMatch(/overflow-y:\s*auto/);
-    expect(topRule(".pe-xp-root")).toMatch(/position:\s*fixed/);
+  it("the full-width preview is the shared large dialog (the dialog scrolls; the client page inside does not)", () => {
+    expect(readFileSync("src/components/proposal-editor/ExpandablePreview.tsx", "utf8")).toContain('<Dialog size="lg"');
+    expect(topRule(".pe-xp-body")).not.toMatch(/overflow-y/);
+    expect(readFileSync("src/app/globals.css", "utf8")).toMatch(/\.lx-modal-root[^{]*\{[^}]*position:\s*fixed/);
   });
 });
 

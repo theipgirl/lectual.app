@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { hasRole } from "@/lib/auth/roles";
 import { getScopedClient } from "@/lib/db/scoped-client";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { listConnectionsForViewer, resolveViewSession } from "@/lib/views/view-as";
 import { orgHasModule } from "@/lib/org/modules";
 import { aiConfigured } from "@/lib/ai/claude";
 import { AGENT_DEFS, AGENT_IDS, type AgentId, type Autonomy } from "@/lib/agents/types";
@@ -11,7 +11,6 @@ import { autopilotForRun } from "@/lib/agents/run-now";
 import { loadAgentMoves, type AgentMovesRead } from "@/lib/stage-keeper/read";
 import { readCalendarProbe } from "@/lib/stage-keeper/readiness-read";
 import { AGENT_MOVES_TODAY_HREF } from "@/lib/stage-keeper/moves";
-import { listConnections } from "@/lib/mailbox/connections";
 import { loadActiveQueue } from "@/lib/queue/load";
 import { relativeTime } from "@/lib/relative-time";
 import { AgentControls } from "@/components/agents/AgentControls";
@@ -36,7 +35,9 @@ import { getFirmTimeZone } from "@/lib/org/profile";
 import { monthQueryFloor, monthStartCivil, civilInZone } from "@/lib/today/outcomes";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
-import { ASSISTANTS_NAME, AI_TOOLS_GROUP } from "@/lib/ui/words";
+import { ASSISTANTS_NAME, BLANK, noneYet } from "@/lib/ui/words";
+import { EmptyState, LoadFailedLine, Notice, PageHeader, Pill, SheetCard, SheetScroll, SheetTable } from "@/components/ui";
+import type { PillTone } from "@/lib/ui/tones";
 
 export const metadata: Metadata = { title: pageTitle(ASSISTANTS_NAME) };
 
@@ -62,11 +63,11 @@ const RUN_AGENT_LABEL: Record<string, string> = {
   "calendar-sync": "Calendar sync",
 };
 const TRIGGER_LABEL: Record<string, string> = { cron: "Scheduled", manual: "Run now", webhook: "Webhook", event: "Event" };
-const STATUS_TONE: Record<string, string> = { ok: "#43602F", skipped: "#7C5312", error: "#8E2733", unfinished: "#8E2733", running: "#7A5A5E" };
+const STATUS_TONE: Record<string, string> = { ok: "var(--ok)", skipped: "var(--warn)", error: "var(--wine)", unfinished: "var(--wine)", running: "var(--muted)" };
 
 export default async function AgentsPage() {
   if (!(await orgHasModule("agents"))) notFound();
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   if (session.kind !== "ok") notFound();
   const canManage = hasRole(session.role, "senior_admin");
 
@@ -116,7 +117,7 @@ export default async function AgentsPage() {
   const hasMailboxModule = await orgHasModule("mailbox");
   const mailbox: ReadinessSource =
     settingsKnown && (isOn("email-intel") || isOn("stage-keeper") || isOn("inbox-summary")) && hasMailboxModule
-      ? await listConnections().then(
+      ? await listConnectionsForViewer().then(
           (r) => (!r.ok ? "unavailable" : r.connections.some((c) => c.status === "active") ? "ok" : "none"),
           () => "unavailable" as const,
         )
@@ -154,42 +155,42 @@ export default async function AgentsPage() {
 
   return (
     <>
-      <div className="lx-page-head">
-        <div style={{ flex: 1, minWidth: 260 }}>
-          <div className="lx-label">{AI_TOOLS_GROUP}</div>
-          <h1 className="lx-h1" data-tour="agents-head">{ASSISTANTS_NAME}</h1>
-          <p className="lx-sub">
+      <PageHeader
+        title={ASSISTANTS_NAME}
+        tour="agents-head"
+        count={
+          settingsKnown
+            ? `${readyCount} of ${AGENT_IDS.length} on${blockedCount > 0 ? ` · ${blockedCount} on but blocked` : ""}`
+            : "Assistant settings unavailable"
+        }
+        sub={
+          <>
             Each assistant reads one source and writes one kind of thing. Anything addressed to a client
             goes to Approvals first, so switching an assistant on can never put a word in front of a
             client.
-          </p>
-        </div>
-        <div className="lx-note">
-          {settingsKnown
-            ? `${readyCount} of ${AGENT_IDS.length} on${blockedCount > 0 ? ` · ${blockedCount} on but blocked` : ""}`
-            : "Assistant settings unavailable"}
-        </div>
+          </>
+        }
+      />
+
+      <div data-health={health.tone}>
+        <Notice tone={health.tone === "risk" ? "risk" : health.tone === "ok" ? "ok" : health.tone === "warn" ? "warn" : "mute"} role="status">
+          {health.text}
+        </Notice>
       </div>
 
-      <p className={`lx-banner lx-banner-${health.tone === "risk" ? "risk" : health.tone === "ok" ? "ok" : health.tone === "warn" ? "warn" : "mute"}`} role="status" style={{ margin: 0 }} data-health={health.tone}>
-        {health.text}
-      </p>
-
       {!settingsKnown && (
-        <div role="alert" className="lx-banner lx-banner-risk">
+        <Notice tone="risk" role="alert">
           We couldn&apos;t read the assistant settings, so whether each one is on or off isn&apos;t shown. Nothing has been switched off. Refresh to try again.
-        </div>
+        </Notice>
       )}
 
       {!aiConfigured() && (
-        <div className="lx-banner lx-banner-mute">
-          AI isn&apos;t switched on for your firm yet, so assistants won&apos;t run. Lectual will turn it on.
-        </div>
+        <Notice tone="mute">AI isn&apos;t switched on for your firm yet, so assistants won&apos;t run. Lectual will turn it on.</Notice>
       )}
 
-      <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }}>
+      <section className="lx-card lx-pad" style={{ display: "grid", gap: 12 }}>
         <div className="lx-card-head" style={{ alignItems: "center", padding: 0 }}>
-          <h2 className="lx-h2" style={{ fontSize: 23, flex: 1 }}>
+          <h2 className="lx-h2" style={{ flex: 1 }}>
             {ASSISTANTS_NAME} on or off
           </h2>
           <span className="lx-note">One switch over every assistant. Each assistant keeps its own setting.</span>
@@ -212,7 +213,7 @@ export default async function AgentsPage() {
           </p>
         )}
         <div>
-          <div className="lx-label" style={{ marginBottom: 4 }}>
+          <div className="lx-label">
             Last 24 hours
           </div>
           <RunDigestList digest={digest} paused={paused} />
@@ -241,8 +242,8 @@ export default async function AgentsPage() {
                 />
               )}
               <div className="lx-agent-head">
-                <div style={{ fontSize: 17, fontWeight: 600 }}>{def.name}</div>
-                <div className="lx-label" style={{ fontSize: 11, marginTop: 4 }}>
+                <h2 className="lx-h3">{def.name}</h2>
+                <div className="lx-label">
                   Reads · {def.reads}
                 </div>
               </div>
@@ -254,20 +255,18 @@ export default async function AgentsPage() {
                   </span>
                 ) : (
                   <span className="lx-note" style={{ flex: 1 }} title={ready.reason}>
-                    {enabled && ready.tone === "ok" ? (last ? `Ran ${relativeTime(last.started_at)}` : "On · not run yet") : ready.label}
+                    {enabled && ready.tone === "ok" ? (last ? `Ran ${relativeTime(last.started_at, now.getTime(), tz)}` : "On · not run yet") : ready.label}
                   </span>
                 )}
-                {enabled && ready.tone !== "ok" && <span className="lx-pill lx-pill-warn">Blocked</span>}
+                {enabled && ready.tone !== "ok" && <Pill tone="warn">Blocked</Pill>}
                 {settingsKnown && enabled && last && (
-                  <span
-                    className={`lx-pill ${lastStatus === "error" || lastStatus === "unfinished" ? "lx-pill-risk" : lastStatus === "running" ? "lx-pill-warn" : last.drafts_out ? "lx-pill-warn" : "lx-pill-ok"}`}
-                  >
+                  <Pill tone={(lastStatus === "error" || lastStatus === "unfinished" ? "risk" : lastStatus === "running" ? "warn" : last.drafts_out ? "warn" : "ok") satisfies PillTone}>
                     {lastStatus === "error" || lastStatus === "unfinished" || lastStatus === "running"
                       ? RUN_STATUS_LABEL[lastStatus]
                       : last.drafts_out
                         ? `${last.drafts_out} held`
                         : `${last.items_in} read`}
-                  </span>
+                  </Pill>
                 )}
               </div>
               {agent === "stage-keeper" && settingsKnown && (
@@ -289,63 +288,61 @@ export default async function AgentsPage() {
         })}
       </div>
 
-      <section className="lx-card" style={{ overflow: "auto" }}>
+      <SheetCard as="section">
         <div className="lx-card-head" style={{ alignItems: "center" }}>
-          <h2 className="lx-h2" style={{ fontSize: 23, flex: 1 }}>
+          <h2 className="lx-h2" style={{ flex: 1 }}>
             Recent runs
           </h2>
           <span className="lx-note">Every run is logged for your firm</span>
         </div>
         {runsError ? (
-          <div className="lx-empty" role="alert">
-            We couldn&apos;t load the run log.
-          </div>
+          <LoadFailedLine role="alert">We couldn&apos;t load the run log.</LoadFailedLine>
         ) : runs.length === 0 ? (
-          <div className="lx-empty">No runs yet.</div>
+          <EmptyState variant="line">{noneYet("runs")}</EmptyState>
         ) : (
-          <table className="lx-tbl">
-            <thead>
-              <tr>
-                <th>Assistant</th>
-                <th>Trigger</th>
-                <th>Result</th>
-                <th>When</th>
-                <th aria-label="Status" />
-              </tr>
-            </thead>
-            <tbody>
-              {runs.map((r) => {
-                // A row left "running" past 15 minutes was cut off, not still working (run-status.ts).
-                const status = displayRunStatus(r, now.getTime());
-                const failed = status === "error" || status === "unfinished";
-                return (
-                  <tr key={r.id}>
-                    <td className="pri">{RUN_AGENT_LABEL[r.agent] ?? r.agent}</td>
-                    <td>{TRIGGER_LABEL[r.trigger] ?? r.trigger}</td>
-                    <RunResultCell status={status} run={r} failed={failed} />
-                    <td className="lx-num">
-                      {relativeTime(r.started_at)} <span className="lx-note">· {runDurationLabel(r, now.getTime())}</span>
-                    </td>
-                    <td>
-                      <span className="lx-dot" aria-hidden="true" style={{ background: STATUS_TONE[status] ?? "#7A5A5E" }} />{" "}
-                      <span className="lx-note">{RUN_STATUS_LABEL[status] ?? status}</span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <SheetScroll>
+            <SheetTable minWidth={720}>
+              <thead>
+                <tr>
+                  <th>Assistant</th>
+                  <th>Trigger</th>
+                  <th>Result</th>
+                  <th>When</th>
+                  <th aria-label="Status" />
+                </tr>
+              </thead>
+              <tbody>
+                {runs.map((r) => {
+                  // A row left "running" past 15 minutes was cut off, not still working (run-status.ts).
+                  const status = displayRunStatus(r, now.getTime());
+                  const failed = status === "error" || status === "unfinished";
+                  return (
+                    <tr key={r.id}>
+                      <td className="pri">{RUN_AGENT_LABEL[r.agent] ?? r.agent}</td>
+                      <td data-label="Trigger">{TRIGGER_LABEL[r.trigger] ?? r.trigger}</td>
+                      <RunResultCell status={status} run={r} failed={failed} />
+                      <td data-label="When">
+                        {relativeTime(r.started_at, now.getTime(), tz)} <span className="lx-note">· {runDurationLabel(r, now.getTime())}</span>
+                      </td>
+                      <td data-label="Status">
+                        <span className="lx-dot" aria-hidden="true" style={{ background: STATUS_TONE[status] ?? "var(--muted)" }} />{" "}
+                        <span className="lx-note">{RUN_STATUS_LABEL[status] ?? status}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </SheetTable>
+          </SheetScroll>
         )}
-      </section>
+      </SheetCard>
 
-      <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }}>
+      <section className="lx-card lx-pad" style={{ display: "grid", gap: 12 }}>
         <div className="lx-card-head" style={{ alignItems: "baseline", padding: 0 }}>
-          <h2 className="lx-h2" style={{ fontSize: 23, flex: 1 }}>
+          <h2 className="lx-h2" style={{ flex: 1 }}>
             Hours saved (est.)
           </h2>
-          <span className="lx-kpi-value" style={{ fontSize: 28 }}>
-            {estimate ? estimate.hours : "—"}
-          </span>
+          <span className="lx-kpi-value">{estimate ? estimate.hours : BLANK}</span>
         </div>
         <p className="lx-note" style={{ margin: 0 }}>
           {estimate

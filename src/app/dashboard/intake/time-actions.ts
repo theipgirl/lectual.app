@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
 import { addManualEntry, deleteEntry, startTimer, stopTimer } from "@/lib/time/entries";
 import { friendlyLeadWriteError } from "@/app/dashboard/leads/errors";
@@ -32,7 +33,7 @@ function revalidateFor(leadId: string | null): void {
 }
 
 /** Starts the caller's clock on a lead. Refused if they already have one running. */
-export async function startTimerAction(leadId: string): Promise<TimeActionResult> {
+export const startTimerAction = previewSafe(async function startTimerAction(leadId: string): Promise<TimeActionResult> {
   if (!leadId) return { ok: false, error: "Missing lead." };
 
   try {
@@ -43,14 +44,14 @@ export async function startTimerAction(leadId: string): Promise<TimeActionResult
 
   revalidateFor(leadId);
   return { ok: true };
-}
+}, "state");
 
 /**
  * Stops a running entry, optionally with the one-line note the dialog prompts
  * for. `leadId` is passed only so the right pages are revalidated — the entry
  * itself is found by id, under RLS.
  */
-export async function stopTimerAction(
+export const stopTimerAction = previewSafe(async function stopTimerAction(
   entryId: string,
   note?: string | null,
   leadId?: string | null,
@@ -65,7 +66,7 @@ export async function stopTimerAction(
 
   revalidateFor(leadId ?? null);
   return { ok: true };
-}
+}, "state");
 
 /**
  * "+ time" — work that already happened. `atIso` is when it ENDED; omitted
@@ -73,7 +74,7 @@ export async function stopTimerAction(
  * data layer, not here, so the dialog's client-side copy of them is a courtesy
  * rather than the guard.
  */
-export async function addManualTimeAction(
+export const addManualTimeAction = previewSafe(async function addManualTimeAction(
   leadId: string,
   seconds: number,
   note?: string | null,
@@ -95,10 +96,10 @@ export async function addManualTimeAction(
 
   revalidateFor(leadId);
   return { ok: true };
-}
+}, "state");
 
 /** Removes an entry — your own, or anyone's if you administer the firm. */
-export async function deleteTimeEntryAction(
+export const deleteTimeEntryAction = previewSafe(async function deleteTimeEntryAction(
   entryId: string,
   leadId?: string | null,
 ): Promise<TimeActionResult> {
@@ -112,4 +113,4 @@ export async function deleteTimeEntryAction(
 
   revalidateFor(leadId ?? null);
   return { ok: true };
-}
+}, "state");

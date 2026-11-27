@@ -9,7 +9,7 @@ import { defaultSelection, normalizeSelection } from "@/lib/proposals/pricing";
 import type { ProposalDetail } from "@/lib/proposals/store";
 import type { ProposalContent, ProposalInclude, ProposalRow, Selection } from "@/lib/proposals/types";
 import { ProposalDocument } from "@/components/client-proposal/ProposalDocument";
-import { CONCIERGE, ENHANCED, ESSENTIAL, danielle } from "../proposals/danielle-fixture";
+import { CONCIERGE, ENHANCED, ESSENTIAL, renata } from "../proposals/renata-fixture";
 
 vi.mock("next/font/google", () => ({ Bodoni_Moda: () => ({ variable: "b" }), Source_Serif_4: () => ({ variable: "s" }) }));
 
@@ -34,7 +34,7 @@ function firmRows(pkg: string): ProposalInclude[] {
 }
 
 function content(): ProposalContent {
-  const c = danielle();
+  const c = renata();
   c.packages = [ESSENTIAL, ENHANCED, CONCIERGE].map((p) => ({ ...p, includes: firmRows(p.package) }));
   return c;
 }
@@ -44,7 +44,7 @@ const SETTING = { packages: [ESSENTIAL, ENHANCED, CONCIERGE].map((p) => ({ ...p,
 function row(c: ProposalContent): ProposalRow {
   return {
     id: ID, org_id: "o", family_id: ID, version: 1, public_token: "t".repeat(43), lead_id: null, matter_id: null,
-    client_name: "Danielle Milton", client_email: "d@example.com", title: "Trademark Proposal", status: "draft", content: c,
+    client_name: "Renata Ostrowski", client_email: "d@example.com", title: "Trademark Proposal", status: "draft", content: c,
     expires_on: "2026-12-10", pay_url: "https://pay.example/x", source: "manual", created_by: null, updated_by: null, approved_by: null,
     approved_at: null, sent_at: null, accepted_at: null, superseded_at: null, withdrawn_at: null, accepted_selection: null, accepted_snapshot: null,
     created_at: UPDATED, updated_at: UPDATED,
@@ -143,7 +143,7 @@ function indexOfPackage(f: FormData, name: string): number {
 function clientPage(c: ProposalContent, selection?: Selection) {
   return renderToStaticMarkup(
     createElement(ProposalDocument, {
-      content: c, title: "Trademark Proposal", clientName: "Danielle Milton", expiresOn: null, firm: { name: "Hartwell", slug: "hartwell" }, mode: "live",
+      content: c, title: "Trademark Proposal", clientName: "Renata Ostrowski", expiresOn: null, firm: { name: "Hartwell", slug: "hartwell" }, mode: "live",
       ...(selection ? { initialSelection: selection } : {}),
       onAccept: async () => ({ ok: true, payUrl: "https://example.com/pay" }),
     }),

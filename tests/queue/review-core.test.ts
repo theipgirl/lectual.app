@@ -176,6 +176,73 @@ describe("runQueueReview: results", () => {
     expect(state.resolve).toHaveBeenCalledWith(expect.objectContaining({ note: approvalReceipt(edited) }));
   });
 
+  describe("Yes approves only the text shown (lead page and deck: requireShown)", () => {
+    const sha = (t: string) => createHash("sha256").update(t, "utf8").digest("hex");
+    const CHANGED = "The draft changed. Refresh to see it.";
+
+    it("the hash of the text shown approves", async () => {
+      const r = await runQueueReview({ id: "q1", intent: "approve", withReceipt: true, requireShown: true, shownSha256: sha(BODY) });
+      expect(r).toMatchObject({ kind: "resolved", intent: "approve" });
+      expect(state.resolve).toHaveBeenCalledTimes(1);
+    });
+
+    it("the resolve carries exactly the text shown as the final body (a later edit never reaches the drafter)", async () => {
+      await runQueueReview({ id: "q1", intent: "approve", requireShown: true, shownSha256: sha(BODY) });
+      expect(state.resolve).toHaveBeenCalledWith(expect.objectContaining({ finalBody: BODY }));
+      const shown = "Hi Ana, the saved edit that was shown.";
+      state.resolve.mockClear();
+      state.item = qitem({ draft_body: BODY, final_body: shown });
+      await runQueueReview({ id: "q1", intent: "approve", requireShown: true, shownSha256: sha(shown) });
+      expect(state.resolve).toHaveBeenCalledWith(expect.objectContaining({ finalBody: shown }));
+    });
+
+    it("a colleague's later edit (final_body) is refused, and nothing is saved, resolved or drafted", async () => {
+      state.item = qitem({ draft_body: BODY, final_body: "Hi Ana, a colleague changed this." });
+      expect(await runQueueReview({ id: "q1", intent: "approve", requireShown: true, shownSha256: sha(BODY) })).toEqual({ kind: "error", error: CHANGED });
+      expect(state.resolve).not.toHaveBeenCalled();
+      expect(state.save).not.toHaveBeenCalled();
+      expect(state.draft).not.toHaveBeenCalled();
+    });
+
+    it("an edit landing between the checks and the resolve is refused too", async () => {
+      const api = await import("@/lib/queue/api");
+      vi.mocked(api.getQueueItem)
+        .mockResolvedValueOnce(qitem({ draft_body: BODY }) as never)
+        .mockResolvedValueOnce(qitem({ draft_body: BODY }) as never)
+        .mockResolvedValueOnce(qitem({ draft_body: BODY, final_body: "edited in between" }) as never);
+      expect(await runQueueReview({ id: "q1", intent: "approve", requireShown: true, shownSha256: sha(BODY) })).toEqual({ kind: "error", error: CHANGED });
+      expect(state.resolve).not.toHaveBeenCalled();
+      expect(state.draft).not.toHaveBeenCalled();
+    });
+
+    it("a missing hash, or an edit posted with it, is refused", async () => {
+      expect(await runQueueReview({ id: "q1", intent: "approve", requireShown: true })).toEqual({ kind: "error", error: CHANGED });
+      expect(await runQueueReview({ id: "q1", intent: "approve", requireShown: true, shownSha256: sha(BODY), body: "other" })).toEqual({ kind: "error", error: CHANGED });
+      expect(state.resolve).not.toHaveBeenCalled();
+      expect(state.save).not.toHaveBeenCalled();
+    });
+
+    it("Sprint 4 S7 (changed on purpose): the full approval page also sends the re-read text as the final body", async () => {
+      state.item = qitem({ draft_body: BODY, final_body: "a saved edit" });
+      expect(await runQueueReview({ id: "q1", intent: "approve" })).toMatchObject({ kind: "resolved" });
+      expect(state.resolve.mock.calls[0][0]).toMatchObject({ finalBody: "a saved edit" });
+    });
+
+    it("Sprint 4 S7: a colleague's save landing between the re-read and the resolve is not what gets approved", async () => {
+      const api = await import("@/lib/queue/api");
+      const reread = qitem({ draft_body: BODY, final_body: "the text re-read and re-classified" });
+      // The colleague's save lands after the last read the approve core makes: the queue would now hold it.
+      vi.mocked(api.getQueueItem).mockImplementation(async () => reread as never);
+      state.resolve.mockImplementation(async (args: { finalBody?: string }) => {
+        expect(args.finalBody).toBe("the text re-read and re-classified");
+        return { status: "approved", send: "none" };
+      });
+      expect(await runQueueReview({ id: "q1", intent: "approve" })).toMatchObject({ kind: "resolved" });
+      expect(state.resolve.mock.calls[0][0].finalBody).not.toBe("a colleague's later save");
+      vi.mocked(api.getQueueItem).mockImplementation(async () => state.item as never);
+    });
+  });
+
   it("without withReceipt the note is unchanged (the full approval page)", async () => {
     await runQueueReview({ id: "q1", intent: "approve" });
     expect(state.resolve).toHaveBeenCalledWith(expect.not.objectContaining({ note: expect.anything() }));
@@ -218,7 +285,7 @@ describe("reviewQueueAction is a thin wrapper", () => {
 
   it("holds no approval logic of its own", () => {
     const src = readFileSync("src/app/dashboard/queue/actions.ts", "utf8");
-    const wrapper = src.slice(src.indexOf("export async function reviewQueueAction"), src.indexOf("export type DismissState"));
+    const wrapper = src.slice(src.indexOf("async function reviewQueueAction"), src.indexOf("export type DismissState"));
     expect(wrapper).toMatch(/runQueueReview\(/);
     expect(wrapper).not.toMatch(/approvalRefusal|approvalBlock|gateLinkedProposal|resolveQueueItem|draftInMyMailbox/);
   });

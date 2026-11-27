@@ -49,6 +49,7 @@ type Allow = { file: RegExp; rules: string[]; reason: string };
 const ALLOW: Allow[] = [
   { file: /^src\/lib\/(documents\/(loe|loe-prefill|opinion-letter|trademark-clearance)|prep-consult\/drafts|consult-proposal\/draft|agents\/matters-chat)\.ts$/, rules: ["scope"], reason: "model prompts and letter text: 'scope' is the legal term (scope of work), not OAuth vocabulary" },
   { file: /^src\/lib\/quotes\/engagement-terms\.ts$/, rules: ["scope"], reason: "legal term in a letter, not OAuth vocabulary" },
+  { file: /^src\/lib\/loe\/client-words\.ts$/, rules: ["scope"], reason: "the flat-fee proposal's \"Scope of Services\" fee-table heading: the legal term, not OAuth vocabulary" },
   { file: /^src\/app\/dashboard\/documents\/new\//, rules: ["scope"], reason: "legal term in a letter, not OAuth vocabulary (the LOE form's 'Scope' field)" },
   { file: /^src\/lib\/agents\/intake-triage\.ts$/, rules: ["lane"], reason: "model instructions (the triage prompt names the routing lane), not text for a person" },
   { file: /^src\/lib\/env\.ts$/, rules: ["environment"], reason: "developer error thrown at server start-up, never rendered to a person" },
@@ -56,6 +57,8 @@ const ALLOW: Allow[] = [
   { file: /^src\/lib\/(lawmatics\/stage-map|reconcile\/milestones)\.ts$/, rules: ["PNC"], reason: "names of stages in the firm's Lawmatics account, matched as data" },
   { file: /^src\/lib\/intake\/(sheet-import|sheet-sections)\.ts$/, rules: ["PNC"], reason: "the firm's own spreadsheet vocabulary (an 'PNC' opener / section name), matched as data" },
   { file: /^src\/lib\/(agents\/prompts|ai)\//, rules: ["schema"], reason: "JSON schema for the model, not text for a person" },
+  { file: /^src\/lib\/consult-prep\/compose\.ts$/, rules: ["scope"], reason: "the consult brief's 'Scope and engagement' section (S2b): 'scope' is the legal term for what an engagement covers, not the OAuth sense" },
+  { file: /^src\/lib\/consult-prep\/judge\/prompt\.ts$/, rules: ["schema", "scope"], reason: "model instructions for the consult brief judge ('scope' is the legal term, 'schema' the JSON format), not text for a person" },
   { file: /^src\/lib\/agents\/(prompt|policy|[a-z-]+\/prompt)/, rules: ["schema", "scope"], reason: "model instructions, not text for a person" },
   { file: /^src\/app\/api\/cron\//, rules: ["setting name"], reason: "JSON for the scheduler (Vercel cron) when its own setting is missing, never drawn to a firm" },
   { file: /^src\/lib\/(mailbox\/crypto|ai\/claude)\.ts$/, rules: ["setting name"], reason: "developer errors thrown on the server; a run's stored error reaches a screen only through friendlyRunError, which shows a fixed sentence" },

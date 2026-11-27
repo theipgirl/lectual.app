@@ -1,5 +1,5 @@
 import { civilDay, evidenceTooltip, monthDay } from "./format";
-import { MOVED_AUTOMATICALLY } from "@/lib/ui/words";
+import { MOVED_AUTOMATICALLY, WHY_LAWMATICS_CONSULT } from "@/lib/ui/words";
 import { SIGNAL_LABEL, isSignalId, type MoveEvidence, type SignalId } from "./signals";
 
 /**
@@ -205,9 +205,9 @@ export function undoStateFor(rows: readonly ActivityRow[], moveActivityId: strin
 
 // ── suggestions ──────────────────────────────────────────────────────────────
 
-export type SuggestionWhy = "won" | "lost" | "nurture" | "welcome-or-payment" | "current-stage" | "recent-person-move" | "autonomy";
+export type SuggestionWhy = "won" | "lost" | "nurture" | "welcome-or-payment" | "current-stage" | "recent-person-move" | "autonomy" | "lawmatics-consult";
 
-const WHY_VALUES: readonly SuggestionWhy[] = ["won", "lost", "nurture", "welcome-or-payment", "current-stage", "recent-person-move", "autonomy"];
+const WHY_VALUES: readonly SuggestionWhy[] = ["won", "lost", "nurture", "welcome-or-payment", "current-stage", "recent-person-move", "autonomy", "lawmatics-consult"];
 
 export const WHY_TEXT: Record<SuggestionWhy, string> = {
   won: "This stage opens a matter, so a person decides.",
@@ -217,6 +217,7 @@ export const WHY_TEXT: Record<SuggestionWhy, string> = {
   "current-stage": "This lead is in a closing or holding stage, so automatic moves only suggest.",
   "recent-person-move": "A person moved this lead in the last 7 days, so their placement stands.",
   autonomy: "This agent is set to suggest, so it left the move to a person.",
+  "lawmatics-consult": WHY_LAWMATICS_CONSULT,
 };
 
 export type StageSuggestion = {

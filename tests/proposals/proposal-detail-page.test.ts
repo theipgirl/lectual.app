@@ -6,7 +6,7 @@ import type { ProposalRow, ProposalEventRow } from "@/lib/proposals/types";
 import { LinkedProposalPanel } from "@/components/queue/LinkedProposalPanel";
 import { buildProposalCard } from "@/lib/proposals/card";
 import type { LinkedPanel } from "@/lib/consult-proposal/link";
-import { sevetri } from "./fixture";
+import { callum } from "./fixture";
 import { acceptedSnapshot } from "./accepted-fixture";
 
 /**
@@ -26,11 +26,11 @@ function row(over: Partial<ProposalRow> = {}): ProposalRow {
     public_token: "t".repeat(43),
     lead_id: "lead-9",
     matter_id: null,
-    client_name: "Sevetri Wilson",
+    client_name: "Callum Ferreira",
     client_email: "s@example.com",
     title: "Trademark Proposal",
     status: "draft",
-    content: sevetri(),
+    content: callum(),
     expires_on: "2026-11-10",
     pay_url: "https://pay.example/x",
     source: "agent",
@@ -120,7 +120,7 @@ async function render(proposal: ProposalRow, events: ProposalEventRow[], strip: 
   vi.doMock("@/components/proposal-editor/EditorActions", () => ({ EditorActions: stub("editor-actions") }));
   vi.doMock("@/components/proposal-editor/GeneralFields", () => ({ GeneralFields: stub("general-fields") }));
   vi.doMock("@/lib/proposals/lead-link", () => ({
-    loadLeadLink: vi.fn(async (id: string | null) => (id ? { state: "linked", id, name: "Sevetri Wilson" } : { state: "none" })),
+    loadLeadLink: vi.fn(async (id: string | null) => (id ? { state: "linked", id, name: "Callum Ferreira" } : { state: "none" })),
   }));
   vi.doMock("@/lib/proposals/lead-options", () => ({ loadLeadOptions: vi.fn(async () => ({ status: "ok", leads: [] })) }));
   vi.doMock("@/components/proposal-editor/LinkLeadForm", () => ({ LinkLeadForm: stub("link-lead") }));
@@ -240,7 +240,7 @@ describe("LinkedProposalPanel (queue item page)", () => {
   const summary = (card: ReturnType<typeof buildProposalCard> | undefined) =>
     ({
       status: "ok",
-      proposal: { id: ID, version: 1, status: "draft", clientName: "Sevetri Wilson", legalCents: 1, govCents: 2, errorCount: 0, warningCount: 1, ...(card ? { card } : {}) },
+      proposal: { id: ID, version: 1, status: "draft", clientName: "Callum Ferreira", legalCents: 1, govCents: 2, errorCount: 0, warningCount: 1, ...(card ? { card } : {}) },
     }) as LinkedPanel;
   const panel = (p: LinkedPanel) => renderToStaticMarkup(createElement(LinkedProposalPanel, { panel: p, pending: true }));
 
@@ -327,7 +327,7 @@ describe("proposal detail page: the payment panel on an accepted version", () =>
     const { html } = await render(accepted(), [], undefined, { steps: [MARKED], members: [] });
     expect(html).toContain("Paid · Oct 21");
     expect(html).not.toContain("u-dawn");
-    expect(html).not.toContain("A teammate");
+    expect(html).not.toContain("Teammate");
   });
 
   it("paid then undone: back to Not paid, Mark paid offered again", async () => {

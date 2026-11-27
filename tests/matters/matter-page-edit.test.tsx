@@ -53,7 +53,7 @@ async function load() {
   vi.doMock("@/components/voice/VoiceNoteRecorder", () => ({ default: stub }));
   vi.doMock("@/components/matters/IntakeRequestCard", () => ({ IntakeRequestCard: stub }));
   vi.doMock("next/cache", () => ({ revalidatePath: vi.fn() }));
-  vi.doMock("next/navigation", async (orig) => ({ ...(await orig<typeof import("next/navigation")>()), redirect: vi.fn() }));
+  vi.doMock("next/navigation", async (orig) => ({ ...(await orig<typeof import("next/navigation")>()), redirect: vi.fn(), useRouter: () => ({ refresh: () => {} }) }));
 
   const page = await import("../../src/app/dashboard/matters/[id]/page");
   const actions = await import("../../src/app/dashboard/matters/[id]/actions");
@@ -78,8 +78,9 @@ function between(html: string, from: string, to: string): string {
 }
 
 /** The second line of the sub-line (days in stage, package, came from). */
-const factsLine = (html: string) => html.match(/<p class="lx-note" style="margin:2px 0 0">(.*?)<\/p>/)?.[1] ?? "";
-const subLine = (html: string) => html.match(/<p class="lx-note" style="margin:6px 0 0">(.*?)<\/p>/)?.[1] ?? "";
+const headSub = (html: string) => html.match(/<p class="lx-sub">(.*?)<\/p>/)?.[1] ?? "";
+const factsLine = (html: string) => headSub(html).split("<br/>")[1] ?? "";
+const subLine = (html: string) => headSub(html).split("<br/>")[0];
 const count = (html: string, needle: RegExp) => (html.match(needle) ?? []).length;
 const link = { id: "l-1", org_id: "org-1", matter_id: "matter-1", contact_id: "contact-1", role: "client", created_at: "2026-02-01T00:00:00Z" };
 
@@ -98,8 +99,8 @@ describe("matter header", () => {
     const { render } = await load();
     const html = await render();
     expect(html).toContain("← Matters");
-    expect(html).toMatch(/Trademark · <span class="lx-num">TM-2026-0001<\/span>/);
-    expect(html).toContain('<h1 class="lx-h1">Acme</h1>');
+    expect(html).toMatch(/<p class="lx-head-details">Trademark · TM-2026-0001<\/p>/);
+    expect(html).toContain('<h1 class="lx-h1" data-tour="matter-head">Acme</h1>');
     expect(subLine(html)).toContain("No client linked");
     expect(subLine(html)).toContain(BAND_COPY.unplaced.label);
     expect(html).toContain('aria-label="Status"');
@@ -135,13 +136,13 @@ describe("matter header", () => {
   it("round trip (D1): the saved title and Came from show in the re-rendered header", async () => {
     const { render, actions } = await load();
     const before = await render();
-    expect(before).toContain('<h1 class="lx-h1">Acme</h1>');
+    expect(before).toContain('<h1 class="lx-h1" data-tour="matter-head">Acme</h1>');
 
     const result = await actions.updateMatterHeaderAction({}, formData({ matterId: "matter-1", title: "Acme Rebrand", referralSource: "Dawn's referral" }));
     expect(result).toEqual({ saved: true });
 
     const after = await render();
-    expect(after).toContain('<h1 class="lx-h1">Acme Rebrand</h1>');
+    expect(after).toContain('<h1 class="lx-h1" data-tour="matter-head">Acme Rebrand</h1>');
     expect(text(factsLine(after))).toContain("Came from Dawn's referral");
     expect(after).toContain('value="Acme Rebrand"'); // the edit form is pre-filled with the saved value
     expect(after).toContain("Matter details updated");
@@ -165,7 +166,7 @@ describe("read-only role sees no new controls (V3)", () => {
     ">Delete<",
     "Save task",
     ">Done<",
-    "Add a task",
+    "Add a next step",
   ];
 
   it("renders none of the controls for viewer and social_media, but still the facts", async () => {
@@ -182,7 +183,7 @@ describe("read-only role sees no new controls (V3)", () => {
       expect(html).toContain("Ana Smith");
       expect(html).toContain("ana@example.com");
       expect(html).toContain("Call the client");
-      expect(html).toContain("Assigned to Dana Cole");
+      expect(html).toContain("Owner: Dana Cole");
       expect(html).toContain("Your role can view this matter but not change it.");
     }
   });
@@ -203,7 +204,7 @@ describe("Client contact card", () => {
     db.rows("crm_matter_contact").push({ ...link });
     const { render } = await load();
     const html = await render();
-    const card = between(html, ">Client contact<", ">Tasks<");
+    const card = between(html, ">Client contact<", ">Next steps<");
     for (const fact of ["Ana Smith", "ana@example.com", "555-0100", "Acme Inc", "Client"]) expect(card).toContain(fact);
     expect(card).not.toContain("No contact linked yet.");
     // The linked contact also names the client in the header.
@@ -216,7 +217,7 @@ describe("Client contact card", () => {
   it("lists every linked contact, oldest link first", async () => {
     db.rows("crm_matter_contact").push({ ...link }, { ...link, id: "l-2", contact_id: "contact-2", role: "co-client", created_at: "2026-03-01T00:00:00Z" });
     const { render } = await load();
-    const card = between(await render(), ">Client contact<", ">Tasks<");
+    const card = between(await render(), ">Client contact<", ">Next steps<");
     expect(card.indexOf("Ana Smith")).toBeGreaterThan(-1);
     expect(card.indexOf("Bo Lee")).toBeGreaterThan(card.indexOf("Ana Smith"));
     expect(card).toContain("Co-client");
@@ -224,7 +225,7 @@ describe("Client contact card", () => {
 
   it("says 'No contact linked yet.' when the read worked and found none", async () => {
     const { render } = await load();
-    const card = between(await render(), ">Client contact<", ">Tasks<");
+    const card = between(await render(), ">Client contact<", ">Next steps<");
     expect(card).toContain("No contact linked yet.");
     expect(card).toContain("Link or add contact");
   });
@@ -233,13 +234,13 @@ describe("Client contact card", () => {
     db.fail("crm_matter_contact", "select");
     const { render } = await load();
     const html = await render();
-    const card = between(html, ">Client contact<", ">Tasks<");
+    const card = between(html, ">Client contact<", ">Next steps<");
     expect(text(card)).toContain("The client contact couldn't be loaded.");
     expect(card).not.toContain("No contact linked yet.");
     expect(text(subLine(html))).toContain("Client contact couldn't be loaded");
     expect(html).toContain(">Deadlines<");
     expect(html).toContain("Timeline");
-    expect(html).toContain(">Tasks<");
+    expect(html).toContain(">Next steps<");
   });
 
   it("reads the contacts through the one three-state loader only", () => {
@@ -257,7 +258,7 @@ describe("Client contact card", () => {
 
     expect(await actions.linkContactAction({}, formData({ matterId: "matter-1", contactId: "contact-1" }))).toMatchObject({ saved: true });
 
-    const card = between(await render(), ">Client contact<", ">Tasks<");
+    const card = between(await render(), ">Client contact<", ">Next steps<");
     for (const fact of ["Ana Smith", "ana@example.com", "555-0100", "Acme Inc"]) expect(card).toContain(fact);
     expect(card).not.toContain("No contact linked yet.");
 
@@ -270,7 +271,7 @@ describe("Client contact card", () => {
     const { render, actions } = await load();
     expect((await actions.editContactAction({}, formData({ matterId: "matter-1", contactId: "contact-1", email: "nope" }))).error).toMatch(/valid email/);
     expect(await actions.editContactAction({}, formData({ matterId: "matter-1", contactId: "contact-1", phone: "555-0999" }))).toEqual({ saved: true });
-    expect(between(await render(), ">Client contact<", ">Tasks<")).toContain("555-0999");
+    expect(between(await render(), ">Client contact<", ">Next steps<")).toContain("555-0999");
   });
 
   it("the search panel shows a failed search as an error, the add form says what it does", async () => {
@@ -325,7 +326,7 @@ describe("deadline controls", () => {
     const closed = docket(await render());
     expect(closed).toContain("1 open");
     expect(closed).toContain("2 closed out");
-    expect(text(closed)).toMatch(/office action response · Nov 3, 2026 · waived/i);
+    expect(text(closed)).toMatch(/office action response · Nov 3(, 2026)? · waived/i);
     expect(count(closed, />Reopen</g)).toBe(2);
 
     expect(await actions.reopenDeadlineAction({}, formData({ matterId: "matter-1", deadlineId: "dl-open" }))).toEqual({});
@@ -396,34 +397,34 @@ describe("deadline controls", () => {
     const html = renderToStaticMarkup(el(edits.DeadlineDelete, { matterId: "matter-1", deadlineId: "dl-open", label: "x", dueDate: "y" }));
     expect(html).toContain(">Delete<");
     expect(html).not.toContain("Yes, delete");
-    expect(html).not.toContain("<form");
+    expect(html).not.toContain("Cancel");
   });
 });
 
 // ── F10, D5: tasks ────────────────────────────────────────────────────────────
 
 describe("task controls", () => {
-  const aside = (html: string) => between(html, ">Tasks<", ">Notes<");
+  const aside = (html: string) => between(html, ">Next steps<", ">Notes<");
 
   it("lifecycle (D5): create, edit title and due date, assign, unassign, delete", async () => {
     const { render, actions } = await load();
     expect(await actions.createTaskAction({}, formData({ matterId: "matter-1", title: "Send engagement letter", dueAt: "2026-11-10" }))).toEqual({});
     let tasks = aside(await render());
     expect(tasks).toContain("Send engagement letter");
-    expect(tasks).toContain("Due Nov 10, 2026");
+    expect(tasks).toMatch(/Due Nov 10(, 2026)?/);
 
     const created = db.rows("crm_task").find((t) => t.title === "Send engagement letter")!;
     expect(await actions.updateTaskAction({}, formData({ matterId: "matter-1", taskId: created.id as string, title: "Send the engagement letter", dueAt: "2026-11-12" }))).toEqual({ saved: true });
     tasks = aside(await render());
     expect(tasks).toContain("Send the engagement letter");
-    expect(tasks).toContain("Due Nov 12, 2026");
+    expect(tasks).toMatch(/Due Nov 12(, 2026)?/);
     expect(tasks).not.toContain("Send engagement letter<");
 
     expect(await actions.updateTaskAction({}, formData({ matterId: "matter-1", taskId: created.id as string, assigneeId: "user-2" }))).toEqual({ saved: true });
-    expect(aside(await render())).toContain("Assigned to Dana Cole");
+    expect(aside(await render())).toContain("Owner: Dana Cole");
 
     expect(await actions.updateTaskAction({}, formData({ matterId: "matter-1", taskId: created.id as string, assigneeId: "" }))).toEqual({ saved: true });
-    expect(aside(await render())).not.toContain("Assigned to");
+    expect(aside(await render())).not.toContain("Owner:");
 
     expect(await actions.deleteTaskAction({}, formData({ matterId: "matter-1", taskId: created.id as string }))).toEqual({});
     tasks = aside(await render());
@@ -434,7 +435,7 @@ describe("task controls", () => {
   it("each open task has Done, Edit and Delete for a write role", async () => {
     const { render } = await load();
     const tasks = aside(await render());
-    for (const label of [">Done<", ">Edit<", ">Delete<", "Add a task"]) expect(tasks).toContain(label);
+    for (const label of [">Done<", ">Edit<", ">Delete<", "Add a next step"]) expect(tasks).toContain(label);
   });
 
   it("the edit form offers an Unassigned option and the firm's members", async () => {

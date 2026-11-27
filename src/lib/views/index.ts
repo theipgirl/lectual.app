@@ -9,26 +9,28 @@ import { APPROVALS_NAME, MORE_NAME, PROPOSALS_NAME, REVIEW_SHORT_NAME } from "@/
  * The per-firm switch is the `role-views` module (a rollout switch kept out of Settings -> Features). With it off,
  * every firm sees today's shell (the technician view), byte for byte.
  */
-export const VIEW_IDS = ["technician", "owner", "attorney", "matters-team", "intake", "office", "marketing", "read-only"] as const;
+export const VIEW_IDS = ["technician", "owner", "team", "attorney", "matters-team", "intake", "office", "marketing", "read-only"] as const;
 export type ViewId = (typeof VIEW_IDS)[number];
 
 /** The view each role would get. Only views in LIVE_VIEWS are ever drawn; every other role keeps today's shell. */
 export const ROLE_VIEW: Record<Role, ViewId> = {
   owner: "owner",
-  // Firm owner, Nov 17: admins (RPB: Amor) get the simplified owner view too.
-  admin: "owner",
-  senior_admin: "office",
-  attorney: "attorney",
-  intake: "intake",
-  paralegal: "matters-team",
-  law_clerk: "matters-team",
-  clerk: "matters-team",
+  // Firm owner, Nov 17: admins (RPB: Amor) got the simplified owner view too. Nov 26 (the firm owner, relayed): RPB's whole
+  // team starts on Lectual, and every non-owner staff role first sees only Today, Weekly review, Matters and its own
+  // Approvals, so admin moves from the owner view to the team view.
+  admin: "team",
+  senior_admin: "team",
+  attorney: "team",
+  intake: "team",
+  paralegal: "team",
+  law_clerk: "team",
+  clerk: "team",
   social_media: "marketing",
   viewer: "read-only",
 };
 
-/** Views that are built. Phase 1: the owner view only. */
-export const LIVE_VIEWS: readonly ViewId[] = ["owner"];
+/** Views that are built: the owner view (Phase 1) and the team view (Nov 26). */
+export const LIVE_VIEWS: readonly ViewId[] = ["owner", "team"];
 
 export const isLiveView = (v: ViewId): boolean => v === "technician" || LIVE_VIEWS.includes(v);
 
@@ -156,6 +158,19 @@ export const OWNER_BAR_LABEL: Record<string, string> = { "": "Today", queue: APP
 export const OWNER_MORE_GROUPS: readonly { label: string; slugs: readonly string[] }[] = [{ label: MORE_NAME, slugs: ["intake", "forms", "matters", "calendar"] }];
 
 /**
+ * The team view (Nov 26; More removed the same week, the firm owner's decision): Today, Weekly review, Matters and the
+ * person's own Approvals, and nothing else. No More row, no Reports row and no Settings row (Settings is in the account
+ * menu). Hide only: every other page still opens by URL or from an in-page link for anyone its own gate allows.
+ * Approvals keeps its own list (Mine is the default for a staff role), never the deck.
+ */
+export const TEAM_MAIN_SLUGS = ["", "review", "matters", "queue"] as const;
+export const TEAM_TREE: readonly (readonly RailNode[])[] = [TEAM_MAIN_SLUGS.map((slug) => ({ slug }))];
+
+/** The team phone bar: Today, Review, Matters, Approvals. No More button and no sheet. */
+export const TEAM_BAR = ["", "review", "matters", "queue"] as const;
+export const TEAM_BAR_LABEL: Record<string, string> = { "": "Today", review: REVIEW_SHORT_NAME, matters: "Matters", queue: APPROVALS_NAME };
+
+/**
  * What the rail, phone bar and tour are handed, from what `visibleNav` already allowed. A filter only: it never adds
  * a section the firm or role cannot see. The technician view returns the list unchanged (same array).
  * In the owner view, Approvals opens the deck.
@@ -163,6 +178,10 @@ export const OWNER_MORE_GROUPS: readonly { label: string; slugs: readonly string
 export function drawnNav(items: NavItem[], view: ViewId): NavItem[] {
   if (view === "technician" || !isLiveView(view)) return items;
   const bySlug = new Map(items.map((i) => [i.slug, i]));
+  if (view === "team") return TEAM_MAIN_SLUGS.flatMap((slug) => {
+    const item = bySlug.get(slug);
+    return item ? [item] : [];
+  });
   return OWNER_SLUGS.flatMap((slug) => {
     const item = bySlug.get(slug);
     if (!item) return [];
@@ -177,7 +196,7 @@ export function drawnNav(items: NavItem[], view: ViewId): NavItem[] {
 
 /** Rail shape for a view; null = today's RAIL_TREE. */
 export function railTreeFor(view: ViewId): readonly (readonly RailNode[])[] | null {
-  return view === "owner" ? OWNER_TREE : null;
+  return view === "owner" ? OWNER_TREE : view === "team" ? TEAM_TREE : null;
 }
 
 /**
@@ -191,10 +210,17 @@ export type ShellSpec = {
   moreGroups: readonly { label: string; slugs: readonly string[] }[] | undefined;
   showSettings: boolean;
   showReports: boolean;
+  /** Only the team view sets this (false): no More button or sheet on the phone bar. Absent = drawn, as before. */
+  showMore?: boolean;
   /** Settings is a link in the account menu (the owner rail has no Settings row). */
   settingsInMenu: boolean;
-  /** The owner's colours and compact top bar. */
+  /** The owner's BEHAVIOURS as well as its look: deal dot, deal times, the welcome deal. Only the owner view sets it. */
   variant: "owner" | undefined;
+  /**
+   * The light owner-style LOOK (colours, widths, compact top bar, no section label) and nothing else. The owner and team
+   * views set it; a behaviour must never read it (read `variant`). `team` also marks the team view's own CSS exceptions.
+   */
+  look: "owner" | "team" | undefined;
 };
 
 export function shellFor(view: ViewId): ShellSpec {
@@ -208,9 +234,24 @@ export function shellFor(view: ViewId): ShellSpec {
       showReports: false,
       settingsInMenu: true,
       variant: "owner",
+      look: "owner",
     };
   }
-  return { view: "technician", tree: undefined, bar: undefined, moreGroups: undefined, showSettings: true, showReports: true, settingsInMenu: false, variant: undefined };
+  if (view === "team") {
+    return {
+      view,
+      tree: TEAM_TREE,
+      bar: { slugs: TEAM_BAR, labels: TEAM_BAR_LABEL },
+      moreGroups: [],
+      showSettings: false,
+      showReports: false,
+      showMore: false,
+      settingsInMenu: true,
+      variant: undefined,
+      look: "team",
+    };
+  }
+  return { view: "technician", tree: undefined, bar: undefined, moreGroups: undefined, showSettings: true, showReports: true, settingsInMenu: false, variant: undefined, look: undefined };
 }
 
 /** What the account menu's View group draws. Absent unless the person may switch (Lectual staff in a firm with role views). */

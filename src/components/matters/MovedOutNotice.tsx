@@ -21,7 +21,7 @@ export function MovedOutNotice() {
     return () => window.removeEventListener(MOVED_GROUP_EVENT, onMoved);
   }, []);
   return (
-    <p role="status" className="lx-note" style={{ margin: 0 }}>
+    <p role="status" className="lx-note lx-state-line">
       {group && (
         <>
           {MATTER_MOVED_TO}{" "}

@@ -1,5 +1,7 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
+import { REFRESH_TO_TRY_AGAIN } from "@/lib/ui/words";
 import { revalidatePath } from "next/cache";
 import { markAllRead, markRead } from "@/lib/notifications";
 import { UUID } from "@/lib/queue/link-rules";
@@ -11,25 +13,25 @@ export type NotificationActionResult = { ok: true } | { error: string };
  * scoped client (RLS pins the rows to them), so neither takes a user id or an org
  * id: there is nothing to forge. A database error is logged, never shown.
  */
-export async function markNotificationRead(id: string): Promise<NotificationActionResult> {
+export const markNotificationRead = previewSafe(async function markNotificationRead(id: string): Promise<NotificationActionResult> {
   if (typeof id !== "string" || !UUID.test(id)) return { error: "That notification isn't valid." };
   try {
     await markRead(id);
   } catch (err) {
     console.warn(`[notifications] mark read failed: ${err instanceof Error ? err.message : String(err)}`);
-    return { error: "Couldn't mark that notification read. Try again shortly." };
+    return { error: `Couldn't mark that notification read. ${REFRESH_TO_TRY_AGAIN}` };
   }
   revalidatePath("/dashboard", "layout");
   return { ok: true };
-}
+}, "state");
 
-export async function markAllNotificationsRead(): Promise<NotificationActionResult> {
+export const markAllNotificationsRead = previewSafe(async function markAllNotificationsRead(): Promise<NotificationActionResult> {
   try {
     await markAllRead();
   } catch (err) {
     console.warn(`[notifications] mark all read failed: ${err instanceof Error ? err.message : String(err)}`);
-    return { error: "Couldn't mark your notifications read. Try again shortly." };
+    return { error: `Couldn't mark your notifications read. ${REFRESH_TO_TRY_AGAIN}` };
   }
   revalidatePath("/dashboard", "layout");
   return { ok: true };
-}
+}, "state");

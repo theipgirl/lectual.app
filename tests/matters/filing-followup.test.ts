@@ -82,7 +82,24 @@ describe("computeFollowUpStatus", () => {
     expect(status).toMatchObject({ kind: "due", monthNumber: 2 });
   });
 
-  it("is stale past the ~5-month sequence rather than auto-drafting a 6th+ update", () => {
+  it("the SOP has four updates: month 4 is the last one offered, month 5 is never offered", () => {
+    expect(MONTHLY_SEQUENCE_MAX_MONTHS).toBe(4);
+    // Filed 4 months before now: month 4 is due.
+    expect(computeFollowUpStatus({ filingDate: "2026-04-21", monthsAlreadyQueued: [1, 2, 3] }, now)).toMatchObject({
+      kind: "due",
+      monthNumber: 4,
+    });
+    // Month 4 already queued: nothing more is offered.
+    expect(computeFollowUpStatus({ filingDate: "2026-04-21", monthsAlreadyQueued: [1, 2, 3, 4] }, now)).toEqual({
+      kind: "already_queued",
+      monthNumber: 4,
+    });
+    // Five months elapsed: stale, never a 5th update (even with 4 queued).
+    expect(computeFollowUpStatus({ filingDate: "2026-03-21", monthsAlreadyQueued: [1, 2, 3, 4] }, now).kind).toBe("stale");
+    expect(computeFollowUpStatus({ filingDate: "2026-03-21", monthsAlreadyQueued: [1, 2, 3] }, now).kind).toBe("stale");
+  });
+
+  it("is stale past the four-month sequence rather than auto-drafting a 5th+ update", () => {
     const status = computeFollowUpStatus(
       { filingDate: "2026-01-01", monthsAlreadyQueued: [] },
       now,
@@ -116,8 +133,12 @@ describe("followUpNeedsAttention", () => {
 describe("monthlyUpdateHeadline / parseMonthlyUpdateMonth", () => {
   it("round-trips a month number through the headline", () => {
     const headline = monthlyUpdateHeadline("SUNBEAM", 3);
-    expect(headline).toBe(`Monthly Status Update — Month 3 of ~${MONTHLY_SEQUENCE_MAX_MONTHS} — SUNBEAM`);
+    expect(headline).toBe(`Monthly Status Update — Month 3 of ${MONTHLY_SEQUENCE_MAX_MONTHS} — SUNBEAM`);
     expect(parseMonthlyUpdateMonth(headline)).toBe(3);
+  });
+
+  it("still reads headlines queued before the change (\"of ~5\")", () => {
+    expect(parseMonthlyUpdateMonth("Monthly Status Update — Month 4 of ~5 — SUNBEAM")).toBe(4);
   });
 
   it("returns null for a headline that isn't one of ours", () => {
@@ -147,7 +168,7 @@ describe("buildMonthlyStatusUpdateDraft — deterministic, no AI", () => {
     expect(draft.draftBody).toContain("about **2 months** into the process");
     expect(draft.draftBody).toContain("approximately **7 months**");
     expect(draft.draftBody).toContain("⚠️ DRAFT — FOR ATTORNEY REVIEW. NOT SENT.");
-    expect(draft.headline).toBe("Monthly Status Update — Month 2 of ~5 — SUNBEAM");
+    expect(draft.headline).toBe("Monthly Status Update — Month 2 of 4 — SUNBEAM");
   });
 
   it("singularizes 'month' at exactly 1", () => {

@@ -122,13 +122,14 @@ const ME = OWNER_ID;
 const DANA = members[1].userId;
 const SAM = members[2].userId;
 export const reviewRows: ReviewRow[] = [
-  row({ id: "r1", client: "Maya Chen", kind: "lead", mark: "CRUMB & CO.", stageLabel: "Proposal sent", nextStep: { id: "t1", title: "Call about the proposal", dueDate: "2026-11-07", assigneeId: ME }, waiting: "us", proposalExpiry: { text: "Proposal expires Nov 11", expiresOn: "2026-11-11", expired: false } as ReviewRow["proposalExpiry"] }),
+  row({ id: "r1", client: "Maya Chen", kind: "lead", lastOutbound: "2026-11-05", lastOutboundType: "email_sent", mark: "CRUMB & CO.", stageLabel: "Proposal sent", nextStep: { id: "t1", title: "Call about the proposal", dueDate: "2026-11-07", assigneeId: ME }, waiting: "us", proposalExpiry: { text: "Proposal expires Nov 11", expiresOn: "2026-11-11", expired: false } as ReviewRow["proposalExpiry"] }),
   row({ id: "r2", client: "Lena Ortiz", mark: "HALCYON PRESS", stageLabel: "Awaiting filing", nextStep: { id: "t2", title: "Send filing receipt", dueDate: "2026-11-12", assigneeId: ME }, waiting: "us" }),
   row({ id: "r3", client: "Sam Lee", kind: "lead", mark: "LUMEN TEA", stageLabel: "Consult held", nextStep: null, waiting: "us", stageDays: 9 }),
-  row({ id: "r4", client: "Jonah Reyes", mark: "NORTHFIELD GOODS", stageLabel: "Office action", nextStep: { id: "t4", title: "Review examiner letter", dueDate: "2026-11-13", assigneeId: DANA }, waiting: "client", lastOutbound: "2026-11-04", lastContact: contact("2026-11-04") }),
-  row({ id: "r5", client: "Priya Nair", mark: "OAT & ORCHARD", stageLabel: "Statement of use", nextStep: { id: "t5", title: "Confirm specimen", dueDate: "2026-11-19", assigneeId: DANA }, waiting: "client", lastOutbound: "2026-10-28", lastContact: contact("2026-10-28") }),
+  row({ id: "r4", client: "Jonah Reyes", mark: "NORTHFIELD GOODS", stageLabel: "Office action", nextStep: { id: "t4", title: "Review examiner letter", dueDate: "2026-11-13", assigneeId: DANA }, waiting: "client", lastOutbound: "2026-11-04", lastOutboundType: "email_sent", lastContact: contact("2026-11-04") }),
+  row({ id: "r5", client: "Priya Nair", mark: "OAT & ORCHARD", stageLabel: "Statement of use", nextStep: { id: "t5", title: "Confirm specimen", dueDate: "2026-11-19", assigneeId: DANA }, waiting: "client", lastOutbound: "2026-10-28", lastOutboundType: "call_logged", lastContact: contact("2026-10-28") }),
   row({ id: "r6", client: "Theo Marsh", mark: "BLUE HERON", stageLabel: "Published", nextStep: { id: "t6", title: "Watch for opposition", dueDate: "2026-12-01", assigneeId: SAM }, waiting: "uspto", deadline: { dueDate: "2026-12-01", title: "Opposition window" } }),
   row({ id: "r7", client: "Ines Walker", kind: "lead", mark: "PAPER MOON", stageLabel: "Questionnaire sent", nextStep: { id: "t7", title: "Nudge for the questionnaire", dueDate: "2026-11-08", assigneeId: SAM }, waiting: "us" }),
+  row({ id: "r9", client: "Jordan Pike", company: "Pike Holdings LLC", kind: "lead", mark: "PIKE & CO", stageLabel: "Consult held", nextStep: { id: "t9", title: "Send the proposal", dueDate: "2026-11-11", assigneeId: ME }, waiting: "us", lastOutbound: "2026-11-09", lastOutboundType: "email_sent" }),
   row({ id: "r8", client: "Omar Haddad", mark: "SALT LINE", stageLabel: "Filed", nextStep: { id: "t8", title: "Check status", dueDate: "2026-12-10", assigneeId: null }, assignedTo: SAM, lastContact: contact("2026-11-09") }),
 ];
 export const review: ReviewLoad = {

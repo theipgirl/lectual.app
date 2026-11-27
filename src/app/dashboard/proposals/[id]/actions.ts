@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { randomBytes } from "node:crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -127,19 +128,19 @@ function withContent(next: Parsed<ProposalContent>): Parsed<UpdateProposalInput>
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Links an unlinked draft or approved proposal to a lead. The composite foreign key keeps it inside the firm. */
-export async function linkLeadAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const linkLeadAction = previewSafe(async function linkLeadAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   return edit(formData, (current) => {
     const leadId = field(formData, "leadId");
     if (!UUID_RE.test(leadId)) return { ok: false, error: "Choose a lead to link." };
     if (current.lead_id) return { ok: false, error: "This proposal is already linked to a lead." };
     return { ok: true, value: { leadId } };
   });
-}
+}, "state");
 
 /** Adding or removing a brand name is refused on a general (flat-fee) proposal. */
 const NOT_ON_GENERAL: Parsed<never> = { ok: false, error: "This is a flat-fee proposal. It has no packages, brand names or classes." };
 
-export async function addNameAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const addNameAction = previewSafe(async function addNameAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   return edit(formData, (current) => {
     if (isGeneralContent(current.content)) return NOT_ON_GENERAL;
     const name = field(formData, "name");
@@ -147,19 +148,19 @@ export async function addNameAction(_prev: ActionState, formData: FormData): Pro
     const added = newBrandName(name, takenIds(current.content), rand);
     return { ok: true, value: { content: { ...current.content, names: [...current.content.names, added] } } };
   });
-}
+}, "state");
 
-export async function removeNameAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const removeNameAction = previewSafe(async function removeNameAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   return edit(formData, (current) => (isGeneralContent(current.content) ? NOT_ON_GENERAL : withContent(removeName(current.content, field(formData, "nameId")))));
-}
+}, "state");
 
 /**
  * "Save": the whole draft from one form post, ONE `updateProposal` call (see `runSaveDraft`). Every function in this
  * file is its own POST entry point, so the module gate and staff role run first, before any read.
  */
-export async function saveDraftAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const saveDraftAction = previewSafe(async function saveDraftAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   return runSaveDraft(draftDeps(), formData);
-}
+}, "state");
 
 function draftDeps(): SaveDraftDeps {
   return {
@@ -187,16 +188,16 @@ function draftDeps(): SaveDraftDeps {
  * store lists the problems when the proposal breaks a firm rule. Whether the
  * button is SHOWN is `isCurrentUserApprover()` on the page, a courtesy.
  */
-export async function approveAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const approveAction = previewSafe(async function approveAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   return lifecycle(formData, approveProposal, "Saved.", "Couldn't save this proposal.");
-}
+}, "state");
 
 /**
  * "Save and create link": approve, then make the link live, in one click. Nothing is emailed;
  * "sent" in the database only means the client link opens. If the first step lands and the
  * second does not, the version stays saved and "Turn on the link" (sendAction) finishes it.
  */
-export async function createLinkAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const createLinkAction = previewSafe(async function createLinkAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   return runCreateLink(
     {
       gate: gateStaffAction,
@@ -217,7 +218,7 @@ export async function createLinkAction(_prev: ActionState, formData: FormData): 
     // When it is absent nothing is saved and the server works from the row it re-reads.
     { dirty: formData.get("dirty") === "1", form: formData },
   );
-}
+}, "state");
 
 /**
  * "Change pay link" on a version whose link is live (lectual 0100): the one field that may change after
@@ -225,7 +226,7 @@ export async function createLinkAction(_prev: ActionState, formData: FormData): 
  * link, and writes `pay_url` alone through the scoped client, fenced on the rendered `updated_at`. The
  * database refuses every other status and logs the change itself (hosts only).
  */
-export async function changePayLinkAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const changePayLinkAction = previewSafe(async function changePayLinkAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   return runChangePayLink(
     {
       gate: gateStaffAction,
@@ -235,7 +236,7 @@ export async function changePayLinkAction(_prev: ActionState, formData: FormData
     },
     { id: field(formData, "proposalId"), payUrl: formData.get("payUrl"), updatedAt: field(formData, "updatedAt") },
   );
-}
+}, "state");
 
 /**
  * "Reset acceptance" on an accepted version (lectual 0101): back to "Link live", so the same client link can be
@@ -244,7 +245,7 @@ export async function changePayLinkAction(_prev: ActionState, formData: FormData
  * writes `status` alone through the scoped client, fenced on `accepted` and the rendered `updated_at`. The database
  * re-judges all of it, clears the acceptance and logs the reset with the previous acceptance. Nothing is emailed.
  */
-export async function resetAcceptanceAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const resetAcceptanceAction = previewSafe(async function resetAcceptanceAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   return runResetAcceptance(
     {
       gate: gateStaffAction,
@@ -263,17 +264,17 @@ export async function resetAcceptanceAction(_prev: ActionState, formData: FormDa
     },
     { id: field(formData, "proposalId"), updatedAt: field(formData, "updatedAt") },
   );
-}
+}, "state");
 
-export async function unapproveAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const unapproveAction = previewSafe(async function unapproveAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   return lifecycle(formData, unapproveProposal, EDIT_AGAIN_DONE, "Couldn't take this proposal back to editing.");
-}
+}, "state");
 
 /**
  * "Turn on the link": the recovery for a saved version whose link is not live. Nothing is emailed from here. The engagement
  * letter copy is re-checked against the firm's current approved version inside `sendProposal` (the one make-live guard).
  */
-export async function sendAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const sendAction = previewSafe(async function sendAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const refused = await gateStaffAction();
   if (refused) return refused;
   // A proposal the consult agent drafted goes live only when its email is
@@ -282,7 +283,7 @@ export async function sendAction(_prev: ActionState, formData: FormData): Promis
   const blocked = await consultSendRefusal(field(formData, "proposalId"));
   if (blocked) return { error: blocked };
   return lifecycle(formData, sendProposal, LINK_TURNED_ON, "Couldn't turn on the link.");
-}
+}, "state");
 
 async function consultSendRefusal(id: string): Promise<string | null> {
   let proposal: ProposalRow | null;
@@ -297,9 +298,9 @@ async function consultSendRefusal(id: string): Promise<string | null> {
   return block.blocked ? GOES_LIVE_ON_APPROVAL : null;
 }
 
-export async function withdrawAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const withdrawAction = previewSafe(async function withdrawAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   return lifecycle(formData, withdrawProposal, "Withdrawn. The client link no longer opens it.", "Couldn't withdraw this proposal.");
-}
+}, "state");
 
 async function lifecycle(
   formData: FormData,
@@ -325,7 +326,7 @@ async function lifecycle(
  * then the owner check here, then the store re-reads the role and the row through the scoped client and
  * deletes the family in one statement. Nothing is sent; nothing touches Lawmatics or LawPay.
  */
-export async function deleteProposalAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const deleteProposalAction = previewSafe(async function deleteProposalAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   await requireProposalsModule();
   if (!canDeleteProposal(await currentRole())) return { error: DELETE_OWNER_ONLY };
   const id = field(formData, "proposalId");
@@ -335,10 +336,10 @@ export async function deleteProposalAction(_prev: ActionState, formData: FormDat
   // 0102 may already have removed the version this page shows).
   if (!result.ok) return { error: result.error };
   redirect("/dashboard/proposals/?deleted=1");
-}
+}, "state");
 
 /** Sent -> the next version, as a draft. Redirects to it. */
-export async function reviseAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const reviseAction = previewSafe(async function reviseAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const refused = await gateStaffAction();
   if (refused) return refused;
   const id = field(formData, "proposalId");
@@ -351,7 +352,7 @@ export async function reviseAction(_prev: ActionState, formData: FormData): Prom
   revalidate(id);
   revalidate(nextId);
   redirect(`/dashboard/proposals/${nextId}/`);
-}
+}, "state");
 
 /* ── the post-consult email ─────────────────────────────────────────────── */
 
@@ -361,7 +362,7 @@ export async function reviseAction(_prev: ActionState, formData: FormData): Prom
  * sent; a named approver approves the email in the queue and a person sends the mailbox draft.
  * Re-checks the session, the lead-writing role, the `proposals` module and the proposal staff roles.
  */
-export async function queuePostConsultEmailAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const queuePostConsultEmailAction = previewSafe(async function queuePostConsultEmailAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const result = await runManualEmail(
     {
       gate: async () => {
@@ -412,4 +413,4 @@ export async function queuePostConsultEmailAction(_prev: ActionState, formData: 
     field(formData, "proposalId"),
   );
   return result.ok ? { saved: true, notice: result.notice, queueId: result.queueId } : { error: result.error };
-}
+}, "state");

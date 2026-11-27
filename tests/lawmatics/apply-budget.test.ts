@@ -73,6 +73,7 @@ function makeSupabase(writes: { inserted: number; updated: number }) {
       const result = { data: [] as unknown[], error: null };
       const chain = {
         order: () => chain,
+        is: () => chain,
         range: () => Promise.resolve(result),
         in: () => Promise.resolve(result),
       };

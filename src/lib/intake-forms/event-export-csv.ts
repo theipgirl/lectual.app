@@ -32,7 +32,7 @@ export async function exportEventCsv(request: Request): Promise<Response> {
     const supabase = await getScopedClient();
     const { data, error } = await supabase.auth.getUser();
     if (error || !data.user) return text(401, "Sign in to export.");
-    const role = await supabase.rpc("current_org_role");
+    const role = await supabase.rpc("current_org_role", undefined, { get: true });
     if (role.error || !canExportCsv(role.data)) return text(403, "Your role can't export event results.");
   } catch {
     return text(503, "We couldn't check your access just now. Try again shortly.");

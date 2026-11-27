@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { moveLeadStage } from "@/lib/pipeline";
@@ -17,6 +18,7 @@ import { authorizeReconcile } from "@/lib/reconcile/authorize";
 import { MAX_MOVES_PER_APPLY, RECONCILE_MESSAGES as MSG, isUuid } from "@/lib/reconcile/rules";
 import { readLawmatics, readLeads, readStageMapping, readStages, readStoredMail } from "@/lib/reconcile/sources";
 import type { ApplyResult, Confidence, MoveRequest, PlanRow, PreviewResult, RowOutcome } from "@/lib/reconcile/types";
+import { leadRead } from "@/lib/leads/live";
 
 /**
  * The two server actions behind /dashboard/intake/reconcile.
@@ -74,7 +76,7 @@ function mailboxSearcher(): (address: string) => Promise<MailboxSearch> {
   return async (address) => searchPersonMail(address, await load());
 }
 
-export async function previewReconcileAction(formData: FormData): Promise<PreviewResult> {
+export const previewReconcileAction = previewSafe(async function previewReconcileAction(formData: FormData): Promise<PreviewResult> {
   const auth = await authorize();
   if (!auth.ok) return auth;
   const { supabase } = auth;
@@ -131,7 +133,7 @@ export async function previewReconcileAction(formData: FormData): Promise<Previe
     searchMail: mailboxSearcher(),
   });
   return { ok: true, view, plan, fingerprint: planFingerprint(plan) };
-}
+}, "state");
 
 // ── apply ────────────────────────────────────────────────────────────────────
 
@@ -192,7 +194,7 @@ async function applyLastTouch(supabase: Scoped, leadId: string, proposed: string
   return (await bumpLeadLastTouch(supabase, leadId, null, new Date(usable))) !== false;
 }
 
-export async function applyReconcileAction(input: unknown): Promise<ApplyResult> {
+export const applyReconcileAction = previewSafe(async function applyReconcileAction(input: unknown): Promise<ApplyResult> {
   const auth = await authorize();
   if (!auth.ok) return auth;
   const { supabase } = auth;
@@ -212,10 +214,13 @@ export async function applyReconcileAction(input: unknown): Promise<ApplyResult>
   }
 
   // (b) Every lead is still where the plan found it, read now through the caller's own client.
-  const { data: current, error: leadError } = await supabase
-    .from("crm_lead")
-    .select("id, current_stage_id, last_activity_at")
-    .in("id", moves.map((m) => m.leadId));
+  // A lead merged since the preview (lectual 0107) reads as missing, so the whole apply is refused below.
+  const { data: current, error: leadError } = await leadRead(({ live }) =>
+    live(supabase.from("crm_lead").select("id, current_stage_id, last_activity_at")).in(
+      "id",
+      moves.map((m) => m.leadId),
+    ),
+  );
   if (leadError) {
     logFailure("re-read leads", leadError);
     return { ok: false, error: MSG.readFailed };
@@ -274,4 +279,4 @@ export async function applyReconcileAction(input: unknown): Promise<ApplyResult>
   }
   if (totals.moved + totals.already === 0) return { ok: false, error: MSG.allFailed, outcomes };
   return { ok: true, outcomes, totals };
-}
+}, "state");

@@ -1,4 +1,9 @@
 import "@/app/dashboard/proposals/proposals.css";
+import "@/components/list-page/list-page.css";
+import { ListSearch } from "@/components/list-page/ListToolbar";
+import { ViewToggle } from "@/components/ViewToggle";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { searchPlaceholder } from "@/lib/ui/words";
 import { SEARCH_MAX, NEW_PROPOSAL_PATH, showingLine, type PickerView } from "@/lib/proposals/new-picker";
 import { StartDraftRow } from "./StartDraft";
 import type { RecordKind } from "@/lib/skills/catalog";
@@ -59,7 +64,7 @@ export function WhoIsThisFor({
   return (
     <section className="lx-card pe-who" aria-labelledby="who-title">
       <div className="pe-who-head">
-        <h2 id="who-title" className="pe-h">
+        <h2 id="who-title" className="lx-h3">
           Who is this for?
         </h2>
         {view.blankHref && (
@@ -69,38 +74,35 @@ export function WhoIsThisFor({
         )}
       </div>
       <p className="lx-note pe-hint">{intro}</p>
-      <nav className="lx-segs pe-who-switch" aria-label="Kind of record">
-        {(["lead", "matter"] as const).map((k) => (
-          <a key={k} href={view.switchHrefs[k]} aria-current={k === kind ? "page" : undefined}>
-            {HEADING[k]}
-          </a>
-        ))}
-      </nav>
-      <form method="get" action={basePath} className="pe-who-search" role="search">
-        <input type="hidden" name="kind" value={kind} />
-        {Object.entries(hidden ?? {}).map(([k, v]) => (
-          <input key={k} type="hidden" name={k} value={v} />
-        ))}
-        <input
-          id={inputId}
-          className="lx-input"
-          name="q"
-          type="search"
-          maxLength={SEARCH_MAX}
-          defaultValue={term}
-          aria-label={`Search ${PLURAL[kind]}`}
-        />
-        <button type="submit" className="lx-btn lx-btn-ghost lx-btn-sm">
-          Search
-        </button>
-      </form>
+      <ViewToggle<RecordKind>
+        className="pe-who-switch"
+        label="Kind of record"
+        value={kind}
+        views={[
+          { value: "lead", label: HEADING.lead },
+          { value: "matter", label: HEADING.matter },
+        ]}
+        hrefFor={(k) => view.switchHrefs[k]}
+      />
+      <ListSearch
+        id={inputId}
+        className="pe-who-search"
+        action={basePath}
+        maxLength={SEARCH_MAX}
+        name="q"
+        defaultValue={term}
+        placeholder={searchPlaceholder(PLURAL[kind])}
+        label={`Search ${PLURAL[kind]}`}
+        hidden={{ kind, ...(hidden ?? {}) }}
+        clearHref={`${basePath}?${new URLSearchParams({ kind, ...(hidden ?? {}) }).toString()}`}
+      />
       <p className="lx-note pe-hint">{SEARCH_HINT[kind]}</p>
       {list.status === "failed" ? (
-        <p className="lx-note pe-who-alert" role="alert">
+        <p className="pe-msg pe-msg-err" role="alert">
           We couldn&apos;t load your {PLURAL[kind]}.
         </p>
       ) : list.rows.length === 0 ? (
-        <p className="lx-note pe-hint">{term ? `No matches for "${term}".` : `No ${PLURAL[kind]} on file yet.`}</p>
+        <EmptyState variant="line">{term ? `No matches for "${term}".` : `No ${PLURAL[kind]} on file yet.`}</EmptyState>
       ) : (
         <>
           <ul className="lx-list pe-who-list">
@@ -122,7 +124,7 @@ export function WhoIsThisFor({
         </>
       )}
       {otherFailed.map((k) => (
-        <p key={k} className="lx-note pe-who-alert" role="alert">
+        <p key={k} className="pe-msg pe-msg-err" role="alert">
           We couldn&apos;t load your {PLURAL[k]}.
         </p>
       ))}

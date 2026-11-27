@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
 import { createMatterIntakeRequest, IntakeRequestError, revokeMatterIntakeRequest } from "@/lib/intake-forms/requests";
 
@@ -17,7 +18,7 @@ function friendly(e: unknown, fallback: string): string {
   return e instanceof IntakeRequestError ? e.message : fallback;
 }
 
-export async function createIntakeRequestAction(matterId: string): Promise<IntakeRequestActionState> {
+export const createIntakeRequestAction = previewSafe(async function createIntakeRequestAction(matterId: string): Promise<IntakeRequestActionState> {
   if (typeof matterId !== "string" || !UUID.test(matterId)) return { error: "That matter isn't available." };
   try {
     const token = await createMatterIntakeRequest(matterId);
@@ -26,9 +27,9 @@ export async function createIntakeRequestAction(matterId: string): Promise<Intak
   } catch (e) {
     return { error: friendly(e, "The link couldn't be created. Nothing was sent. Try again.") };
   }
-}
+}, "state");
 
-export async function revokeIntakeRequestAction(matterId: string, requestId: string): Promise<IntakeRequestActionState> {
+export const revokeIntakeRequestAction = previewSafe(async function revokeIntakeRequestAction(matterId: string, requestId: string): Promise<IntakeRequestActionState> {
   if (typeof matterId !== "string" || !UUID.test(matterId) || typeof requestId !== "string" || !UUID.test(requestId)) {
     return { error: "That link isn't available." };
   }
@@ -39,4 +40,4 @@ export async function revokeIntakeRequestAction(matterId: string, requestId: str
   } catch (e) {
     return { error: friendly(e, "The link couldn't be withdrawn. Try again.") };
   }
-}
+}, "state");

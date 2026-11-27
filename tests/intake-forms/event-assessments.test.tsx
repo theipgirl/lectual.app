@@ -52,11 +52,11 @@ beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
-describe("Forms list: Event assessments (F15)", () => {
+describe("Forms list: Scored assessments (F15)", () => {
   it("shows one read-only row per event code with started, finished and median, each linking to ?event=<code>", async () => {
     const html = await listPage(newDb({ crm_booth_scorecard: boothTables() }));
-    const section = html.slice(html.indexOf('aria-label="Event assessments"'));
-    expect(section).toContain(">Event assessments<");
+    const section = html.slice(html.indexOf('aria-label="Scored assessments"'));
+    expect(section).toContain(">Scored assessments<");
     const rows = section.split("<article").slice(1);
     expect(rows).toHaveLength(2);
     const urban = rows.find((r) => r.includes("urban-golf-2026"))!;
@@ -84,7 +84,7 @@ describe("Forms list: Event assessments (F15)", () => {
 
   it("has no create, edit, archive, duplicate or copy control in the section", async () => {
     const html = await listPage(newDb({ crm_booth_scorecard: boothTables() }));
-    const section = html.slice(html.indexOf('aria-label="Event assessments"'));
+    const section = html.slice(html.indexOf('aria-label="Scored assessments"'));
     for (const word of ["<button", "<form", "<input", "<select", "Archive", "Duplicate", "New form", "Copy link", ">Edit<", "disabled"]) expect(section).not.toContain(word);
   });
 
@@ -92,8 +92,8 @@ describe("Forms list: Event assessments (F15)", () => {
     const db = newDb({ crm_booth_scorecard: boothTables() });
     db.fail("crm_booth_scorecard", "select");
     const html = await listPage(db);
-    expect(html).toContain("Event assessments couldn't be loaded. Refresh to try again.");
-    expect(html).not.toContain('aria-label="Event assessments"');
+    expect(html).toContain("Scored assessments couldn't be loaded. Refresh to try again.");
+    expect(html).not.toContain('aria-label="Scored assessments"');
     expect(html).not.toContain("urban-golf-2026");
     // The intakes above it are still listed.
     expect(html).toContain("UGW 2026 booth");
@@ -103,26 +103,26 @@ describe("Forms list: Event assessments (F15)", () => {
     const db = newDb({ crm_booth_scorecard: boothTables() });
     db.fail("crm_booth_scorecard", "select", { code: "PGRST205", message: "Could not find the table 'public.crm_booth_scorecard'" });
     const html = await listPage(db);
-    expect(html).toContain("Event assessments aren't switched on for your firm yet. Lectual will turn them on.");
+    expect(html).toContain("Scored assessments aren't switched on for your firm yet. Lectual will turn them on.");
     expect(html).not.toContain("couldn't be loaded. Refresh to try again.");
   });
 
   it("shows no section at all for a firm with no booth cards", async () => {
     const html = await listPage(newDb({ crm_booth_scorecard: [] }));
-    expect(html).not.toContain("Event assessments");
+    expect(html).not.toContain("Scored assessments");
     expect(html).toContain("UGW 2026 booth");
   });
 
   it("shows a read-only role the same rows, with no edit controls anywhere", async () => {
     const html = await listPage(newDb({ crm_booth_scorecard: boothTables() }, "viewer"), "viewer");
-    expect(html).toContain('aria-label="Event assessments"');
+    expect(html).toContain('aria-label="Scored assessments"');
     expect(html).not.toContain("New form");
     expect(html).not.toContain("Duplicate");
   });
 
   it("keeps the existing list as before: intakes, create, duplicate, archive, QR, numbers", async () => {
     const html = await listPage(newDb({ crm_booth_scorecard: boothTables() }));
-    const list = html.slice(0, html.indexOf('aria-label="Event assessments"'));
+    const list = html.slice(0, html.indexOf('aria-label="Scored assessments"'));
     expect(list).toContain("Forms");
     expect(list).toContain("UGW 2026 booth");
     expect(list).toContain("New form");
@@ -135,7 +135,7 @@ describe("Forms list: Event assessments (F15)", () => {
   it("does not show another firm's booth cards", async () => {
     const html = await listPage(newDb({ crm_booth_scorecard: [boothRow("z", { org_id: "org-2", event_code: "their-event" })] }));
     expect(html).not.toContain("their-event");
-    expect(html).not.toContain("Event assessments");
+    expect(html).not.toContain("Scored assessments");
   });
 });
 
@@ -149,7 +149,7 @@ describe("event page (F16)", () => {
     expect(kpi("Completion rate")).toBe("66.7%");
     expect(kpi("Typical time (median)")).toBe("4 min");
     for (const heading of ["Score bands", "Hot, warm and cold", "Score distribution", "Most common gaps", "Drop-off by question"]) expect(html).toContain(`>${heading}<`);
-    expect(html).toContain("2 people finished at this event. 1 more gave contact details and didn't finish.");
+    expect(html).toContain("2 people finished. 1 more gave contact details and didn't finish.");
     // Option counts use the card's labels, with options nobody chose present.
     expect(html).toContain("Is your business name or logo federally registered?");
     expect(html).toContain("Application pending");
@@ -165,7 +165,7 @@ describe("event page (F16)", () => {
   it("filter links work: All time, 7, 30, 90 days, each keeping event=<code>", async () => {
     const html = await eventPage(newDb({ crm_booth_scorecard: boothTables() }), "urban-golf-2026", 30);
     const nav = html.slice(html.indexOf('aria-label="Date range"'));
-    const links = [...nav.matchAll(/<a class="(on)?" (?:aria-current="page" )?href="([^"]+)">([^<]+)<\/a>/g)].map((m) => [m[3], m[2], m[1]]);
+    const links = [...nav.matchAll(/<a (aria-current="page" )?href="([^"]+)">([^<]+)<\/a>/g)].map((m) => [m[3], m[2], m[1] ? "on" : ""]);
     expect(links.map((l) => l[0])).toEqual(["All time", "7 days", "30 days", "90 days"]);
     expect(links.map((l) => l[1])).toEqual([
       "/dashboard/forms?event=urban-golf-2026&range=all",
@@ -212,7 +212,7 @@ describe("drop-off on the event page (F10, deviation 3)", () => {
   it("says answers aren't recorded for unfinished cards, and draws no chart of identical bars", async () => {
     const html = await eventPage(newDb({ crm_booth_scorecard: boothTables() }), "urban-golf-2026");
     const drop = html.slice(html.indexOf(">Drop-off by question<"));
-    expect(drop).toContain("1 card was started and not finished. Answers are saved when a card is finished, so where people stopped isn't recorded for these cards.");
+    expect(drop).toContain("1 assessment was started and not finished. Answers are saved only when one is finished, so where people stopped isn't recorded for these.");
     expect(drop).not.toContain("ifr-bars");
     expect(drop).not.toContain("stopped at");
   });
@@ -226,7 +226,7 @@ describe("drop-off on the event page (F10, deviation 3)", () => {
     ];
     const html = await eventPage(newDb({ crm_booth_scorecard: rows }), "urban-golf-2026");
     const drop = html.slice(html.indexOf(">Drop-off by question<"));
-    expect(drop).toContain("3 cards were started and not finished. Each is counted at the first question it has no answer for.");
+    expect(drop).toContain("3 assessments were started and not finished. Each is counted at the first question it has no answer for.");
     const bars = [...drop.matchAll(/<span class="ifr-bar-label">([^<]+)<\/span>.*?<span class="ifr-bar-count">(\d+)<\/span>/g)].map((m) => [m[1], Number(m[2])]);
     expect(bars.map((b) => b[1])).toEqual([0, 1, 0, 1, 0, 0, 1, 0]);
     expect(bars[0][0]).toBe("Do you have a business, a personal brand, or both?");

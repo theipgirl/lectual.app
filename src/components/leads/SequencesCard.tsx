@@ -1,9 +1,11 @@
 "use client";
 
+import { LoadFailedLine } from "@/components/ui/LoadFailed";
 import Link from "next/link";
 import { useActionState } from "react";
 import { stopLeadSequenceAction, type LeadSequenceState } from "@/app/dashboard/leads/[id]/sequence-actions";
 import { MANUAL_STOP_REASONS, STOP_REASON_LABEL } from "@/lib/campaigns/stops";
+import { SAVING } from "@/lib/ui/words";
 
 export type SequenceRow = {
   id: string;
@@ -38,7 +40,7 @@ function StopForm({ leadId, enrollmentId }: { leadId: string; enrollmentId: stri
         ))}
       </select>
       <button type="submit" className="lx-btn lx-btn-sec lx-btn-sm" disabled={pending}>
-        {pending ? "Stopping…" : "Stop campaign"}
+        {pending ? SAVING : "Stop campaign"}
       </button>
       {state.error && (
         <span role="alert" className="lx-note" style={{ color: "var(--wine)", flexBasis: "100%" }}>
@@ -59,13 +61,11 @@ export function SequencesCard(props: { leadId: string; rows: SequenceRow[] | nul
   const { leadId, rows } = props;
   return (
     <section className="lx-card" style={{ padding: 18, display: "grid", gap: 10 }} aria-labelledby="sequences-heading">
-      <h2 id="sequences-heading" className="lx-h2" style={{ fontSize: 23, margin: 0 }}>
+      <h2 id="sequences-heading" className="lx-h2">
         Campaigns
       </h2>
       {rows === null ? (
-        <p role="alert" className="lx-note" style={{ margin: 0, color: "var(--wine)" }}>
-          Couldn&apos;t load this lead&apos;s campaigns. That isn&apos;t the same as none — try again shortly.
-        </p>
+        <LoadFailedLine role="alert">Couldn&apos;t load this lead&apos;s campaigns. That isn&apos;t the same as none.</LoadFailedLine>
       ) : rows.length === 0 ? (
         <p className="lx-note" style={{ margin: 0 }}>
           Not in any campaign.

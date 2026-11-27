@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { firstNameOf, joinOr, statusLabel, statusTone } from "@/lib/proposal-editor/labels";
 import { navItemAllowed, navItemBySlug, railGroups, visibleNav } from "@/lib/nav";
 import { PROPOSAL_STATUSES } from "@/lib/proposals/types";
+import { PROPOSALS_NAME } from "@/lib/ui/words";
 
 describe("status pills", () => {
   it("has a label and a tone for every status", () => {
@@ -37,13 +38,17 @@ describe("the Client proposals rail entry", () => {
     expect(item.module).toBe("proposals");
     expect(navItemAllowed(item, [], "owner")).toBe(false);
     expect(navItemAllowed(item, ["mailbox"], "owner")).toBe(false);
-    expect(navItemAllowed(item, ["proposals"], "viewer")).toBe(true);
-    const labels = (mods: string[]) => railGroups(visibleNav(mods, "owner"), "/dashboard/").flat().map((e) => e.label);
-    expect(labels([])).not.toContain("Client proposals");
-    expect(labels(["proposals"])).toContain("Client proposals");
+    // Changed on purpose: the row is drawn for the admin tier only (navigation; the pages keep their own gates).
+    expect(navItemAllowed(item, ["proposals"], "senior_admin")).toBe(true);
+    expect(navItemAllowed(item, ["proposals"], "viewer")).toBe(false);
+    // One name per thing (design rollout, item 25): the rail row reads PROPOSALS_NAME; it is found by its key, since the older quotes
+    // entry (shown only without the module) carries the same name.
+    const entry = (mods: string[]) => railGroups(visibleNav(mods, "owner"), "/dashboard/").flat().find((e) => e.key === "proposals");
+    expect(entry([])).toBeUndefined();
+    expect(entry(["proposals"])?.label).toBe(PROPOSALS_NAME);
   });
   it("is active on the editor and new-proposal pages", () => {
     const groups = railGroups(visibleNav(["proposals"], "owner"), "/dashboard/proposals/new/");
-    expect(groups.flat().find((e) => e.label === "Client proposals")?.active).toBe(true);
+    expect(groups.flat().find((e) => e.key === "proposals")?.active).toBe(true);
   });
 });

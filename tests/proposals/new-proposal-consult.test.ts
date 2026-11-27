@@ -224,11 +224,11 @@ describe("the box without a lead, or not ticked", () => {
   });
 
   it("not ticked: only the lead's own brand with the default pair and no classes, and the consult is never read", async () => {
-    const { created, loadConsult, run } = await setup({ consult: reviewed(details([ZEPHYR, SWIRL])), lead: leadRow({ mark_text: "Prosperall" }) });
+    const { created, loadConsult, run } = await setup({ consult: reviewed(details([ZEPHYR, SWIRL])), lead: leadRow({ mark_text: "Larkmoor" }) });
     await expect(run({ ...base, leadId: LEAD })).rejects.toBeInstanceOf(Redirected);
     expect(loadConsult).not.toHaveBeenCalled();
     const { names } = contentOf(created);
-    expect(names.map((x) => x.name)).toEqual(["Prosperall"]);
+    expect(names.map((x) => x.name)).toEqual(["Larkmoor"]);
     expect(names[0].marks.map((m) => m.kind)).toEqual(["word", "logo"]);
     expect(names[0].classes).toEqual([]);
   });

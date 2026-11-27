@@ -1,10 +1,14 @@
 import { roleLabel } from "@/lib/auth/roles";
+import { LoadFailedLine } from "@/components/ui/LoadFailed";
 import type { ReactNode } from "react";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { loadConsultEntries, type ConsultDb, type ConsultEntry } from "@/lib/consult/store";
 import { CONSULT_BASIS_LABEL, MARK_TYPE_LABEL, formatClassLines, type StoredConsultDetails } from "@/lib/consult/vocab";
 import { relativeTime } from "@/lib/relative-time";
 import { ConsultDetailsForm } from "./ConsultDetailsForm";
+import { Pill } from "@/components/ui/Pill";
+import { Notice } from "@/components/ui/Notice";
+import { MEANING_TONE } from "@/lib/ui/tones";
 
 /**
  * The lead page's "Consult details" card: per mark, what the call said about
@@ -25,26 +29,26 @@ const SOURCE_LABEL: Record<string, string> = {
   "meeting-follow-up": "Read from the meeting when its follow-up was drafted",
 };
 
-function Provenance({ entry, details }: { entry: ConsultEntry; details: StoredConsultDetails | null }) {
+function Provenance({ entry, details, timeZone }: { entry: ConsultEntry; details: StoredConsultDetails | null; timeZone?: string }) {
   const source = entry.source ? entry.source.charAt(0).toUpperCase() + entry.source.slice(1) : "Consult";
   const how = details ? (details.extracted ? SOURCE_LABEL[details.extracted.source] : "Entered by hand") : null;
   return (
     <span className="lx-note">
-      {source} · {relativeTime(entry.createdAt)}
+      {source} · {relativeTime(entry.createdAt, undefined, timeZone)}
       {how ? ` · ${how}` : ""}
     </span>
   );
 }
 
-function ReviewPill({ details }: { details: StoredConsultDetails }) {
+function ReviewPill({ details, timeZone }: { details: StoredConsultDetails; timeZone?: string }) {
   if (!details.review) {
-    return <span className="lx-pill lx-pill-warn">Needs review</span>;
+    return <Pill tone={MEANING_TONE.needsPerson}>Needs review</Pill>;
   }
   const who = details.review.reviewed_by_name ?? "a teammate";
   return (
-    <span className="lx-pill lx-pill-ok" title={`Reviewed by ${who} ${relativeTime(details.review.reviewed_at)}`}>
+    <Pill tone={MEANING_TONE.done} title={`Reviewed by ${who} ${relativeTime(details.review.reviewed_at, undefined, timeZone)}`}>
       Reviewed
-    </span>
+    </Pill>
   );
 }
 
@@ -77,7 +81,7 @@ function ReadOnly({ details }: { details: StoredConsultDetails }) {
   );
 }
 
-export async function ConsultDetailsSection({ leadId, canWrite }: { leadId: string; canWrite: boolean }) {
+export async function ConsultDetailsSection({ leadId, canWrite, timeZone }: { leadId: string; canWrite: boolean; timeZone?: string }) {
   const supabase = await getScopedClient();
   const read = await loadConsultEntries(supabase as unknown as ConsultDb, leadId);
 
@@ -85,7 +89,7 @@ export async function ConsultDetailsSection({ leadId, canWrite }: { leadId: stri
     <section className="lx-card" style={{ padding: 18, display: "grid", gap: 14 }} aria-labelledby="consult-details-title">
       <div>
         <div className="lx-label">From the consultation</div>
-        <h2 id="consult-details-title" className="lx-h2" style={{ fontSize: 23 }}>
+        <h2 id="consult-details-title" className="lx-h2">
           Consult details
         </h2>
         <p className="lx-note" style={{ margin: "6px 0 0" }}>
@@ -98,7 +102,7 @@ export async function ConsultDetailsSection({ leadId, canWrite }: { leadId: stri
   );
 
   if (read.status === "unavailable") {
-    return shell(<p className="lx-note" style={{ margin: 0 }}>Consult details couldn&apos;t be loaded just now. Nothing is shown rather than a guess.</p>);
+    return shell(<LoadFailedLine>Consult details couldn&apos;t be loaded just now. Nothing is shown rather than a guess.</LoadFailedLine>);
   }
 
   if (read.entries.length === 0) {
@@ -118,9 +122,9 @@ export async function ConsultDetailsSection({ leadId, canWrite }: { leadId: stri
     [...shown.map((entry, idx) => {
       const body =
         entry.read.kind === "invalid" ? (
-          <p className="lx-banner lx-banner-risk" style={{ margin: 0 }}>
+          <Notice tone="risk">
             The details saved on this consult couldn&apos;t be read, so they aren&apos;t shown or carried anywhere. Ask Lectual to take a look.
-          </p>
+          </Notice>
         ) : entry.read.kind === "none" ? (
           canWrite ? (
             <ConsultDetailsForm key={`${entry.noteId}:none`} leadId={leadId} noteId={entry.noteId} details={null} />
@@ -135,14 +139,14 @@ export async function ConsultDetailsSection({ leadId, canWrite }: { leadId: stri
       return (
         <div key={entry.noteId} style={{ display: "grid", gap: 10, paddingTop: idx === 0 ? 0 : 14, borderTop: idx === 0 ? "none" : "1px solid var(--line-2)" }}>
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            {entry.read.kind === "ok" && <ReviewPill details={entry.read.details} />}
-            <Provenance entry={entry} details={entry.read.kind === "ok" ? entry.read.details : null} />
+            {entry.read.kind === "ok" && <ReviewPill details={entry.read.details} timeZone={timeZone} />}
+            <Provenance entry={entry} details={entry.read.kind === "ok" ? entry.read.details : null} timeZone={timeZone} />
           </div>
           {entry.read.kind === "ok" && entry.read.details.review && (
             <span className="lx-note">
               Reviewed by {entry.read.details.review.reviewed_by_name ?? "a teammate"}
               {entry.read.details.review.reviewed_by_role ? ` (${roleLabel(entry.read.details.review.reviewed_by_role)})` : ""} ·{" "}
-              {relativeTime(entry.read.details.review.reviewed_at)}
+              {relativeTime(entry.read.details.review.reviewed_at, undefined, timeZone)}
             </span>
           )}
           {body}

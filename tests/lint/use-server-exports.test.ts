@@ -24,7 +24,10 @@ describe('"use server" files export only async functions', () => {
     const bad = readFileSync(file, "utf8")
       .split("\n")
       .filter((line) => /^export\s/.test(line))
-      .filter((line) => !/^export\s+(async\s+function|type\s|interface\s)/.test(line));
+      // View as: every action is `export const X = previewSafe(async function X(...) {...}, refusal)` (or previewReadOnly), and
+      // both wrappers return an async function (tests/views/view-as-actions-guarded.test.ts checks the whole form).
+      .filter((line) => !/^export\s+(async\s+function|type\s|interface\s)/.test(line))
+      .filter((line) => !/^export const (\w+) = preview(Safe|ReadOnly)\(async function \1[(<]/.test(line));
     expect(bad).toEqual([]);
   });
 });

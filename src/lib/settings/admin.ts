@@ -2,6 +2,7 @@ import { getScopedClient } from "@/lib/db/scoped-client";
 import type { Database } from "@/lib/db/types";
 import { ROLES, hasRole, type Role } from "@/lib/auth/roles";
 import { ReadableError } from "@/lib/ui/readable-error";
+import { OWNER_ROW_CHECK_FAILED, OWNER_ROW_NEEDS_OWNER } from "@/lib/ui/words";
 
 
 export type Stage = Database["public"]["Tables"]["crm_stage"]["Row"];
@@ -37,7 +38,7 @@ function isRole(value: unknown): value is Role {
  * Re-checked on every call — never cache a prior result across actions.
  */
 export async function requireSettingsAdminRole(supabase: ScopedClient): Promise<Role> {
-  const { data, error } = await supabase.rpc("current_org_role");
+  const { data, error } = await supabase.rpc("current_org_role", undefined, { get: true });
   if (error) throw error;
   if (!isRole(data) || !SETTINGS_ADMIN_ROLES.includes(data)) {
     throw new ReadableError("You don't have permission to change firm settings.");
@@ -45,9 +46,29 @@ export async function requireSettingsAdminRole(supabase: ScopedClient): Promise<
   return data;
 }
 
+/**
+ * Touching an OWNER row (removing an owner, re-roling an owner, or making someone owner) needs a real OWNER membership row of the caller
+ * in the active firm, not just an owner role claim. Lectual staff acting inside a firm (0050 platform admins) carry an owner claim but no
+ * crm_org_member row; the lectual 0116 proposal refuses their write at the database, and this check refuses it FIRST, so removeMember
+ * never signs an owner out of every session before a delete that would then be refused. Reads the caller's own row through the scoped
+ * client (`user_id` = the session user; RLS keeps it to the active org). No row, another role, or a failed read: refused, fixed sentence.
+ */
+export async function assertCallerIsOwnerMember(supabase: ScopedClient, callerUserId: string | null | undefined): Promise<void> {
+  if (!callerUserId) throw new ReadableError(OWNER_ROW_NEEDS_OWNER);
+  let role: unknown;
+  try {
+    const { data, error } = await supabase.from("crm_org_member").select("role").eq("user_id", callerUserId).maybeSingle();
+    if (error) throw error;
+    role = (data as { role?: unknown } | null)?.role;
+  } catch {
+    throw new ReadableError(OWNER_ROW_CHECK_FAILED);
+  }
+  if (role !== "owner") throw new ReadableError(OWNER_ROW_NEEDS_OWNER);
+}
+
 /** Resolves the caller's active org id via the `current_org_id()` RPC. */
 export async function currentOrgId(supabase: ScopedClient): Promise<string> {
-  const { data, error } = await supabase.rpc("current_org_id");
+  const { data, error } = await supabase.rpc("current_org_id", undefined, { get: true });
   if (error) throw error;
   if (!data) throw new ReadableError("No active organization for the current session.");
   return data;
@@ -323,6 +344,11 @@ export async function setMemberRole(userId: string, role: Role): Promise<OrgMemb
         targetCurrentRole ?? "that member"
       }).`,
     );
+  }
+
+  // b2) An owner row (the target is an owner, or would become one) needs the caller's own OWNER membership row, not just the claim.
+  if (targetCurrentRole === "owner" || role === "owner") {
+    await assertCallerIsOwnerMember(supabase, user?.id);
   }
 
   // c) Last-owner guard — never let the org drop to zero owners.

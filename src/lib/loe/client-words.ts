@@ -89,3 +89,30 @@ export const PDF_MESSAGES = {
   details: "Please fill in your full legal name and your full mailing address first: street, city, state, ZIP code and country.",
   not_signed: "There is no signed letter to download.",
 } as const;
+
+/* ── Payment terms ("Due today") and flat-fee work sections (both kinds of proposal) ───────────────────────────────────
+ * Labels for figures only: what part of the fee is due when, and the headings of the fee table. They describe amounts the
+ * page already shows; they say nothing about what accepting means. Used with or without an engagement letter.
+ */
+
+/** The total line's label when the legal fee is paid in two parts (trademark proposal). */
+export const LEGAL_FEE_TOTAL_LABEL = "Legal fee";
+/** The total line's label when the flat fee is paid in two parts (flat-fee proposal). */
+export const FLAT_FEE_TOTAL_LABEL = "Flat fee";
+/** Under the total line when it is paid in two parts. */
+export const PAID_IN_TWO_PARTS = "Total, paid in two parts";
+/** "Due today (50%)". */
+export const dueTodayLabel = (pct: number): string => `Due today (${pct}%)`;
+/** Under "Due today": the amount to enter in the payment form. */
+export const DUE_TODAY_NOTE = "The amount to pay now";
+/** "Balance (50%) due upon delivery of the agreements" / "Balance (50%) due later". */
+export const balanceLabel = (pct: number, note?: string | null): string => `Balance (${pct}%) due ${note?.trim() || "later"}`;
+/** The phone bar's label when part of the fee is due today. */
+export const DUE_TODAY_BAR = "Due today";
+/** Beside the pay button after acceptance: "Pay $1,732.50 today". */
+export const payTodayLine = (amount: string): string => `Pay ${amount} today`;
+
+/** Flat-fee work shown as numbered sections: the fee table under them (one or more pieces of work). */
+export const FEE_SUMMARY_HEADING = "Legal Fee Summary";
+export const FEE_SUMMARY_COLUMNS = ["Scope of Services", "Estimated Hours", "Legal Fees"] as const;
+export const FEE_SUMMARY_TOTAL = "Total";

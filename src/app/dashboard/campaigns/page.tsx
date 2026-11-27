@@ -1,10 +1,12 @@
 import Link from "next/link";
-import { currentRole } from "@/lib/auth/current-role";
+import { viewerRole } from "@/lib/views/view-as";
 import { AUTOMATION_ADMIN_ROLES, listEnrollments, listSequences, type DripSequence } from "@/lib/automation";
 import { loadActiveQueue } from "@/lib/queue/load";
 import { sequenceStatusLabel, sequenceStatusTone } from "@/lib/campaigns/steps";
 import { relativeTime } from "@/lib/relative-time";
-import { NewSequenceForm } from "./_components/CampaignForms";
+import { NewCampaignButton } from "./_components/CampaignForms";
+import { EmptyState, LoadFailedCard, PageHeader, SheetCard, SheetScroll, SheetTable } from "@/components/ui";
+import { getFirmTimeZone } from "@/lib/org/profile";
 import "./campaigns.css";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
@@ -37,7 +39,7 @@ export const dynamic = "force-dynamic";
  * the gate (AGENTS.md).
  */
 export default async function CampaignsPage() {
-  const role = await currentRole();
+  const role = await viewerRole();
   const canManage = role !== null && AUTOMATION_ADMIN_ROLES.includes(role);
 
   let sequences: DripSequence[] = [];
@@ -58,25 +60,25 @@ export default async function CampaignsPage() {
     loadError = campaignLoadError("list", err);
   }
 
+  const tz = await getFirmTimeZone();
   const queue = await loadActiveQueue();
   const campaignDrafts = queue.status === "ok" ? queue.items.filter((item) => item.agent === "campaign").length : null;
   const activeSequences = sequences.filter((s) => s.active).length;
 
   return (
     <>
-      <div className="lx-page-head">
-        <div style={{ flex: 1, minWidth: 260 }}>
-          <div className="lx-label">Nurture &amp; follow-up</div>
-          <h1 className="lx-h1">Campaigns</h1>
-          <p className="lx-sub">
-            Campaigns for leads who haven&apos;t signed yet, and for existing clients. Every email step drafts into
-            the approval queue from the firm&apos;s own templates — nothing sends until a person approves it.
-          </p>
-        </div>
-        <Link href="/dashboard/campaigns/templates/" className="lx-btn lx-btn-sec">
-          Email templates
-        </Link>
-      </div>
+      <PageHeader
+        title="Campaigns"
+        sub="Campaigns for leads who haven't signed yet, and for existing clients. Every email step drafts into the approval queue from the firm's own templates — nothing sends until a person approves it."
+        actions={
+          <>
+            {canManage && <NewCampaignButton />}
+            <Link href="/dashboard/campaigns/templates/" className="lx-btn lx-btn-sec">
+              Email templates
+            </Link>
+          </>
+        }
+      />
 
       <div className="lx-kpis lx-kpis-compact">
         <div className="lx-card lx-kpi">
@@ -99,63 +101,46 @@ export default async function CampaignsPage() {
         </Link>
       </div>
 
-      {canManage && (
-        <details className="lx-card lx-disclosure">
-          <summary>New campaign</summary>
-          <NewSequenceForm />
-        </details>
-      )}
-
       {loadError ? (
-        <div className="lx-card lx-empty-card">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            Campaigns couldn&apos;t be loaded
-          </h2>
-          <p className="lx-note" style={{ margin: 0 }}>
-            {loadError}
-          </p>
-        </div>
+        <LoadFailedCard what="campaigns" body={loadError} />
       ) : sequences.length === 0 ? (
-        <div className="lx-card lx-empty-card">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            No campaigns yet
-          </h2>
-          <p className="lx-note" style={{ margin: 0 }}>
-            {canManage ? "Create one above — it starts with no steps until you add them." : "Ask a firm admin to set one up."}
-          </p>
-        </div>
+        <EmptyState title="No campaigns yet">
+          {canManage ? "Create one with New campaign — it starts with no steps until you add them." : "Ask a firm admin to set one up."}
+        </EmptyState>
       ) : (
-        <div className="lx-card" style={{ overflow: "auto" }}>
-          <table className="lx-tbl" style={{ minWidth: 640 }}>
-            <thead>
-              <tr>
-                <th>Campaign</th>
-                <th>Status</th>
-                <th style={{ textAlign: "right" }}>Enrolled</th>
-                <th>Updated</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sequences.map((sequence) => (
-                <tr key={sequence.id}>
-                  <td className="pri wrap">
-                    <Link href={`/dashboard/campaigns/${sequence.id}/`} className="lx-rowlink">
-                      {sequence.name}
-                    </Link>
-                    {sequence.description && <div className="lx-note">{sequence.description}</div>}
-                  </td>
-                  <td>
-                    <span className={`lx-pill ${sequenceStatusTone(sequence.active)}`}>{sequenceStatusLabel(sequence.active)}</span>
-                  </td>
-                  <td className="lx-num" style={{ textAlign: "right" }}>
-                    {activeEnrolledBySequence.get(sequence.id) ?? 0}
-                  </td>
-                  <td className="lx-num">{relativeTime(sequence.updated_at)}</td>
+        <SheetCard>
+          <SheetScroll>
+            <SheetTable minWidth={640}>
+              <thead>
+                <tr>
+                  <th>Campaign</th>
+                  <th>Status</th>
+                  <th className="num">Enrolled</th>
+                  <th>Updated</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {sequences.map((sequence) => (
+                  <tr key={sequence.id}>
+                    <td className="pri wrap">
+                      <Link href={`/dashboard/campaigns/${sequence.id}/`} className="lx-rowlink">
+                        {sequence.name}
+                      </Link>
+                      {sequence.description && <div className="lx-note">{sequence.description}</div>}
+                    </td>
+                    <td data-label="Status">
+                      <span className={`lx-pill ${sequenceStatusTone(sequence.active)}`}>{sequenceStatusLabel(sequence.active)}</span>
+                    </td>
+                    <td className="num" data-label="Enrolled">
+                      {activeEnrolledBySequence.get(sequence.id) ?? 0}
+                    </td>
+                    <td data-label="Updated">{relativeTime(sequence.updated_at, undefined, tz)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </SheetTable>
+          </SheetScroll>
+        </SheetCard>
       )}
 
       <p className="lx-upl">

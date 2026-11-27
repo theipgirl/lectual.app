@@ -33,3 +33,22 @@ export function waitingOnPerson(rows: readonly ReviewRow[], personId: string): R
     .filter((r) => r.nextStep?.assigneeId === personId || r.waiting === "approval")
     .sort((a, b) => a.client.localeCompare(b.client, "en") || a.key.localeCompare(b.key));
 }
+
+/** One open deadline in the Deadlines strip: the row it belongs to, its title, date, and whether an attorney confirmed it. */
+export type DeadlineOut = { row: ReviewRow; id: string; title: string; dueDate: string; confirmed: boolean; text: string; overdue: boolean };
+
+/**
+ * Every open deadline in the rows the page shows (so Whose / kind / search narrow it too), soonest first. Pure.
+ * Rows whose deadlines were not read carry no `openDeadlines` and add nothing; the page says the read failed.
+ */
+export function deadlinesOut(rows: readonly ReviewRow[], today: string): DeadlineOut[] {
+  const out: DeadlineOut[] = [];
+  for (const row of rows) {
+    for (const d of row.openDeadlines ?? []) {
+      const overdue = d.dueDate < today;
+      const text = d.dueDate === today ? "Due today" : overdue ? `Overdue ${shortDate(d.dueDate, today)}` : `Due ${shortDate(d.dueDate, today)}`;
+      out.push({ row, id: d.id, title: d.title, dueDate: d.dueDate, confirmed: d.confirmed, text, overdue });
+    }
+  }
+  return out.sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.row.client.localeCompare(b.row.client, "en") || a.id.localeCompare(b.id));
+}

@@ -7,6 +7,9 @@
  * client (those were never stored). Pure, so the shaping is tested.
  */
 
+import { civilDay, formatDay, formatTime } from "@/lib/ui/dates";
+import { DEFAULT_TIME_ZONE } from "@/lib/org/profile-rules";
+
 export type MailActivity = {
   id: string;
   type: string;
@@ -75,11 +78,15 @@ export function safeMailLink(link: string | null): string | null {
 
 export type MailGroup = { key: string; label: string; rows: MailRow[] };
 
-/** Today / Yesterday / Earlier this week / Earlier, as in the design. Local civil days. */
-export function groupMailByDay(rows: readonly MailRow[], now: Date = new Date()): MailGroup[] {
-  const startOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-  const today = startOf(now);
-  const DAY = 86_400_000;
+/** Whole days since the epoch of a civil "YYYY-MM-DD" day. */
+function dayNumber(civil: string): number {
+  const [y, m, d] = civil.split("-").map(Number);
+  return Math.floor(Date.UTC(y, m - 1, d) / 86_400_000);
+}
+
+/** Today / Yesterday / Earlier this week / Earlier, as in the design. Civil days in the FIRM's zone. */
+export function groupMailByDay(rows: readonly MailRow[], now: Date = new Date(), tz: string = DEFAULT_TIME_ZONE): MailGroup[] {
+  const today = dayNumber(civilDay(now, tz) ?? "1970-01-01");
   const groups: MailGroup[] = [
     { key: "today", label: "Today", rows: [] },
     { key: "yesterday", label: "Yesterday", rows: [] },
@@ -87,19 +94,17 @@ export function groupMailByDay(rows: readonly MailRow[], now: Date = new Date())
     { key: "earlier", label: "Earlier", rows: [] },
   ];
   for (const r of rows) {
-    const t = Date.parse(r.at);
-    const i = t >= today ? 0 : t >= today - DAY ? 1 : t >= today - 6 * DAY ? 2 : 3;
+    const civil = civilDay(r.at, tz);
+    const age = civil ? today - dayNumber(civil) : Number.POSITIVE_INFINITY;
+    const i = age <= 0 ? 0 : age === 1 ? 1 : age <= 6 ? 2 : 3;
     groups[i].rows.push(r);
   }
   return groups.filter((g) => g.rows.length > 0);
 }
 
-/** The time label on a row: a clock time today, a weekday this week, else a date. */
-export function mailTime(iso: string, now: Date = new Date()): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const sameDay = d.toDateString() === now.toDateString();
-  if (sameDay) return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  if (now.getTime() - d.getTime() < 6 * 86_400_000) return d.toLocaleDateString("en-US", { weekday: "short" });
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+/** The time label on a row: a clock time today, else a date ("Nov 16"), in the firm's zone. */
+export function mailTime(iso: string, now: Date = new Date(), tz: string = DEFAULT_TIME_ZONE): string {
+  if (Number.isNaN(Date.parse(iso))) return "";
+  if (civilDay(iso, tz) === civilDay(now, tz)) return formatTime(iso, { tz }) ?? "";
+  return formatDay(iso, { tz, now }) ?? "";
 }

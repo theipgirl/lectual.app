@@ -16,6 +16,9 @@ import { LeadWriteError, forbiddenLeadWrite } from "./errors";
 import { usableEvidenceDate } from "./evidence-date";
 import { newEnquiryStage } from "./new-enquiry";
 import { notifyAssigned } from "@/lib/notifications/producers";
+import { leadRead } from "@/lib/leads/live";
+import { scheduleConsultPrepOnEntry } from "@/lib/consult-prep/hook";
+import { withRoleFallback } from "@/lib/stages/roles";
 
 export type Lead = Database["public"]["Tables"]["crm_lead"]["Row"];
 
@@ -78,7 +81,7 @@ type ScopedClient = Awaited<ReturnType<typeof getScopedClient>>;
  * revoked between two requests must take effect on the very next one.
  */
 export async function resolveCurrentRole(supabase: ScopedClient): Promise<Role> {
-  const { data, error } = await supabase.rpc("current_org_role");
+  const { data, error } = await supabase.rpc("current_org_role", undefined, { get: true });
   if (error) throw error;
   if (!isRole(data)) {
     throw new LeadWriteError("Forbidden: no resolvable role for the active org", {
@@ -109,27 +112,30 @@ function inputError(fieldErrors: LeadFieldErrors): LeadWriteError {
  */
 export async function listLeads(filter: LeadFilter = {}): Promise<Lead[]> {
   const supabase = await getScopedClient();
-  let query = supabase.from("crm_lead").select("*");
+  // A merged lead (lectual 0107) is never listed: src/lib/leads/live.ts.
+  const { data, error } = await leadRead(({ live }) => {
+    let query = live(supabase.from("crm_lead").select("*"));
 
-  if (filter.stageId) {
-    query = query.eq("current_stage_id", filter.stageId);
-  }
-  if (filter.assignedTo) {
-    query = query.eq("assigned_to", filter.assignedTo);
-  }
-  if (filter.search) {
-    const term = filter.search.trim();
-    if (term) {
-      const like = `%${term}%`;
-      query = query.or(
-        `first_name.ilike.${like},last_name.ilike.${like},email.ilike.${like},business_name.ilike.${like}`,
-      );
+    if (filter.stageId) {
+      query = query.eq("current_stage_id", filter.stageId);
     }
-  }
+    if (filter.assignedTo) {
+      query = query.eq("assigned_to", filter.assignedTo);
+    }
+    if (filter.search) {
+      const term = filter.search.trim();
+      if (term) {
+        const like = `%${term}%`;
+        query = query.or(
+          `first_name.ilike.${like},last_name.ilike.${like},email.ilike.${like},business_name.ilike.${like}`,
+        );
+      }
+    }
 
-  const { data, error } = await query.order("last_activity_at", {
-    ascending: false,
-    nullsFirst: false,
+    return query.order("last_activity_at", {
+      ascending: false,
+      nullsFirst: false,
+    });
   });
   if (error) throw error;
   return data ?? [];
@@ -139,6 +145,7 @@ export async function listLeads(filter: LeadFilter = {}): Promise<Lead[]> {
 export async function getLead(id: string): Promise<Lead | null> {
   const supabase = await getScopedClient();
   const { data, error } = await supabase
+    // live-guard: getLead reads by id so the lead page can redirect a merged lead; updateLead / moveLeadStage / assignLead write by id and a merged lead's guard refusal is shown as LEAD_MERGED_WRITE (friendlyLeadWriteError / friendlyMoveStageError)
     .from("crm_lead")
     .select("*")
     .eq("id", id)
@@ -176,7 +183,7 @@ export async function createLead(input: CreateLeadInput): Promise<Lead> {
   // org_id is the caller's active org, never taken from the input. RLS's
   // WITH CHECK requires it to equal current_org_id() anyway, so this is the
   // single source of truth for the new lead's tenant.
-  const { data: orgId, error: orgError } = await supabase.rpc("current_org_id");
+  const { data: orgId, error: orgError } = await supabase.rpc("current_org_id", undefined, { get: true });
   if (orgError) throw orgError;
   if (!orgId) throw new LeadWriteError("No active organization for the current session.");
 
@@ -185,12 +192,15 @@ export async function createLead(input: CreateLeadInput): Promise<Lead> {
     // RLS already scopes crm_stage to the active org. A lead with no stage given goes to the firm's new-enquiry
     // stage ("Potential New Client" and friends, else the first open stage in pipeline order), never to
     // whichever stage happens to sort first: that was "Follow-Up" for RPB.
-    const { data: stageRows, error: stageError } = await supabase
-      .from("crm_stage")
-      .select("id, name, category, order_index")
-      .order("order_index", { ascending: true });
+    // `role` (lectual 0119) is read when the database has it: the stage holding `new_enquiry` wins over the names.
+    const { data: stageRows, error: stageError } = await withRoleFallback((r) =>
+      supabase
+        .from("crm_stage")
+        .select(r ? "id, name, category, order_index, role" : "id, name, category, order_index")
+        .order("order_index", { ascending: true }),
+    );
     if (stageError) throw stageError;
-    const enquiry = newEnquiryStage(Array.isArray(stageRows) ? stageRows : []);
+    const enquiry = newEnquiryStage(Array.isArray(stageRows) ? (stageRows as unknown as Array<{ id: string; name: string; category: string; order_index: number; role?: string | null }>) : []);
     if (!enquiry) {
       throw new LeadWriteError(
         "This firm has no pipeline stages yet — an owner or admin needs to set them up in Settings first.",
@@ -261,6 +271,7 @@ export async function updateLead(id: string, input: UpdateLeadInput): Promise<Le
   if (!validated.ok) throw inputError(validated.fieldErrors);
 
   const { data: before, error: beforeError } = await supabase
+    // live-guard: getLead reads by id so the lead page can redirect a merged lead; updateLead / moveLeadStage / assignLead write by id and a merged lead's guard refusal is shown as LEAD_MERGED_WRITE (friendlyLeadWriteError / friendlyMoveStageError)
     .from("crm_lead")
     .select("first_name, last_name, email, phone, business_name, website")
     .eq("id", id)
@@ -277,6 +288,7 @@ export async function updateLead(id: string, input: UpdateLeadInput): Promise<Le
 
   const now = new Date().toISOString();
   const { data, error } = await supabase
+    // live-guard: getLead reads by id so the lead page can redirect a merged lead; updateLead / moveLeadStage / assignLead write by id and a merged lead's guard refusal is shown as LEAD_MERGED_WRITE (friendlyLeadWriteError / friendlyMoveStageError)
     .from("crm_lead")
     .update({ ...validated.value, updated_at: now, last_activity_at: now })
     .eq("id", id)
@@ -324,6 +336,7 @@ export async function moveLeadStage(
   // Captured before the update so the audit row can name where the lead came
   // from. Best-effort: a missing prior stage id must not block the move.
   const { data: before } = await supabase
+    // live-guard: getLead reads by id so the lead page can redirect a merged lead; updateLead / moveLeadStage / assignLead write by id and a merged lead's guard refusal is shown as LEAD_MERGED_WRITE (friendlyLeadWriteError / friendlyMoveStageError)
     .from("crm_lead")
     .select("current_stage_id")
     .eq("id", id)
@@ -333,6 +346,7 @@ export async function moveLeadStage(
   const now = new Date().toISOString();
   const enteredAt = usableEvidenceDate(evidenceAt, Date.parse(now));
   const { data, error } = await supabase
+    // live-guard: getLead reads by id so the lead page can redirect a merged lead; updateLead / moveLeadStage / assignLead write by id and a merged lead's guard refusal is shown as LEAD_MERGED_WRITE (friendlyLeadWriteError / friendlyMoveStageError)
     .from("crm_lead")
     .update({
       current_stage_id: stageId,
@@ -403,6 +417,14 @@ export async function moveLeadStage(
     // swallow: the stage move already succeeded.
   }
 
+  // Automatic consult prep (lectual.app only): a lead entering the firm's consult stage is prepped, after the response.
+  // The hook decides whether this IS the consult stage; it never throws into, delays or changes the move.
+  try {
+    scheduleConsultPrepOnEntry({ leadId: id, toStageId: stageId });
+  } catch {
+    // swallow: the stage move already succeeded.
+  }
+
   return data;
 }
 
@@ -431,6 +453,7 @@ export async function assignLead(id: string, userId: string | null): Promise<Lea
   const supabase = await getScopedClient();
 
   const { data: before } = await supabase
+    // live-guard: getLead reads by id so the lead page can redirect a merged lead; updateLead / moveLeadStage / assignLead write by id and a merged lead's guard refusal is shown as LEAD_MERGED_WRITE (friendlyLeadWriteError / friendlyMoveStageError)
     .from("crm_lead")
     .select("assigned_to")
     .eq("id", id)
@@ -438,6 +461,7 @@ export async function assignLead(id: string, userId: string | null): Promise<Lea
   const fromUserId = before?.assigned_to ?? null;
 
   const { data, error } = await supabase
+    // live-guard: getLead reads by id so the lead page can redirect a merged lead; updateLead / moveLeadStage / assignLead write by id and a merged lead's guard refusal is shown as LEAD_MERGED_WRITE (friendlyLeadWriteError / friendlyMoveStageError)
     .from("crm_lead")
     .update({ assigned_to: userId })
     .eq("id", id)

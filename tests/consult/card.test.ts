@@ -11,6 +11,7 @@ import { MemDb, type Row } from "./memdb";
  * a role that cannot write gets no form.
  */
 
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
 const h = vi.hoisted(() => ({ db: null as unknown }));
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));

@@ -3,10 +3,10 @@ import type { Availability } from "@/lib/reconcile/availability";
 /** What the screen does, in plain words, plus each source's availability when it can be known before an upload. */
 export function Explanation({ availability }: { availability: Availability }) {
   return (
-    <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }} aria-label="How this works">
+    <section className="lx-card rc-panel" aria-label="How this works">
       <div>
         <div className="lx-label">Before you start</div>
-        <h2 className="lx-h2" style={{ fontSize: 23 }}>
+        <h2 className="lx-h2">
           Compare the sheet with the app
         </h2>
       </div>

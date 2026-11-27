@@ -9,15 +9,15 @@ vi.mock("next/font/google", () => ({
 import { ProposalDocument, type ProposalDocumentProps } from "@/components/client-proposal/ProposalDocument";
 import { defaultSelection, quoteProposal } from "@/lib/proposals/pricing";
 import type { ProposalContent } from "@/lib/proposals/types";
-import { sevetriCustom } from "../proposals/sevetri-custom-fixture";
-import { danielle } from "../proposals/danielle-fixture";
+import { callumCustom } from "../proposals/callum-custom-fixture";
+import { renata } from "../proposals/renata-fixture";
 
 function render(over: Partial<ProposalDocumentProps> = {}) {
   return renderToStaticMarkup(
     <ProposalDocument
-      content={sevetriCustom()}
+      content={callumCustom()}
       title="Trademark Proposal"
-      clientName="Sevetri Wilson"
+      clientName="Callum Ferreira"
       expiresOn={null}
       firm={{ name: "Hartwell", slug: "hartwell" }}
       mode="live"
@@ -48,7 +48,7 @@ describe("custom discount on the client page", () => {
   });
 
   it("the receipt (accepted) shows the same discount line", () => {
-    const c = sevetriCustom();
+    const c = callumCustom();
     const sel = defaultSelection(c);
     const html = render({ mode: "accepted", initialSelection: sel, content: c, acceptedQuote: quoteProposal(c, sel), payUrl: "https://example.com/pay" });
     expect(html).toContain('<div class="cp-ln cp-custom-off"><span class="cp-l">Custom proposal discount</span><span class="cp-r cp-num">−$1,485</span></div>');
@@ -56,7 +56,7 @@ describe("custom discount on the client page", () => {
   });
 
   it("Essential or Enhanced: no discount line at all", () => {
-    const c = sevetriCustom();
+    const c = callumCustom();
     const picks: Record<string, string> = {};
     for (const n of c.names) for (const m of n.marks) picks[m.id] = "Enhanced";
     const html = render({ initialSelection: { ...defaultSelection(c), packages: picks } });
@@ -65,7 +65,7 @@ describe("custom discount on the client page", () => {
   });
 
   it("a brand-name-level package (Spec 6) shows the discount line under its package line", () => {
-    const d = danielle();
+    const d = renata();
     const c: ProposalContent = {
       ...d,
       packages: (d.packages ?? []).map((p) => (p.package === "Concierge" ? { ...p, custom_discount: { label: "Custom proposal discount", per_class_under_cents: 82_500 } } : p)),

@@ -33,6 +33,17 @@ const fieldSchemas = {
   // "Send feedback" (src/lib/feedback/submit.ts). Unset TO = "Feedback isn't set up yet." and nothing is sent.
   FEEDBACK_TO: z.string().optional(),
   FEEDBACK_FROM: z.string().optional(),
+  // Automatic consult prep (src/lib/consult-prep/). The sender of the internal brief emails: an address on a domain verified on
+  // RESEND_API_KEY's account. Unset (or no RESEND_API_KEY) = no email; the brief is still kept in Lectual.
+  CONSULT_PREP_FROM: z.string().optional(),
+  // S2c. Where replies to a consult prep email go (a bare firm address, e.g. info@yourfirm.com; the sender may not be a real mailbox).
+  // Anything that is not a bare address is ignored, and it is put on an email only when it is on the sender's domain or a recipient's
+  // (src/lib/consult-prep/recipients.ts guardReplyTo). Unset = no reply-to.
+  CONSULT_PREP_REPLY_TO: z.string().optional(),
+  // S2c. The moment lawmatics-mcp's own pre-consult brief was switched off: a full ISO instant WITH a zone (2026-12-01T15:30:00-05:00).
+  // Lectual then sends nothing for a consult lawmatics-mcp may already have scheduled a brief for (src/lib/consult-prep/cutover.ts).
+  // Unset or anything else = no cutover rule.
+  CONSULT_PREP_CUTOVER_AT: z.string().optional(),
   // Model for the matters copilot (src/lib/ai/claude.ts copilotModel()). Unset = claude-sonnet-5.
   COPILOT_MODEL: z.string().optional(),
   // Mailbox OAuth (step 3). Optional until that step lands.
@@ -63,6 +74,9 @@ const fieldSchemas = {
   WORKSHEET_REPLY_TO: z.string().optional(),
   WORKSHEET_ALLOWED_ORIGINS: z.string().optional(),
   WORKSHEET_LAWMATICS_SYNC: z.string().optional(),
+  // USPTO TSDR status reader (src/lib/uspto/). One deployment-wide key from the USPTO API Key Manager, sent in the
+  // USPTO-API-KEY header. Read ONLY by src/lib/uspto/config.ts. Unset = "not-set-up". Never logged.
+  USPTO_TSDR_API_KEY: z.string().optional(),
   // LawPay (AffiniPay) partner OAuth app — docs/lawpay-setup.md. All optional:
   // unset = "Connect LawPay" is disabled with an explanation, and payments are
   // recorded manually. The firm signs in to ITS OWN LawPay account; there is

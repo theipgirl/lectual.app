@@ -46,7 +46,7 @@ describe("parent rows open the list (F2)", () => {
     Object.fromEntries(railGroups(visibleNav(modules, "owner"), "/dashboard/").flat().filter((e) => e.kids.length).map((e) => [e.label, e.href]));
 
   it("Intake, Active matters and AI tools open their lists; Communication opens Mail with the mailbox module, else Meetings", () => {
-    expect(parents(["mailbox"])).toEqual({ Communication: "/dashboard/mail/", Intake: "/dashboard/intake/", "Active matters": "/dashboard/matters/", "AI tools": "/dashboard/copilot/" });
+    expect(parents(["mailbox"])).toEqual({ Communication: "/dashboard/mail/", Intake: "/dashboard/intake/?view=table", "Active matters": "/dashboard/matters/?view=table", "AI tools": "/dashboard/copilot/" });
     expect(parents([]).Communication).toBe("/dashboard/meetings/");
   });
 
@@ -110,14 +110,15 @@ describe("one sign-out and avatar block (F4)", () => {
   it("the rail has no me block and no sign-out", () => {
     const src = read("src/components/shell/Rail.tsx");
     expect(src).not.toContain("signOutAction");
+    expect(src).not.toContain("SIGN_OUT_PATH");
     expect(src).not.toContain("lx-rail-me");
     expect(src).not.toContain("lx-rail-avatar");
     expect(read("src/app/globals.css")).not.toContain("lx-rail-me");
   });
 
-  it("signOutAction is used by exactly one shell component, the account menu", () => {
+  it("sign-out (now the fixed route /auth/sign-out/, View as) is used by exactly one shell component, the account menu", () => {
     // NoFirmAccess is the screen for a signed-in person with no firm: there is no account menu there, so it keeps its own button.
     const files = ["Rail", "MobileBar", "AccountMenu", "SectionLabel", "NavProgress"].map((n) => [n, read(`src/components/shell/${n}.tsx`)] as const);
-    expect(files.filter(([, s]) => s.includes("signOutAction")).map(([n]) => n)).toEqual(["AccountMenu"]);
+    expect(files.filter(([, s]) => s.includes("SIGN_OUT_PATH")).map(([n]) => n)).toEqual(["AccountMenu"]);
   });
 });

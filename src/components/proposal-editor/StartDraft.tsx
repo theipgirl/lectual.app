@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { createProposalAction } from "@/app/dashboard/proposals/actions";
 import { ActionForm, Outcome } from "./ActionForm";
+import { SAVING, OPTIONAL } from "@/lib/ui/words";
 
 /** The proposal type the draft is made as. `general` = a contract or other matter at a flat fee. */
 type Kind = "trademark" | "general";
@@ -21,7 +22,7 @@ export function StartDraftRow({ recordKind, id, name, secondary, type }: { recor
           <button type="submit" className="pe-who-row pe-start-row" disabled={pending} data-start-row>
             <span className="pe-who-name">{name}</span>
             {secondary && <span className="pe-who-sub">{secondary}</span>}
-            <span className="pe-who-mark">{pending ? "Creating…" : "Create draft"}</span>
+            <span className="pe-who-mark">{pending ? SAVING : "Create draft"}</span>
           </button>
           <Outcome state={state} pending={pending} />
         </>
@@ -47,17 +48,17 @@ export function StartBlankForm({ type }: { type: Kind }) {
               <input className="lx-input" name="firstName" maxLength={120} />
             </label>
             <label className="lx-field">
-              <span className="lx-label">Company (optional)</span>
+              <span className="lx-label">Company<span className="lx-optional"> {OPTIONAL}</span></span>
               <input className="lx-input" name="company" maxLength={200} />
             </label>
             <label className="lx-field">
-              <span className="lx-label">Client email (optional)</span>
+              <span className="lx-label">Client email<span className="lx-optional"> {OPTIONAL}</span></span>
               <input className="lx-input" name="clientEmail" type="email" maxLength={320} />
             </label>
           </div>
           <div className="pe-save">
             <button type="submit" className="lx-btn lx-btn-pri" disabled={pending}>
-              {pending ? "Creating…" : "Create draft"}
+              {pending ? SAVING : "Create draft"}
             </button>
             <Outcome state={state} pending={pending} />
           </div>
@@ -82,7 +83,7 @@ export function CreateDraftForm({ leadId, matterId, type, consult }: { leadId: s
           {consult}
           <div className="pe-save">
             <button type="submit" className="lx-btn lx-btn-pri" disabled={pending}>
-              {pending ? "Creating…" : "Create draft"}
+              {pending ? SAVING : "Create draft"}
             </button>
             <Outcome state={state} pending={pending} />
           </div>

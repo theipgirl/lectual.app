@@ -4,9 +4,9 @@ import { docStatus, isDocFilter, DOC_TYPE_LABEL, DOC_KIND } from "@/lib/document
 describe("documents list helpers", () => {
   it("never shows a queued letter as sent or done", () => {
     expect(docStatus("queued").label).toBe("Waiting on approval");
-    expect(docStatus("generated").tone).toBe("lx-pill-ok");
-    expect(docStatus("failed").tone).toBe("lx-pill-risk");
-    expect(docStatus("mystery")).toEqual({ label: "mystery", tone: "lx-pill-mute" });
+    expect(docStatus("generated").tone).toBe("ok");
+    expect(docStatus("failed").tone).toBe("risk");
+    expect(docStatus("mystery")).toEqual({ label: "mystery", tone: "mute" });
   });
   it("labels every doc_type 0045 allows", () => {
     for (const t of ["opinion_letter", "loe_trademark_current", "loe_trademark_legacy", "loe_general"]) {

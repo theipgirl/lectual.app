@@ -1,10 +1,16 @@
+import Link from "next/link";
+import { cardRecipient } from "@/lib/queue/shown-recipient";
+import { Notice } from "@/components/ui/Notice";
 import { notFound } from "next/navigation";
 import { orgHasModule } from "@/lib/org/modules";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { loadActiveQueue } from "@/lib/queue/load";
 import { loadApprovalRouting } from "@/lib/queue/routing-load";
 import { loadCardState } from "@/lib/queue/card-state";
+import { loadReadyToDraft } from "@/lib/queue/ready-load";
+import { READY_TO_DRAFT_UNCHECKED, readyToDraftCount } from "@/lib/ui/words";
 import { loadAuditContext } from "@/lib/queue/audit-context";
+import { shownBodySha256 } from "@/lib/queue/shown-text";
 import { checkDraftStaleness, stalenessRequiresConfirm } from "@/lib/queue/stale";
 import { gateLinkedProposal } from "@/lib/consult-proposal/link";
 import { getFirmTimeZone } from "@/lib/org/profile";
@@ -45,6 +51,7 @@ import { DeckKeys } from "@/components/review/DeckKeys";
 import { agentLabel } from "@/components/queue/format";
 import { outcomeOf } from "@/lib/queue/done";
 import {
+  BLANK,
   DECK_BADGE_INTERNAL,
   DECK_BADGE_REVIEW,
   DECK_BADGE_YES,
@@ -74,7 +81,7 @@ import {
   DECK_DEALT_NOW,
   DECK_DECIDED_UNREAD,
   DECK_EVENTS_UNREAD,
-  DECK_NOTHING_HERE,
+  DECK_BOARD_EMPTY,
   DECK_TAG_INTERNAL,
   NOT_SWITCHED_ON,
   dealHeader,
@@ -135,7 +142,7 @@ const roleName = (m: MemberIdentity) => `${memberName(m)} · ${roleLabel(m.role)
 
 export async function DeckView({ searchParams, initial }: { searchParams: Promise<Search>; initial?: DeckInitial }) {
   if (!(await orgHasModule("role-views"))) notFound();
-  const session = await resolveFirmSession().catch(() => null);
+  const session = await resolveViewSession().catch(() => null);
   if (!session || session.kind !== "ok") notFound();
 
   const params = await searchParams;
@@ -192,6 +199,12 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
     loadActiveQueue("rejected"),
   ]);
   const routing = routed.status === "ok" ? routed.routing : {};
+  // Sprint 4: approved emails passed to this viewer for their own draft click (drawn only when some are ready).
+  const ready = routed.status === "ok" && routed.drafter && QUEUE_EDIT_ROLES.includes(viewer.role) && approved.status === "ok" ? await loadReadyToDraft({ viewerId: viewer.userId, trust: eventTrust(routed), approved: approved.items }) : null;
+  const readyCount = ready && ready.status === "ok" ? ready.items.length : 0;
+  // SHOULD 4: for the drafter, a failed read (the approved list or the events) is said, never drawn as nothing.
+  const readyUnchecked =
+    routed.status === "ok" && routed.drafter === viewer.userId && (approved.status === "unavailable" || ready?.status === "unavailable");
   const base = { items: load.items, routing, viewer, cardState, trust: eventTrust(routed), now, dealtAt: dealNow ? null : dealtAt(now, tz, myTimes), audit };
   const first = buildDeck(base);
   const deck: Deck = buildDeck({ ...base, flags: await closerLookFlags(first.cards.map((c) => c.item)) });
@@ -245,8 +258,18 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
     {seenMark}
     <DeckFrame {...frameProps} side={side} meta={meta} wideSub={wideSub}>
       {routed.status !== "ok" && (
-        <p role="status" className="lx-note" style={{ margin: 0 }}>
+        <Notice tone="warn" role="status">
           {DECK_ROUTING_UNREAD}
+        </Notice>
+      )}
+      {readyUnchecked && (
+        <p className="lx-note" role="status" data-ready-unchecked>
+          {READY_TO_DRAFT_UNCHECKED}
+        </p>
+      )}
+      {readyCount > 0 && (
+        <p className="lx-note" data-ready-to-draft>
+          <Link href="/dashboard/queue/?status=approved&who=ready">{readyToDraftCount(readyCount)}</Link>
         </p>
       )}
       {children}
@@ -276,8 +299,8 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
       ...deck.cards.map((c) => row(c.item, dealAt, statusOf(c))),
       ...deck.laterArrivals.map((c) => row(c.item, deal.next.label, { label: DECK_ST_NEXT_DEAL, tone: "line" })),
       ...deck.later.map((c) => row(c.item, deal.next.label, { label: DECK_COL_LATER, tone: "line" })),
-      ...deck.handedOff.map((c) => row(c.item, "—", { label: `${DECK_COL_HANDED_OFF} · ${nameOf(c.holder.userId)}`, tone: "line" })),
-      ...decided.map((i) => row(i, "—", outcomeOf(i) === "rejected" ? { label: DECK_CHIP_REJECTED, tone: "risk" } : { label: decidedChip(i), tone: "ok" })),
+      ...deck.handedOff.map((c) => row(c.item, BLANK, { label: `${DECK_COL_HANDED_OFF} · ${nameOf(c.holder.userId)}`, tone: "line" })),
+      ...decided.map((i) => row(i, BLANK, outcomeOf(i) === "rejected" ? { label: DECK_CHIP_REJECTED, tone: "risk" } : { label: decidedChip(i), tone: "ok" })),
     ];
     return frame(null, null, <DeckList rows={rows} decidedReadable={decidedReadable} />, deckListSub(waiting, deck.cards.length, deck.laterArrivals.length, dealLabel ?? deal.next.label));
   }
@@ -295,7 +318,7 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
     const columns: BoardColumn[] = [
       {
         title: DECK_COL_NEEDS_YES,
-        empty: DECK_NOTHING_HERE,
+        empty: DECK_BOARD_EMPTY,
         cards: deck.cards.map((c) => {
           const [badge, tone]: [string, BoardCard["badgeTone"]] = c.tag.kind === "internal" ? [DECK_BADGE_INTERNAL, "plain"] : c.closerLook.length > 0 && c.canYes ? [DECK_BADGE_REVIEW, "ox"] : [DECK_BADGE_YES, "warn"];
           return card(c.item, badge, tone, c.handedToMe ? `From ${nameOf(c.handedToMe.by)}` : waitingText(c.item.created_at, now));
@@ -303,19 +326,19 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
       },
       {
         title: DECK_COL_HANDED_OFF,
-        empty: DECK_NOTHING_HERE,
+        empty: DECK_BOARD_EMPTY,
         note: movesUnavailable,
         cards: deck.handedOff.map((c) => card(c.item, nameOf(c.holder.userId), "line", deckWaitingTo(nameOf(c.holder.userId), ageText(c.holder.at, now)))),
       },
       {
         title: DECK_COL_LATER,
-        empty: DECK_NOTHING_HERE,
+        empty: DECK_BOARD_EMPTY,
         note: movesUnavailable,
         cards: deck.later.map((c) => card(c.item, deal.next.label, "line", deckWaitingBack(deal.next.label))),
       },
       {
         title: DECK_COL_DECIDED,
-        empty: DECK_NOTHING_HERE,
+        empty: DECK_BOARD_EMPTY,
         note: decidedReadable ? null : DECK_DECIDED_UNREAD,
         cards: decided.map((i) => card(i, decidedChip(i), decidedTone(i) === "crit" ? "risk" : "ok", decidedSub(i, queuedLabel(i.resolved_at, now, tz)))),
       },
@@ -384,7 +407,7 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
         source={deckSource(agentLabel(card.item.agent))}
         tag={tagText(card)}
         title={card.item.headline}
-        recipient={card.item.recipient}
+        recipient={cardRecipient(card.item)}
         opening={draftOpening(card.item)}
         firstStep={card.firstStep}
         checkFirst={card.checkFirst}
@@ -402,6 +425,7 @@ export async function DeckView({ searchParams, initial }: { searchParams: Promis
         canMove={card.canYes || !!card.handedToMe}
         movesUnavailable={movesUnavailable}
         people={people}
+        shownSha256={shownBodySha256(card.item.final_body ?? card.item.draft_body)}
         review={{ initialBody: card.item.final_body ?? card.item.draft_body, canApprove: card.canYes, canEdit, audit: { type: card.item.type, ...audit } }}
         initial={initial}
       />

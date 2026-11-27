@@ -14,6 +14,7 @@ import {
   LETTER_SETUP_LINK,
   letterAttachedLabel,
 } from "@/lib/ui/words";
+import { Pill } from "@/components/ui/Pill";
 
 /** Where a firm writes and approves its letter. */
 const SETUP_HREF = "/dashboard/settings/proposals/engagement-letter/";
@@ -34,7 +35,7 @@ export function EngagementLetterSlot({ state, editable, logo }: { state: EditorL
     <section className="lx-card pe-card" id="pe-sec-letter" aria-label={LETTER_SECTION_HEADING}>
       <header className="pe-card-head pe-card-head-row">
         <div>
-          <h2 className="pe-h">{LETTER_SECTION_HEADING}</h2>
+          <h2 className="lx-h3">{LETTER_SECTION_HEADING}</h2>
           <p className="lx-note pe-hint">{LETTER_SECTION_HINT}</p>
         </div>
         <UnsavedMarker />
@@ -76,7 +77,7 @@ function Body({ state, editable, logo }: { state: EditorLetterState; editable: b
             {state.state === "on" ? (
               <>
                 <p className="pe-letter-version">
-                  <span className="lx-pill lx-pill-ok">{letterAttachedLabel(state.version)}</span>
+                  <Pill tone="ok">{letterAttachedLabel(state.version)}</Pill>
                 </p>
                 <PreviewBlock blocks={blocks} problems={problems} logo={logo} />
               </>

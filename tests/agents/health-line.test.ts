@@ -62,11 +62,11 @@ describe("F16/P2: autonomy confirm, text status labels, Run now visibility", () 
 
   it("changing autonomy asks first; only Confirm submits, and Cancel changes nothing", () => {
     expect(autonomyChangeQuestion("Intake triage", "draft", "act")).toBe("Change Intake triage from Draft to Act?");
-    const levels = controls.slice(controls.indexOf('<form action={save} className="lx-lv">'), controls.indexOf("</form>", controls.indexOf('className="lx-lv"')));
+    const levels = controls.slice(controls.indexOf('<form action={save} className="vs-switch lx-lv">'), controls.indexOf("</form>", controls.indexOf('className="vs-switch lx-lv"')));
     expect(levels).toContain("setAsking(l.k)");
     expect(levels).not.toMatch(/key=\{l\.k\}\s+type="submit"/);
     expect(levels).toMatch(/type="submit" name="autonomy" value=\{asking\}/);
-    expect(levels).toMatch(/onClick=\{\(\) => setAsking\(null\)\}>\s*Cancel/);
+    expect(levels).toMatch(/onClick=\{\(\) => setAsking\(null\)\}>\s*\{CANCEL\}/);
   });
 
   it("each status dot in the run log has a visible text label", () => {

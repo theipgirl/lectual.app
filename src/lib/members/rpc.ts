@@ -30,9 +30,10 @@ export async function callMemberRpc<T>(
   args?: Record<string, unknown>,
 ): Promise<RpcResult<T>> {
   const untyped = supabase as unknown as {
-    rpc: (name: string, params?: Record<string, unknown>) => PromiseLike<RpcResult<T>>;
+    rpc: (name: string, params?: Record<string, unknown>, options?: { get?: boolean }) => PromiseLike<RpcResult<T>>;
   };
-  return untyped.rpc(fn, args);
+  // The directory is a read (STABLE): called as GET, so it passes View as's database net (spec Layer b). The other two stay POST.
+  return fn === "org_member_directory" ? untyped.rpc(fn, args, { get: true }) : untyped.rpc(fn, args);
 }
 
 /**

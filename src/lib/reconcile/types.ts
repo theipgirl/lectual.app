@@ -9,6 +9,8 @@ export type StageOpt = {
   name: string;
   category: string;
   orderIndex: number;
+  /** The stage's role (lectual 0119), when the read had the column. Rules read it before the name. */
+  role?: string | null;
 };
 
 import type { Milestone } from "./milestones";
@@ -161,6 +163,11 @@ export type LeadRow = {
   sheetKey: string | null;
   lawmaticsId: string | null;
   practiceArea: string | null;
+  /**
+   * M5 (lectual 0107): the sheet keys and Lawmatics ids of leads merged into this one. A sheet row or Lawmatics record
+   * held only by a merged lead matches THIS lead (the keeper), so it is never offered as "Create lead".
+   */
+  mergedKeys?: { sheetKey: string | null; lawmaticsId: string | null }[];
 };
 
 export type SheetRowRef = { row: number; owner: string; mark: string | null; status: string };

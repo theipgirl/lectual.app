@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
 import {
   archiveServiceItem,
@@ -42,7 +43,7 @@ function signedAmount(kind: string, magnitude: number): number {
   return kind === "discount" ? -magnitude : magnitude;
 }
 
-export async function createServiceItemAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const createServiceItemAction = previewSafe(async function createServiceItemAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const { label, kind, chargeAt, description, magnitude } = readItem(formData);
   if (!label) return { error: "Enter a label." };
   if (magnitude === null || magnitude < 0) return { error: "Enter a valid price, e.g. 1250.00." };
@@ -53,9 +54,9 @@ export async function createServiceItemAction(_prev: ActionState, formData: Form
   }
   revalidatePath(LIBRARY_PATH);
   return { saved: true };
-}
+}, "state");
 
-export async function updateServiceItemAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const updateServiceItemAction = previewSafe(async function updateServiceItemAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const id = String(formData.get("id") ?? "");
   const { label, kind, chargeAt, description, magnitude } = readItem(formData);
   if (!id) return { error: "Missing service." };
@@ -68,9 +69,9 @@ export async function updateServiceItemAction(_prev: ActionState, formData: Form
   }
   revalidatePath(LIBRARY_PATH);
   return { saved: true };
-}
+}, "state");
 
-export async function archiveServiceItemAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const archiveServiceItemAction = previewSafe(async function archiveServiceItemAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const id = String(formData.get("id") ?? "");
   if (!id) return { error: "Missing service." };
   try {
@@ -80,9 +81,9 @@ export async function archiveServiceItemAction(_prev: ActionState, formData: For
   }
   revalidatePath(LIBRARY_PATH);
   return {};
-}
+}, "state");
 
-export async function restoreServiceItemAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export const restoreServiceItemAction = previewSafe(async function restoreServiceItemAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const id = String(formData.get("id") ?? "");
   if (!id) return { error: "Missing service." };
   try {
@@ -92,4 +93,4 @@ export async function restoreServiceItemAction(_prev: ActionState, formData: For
   }
   revalidatePath(LIBRARY_PATH);
   return {};
-}
+}, "state");

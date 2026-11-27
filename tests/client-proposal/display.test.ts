@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { markDisplayPrices } from "@/components/client-proposal/display";
 import { defaultSelection, quoteProposal } from "@/lib/proposals/pricing";
-import { sevetri } from "../proposals/fixture";
+import { callum } from "../proposals/fixture";
 
 describe("markDisplayPrices", () => {
   it("shows ticked marks at the quote's own prices (first full, second 20% off)", () => {
-    const content = sevetri();
+    const content = callum();
     const sel = defaultSelection(content);
     const d = markDisplayPrices(content, sel);
     const q = quoteProposal(content, sel);
@@ -20,7 +20,7 @@ describe("markDisplayPrices", () => {
   });
 
   it("prices an unticked mark as what ticking it would add", () => {
-    const content = sevetri();
+    const content = callum();
     const sel = { ...defaultSelection(content), "p-logo": false };
     const d = markDisplayPrices(content, sel);
     const withLogo = quoteProposal(content, defaultSelection(content)).names[0].marks.find((m) => m.id === "p-logo")!;
@@ -29,7 +29,7 @@ describe("markDisplayPrices", () => {
   });
 
   it("prices a brand name with no class ticked as if all its classes were, never $0", () => {
-    const content = sevetri();
+    const content = callum();
     const sel = { ...defaultSelection(content), "p-c1": false, "p-c2": false };
     const d = markDisplayPrices(content, sel);
     expect(d["p-word"].price_cents).toBeGreaterThan(0);
@@ -37,7 +37,7 @@ describe("markDisplayPrices", () => {
   });
 
   it("an untouched first mark with nothing else ticked is the base price", () => {
-    const content = sevetri();
+    const content = callum();
     const sel = { ...defaultSelection(content), "p-word": false, "p-logo": false };
     const d = markDisplayPrices(content, sel);
     expect(d["p-word"].second).toBe(false);

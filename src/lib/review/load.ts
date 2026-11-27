@@ -1,5 +1,8 @@
 import "server-only";
 import { getScopedClient } from "@/lib/db/scoped-client";
+import { countFilesByParent, countLettersByMatter } from "@/lib/files/read";
+import { leadRead } from "@/lib/leads/live";
+import { activeOrgModulesOrNull } from "@/lib/org/modules";
 import type { Database } from "@/lib/db/types";
 import { listMatters } from "@/lib/matters";
 import { listLeads, listStages } from "@/lib/pipeline";
@@ -11,9 +14,17 @@ import { matterIdsNeedingReview } from "@/app/dashboard/matters/list-utils";
 import { buildReviewRows, civilDateIn, reviewLeadStageIds, type ReviewActivityIn, type ReviewDeadlineIn, type ReviewTaskIn } from "./build";
 import type { ReviewRow } from "./buckets";
 import { CONTACT_TYPES } from "./contact";
+import { firmSendersFrom, NO_FIRM_SENDERS, type FirmSenders } from "@/lib/mailbox/firm-sender";
 import { proposalExpiryTag, type ProposalExpiryIn } from "./proposal-expiry";
+import { CHANGE_SELECT, CHANGE_TYPES, changeWindowStart, lastChangeFor, pickLastChanges, withFormNames, withoutPeople, type ChangeRowIn } from "./last-changed";
+import { DEFAULT_FEE_READS, type FeeReads } from "./fees-load";
+import { loadCustomColumns } from "@/lib/custom-columns/load";
+import type { CustomColumnsState } from "@/lib/custom-columns/rules";
+import { feesFor } from "./fees-cells";
 import { closeStagesOf, type CloseStage } from "./close-stage";
 import { OPTIONAL_SOURCES, type CriticalSource, type OptionalSource } from "./notes";
+import { readSheetNotes, type NotesDb } from "./sheet-notes-load";
+import type { SheetNotes } from "./sheet-notes";
 
 type ScopedClient = Awaited<ReturnType<typeof getScopedClient>>;
 type ActivityType = Database["public"]["Tables"]["crm_activity"]["Row"]["type"];
@@ -35,6 +46,10 @@ export type ReviewLoad =
       failed: OptionalSource[];
       /** The firm's lost / nurture stages, for the Lost / Nurture button. Empty hides the button. */
       closeStages: CloseStage[];
+      /** The firm's custom columns, when the page asked for them (the List): ok, not switched on, or couldn't load. Null when not asked. */
+      custom?: CustomColumnsState | null;
+      /** The Sheet's Notes column (only when asked for): the newest plain note per row, or `unavailable`. */
+      notes?: SheetNotes;
     }
   | { status: "unavailable"; failed: CriticalSource[] };
 
@@ -85,28 +100,46 @@ export async function readOpenTasks(db: ScopedClient, matterIds: readonly string
 }
 
 export async function readContactActivity(db: ScopedClient, matterIds: readonly string[], leadIds: readonly string[]): Promise<ReviewActivityIn[]> {
-  // Type, date and the two ids only. No payload is selected, so no body can reach this module.
-  const select = "lead_id, matter_id, type, created_at";
+  // Type, date, the two ids, and two payload fields: the sender address and the party ("uspto"), which decide an
+  // email's direction. Nothing else of the payload (no subject, no recipients) is selected; the payload holds no body.
+  const select = "lead_id, matter_id, type, created_at, sender:payload->>from, party:payload->>party";
+  type Raw = Omit<ReviewActivityIn, "from"> & { sender?: string | null };
   const types = [...CONTACT_TYPES] as unknown as ActivityType[];
   const [m, l] = await Promise.all([
     inChunks(matterIds, (chunk) =>
-      readAllPages<ReviewActivityIn>((from, to) =>
-        db.from("crm_activity").select(select).in("type", types).in("matter_id", chunk).order("created_at", { ascending: false }).order("id").range(from, to),
+      readAllPages<Raw>((from, to) =>
+        db.from("crm_activity").select(select).in("type", types).in("matter_id", chunk).order("created_at", { ascending: false }).order("id").range(from, to) as unknown as PromiseLike<{ data: Raw[] | null; error: unknown }>,
       ),
     ),
     inChunks(leadIds, (chunk) =>
-      readAllPages<ReviewActivityIn>((from, to) =>
-        db.from("crm_activity").select(select).in("type", types).in("lead_id", chunk).order("created_at", { ascending: false }).order("id").range(from, to),
+      readAllPages<Raw>((from, to) =>
+        db.from("crm_activity").select(select).in("type", types).in("lead_id", chunk).order("created_at", { ascending: false }).order("id").range(from, to) as unknown as PromiseLike<{ data: Raw[] | null; error: unknown }>,
       ),
     ),
   ]);
-  return [...m, ...l];
+  return [...m, ...l].map(({ sender, ...rest }) => ({ ...rest, from: sender ?? null, party: rest.party ?? null }));
+}
+
+/**
+ * The firm's own sender addresses, from its mailbox connections, read through the SAME scoped client (column
+ * `email` only, never a token column: RLS shows the firm rows and the caller's own personal ones). Any failure is
+ * "none known", which is the review's behaviour before this read existed.
+ */
+export async function readFirmSenders(db: ScopedClient): Promise<FirmSenders> {
+  try {
+    const raw = db as unknown as { from(table: string): { select(columns: string): PromiseLike<{ data: { email?: string | null }[] | null; error: unknown }> } };
+    const { data, error } = await raw.from("mailbox_connection").select("email");
+    if (error || !Array.isArray(data)) return NO_FIRM_SENDERS;
+    return firmSendersFrom(data.map((r) => r.email));
+  } catch {
+    return NO_FIRM_SENDERS;
+  }
 }
 
 export async function readOpenDeadlines(db: ScopedClient, matterIds: readonly string[]): Promise<ReviewDeadlineIn[]> {
   return inChunks(matterIds, (chunk) =>
     readAllPages<ReviewDeadlineIn>((from, to) =>
-      db.from("crm_matter_deadline").select("matter_id, due_date, title").eq("status", "open").in("matter_id", chunk).order("id").range(from, to),
+      db.from("crm_matter_deadline").select("id, matter_id, kind, due_date, title, attorney_confirmed").eq("status", "open").in("matter_id", chunk).order("id").range(from, to),
     ),
   );
 }
@@ -135,6 +168,56 @@ export async function readProposalExpiries(db: ScopedClient, matterIds: readonly
   return [...m, ...l];
 }
 
+/**
+ * The change rows of the given records (type, actor, date, and the two stamp fields only), newest first, paged and chunked like
+ * the other reads. A read that cannot finish (an error, or the page budget) rejects: the caller then draws NO line, never "not changed".
+ */
+export async function readChangeRows(db: ScopedClient, matterIds: readonly string[], leadIds: readonly string[], now: Date = new Date()): Promise<ChangeRowIn[]> {
+  const since = changeWindowStart(now);
+  type Raw = ChangeRowIn;
+  const types = [...CHANGE_TYPES] as unknown as ActivityType[];
+  const page = (column: "matter_id" | "lead_id", chunk: string[]) =>
+    readAllPages<Raw>(
+      (from, to) =>
+        db.from("crm_activity").select(CHANGE_SELECT).in("type", types).gte("created_at", since).in(column, chunk).order("created_at", { ascending: false }).order("id").range(from, to) as unknown as PromiseLike<{ data: Raw[] | null; error: unknown }>,
+    );
+  const [m, l] = await Promise.all([inChunks(matterIds, (c) => page("matter_id", c)), inChunks(leadIds, (c) => page("lead_id", c))]);
+  return [...m, ...l];
+}
+
+/**
+ * lead id -> the staff name of the intake form the lead came in through (Taylor, Nov 23), for the "Came in through the <name> form" line.
+ * Two batched reads through the scoped client: the leads' intake submissions (lead_id, form_id, started_at; no answers, no contact), then
+ * the forms' `name` (never the slug). A lead with several submissions takes its FIRST (oldest `started_at`, then id): that one filed it.
+ * A form that can't be found (archived ones are still rows; a missing one), or an empty name, leaves the lead out (the generic sentence).
+ * Any failed read rejects; the caller then keeps the generic sentence for every row (never a guess).
+ */
+export async function readIntakeFormNames(db: ScopedClient, leadIds: readonly string[]): Promise<Map<string, string>> {
+  type Sub = { id: string; lead_id: string | null; form_id: string | null; started_at: string | null };
+  const raw = db as unknown as { from(t: string): { select(c: string): { in(c: string, v: string[]): { order(c: string): { range(a: number, b: number): PromiseLike<{ data: unknown[] | null; error: unknown }> } } } } };
+  const subs = await inChunks(leadIds, (chunk) =>
+    readAllPages<Sub>((from, to) => raw.from("crm_intake_submission").select("id, lead_id, form_id, started_at").in("lead_id", chunk).order("id").range(from, to) as PromiseLike<{ data: Sub[] | null; error: unknown }>),
+  );
+  const first = new Map<string, Sub>();
+  for (const s of subs) {
+    if (!s.lead_id || !s.form_id) continue;
+    const cur = first.get(s.lead_id);
+    const k = (x: Sub) => `${x.started_at ?? "9999"}|${x.id}`;
+    if (!cur || k(s) < k(cur)) first.set(s.lead_id, s);
+  }
+  const formIds = [...new Set([...first.values()].map((s) => s.form_id as string))];
+  const forms = await inChunks(formIds, (chunk) =>
+    readAllPages<{ id: string; name: string | null }>((from, to) => raw.from("crm_intake_form").select("id, name").in("id", chunk).order("id").range(from, to) as PromiseLike<{ data: { id: string; name: string | null }[] | null; error: unknown }>),
+  );
+  const nameOf = new Map(forms.filter((f) => typeof f.name === "string" && f.name.trim() !== "").map((f) => [f.id, f.name as string]));
+  const out = new Map<string, string>();
+  for (const [leadId, s] of first) {
+    const name = nameOf.get(s.form_id as string);
+    if (name) out.set(leadId, name);
+  }
+  return out;
+}
+
 export async function readLastStageChange(db: ScopedClient, leadIds: readonly string[]): Promise<Map<string, string>> {
   const rows = await inChunks(leadIds, (chunk) =>
     readAllPages<{ lead_id: string | null; created_at: string }>((from, to) =>
@@ -144,6 +227,63 @@ export async function readLastStageChange(db: ScopedClient, leadIds: readonly st
   const newest = new Map<string, string>();
   for (const r of rows) if (r.lead_id && !newest.has(r.lead_id)) newest.set(r.lead_id, r.created_at);
   return newest;
+}
+
+/**
+ * child lead id -> keeper id, for the leads merged into any of `leadIds`: one batched read per chunk through the live-leads
+ * helper (before 0107 there is no pointer and nothing is merged). Any failure, or a read that may have hit PostgREST's
+ * 1000-row cap, rejects: a keeper's count must never be too low, so the caller draws no tag and names "documents".
+ */
+export async function readMergedChildren(db: ScopedClient, leadIds: readonly string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  await Promise.all(
+    chunks(leadIds).map(async (chunk) => {
+      const result = await leadRead<{ data: unknown; error: unknown }>((kit) => {
+        if (!kit.merged) return Promise.resolve({ data: [], error: null });
+        // live-guard: the live-leads helper itself reads the merge pointer
+        return db.from("crm_lead").select("id, merged_into_id").in("merged_into_id", [...chunk]).limit(PAGE);
+      });
+      if (result.error) throw new Error("merged read failed");
+      const rows = (result.data ?? []) as { id: string; merged_into_id: string | null }[];
+      if (rows.length >= PAGE) throw new Error("merged read may be cut short");
+      for (const r of rows) if (r.merged_into_id) out.set(r.id, r.merged_into_id);
+    }),
+  );
+  return out;
+}
+
+/**
+ * Documents per record: stored files (lead and matter) plus, for a matter in a firm with Document Center, its
+ * generated letters. One batched read per chunk of ids and table, never one per record. Keys are `kind:id`; a record
+ * with none has no key. Any failed read, or a module list that cannot be read (the letters would be uncounted),
+ * rejects, so the caller draws no tag and names "documents" in the note, never a 0.
+ */
+export async function readDocumentCounts(db: ScopedClient, matterIds: readonly string[], leadIds: readonly string[]): Promise<Map<string, number>> {
+  const modules = await activeOrgModulesOrNull();
+  if (modules === null) throw new Error("modules unreadable");
+  const withLetters = modules.includes("document-center");
+  const counts = new Map<string, number>();
+  const add = (kind: string, parts: Map<string, number>[]) => {
+    for (const part of parts) for (const [id, n] of part) counts.set(`${kind}:${id}`, (counts.get(`${kind}:${id}`) ?? 0) + n);
+  };
+  const matterParts = chunks(matterIds).map(async (chunk) => {
+    const [files, letters] = await Promise.all([countFilesByParent(db, "matter", chunk), withLetters ? countLettersByMatter(db, chunk) : Promise.resolve(new Map<string, number>())]);
+    return [files, letters];
+  });
+  const leadParts = chunks(leadIds).map((chunk) => countFilesByParent(db, "lead", chunk));
+  // Leads merged into these keep their files on themselves (lectual 0107); the keeper's count includes them, as its page lists them.
+  const mergedChildren = await readMergedChildren(db, leadIds);
+  const childParts = chunks([...mergedChildren.keys()]).map((chunk) => countFilesByParent(db, "lead", chunk));
+  const [matterDone, leadDone, childDone] = await Promise.all([Promise.all(matterParts), Promise.all(leadParts), Promise.all(childParts)]);
+  add("matter", matterDone.flat());
+  add("lead", leadDone);
+  for (const part of childDone) {
+    for (const [childId, n] of part) {
+      const keeper = mergedChildren.get(childId);
+      if (keeper) counts.set(`lead:${keeper}`, (counts.get(`lead:${keeper}`) ?? 0) + n);
+    }
+  }
+  return counts;
 }
 
 /** A matter row also shows proposals filed against its lead (a quote drafted before the matter opened). */
@@ -158,7 +298,23 @@ function proposalsFor(row: ReviewRow, all: readonly ProposalExpiryRead[], matter
  * tasks are CRITICAL: if any fails there are no sections (a failed task read must not put everyone
  * under "Needs a next step"). The rest only enrich a row and are named when they fail.
  */
-export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
+/** The optional reads `loadReview` can be handed (tests inject them; the page uses the defaults). */
+export type ReviewReads = FeeReads & { customColumns: typeof loadCustomColumns };
+export type ReviewLoadOptions = {
+  withFees?: boolean;
+  withCustom?: boolean;
+  /** The firm's own Money columns: only when the page's re-resolved role may see money (`canSeeCustomMoney`). Defaults to no. */
+  customMoney?: boolean;
+  /** Read each row's newest note (the List's Notes column). */
+  notes?: boolean;
+  reads?: Partial<ReviewReads>;
+};
+
+export async function loadReview(now: Date = new Date(), opts: ReviewLoadOptions = {}): Promise<ReviewLoad> {
+  const withFees = opts.withFees === true;
+  const withCustom = opts.withCustom === true;
+  const feeReads: FeeReads = { ...DEFAULT_FEE_READS, ...opts.reads };
+  const customRead = opts.reads?.customColumns ?? loadCustomColumns;
   const db = await getScopedClient();
   const [mattersS, leadsS, stagesS, membersS, tzS, queueS] = await Promise.allSettled([
     listMatters(),
@@ -186,17 +342,35 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
 
   const dependsOnRecords = failedCritical.length === 0;
   const proposalLeadIds = [...new Set([...leadIds, ...matters.filter((m) => m.status === "open" || m.status === "on_hold").map((m) => m.lead_id).filter((x): x is string => !!x)])];
-  const [tasksS, activityS, deadlinesS, changesS, proposalsS] = dependsOnRecords
+  const noteRows = [...matterIds.map((id) => ({ kind: "matter" as const, id })), ...leadIds.map((id) => ({ kind: "lead" as const, id }))];
+  const [tasksS, activityS, deadlinesS, changesS, proposalsS, countsS, sendersS, changeRowsS, feeProposalsS, feeTrackerS, customS, notesS, formNamesS] = dependsOnRecords
     ? await Promise.allSettled([
         readOpenTasks(db, matterIds, leadIds),
-        readContactActivity(db, matterIds, leadIds),
+        // A matter shows its lead's mail too (the emails were filed on the lead before it signed), so the lead ids behind matters are read as well.
+        readContactActivity(db, matterIds, proposalLeadIds),
         readOpenDeadlines(db, matterIds),
         readLastStageChange(db, leadIds),
         readProposalExpiries(db, matterIds, proposalLeadIds),
+        readDocumentCounts(db, matterIds, leadIds),
+        readFirmSenders(db),
+        readChangeRows(db, matterIds, proposalLeadIds, now),
+        // Owner-only money, in the same parallel batch (each read's failure stays its own). Asked for only when the page's re-resolved role may see it.
+        withFees ? feeReads.acceptedProposalFees(db, matterIds, proposalLeadIds) : Promise.resolve([] as Awaited<ReturnType<FeeReads["acceptedProposalFees"]>>),
+        withFees ? feeReads.trackerFees(db, matterIds) : Promise.resolve([] as Awaited<ReturnType<FeeReads["trackerFees"]>>),
+        // The firm's custom columns (the List only), in the same batch. A matter shows its lead's value, so the leads behind matters are read too.
+        withCustom ? customRead(db, matterIds, proposalLeadIds, readMergedChildren, { canSeeMoney: opts.customMoney === true }) : Promise.resolve(null),
+        // In parallel with the rest, one bounded query per record (sheet-notes-load.ts); never throws, failure is `unavailable`.
+        opts.notes ? readSheetNotes(db as unknown as NotesDb, noteRows, timeZone) : Promise.resolve(null),
+        // The intake form a lead came in through, by its staff name (the last-changed line). A matter shows its lead's line, so the
+        // leads behind matters are read too. A failure keeps the generic "Came in through a form" (no note: the line still says something true).
+        readIntakeFormNames(db, proposalLeadIds),
       ])
-    : ([null, null, null, null, null] as const);
+    : ([null, null, null, null, null, null, null, null, null, null, null, null, null] as const);
   if (dependsOnRecords && tasksS && tasksS.status === "rejected") failedCritical.push("tasks");
   if (failedCritical.length > 0) return { status: "unavailable", failed: failedCritical };
+
+  // One source, `fees`: either read failing (or being cut short) leaves the fee fields absent on every row.
+  const feesS = withFees && feeProposalsS && feeTrackerS ? ([feeProposalsS, feeTrackerS] as const) : null;
 
   const failed: OptionalSource[] = [];
   const activityOk = activityS?.status === "fulfilled";
@@ -208,6 +382,13 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
 
   const proposals = proposalsS?.status === "fulfilled" ? proposalsS.value : null;
   if (!proposals) failed.push("proposals");
+
+  const formNames = formNamesS?.status === "fulfilled" ? formNamesS.value : null;
+  const lastChanges = changeRowsS?.status === "fulfilled" ? withFormNames(pickLastChanges(changeRowsS.value, timeZone, now), formNames) : null;
+  if (!lastChanges) failed.push("last change");
+
+  const docCounts = countsS?.status === "fulfilled" ? countsS.value : null;
+  if (!docCounts) failed.push("documents");
 
   // Approvals: the queue's own three states. Unconfigured = nothing pending to chip; unavailable = chip skipped, said so.
   let pendingMatterIds: Set<string> | null = new Set();
@@ -243,6 +424,7 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
     pendingMatterIds,
     pendingLeadIds,
     sources: { activity: activityOk ? "ok" : "unavailable", deadlines: deadlinesOk ? "ok" : "unavailable" },
+    firmSenders: sendersS?.status === "fulfilled" ? sendersS.value : NO_FIRM_SENDERS,
     timeZone,
     now,
   });
@@ -250,13 +432,51 @@ export async function loadReview(now: Date = new Date()): Promise<ReviewLoad> {
   // Tags only: a failed read draws no tags (and the KPI tile is a dash), never "no proposal".
   const tagged = proposals ? rows.map((r) => ({ ...r, proposalExpiry: proposalExpiryTag(proposalsFor(r, proposals, matters), today) })) : rows;
 
+  // A count only where the read worked; a record with no stored documents is a real 0 (never drawn), a failed read leaves the field unset.
+  const counted = docCounts ? tagged.map((r) => ({ ...r, documentCount: docCounts.get(`${r.kind}:${r.id}`) ?? 0 })) : tagged;
+
+  // The last change only where the read worked: a record with no change row is a real `null`; a failed read leaves it unset (no line).
+  // A matter also takes the changes filed on its lead. With the member directory unreadable a person's change draws no line (never "a teammate").
+  const leadOfMatter = new Map(matters.map((m) => [m.id, m.lead_id]));
+  const namesKnown = membersS.status === "fulfilled";
+  const feeData = feesS && feesS[0].status === "fulfilled" && feesS[1].status === "fulfilled" ? { proposals: feesS[0].value, tracker: feesS[1].value } : null;
+  if (feesS && !feeData) failed.push("fees");
+
+  const changed = lastChanges
+    ? counted.map((r) => {
+        const c = lastChangeFor(lastChanges, r.kind, r.id, r.kind === "matter" ? leadOfMatter.get(r.id) : null);
+        return { ...r, lastChange: namesKnown ? c : withoutPeople(c) };
+      })
+    : counted;
+
+  // Custom columns: "not switched on" is not a failure; anything else that isn't ok is named "custom columns".
+  let custom: CustomColumnsState | null = null;
+  if (withCustom) {
+    const read = customS?.status === "fulfilled" ? customS.value : null;
+    if (read && read.status === "ok") {
+      const open = new Set(matterIds);
+      const leadOf: Record<string, string> = {};
+      for (const m of matters) if (m.lead_id && open.has(m.id)) leadOf[m.id] = m.lead_id;
+      custom = { ...read, leadOfMatter: leadOf };
+    } else if (read && read.status === "not-set-up") {
+      custom = read;
+    } else {
+      custom = { status: "unavailable" };
+      failed.push("custom columns");
+    }
+  }
+
+  const withMoney = feeData ? changed.map((r) => ({ ...r, fees: feesFor(r, r.kind === "matter" ? leadOfMatter.get(r.id) ?? null : null, feeData.proposals, feeData.tracker) })) : changed;
+
   return {
     status: "ok",
-    rows: tagged,
+    rows: withMoney,
     closeStages: closeStagesOf(leadStages),
+    ...(opts.notes ? { notes: notesS?.status === "fulfilled" && notesS.value ? notesS.value : ({ status: "unavailable" } as const) } : {}),
     today,
     timeZone,
     members: memberList.map((m) => ({ userId: m.userId, name: m.displayName || m.email || "Teammate", role: m.role })),
     failed: OPTIONAL_SOURCES.filter((s) => failed.includes(s)),
+    custom,
   };
 }

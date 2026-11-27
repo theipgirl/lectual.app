@@ -1,0 +1,83 @@
+/* Record card (Sprint 10 Part 2): edit-in-place controls and the opened card. Tokens only; text 13px and up. */
+.rc-ctl { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; position: relative; flex-wrap: wrap; }
+.rc-text { font-size: var(--fs-1); color: var(--body); min-width: 0; }
+.rc-text[data-empty] { color: var(--muted); }
+.rc-warn { color: var(--ox); }
+.rc-btn { font: inherit; font-size: var(--fs-1); color: var(--body); background: none; border: 0; padding: 2px 4px; margin: 0 -4px; border-radius: var(--r-sm); cursor: pointer; text-align: left; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rc-btn:hover { background: var(--well); }
+.rc-btn:focus-visible, .rc-temp:focus-visible, .rc-pill-btn:focus-visible { outline: 2px solid var(--ox); outline-offset: 1px; }
+.rc-btn[data-empty] { color: var(--muted); }
+.rc-btn:disabled, .rc-temp:disabled { cursor: progress; opacity: 0.55; }
+.rc-err { font-size: var(--fs-1); color: var(--ox); }
+/* temperature: a person's level is FILLED, Lectual's suggestion is OUTLINED with a small "suggested" mark */
+.rc-temp { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: var(--r-pill); border: 1px solid transparent; font: inherit; font-size: var(--fs-1); font-weight: 500; line-height: 1.4; background: var(--well); color: var(--body); white-space: nowrap; cursor: default; }
+button.rc-temp { cursor: pointer; }
+.rc-temp[data-tone="hot"] { background: var(--tint-wine); color: var(--wine); }
+.rc-temp[data-tone="warm"] { background: var(--tint-warn); color: var(--warn); }
+.rc-temp[data-tone="cold"] { background: var(--well); color: var(--body); }
+.rc-temp[data-style="outlined"] { background: transparent; border-color: currentColor; }
+.rc-temp[data-tone="cold"][data-style="outlined"] { color: var(--muted); }
+.rc-temp[data-empty] { background: transparent; border-color: var(--line); color: var(--muted); }
+/* On a row or a board card an empty "Set" pill is invisible until hover or focus, as the Leads page always drew it. */
+.ix-row .rc-temp[data-empty], .ix-card .rc-temp[data-empty] { color: transparent; border-color: transparent; }
+.ix-row:hover .rc-temp[data-empty], .ix-card:hover .rc-temp[data-empty], .ix-row .rc-temp[data-empty]:focus-visible, .ix-card .rc-temp[data-empty]:focus-visible { color: var(--muted); border-color: var(--line); }
+/* The pill keeps its height; the 44px tap area is an invisible layer around it (coarse pointers and phones). */
+@media (pointer: coarse), (max-width: 640px) {
+  button.rc-temp { position: relative; }
+  button.rc-temp::after { content: ""; position: absolute; inset: -12px 0; }
+}
+.rc-temp-mark { font-size: var(--fs-1); font-weight: 400; opacity: 0.85; }
+.rc-pill { display: inline-block; max-width: 100%; padding: 2px 8px; border-radius: var(--r-pill); background: var(--well); color: var(--body); font: inherit; font-size: var(--fs-1); border: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rc-pill-btn { cursor: pointer; }
+.rc-avatar { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: var(--r-pill); background: var(--well); color: var(--body); font-size: var(--fs-1); font-weight: 600; flex: none; }
+.rc-avatar[data-empty] { color: var(--muted); }
+.rc-owner { display: inline-flex; align-items: center; gap: 6px; }
+.rc-owner-name { overflow: hidden; text-overflow: ellipsis; }
+.rc-stepline { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; max-width: 100%; }
+.rc-stepline[data-overdue] .rc-step-text { color: var(--ox); }
+.rc-step-text { display: block; max-width: 100%; }
+.rc-snooze { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.rc-stepform { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; align-items: center; }
+.rc-stepform .lx-saved, .rc-stepform .rc-err { grid-column: 1 / -1; }
+.rc-stepform-who { grid-template-columns: minmax(0, 1fr) auto minmax(0, 160px) auto; }
+@media (max-width: 640px) { .rc-stepform, .rc-stepform-who { grid-template-columns: minmax(0, 1fr); } }
+.rc-menu-scroll { max-height: 320px; overflow-y: auto; display: grid; }
+.rc-menu-h { padding: 6px 12px 2px; }
+a.lp-pop-item { text-decoration: none; color: inherit; display: flex; }
+.rc-noshow-note { width: 200px; min-height: 0; padding: 4px 8px; }
+.rc-noshow-paused { font-size: var(--fs-1); opacity: 0.85; }
+.rc-attn { font-size: var(--fs-1); }
+.rc-bottom { display: grid; gap: 4px; font-size: var(--fs-1); color: var(--muted); min-width: 0; }
+.rc-bottom > * { min-width: 0; }
+.rc-bottom-row { display: flex; align-items: center; gap: 8px; min-width: 0; flex-wrap: wrap; }
+
+/* the opened card: centred from 900px, a full-screen sheet below */
+.rc-card.lx-modal { width: min(1080px, 100%); padding: 0; gap: 0; }
+.rc-card .lx-modal-head { padding: 16px 20px 8px; }
+.rc-card .lx-modal-body { padding: 0 20px 20px; min-width: 0; }
+.rc-head { display: grid; gap: 8px; min-width: 0; }
+.rc-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.rc-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 320px); gap: 16px; align-items: start; }
+.rc-main, .rc-side { display: grid; gap: 14px; min-width: 0; align-content: start; }
+.rc-sec { display: grid; gap: 8px; min-width: 0; }
+.rc-sec > h3 { margin: 0; }
+.rc-checklist { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.rc-checklist li { display: grid; gap: 4px; min-width: 0; }
+.rc-step-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.rc-step-row[data-overdue] .rc-step-due { color: var(--ox); }
+.rc-step-who { color: var(--muted); }
+.rc-tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.rc-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: var(--r-pill); background: var(--well); font-size: var(--fs-1); }
+.rc-tag button { border: 0; background: none; padding: 0 2px; cursor: pointer; color: var(--muted); font: inherit; }
+.rc-fee { display: flex; justify-content: space-between; gap: 12px; font-size: var(--fs-2); }
+.rc-edit { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.rc-edit .lx-input { flex: 1 1 140px; min-width: 0; }
+.rc-linkrow { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 900px) {
+  .lx-modal-root:has(.rc-card) { padding: 0; place-items: stretch; }
+  .rc-card.lx-modal { width: 100%; max-height: 100dvh; height: 100dvh; border-radius: 0; border: 0; }
+  .rc-cols { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .rc-text, .rc-btn, .rc-temp, .rc-pill, .rc-avatar { font-size: var(--fs-2); }
+}

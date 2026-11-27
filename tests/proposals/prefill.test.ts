@@ -203,8 +203,8 @@ describe("buildBrandNames: the typed name and the consult marks", () => {
   });
 
   it("with no consult marks it is exactly today's single typed name (default pair, no classes)", () => {
-    const names = buildBrandNames({ typed: "Prosperall", brands: [], rand: seq() });
-    expect(names).toEqual([newBrandName("Prosperall", new Set<string>(), seq())]);
+    const names = buildBrandNames({ typed: "Larkmoor", brands: [], rand: seq() });
+    expect(names).toEqual([newBrandName("Larkmoor", new Set<string>(), seq())]);
     expect(buildBrandNames({ typed: "", brands: [], rand })).toEqual([]);
   });
 
@@ -246,8 +246,8 @@ describe("buildBrandNames: the typed name and the consult marks", () => {
 
   it("builds a proposal document with the names as given, and today's output without them", () => {
     const standard = { pricing: { ...DEFAULT_PROPOSAL_PRICING }, includes: [], office_action_note: "note" };
-    const today = buildNewContent({ firstName: "Ana", fullName: "Ana Ruiz", brandName: "Prosperall", standard, rand: seq() });
-    expect(today.names).toEqual([newBrandName("Prosperall", new Set<string>(), seq())]);
+    const today = buildNewContent({ firstName: "Ana", fullName: "Ana Ruiz", brandName: "Larkmoor", standard, rand: seq() });
+    expect(today.names).toEqual([newBrandName("Larkmoor", new Set<string>(), seq())]);
     n = 0;
     const names = buildBrandNames({ typed: "", brands, rand });
     const withNames = buildNewContent({ firstName: "Ana", fullName: "Ana Ruiz", brandName: "ignored", names, standard, rand });
@@ -304,12 +304,12 @@ describe("the 'Filled from' line", () => {
     // 02:30 UTC on Oct 21 is still Oct 20 in New York.
     expect(
       filledFromLine({ lead: "Ana Ruiz", consult: { reviewedBy: "Rebecca Beliard", reviewedAt: "2026-10-21T02:30:00Z" }, packageName: "Enhanced", tz }),
-    ).toBe("Filled from: lead Ana Ruiz; consult details reviewed by Rebecca Beliard on Oct 20, 2026; package Enhanced.");
+    ).toBe("Filled from: lead Ana Ruiz; consult details reviewed by Rebecca Beliard on Oct 20; package Enhanced.");
   });
 
   it("a review with no stored name reads 'reviewed on <date>'", () => {
     expect(filledFromLine({ lead: "Ana", consult: { reviewedBy: null, reviewedAt: "2026-10-21T16:00:00Z" }, tz })).toBe(
-      "Filled from: lead Ana; consult details reviewed on Oct 21, 2026.",
+      "Filled from: lead Ana; consult details reviewed on Oct 21.",
     );
   });
 

@@ -3,7 +3,7 @@
  *
  * `validateContent` reports paths like `names[1].marks[0].desc`. The editor
  * has one form per section, so each issue is shown inside the form that can fix
- * it, in words ("Prosperall, mark 1, description"), not as a path.
+ * it, in words ("Larkmoor, mark 1, description"), not as a path.
  */
 
 import type { ProposalContent } from "@/lib/proposals/types";
@@ -32,7 +32,7 @@ export function groupIssues(issues: readonly ValidationIssue[]): IssueGroups {
     } else if (/^(title|client_email|pay_url|client)(\.|$)/.test(p)) g.details.push(issue);
     else if (/^expires_on$/.test(p)) g.pricing.push(issue);
     else if (/^(greeting|recommendation|office_action_note)$/.test(p)) g.message.push(issue);
-    else if (/^pricing(\.|$)/.test(p)) g.pricing.push(issue);
+    else if (/^(pricing|payment_terms)(\.|$)/.test(p)) g.pricing.push(issue);
     else if (/^adjustments(\[|$)/.test(p)) g.adjustments.push(issue);
     else if (/^includes(\[|$)/.test(p)) g.includes.push(issue);
     else g.general.push(issue);
@@ -58,7 +58,7 @@ const FIELD_WORDS: Record<string, string> = {
   company: "company",
 };
 
-/** "names[1].marks[0].desc" -> "Prosperall, mark 1, description". */
+/** "names[1].marks[0].desc" -> "Larkmoor, mark 1, description". */
 export function describeIssuePath(path: string, content: ProposalContent | null): string {
   const parts: string[] = [];
   const re = /([A-Za-z_]+)(?:\[(\d+)\])?/g;

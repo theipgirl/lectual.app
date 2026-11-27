@@ -11,14 +11,6 @@
   gap: 10px;
 }
 
-.su-count {
-  font-family: var(--serif);
-  font-size: 27px;
-  line-height: 1.15;
-  color: var(--ink);
-  margin: 0;
-}
-
 .su-bar {
   height: 8px;
   border-radius: 999px;
@@ -51,8 +43,8 @@
 }
 
 .su-num {
-  font-family: var(--mono);
-  font-size: 12px;
+  font-size: var(--fs-1);
+  font-variant-numeric: tabular-nums;
   color: var(--muted);
 }
 
@@ -61,16 +53,16 @@
 .su-label {
   color: var(--ink);
   font-weight: 500;
-  font-size: 15.5px;
+  font-size: var(--fs-3);
 }
 
 .su-why {
   margin: 2px 0 0;
 }
 
-/* At 720px and under: number in column 1, then label and why in column 2, with the pill and the button
+/* At 640px and under: number in column 1, then label and why in column 2, with the pill and the button
    following in column 2 (DOM order is label, pill, action), so a long label never squeezes the pill. */
-@media (max-width: 720px) {
+@media (max-width: 640px) {
   .su-item {
     grid-template-columns: 24px minmax(0, 1fr);
   }
@@ -89,7 +81,7 @@
 }
 
 .su-card {
-  padding: 16px 18px;
+  padding: var(--pad-card);
   display: flex;
   gap: 14px;
   align-items: center;
@@ -104,6 +96,22 @@
   gap: 4px;
 }
 
-.su-card-title {
-  font-size: 25px;
+.su-card-warn {
+  color: var(--warn);
+}
+
+/* Team accounts and "Your setup": one block per person, each item with its own pill. Tokens only. */
+.su-accounts { padding: 18px; display: grid; gap: 12px; }
+.su-accounts-sub { margin: 0; }
+.su-acct-list, .su-acct-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.su-acct { padding: 12px 0; display: grid; gap: 6px; }
+.su-acct + .su-acct { border-top: 1px solid var(--line-2); }
+.su-acct-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.su-acct-name { font-weight: 500; color: var(--ink); font-size: var(--fs-3); }
+.su-acct-item { display: grid; grid-template-columns: 160px auto minmax(0, 1fr); gap: 10px; align-items: baseline; padding: 4px 0; }
+.su-acct-label { color: var(--ink); font-size: var(--fs-2); }
+.su-acct-text { margin: 0; }
+@media (max-width: 640px) {
+  .su-acct-item { grid-template-columns: minmax(0, 1fr) auto; }
+  .su-acct-text { grid-column: 1 / -1; }
 }

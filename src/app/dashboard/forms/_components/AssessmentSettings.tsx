@@ -1,5 +1,6 @@
 "use client";
 
+import { EmptyState } from "@/components/ui/EmptyState";
 import { isHideable } from "@/lib/assessment-card/hideable";
 import { boothVariant } from "@/lib/assessment-card/variants";
 import {
@@ -85,7 +86,7 @@ export function AssessmentSettingsCard({
         <input type="checkbox" checked={settings.showScore} onChange={(e) => onChange({ ...settings, showScore: e.target.checked })} />
         <span>Show people their score and biggest gaps when they finish</span>
       </label>
-      <p className="ifm-help" style={{ margin: 0 }}>
+      <p className="ifm-help">
         Hot, warm or cold is only ever shown to your firm: on the lead, in Intake numbers and as a Lawmatics tag.
       </p>
 
@@ -102,7 +103,7 @@ export function AssessmentSettingsCard({
             return (
               <li key={q.id} className={`ifm-asm-q${isHidden ? " hidden" : ""}`}>
                 <input
-                  className="ifm-input"
+                  className="lx-input"
                   value={w?.question ?? ""}
                   placeholder={q.question}
                   maxLength={ASSESSMENT_LIMITS.question}
@@ -110,7 +111,7 @@ export function AssessmentSettingsCard({
                   onChange={(e) => setWording(q.id, "question", e.target.value)}
                 />
                 <input
-                  className="ifm-input ifm-asm-sub"
+                  className="lx-input ifm-asm-sub"
                   value={w?.subtext ?? ""}
                   placeholder={q.subtext || "Optional note under the question"}
                   maxLength={ASSESSMENT_LIMITS.subtext}
@@ -143,13 +144,13 @@ export function AssessmentSettingsCard({
           Your team sees the answers on the lead and in Results.
         </span>
         {extras.length === 0 ? (
-          <div className="ifm-empty">No questions of your own yet. People answer only the card.</div>
+          <EmptyState variant="line">No questions of your own yet. People answer only the card.</EmptyState>
         ) : (
           <ol className="ifm-extras">
             {extras.map((e, i) => (
               <li key={e.id} className={`ifm-extra${isChoice(e) ? " has-options" : ""}`}>
                 <input
-                  className="ifm-input ifm-q-text"
+                  className="lx-input ifm-q-text"
                   value={e.text}
                   maxLength={ASSESSMENT_LIMITS.question}
                   disabled={disabled}
@@ -208,10 +209,10 @@ export function AssessmentPreview({ settings }: { settings: AssessmentSettings }
   return (
     <div className="ifm-card ifm-asm-preview" aria-label="Assessment preview">
       <div className="ifm-field-label">Preview</div>
-      <h3 className="ifm-title" style={{ margin: 0 }}>
+      <h3 className="ifm-title">
         {boothVariant(settings.variant).title}
       </h3>
-      <p className="ifm-help" style={{ margin: 0 }}>
+      <p className="ifm-help">
         Name, email, phone and consent first. Then one question at a time:
       </p>
       <ol className="ifm-asm-plist">
@@ -228,7 +229,7 @@ export function AssessmentPreview({ settings }: { settings: AssessmentSettings }
           </li>
         ))}
       </ol>
-      <p className="ifm-help" style={{ margin: 0 }}>
+      <p className="ifm-help">
         {settings.showScore ? "At the end they see their score out of 100, a band and their biggest gaps." : "At the end they see your closing message."}
       </p>
     </div>

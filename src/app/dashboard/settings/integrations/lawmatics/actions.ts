@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 // Ported from lectual src/app/(firm)/dashboard/import/actions.ts. The preview →
 // confirm flow, the fingerprint check and the view models are unchanged.
 // Changed: the gate. lectual needs the `lawmatics-import` module because its
@@ -18,6 +19,7 @@ import {
   LawmaticsNotConnectedError,
   checkTokenShape,
   disconnectLawmatics,
+  getLawmaticsConnection,
   recordLawmaticsOutcome,
   saveLawmaticsToken,
   verifyLawmaticsToken,
@@ -30,7 +32,19 @@ import {
   type ImportReport,
   type PreviewResult,
 } from "@/lib/lawmatics/import";
-import { runHiredSync } from "@/lib/lawmatics/hired-sync";
+import { BUTTON_BUDGET_MS, runLawmaticsDailySync } from "@/lib/lawmatics/daily-sync";
+import {
+  LAWMATICS_SYNC_FAILED,
+  LAWMATICS_SYNC_KEY_UNREADABLE,
+  LAWMATICS_SYNC_NOT_ALLOWED,
+  LAWMATICS_SYNC_NOT_CONNECTED,
+  LAWMATICS_SYNC_OUT_OF_TIME,
+  LAWMATICS_SYNC_REAUTH,
+  LAWMATICS_SYNC_SIGN_IN,
+  LAWMATICS_SYNC_STEP_NAMES,
+  lawmaticsSyncResult,
+  lawmaticsSyncStepsFailed,
+} from "@/lib/ui/words";
 import { planPeople, type PlanPerson } from "@/lib/lawmatics/find-in-plan";
 import type {
   PlanOptions,
@@ -62,7 +76,7 @@ const REQUIRED_ROLE: Role = "senior_admin";
 
 async function requireImportAdmin(): Promise<void> {
   const supabase = await getScopedClient();
-  const { data, error } = await supabase.rpc("current_org_role");
+  const { data, error } = await supabase.rpc("current_org_role", undefined, { get: true });
   if (error) throw new Error("Forbidden: could not resolve your role for this firm.");
   const role: Role | null =
     typeof data === "string" && (ROLES as readonly string[]).includes(data) ? (data as Role) : null;
@@ -89,7 +103,7 @@ async function failure(err: unknown): Promise<string> {
 
 export type ConnectState = { ok?: boolean; error?: string };
 
-export async function connectLawmaticsAction(_prev: ConnectState, formData: FormData): Promise<ConnectState> {
+export const connectLawmaticsAction = previewSafe(async function connectLawmaticsAction(_prev: ConnectState, formData: FormData): Promise<ConnectState> {
   try {
     await requireImportAdmin();
   } catch {
@@ -111,10 +125,10 @@ export async function connectLawmaticsAction(_prev: ConnectState, formData: Form
   revalidatePath(PAGE);
   revalidatePath("/dashboard/settings/integrations/");
   return { ok: true };
-}
+}, "state");
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function disconnectLawmaticsAction(_prev: ConnectState, _formData: FormData): Promise<ConnectState> {
+export const disconnectLawmaticsAction = previewSafe(async function disconnectLawmaticsAction(_prev: ConnectState, _formData: FormData): Promise<ConnectState> {
   try {
     await requireImportAdmin();
   } catch {
@@ -125,7 +139,7 @@ export async function disconnectLawmaticsAction(_prev: ConnectState, _formData: 
   revalidatePath(PAGE);
   revalidatePath("/dashboard/settings/integrations/");
   return { ok: true };
-}
+}, "state");
 
 // ── View models ──────────────────────────────────────────────────────────────
 // The full plan can run to thousands of rows. The browser gets a capped copy
@@ -261,7 +275,7 @@ function readOptions(formData: FormData): PlanOptions {
  * than an explicit `confirm` with a matching fingerprint and a ticked
  * acknowledgement is a dry run.
  */
-export async function importAction(
+export const importAction = previewSafe(async function importAction(
   _prev: ImportState,
   formData: FormData,
 ): Promise<ImportState> {
@@ -326,7 +340,7 @@ export async function importAction(
   } catch (err) {
     return { phase: "error", error: await failure(err) };
   }
-}
+}, (message) => ({ phase: "error" as const, error: message }));
 
 // ── Matters (update-existing-only) importer ─────────────────────────────────
 // Same two-step preview/confirm shape as the lead importer above, but as two
@@ -395,7 +409,7 @@ function toMattersReportView(report: MattersImportReport): MattersReportView {
 }
 
 /* eslint-disable @typescript-eslint/no-unused-vars */
-export async function previewMattersImportAction(
+export const previewMattersImportAction = previewSafe(async function previewMattersImportAction(
   _prev: MattersImportState,
   _formData: FormData,
 )
@@ -411,9 +425,9 @@ export async function previewMattersImportAction(
   } catch (err) {
     return { phase: "error", error: await failure(err) };
   }
-}
+}, (message) => ({ phase: "error" as const, error: message }));
 
-export async function applyMattersImportAction(
+export const applyMattersImportAction = previewSafe(async function applyMattersImportAction(
   _prev: MattersImportState,
   formData: FormData,
 ): Promise<MattersImportState> {
@@ -465,38 +479,55 @@ export async function applyMattersImportAction(
     }
     return { phase: "error", error: await failure(err) };
   }
-}
+}, (message) => ({ phase: "error" as const, error: message }));
 
-// ── Hired matters (create path) ──────────────────────────────────────────────
-// A person marked Hired in the firm's own Lawmatics becomes a matter here. The same runner the daily
-// job uses, for the CALLER'S org only: the org comes from the session, never from the form.
+// ── Sync from Lawmatics now ──────────────────────────────────────────────────
+// Every step a 4 AM run does (hired matters, new leads, consults), for the CALLER'S org only: the org comes from
+// the session, never from the form. The same runner the cron uses, with the button's own budget. Counts only.
 
-export type HiredSyncState = { ok?: boolean; notice?: string; error?: string };
+export type LawmaticsSyncState = { ok?: boolean; notice?: string; error?: string };
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function syncHiredMattersAction(_prev: HiredSyncState, _formData: FormData): Promise<HiredSyncState> {
+export const syncLawmaticsAction = previewSafe(async function syncLawmaticsAction(_prev: LawmaticsSyncState, _formData: FormData): Promise<LawmaticsSyncState> {
   try {
     await requireImportAdmin();
   } catch {
-    return { error: `${ADMIN_TIER_PHRASE} can add hired matters from Lawmatics.` };
+    return { error: LAWMATICS_SYNC_NOT_ALLOWED(ADMIN_TIER_PHRASE) };
   }
   const session = await resolveFirmSession();
-  if (session.kind !== "ok") return { error: "Sign in again to add hired matters." };
+  if (session.kind !== "ok") return { error: LAWMATICS_SYNC_SIGN_IN };
 
   try {
-    const s = await runHiredSync({ orgId: session.org.id });
-    if (s.connections === 0) return { error: "Lawmatics isn't connected for your firm. Connect it above." };
-    if (s.failedFirms > 0) {
-      return { error: "We couldn't read all of Lawmatics, so nothing was added. Try again shortly." };
+    const s = await runLawmaticsDailySync({ orgId: session.org.id, mode: "full", budgetMs: BUTTON_BUDGET_MS });
+    if (s.connections === 0) {
+      // The sync reads active connections only: an `invalid` one (its key refused) says Reconnect, never "isn't connected".
+      const read = await getLawmaticsConnection().catch(() => ({ ok: false as const }));
+      return { error: read.ok && read.connection?.status === "invalid" ? LAWMATICS_SYNC_REAUTH : LAWMATICS_SYNC_NOT_CONNECTED };
     }
-    revalidatePath("/dashboard/matters/");
-    revalidatePath(PAGE);
-    const needs = s.skipped + s.failedWrites;
-    const moves =
-      (s.leadsMoved > 0 ? ` Moved ${s.leadsMoved} ${s.leadsMoved === 1 ? "lead" : "leads"} to signed.` : "") +
-      (s.leadMovesFailed > 0 ? ` ${s.leadMovesFailed} ${s.leadMovesFailed === 1 ? "lead" : "leads"} couldn't be moved.` : "");
-    return { ok: true, notice: `Added ${s.created} matters, linked ${s.linked}, ${needs} need a look.${moves}` };
+    for (const path of ["/dashboard/intake/", "/dashboard/calendar/", "/dashboard/", "/dashboard/matters/", PAGE]) revalidatePath(path);
+    if (s.reauthNeeded > 0) return { error: LAWMATICS_SYNC_REAUTH };
+    // The firm's key couldn't be opened: nothing ran, so never "ok" with all-zero counts.
+    if (s.tokenUnreadable > 0) return { error: LAWMATICS_SYNC_KEY_UNREADABLE };
+    const notice = lawmaticsSyncResult({
+      leadsAdded: s.prospects.created,
+      leadsLinked: s.prospects.linked,
+      cameBack: s.prospects.cameBack,
+      needALook: s.prospects.needALook + s.prospects.failedWrites + s.prospects.flagsNotWritten,
+      consultsUpdated: s.consults.written,
+      consultsRemoved: s.consults.removed,
+      mattersAdded: s.hired.ran > 0 ? s.hired.created : null,
+      mattersLinked: s.hired.ran > 0 ? s.hired.linked : null,
+      waiting: s.prospects.overCap + s.consults.overCap,
+    });
+    const failed = ([
+      s.hired.failed > 0 ? LAWMATICS_SYNC_STEP_NAMES.hired : null,
+      s.prospects.failed > 0 ? LAWMATICS_SYNC_STEP_NAMES.prospects : null,
+      s.consults.failed > 0 ? LAWMATICS_SYNC_STEP_NAMES.consults : null,
+    ] as (string | null)[]).filter((x): x is string => x !== null);
+    if (s.outOfTime > 0 || s.failures.timeout > 0) return { error: LAWMATICS_SYNC_OUT_OF_TIME, notice };
+    if (failed.length > 0) return { error: lawmaticsSyncStepsFailed(failed), notice };
+    return { ok: true, notice };
   } catch {
-    return { error: "We couldn't add hired matters just now. Try again shortly." };
+    return { error: LAWMATICS_SYNC_FAILED };
   }
-}
+}, "state");

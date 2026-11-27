@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { orgHasModule } from "@/lib/org/modules";
 import { listLeads } from "@/lib/pipeline";
 import { listMatters } from "@/lib/matters";
@@ -10,7 +10,8 @@ import { CoworkSkills } from "@/components/skills/CoworkSkills";
 import type { PickerGroup } from "@/components/skills/SkillPicker";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
-import { AI_TOOLS_GROUP, SHORTCUTS_NAME } from "@/lib/ui/words";
+import { SHORTCUTS_NAME } from "@/lib/ui/words";
+import { PageHeader } from "@/components/ui";
 
 export const metadata: Metadata = { title: pageTitle(SHORTCUTS_NAME) };
 
@@ -33,7 +34,7 @@ async function readRecords(kind: RecordKind): Promise<ListRead> {
 /** The page: what the staff-run skills do, and a way onto the record each one works on. Reads only. */
 export default async function SkillsPage({ searchParams }: { searchParams: Promise<Search> }) {
   if (!(await orgHasModule("agent-toolkit"))) notFound();
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   if (session.kind !== "ok") notFound();
 
   const params = await searchParams;
@@ -67,16 +68,15 @@ export default async function SkillsPage({ searchParams }: { searchParams: Promi
 
   return (
     <>
-      <div className="lx-page-head">
-        <div style={{ flex: 1, minWidth: 260 }}>
-          <div className="lx-label">{AI_TOOLS_GROUP}</div>
-          <h1 className="lx-h1">{SHORTCUTS_NAME}</h1>
-          <p className="lx-sub">
+      <PageHeader
+        title={SHORTCUTS_NAME}
+        sub={
+          <>
             The drafting tools the staff already have, in one place. Pick a record and each one opens the form or panel where its
             work happens. Everything they write is held for review: nothing goes to a client until an attorney has read it.
-          </p>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {!canRun && (
         <p className="lx-note" style={{ margin: 0 }}>

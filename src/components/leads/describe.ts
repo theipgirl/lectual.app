@@ -6,7 +6,10 @@
 import { STOP_REASON_LABEL, isStopReason } from "@/lib/campaigns/stops";
 import { CONSULT_OUTCOME_LABEL, isConsultOutcome } from "@/lib/pipeline/consult-outcome-labels";
 import { formatFileSize } from "@/lib/files/rules";
-import { AUTOMATIC_STAGE_MOVES, FIRST_READ, FROM_THEIR_EMAILS } from "@/lib/ui/words";
+import { PREP_BUILD_SOURCE, PREP_SEND_SOURCE } from "@/lib/consult-prep/keys";
+import { parseSendRecord } from "@/lib/consult-prep/sends";
+import { AUTOMATIC_STAGE_MOVES, CAME_BACK_TIMELINE, consultPrepTimelineBuild, consultPrepTimelineSend, FIRST_READ, FROM_THEIR_EMAILS, LAWMATICS_NAME } from "@/lib/ui/words";
+import { CAME_BACK_SOURCE, isCameBackRow } from "@/lib/today/came-back-rules";
 import { reasonText } from "@/lib/stage-keeper/format";
 import { AGENT_ACTOR, REVIEW_SOURCE, SUGGESTION_SOURCE, WHY_TEXT, parseAgentMove, parseSuggestion } from "@/lib/stage-keeper/moves";
 
@@ -45,6 +48,7 @@ const MATTER_CHANGE: Record<string, string> = {
   task_edited: "Task edited",
   task_assigned: "Task assigned",
   task_deleted: "Task deleted",
+  close_override: "Closed with an open deadline (attorney override)",
 };
 
 // Column names the matter edits record, in the words a person would say.
@@ -54,6 +58,8 @@ function matterChangeDetail(p: Record<string, unknown>): string | null {
   if (Array.isArray(p.fields)) {
     return (p.fields as string[]).map((f) => FIELD_WORDS[f] ?? f.replaceAll("_", " ")).join(", ");
   }
+  // PGE Sprint 3: the reason the attorney gave for closing past the deadline guard, as they wrote it (staff-only timeline).
+  if (str(p.change) === "close_override") return str(p.reason) ? `Reason: ${str(p.reason)}` : null;
   // A reassigned task: the new assignee is an id (the row never copies a name), so say only the task and whether it was cleared.
   if (str(p.change) === "task_assigned") return [str(p.title), p.assignee_id ? null : "unassigned"].filter(Boolean).join(" · ") || null;
   const due = str(p.due_date) ?? str(p.to);
@@ -91,6 +97,44 @@ function carriedDetail(p: Record<string, unknown>): string | null {
     not_trademark: "consult details are trademark filing details, so not carried onto this matter",
   };
   return (skipped && WHY[skipped]) || null;
+}
+
+/**
+ * lectual 0107's `lead_merged` row (one on each lead). The payload is read defensively: which side this row is
+ * on (`role` / `side`: "keeper" or "loser"), the fields that changed and the counts that moved. Field VALUES are never shown (an old email or phone is not timeline text); only the field names.
+ */
+const MERGE_FIELD_WORDS: Record<string, string> = { first_name: "first name", last_name: "last name", business_name: "business", mark_text: "mark", referral_source: "source", referral_detail: "source detail", practice_area: "practice area", assigned_to: "assignee", lane: "temperature", temperature: "suggested temperature" };
+
+function mergedSide(p: Record<string, unknown>): "keeper" | "loser" | null {
+  const side = str(p.role) ?? str(p.side);
+  if (side === "keeper" || side === "kept") return "keeper";
+  if (side === "loser" || side === "merged") return "loser";
+  if (str(p.merged_into_id) ?? str(p.keeper_id) ?? str(p.into)) return "loser";
+  if (str(p.merged_lead_id) ?? str(p.loser_id) ?? str(p.from)) return "keeper";
+  return null;
+}
+
+function mergedTitle(p: Record<string, unknown>): string {
+  const side = mergedSide(p);
+  if (side === "keeper") return "Another lead merged into this one";
+  if (side === "loser") return "Merged into another lead";
+  return "Leads merged";
+}
+
+function mergedDetail(p: Record<string, unknown>): string | null {
+  const changes = p.fields ?? p.changes ?? p.changed;
+  const names = Array.isArray(changes)
+    ? (changes as unknown[]).map((f) => (typeof f === "string" ? f : str((f as Record<string, unknown> | null)?.field))).filter((f): f is string => !!f)
+    : changes && typeof changes === "object"
+      ? Object.keys(changes as Record<string, unknown>)
+      : [];
+  const counts = p.counts && typeof p.counts === "object" && !Array.isArray(p.counts) ? (p.counts as Record<string, unknown>) : {};
+  const moved = Object.values(counts).reduce<number>((sum, v) => (typeof v === "number" && Number.isFinite(v) && v > 0 ? sum + v : sum), 0);
+  const parts = [
+    names.length ? `details changed: ${names.map((f) => MERGE_FIELD_WORDS[f] ?? f.replaceAll("_", " ")).join(", ")}` : null,
+    moved > 0 ? `${moved} record${moved === 1 ? "" : "s"} moved` : null,
+  ];
+  return parts.filter(Boolean).join(" · ") || null;
 }
 
 export type DescribeOptions = {
@@ -158,9 +202,12 @@ export function describeActivity(row: Row & { id?: string }, options: DescribeOp
       };
     }
     case "lead_created":
-      return { title: "Lead created", detail: str(p.source), tone: "system", link: null };
+      // The Lawmatics daily sync stamps its own source id; the timeline names Lawmatics instead.
+      return { title: "Lead created", detail: p.source === CAME_BACK_SOURCE ? LAWMATICS_NAME : str(p.source), tone: "system", link: null };
     case "lead_assigned":
       return { title: "Lead assigned", detail: null, tone: "system", link: null };
+    case "lead_merged":
+      return { title: mergedTitle(p), detail: mergedDetail(p), tone: "system", link: null };
     case "lead_updated":
       if (str(p.change) === "consult_details") return { title: "Consult details reviewed", detail: consultReviewDetail(p), tone: "system", link: null };
       if (str(p.field) === "lane") {
@@ -209,6 +256,15 @@ export function describeActivity(row: Row & { id?: string }, options: DescribeOp
       return { title: "Draft queued for approval", detail: str(p.subject), tone: "ai", link: null };
     case "ai_insight": {
       const source = str(p.source) ?? "";
+      // The Lawmatics daily sync's "came back" flag: ids and the category only, so the words come from the glossary.
+      if (isCameBackRow({ payload: p })) return { title: CAME_BACK_TIMELINE, detail: null, tone: "system", link: null };
+      if (source === PREP_SEND_SOURCE) {
+        // Consult prep's send record: ids and times only, so the line is the glossary's.
+        const send = parseSendRecord({ payload: p });
+        return { title: send ? consultPrepTimelineSend(send.kind, send.status) : AI_SOURCES[source] ?? "AI insight", detail: null, tone: "ai", link: null };
+      }
+      // S2b: a full-brief build record (codes and ids only), so the line is the glossary's.
+      if (source === PREP_BUILD_SOURCE) return { title: consultPrepTimelineBuild(p.status), detail: null, tone: "ai", link: null };
       if (source === "intake-triage") {
         return { title: `First read: ${String(p.lane ?? "").toUpperCase() || "scored"}`, detail: str(p.reason), tone: "ai", link: null };
       }

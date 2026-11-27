@@ -2,31 +2,31 @@ import Link from "next/link";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { TODAY_CONSULT_DAYS } from "@/lib/calendar/outlook-read";
 import { formatEventWhen, joinHref } from "@/lib/calendar/outlook-format";
-import { loadTodayConsults, sourceNote, type TodayConsultsResult } from "@/lib/calendar/consult-sources";
-import { liveConsultDeps } from "@/lib/calendar/consult-sources-live";
+import { consultSources, loadTodayConsults, sourceNote, type TodayConsultsResult } from "@/lib/calendar/consult-sources";
+import { LAWMATICS_NAME } from "@/lib/ui/words";
+import { consultDepsForViewer } from "@/lib/calendar/consult-deps-view";
+import { consultPreview } from "@/lib/views/view-as";
+import "./calendar.css";
 
-const SOURCE_LABEL = { outlook: "Outlook", zoom: "Zoom" } as const;
+const SOURCE_LABEL = { outlook: "Outlook", lawmatics: LAWMATICS_NAME, zoom: "Zoom" } as const;
 
 /**
- * Today's "Consults" card: consults on the firm's connected Outlook calendars (the daily sync) and its
- * connected Zoom (a live read of upcoming meetings), starting today or in the next 7 days. It always
+ * Today's "Consults" card: consults on the firm's connected Outlook calendars (the daily sync), the consults the
+ * Lawmatics daily sync stored, and its connected Zoom (a live read of upcoming meetings), starting today or in the next 7 days. It always
  * draws something. A list is shown when there are consults; "No consults" only when every source was
  * read; a source that was not connected, not allowed or failed is named with its next step, and the
  * other source's consults still show. Read-only: nothing is sent or booked.
  */
 export function TodayConsultsView({ result, timeZone }: { result: TodayConsultsResult; timeZone: string }) {
-  const sources = [
-    { source: "outlook" as const, state: result.outlook },
-    { source: "zoom" as const, state: result.zoom },
-  ];
-  const notes = sources.map((s) => sourceNote(s.source, s.state)).filter((n): n is NonNullable<typeof n> => n !== null);
+  const sources = consultSources(result);
+  const notes = sources.map((s) => sourceNote(s.source, s.state, result.previewName)).filter((n): n is NonNullable<typeof n> => n !== null);
   const allRead = notes.length === 0;
   const readOk = sources.filter((s) => s.state === "ok").map((s) => SOURCE_LABEL[s.source]);
 
   return (
-    <section className="lx-card" style={{ padding: 18, display: "grid", gap: 10 }} aria-labelledby="today-consults-h">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
-        <h2 id="today-consults-h" className="lx-h2" style={{ fontSize: 25 }}>
+    <section className="lx-card lx-pad lx-consults-card" aria-labelledby="today-consults-h">
+      <div className="lx-consults-head">
+        <h2 id="today-consults-h" className="lx-h2">
           Consults
         </h2>
         <Link href="/dashboard/calendar/" className="lx-note">
@@ -39,9 +39,9 @@ export function TodayConsultsView({ result, timeZone }: { result: TodayConsultsR
             const join = joinHref(c.joinUrl);
             return (
               <li key={c.key} className="lx-task">
-                <span style={{ minWidth: 0 }}>
-                  <span style={{ fontWeight: 500, color: "var(--ink)" }}>{c.title}</span>
-                  <span className="lx-note" style={{ display: "block" }}>
+                <span className="lx-consults-text">
+                  <span className="lx-consults-title">{c.title}</span>
+                  <span className="lx-note lx-consults-when">
                     {formatEventWhen({ starts_at: c.startsAt, all_day: c.allDay }, timeZone)}
                     {c.leadId && (
                       <>
@@ -61,16 +61,16 @@ export function TodayConsultsView({ result, timeZone }: { result: TodayConsultsR
           })}
         </ul>
       ) : allRead ? (
-        <p className="lx-note" style={{ margin: 0 }}>
+        <p className="lx-note">
           No consults in the next {TODAY_CONSULT_DAYS} days.
         </p>
       ) : readOk.length > 0 ? (
-        <p className="lx-note" style={{ margin: 0 }}>
-          No consults found in {readOk.join(" and ")} in the next {TODAY_CONSULT_DAYS} days.
+        <p className="lx-note">
+          No consults found in {readOk.join(", ").replace(/, ([^,]*)$/, " and $1")} in the next {TODAY_CONSULT_DAYS} days.
         </p>
       ) : null}
       {notes.map((n) => (
-        <p key={n.source} className="lx-note" role="status" style={{ margin: 0, color: "var(--warn)" }}>
+        <p key={n.source} className="lx-note lx-consults-warn" role="status">
           {n.text}
           {n.link && (
             <>
@@ -87,6 +87,6 @@ export function TodayConsultsView({ result, timeZone }: { result: TodayConsultsR
 /** Self-loading, so Today's page only mounts it. It never renders nothing. */
 export async function TodayConsults() {
   const timeZone = await getFirmTimeZone();
-  const result = await loadTodayConsults(new Date(), timeZone, liveConsultDeps);
+  const result = await loadTodayConsults(new Date(), timeZone, await consultDepsForViewer(await consultPreview()));
   return <TodayConsultsView result={result} timeZone={timeZone} />;
 }

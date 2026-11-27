@@ -13,7 +13,7 @@ import { DEFAULT_PROPOSAL_PRICING, normalisePackages, withPackages } from "@/lib
 import { packageOffersFromSetting, withPackageSnapshot } from "@/lib/proposals/package-snapshot";
 import { validateSettingInput } from "@/lib/proposals/validate";
 import { defaultSelection, quoteProposal } from "@/lib/proposals/pricing";
-import { danielle } from "./danielle-fixture";
+import { renata } from "./renata-fixture";
 
 const APPROVER = "99999999-9999-4999-8999-999999999999";
 
@@ -131,8 +131,8 @@ describe("a new proposal gets the firm's rows", () => {
       { package: "Enhanced", base_cents: 325_000, per_class_cents: 82_500, included_classes: 2, gov_per_class_cents: 35_000, second_mark_discount_pct: 20 },
       { package: "Concierge", base_cents: 495_000, per_class_cents: 82_500, included_classes: 3, gov_per_class_cents: 35_000, second_mark_discount_pct: 20, includes: concierge },
     ]);
-    const before = danielle();
-    const c = danielle();
+    const before = renata();
+    const c = renata();
     delete c.packages;
     const snap = withPackageSnapshot(c, setting);
     expect(snap.packages?.map((p) => p.includes)).toEqual([essential, undefined, concierge]);

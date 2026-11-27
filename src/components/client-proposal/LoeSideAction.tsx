@@ -42,6 +42,8 @@ export type LoeSideActionProps = {
   /** Rendered between the button and the notes (the "describe each class" warning). */
   warning?: ReactNode;
   legalTotalText: string;
+  /** Beside the pay button on the receipt: "Pay $X today" when part of the fee is due today (`PayToday`). */
+  payToday?: ReactNode;
   onContinue: () => void;
   onBack: () => void;
   onSign: () => void;
@@ -66,6 +68,7 @@ export function LoeSideAction(p: LoeSideActionProps) {
           </p>
         </div>
         <DownloadPdfButton label={DOWNLOAD_SIGNED_LABEL} onDownload={p.onDownloadSigned} />
+        {p.payUrl ? p.payToday : null}
         {p.payUrl ? (
           <a className="cp-btn" href={p.payUrl} target="_blank" rel="noopener noreferrer">
             {PAY_LABEL}

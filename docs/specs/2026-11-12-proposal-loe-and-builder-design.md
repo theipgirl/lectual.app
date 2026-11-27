@@ -9,7 +9,7 @@ Repos: `lectual.app` (the app code), `lectual` (one migration, the isolation gat
 
 Rebecca wants a client to accept a proposal, sign the engagement letter (LOE) and pay in one
 sitting. Today the LOE is drafted by hand after payment and sent from Lawmatics, which adds
-about a day and, for proposals like Sevetri Wilson's, produces a letter whose fee chart is
+about a day and, for proposals like Callum Ferreira's, produces a letter whose fee chart is
 empty and reads "Trademark Package: TBD".
 
 Taylor wants a proposal to be made one of three ways (the assistant drafts it from a consult,
@@ -35,7 +35,7 @@ Done means:
 | Nov 11 | Order is client details, then agree to the agreement, then pay. Pay-first was only ever a seriousness filter; the consult fee does that now. | Decided |
 | Nov 11 | Stop typing the package into the LOE. The LOE says the fees are as outlined in the proposal. | Decided |
 | Nov 10 | Client clicks accept and signs, the LOE fills in with name and address, signing leads to the pay link. Signed and paid means Hired. | Decided (mechanism proposed by Taylor, agreed) |
-| Nov 9 | LOE and invoice go out as one step. Sevetri asked to see the LOE before signing. | Decided |
+| Nov 9 | LOE and invoice go out as one step. Callum asked to see the LOE before signing. | Decided |
 | Oct 27, Jun 11 | Rebecca sees what goes to a client before it goes. | Standing rule |
 | Aug 28, Nov 11 | Payment stays in Lawmatics. The LOE must end up in the Lawmatics client file. | Standing rule |
 | May 7 | Never list the packages the client did not choose in the LOE. | Standing rule |
@@ -51,7 +51,7 @@ LOE needs its own review. Taylor decided those on Nov 12 (section 3).
   live only in Lawmatics.
 - That chart is refused for more than one brand name (`multiple_brands`), for marks on
   different packages (`mixed_mark_packages`), for a package no longer on the firm's list, and
-  for flat-fee proposals. Sevetri's proposal hits the first two, so nothing was filled in.
+  for flat-fee proposals. Callum's proposal hits the first two, so nothing was filled in.
 - The client proposal page records no signature. The older quote engine (`src/lib/quotes/public.ts`)
   already has a typed-name signature with name, IP, browser, a frozen snapshot and a
   fingerprint check. That is the pattern to reuse.
@@ -74,7 +74,7 @@ LOE needs its own review. Taylor decided those on Nov 12 (section 3).
 ### 4.1 The firm's letter (Settings, Proposals, "Engagement letter")
 
 - One template per kind: `trademark` and `general`. The trademark text starts from the clean
-  current RPB letter (the Sevetri example is that letter, with the AI-use paragraph).
+  current RPB letter (the Callum example is that letter, with the AI-use paragraph).
 - Stored in a new table, `client_proposal_loe_template` (migration 0106). The proposals
   settings jsonb is capped at 64 KB and already holds the packages, so the letter does not go there.
 - A template has versions. A version is `draft`, `approved` or `retired`. The admin tier edits
@@ -116,7 +116,7 @@ Two rules from Taylor (Nov 12, after the first mockup):
 Four steps on the same page, same link, same domain:
 
 1. **Choose.** As today. A link, "Read the engagement letter first", shows the letter at any
-   time before signing (Sevetri's request).
+   time before signing (Callum's request).
 2. **Your details.** Full legal name, business name (optional), title (optional), mailing
    address. Prefilled from what the firm entered. These go on the letter.
 3. **Engagement letter.** The letter with their details and today's date merged in, followed by
@@ -191,7 +191,7 @@ is signed.
   Accepted column reads "Signed Nov 12".
 - Mark paid stays as it is. For a signed version the old "draft the LOE" step is recorded as
   skipped ("Signed on the proposal page") and no approval-queue item is made. The refusals that
-  broke Sevetri's letter no longer apply, because the exhibit comes from the accepted quote.
+  broke Callum's letter no longer apply, because the exhibit comes from the accepted quote.
 - Hired: unchanged. The hired-matter sync still follows Lawmatics.
 
 ### 4.7 Wording that must change (client-facing; Rebecca approves each line)

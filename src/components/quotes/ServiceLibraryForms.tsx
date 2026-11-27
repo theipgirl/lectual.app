@@ -7,10 +7,15 @@ import {
   restoreServiceItemAction,
   updateServiceItemAction,
 } from "@/app/dashboard/settings/services/actions";
+import "@/app/dashboard/quotes/quotes.css";
 import type { ActionState } from "@/app/dashboard/quotes/errors";
 import { CHARGE_AT_LABEL, KIND_LABEL, QUOTE_LINE_KINDS, chargeAtLabel, chargeAtOptionsFor, kindLabel } from "@/lib/quotes/labels";
-import { centsToInput, formatCents } from "@/lib/quotes/money";
+import { centsToInput } from "@/lib/quotes/money";
+import { formatMoney } from "@/lib/ui/format";
+import { Notice } from "@/components/ui/Notice";
+import { Pill, type PillTone } from "@/components/ui/Pill";
 import type { ServiceItemRow } from "@/lib/quotes/types";
+import { SAVING, OPTIONAL } from "@/lib/ui/words";
 
 /**
  * The service library's forms. The library is the firm's standing price list
@@ -20,9 +25,9 @@ import type { ServiceItemRow } from "@/lib/quotes/types";
 
 function Err({ state }: { state: ActionState }) {
   return state.error ? (
-    <p role="alert" className="lx-note" style={{ color: "var(--wine)", margin: 0 }}>
+    <Notice tone="risk" role="alert">
       {state.error}
-    </p>
+    </Notice>
   ) : null;
 }
 
@@ -76,7 +81,7 @@ function ItemFields({ item, disabled }: { item?: ServiceItemRow; disabled: boole
         <input className="lx-input lx-num" name="amount" inputMode="decimal" required defaultValue={item ? centsToInput(item.unit_amount_cents) : ""} placeholder="0.00" disabled={disabled} />
       </label>
       <label className="lx-field" style={{ gridColumn: "1 / -1" }}>
-        <span className="lx-label">Description (optional)</span>
+        <span className="lx-label">Description<span className="lx-optional"> {OPTIONAL}</span></span>
         <input className="lx-input" name="description" maxLength={2000} defaultValue={item?.description ?? ""} disabled={disabled} />
       </label>
     </>
@@ -97,7 +102,7 @@ export function NewServiceItemForm() {
       <ItemFields disabled={pending} />
       <div style={{ gridColumn: "1 / -1", display: "flex", gap: 10, alignItems: "center" }}>
         <button type="submit" className="lx-btn lx-btn-pri" disabled={pending}>
-          {pending ? "Adding…" : "Add service"}
+          {pending ? SAVING : "Add service"}
         </button>
         <Err state={state} />
       </div>
@@ -105,11 +110,11 @@ export function NewServiceItemForm() {
   );
 }
 
-const KIND_TONE: Record<string, string> = {
-  legal_fee: "lx-pill-ox",
-  government_fee: "lx-pill-warn",
-  expense: "lx-pill-mute",
-  discount: "lx-pill-risk",
+const KIND_TONE: Record<string, PillTone> = {
+  legal_fee: "ox",
+  government_fee: "warn",
+  expense: "mute",
+  discount: "risk",
 };
 
 /** One library item: summary, edit, archive/restore. */
@@ -125,19 +130,15 @@ export function ServiceItemRowEditor({ item, canEdit }: { item: ServiceItemRow; 
   const toggling = archiving || restoring;
 
   return (
-    <li style={{ display: "grid", gap: 8, padding: "12px 0" }}>
-      <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
-        <span className={`lx-pill ${KIND_TONE[item.kind] ?? "lx-pill-mute"}`}>{kindLabel(item.kind)}</span>
-        <span className="lx-pill lx-pill-mute">{chargeAtLabel(item.charge_at)}</span>
-        {!item.active && <span className="lx-pill lx-pill-mute">Archived</span>}
-        <span style={{ color: item.active ? "var(--ink)" : "var(--muted)", fontWeight: 500, fontSize: 14.5, flex: "1 1 200px" }}>{item.label}</span>
-        <span className="lx-num">{formatCents(item.unit_amount_cents)}</span>
+    <li className="qb-svc-item">
+      <div className="qb-svc-head">
+        <Pill tone={KIND_TONE[item.kind] ?? "mute"}>{kindLabel(item.kind)}</Pill>
+        <Pill tone="mute">{chargeAtLabel(item.charge_at)}</Pill>
+        {!item.active && <Pill tone="mute">Archived</Pill>}
+        <span className="qb-svc-label" data-active={item.active}>{item.label}</span>
+        <span className="qb-svc-price">{formatMoney(item.unit_amount_cents)}</span>
       </div>
-      {item.description && (
-        <p className="lx-note" style={{ margin: 0 }}>
-          {item.description}
-        </p>
-      )}
+      {item.description && <p className="lx-note">{item.description}</p>}
       {canEdit && (
         <div className="lx-row-actions">
           <button type="button" className="lx-btn lx-btn-ghost lx-btn-sm" onClick={() => setEditing((v) => !v)}>
@@ -146,19 +147,19 @@ export function ServiceItemRowEditor({ item, canEdit }: { item: ServiceItemRow; 
           <form action={item.active ? archiveAction : restoreAction}>
             <input type="hidden" name="id" value={item.id} />
             <button type="submit" className={`lx-btn lx-btn-sm ${item.active ? "lx-btn-danger" : "lx-btn-sec"}`} disabled={toggling}>
-              {toggling ? "…" : item.active ? "Archive" : "Restore"}
+              {toggling ? SAVING : item.active ? "Archive" : "Restore"}
             </button>
           </form>
         </div>
       )}
       <Err state={item.active ? archiveState : restoreState} />
       {canEdit && editing && (
-        <form action={updateAction} className="lx-form-grid" style={{ paddingTop: 10, borderTop: "1px solid var(--line-2)" }}>
+        <form action={updateAction} className="lx-form-grid qb-svc-edit">
           <input type="hidden" name="id" value={item.id} />
           <ItemFields item={item} disabled={updating} />
           <div style={{ gridColumn: "1 / -1", display: "flex", gap: 10, alignItems: "center" }}>
             <button type="submit" className="lx-btn lx-btn-pri lx-btn-sm" disabled={updating}>
-              {updating ? "Saving…" : "Save"}
+              {updating ? SAVING : "Save"}
             </button>
             <Err state={updateState} />
           </div>

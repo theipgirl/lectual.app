@@ -1,3 +1,4 @@
+import { previewSafeRoute } from "@/lib/views/preview-safe";
 import { NextResponse, type NextRequest } from "next/server";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { hasRole } from "@/lib/auth/roles";
@@ -19,7 +20,7 @@ const LAWPAY_PAGE = "/dashboard/settings/integrations/lawpay/";
  * gateway credentials, and everything secret is sealed before it is written —
  * through the caller's own scoped client, so RLS decides.
  */
-export async function GET(req: NextRequest) {
+export const GET = previewSafeRoute(async function GET(req: NextRequest) {
   const finish = (query: string) => {
     const res = NextResponse.redirect(new URL(`${LAWPAY_PAGE}?${query}`, req.url));
     res.cookies.set(LAWPAY_STATE_COOKIE, "", { path: LAWPAY_STATE_PATH, maxAge: 0 });
@@ -71,4 +72,4 @@ export async function GET(req: NextRequest) {
     console.error("[lawpay/callback] unexpected error", err instanceof Error ? err.message : err);
     return fail("failed");
   }
-}
+});

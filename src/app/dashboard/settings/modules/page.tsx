@@ -2,8 +2,9 @@ import Link from "next/link";
 import { activeOrgModules } from "@/lib/org/modules";
 import { MODULES } from "@/lib/settings/modules-copy";
 import { FeedbackLink } from "@/components/feedback/SendFeedbackButton";
-import { listConnections } from "@/lib/mailbox/connections";
+import { listConnectionsForViewer } from "@/lib/views/view-as";
 import type { Metadata } from "next";
+import { PageHeader, Pill } from "@/components/ui";
 import { pageTitle } from "@/lib/ui/page-title";
 import { CONTACT_LECTUAL, FEATURES_NAME, FEATURES_SUBLINE_END, FEATURES_SUBLINE_START } from "@/lib/ui/words";
 
@@ -26,7 +27,7 @@ type ModuleStatus = { label: string; tone: "ok" | "warn" | "risk" | "mute" };
  */
 async function mailboxStatus(enabled: boolean): Promise<ModuleStatus & { connected: number | null }> {
   if (!enabled) return { label: "Off", tone: "mute", connected: null };
-  const result = await listConnections().catch(() => ({ ok: false as const, error: "unreadable" }));
+  const result = await listConnectionsForViewer().catch(() => ({ ok: false as const, error: "unreadable" }));
   if (!result.ok) return { label: "On · couldn't check connections", tone: "risk", connected: null };
   const connected = result.connections.filter((c) => c.status === "active").length;
   return connected > 0
@@ -39,13 +40,15 @@ export default async function ModulesPage() {
   const mailbox = await mailboxStatus(on.includes("mailbox"));
   return (
     <>
-      <div>
-        <div className="lx-label">Settings</div>
-        <h1 className="lx-h1" data-tour="modules-head">{FEATURES_NAME}</h1>
-        <p className="lx-sub">
-          {FEATURES_SUBLINE_START} <FeedbackLink>{CONTACT_LECTUAL}</FeedbackLink> {FEATURES_SUBLINE_END}
-        </p>
-      </div>
+      <PageHeader
+        title={FEATURES_NAME}
+        tour="modules-head"
+        sub={
+          <>
+            {FEATURES_SUBLINE_START} <FeedbackLink>{CONTACT_LECTUAL}</FeedbackLink> {FEATURES_SUBLINE_END}
+          </>
+        }
+      />
       <section className="lx-card lx-int" aria-label={FEATURES_NAME}>
         {MODULES.map((m) => {
           const enabled = on.includes(m.key);
@@ -70,7 +73,7 @@ export default async function ModulesPage() {
                     </span>
                   )}
                 </span>
-                <span className={`lx-pill lx-pill-${status.tone}`}>{status.label}</span>
+                <Pill tone={status.tone}>{status.label}</Pill>
               </div>
             </div>
           );

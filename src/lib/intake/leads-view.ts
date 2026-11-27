@@ -1,7 +1,7 @@
 import { decisionOpen } from "./stage-decision";
 import type { IntakeRow } from "./rows";
 import type { LeadSet } from "./working";
-import { leadsNeedingApproval } from "./needs-rebecca";
+import { leadsNeedingApproval, stageIgnoresApprovals } from "./needs-rebecca";
 import type { LeadPendingApprovals } from "./pending-approvals";
 import type { LeadTimeSummary, RunningSummary } from "@/lib/time";
 
@@ -70,7 +70,7 @@ export function chipCountsWithin(
   const needing = leadsNeedingApproval(reads.approvals);
   return {
     decision: reads.decisionsRead ? setRows.filter((r) => decisionOpen(r.decision, r.lead.current_stage_id)).length : null,
-    needsAttorney: reads.approvals?.status === "ok" ? setRows.filter((r) => needing.has(r.lead.id)).length : null,
+    needsAttorney: reads.approvals?.status === "ok" ? setRows.filter((r) => needing.has(r.lead.id) && !stageIgnoresApprovals(r.stage)).length : null,
     duplicates: setRows.filter((r) => !!reads.duplicates?.[r.lead.id]).length,
     suggestions: setRows.filter((r) => r.temperature.suggestion === "long_term_nurture").length,
     agent: reads.agentRead ? { today: setRows.filter((r) => r.agentMove?.today).length, week: setRows.filter((r) => r.agentMove).length } : null,

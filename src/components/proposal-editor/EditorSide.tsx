@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import { formatCents } from "@/lib/quotes/money";
+import { formatMoney } from "@/lib/ui/format";
 import { packageLineTitle } from "@/lib/proposals/name-package";
 import type { ProposalQuote } from "@/lib/proposals/types";
 import { EDITOR_WORDS, checkTheseHeading } from "@/lib/proposal-editor/vocabulary";
@@ -13,7 +13,18 @@ import { UnsavedPriceNote } from "./UnsavedGuard";
  */
 
 /** "What the client pays": the SAVED prices. While the page has unsaved changes it says they update when you save. */
-export function PayBox({ quote, general, valueOverFee }: { quote: ProposalQuote; general: boolean; valueOverFee: { value_cents: number } | null }) {
+export function PayBox({
+  quote,
+  general,
+  valueOverFee,
+  dueTodayLine = null,
+}: {
+  quote: ProposalQuote;
+  general: boolean;
+  valueOverFee: { value_cents: number } | null;
+  /** "Due today $X · Balance $Y" when part of the fee is due today (`dueTodayStaffLine`). */
+  dueTodayLine?: string | null;
+}) {
   return (
     <section className="lx-card pe-totals" aria-label={EDITOR_WORDS.clientPays}>
       <div className="lx-label">{EDITOR_WORDS.clientPays}</div>
@@ -26,23 +37,23 @@ export function PayBox({ quote, general, valueOverFee }: { quote: ProposalQuote;
                   {it.label}
                   {typeof it.hours === "number" ? ` (${it.hours} ${it.hours === 1 ? "hr" : "hrs"})` : ""}
                 </dt>
-                <dd>{formatCents(it.value_cents)}</dd>
+                <dd>{formatMoney(it.value_cents)}</dd>
               </div>
             ))}
             {valueOverFee && (
               <div className="pe-line pe-line-mute">
                 <dt>Value of the work</dt>
-                <dd>{formatCents(valueOverFee.value_cents)}</dd>
+                <dd>{formatMoney(valueOverFee.value_cents)}</dd>
               </div>
             )}
             <div className="pe-line">
               <dt>Flat fee</dt>
-              <dd>{formatCents(quote.legal_subtotal_cents)}</dd>
+              <dd>{formatMoney(quote.legal_subtotal_cents)}</dd>
             </div>
             <Credits quote={quote} />
             <div className="pe-line pe-line-total">
               <dt>Legal fee, due when accepted</dt>
-              <dd>{formatCents(quote.legal_total_cents)}</dd>
+              <dd>{formatMoney(quote.legal_total_cents)}</dd>
             </div>
           </dl>
           <p className="lx-note" style={{ margin: 0 }}>
@@ -56,12 +67,12 @@ export function PayBox({ quote, general, valueOverFee }: { quote: ProposalQuote;
               <Fragment key={n.id}>
                 <div className="pe-line">
                   <dt>{packageLineTitle(n)}</dt>
-                  <dd>{n.included ? formatCents(n.legal_cents) : "none selected"}</dd>
+                  <dd>{n.included ? formatMoney(n.legal_cents) : "none selected"}</dd>
                 </div>
                 {n.included && n.custom_discount_cents ? (
                   <div className="pe-line pe-line-mute">
                     <dt>{`${n.custom_discount_label || "Discount"} (in the fee above)`}</dt>
-                    <dd>−{formatCents(n.custom_discount_cents)}</dd>
+                    <dd>−{formatMoney(n.custom_discount_cents)}</dd>
                   </div>
                 ) : null}
               </Fragment>
@@ -69,14 +80,14 @@ export function PayBox({ quote, general, valueOverFee }: { quote: ProposalQuote;
             <Credits quote={quote} />
             <div className="pe-line pe-line-total">
               <dt>Legal fee, due when accepted</dt>
-              <dd>{formatCents(quote.legal_total_cents)}</dd>
+              <dd>{formatMoney(quote.legal_total_cents)}</dd>
             </div>
             <div className="pe-line pe-line-mute">
               <dt>
                 USPTO fees, due at filing
                 {quote.gov_class_count > 0 ? ` (${quote.gov_class_count} ${quote.gov_class_count === 1 ? "filing" : "filings"})` : ""}
               </dt>
-              <dd>{formatCents(quote.gov_total_cents)}</dd>
+              <dd>{formatMoney(quote.gov_total_cents)}</dd>
             </div>
           </dl>
           <p className="lx-note" style={{ margin: 0 }}>
@@ -84,6 +95,11 @@ export function PayBox({ quote, general, valueOverFee }: { quote: ProposalQuote;
           </p>
         </>
       )}
+      {dueTodayLine ? (
+        <p className="lx-note pe-due-today" style={{ margin: 0 }}>
+          {dueTodayLine}
+        </p>
+      ) : null}
       <UnsavedPriceNote text={EDITOR_WORDS.pricesUpdateOnSave} />
     </section>
   );
@@ -97,7 +113,7 @@ function Credits({ quote }: { quote: ProposalQuote }) {
         .map((a) => (
           <div key={a.id} className="pe-line pe-line-mute">
             <dt>{a.label || "Adjustment"}</dt>
-            <dd>−{formatCents(a.discount_cents)}</dd>
+            <dd>−{formatMoney(a.discount_cents)}</dd>
           </div>
         ))}
     </>

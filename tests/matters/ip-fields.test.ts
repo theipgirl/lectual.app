@@ -91,8 +91,9 @@ describe("parseCivilDate", () => {
 describe("formatCivilDate", () => {
   it("formats in UTC so a date column never shifts a day", () => {
     // A naive local render of 2026-01-01 lands on 31 Dec 2025 west of Greenwich.
-    expect(formatCivilDate("2026-01-01")).toMatch(/2026/);
-    expect(formatCivilDate("2026-01-01")).not.toMatch(/2025/);
+    // A year other than this one is spelled out ("Jan 1, 2020"); this year's dates read "Jan 1".
+    expect(formatCivilDate("2020-01-01")).toBe("Jan 1, 2020");
+    expect(formatCivilDate("2019-12-31")).toBe("Dec 31, 2019");
   });
 
   it("returns null (not a placeholder) for an absent or malformed value", () => {

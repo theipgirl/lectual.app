@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { countChangedFields, messageInMoreOptions, moreOptionsSummary } from "@/lib/proposal-editor/more-options";
 import type { ProposalDetail } from "@/lib/proposals/store";
 import type { ProposalRow } from "@/lib/proposals/types";
-import { sevetri } from "../proposals/fixture";
+import { callum } from "../proposals/fixture";
 
 vi.mock("@/app/dashboard/proposals/actions", () => ({ createProposalAction: vi.fn() }));
 
@@ -47,7 +47,7 @@ const ID = "55555555-5555-4555-8555-555555555555";
 function row(over: Partial<ProposalRow> = {}): ProposalRow {
   return {
     id: ID, org_id: "o", family_id: ID, version: 1, public_token: "t".repeat(43), lead_id: "lead-9", matter_id: null,
-    client_name: "Sevetri Wilson", client_email: "s@example.com", title: "Trademark Proposal", status: "draft", content: sevetri(),
+    client_name: "Callum Ferreira", client_email: "s@example.com", title: "Trademark Proposal", status: "draft", content: callum(),
     expires_on: "2026-11-10", pay_url: "https://pay.example/x", source: "manual", created_by: null, updated_by: null, approved_by: null,
     approved_at: null, sent_at: null, accepted_at: null, superseded_at: null, withdrawn_at: null, accepted_selection: null, accepted_snapshot: null,
     created_at: "2026-10-18T12:00:00Z", updated_at: "2026-10-18T12:00:00Z", ...over,
@@ -70,7 +70,7 @@ async function renderEditor(proposal: ProposalRow, extra: { lead?: unknown; sett
   }));
   vi.doMock("@/lib/consult-proposal/link", () => ({ GOES_LIVE_ON_APPROVAL: "x", proposalSendBlock: vi.fn(async () => ({ blocked: false })) }));
   vi.doMock("@/lib/proposals/consult-strip-load", () => ({ loadConsultStrip: vi.fn(async () => ({ status: "none" })) }));
-  vi.doMock("@/lib/proposals/lead-link", () => ({ loadLeadLink: vi.fn(async () => extra.lead ?? { state: "linked", id: "lead-9", name: "Sevetri Wilson · Prosperall" }) }));
+  vi.doMock("@/lib/proposals/lead-link", () => ({ loadLeadLink: vi.fn(async () => extra.lead ?? { state: "linked", id: "lead-9", name: "Callum Ferreira · Larkmoor" }) }));
   vi.doMock("@/lib/proposals/lead-options", () => ({ loadLeadOptions: vi.fn(async () => ({ status: "ok", leads: [{ id: "l1", label: "Ana Ruiz" }] })) }));
   vi.doMock("@/components/client-proposal/ProposalDocument", () => ({ ProposalDocument: () => createElement("div", { "data-stub": "document" }) }));
   vi.doMock("@/app/dashboard/proposals/[id]/paid-actions", () => ({ markPaidAction: vi.fn(), undoPaidAction: vi.fn(), retryUploadAction: vi.fn() }));
@@ -114,7 +114,7 @@ describe("the proposal editor: five sections, one Save (Sprint 1)", () => {
   });
 
   it("a stored non-default value inside Advanced is still in the markup", async () => {
-    const c = sevetri();
+    const c = callum();
     c.pricing = { ...c.pricing, second_mark_discount_pct: 17.5, reduce_under_included: true };
     c.adjustments = [{ id: "a1", label: "Event credit", kind: "amount", value: 15_000 }];
     c.names[0].price_override = { base_cents: 450_000 };
@@ -138,13 +138,13 @@ describe("the editor header: whose proposal this is", () => {
 
   it("with a lead: 'Open lead' linking to the lead's page", async () => {
     const html = await renderEditor(row());
-    expect(html).toMatch(/href="\/dashboard\/leads\/lead-9"[^>]*>Open lead →<\/a>/);
+    expect(html).toMatch(/href="\/dashboard\/leads\/lead-9"[^>]*>Open lead <svg/);
   });
 
   it("with a matter as well: a link to the matter", async () => {
     const html = await renderEditor(row({ matter_id: "matter-3" }));
     expect(html).toContain('href="/dashboard/matters/matter-3"');
-    expect(html).toContain("Open matter →");
+    expect(html).toContain("Open matter <svg");
   });
 
   it("a lead that could not be read says so, and is not 'not linked'", async () => {
@@ -166,7 +166,7 @@ describe("the editor's class rows: one class is always included", () => {
   beforeEach(() => vi.resetModules());
 
   it("a brand name with one class shows it ticked and disabled with 'Included', and still posts it", async () => {
-    const c = sevetri();
+    const c = callum();
     c.names[0].classes = [c.names[0].classes[0]];
     const html = await renderEditor(row({ content: c }));
     expect(html).toContain('<span class="pe-lock">Included</span>');
@@ -175,7 +175,7 @@ describe("the editor's class rows: one class is always included", () => {
   });
 
   it("with several classes and one left ticked, that one says 'At least one class is included'", async () => {
-    const c = sevetri();
+    const c = callum();
     c.names[0].classes[1].preselected = false;
     const html = await renderEditor(row({ content: c }));
     expect(html).toContain('<span class="pe-lock">At least one class is included</span>');

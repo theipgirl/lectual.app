@@ -1,3 +1,4 @@
+import { formatDay, formatTime } from "@/lib/ui/dates";
 /**
  * When the approval deck is dealt. Pure: the clock and the firm's time zone come in.
  *
@@ -39,7 +40,7 @@ function offsetAt(at: Date, timeZone: string): number {
 }
 
 /** The instant a wall-clock time on a calendar date in `timeZone` happens. A time skipped by a DST jump lands just after it. */
-function zonedInstant(year: number, month: number, day: number, hour: number, minute: number, timeZone: string): Date {
+export function zonedInstant(year: number, month: number, day: number, hour: number, minute: number, timeZone: string): Date {
   const wall = Date.UTC(year, month - 1, day, hour, minute);
   let guess = wall - offsetAt(new Date(wall), timeZone);
   // A second pass settles the offset when the guess crossed a DST change.
@@ -122,13 +123,12 @@ export function sameFirmDay(at: Date, now: Date, timeZone: string): boolean {
  */
 export function whenLabel(at: Date, now: Date, timeZone: string): string {
   const tz = safeZone(timeZone);
-  const time = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit" }).format(at);
+  const time = formatTime(at, { tz }) ?? "";
   const a = partsIn(at, tz);
   const n = partsIn(now, tz);
   const dayNumber = (p: { year: number; month: number; day: number }) => Date.UTC(p.year, p.month - 1, p.day) / 86_400_000;
   const diff = dayNumber(a) - dayNumber(n);
   if (diff === 0) return `today at ${time}`;
   if (diff === 1) return `tomorrow at ${time}`;
-  const day = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short", month: "short", day: "numeric" }).format(at);
-  return `${day} at ${time}`;
+  return `${formatDay(at, { tz, now, weekday: "short" }) ?? ""} at ${time}`;
 }

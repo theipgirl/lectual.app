@@ -6,7 +6,7 @@ import { findPackageSpoken, packageSpokenKey } from "@/lib/proposals/package-lis
 import { defaultSelection, quoteProposal } from "@/lib/proposals/pricing";
 import type { ProposalPricing } from "@/lib/proposals/types";
 import { fakeLlm } from "../agents/helpers";
-import { draftInput, meetingSource, sevetriOutput } from "./fixture";
+import { draftInput, meetingSource, callumOutput } from "./fixture";
 
 const CONCIERGE: ProposalPricing = { package: "Concierge", base_cents: 495_000, included_classes: 3, per_class_cents: 82_500, second_mark_discount_pct: 20, gov_per_class_cents: 35_000 };
 const ESSENTIAL: ProposalPricing = { package: "Essential", base_cents: 195_000, included_classes: 1, per_class_cents: 82_500, second_mark_discount_pct: 20, gov_per_class_cents: 35_000 };
@@ -30,7 +30,7 @@ const MELVIN: ConsultTranscriptTurn[] = [
 ];
 
 function melvinOutput(over: Partial<ConsultProposalExtract> = {}): ConsultProposalExtract {
-  const base = sevetriOutput();
+  const base = callumOutput();
   return {
     ...base,
     brands: [

@@ -1,10 +1,12 @@
+import { canSeeFormsAndProposals } from "@/lib/auth/forms-proposals";
 import Link from "next/link";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { previewingAs, resolveViewSession } from "@/lib/views/view-as";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { loadActiveQueue, type QueueLoad } from "@/lib/queue/load";
 import { mineQueue } from "@/lib/queue/mine-load";
 import { orgHasModule } from "@/lib/org/modules";
 import { listLeads, type Lead } from "@/lib/pipeline";
+import { loadIntakeStageIds, withoutIntake } from "@/lib/matters/intake-ids";
 import { listMatters, listTasks, listUpcomingDeadlines, summarizeDocket } from "@/lib/matters";
 import { buildCalendarRows } from "@/lib/matters/calendar-rows";
 import { BAND_COPY } from "@/lib/matters/worklist";
@@ -13,6 +15,7 @@ import { hourInZone } from "@/lib/today/priorities";
 import { greetingName, greetingSuffix } from "@/lib/today/greeting-name";
 import { buildNeedsYou } from "@/lib/today/needs-you";
 import { loadConnectionsNeedingReauth, loadDeadlinesClosedSince, loadOpenQuotes, loadUnreviewedSubmissions } from "@/lib/today/load-needs-you";
+import { loadCameBack } from "@/lib/today/came-back";
 import { civilInZone, deadlinesMetThisMonth, mattersOpenedThisMonth, monthQueryFloor, monthStartCivil } from "@/lib/today/outcomes";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { loadAutopilot, type AutopilotLoad } from "@/lib/agents/autopilot";
@@ -37,11 +40,19 @@ import { needsReviewItems } from "@/lib/today/needs-review";
 import { NeedsYouSection } from "@/components/today/NeedsYouSection";
 import { AddNameLink } from "@/components/account/AddNameLink";
 import { TodayConsults } from "@/components/calendar/TodayConsults";
+import { DeadlineAlertsCard, loadDeadlineAlerts } from "@/components/today/DeadlineAlertsCard";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
-import { ASSISTANTS_NAME, OUR_TURN } from "@/lib/ui/words";
+import { ASSISTANTS_NAME, BLANK, OUR_TURN } from "@/lib/ui/words";
+import { LoadFailedLine } from "@/components/ui/LoadFailed";
+import { Notice } from "@/components/ui/Notice";
+import { PageHeader } from "@/components/ui/PageHeader";
+import "@/components/today/today.css";
 import { OwnerToday } from "@/components/today/OwnerToday";
+import { TeamToday } from "@/components/today/TeamToday";
 import { NO_PREVIEW, previewFor, viewFor } from "@/lib/views";
+import { intakeListHref } from "@/lib/intake/list-href";
+import { mattersListHref } from "@/lib/matters/list-href";
 
 export const metadata: Metadata = { title: pageTitle("Today") };
 
@@ -56,7 +67,7 @@ function Kpi({ label, value, sub, href, failed }: { label: string; value: number
   return (
     <Link href={href} className="lx-card lx-kpi">
       <span className="lx-label">{label}</span>
-      <span className="lx-kpi-value">{value === null ? "—" : value}</span>
+      <span className="lx-kpi-value">{value === null ? BLANK : value}</span>
       <span className="lx-note">{value === null ? failed ?? "Couldn't load" : sub}</span>
     </Link>
   );
@@ -69,7 +80,7 @@ function Kpi({ label, value, sub, href, failed }: { label: string; value: number
  * unreachable queue rendering "all caught up".
  */
 export default async function TodayPage() {
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   if (session.kind !== "ok") return null; // the layout already handled this
   // The owner's Today is its own page. It is chosen BEFORE any technician read runs, so with the switch off nothing below changes.
   const view = viewFor({
@@ -81,11 +92,19 @@ export default async function TodayPage() {
   if (view === "owner") {
     return <OwnerToday userId={session.user.id} role={session.role} email={session.user.email} metadata={session.user.user_metadata} />;
   }
+  // The team view's Today (non-owner staff, role views on) is its own simple page, chosen before any technician read too.
+  if (view === "team") {
+    return <TeamToday userId={session.user.id} role={session.role} email={session.user.email} metadata={session.user.user_metadata} />;
+  }
   const now = new Date();
+  // The Deadlines card (PGE Sprint 3) reads on its own, started now so it runs beside every other read on this page.
+  const alertsP = loadDeadlineAlerts(session.user.id, now);
+  // Returning clients (the Lawmatics daily sync's "came back" rows): never throws, three states.
+  const cameBackP = loadCameBack(now);
   const [hasAgents, tz] = await Promise.all([orgHasModule("agents"), getFirmTimeZone()]);
   const monthFloor = monthQueryFloor(now, tz);
 
-  const [queueS, leadsS, mattersS, deadlinesS, tasksS, runsS, autopilotS, quotesS, connectionsS, submissionsS, closedS, membersS] =
+  const [queueS, leadsS, mattersS, deadlinesS, tasksS, runsS, autopilotS, quotesS, connectionsS, submissionsS, closedS, membersS, intakeIdsS] =
     await Promise.allSettled([
       loadActiveQueue(),
       listLeads(),
@@ -112,8 +131,12 @@ export default async function TodayPage() {
       loadUnreviewedSubmissions(),
       loadDeadlinesClosedSince(monthFloor),
       listMemberDirectory(),
+      // Read beside the matters it filters (it never throws; null = a failed stage read, which counts every matter).
+      loadIntakeStageIds(),
     ]);
 
+  const alertsData = await alertsP;
+  const cameBack = await cameBackP;
   // loadActiveQueue never throws; a rejection would be a bug, shown as unavailable.
   const queue: QueueLoad = await mineQueue(queueS.status === "fulfilled" ? queueS.value : { status: "unavailable", items: [] }, { userId: session.user.id, role: session.role });
   const leads: Lead[] | null = leadsS.status === "fulfilled" ? leadsS.value : null;
@@ -128,8 +151,10 @@ export default async function TodayPage() {
   const submissions = submissionsS.status === "fulfilled" ? submissionsS.value : null;
   const closedDeadlines = closedS.status === "fulfilled" ? closedS.value : null;
   const members = membersS.status === "fulfilled" ? membersS.value : [];
+  const intakeIds = intakeIdsS.status === "fulfilled" ? intakeIdsS.value : null;
 
-  const docket = matters ? summarizeDocket(matters, now) : null;
+  // Matters still in an intake stage are not on the Matters page, so they are not "open matters" here either.
+  const docket = matters ? summarizeDocket(withoutIntake(matters, intakeIds), now) : null;
   const rows = buildCalendarRows(deadlines ?? [], tasks ?? [], now);
   const overdue = rows.filter((r) => r.overdueDays > 0).length;
   const weekAgo = now.getTime() - 7 * 86_400_000;
@@ -144,6 +169,7 @@ export default async function TodayPage() {
 
   const needs = buildNeedsYou({
     userId: session.user.id,
+    canOpenForms: canSeeFormsAndProposals(session.role),
     now,
     deadlines:
       deadlines?.filter((d) => !deadlineNeedsReview(d, civilDate(now))).map((d) => ({
@@ -182,6 +208,7 @@ export default async function TodayPage() {
     submissions,
     hotLeads,
     stalled: docket ? docket.stalled : null,
+    cameBack,
   });
 
   // Outcomes. Each is "—" with why when its source couldn't be read.
@@ -201,27 +228,25 @@ export default async function TodayPage() {
 
   return (
     <>
-      <div className="lx-page-head lx-page-head-list">
-        <div style={{ flex: 1, minWidth: 260 }}>
-          <h1 className="lx-h1">
+      <PageHeader
+        title={
+          <>
             Good {greeting(hourInZone(now, tz))}
             {greetingSuffix(firstName)}.
-          </h1>
-          {!firstName && <AddNameLink />}
-        </div>
-      </div>
+          </>
+        }
+        sub={!firstName && !(await previewingAs()) ? <AddNameLink /> : undefined}
+      />
 
       <div className="lx-kpis">
         <Kpi label="Waiting on you" value={queueValue} sub="drafts to approve" href="/dashboard/queue/" failed={queueFailed} />
         <Kpi label="Overdue" value={deadlines === null && tasks === null ? null : overdue} sub="deadlines and tasks past due" href="/dashboard/calendar/" />
-        <Kpi label={OUR_TURN} value={docket ? docket.waitingOn.firm : null} sub={docket ? `of ${docket.open} open matters` : ""} href="/dashboard/matters/?group=all&seg=firm" />
-        <Kpi label="New leads" value={newLeads ? newLeads.length : null} sub="in the last 7 days" href="/dashboard/intake/" />
+        <Kpi label={OUR_TURN} value={docket ? docket.waitingOn.firm : null} sub={docket ? `of ${docket.open} open matters` : ""} href={mattersListHref("group=all&seg=firm")} />
+        <Kpi label="New leads" value={newLeads ? newLeads.length : null} sub="in the last 7 days" href={intakeListHref()} />
       </div>
 
       {queue.status === "unavailable" && (
-        <p className="lx-banner lx-banner-risk" style={{ margin: 0 }}>
-          We couldn&apos;t reach the approval queue, so we don&apos;t know what&apos;s waiting. Refresh to try again.
-        </p>
+        <Notice tone="risk">We couldn&apos;t reach the approval queue, so we don&apos;t know what&apos;s waiting. Refresh to try again.</Notice>
       )}
 
       <GetSetUpCard role={session.role} />
@@ -229,6 +254,8 @@ export default async function TodayPage() {
       <div className="lx-split">
         <div className="lx-col">
           <TodayConsults />
+
+          <DeadlineAlertsCard data={alertsData} userId={session.user.id} />
 
           <NeedsYouSection needs={needs} queue={queue.status} />
 
@@ -238,27 +265,27 @@ export default async function TodayPage() {
         <aside className="lx-col lx-col-aside">
           <section className="lx-card lx-aside">
             <div className="lx-label">This month</div>
-            <div className="lx-task" style={{ padding: "2px 0" }}>
-              <Link href="/dashboard/matters/?group=all">Matters opened</Link>
-              <span className="lx-num">{opened ?? "—"}</span>
+            <div className="lx-task td-row">
+              <Link href={mattersListHref("group=all")}>Matters opened</Link>
+              <span className="lx-num">{opened ?? BLANK}</span>
             </div>
-            <div className="lx-task" style={{ padding: "2px 0" }}>
+            <div className="lx-task td-row">
               <Link href="/dashboard/calendar/" title="Deadlines closed as satisfied this month, on or before their due date">
                 Deadlines met
               </Link>
-              <span className="lx-num">{met ? `${met.met} of ${met.closed}` : "—"}</span>
+              <span className="lx-num">{met ? `${met.met} of ${met.closed}` : BLANK}</span>
             </div>
             {hasAgents && (
-              <div className="lx-task" style={{ padding: "2px 0" }}>
+              <div className="lx-task td-row">
                 <Link href="/dashboard/agents/" title={`est. using ${estimateAssumption(minutes)}`}>
                   Hours saved (est.)*
                 </Link>
-                <span className="lx-num">{estimate ? estimate.hours : "—"}</span>
+                <span className="lx-num">{estimate ? estimate.hours : BLANK}</span>
               </div>
             )}
-            {(opened === null || met === null) && <p className="lx-note" style={{ margin: 0 }}>A figure shown as — couldn&apos;t be read just now.</p>}
+            {(opened === null || met === null) && <p className="lx-note td-foot">A figure shown as — couldn&apos;t be read just now.</p>}
             {hasAgents && (
-              <p className="lx-note" style={{ margin: 0, fontSize: 12 }}>
+              <p className="lx-note td-foot">
                 * An estimate, not a measurement: completed agent tasks × your firm&apos;s minutes per task ({estimateAssumption(minutes)}).{" "}
                 <Link href="/dashboard/agents/">Change the minutes</Link>
               </p>
@@ -278,9 +305,9 @@ export default async function TodayPage() {
                   canResume={canResumeAutopilot(session.role)}
                 />
               ) : autopilot?.status === "unavailable" ? (
-                <p className="lx-note" role="alert" style={{ margin: 0, color: "var(--warn)" }}>
+                <Notice tone="warn" role="alert">
                   We couldn&apos;t read whether assistants are paused. Until we can, none of them run.
-                </p>
+                </Notice>
               ) : null}
               <RunDigestList digest={digest} paused={paused} />
               <Link href="/dashboard/agents/" className="lx-note">
@@ -294,13 +321,13 @@ export default async function TodayPage() {
             {docket ? (
               <>
                 {(["firm", "client", "uspto", "court"] as const).filter((w) => w !== "court" || docket.waitingOn.court > 0).map((w) => (
-                  <div key={w} className="lx-task" style={{ padding: "2px 0" }}>
-                    <Link href={`/dashboard/matters/?group=all&seg=${w}`}>{BAND_COPY[w].label}</Link>
+                  <div key={w} className="lx-task td-row">
+                    <Link href={mattersListHref(`group=all&seg=${w}`)}>{BAND_COPY[w].label}</Link>
                     <span className="lx-num">{docket.waitingOn[w]}</span>
                   </div>
                 ))}
                 {docket.stalled.length > 0 && (
-                  <Link href="/dashboard/matters/?group=all&seg=stalled" className="lx-note">
+                  <Link href={mattersListHref("group=all&seg=stalled")} className="lx-note">
                     {docket.stalled.length} gone quiet →
                   </Link>
                 )}
@@ -309,14 +336,14 @@ export default async function TodayPage() {
                 </Link>
               </>
             ) : (
-              <p className="lx-note" style={{ margin: 0 }}>Matters couldn&apos;t be loaded.</p>
+              <LoadFailedLine role="alert" refresh={false}>Matters couldn&apos;t be loaded.</LoadFailedLine>
             )}
           </section>
 
-          <div className="lx-upl">
+          <div className="lx-upl td-rule">
             <span aria-hidden="true">§</span>
             <div>
-              <b style={{ color: "var(--ox)" }}>The one rule.</b> Nothing reaches a client without a person approving it. Assistants draft;
+              <b>The one rule.</b> Nothing reaches a client without a person approving it. Assistants draft;
               Approvals is the only way out of the firm.
             </div>
           </div>

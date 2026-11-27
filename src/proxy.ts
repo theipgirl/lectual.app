@@ -2,7 +2,10 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { frameAncestors, frameTarget } from "@/lib/intake-forms/frame-policy";
 import { safeNext } from "@/lib/auth/safe-next";
+import { RETURN_PATH_HEADER, dashboardReturnPath } from "@/lib/auth/return-path";
 import { readFrameDomains } from "@/lib/intake-forms/frame-lookup";
+import { VIEW_AS_COOKIE, proxyRefuses } from "@/lib/views/view-as-rules";
+import { VIEW_AS_READ_ONLY } from "@/lib/ui/words";
 
 /**
  * Session refresh — the piece scoped-client.ts has always assumed existed.
@@ -35,6 +38,14 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     target.searchParams.set("code", code);
     target.searchParams.set("next", safeNextPath);
     return NextResponse.redirect(target);
+  }
+
+  // View as, Layer c: a QUICK refusal only. While the hint cookie is present, a non-GET on a signed-in path (and the OAuth
+  // connect / callback GETs) gets 409 here, before any work. It reads no preview state and decides nothing: the guarantee
+  // is previewSafe() on every action and the database net in getScopedClient() (the matcher skips some paths, and server
+  // functions can fall outside it). Enter, Exit and sign-out are let through by path.
+  if (request.cookies.get(VIEW_AS_COOKIE)?.value && proxyRefuses(request.method, request.nextUrl.pathname)) {
+    return new NextResponse(VIEW_AS_READ_ONLY, { status: 409, headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" } });
   }
 
   const response = await refreshSession(request);
@@ -71,8 +82,21 @@ async function applyFramePolicy(request: NextRequest, response: NextResponse): P
   if (policy) response.headers.set("Content-Security-Policy", policy);
 }
 
+/**
+ * Pass the request on, with the dashboard page's own path + query in RETURN_PATH_HEADER (a layout cannot read its
+ * URL, and the sign-in redirect needs it). A value sent by the browser is always dropped first. Built at the moment
+ * of the call so the refreshed session cookies Supabase just wrote onto the request are carried too.
+ */
+function passOn(request: NextRequest): NextResponse {
+  const headers = new Headers(request.headers);
+  headers.delete(RETURN_PATH_HEADER);
+  const back = dashboardReturnPath(request.nextUrl.pathname, request.nextUrl.search);
+  if (back) headers.set(RETURN_PATH_HEADER, back);
+  return NextResponse.next({ request: { headers } });
+}
+
 async function refreshSession(request: NextRequest): Promise<NextResponse> {
-  let response = NextResponse.next({ request });
+  let response = passOn(request);
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -84,7 +108,7 @@ async function refreshSession(request: NextRequest): Promise<NextResponse> {
       getAll: () => request.cookies.getAll(),
       setAll: (toSet) => {
         toSet.forEach(({ name, value }) => request.cookies.set(name, value));
-        response = NextResponse.next({ request });
+        response = passOn(request);
         toSet.forEach(({ name, value, options }) =>
           response.cookies.set(name, value, options),
         );

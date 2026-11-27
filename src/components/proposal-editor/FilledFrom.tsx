@@ -9,6 +9,7 @@ import {
   type ConsultBrand,
   type ConsultSkip,
 } from "@/lib/proposals/prefill";
+import { Notice } from "@/components/ui/Notice";
 
 /** The "Filled from" line: each source that was used, as `filledFromLine` words it. Nothing when nothing was chosen. */
 export function FilledFrom({ line }: { line: string | null }) {
@@ -24,7 +25,7 @@ export function FilledFrom({ line }: { line: string | null }) {
 export function ConsultSkipNote({ skip, leadId }: { skip: ConsultSkip; leadId: string }) {
   if (skip === "none") return null;
   return (
-    <p role="status" className="lx-banner lx-banner-mute" style={{ margin: 0 }}>
+    <Notice tone="mute" role="status">
       {skip === "not_reviewed" && (
         <>
           {NOT_REVIEWED_NOTE} <a href={`/dashboard/leads/${encodeURIComponent(leadId)}/`}>{REVIEW_ON_LEAD}</a>
@@ -33,7 +34,7 @@ export function ConsultSkipNote({ skip, leadId }: { skip: ConsultSkip; leadId: s
       {skip === "unreadable" && UNREADABLE_NOTE}
       {skip === "no_marks" && NO_MARKS_NOTE}
       {skip === "no_lead" && NO_LEAD_NOTE}
-    </p>
+    </Notice>
   );
 }
 

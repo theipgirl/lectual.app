@@ -19,6 +19,8 @@ export type InternalMail = {
   apiKey: string;
   from: string;
   to: string[];
+  /** Copied addresses. The caller guards them (src/lib/consult-prep/recipients.ts); this file only passes them on. */
+  cc?: string[];
   replyTo?: string;
   subject: string;
   text: string;
@@ -29,9 +31,25 @@ export type InternalMail = {
   label?: string;
   /** Sent as Resend's Idempotency-Key header: a retried send with the same key within 24 h is not delivered twice. */
   idempotencyKey?: string;
+  /** ISO time: Resend holds the email and sends it then (`scheduled_at`). Absent = send now. */
+  scheduledAt?: string;
+  /**
+   * Files sent with the email (Resend's `attachments`: a name and the content as base64). A Buffer is encoded here; a string is taken
+   * as base64 already. The caller keeps the total under Resend's 40 MB limit; this file only passes them on and never logs them.
+   */
+  attachments?: MailAttachment[];
 };
 
-export type InternalMailResult = { status: "sent" } | { status: "failed"; http: number | null };
+export type MailAttachment = { filename: string; content: Buffer | Uint8Array | string };
+
+/** Base64 for Resend: a Buffer or bytes are encoded, a string is taken as base64 already. */
+export function attachmentBase64(content: MailAttachment["content"]): string {
+  if (typeof content === "string") return content;
+  return Buffer.from(content).toString("base64");
+}
+
+/** `id` is Resend's id for the email (what a cancel needs), or null when the answer carried none. Never the body. */
+export type InternalMailResult = { status: "sent"; id?: string | null } | { status: "failed"; http: number | null };
 
 export async function sendInternalMail(mail: InternalMail): Promise<InternalMailResult> {
   const label = mail.label ?? "internal-mail";
@@ -47,19 +65,58 @@ export async function sendInternalMail(mail: InternalMail): Promise<InternalMail
       body: JSON.stringify({
         from: mail.from,
         to: mail.to,
+        ...(mail.cc && mail.cc.length > 0 ? { cc: mail.cc } : {}),
         ...(mail.replyTo ? { reply_to: mail.replyTo } : {}),
         subject: mail.subject,
         text: mail.text,
         ...(mail.html ? { html: mail.html } : {}),
+        ...(mail.scheduledAt ? { scheduled_at: mail.scheduledAt } : {}),
+        ...(mail.attachments && mail.attachments.length > 0
+          ? { attachments: mail.attachments.map((a) => ({ filename: a.filename, content: attachmentBase64(a.content) })) }
+          : {}),
       }),
     });
     if (!res.ok) {
       console.error(`[${label}] the email was refused (HTTP ${res.status}).`);
       return { status: "failed", http: res.status };
     }
-    return { status: "sent" };
+    // The id is the only thing read from the answer; the rest of it is never kept or logged.
+    let id: string | null = null;
+    try {
+      const body = (await res.json()) as { id?: unknown } | null;
+      id = typeof body?.id === "string" && body.id ? body.id : null;
+    } catch {
+      id = null;
+    }
+    return { status: "sent", id };
   } catch {
     console.error(`[${label}] the email could not be sent.`);
+    return { status: "failed", http: null };
+  }
+}
+
+export type CancelMail = { apiKey: string; id: string; fetchImpl?: typeof fetch; label?: string };
+export type CancelMailResult = { status: "cancelled" } | { status: "failed"; http: number | null };
+
+/**
+ * Cancels an email Resend is holding for a later time (`POST /emails/{id}/cancel`). Never throws, never returns or
+ * logs Resend's answer. An email that has already gone out is refused by Resend and reads as `failed`.
+ */
+export async function cancelInternalMail(cancel: CancelMail): Promise<CancelMailResult> {
+  const label = cancel.label ?? "internal-mail";
+  try {
+    const post = fetchWithTimeout(cancel.fetchImpl ?? fetch, INTERNAL_MAIL_TIMEOUT_MS);
+    const res = await post(`${RESEND_URL}/${encodeURIComponent(cancel.id)}/cancel`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${cancel.apiKey}`, "Content-Type": "application/json" },
+    });
+    if (!res.ok) {
+      console.error(`[${label}] the cancel was refused (HTTP ${res.status}).`);
+      return { status: "failed", http: res.status };
+    }
+    return { status: "cancelled" };
+  } catch {
+    console.error(`[${label}] the cancel could not be sent.`);
     return { status: "failed", http: null };
   }
 }

@@ -4,6 +4,9 @@ import { GENERAL_LIMITS } from "@/lib/proposals/validate";
 import type { GeneralFormValues } from "@/lib/proposal-editor/general-form";
 import { fieldId } from "@/lib/proposal-editor/checklist";
 import { newRowId, useRows } from "./rows";
+import { OPTIONAL } from "@/lib/ui/words";
+import { PAYMENT_TERMS_WORDS } from "@/lib/proposal-editor/vocabulary";
+import { PaymentTermsFields } from "./PaymentTermsFields";
 
 /**
  * Spec 9: the fields of a general (flat-fee) proposal: the matter, a summary, the work (each piece with hours and
@@ -11,8 +14,17 @@ import { newRowId, useRows } from "./rows";
  * nothing here writes text for the client and no amount is worked out in the browser (the server and the client page
  * price through `quoteProposal`). Used by New proposal and by the editor.
  */
-export function GeneralFields({ values, editable = true }: { values: GeneralFormValues; editable?: boolean }) {
-  const start = values.items.length > 0 ? values.items : [{ id: "", label: "", hours: "", rate: "", value: "" }];
+export function GeneralFields({
+  values,
+  editable = true,
+  paymentTerms,
+}: {
+  values: GeneralFormValues;
+  editable?: boolean;
+  /** "Due today" (a deposit), in the editor only: New proposal doesn't offer it. */
+  paymentTerms?: { dueNowPct: string; balanceNote: string };
+}) {
+  const start = values.items.length > 0 ? values.items : [{ id: "", label: "", hours: "", rate: "", value: "", intro: "", details: "" }];
   const list = useRows(start);
   return (
     <div className="pe-general" id={fieldId.general}>
@@ -28,7 +40,7 @@ export function GeneralFields({ values, editable = true }: { values: GeneralForm
         />
       </label>
       <label className="lx-field">
-        <span className="lx-label">Summary (optional)</span>
+        <span className="lx-label">Summary<span className="lx-optional"> {OPTIONAL}</span></span>
         <textarea className="lx-input" name="summary" rows={3} maxLength={GENERAL_LIMITS.summary} defaultValue={values.summary} />
         <span className="lx-note">A short paragraph the client reads above the work.</span>
       </label>
@@ -58,6 +70,23 @@ export function GeneralFields({ values, editable = true }: { values: GeneralForm
               ) : (
                 <span />
               )}
+              <div className="pe-work-more">
+                <label className="lx-field">
+                  <span className="lx-label">{PAYMENT_TERMS_WORDS.workIntroLabel}</span>
+                  <textarea
+                    className="lx-input"
+                    name={`item.${i}.intro`}
+                    rows={2}
+                    maxLength={GENERAL_LIMITS.intro}
+                    defaultValue={row.intro}
+                    aria-label={`Work ${i + 1} intro`}
+                  />
+                </label>
+                <label className="lx-field">
+                  <span className="lx-label">{PAYMENT_TERMS_WORDS.workDetailsLabel}</span>
+                  <textarea className="lx-input" name={`item.${i}.details`} rows={3} defaultValue={row.details} aria-label={`Work ${i + 1} details`} />
+                </label>
+              </div>
             </div>
           ))}
         </div>
@@ -65,7 +94,7 @@ export function GeneralFields({ values, editable = true }: { values: GeneralForm
           <button
             type="button"
             className="lx-btn lx-btn-sec lx-btn-sm"
-            onClick={() => list.add({ id: newRowId("w"), label: "", hours: "", rate: "", value: "" })}
+            onClick={() => list.add({ id: newRowId("w"), label: "", hours: "", rate: "", value: "", intro: "", details: "" })}
           >
             Add a piece of work
           </button>
@@ -77,12 +106,13 @@ export function GeneralFields({ values, editable = true }: { values: GeneralForm
         <input className="lx-input" name="fee" required inputMode="decimal" defaultValue={values.fee} placeholder="500" />
         <span className="lx-note">What the client pays. A flat fee only: never a percentage.</span>
       </label>
+      {paymentTerms ? <PaymentTermsFields values={paymentTerms} /> : null}
       <label className="lx-field">
         <span className="lx-label">Not included (one per line, optional)</span>
         <textarea className="lx-input" name="excludes" rows={3} defaultValue={values.excludes} />
       </label>
       <label className="lx-field">
-        <span className="lx-label">Terms note (optional)</span>
+        <span className="lx-label">Terms note<span className="lx-optional"> {OPTIONAL}</span></span>
         <textarea className="lx-input" name="termsNote" rows={2} maxLength={GENERAL_LIMITS.termsNote} defaultValue={values.termsNote} />
       </label>
     </div>

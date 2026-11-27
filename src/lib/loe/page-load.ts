@@ -1,5 +1,5 @@
 import "server-only";
-import { currentRole } from "@/lib/auth/current-role";
+import { previewingAs, viewerRole } from "@/lib/views/view-as";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { listMemberDirectory } from "@/lib/members/directory";
 import { firstNameOf } from "@/lib/proposal-editor/labels";
@@ -7,6 +7,7 @@ import { getProposalSettings } from "@/lib/proposals/store";
 import { PROPOSAL_ADMIN_ROLES, PROPOSAL_STAFF_WRITE_ROLES } from "@/lib/proposals/types";
 import type { LetterPageModel } from "./page-model";
 import { listLetterVersions } from "./templates-store";
+import { TEAMMATE } from "@/lib/ui/words";
 
 /**
  * Everything the Engagement letter settings page draws, read through the caller's scoped client.
@@ -15,7 +16,8 @@ import { listLetterVersions } from "./templates-store";
  */
 export async function loadLetterPage(): Promise<LetterPageModel> {
   const db = await getScopedClient();
-  const [read, role] = await Promise.all([listLetterVersions(db), currentRole()]);
+  // Drawn for the VIEWER (View as: the teammate's role and id); the actions re-check with the session.
+  const [read, role, previewing] = await Promise.all([listLetterVersions(db), viewerRole(), previewingAs()]);
   if (read.status === "not-set-up") return { status: "not-set-up" };
   if (read.status === "unavailable") return { status: "unavailable" };
 
@@ -26,12 +28,12 @@ export async function loadLetterPage(): Promise<LetterPageModel> {
   let userId: string | null = null;
   let approverIds: string[] = [];
   try {
-    const [settings, members, auth] = await Promise.all([getProposalSettings(), listMemberDirectory(), db.auth.getUser()]);
-    userId = auth.data.user?.id ?? null;
+    const [settings, members, auth] = await Promise.all([getProposalSettings(), listMemberDirectory(), previewing ? null : db.auth.getUser()]);
+    userId = previewing ? previewing.userId : (auth?.data.user?.id ?? null);
     approverIds = settings?.approver_user_ids ?? [];
     const names = approverIds.map((id) => {
       const m = members.find((x) => x.userId === id);
-      return m ? (m.displayName ?? firstNameOf(m.email) ?? m.email ?? "A teammate") : "A teammate";
+      return m ? (m.displayName ?? firstNameOf(m.email) ?? m.email ?? TEAMMATE) : TEAMMATE;
     });
     approvers = { status: "ok", names };
   } catch {

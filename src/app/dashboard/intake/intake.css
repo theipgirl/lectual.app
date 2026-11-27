@@ -1,53 +1,16 @@
 /* ============================================================
-   INTAKE: the design-canvas skin from lectual's /intake, scoped to
-   `.intake-root` (ported from lectual src/app/(intake)/intake.css).
-
-   Inside lectual.app it sits in the app shell (rail + top bar), so the
-   intake route group's own rail, top bar and 100dvh frame are not
-   ported. Everything else is verbatim: tokens, type, cards, the
-   inner-scrolling tables and boards, links and focus rings.
-
-   Mono labels use the app's mono face (Courier Prime) so the page
-   reads as one system with the rest of the workspace.
+   INTAKE: the page wrapper and the few Intake-only pieces, scoped to `.intake-root`. Colours, type sizes, links and the focus ring
+   are the shared ones in globals.css (one sans face, no private tokens).
    ============================================================ */
 
 .intake-root {
-  --ink: #2a1216;
-  --ink2: #4a2a2e;
-  --mute: #7a5a5e;
-  --ground: #f6f0e3;
-  --surface: #fffdf7;
-  --surface2: #f1e8d8;
-  --line: rgba(42, 18, 22, 0.13);
-  --ox: #6a1f2b;
-  --burg: #8e2733;
-  --blush: #efd9dc;
-  --cream: #fdf7eb;
-  --ok: #43602f;
-  --warn: #7c5312;
-  --crit: #8e2733;
-  --okbg: rgba(67, 96, 47, 0.12);
-  --warnbg: rgba(124, 83, 18, 0.12);
-  --critbg: rgba(142, 39, 51, 0.12);
-  --oxbg: rgba(106, 31, 43, 0.1);
-  --shadow: 0 1px 2px rgba(20, 4, 8, 0.05), 0 12px 28px -22px rgba(20, 4, 8, 0.4);
-  --rowh: 46px;
-
-  background: var(--ground);
-  color: var(--ink);
-  font-family: var(--font-geist), system-ui, sans-serif;
-  -webkit-font-smoothing: antialiased;
-
-}
-
-.intake-root {
-  --font-jetbrains-mono: var(--font-courier-prime);
-  --font-mono: var(--font-courier-prime), monospace;
   background: transparent;
+  color: var(--ink);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
 }
 
-/* The app page column scrolls; intake wants its table/board to scroll
-   inside itself, so it takes the column's full height instead. */
+/* The page scrolls (the lists draw their own cards). */
 .lx-page > .intake-root {
   flex: 1 1 auto;
   min-height: 0;
@@ -55,89 +18,14 @@
   flex-direction: column;
 }
 
-/* ---- type ---------------------------------------------------------- */
-
-.intake-root .intake-serif {
-  font-family: var(--font-instrument-serif), serif;
-}
-
-.intake-root .intake-mono {
-  font-family: var(--font-jetbrains-mono), monospace;
-}
-
-/* The canvas's small-caps label: column heads, section labels, the
-   top-bar eyebrow. 10.5px is deliberate — it is a label, not copy. */
-.intake-root .intake-eyebrow {
-  font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 12px;
-  letter-spacing: 0.17em;
-  text-transform: uppercase;
-  color: var(--mute);
-}
-
-/* ---- surfaces ------------------------------------------------------ */
-
-.intake-root .intake-card {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  box-shadow: var(--shadow);
-}
-
-/* Every table, board and long list on these pages scrolls INSIDE one of
-   these, never by moving the page. A law firm reading a row across on a
-   laptop must not lose the rail and the top bar off the left edge. */
-.intake-root .intake-scroll {
-  overflow: auto;
-  min-height: 0;
-  min-width: 0;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(42, 18, 22, 0.22) transparent;
-}
-
-.intake-root .intake-scroll::-webkit-scrollbar {
-  width: 9px;
-  height: 9px;
-}
-
-.intake-root .intake-scroll::-webkit-scrollbar-thumb {
-  background: rgba(42, 18, 22, 0.22);
-  border-radius: 999px;
-}
-
-.intake-root .intake-scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-/* ---- links + focus ------------------------------------------------- */
-
-.intake-root a {
-  color: var(--burg);
-  text-decoration: none;
-}
-
-.intake-root a:hover {
-  color: var(--ox);
-  text-decoration: underline;
-}
-
-/* One visible ring for everything focusable. Oxblood rather than the UA
-   default because the default blue is invisible against --blush. */
-.intake-root :focus-visible {
-  outline: 2px solid var(--ox);
-  outline-offset: 2px;
-  border-radius: 6px;
-}
-
-/* The page's own column. min-height:0 so a table inside it can be the
-   thing that scrolls (see .intake-scroll) instead of the document. */
+/* The page's own column (Reconcile). */
 .intake-content {
   flex: 1;
   min-height: 0;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--gap-section);
   padding: 0 0 8px;
   box-sizing: border-box;
 }
@@ -150,13 +38,14 @@
   gap: 5px;
   max-width: 100%;
   min-width: 0;
-  padding: 2px 7px;
-  border-radius: 5px;
-  /* The assistants' own colour (--asst-*, leads.css): green, never the oxblood tint of a person's pills. */
-  background: var(--asst-bg);
-  color: var(--asst-fg);
-  font-family: var(--font-geist), system-ui, sans-serif;
-  font-size: var(--lp-meta, 13px);
+  padding: 2px 8px;
+  border-radius: var(--r-sm);
+  /* The assistants' own colour (--ok, --tint-ok): green, never the oxblood tint of a person's pills. */
+  background: var(--tint-ok);
+  color: var(--ok);
+  font-family: var(--sans);
+  font-size: var(--fs-1);
+  font-weight: 500;
   line-height: 1.35;
   /* It may wrap to a second line; the tooltip holds the evidence. */
   white-space: normal;
@@ -169,62 +58,15 @@
   overflow-wrap: break-word;
 }
 
-/* ---- Sprint 29: why a card is in its column, stage decisions, bulk select ---- */
-
-.intake-root .intake-why {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: normal;
-  font-size: var(--lp-meta, 13px);
-  line-height: 1.4;
-  color: var(--ink2);
-}
-
-.intake-root .intake-decision-pill {
-  display: inline-block;
-  max-width: 100%;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  padding: 2px 7px;
-  border-radius: 5px;
-  background: var(--warnbg);
-  color: var(--warn);
-  font-family: var(--font-geist), system-ui, sans-serif;
-  font-size: var(--lp-meta, 13px);
-  line-height: 1.4;
-  white-space: normal;
-}
-
-.intake-root .intake-column-badge {
-  padding: 2px 6px;
-  border-radius: 5px;
-  background: var(--warnbg);
-  color: var(--warn);
-  font-family: var(--font-geist), system-ui, sans-serif;
-  font-size: var(--lp-meta, 13px);
-  line-height: 1.4;
-  white-space: nowrap;
-}
+/* ---- bulk select on the board ---- */
 
 .intake-root .intake-select {
   flex: none;
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
   margin: 0;
   accent-color: var(--ox);
   cursor: pointer;
-}
-
-.intake-root .intake-select:focus-visible {
-  outline: 2px solid var(--ox);
-  outline-offset: 2px;
-}
-
-.intake-root .intake-card-selected {
-  border-color: var(--ox);
-  background: var(--oxbg);
 }
 
 .intake-root .intake-bulk {
@@ -234,26 +76,11 @@
   gap: 8px 10px;
   padding: 8px 12px;
   border: 1px solid var(--ox);
-  border-radius: 10px;
-  background: var(--cream);
-  font-size: 13px;
+  border-radius: var(--r-md);
+  background: var(--card);
+  font-size: var(--fs-1);
   color: var(--ink);
 }
-
-.intake-root .intake-bulk select {
-  min-width: 0;
-  max-width: 100%;
-  padding-block: 5px;
-  padding-left: 8px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background-color: var(--surface);
-  color: var(--ink);
-  font: inherit;
-}
-
-.intake-root .intake-bulk select:focus-visible,
-.intake-root .intake-bulk button:focus-visible {
-  outline: 2px solid var(--ox);
-  outline-offset: 2px;
-}
+.ix-bulk-label { display: inline-flex; align-items: center; gap: 6px; }
+.intake-root .intake-bulk select.lx-input { width: auto; min-width: 0; max-width: 100%; }
+@media (pointer: coarse), (max-width: 640px) { .intake-root .intake-select { width: 24px; height: 24px; } }

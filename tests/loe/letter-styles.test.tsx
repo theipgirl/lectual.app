@@ -31,7 +31,7 @@ import { PreviewBlock } from "@/components/proposal-editor/LetterSwitch";
 import { quoteWithClientClasses } from "@/lib/proposals/client-classes";
 import { defaultSelection } from "@/lib/proposals/pricing";
 import type { AcceptedSnapshot } from "@/lib/proposals/types";
-import { sevetri } from "../proposals/fixture";
+import { callum } from "../proposals/fixture";
 import { TEST_DETAILS, fullLetterBlocks, fullLetterBody } from "./full-letter-fixture";
 
 vi.mock("next/server", () => ({ after: vi.fn() }));
@@ -39,8 +39,8 @@ vi.mock("@/lib/proposals/accept-followups", () => ({ runAcceptanceFollowups: vi.
 
 const VALUES = { ...SAMPLE_VALUES };
 
-function exhibitForSevetri() {
-  const content = sevetri();
+function exhibitForCallum() {
+  const content = callum();
   const priced = quoteWithClientClasses(content, defaultSelection(content), { entries: {}, added: {} });
   if (!priced.ok) throw new Error("no quote");
   return buildExhibit(priced.content, priced.quote, money);
@@ -51,7 +51,7 @@ function letterBeforeMarkers(): string {
   return readFileSync(join(process.cwd(), "tests", "loe", "__fixtures__", "rpb-letter-before-markers.txt"), "utf8").trim();
 }
 
-const INPUTS = { details: TEST_DETAILS, typedName: "Sevetri Wilson", dateText: "November 12, 2026", clientEmail: "sevetri@example.com" };
+const INPUTS = { details: TEST_DETAILS, typedName: "Callum Ferreira", dateText: "November 12, 2026", clientEmail: "callum@example.com" };
 
 describe("style markers are read from the template", () => {
   it("reads a marker on its own line, drops it from the text, and orders the styles one way", () => {
@@ -213,7 +213,7 @@ describe("the RPB letter: logo, address line, rule, and the words", () => {
   });
 
   it("the agreement text is the words only: the old text with the firm-name line as its own paragraph", () => {
-    const exhibit = exhibitForSevetri();
+    const exhibit = exhibitForCallum();
     const before = assembleAgreement({ body: letterBeforeMarkers(), inputs: INPUTS, exhibit });
     const after = assembleAgreement({ body: fullLetterBody(), inputs: INPUTS, exhibit });
     if (!before.ok || !after.ok) throw new Error("no agreement");
@@ -226,19 +226,19 @@ describe("the RPB letter: logo, address line, rule, and the words", () => {
 
   it("a letter with no markers gives exactly the agreement text, canonical form and fingerprint the code gave before styles", async () => {
     // Pinned from the code at 021c352 (before style markers), over the RPB letter as it was then.
-    const r = assembleAgreement({ body: letterBeforeMarkers(), inputs: INPUTS, exhibit: exhibitForSevetri() });
+    const r = assembleAgreement({ body: letterBeforeMarkers(), inputs: INPUTS, exhibit: exhibitForCallum() });
     if (!r.ok) throw new Error("no agreement");
     expect(r.agreement.blocks.some((b) => "style" in b)).toBe(false);
-    expect(r.agreement.text.length).toBe(16552);
-    expect(agreementTextSha256(r.agreement.text)).toBe("909ce0fffaa85d9e52756a466e025444012f9118a4d47a8c0d2cb8c447c1fad4");
-    expect(r.agreement.canonical.length).toBe(18080);
-    expect(canonicalFingerprint(r.agreement.canonical)).toBe("57bff724884b4802abbf6819cb7a75f3f114dd5de0bb9c8fdbd20a2ec0c3cdbb");
+    expect(r.agreement.text.length).toBe(16542);
+    expect(agreementTextSha256(r.agreement.text)).toBe("7de0b56ea656fb7a24ccb362d2585d15d2cfdd4abcee0a36c8bb07671b4bb9c0");
+    expect(r.agreement.canonical.length).toBe(18069);
+    expect(canonicalFingerprint(r.agreement.canonical)).toBe("f0882f5f72a6476d279671316cff19b1cf8ced5ad17bcca03ed7676550812c99");
     expect(wordsOnly(r.agreement.blocks)).toEqual(r.agreement.blocks);
   });
 
   it("the page's fingerprint equals the server's, and the rebuilt signed letter verifies against the stored sha256", async () => {
-    const exhibit = exhibitForSevetri();
-    const state = { body: fullLetterBody(), details: TEST_DETAILS, typedName: "Sevetri  Wilson", dateText: "November 11, 2026", clientEmail: "sevetri@example.com", exhibit };
+    const exhibit = exhibitForCallum();
+    const state = { body: fullLetterBody(), details: TEST_DETAILS, typedName: "Callum  Ferreira", dateText: "November 11, 2026", clientEmail: "callum@example.com", exhibit };
     const page = pageAgreement(state);
     const payload = await pageSigningPayload({ ...state, agree: true });
     if (!page || !payload) throw new Error("the page could not sign");
@@ -247,12 +247,12 @@ describe("the RPB letter: logo, address line, rule, and the words", () => {
     // The server's side, as `signAndAccept` does it: clean, assemble with ITS date, compare fingerprints.
     const checked = checkSigning(payload);
     if (!checked.ok) throw new Error("refused");
-    const server = assembleAgreement({ body: fullLetterBody(), inputs: { details: checked.details, typedName: checked.typedName, dateText: "November 12, 2026", clientEmail: "sevetri@example.com" }, exhibit });
+    const server = assembleAgreement({ body: fullLetterBody(), inputs: { details: checked.details, typedName: checked.typedName, dateText: "November 12, 2026", clientEmail: "callum@example.com" }, exhibit });
     if (!server.ok) throw new Error("no agreement");
     expect(payload.fingerprint).toBe(canonicalFingerprint(server.agreement.canonical));
 
     const sha256 = agreementTextSha256(server.agreement.text);
-    const content = { ...sevetri(), loe: { kind: "trademark" as const, template_id: null, template_version: 3, title: "Engagement letter", body: fullLetterBody() } };
+    const content = { ...callum(), loe: { kind: "trademark" as const, template_id: null, template_version: 3, title: "Engagement letter", body: fullLetterBody() } };
     const priced = quoteWithClientClasses(content, defaultSelection(content), { entries: {}, added: {} });
     if (!priced.ok) throw new Error("no quote");
     const snapshot = {
@@ -262,7 +262,7 @@ describe("the RPB letter: logo, address line, rule, and the words", () => {
       quote: priced.quote,
       accepted_at: "2026-11-12T19:14:00.000Z",
       agreement: { signature_id: "sig-1", signer_name: checked.typedName, signed_at: "2026-11-12T19:14:00.000Z", sha256, template_version: 3 },
-      signing: { details: { ...checked.details }, date_text: "November 12, 2026", client_email: "sevetri@example.com" },
+      signing: { details: { ...checked.details }, date_text: "November 12, 2026", client_email: "callum@example.com" },
     } as unknown as AcceptedSnapshot;
     const rebuilt = rebuildSignedLetter(snapshot, "America/New_York");
     expect(rebuilt).not.toBeNull();
@@ -310,11 +310,11 @@ async function pdfItems(bytes: Uint8Array): Promise<{ items: PdfItem[]; pageWidt
 describe("the PDF draws the styles", () => {
   it("logo, then the centred address line, then the letter in order; Sincerely and the signer are indented", async () => {
     const blocks = fullLetterBlocks();
-    const bytes = await buildLetterPdf({ blocks, exhibit: exhibitForSevetri(), details: TEST_DETAILS, mode: "review", firmName: "RPB Law Firm", logo: RPB_LETTER_LOGO });
+    const bytes = await buildLetterPdf({ blocks, exhibit: exhibitForCallum(), details: TEST_DETAILS, mode: "review", firmName: "RPB Law Firm", logo: RPB_LETTER_LOGO });
     const pdf = await getDocumentProxy(new Uint8Array(bytes));
     const { text } = await extractText(pdf, { mergePages: true });
     const flat = text.replace(/\s+/g, " ");
-    const order = ["333 S.E. 2nd Avenue", "November 12, 2026", "Via Email: sevetri@example.com", "Re: Letter of Engagement for Legal Services", "Dear Sevetri Wilson:", "Sincerely yours,", "Rebecca P. Beliard, Esq.", "ACKNOWLEDGED AND AGREED TO:", "By: Sevetri Wilson"];
+    const order = ["333 S.E. 2nd Avenue", "November 12, 2026", "Via Email: callum@example.com", "Re: Letter of Engagement for Legal Services", "Dear Callum Ferreira:", "Sincerely yours,", "Rebecca P. Beliard, Esq.", "ACKNOWLEDGED AND AGREED TO:", "By: Callum Ferreira"];
     let at = -1;
     for (const s of order) {
       const i = flat.indexOf(s, at + 1);
@@ -332,7 +332,7 @@ describe("the PDF draws the styles", () => {
     expect(address!.x).toBeGreaterThan(64 + 10);
     const re = items.find((i) => i.str.startsWith("Re: Letter of Engagement"));
     expect(Math.abs(re!.x + re!.w / 2 - pageWidth / 2)).toBeLessThan(4);
-    const dear = items.find((i) => i.str.startsWith("Dear Sevetri"));
+    const dear = items.find((i) => i.str.startsWith("Dear Callum"));
     expect(dear!.x).toBeCloseTo(64, 0);
     const sincerely = items.find((i) => i.str.startsWith("Sincerely yours"));
     const rebecca = items.find((i) => i.str.startsWith("Rebecca P. Beliard"));
@@ -344,16 +344,16 @@ describe("the PDF draws the styles", () => {
 
   it("without the logo the firm-name letterhead still comes first, and the review mark and signature record are unchanged", async () => {
     const blocks = fullLetterBlocks();
-    const review = await buildLetterPdf({ blocks, exhibit: exhibitForSevetri(), details: TEST_DETAILS, mode: "review", firmName: "RPB Law Firm" });
+    const review = await buildLetterPdf({ blocks, exhibit: exhibitForCallum(), details: TEST_DETAILS, mode: "review", firmName: "RPB Law Firm" });
     const r = (await extractText(await getDocumentProxy(new Uint8Array(review)), { mergePages: true })).text.replace(/\s+/g, " ");
     expect(r.indexOf("RPB Law Firm")).toBeLessThan(r.indexOf("333 S.E."));
     expect(r).toContain("Review copy");
     const signed = await buildLetterPdf({
       blocks,
-      exhibit: exhibitForSevetri(),
+      exhibit: exhibitForCallum(),
       details: TEST_DETAILS,
       mode: "signed",
-      signature: { signerName: "Sevetri Wilson", signedAtText: "November 12, 2026 at 2:14 PM EST", signedAtUtc: "2026-11-12T19:14:00.000Z", fingerprint: "ab".repeat(32) },
+      signature: { signerName: "Callum Ferreira", signedAtText: "November 12, 2026 at 2:14 PM EST", signedAtUtc: "2026-11-12T19:14:00.000Z", fingerprint: "ab".repeat(32) },
       logo: RPB_LETTER_LOGO,
     });
     const s = (await extractText(await getDocumentProxy(new Uint8Array(signed)), { mergePages: true })).text.replace(/\s+/g, " ");

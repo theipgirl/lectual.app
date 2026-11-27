@@ -1,6 +1,7 @@
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { canSeeBilling } from "@/lib/billing/can-see";
 import { loadMatterInvoices } from "@/lib/billing/load";
+import { getFirmTimeZone } from "@/lib/org/profile";
 import { BillingCard } from "./BillingCard";
 
 /**
@@ -9,8 +10,8 @@ import { BillingCard } from "./BillingCard";
  * `canSeeBilling` check decides whether to mount it, and this asks again before anything is read.
  */
 export async function MatterBilling({ lawmaticsId }: { lawmaticsId: string | null }) {
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   if (session.kind !== "ok" || !canSeeBilling(session.role)) return null;
   const read = await loadMatterInvoices(lawmaticsId);
-  return <BillingCard read={read} />;
+  return <BillingCard read={read} tz={await getFirmTimeZone()} />;
 }

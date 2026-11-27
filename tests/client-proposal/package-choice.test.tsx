@@ -8,14 +8,14 @@ vi.mock("next/font/google", () => ({
 
 import { ProposalDocument, includesComparison, type ProposalDocumentProps } from "@/components/client-proposal/ProposalDocument";
 import { normalizeSelection, quoteProposal } from "@/lib/proposals/pricing";
-import { danielle } from "../proposals/danielle-fixture";
+import { renata } from "../proposals/renata-fixture";
 
 function render(over: Partial<ProposalDocumentProps> = {}) {
   return renderToStaticMarkup(
     <ProposalDocument
-      content={danielle()}
+      content={renata()}
       title="Trademark Proposal"
-      clientName="Danielle Milton"
+      clientName="Renata Ostrowski"
       expiresOn={null}
       firm={{ name: "Hartwell", slug: "hartwell" }}
       mode="live"
@@ -44,8 +44,8 @@ describe("Select your package (Spec 6)", () => {
 
   it("next to it: the price for this brand name and the package's terms", () => {
     const html = render();
-    expect(html).toContain("Enhanced: $4,075 legal fee for “The Fold” · includes 2 classes, each additional class $825");
-    expect(html).toContain("Enhanced: $2,925 legal fee for “The Confidence Interval” (after 10% off) · includes 2 classes, each additional class $825");
+    expect(html).toContain("Enhanced: $4,075 legal fee for “The Pleat” · includes 2 classes, each additional class $825");
+    expect(html).toContain("Enhanced: $2,925 legal fee for “The Margin Note” (after 10% off) · includes 2 classes, each additional class $825");
   });
 
   it("classes stay checkboxes, Add a class is offered, and the review panel names the package", () => {
@@ -53,26 +53,26 @@ describe("Select your package (Spec 6)", () => {
     expect(html).toContain("Class 1 · Clothing");
     expect((html.match(/type="checkbox"/g) ?? []).length).toBe(7);
     expect(html).toContain("Add a class");
-    expect(html).toContain("<h3>“The Fold” — Enhanced</h3>");
-    expect(html).toContain("<h3>“The Confidence Interval” — Enhanced</h3>");
+    expect(html).toContain("<h3>“The Pleat” — Enhanced</h3>");
+    expect(html).toContain("<h3>“The Margin Note” — Enhanced</h3>");
     expect(html).toContain("$7,000");
   });
 
   it("starting picks other than the default re-price through the same helper", () => {
     const html = render({ initialSelection: { packages: { fold: "Concierge", ci: "Essential" } } });
     expect(html).toContain('<option value="Concierge" selected="">Concierge</option>');
-    expect(html).toContain("Concierge: $4,950 legal fee for “The Fold”");
-    expect(html).toContain("Essential: $2,497.50 legal fee for “The Confidence Interval” (after 10% off)");
+    expect(html).toContain("Concierge: $4,950 legal fee for “The Pleat”");
+    expect(html).toContain("Essential: $2,497.50 legal fee for “The Margin Note” (after 10% off)");
   });
 });
 
 describe("the receipt (Spec 6)", () => {
   it("shows '<Brand name> — <Package>' and no select", () => {
-    const c = danielle();
+    const c = renata();
     const sel = normalizeSelection(c, { "fold-word": true, "fold-c1": true, "fold-c2": true, "fold-c3": true, "ci-word": true, "ci-c1": true, "ci-c2": true, packages: { fold: "Concierge", ci: "Essential" } });
     const html = render({ mode: "accepted", initialSelection: sel, acceptedQuote: quoteProposal(c, sel), payUrl: "https://example.com/pay" });
-    expect(html).toContain("<h3>“The Fold” — Concierge</h3>");
-    expect(html).toContain("<h3>“The Confidence Interval” — Essential</h3>");
+    expect(html).toContain("<h3>“The Pleat” — Concierge</h3>");
+    expect(html).toContain("<h3>“The Margin Note” — Essential</h3>");
     expect(html).toContain("<h4>Package: Concierge</h4>");
     expect(html).not.toContain("<select");
   });
@@ -80,7 +80,7 @@ describe("the receipt (Spec 6)", () => {
 
 describe("What each package includes (Spec 6)", () => {
   it("one comparison table, a column per offered package, when the packages carry includes", () => {
-    const c = danielle();
+    const c = renata();
     c.packages = c.packages!.map((p, i) => ({ ...p, includes: [{ label: "Search report", included: String(i + 1) }, ...(i === 2 ? [{ label: "Post registration monitoring", included: "✓" }] : [])] }));
     const table = includesComparison(c);
     expect(table?.packages).toEqual(["Essential", "Enhanced", "Concierge"]);
@@ -97,7 +97,7 @@ describe("What each package includes (Spec 6)", () => {
 
   it("without package includes, the existing table is unchanged", () => {
     const html = render();
-    expect(includesComparison(danielle())).toBeNull();
+    expect(includesComparison(renata())).toBeNull();
     expect(html).toContain("What your package includes");
   });
 });

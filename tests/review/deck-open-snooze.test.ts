@@ -4,7 +4,7 @@ import { buildDeck, chosenPerson, defaultPerson, deckPeople } from "@/lib/review
 import { parseOpenParam } from "@/lib/review/open";
 import { parseReviewParams, reviewHref } from "@/lib/review/params";
 import { snoozeDate } from "@/lib/review/snooze";
-import { activityLines, clipNote, leadStageChoices } from "@/lib/review/detail";
+import { clipNote, leadStageChoices } from "@/lib/review/detail";
 import { initials } from "@/lib/review/format";
 import { limitTags, rowTags } from "@/lib/review/tags";
 import { noticeFor } from "@/lib/review/notice";
@@ -126,20 +126,9 @@ describe("small pure helpers", () => {
     ]);
     expect(out.map((o) => o.id)).toEqual(["1", "3", "4"]);
   });
-  it("notes are clipped to 200 characters; only notes carry their text", () => {
+  it("notes are clipped to 200 characters", () => {
     expect(clipNote("x".repeat(500))).toHaveLength(200);
     expect(clipNote("  short ")).toBe("short");
-    const lines = activityLines(
-      [
-        { id: "1", type: "note", actor_type: "user", created_at: "2026-10-30T15:00:00Z", payload: { note: "n".repeat(300) } },
-        { id: "2", type: "email_sent", actor_type: "user", created_at: "2026-10-29T15:00:00Z", payload: { subject: "Secret subject" } },
-      ],
-      "America/New_York",
-      TODAY,
-    );
-    expect(lines[0].note).toHaveLength(200);
-    expect(lines[0].when).toBe("Oct 30");
-    expect(lines[1].note).toBeNull();
   });
   it("notices are fixed sentences chosen by a closed code", () => {
     expect(noticeFor("denied")).toMatch(/permission/);

@@ -10,7 +10,7 @@ describe("the state-to-pill mapping", () => {
   });
 
   it("gives every state a tone class from the shared pill set", () => {
-    for (const s of INTEGRATION_STATES) expect(integrationPill(s).tone).toMatch(/^lx-pill-(ok|warn|risk|mute)$/);
+    for (const s of INTEGRATION_STATES) expect(integrationPill(s).tone).toMatch(/^(ok|warn|risk|mute)$/);
   });
 
   it("maps a stored connection status to a state", () => {

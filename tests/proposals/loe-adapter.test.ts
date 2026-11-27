@@ -12,7 +12,7 @@ import {
   LOE_REFUSAL_TEXT,
 } from "@/lib/proposals/loe-adapter";
 import { quoteWithClientClasses } from "@/lib/proposals/client-classes";
-import { sevetri } from "./fixture";
+import { callum } from "./fixture";
 import { acceptedSnapshot, CONCIERGE } from "./accepted-fixture";
 
 const FACTS = { packages: [CONCIERGE], todayIso: "2026-10-22" };
@@ -29,9 +29,9 @@ describe("loeInputFromAcceptedProposal: a real-shaped accepted snapshot", () => 
     expect(input).toMatchObject({
       variant: "current",
       packageName: "Concierge",
-      clientName: "Sevetri Wilson",
-      entityName: "Prosperall",
-      markText: "Prosperall",
+      clientName: "Callum Ferreira",
+      entityName: "Larkmoor",
+      markText: "Larkmoor",
       classSelected: "Cloud-Based Software as a Service (SaaS), Consulting & Professional Services",
       classCount: 2,
       sendDateIso: "2026-10-22",
@@ -49,7 +49,7 @@ describe("loeInputFromAcceptedProposal: a real-shaped accepted snapshot", () => 
 
   it("drops a row whose included cell is blank or a dash, and keeps a row with a note", () => {
     const includes = [
-      ...sevetri().includes,
+      ...callum().includes,
       { label: "Trademark Watch", included: "—" },
       { label: "Logo redesign", included: "-" },
       { label: "Expedited filing", included: "  " },
@@ -57,7 +57,7 @@ describe("loeInputFromAcceptedProposal: a real-shaped accepted snapshot", () => 
       { label: "N/A row", included: "n/a" },
       { label: "Ownership review", value: "$300", included: "✓", note: "Optional" },
     ];
-    const rows = chartRowsFor({ ...sevetri(), includes });
+    const rows = chartRowsFor({ ...callum(), includes });
     expect(rows.join("\n")).not.toMatch(/Watch|redesign|Expedited|Rush|N\/A row/);
     expect(rows).toContain("Ownership review ($300) | ✓");
     expect(rows).toContain("Substantive Office Action Legal Strategy Review ($675) | ✓");
@@ -147,7 +147,7 @@ describe("the LOE draft built from the adapter's output", () => {
 
   it("is the current template, in the chart format, for the chosen package only", () => {
     expect(draft.docType).toBe("loe_trademark_current");
-    expect(draft.draftBody).toContain("**Trademark Package — Word Mark – Prosperall**");
+    expect(draft.draftBody).toContain("**Trademark Package — Word Mark – Larkmoor**");
     expect(draft.draftBody).toContain("Classes Included");
     expect(draft.draftBody).toContain("Class Selected:");
     expect(draft.draftBody).toContain("Amount Paid");
@@ -217,7 +217,7 @@ describe("the fee chart flattened for the Lawmatics fields", () => {
 
   it("is one text with the chart, classes, amount math and gov fees on their own lines", () => {
     const text = flattenFeeChart(input);
-    expect(text.split("\n")[0]).toBe("Trademark Package — Word Mark – Prosperall");
+    expect(text.split("\n")[0]).toBe("Trademark Package — Word Mark – Larkmoor");
     expect(text).toContain("Classes Included | 3 Classes");
     expect(text).toContain("Class Selected: Cloud-Based Software as a Service (SaaS), Consulting & Professional Services");
     expect(text).toContain(`Amount Paid: ${input.amountPaid} (${input.amountPaidMath})`);

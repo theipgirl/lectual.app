@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { refresh } from "next/cache";
 import { orgHasModule } from "@/lib/org/modules";
 import { rootKeyOrNull } from "@/lib/mailbox/config";
@@ -13,7 +14,7 @@ export type DisconnectState = { ok?: boolean; error?: string; revoked?: boolean 
  * the ACTION"). Who may remove WHICH mailbox is left to RLS: disconnect()
  * deletes through the caller's scoped client and reports 0 rows as refused.
  */
-export async function disconnectMailboxAction(
+export const disconnectMailboxAction = previewSafe(async function disconnectMailboxAction(
   _prev: DisconnectState,
   formData: FormData,
 ): Promise<DisconnectState> {
@@ -25,4 +26,4 @@ export async function disconnectMailboxAction(
   if (!result.ok) return { error: result.message };
   refresh();
   return { ok: true, revoked: result.revoked };
-}
+}, "state");

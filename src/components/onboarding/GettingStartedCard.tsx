@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { previewingAs, resolveViewSession } from "@/lib/views/view-as";
 import { aiConfigured } from "@/lib/ai/claude";
+import { connectableProviders } from "@/lib/mailbox/config";
 import { HUB_PATH, hubTracks, overallCount, parseHubProgress, shouldShowHubCard } from "@/lib/onboarding/hub";
 import { HideHubCard } from "./HideHubCard";
 import "./hub.css";
@@ -15,9 +16,11 @@ export async function GettingStartedCard() {
   let heading = "Getting started";
   let hideable = false;
   try {
-    const session = await resolveFirmSession();
+    // View as: Getting started progress lives on the teammate's own account, which can't be read (D10): hidden.
+    if (await previewingAs()) return null;
+    const session = await resolveViewSession();
     if (session.kind !== "ok") return null;
-    const tracks = hubTracks({ role: session.role, modules: session.org.modules, aiConfigured: aiConfigured() });
+    const tracks = hubTracks({ role: session.role, modules: session.org.modules, aiConfigured: aiConfigured(), outlookConnectable: connectableProviders().microsoft });
     const progress = parseHubProgress(session.user.user_metadata);
     if (!shouldShowHubCard(tracks, progress)) return null;
     const { done, total } = overallCount(tracks, progress.done);
@@ -29,7 +32,7 @@ export async function GettingStartedCard() {
   return (
     <section className="lx-card gs-card" aria-labelledby="getting-started-h">
       <div className="gs-card-main">
-        <h2 id="getting-started-h" className="lx-h2" style={{ margin: 0 }}>
+        <h2 id="getting-started-h" className="lx-h3">
           {heading}
         </h2>
         <p className="lx-sub" style={{ margin: 0 }}>

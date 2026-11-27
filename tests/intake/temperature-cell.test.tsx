@@ -36,17 +36,18 @@ describe("TemperatureCell's menu", () => {
     return { popover, items, close };
   }
 
-  it("offers Hot, Warm, Cold and Not rated, in that order", () => {
+  it("starts with Lectual's suggestion for a suggested level, then Hot, Warm, Cold and Not rated", () => {
     const { items } = menuOf(() => {});
-    expect(items.map((item) => (item.props as { children: ReactNode }).children)).toEqual(["Hot", "Warm", "Cold", "Not rated"]);
+    expect(items.map((item) => (item.props as { children: ReactNode }).children)).toEqual(["Lectual suggests Hot · Accept", "Hot", "Warm", "Cold", "Not rated"]);
   });
 
   it("calls the set handler with hot, warm, cold and null, closing the menu each time", () => {
     const onSet = vi.fn();
     const { items, close } = menuOf(onSet);
     for (const item of items) (item.props as { onSelect: () => void }).onSelect();
-    expect(onSet.mock.calls).toEqual([["hot"], ["warm"], ["cold"], [null]]);
-    expect(close).toHaveBeenCalledTimes(4);
+    // Accept writes the suggested level like any other choice.
+    expect(onSet.mock.calls).toEqual([["hot"], ["hot"], ["warm"], ["cold"], [null]]);
+    expect(close).toHaveBeenCalledTimes(5);
   });
 
   it("checks the current choice only for a person's temperature", () => {
@@ -55,7 +56,7 @@ describe("TemperatureCell's menu", () => {
     const items = elements((popover.props as { children: (c: () => void) => ReactNode }).children(() => {})).filter((el) => el.type === PopoverItem);
     expect(items.map((item) => (item.props as { checked: boolean }).checked)).toEqual([false, true, false, false]);
     const { items: suggested } = menuOf(() => {});
-    expect(suggested.map((item) => (item.props as { checked: boolean }).checked)).toEqual([false, false, false, false]);
+    expect(suggested.map((item) => (item.props as { checked: boolean }).checked)).toEqual([false, false, false, false, true]);
   });
 
   it("is a disabled chip while a write is pending", () => {
@@ -102,18 +103,17 @@ describe("the table row's refusal", () => {
 });
 
 describe("the merged control styling", () => {
-  it("the view switch's rules live once, in the shared view-toggle.css, in tokens (D1)", () => {
-    const css = read("src/components/view-toggle.css");
+  it("the view switch's rules live once, in globals.css, in tokens (D1)", () => {
+    const css = read("src/app/globals.css");
     expect(css).toContain(".vs-switch button");
-    expect(css).toContain(".vs-switch button[aria-current]");
-    expect(css).not.toMatch(/font-family/);
+    expect(css).toContain(".vs-switch [aria-current]");
     expect(read("src/components/list-page/list-page.css")).not.toContain("lx-view-toggle");
     expect(read("src/app/dashboard/intake/intake.css")).not.toContain("lx-view-toggle");
   });
 
-  it("the older .lx-view-toggle anchor rules stay only for Reports' period control (not a view switch)", () => {
+  it("the older .lx-view-toggle name is only an alias of the shared look (Reports' period control)", () => {
     const globals = read("src/app/globals.css");
-    expect(globals).toContain(".lx-view-toggle a.on { background: var(--card);");
-    expect(globals).not.toContain(".lx-view-toggle button");
+    expect(globals).toContain(".lx-view-toggle a,");
+    expect(globals).toContain(".lx-view-toggle [aria-current]");
   });
 });

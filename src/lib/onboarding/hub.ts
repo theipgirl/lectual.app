@@ -2,9 +2,29 @@ import { ROLES, type Role } from "@/lib/auth/roles";
 import { visibleNav } from "@/lib/nav";
 import { canApproveQueue } from "@/lib/queue/roles";
 import { canSeeSetup } from "@/lib/setup/roles";
-import { SETUP_PATH } from "@/lib/setup/routes";
+import { INTEGRATIONS_PATH, SETUP_PATH } from "@/lib/setup/routes";
 import type { TourSide } from "./tour";
-import { APPROVALS_NAME, ASSISTANTS_NAME, COPILOT_NAME, FEATURES_NAME, INTAKE_NAME } from "@/lib/ui/words";
+import {
+  APPROVALS_NAME,
+  ASSISTANTS_NAME,
+  COPILOT_NAME,
+  FEATURES_NAME,
+  INTAKE_NAME,
+  STAFF_GUIDE_MAILBOX_BODY,
+  STAFF_GUIDE_MAILBOX_SUMMARY,
+  STAFF_GUIDE_MAILBOX_TITLE,
+  STAFF_GUIDE_NAME_BODY,
+  STAFF_GUIDE_NAME_STEP,
+  STAFF_GUIDE_NAME_SUMMARY,
+  STAFF_GUIDE_NAME_TITLE,
+  STAFF_GUIDE_TOUR_BODY,
+  STAFF_GUIDE_TOUR_SUMMARY,
+  STAFF_GUIDE_TOUR_TITLE,
+  STAFF_GUIDE_TRACK,
+  STAFF_GUIDE_TRACK_SUMMARY,
+} from "@/lib/ui/words";
+import { INTAKE_LIST_PATH } from "@/lib/intake/list-href";
+import { MATTERS_LIST_PATH } from "@/lib/matters/list-href";
 
 /**
  * The Getting started hub: guided flows over the real screens. This file is the
@@ -18,7 +38,7 @@ export const HUB_VERSION = 1;
 /** The target for a step that is a centered card rather than a spotlight. */
 export const HUB_CENTERED = "centered";
 
-export type HubTrackId = "intake" | "consults" | "matters" | "approvals" | "admin";
+export type HubTrackId = "start" | "intake" | "consults" | "matters" | "approvals" | "admin";
 export type HubRecordKind = "lead" | "matter";
 
 export type HubStep = {
@@ -38,8 +58,11 @@ export type HubStep = {
 
 type CatalogStep = HubStep & { bodyReadOnly?: string };
 
-/** What a flow needs. Every named rail section must be visible to the person (the rail's own data). */
-export type HubRequires = { nav: readonly string[]; admin?: boolean; ai?: boolean; staff?: boolean };
+/**
+ * What a flow needs. Every named rail section must be visible to the person (the rail's own data). `staffGuide` marks the short
+ * staff guide: those flows are the ONLY ones a role outside the admin tier sees, and the admin tier never sees them.
+ */
+export type HubRequires = { nav: readonly string[]; admin?: boolean; ai?: boolean; staff?: boolean; staffGuide?: boolean; /** Outlook can be connected on this deployment. */ outlook?: boolean };
 
 export type HubFlow = {
   id: string;
@@ -55,6 +78,7 @@ type CatalogFlow = Omit<HubFlow, "steps"> & { steps: CatalogStep[] };
 export type HubTrack = { id: HubTrackId; title: string; summary: string; flows: HubFlow[] };
 
 export const HUB_TRACKS: readonly { id: HubTrackId; title: string; summary: string }[] = [
+  { id: "start", title: STAFF_GUIDE_TRACK, summary: STAFF_GUIDE_TRACK_SUMMARY },
   { id: "intake", title: INTAKE_NAME, summary: "Leads, the board, forms and stages." },
   { id: "consults", title: "Consults to proposals", summary: "From a booked call to an accepted proposal." },
   { id: "matters", title: "Matters", summary: "Open matters, their pages, files and client updates." },
@@ -66,6 +90,34 @@ const UNSEEN_LEAD = "There are no leads to open yet, so this guide cannot show o
 const UNSEEN_MATTER = "There are no matters to open yet, so this guide cannot show one.";
 
 const FLOWS: readonly CatalogFlow[] = [
+  // ── The staff guide: everything a role outside the admin tier is offered (own name, own mailbox, the tour) ──
+  {
+    id: "staff-name",
+    track: "start",
+    title: STAFF_GUIDE_NAME_TITLE,
+    summary: STAFF_GUIDE_NAME_SUMMARY,
+    requires: { nav: [], staffGuide: true },
+    steps: [{ id: "name", path: "/dashboard/", target: "account", side: "bottom", title: STAFF_GUIDE_NAME_STEP, body: STAFF_GUIDE_NAME_BODY }],
+  },
+  {
+    id: "staff-mailbox",
+    track: "start",
+    title: STAFF_GUIDE_MAILBOX_TITLE,
+    summary: STAFF_GUIDE_MAILBOX_SUMMARY,
+    // Only with the Mailboxes feature (the Mail row is its rail section; an unreadable module list hides it).
+    // ...and only when this deployment can connect Outlook at all (the Integrations page offers the button).
+    requires: { nav: ["mail"], staffGuide: true, outlook: true },
+    steps: [{ id: "mailbox", path: INTEGRATIONS_PATH, target: "integrations-head", side: "bottom", title: STAFF_GUIDE_MAILBOX_TITLE, body: STAFF_GUIDE_MAILBOX_BODY }],
+  },
+  {
+    id: "staff-tour",
+    track: "start",
+    title: STAFF_GUIDE_TOUR_TITLE,
+    summary: STAFF_GUIDE_TOUR_SUMMARY,
+    requires: { nav: [], staffGuide: true },
+    steps: [{ id: "tour", path: "/dashboard/", target: "account", side: "bottom", title: STAFF_GUIDE_TOUR_TITLE, body: STAFF_GUIDE_TOUR_BODY }],
+  },
+
   // ── Intake ──
   {
     id: "intake-leads",
@@ -76,15 +128,15 @@ const FLOWS: readonly CatalogFlow[] = [
     steps: [
       {
         id: "rail",
-        path: "/dashboard/intake/",
+        path: INTAKE_LIST_PATH,
         target: "nav-intake",
         side: "right",
         title: "Intake lives here",
-        body: "Every lead the firm is working starts in Intake. Open it from the rail whenever you want the list.",
+        body: "Every lead the firm is working starts in Intake. This is where the list lives.",
       },
       {
         id: "list",
-        path: "/dashboard/intake/",
+        path: INTAKE_LIST_PATH,
         target: "intake-board",
         side: "top",
         title: "Sorted by last touch",
@@ -280,7 +332,7 @@ const FLOWS: readonly CatalogFlow[] = [
     steps: [
       {
         id: "rail",
-        path: "/dashboard/matters/",
+        path: MATTERS_LIST_PATH,
         target: "nav-matters",
         side: "right",
         title: "Matters",
@@ -288,7 +340,7 @@ const FLOWS: readonly CatalogFlow[] = [
       },
       {
         id: "list",
-        path: "/dashboard/matters/",
+        path: MATTERS_LIST_PATH,
         target: "matters-head",
         side: "bottom",
         title: "The matters list",
@@ -548,6 +600,8 @@ export type HubContext = {
   /** `null` = the module list could not be read: treated as none, and the page says so. */
   modules: readonly string[] | null;
   aiConfigured: boolean;
+  /** `connectableProviders().microsoft`, read on the server. Absent or false hides the "Connect your Outlook" guide (fails closed). */
+  outlookConnectable?: boolean;
 };
 
 function isKnownRole(role: string): role is Role {
@@ -569,10 +623,19 @@ function visibleSlugs(ctx: HubContext): Set<string> {
   return new Set(visibleNav(ctx.modules ?? [], ctx.role).map((i) => i.slug));
 }
 
+/** The walkthroughs an approver outside the admin tier keeps beside the staff guide. */
+const STAFF_APPROVER_TRACKS: readonly HubTrackId[] = ["consults", "approvals"];
+
 function flowVisible(flow: CatalogFlow, ctx: HubContext, slugs: Set<string>): boolean {
+  // The admin tier's hub is exactly what it was (no staff guide). Outside it (an unknown or unreadable role included: canSeeSetup
+  // fails closed) the staff guide is offered, and a queue approver (attorney) also keeps the Consults and Approvals walkthroughs.
+  if (canSeeSetup(ctx.role)) {
+    if (flow.requires.staffGuide) return false;
+  } else if (!flow.requires.staffGuide && !(hubApproves(ctx.role) && STAFF_APPROVER_TRACKS.includes(flow.track))) return false;
   if (flow.requires.admin && !canSeeSetup(ctx.role)) return false;
   if (flow.requires.staff && hubReadOnly(ctx.role)) return false;
   if (flow.requires.ai && !ctx.aiConfigured) return false;
+  if (flow.requires.outlook && ctx.outlookConnectable !== true) return false;
   return flow.requires.nav.every((slug) => slugs.has(slug));
 }
 

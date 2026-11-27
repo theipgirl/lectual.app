@@ -1,0 +1,8 @@
+/* The voice-note recorder (lead and matter pages). Tokens only; type sizes are the shared ones. */
+.lx-voice { display: grid; gap: 10px; }
+.lx-voice-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.lx-voice-actions { display: flex; gap: 8px; }
+.lx-voice-review { display: grid; gap: 10px; }
+.lx-voice-audio { width: 100%; height: 36px; }
+.lx-voice-error { margin: 0; font-size: var(--fs-1); color: var(--wine); }
+.lx-voice-live { font-size: var(--fs-1); color: var(--wine); }

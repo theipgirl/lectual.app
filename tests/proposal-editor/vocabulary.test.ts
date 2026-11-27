@@ -24,7 +24,7 @@ describe("Sprint 27 vocabulary", () => {
 
   it("button words and sentences", () => {
     expect(BUTTON_WORDS.createLink).toBe("Save and create link");
-    expect(BUTTON_WORDS.creatingLink).toBe("Creating link…");
+    expect(BUTTON_WORDS.creatingLink).toBe("Saving…");
     expect(BUTTON_WORDS.turnOnLink).toBe("Turn on the link");
     expect(BUTTON_WORDS.editAgain).toBe("Edit again");
     expect(askToCreateLink("A or B")).toBe("Ask A or B to create the link");

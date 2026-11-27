@@ -1,0 +1,4 @@
+/* Pipeline. Tokens only. The Closed column is a disclosure that opens in place. */
+.lx-board-col.pl-closed > summary { cursor: pointer; list-style: none; }
+.lx-board-col.pl-closed > summary::-webkit-details-marker { display: none; }
+.lx-board-col .lx-showing { margin: 0; }

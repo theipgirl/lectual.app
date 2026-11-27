@@ -1,6 +1,7 @@
 import { normalizeStageName } from "@/lib/lawmatics/stage-map";
 import { newEnquiryStage } from "@/lib/pipeline/new-enquiry";
 import { compareStageOrder } from "@/lib/pipeline/stage-order";
+import { leadStageWithRole } from "@/lib/stages/roles";
 
 /**
  * The Leads page's "Working" rule (item L). PURE: no client, no clock, no server-only import, so the
@@ -48,6 +49,8 @@ export type WorkingStage = {
   name: string;
   category?: string | null;
   order_index: number | null;
+  /** The stage's role (lectual 0119), when read. */
+  role?: string | null;
 };
 
 export type FactSet =
@@ -65,6 +68,10 @@ export type WorkingFacts = {
   consults: FactSet;
   /** Leads with a booth scorecard row. */
   booth: FactSet;
+  /** Soonest booked consult start per lead, today (firm day) or later. Present only when the consult read answered. */
+  consultStarts?: ReadonlyMap<string, string>;
+  /** Latest consult that already started (within 30 days) per lead. Present only when the consult read answered. */
+  pastConsultStarts?: ReadonlyMap<string, string>;
 };
 
 export type FactSource = keyof WorkingFacts;
@@ -124,6 +131,16 @@ export function isFollowUpStage(stage: Pick<WorkingStage, "name">): boolean {
 }
 
 /**
+ * The firm's Follow-Up stage ids, ROLE FIRST (lectual 0119): when one open stage holds the `follow_up` role, it alone is the
+ * Follow-Up stage, whatever it is called now. With no role, every open stage whose NAME reads as Follow-Up, as before.
+ */
+export function followUpStageIds(stages: readonly WorkingStage[]): Set<string> {
+  const byRole = leadStageWithRole(stages, "follow_up");
+  if (byRole) return new Set([byRole.id]);
+  return new Set(stages.filter((s) => s.category === "open" && isFollowUpStage(s)).map((s) => s.id));
+}
+
+/**
  * The pipeline position a lead must be STRICTLY beyond to count as "past first contact": the furthest
  * of the new-enquiry stage and every open Follow-Up stage, in pipeline order (`compareStageOrder`).
  * Null when the firm has no open stage at all. Positions are indexes into the whole stage list in
@@ -136,9 +153,10 @@ export function firstContactBoundary(stages: readonly WorkingStage[]): { stageId
   if (!enquiry) return null;
   let at = position.get(enquiry.id) ?? 0;
   let id = enquiry.id;
+  const followUp = followUpStageIds(stages);
   for (const s of ordered) {
     const p = position.get(s.id) ?? -1;
-    if (s.category === "open" && isFollowUpStage(s) && p > at) {
+    if (s.category === "open" && followUp.has(s.id) && p > at) {
       at = p;
       id = s.id;
     }

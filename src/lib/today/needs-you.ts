@@ -1,5 +1,8 @@
+import { intakeListHref } from "@/lib/intake/list-href";
 import type { StalledMatter } from "@/lib/matters/docket-summary";
 import type { DigestFailure } from "@/lib/agents/digest";
+import { CAME_BACK_LABEL, CAME_BACK_OPEN, cameBackLine } from "@/lib/ui/words";
+import type { CameBackRead } from "./came-back-rules";
 
 /**
  * "Needs you" on Today: every stuck or waiting thing in the firm, phrased as
@@ -34,7 +37,8 @@ export type NeedsYouKind =
   | "reconnect"
   | "intake-review"
   | "hot-lead"
-  | "quiet-matter";
+  | "quiet-matter"
+  | "came-back";
 
 export type NeedsYouItem = {
   key: string;
@@ -99,9 +103,14 @@ export type NeedsYouInput = {
   submissions: readonly NeedsYouSubmission[] | null;
   hotLeads: ReadonlyArray<{ id: string; name: string; reason: string | null }>;
   stalled: readonly StalledMatter[] | null;
+  /** `canSeeFormsAndProposals(role)`: the submissions item links to Forms; otherwise (and when absent) to the Leads list. */
+  canOpenForms?: boolean;
+  /** Lost, Won or Nurture leads with a new enquiry in Lawmatics (the daily sync). Absent = not read here. */
+  cameBack?: CameBackRead;
 };
 
-export type NeedsYou = { items: NeedsYouItem[]; unavailable: string[] };
+/** `cameBackUnavailable`: the returning-clients read failed; the section says so in its own line, never silence. */
+export type NeedsYou = { items: NeedsYouItem[]; unavailable: string[]; cameBackUnavailable?: boolean };
 
 const DAY = 86_400_000;
 
@@ -315,6 +324,8 @@ export function buildNeedsYou(input: NeedsYouInput): NeedsYou {
   }
 
   // ── Intake submissions nobody has reviewed ───────────────────────────────
+  // Every submission is filed as a lead first (contact first), so a role that isn't shown Forms reviews it from the Leads list.
+  const submissionsHref = input.canOpenForms === true ? "/dashboard/forms/?tab=performance" : intakeListHref();
   if (input.submissions === null) unavailable.push("intake submissions");
   else if (input.submissions.length > SUBMISSION_ROLLUP) {
     items.push({
@@ -324,7 +335,7 @@ export function buildNeedsYou(input: NeedsYouInput): NeedsYou {
       subject: "Intake forms",
       detail: null,
       forYou: false,
-      href: "/dashboard/forms/?tab=performance",
+      href: submissionsHref,
       cta: "Review",
       tone: "ox",
       score: 330,
@@ -338,7 +349,7 @@ export function buildNeedsYou(input: NeedsYouInput): NeedsYou {
         subject: s.name,
         detail: null,
         forYou: false,
-        href: "/dashboard/forms/?tab=performance",
+        href: submissionsHref,
         cta: "Review",
         tone: "ox",
         score: 320,
@@ -379,8 +390,26 @@ export function buildNeedsYou(input: NeedsYouInput): NeedsYou {
     );
   }
 
+  // ── Came back: a Lost, Won or Nurture lead with a new enquiry in Lawmatics ──
+  if (input.cameBack?.status === "ok") {
+    input.cameBack.items.forEach((c, i) =>
+      items.push({
+        key: `cb-${c.id}`,
+        kind: "came-back",
+        action: cameBackLine(c.name, c.category),
+        subject: CAME_BACK_LABEL,
+        detail: null,
+        forYou: false,
+        href: `/dashboard/leads/${c.leadId}/`,
+        cta: CAME_BACK_OPEN,
+        tone: "ox",
+        score: 340 - i,
+      }),
+    );
+  }
+
   items.sort((a, b) => b.score - a.score || Number(b.forYou) - Number(a.forYou));
-  return { items, unavailable };
+  return input.cameBack?.status === "unavailable" ? { items, unavailable, cameBackUnavailable: true } : { items, unavailable };
 }
 
 /** What the section says when the list is empty. Never "all clear" over a failed read. */

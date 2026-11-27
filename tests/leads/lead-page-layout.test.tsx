@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { LeadStatusRow } from "@/components/leads/LeadStatusRow";
 import { NeedsAttentionCard } from "@/components/leads/NeedsAttentionCard";
@@ -11,19 +11,26 @@ import { WaitingOnRebecca } from "@/components/leads/WaitingOnRebecca";
 import { contactLinks, lastHeardLabel } from "@/lib/leads/status-row";
 import { needsAttention } from "@/lib/leads/needs-attention";
 
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
+
 const root = path.resolve(__dirname, "../..");
 const page = readFileSync(path.join(root, "src/app/dashboard/leads/[id]/page.tsx"), "utf8");
+// The Consult prep card (automatic consult prep) owns the prep-consult anchor and its tour hook; the page places the card.
+const prepCard = readFileSync(path.join(root, "src/components/leads/ConsultPrepCard.tsx"), "utf8");
 const css = readFileSync(path.join(root, "src/components/leads/lead-page.css"), "utf8");
 const NOW = Date.parse("2026-10-27T12:00:00Z");
 
 describe("F1: lead page order", () => {
-  it("draws the sections in the Sprint 33 order", () => {
+  it("draws the sections in the Sprint 33 order, with the top card, What Lectual did and the four facts after the status row (Sprint 9)", () => {
     const order = [
       "<LeadStatusRow",
+      "<TopCardFrame>",
+      "<WhatLectualDid",
+      "<FourFacts",
       "<NeedsAttentionCard>",
       "<ComposerTabs",
       'data-tour="lead-timeline"',
-      'id="prep-consult"',
+      "<ConsultPrepCard",
       "<ConsultDetailsSection",
       "<LinkedMeetings",
       "<LeadProposalsCard",
@@ -43,7 +50,7 @@ describe("F1: lead page order", () => {
     expect(html).toContain("Consult Held");
     expect(html).toContain("Temperature: <b>Hot</b>");
     expect(html).toContain("Owner: <b>Dawn Reyes</b>");
-    expect(html).toContain("Last heard from 3 days ago");
+    expect(html).toContain("Last contact 3 days ago");
     const none = renderToStaticMarkup(<LeadStatusRow stageName={null} temperatureLabel={null} ownerName={null} lastInboundAt={null} now={NOW} />);
     expect(none).not.toContain("Owner");
     expect(none).toContain("Not rated");
@@ -54,8 +61,8 @@ describe("F1: lead page order", () => {
     expect(lastHeardLabel(null, NOW)).toBe("No contact yet");
     expect(lastHeardLabel("garbage", NOW)).toBe("No contact yet");
     expect(lastHeardLabel("2026-11-30T00:00:00Z", NOW)).toBe("No contact yet");
-    expect(lastHeardLabel("2026-10-27T01:00:00Z", NOW)).toBe("Last heard from today");
-    expect(lastHeardLabel("2026-10-26T01:00:00Z", NOW)).toBe("Last heard from 1 day ago");
+    expect(lastHeardLabel("2026-10-27T01:00:00Z", NOW)).toBe("Last contact today");
+    expect(lastHeardLabel("2026-10-26T01:00:00Z", NOW)).toBe("Last contact 1 day ago");
   });
 });
 
@@ -98,9 +105,13 @@ describe("F3: rare forms are collapsed and anchors kept", () => {
     expect(page).not.toMatch(/<details[^>]*\sopen/);
   });
   it("keeps each anchor and data-tour token exactly once", () => {
-    for (const token of ['id="prep-consult"', 'data-tour="lead-prep"', 'data-tour="lead-timeline"', 'data-tour="lead-head"']) {
-      expect(page.split(token).length - 1).toBe(1);
+    for (const token of ['id="prep-consult"', 'data-tour="lead-prep"', 'data-tour="lead-timeline"', 'tour="lead-head"']) {
+      // The anchor and the tour hook are on the card component, once; the page itself places the card and carries neither.
+      const onCard = token === 'id="prep-consult"' || token === 'data-tour="lead-prep"';
+      expect((onCard ? prepCard : page).split(token).length - 1).toBe(1);
+      if (onCard) expect(page.split(token).length - 1).toBe(0);
     }
+    expect(page.split("<ConsultPrepCard").length - 1).toBe(1);
   });
   it("the by-hand consult details form is a closed details", () => {
     const src = readFileSync(path.join(root, "src/components/leads/ConsultDetailsSection.tsx"), "utf8");
@@ -146,19 +157,21 @@ describe("P1: composer tabs", () => {
   it("status row reads last_inbound_at, the same field as the aside", () => {
     expect(page).toContain("lastInboundAt={lead.last_inbound_at}");
     expect(page).not.toContain("lastActivityAt=");
-    expect(page).toContain("lead.last_inbound_at ? relativeTime(lead.last_inbound_at)");
+    expect(page).toContain("lead.last_inbound_at ? relativeTime(lead.last_inbound_at");
   });
 
   it("V1: coarse-pointer rules give the new controls 44px targets", () => {
     const rd = (f: string) => readFileSync(path.join(root, f), "utf8");
     const coarse = (src: string, rule: RegExp) => {
-      const m = src.match(/@media \(pointer: coarse\) \{[\s\S]*?\n\}/g) ?? [];
+      const m = src.match(/@media \(pointer: coarse\)(?:, \(max-width: 640px\))? \{[\s\S]*?\n\}/g) ?? [];
       return m.some((b) => rule.test(b));
     };
-    expect(coarse(css, /\.lx-segs button \{ min-height: 44px; min-width: 44px; \}/)).toBe(true);
-    expect(coarse(rd("src/components/matters/matter-page.css"), /\.lx-board-move \.lp-btn \{ min-height: 44px; \}/)).toBe(true);
+    expect(coarse(rd("src/app/globals.css"), /\.lx-segs button,/)).toBe(true);
+    // The Matters board's move trigger is the shared "⋯" menu button, made 44px in the shared coarse block.
+    expect(coarse(rd("src/app/globals.css"), /\.lx-board-menu,[\s\S]*?min-height: 44px; min-width: 44px;/)).toBe(true);
     const pq = rd("src/app/dashboard/proposals/proposals.css");
-    expect(coarse(pq, /\.pq-seg \{ min-height: 44px; \}/)).toBe(true);
+    // The filter chips are the shared .lp-chip (44px in globals), not a private control.
+    expect(pq).not.toMatch(/\.pq-seg\b/);
     // The collapsed consults strip is gone (Spec 8); its row buttons are 44px at every width.
     expect(pq).toMatch(/\.pq-row-actions \.lx-btn[^{]*\{ min-height: 44px;/);
   });

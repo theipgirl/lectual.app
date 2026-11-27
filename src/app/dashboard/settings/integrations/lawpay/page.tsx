@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { hasRole } from "@/lib/auth/roles";
 import { relativeTime } from "@/lib/relative-time";
 import { lawPayDeploymentMode, lawPaySetup } from "@/lib/payments/lawpay-config";
@@ -13,6 +12,8 @@ import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
 import { integrationErrorLine, LAWPAY_NOT_ISSUED, lawpayModeMismatch } from "@/lib/ui/words";
 import { ADMIN_TIER_PHRASE } from "@/lib/setup/roles";
+import { LoadFailedCard, Notice, PageHeader, Pill } from "@/components/ui";
+import { getFirmTimeZone } from "@/lib/org/profile";
 
 export const metadata: Metadata = { title: pageTitle("LawPay") };
 
@@ -43,32 +44,30 @@ export default async function LawPayPage({
 }: {
   searchParams: Promise<{ connected?: string; reconnected?: string; unmapped?: string; error?: string }>;
 }) {
-  const session = await resolveFirmSession();
+  const session = await resolveViewSession();
   if (session.kind !== "ok") notFound();
   const canManage = hasRole(session.role, "senior_admin");
   const { connected, reconnected, unmapped, error } = await searchParams;
 
+  const tz = await getFirmTimeZone();
   const header = (
-    <>
-      <Link href="/dashboard/settings/integrations/" className="lx-back">
-        ← Integrations
-      </Link>
-      <div>
-        <div className="lx-label">Integrations</div>
-        <h1 className="lx-h1">LawPay</h1>
-        <p className="lx-sub">
+    <PageHeader
+      back={{ href: "/dashboard/settings/integrations/", label: "Integrations" }}
+      title="LawPay"
+      sub={
+        <>
           Let clients pay the amount due at signing by card, straight into your firm&apos;s own LawPay operating account. USPTO filing fees are
           never charged at signing.
-        </p>
-      </div>
-    </>
+        </>
+      }
+    />
   );
 
   if (!canManage) {
     return (
       <>
         {header}
-        <section className="lx-card" style={{ padding: 18 }}>
+        <section className="lx-card lx-pad">
           <p className="lx-note" style={{ margin: 0 }}>
             {ADMIN_TIER_PHRASE}{" "}can connect LawPay and choose the firm&apos;s payment accounts.
           </p>
@@ -89,58 +88,54 @@ export default async function LawPayPage({
       {header}
 
       {connected && (
-        <div role="status" className="lx-banner lx-banner-ok">
+        <Notice tone="ok" role="status">
           LawPay {reconnected ? "reconnected" : "connected"}.{" "}
           {unmapped ? `LawPay no longer lists the ${unmapped.replace(",", " and ")} account you had chosen — choose again below.` : "Now choose your operating account below."}
-        </div>
+        </Notice>
       )}
       {errorText && (
-        <div role="alert" className="lx-banner lx-banner-risk">
+        <Notice tone="risk" role="alert">
           {errorText}
-        </div>
+        </Notice>
       )}
       {!read.ok && (
-        <div role="alert" className="lx-banner lx-banner-risk">
-          We couldn&apos;t check your firm&apos;s LawPay connection just now. Refresh to try again.
-        </div>
+        <LoadFailedCard role="alert" what="your LawPay connection" />
       )}
 
-      <section className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }} aria-labelledby="lp-conn">
+      <section className="lx-card lx-pad" style={{ display: "grid", gap: 12 }} aria-labelledby="lp-conn">
         <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: 220 }}>
-            <h2 id="lp-conn" className="lx-h2" style={{ fontSize: 23 }}>
+            <h2 id="lp-conn" className="lx-h2">
               Connection
             </h2>
             <div className="lx-note">
               {conn
-                ? `${conn.display_hint ?? "LawPay merchant"} · connected ${relativeTime(conn.created_at)}`
+                ? `${conn.display_hint ?? "LawPay merchant"} · connected ${relativeTime(conn.created_at, undefined, tz)}`
                 : read.ok
                   ? "Not connected."
                   : "Status unknown."}
             </div>
           </div>
-          {conn && <span className={`lx-pill ${conn.status === "active" ? "lx-pill-ok" : "lx-pill-risk"}`}>{conn.status === "active" ? "Connected" : "Reconnect"}</span>}
+          {conn && <Pill tone={conn.status === "active" ? "ok" : "risk"}>{conn.status === "active" ? "Connected" : "Reconnect"}</Pill>}
         </div>
 
         {conn && (
           <details className="lx-disclosure">
             <summary>Details</summary>
-            <p className="lx-note" style={{ margin: "6px 0 0" }}>
-              {conn.last_verified_at ? `Checked ${relativeTime(conn.last_verified_at)}. ` : ""}
+            <p className="lx-note" style={{ margin: 0 }}>
+              {conn.last_verified_at ? `Checked ${relativeTime(conn.last_verified_at, undefined, tz)}. ` : ""}
               {conn.mode === "test" ? "Test mode: cards are charged against LawPay's test credentials, and no real money moves." : "Live mode: cards are charged for real."}
             </p>
           </details>
         )}
         {conn && conn.mode !== deploymentMode && (
-          <p className="lx-banner lx-banner-warn" style={{ margin: 0 }}>
-            {lawpayModeMismatch(conn.mode, deploymentMode)}
-          </p>
+          <Notice tone="warn">{lawpayModeMismatch(conn.mode, deploymentMode)}</Notice>
         )}
         {conn && conn.status !== "active" && (
-          <p className="lx-banner lx-banner-risk" style={{ margin: 0 }}>
+          <Notice tone="risk">
             LawPay stopped accepting this connection. {integrationErrorLine(conn.status, conn.last_error)}{" "}Clients see &ldquo;the firm will send a way to
             pay&rdquo; until you reconnect.
-          </p>
+          </Notice>
         )}
 
         {!setup.ready ? (
@@ -178,23 +173,23 @@ export default async function LawPayPage({
       {conn && conn.status === "active" && (
         <>
           {mappings.status !== "ok" && (
-            <div role="alert" className="lx-banner lx-banner-risk">
-              We couldn&apos;t read which accounts you chose. Try again shortly.
-            </div>
+            <Notice tone="risk" role="alert">
+              We couldn&apos;t read which accounts you chose. Refresh to try again.
+            </Notice>
           )}
           {mappings.status === "ok" && !mapped("operating") && (
-            <div className="lx-banner lx-banner-warn">Clients can&apos;t pay by card until you choose the operating account.</div>
+            <Notice tone="warn">Clients can&apos;t pay by card until you choose the operating account.</Notice>
           )}
           {(["operating", "trust"] as const).map((kind) => {
             const current = mapped(kind);
             const choices = candidateAccounts(conn.accounts, kind, conn.mode).map((a) => ({ id: a.id, label: accountLabel(a) }));
             const currentAccount = current ? conn.accounts.find((a) => a.id === current.provider_account_id) : null;
             return (
-              <section key={kind} className="lx-card" style={{ padding: 18, display: "grid", gap: 12 }} aria-labelledby={`lp-${kind}`}>
+              <section key={kind} className="lx-card lx-pad" style={{ display: "grid", gap: 12 }} aria-labelledby={`lp-${kind}`}>
                 <div>
-                  <h2 id={`lp-${kind}`} className="lx-h2" style={{ fontSize: 23 }}>
+                  <h2 id={`lp-${kind}`} className="lx-h2">
                     {kind === "operating" ? "Operating account" : "Trust (IOLTA) account"}{" "}
-                    <span className="lx-note" style={{ fontSize: 13 }}>
+                    <span className="lx-note">
                       {kind === "operating" ? "required" : "optional"}
                     </span>
                   </h2>
@@ -210,12 +205,12 @@ export default async function LawPayPage({
                     <span style={{ flex: 1, minWidth: 200 }}>
                       <b style={{ color: "var(--ink)" }}>{currentAccount ? accountShortLabel(currentAccount) : "An account LawPay no longer lists"}</b>
                       <span className="lx-note" style={{ display: "block" }}>
-                        {current.verified_at ? `Confirmed ${relativeTime(current.verified_at)}` : "Not confirmed"}
+                        {current.verified_at ? `Confirmed ${relativeTime(current.verified_at, undefined, tz)}` : "Not confirmed"}
                         {currentAccount ? "" : " · no longer listed by LawPay"}
                       </span>
                       <details className="lx-disclosure">
                         <summary>Account details</summary>
-                        <span className="lx-note" style={{ display: "block", margin: "6px 0 0" }}>
+                        <span className="lx-note" style={{ display: "block" }}>
                           {currentAccount ? accountLabel(currentAccount) : `Account ···${current.provider_account_id.slice(-4)}`} · {conn.mode} mode
                         </span>
                       </details>

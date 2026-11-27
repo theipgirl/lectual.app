@@ -21,9 +21,9 @@ import type { Screen } from "../registry";
 type Page = { key: string; title: string; pathname: string; render: () => Promise<ReactElement> | ReactElement };
 
 const pages: Page[] = [
-  { key: "matters-list", title: "Matters list", pathname: "/dashboard/matters/", render: () => MattersPage({ searchParams: Promise.resolve({}) }) as unknown as Promise<ReactElement> },
+  { key: "matters-list", title: "Matters list", pathname: "/dashboard/matters/", render: () => MattersPage({ searchParams: Promise.resolve({ view: "table" }) }) as unknown as Promise<ReactElement> },
   { key: "matters-board", title: "Matters board", pathname: "/dashboard/matters/", render: () => MattersPage({ searchParams: Promise.resolve({ view: "board" }) }) as unknown as Promise<ReactElement> },
-  { key: "leads-list", title: "Leads list", pathname: "/dashboard/intake/", render: () => IntakePage({ searchParams: Promise.resolve({}) }) as unknown as Promise<ReactElement> },
+  { key: "leads-list", title: "Leads list", pathname: "/dashboard/intake/", render: () => IntakePage({ searchParams: Promise.resolve({ view: "table" }) }) as unknown as Promise<ReactElement> },
   { key: "leads-board", title: "Leads board", pathname: "/dashboard/intake/", render: () => IntakePage({ searchParams: Promise.resolve({ view: "board" }) }) as unknown as Promise<ReactElement> },
   { key: "proposals-list", title: "Proposals list", pathname: "/dashboard/proposals/", render: () => ProposalsPage({ searchParams: Promise.resolve({}) }) as unknown as Promise<ReactElement> },
   { key: "proposal-page", title: "Proposal page", pathname: `/dashboard/proposals/${P.crumb}/`, render: () => ProposalPage({ params: Promise.resolve({ id: P.crumb }) }) as unknown as Promise<ReactElement> },

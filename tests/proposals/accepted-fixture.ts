@@ -1,12 +1,12 @@
 import { buildAcceptedSnapshot } from "@/lib/proposals/public";
 import { quoteProposal } from "@/lib/proposals/pricing";
 import type { AcceptedSnapshot, ProposalAdjustment, ProposalContent, ProposalPricing } from "@/lib/proposals/types";
-import { sevetri } from "./fixture";
+import { callum } from "./fixture";
 
 /**
  * A real-shaped ACCEPTED snapshot (content + selection + the recomputed quote), built with the
  * production `quoteProposal` and `buildAcceptedSnapshot`, for the Sprint 19 tests. One brand name
- * (Prosperall) by default so the LOE adapter has exactly one mark to draft.
+ * (Larkmoor) by default so the LOE adapter has exactly one mark to draft.
  */
 
 export const ACCEPTED_AT = "2026-10-21T15:00:00.000Z";
@@ -22,11 +22,11 @@ export const CONCIERGE: ProposalPricing = {
 
 export function acceptedSnapshot(
   opts: {
-    /** Brand names to include: `p` (Prosperall) and/or `t` (Tech4PublicGood). Default: p only. */
+    /** Brand names to include: `p` (Larkmoor) and/or `t` (Open4Everyone). Default: p only. */
     brands?: Array<"p" | "t">;
-    /** How many of Prosperall's classes are picked (1..3). Default 1. */
+    /** How many of Larkmoor's classes are picked (1..3). Default 1. */
     classes?: number;
-    /** Prosperall's picked marks. Default: word only. */
+    /** Larkmoor's picked marks. Default: word only. */
     marks?: Array<"word" | "logo">;
     adjustments?: ProposalAdjustment[];
     packageName?: string;
@@ -35,7 +35,7 @@ export function acceptedSnapshot(
     acceptedAt?: string;
   } = {},
 ): AcceptedSnapshot {
-  const content = sevetri();
+  const content = callum();
   const brands = opts.brands ?? ["p"];
   const classes = opts.classes ?? 1;
   const marks = opts.marks ?? ["word"];

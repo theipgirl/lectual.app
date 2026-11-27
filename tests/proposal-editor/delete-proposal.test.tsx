@@ -5,7 +5,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
   DELETE_CONFIRM,
   DELETE_FAILED,
-  DELETE_LABEL,
   DELETE_NEEDS_DB_UPDATE,
   DELETE_NOT_FOUND,
   DELETE_OWNER_ONLY,
@@ -144,9 +143,8 @@ describe("who may delete, and the More menu", () => {
       ),
     );
 
-  it("an accepted proposal shows the Delete menu only to the owner (the menu is named for what it holds)", async () => {
-    expect(await render(true, "accepted")).toContain(">Delete<");
-    expect(await render(false, "accepted")).not.toContain(">Delete<");
+  it("an accepted proposal shows the More menu (with Delete in it) only to the owner", async () => {
+    expect(await render(true, "accepted")).toContain('data-more-items="delete"');
     expect(await render(false, "accepted")).not.toContain(">More<");
   });
 
@@ -158,7 +156,7 @@ describe("who may delete, and the More menu", () => {
     );
     expect(html).toContain("all its versions");
     expect(html).toContain("can&#x27;t be undone");
-    expect(html).toContain(`>${DELETE_LABEL}<`);
+    expect(html).toContain(">Yes, delete<");
     expect(html).toContain(">Cancel<");
   });
 });
@@ -175,7 +173,7 @@ describe("the store and the action", () => {
   });
 
   it("the action gates the module, checks the owner, and redirects to the list with the flash", () => {
-    const body = action.slice(action.indexOf("export async function deleteProposalAction"));
+    const body = action.slice(action.indexOf("async function deleteProposalAction"));
     expect(body.indexOf("requireProposalsModule()")).toBeLessThan(body.indexOf("canDeleteProposal("));
     expect(body.indexOf("canDeleteProposal(")).toBeLessThan(body.indexOf("deleteProposalFamily("));
     expect(body).toContain('redirect("/dashboard/proposals/?deleted=1")');

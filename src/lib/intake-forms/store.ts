@@ -167,9 +167,12 @@ export async function loadIntakeForm(id: string): Promise<IntakeFormLoad> {
  * visit (design: the page opens on a ready-to-edit intake, not an empty state).
  * Non-admins never create.
  */
-export async function listOrCreateIntakeForms(orgName: string): Promise<Load<IntakeFormRecord[]>> {
+export async function listOrCreateIntakeForms(orgName: string, opts: { mayCreate?: boolean } = {}): Promise<Load<IntakeFormRecord[]>> {
   const existing = await listIntakeForms();
   if (existing.status !== "ok" || existing.value.length > 0) return existing;
+  // `mayCreate: false` (a View as preview, where nothing may be written) never creates. The role is the SESSION's: this is
+  // a write, so it is authorized as one.
+  if (opts.mayCreate === false) return existing;
   if (!canEditIntakeForm(await currentRole())) return existing;
   try {
     await insertIntakeForm({ name: orgName.trim() ? `${orgName.trim()} intake` : "Intake", slugBase: slugFromFirmName(orgName), sourceTag: null });
@@ -201,7 +204,7 @@ async function insertIntakeForm(input: {
 }): Promise<IntakeFormRecord> {
   const supabase = await getScopedClient();
   const [{ data: orgId, error: orgError }, { data: userData }] = await Promise.all([
-    supabase.rpc("current_org_id"),
+    supabase.rpc("current_org_id", undefined, { get: true }),
     supabase.auth.getUser(),
   ]);
   if (orgError) throw orgError;

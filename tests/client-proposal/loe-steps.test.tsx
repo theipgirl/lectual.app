@@ -12,8 +12,8 @@ import { buildAcceptedSnapshot } from "@/lib/proposals/public";
 import { quoteWithClientClasses } from "@/lib/proposals/client-classes";
 import { defaultSelection } from "@/lib/proposals/pricing";
 import { STEP_NAMES, SIGN_LABEL, READ_LETTER_FIRST, CONTINUE_LABEL, DOWNLOAD_SIGNED_LABEL, READ_AGAIN_LABEL, PAY_LABEL, ATTORNEY_FOOTER_LETTER_LINE, PAYNOTE_BEFORE_SIGNING } from "@/lib/loe/client-words";
-import { sevetri } from "../proposals/fixture";
-import { danielle } from "../proposals/danielle-fixture";
+import { callum } from "../proposals/fixture";
+import { renata } from "../proposals/renata-fixture";
 import { TEST_DETAILS, fullLetterBlocks, fullLetterBody, paragraphText } from "../loe/full-letter-fixture";
 import { generalWithLoe, twoBrandPerMark, withLoe } from "../loe/loe-fixtures";
 import { hasStyle, splitFirstLine } from "@/lib/loe/letter-styles";
@@ -31,14 +31,14 @@ function drawnText(b: LetterBlock): string {
   return `<span class="loe-s-first-line">${esc(first)}</span>${esc(rest)}`;
 }
 
-const LETTER = { dateText: "November 12, 2026", clientEmail: "sevetri@example.com" };
+const LETTER = { dateText: "November 12, 2026", clientEmail: "callum@example.com" };
 
 function render(over: Partial<ProposalDocumentProps> = {}) {
   return renderToStaticMarkup(
     <ProposalDocument
       content={withLoe(twoBrandPerMark())}
       title="Trademark Proposal"
-      clientName="Sevetri Wilson"
+      clientName="Callum Ferreira"
       expiresOn="2026-12-01"
       firm={{ name: "RPB Law", slug: "rpb-law" }}
       mode="live"
@@ -124,10 +124,10 @@ describe("every step keeps the totals panel and the phone bar", () => {
 describe("step 2: your details", () => {
   it("prefills the name and company from what the firm entered and links back to the includes table", () => {
     const content = withLoe(twoBrandPerMark());
-    content.client = { ...content.client, company: "Prosperall Inc." };
+    content.client = { ...content.client, company: "Larkmoor Inc." };
     const html = render({ content, initialLoe: { step: 2 } });
-    expect(html).toContain('value="Sevetri Wilson"');
-    expect(html).toContain('value="Prosperall Inc."');
+    expect(html).toContain('value="Callum Ferreira"');
+    expect(html).toContain('value="Larkmoor Inc."');
     expect(html).toContain('href="#cp-h-inc"');
     expect(html).toContain("Street address");
     // The step's button is disabled until the name, street and city are given.
@@ -166,7 +166,7 @@ describe("step 3: the engagement letter", () => {
     // Nothing is collapsed or summarised: the first and the last paragraph.
     expect(html).toContain(drawnText(blocks[0]));
     expect(html).toContain(drawnText(blocks[blocks.length - 1]));
-    expect(html).toContain("Dear Sevetri Wilson:");
+    expect(html).toContain("Dear Callum Ferreira:");
     expect(html).toContain("100 Example Street");
     expect(html).toContain("November 12, 2026");
     expect(html).not.toMatch(/\{\{[a-z_]+\}\}/);
@@ -179,8 +179,8 @@ describe("step 3: the engagement letter", () => {
   });
 
   it("Exhibit A lists the selected marks and the exact figures", () => {
-    expect(html).toContain("The Fold");
-    expect(html).toContain("The Confidence Interval");
+    expect(html).toContain("The Pleat");
+    expect(html).toContain("The Margin Note");
     expect(html).toContain("Legal fee due now");
     expect(html).toContain("USPTO filing fees, due at filing");
   });
@@ -193,12 +193,12 @@ describe("step 3: the engagement letter", () => {
   it("Sign and continue to payment is disabled until the name is typed and the box ticked", () => {
     const disabled = /<button[^>]*disabled[^>]*>Sign and continue to payment<\/button>/;
     expect(html).toMatch(disabled);
-    expect(render({ initialLoe: { step: 3, details: TEST_DETAILS, typedName: "Sevetri Wilson" } })).toMatch(disabled);
+    expect(render({ initialLoe: { step: 3, details: TEST_DETAILS, typedName: "Callum Ferreira" } })).toMatch(disabled);
     expect(render({ initialLoe: { step: 3, details: TEST_DETAILS, agree: true } })).toMatch(disabled);
-    const ready = render({ initialLoe: { step: 3, details: TEST_DETAILS, typedName: "Sevetri Wilson", agree: true } });
+    const ready = render({ initialLoe: { step: 3, details: TEST_DETAILS, typedName: "Callum Ferreira", agree: true } });
     expect(ready).not.toMatch(disabled);
     expect(ready).toContain(`>${SIGN_LABEL}</button>`);
-    expect(ready).toContain('value="Sevetri Wilson"');
+    expect(ready).toContain('value="Callum Ferreira"');
   });
 
   it("shows the recording notice and the agreement tick", () => {
@@ -227,8 +227,8 @@ describe("the receipt after signing", () => {
       quote: priced.quote,
       acceptedAt: "2026-11-12T19:14:00.000Z",
       signed: {
-        agreement: { signature_id: "sig-1", signer_name: "Sevetri Wilson", signed_at: "2026-11-12T19:14:00.000Z", sha256: "c".repeat(64), template_version: 3 },
-        signing: { details: { ...TEST_DETAILS }, date_text: "November 12, 2026", client_email: "sevetri@example.com" },
+        agreement: { signature_id: "sig-1", signer_name: "Callum Ferreira", signed_at: "2026-11-12T19:14:00.000Z", sha256: "c".repeat(64), template_version: 3 },
+        signing: { details: { ...TEST_DETAILS }, date_text: "November 12, 2026", client_email: "callum@example.com" },
       },
     });
     const signed = rebuildSignedLetter(snapshot, "America/New_York");
@@ -250,7 +250,7 @@ describe("the receipt after signing", () => {
       onDownloadReview: undefined,
       onAccept: undefined,
     });
-    expect(html).toContain("Signed November 12, 2026 at 2:14 PM EST by Sevetri Wilson");
+    expect(html).toContain("Signed November 12, 2026 at 2:14 PM EST by Callum Ferreira");
     expect(html).toContain(DOWNLOAD_SIGNED_LABEL);
     expect(html).toContain(READ_AGAIN_LABEL);
     expect(html).toContain(`>${PAY_LABEL}</a>`);
@@ -276,10 +276,10 @@ describe("the receipt after signing", () => {
 describe("a flat-fee proposal with a letter", () => {
   it("steps through the same four steps with the matter, the work and the fee in the exhibit and no USPTO line", () => {
     const content = generalWithLoe();
-    const one = render({ content, title: "Proposal", clientName: "Faithe Williams", onDownloadReview: undefined });
+    const one = render({ content, title: "Proposal", clientName: "Imogen Pellegrino", onDownloadReview: undefined });
     expect(one).toContain(`>${CONTINUE_LABEL}</button>`);
     expect(count(one, "<li class=\"cp-step ")).toBe(4);
-    const three = render({ content, clientName: "Faithe Williams", initialLoe: { step: 3, details: TEST_DETAILS } });
+    const three = render({ content, clientName: "Imogen Pellegrino", initialLoe: { step: 3, details: TEST_DETAILS } });
     expect(three).toContain("Exhibit A: Fee Structure and Estimated Costs");
     expect(three).toContain("Review both management agreements");
     expect(three).toContain("Flat fee");
@@ -293,7 +293,7 @@ describe("a flat-fee proposal with a letter", () => {
 
 describe("content without a letter", () => {
   it("shows none of the steps", () => {
-    for (const content of [sevetri(), danielle()]) {
+    for (const content of [callum(), renata()]) {
       const html = render({ content, letter: undefined, onDownloadReview: undefined });
       expect(html).not.toContain("cp-steps");
       expect(html).toContain("Accept and pay my legal fee");

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { acceptedProposalFileName, acceptedProposalLines, renderAcceptedProposalDocx, DOCX_MIME } from "@/lib/documents/accepted-proposal-docx";
 import { acceptedSnapshot } from "../proposals/accepted-fixture";
 
-const FACTS = { clientName: "Sevetri Wilson", entityName: "Prosperall", timeZone: "America/New_York" };
+const FACTS = { clientName: "Callum Ferreira", entityName: "Larkmoor", timeZone: "America/New_York" };
 const fmt = (c: number) => `$${(c / 100).toLocaleString("en-US")}`;
 
 describe("acceptedProposalLines: exactly what was accepted", () => {
@@ -11,7 +11,7 @@ describe("acceptedProposalLines: exactly what was accepted", () => {
   const text = lines.map((l) => l.text).join("\n");
 
   it("has the client, the accepted date in the firm's zone, the package and its chart rows", () => {
-    expect(text).toContain("Client: Sevetri Wilson (Prosperall)");
+    expect(text).toContain("Client: Callum Ferreira (Larkmoor)");
     // 2026-10-21T15:00Z is October 21 in New York.
     expect(text).toContain("Accepted: October 21, 2026");
     expect(text).toContain("Package: Concierge");
@@ -20,7 +20,7 @@ describe("acceptedProposalLines: exactly what was accepted", () => {
   });
 
   it("names the brand, its marks and the classes that were picked", () => {
-    expect(text).toContain("Prosperall");
+    expect(text).toContain("Larkmoor");
     expect(text).toContain("Marks: Word mark, Logo");
     expect(text).toContain("Cloud-Based Software as a Service (SaaS); Consulting & Professional Services");
     expect(text).not.toContain("Software Development"); // the third class was not picked
@@ -39,13 +39,13 @@ describe("acceptedProposalLines: exactly what was accepted", () => {
   });
 
   it("contains no brand or package the client did not choose", () => {
-    expect(text).not.toContain("Tech4PublicGood");
+    expect(text).not.toContain("Open4Everyone");
     const two = acceptedProposalLines(acceptedSnapshot({ brands: ["p", "t"] }), FACTS).map((l) => l.text).join("\n");
-    expect(two).toContain("Tech4PublicGood");
+    expect(two).toContain("Open4Everyone");
     // A brand with nothing picked is not in what was accepted.
     const none = acceptedSnapshot({ brands: ["p", "t"] });
     none.quote.names.find((n) => n.id === "t")!.included = false;
-    expect(acceptedProposalLines(none, FACTS).map((l) => l.text).join("\n")).not.toContain("Tech4PublicGood");
+    expect(acceptedProposalLines(none, FACTS).map((l) => l.text).join("\n")).not.toContain("Open4Everyone");
   });
 
   it("states that it records the acceptance and gives no advice", () => {
@@ -56,7 +56,7 @@ describe("acceptedProposalLines: exactly what was accepted", () => {
   it("omits the math line when nothing was taken off, and the entity when there is none", () => {
     const plain = acceptedProposalLines(acceptedSnapshot(), { ...FACTS, entityName: null }).map((l) => l.text).join("\n");
     expect(plain).not.toContain("Legal fee math");
-    expect(plain).toContain("Client: Sevetri Wilson\n");
+    expect(plain).toContain("Client: Callum Ferreira\n");
   });
 });
 
@@ -65,7 +65,7 @@ describe("renderAcceptedProposalDocx", () => {
     const { buffer, fileName } = await renderAcceptedProposalDocx(acceptedSnapshot(), FACTS);
     expect(buffer.byteLength).toBeGreaterThan(1000);
     expect(buffer.subarray(0, 2).toString()).toBe("PK");
-    expect(fileName).toBe("Sevetri Wilson - Accepted Proposal.docx");
+    expect(fileName).toBe("Callum Ferreira - Accepted Proposal.docx");
     expect(DOCX_MIME).toBe("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
   });
 

@@ -5,7 +5,7 @@ const NOW = new Date("2026-11-02T15:00:00Z");
 const matter = (over: Record<string, unknown> = {}) => ({
   id: "m1", matter_number: "TM-1", title: "Acme mark", mark_text: "ACME", owner_name: "Acme Inc", status: "open", lead_id: null, assigned_to: "u1",
   stage_entered_at: "2026-10-20T00:00:00Z", created_at: "2026-01-01T00:00:00Z", lawmatics_id: null, lawmatics_synced_at: null,
-  stage: { code: "10", label: "Application Filed", is_open: true, waiting_on: "firm", order_index: 5 }, ...over,
+  stage: { code: "10", label: "Application Filed", is_open: true, waiting_on: "uspto", order_index: 5 }, ...over,
 });
 const lead = (over: Record<string, unknown> = {}) => ({
   id: "l1", first_name: "Jo", last_name: "Lee", business_name: null, email: "jo@x.com", mark_text: null, current_stage_id: "s2", assigned_to: null,

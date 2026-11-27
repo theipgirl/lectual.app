@@ -82,7 +82,7 @@ export function attendeeHtml(input: WorksheetInput, now: Date, bookingUrl: strin
     // greeting
     `<tr><td style="padding:20px 28px 0 28px;font-family:${SANS};font-size:16px;line-height:25px;color:${INK};">` +
     `<p style="margin:0 0 12px 0;">Hi ${esc(first)},</p>` +
-    `<p style="margin:0;">Thank you for joining ${esc(WORKSHEET_EVENT.name)} with RPB Law Firm. Here is a copy of the worksheet you filled in, so you can keep it.</p></td></tr>` +
+    `<p style="margin:0;">Thank you for joining ${esc(WORKSHEET_EVENT.name)} with RPB Law Firm. Here is a copy of Your IP Portfolio you filled in, so you can keep it.</p></td></tr>` +
     // sections
     `<tr><td style="padding:0 28px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${sections}</table></td></tr>` +
     // CTA

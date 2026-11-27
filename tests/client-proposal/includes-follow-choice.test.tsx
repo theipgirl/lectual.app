@@ -12,9 +12,9 @@ import { withPackageSnapshot } from "@/lib/proposals/package-snapshot";
 import { normalisePackages, withPackages } from "@/lib/proposals/package-list";
 import { defaultSelection, normalizeSelection, quoteProposal } from "@/lib/proposals/pricing";
 import type { ProposalContent, ProposalInclude, Selection } from "@/lib/proposals/types";
-import { danielle } from "../proposals/danielle-fixture";
+import { renata } from "../proposals/renata-fixture";
 import { fold } from "../proposals/mark-fixture";
-import { sevetri } from "../proposals/fixture";
+import { callum } from "../proposals/fixture";
 
 const ROWS: Record<string, ProposalInclude[]> = {
   Essential: [{ label: "Search report", included: "Basic" }],
@@ -31,7 +31,7 @@ function render(content: ProposalContent, over: Partial<ProposalDocumentProps> =
     <ProposalDocument
       content={content}
       title="Trademark Proposal"
-      clientName="Danielle Milton"
+      clientName="Renata Ostrowski"
       expiresOn={null}
       firm={{ name: "Hartwell", slug: "hartwell" }}
       mode="live"
@@ -51,13 +51,13 @@ const col = (name: string) => `<th scope="col" class="cp-vcell">${name}</th>`;
 
 describe("chosenPackageNames", () => {
   it("name-level choice: the default, or the client's pick, de-duplicated", () => {
-    const c = danielle();
+    const c = renata();
     expect(chosenPackageNames(c, sel(c))).toEqual(["Enhanced"]);
     expect(chosenPackageNames(c, sel(c, { packages: { fold: "Concierge", ci: "Essential" } }))).toEqual(["Essential", "Concierge"]);
   });
 
   it("an unticked brand name adds nothing", () => {
-    const c = danielle();
+    const c = renata();
     const picked = sel(c, { "ci-word": false, packages: { fold: "Concierge", ci: "Essential" } });
     expect(chosenPackageNames(c, picked)).toEqual(["Concierge"]);
   });
@@ -72,14 +72,14 @@ describe("chosenPackageNames", () => {
   });
 
   it("no package choice anywhere: nothing", () => {
-    const c = sevetri();
+    const c = callum();
     expect(chosenPackageNames(c, sel(c))).toEqual([]);
   });
 });
 
 describe("includesComparison follows the choice", () => {
   it("chosen packages only, in the given order", () => {
-    const t = includesComparison(withIncludes(danielle()), ["Essential", "Concierge"]);
+    const t = includesComparison(withIncludes(renata()), ["Essential", "Concierge"]);
     expect(t?.mode).toBe("chosen");
     expect(t?.packages).toEqual(["Essential", "Concierge"]);
     expect(t?.rows.map((r) => r.label)).toEqual(["Search report", "Monitoring"]);
@@ -87,18 +87,18 @@ describe("includesComparison follows the choice", () => {
   });
 
   it("falls back to every offered package when nothing is chosen or no chosen package has rows", () => {
-    const c = withIncludes(danielle());
+    const c = withIncludes(renata());
     expect(includesComparison(c, [])?.mode).toBe("all");
     expect(includesComparison(c, [])?.packages).toEqual(["Essential", "Enhanced", "Concierge"]);
     const partial: ProposalContent = { ...c, packages: c.packages!.map((p) => (p.package === "Essential" ? { ...p, includes: undefined } : p)) };
     expect(includesComparison(partial, ["Essential"])?.mode).toBe("all");
-    expect(includesComparison(danielle(), ["Essential"])).toBeNull();
+    expect(includesComparison(renata(), ["Essential"])).toBeNull();
   });
 });
 
 describe("the client page's included table", () => {
   it("one brand name on Essential: only an Essential column", () => {
-    const c = withIncludes(danielle());
+    const c = withIncludes(renata());
     const html = render(c, { initialSelection: { "ci-word": false, packages: { fold: "Essential" } } });
     expect(html).toContain("What your package includes");
     expect(html).toContain(col("Essential"));
@@ -126,7 +126,7 @@ describe("the client page's included table", () => {
   });
 
   it("the receipt follows the accepted selection", () => {
-    const c = withIncludes(danielle());
+    const c = withIncludes(renata());
     const accepted = sel(c, { packages: { fold: "Concierge", ci: "Concierge" } });
     const html = render(c, { mode: "accepted", initialSelection: accepted, acceptedQuote: quoteProposal(c, accepted), payUrl: "https://example.com/pay" });
     expect(html).toContain("What your package includes");
@@ -135,7 +135,7 @@ describe("the client page's included table", () => {
   });
 
   it("a proposal with no package choice renders the old single-package table", () => {
-    const c = sevetri();
+    const c = callum();
     const html = render(c);
     expect(html).toContain("What your package includes");
     expect(html).not.toContain("cp-cmp");
@@ -144,10 +144,10 @@ describe("the client page's included table", () => {
 });
 
 describe("withPackageSnapshot keeps a proposal's includes", () => {
-  const setting = { packages: normalisePackages({ packages: danielle().packages }) };
+  const setting = { packages: normalisePackages({ packages: renata().packages }) };
 
   it("keeps the earlier entry's includes when the firm's list has none, and the custom discount", () => {
-    const c = withIncludes(danielle());
+    const c = withIncludes(renata());
     c.packages = c.packages!.map((p) => (p.package === "Concierge" ? { ...p, custom_discount: { label: "Custom", per_class_under_cents: 82_500 } } : p));
     const out = withPackageSnapshot(c, setting);
     expect(out.packages!.find((p) => p.package === "Enhanced")?.includes).toEqual(ROWS.Enhanced);
@@ -157,7 +157,7 @@ describe("withPackageSnapshot keeps a proposal's includes", () => {
   });
 
   it("the firm's includes win when the firm's list has them", () => {
-    const c = withIncludes(danielle());
+    const c = withIncludes(renata());
     const firmRows = [{ label: "Firm row", included: "Yes" }];
     const firm = { packages: setting.packages.map((p) => ({ ...p, includes: firmRows })) };
     const out = withPackageSnapshot(c, firm);
@@ -165,7 +165,7 @@ describe("withPackageSnapshot keeps a proposal's includes", () => {
   });
 
   it("a package new to the proposal gets the firm's includes, or none", () => {
-    const c = withIncludes(danielle());
+    const c = withIncludes(renata());
     c.packages = c.packages!.filter((p) => p.package !== "Concierge");
     const out = withPackageSnapshot(c, setting);
     expect(out.packages!.find((p) => p.package === "Concierge")?.includes).toBeUndefined();
@@ -179,11 +179,11 @@ describe("withPackages keeps each package's includes across a settings save", ()
     const stored = {
       includes: [{ label: "Firm table", included: "✓" }],
       packages: [
-        { ...normalisePackages({ packages: danielle().packages })[0], includes: ROWS.Essential },
-        { ...normalisePackages({ packages: danielle().packages })[1], package: " ENHANCED ", includes: ROWS.Enhanced },
+        { ...normalisePackages({ packages: renata().packages })[0], includes: ROWS.Essential },
+        { ...normalisePackages({ packages: renata().packages })[1], package: " ENHANCED ", includes: ROWS.Enhanced },
       ],
     };
-    const list = normalisePackages({ packages: danielle().packages });
+    const list = normalisePackages({ packages: renata().packages });
     const out = withPackages(stored, list);
     const pkgs = out.packages as { package: string; includes?: ProposalInclude[] }[];
     expect(pkgs.find((p) => p.package === "Essential")?.includes).toEqual(ROWS.Essential);
@@ -197,8 +197,8 @@ describe("withPackages keeps each package's includes across a settings save", ()
 
 describe("a note typed on any package's row is shown (2026-11-12)", () => {
   const withNotes = (): ProposalContent => ({
-    ...danielle(),
-    packages: danielle().packages!.map((p) => ({
+    ...renata(),
+    packages: renata().packages!.map((p) => ({
       ...p,
       includes: [
         { label: "Search report", value: p.package === "Concierge" ? "$900" : undefined, included: "✓", note: p.package === "Essential" ? undefined : p.package === "Enhanced" ? "Shared note" : "Concierge only" },

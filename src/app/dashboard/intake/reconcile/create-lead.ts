@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
 import { placeholderEmailFor } from "@/lib/intake/sheet-import";
 import { logActivitySafe } from "@/lib/matters/activity";
@@ -23,7 +24,7 @@ import { readStages } from "@/lib/reconcile/sources";
 
 export type CreateLeadResult = { ok: true; leadId: string; name: string } | { ok: false; error: string };
 
-export async function createLeadFromReconcileAction(input: unknown): Promise<CreateLeadResult> {
+export const createLeadFromReconcileAction = previewSafe(async function createLeadFromReconcileAction(input: unknown): Promise<CreateLeadResult> {
   const auth = await authorizeReconcile();
   if (!auth.ok) return auth;
   const { supabase } = auth;
@@ -49,6 +50,7 @@ export async function createLeadFromReconcileAction(input: unknown): Promise<Cre
       ["email", candidate.email],
     ] as const) {
       if (!value) continue;
+      // live-guard: duplicate check: a sheet key, Lawmatics id or address held by a merged lead still means the person exists, so no second lead is created
       const { data, error } = await supabase.from("crm_lead").select("id").eq(column, value).limit(1);
       if (error) throw error;
       if ((data ?? []).length > 0) return { ok: false, error: MSG.createExists };
@@ -59,7 +61,7 @@ export async function createLeadFromReconcileAction(input: unknown): Promise<Cre
 
   let orgId: string;
   try {
-    const { data, error } = await supabase.rpc("current_org_id");
+    const { data, error } = await supabase.rpc("current_org_id", undefined, { get: true });
     if (error || typeof data !== "string" || !data) return { ok: false, error: MSG.createFailed };
     orgId = data;
   } catch {
@@ -100,4 +102,4 @@ export async function createLeadFromReconcileAction(input: unknown): Promise<Cre
   revalidatePath("/dashboard/intake/");
   revalidatePath("/dashboard/leads/");
   return { ok: true, leadId: data.id, name };
-}
+}, "state");

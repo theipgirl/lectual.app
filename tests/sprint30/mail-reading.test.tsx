@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }));
 import { renderToStaticMarkup } from "react-dom/server";
 import fs from "node:fs";
 import { fetchLiveInbox, fetchMessageToRead, LIVE_MESSAGE_ID, type MessageToRead } from "@/lib/mailbox/fetch";

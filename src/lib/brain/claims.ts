@@ -51,7 +51,7 @@ export const CLAIM_DELETE_ROLES: Role[] = ["owner", "admin", "senior_admin"];
  * result across actions.
  */
 export async function requireClaimProposeRole(supabase: ScopedClient): Promise<Role> {
-  const { data, error } = await supabase.rpc("current_org_role");
+  const { data, error } = await supabase.rpc("current_org_role", undefined, { get: true });
   if (error) throw error;
   if (!isRole(data) || !CLAIM_PROPOSE_ROLES.includes(data)) {
     throw new Error("You don't have permission to propose a claim.");
@@ -65,7 +65,7 @@ export async function requireClaimProposeRole(supabase: ScopedClient): Promise<R
  * result across actions.
  */
 export async function requireClaimReviewRole(supabase: ScopedClient): Promise<Role> {
-  const { data, error } = await supabase.rpc("current_org_role");
+  const { data, error } = await supabase.rpc("current_org_role", undefined, { get: true });
   if (error) throw error;
   if (!isRole(data) || !CLAIM_REVIEW_ROLES.includes(data)) {
     throw new Error("You don't have permission to review a claim.");
@@ -79,7 +79,7 @@ export async function requireClaimReviewRole(supabase: ScopedClient): Promise<Ro
  * result across actions.
  */
 async function requireClaimDeleteRole(supabase: ScopedClient): Promise<Role> {
-  const { data, error } = await supabase.rpc("current_org_role");
+  const { data, error } = await supabase.rpc("current_org_role", undefined, { get: true });
   if (error) throw error;
   if (!isRole(data) || !CLAIM_DELETE_ROLES.includes(data)) {
     throw new Error("You don't have permission to delete a claim.");
@@ -89,7 +89,7 @@ async function requireClaimDeleteRole(supabase: ScopedClient): Promise<Role> {
 
 /** Resolves the caller's active org id via the `current_org_id()` RPC. */
 async function currentOrgId(supabase: ScopedClient): Promise<string> {
-  const { data, error } = await supabase.rpc("current_org_id");
+  const { data, error } = await supabase.rpc("current_org_id", undefined, { get: true });
   if (error) throw error;
   if (!data) throw new Error("No active organization for the current session.");
   return data;

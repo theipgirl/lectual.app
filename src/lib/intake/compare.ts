@@ -25,7 +25,8 @@ export type CompareSide =
   | { status: "ok"; id: string; name: string; business: string; email: string | null; stage: string; source: string; created: string; timeline: CountRead; tasks: CountRead; proposals: CountRead }
   | { status: "gone"; id: string };
 
-export type CompareData = { a: CompareSide; b: CompareSide };
+/** `merge`: the caller may merge these two (owner / admin / senior admin, and lectual 0107 is there). Absent = no Merge link. */
+export type CompareData = { a: CompareSide; b: CompareSide; merge?: boolean };
 
 const DASH = "—";
 

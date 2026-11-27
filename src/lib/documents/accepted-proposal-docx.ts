@@ -105,7 +105,7 @@ function paragraph(line: DocLine): Paragraph {
   }
 }
 
-/** "Sevetri Wilson - Accepted Proposal.docx", with anything a file name cannot hold removed. */
+/** "Callum Ferreira - Accepted Proposal.docx", with anything a file name cannot hold removed. */
 export function acceptedProposalFileName(clientName: string): string {
   const safe = clean(clientName).replace(/[\\/:*?"<>|]+/g, "").trim() || "Client";
   return `${safe} - Accepted Proposal.docx`;

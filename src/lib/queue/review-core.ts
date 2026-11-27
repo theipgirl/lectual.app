@@ -6,7 +6,13 @@ import { generateApprovedDocument } from "@/lib/documents/approve-hook";
 import { activeQueueOrgKey } from "@/lib/queue/org";
 import { QUEUE_EDIT_ROLES, resolveQueueRole } from "@/lib/queue/roles";
 import { approvalRefusal } from "@/lib/queue/routing";
-import { loadApprovalRouting } from "@/lib/queue/routing-load";
+import { loadApprovalRouting, type RoutingLoad } from "@/lib/queue/routing-load";
+import { approvePlan, draftToNote, type ApprovePlan } from "@/lib/queue/draft-handoff";
+import { recordCardEvent } from "@/lib/queue/card-state";
+import { cardCaller, staffPreviewRefusal } from "@/lib/queue/card-moves";
+import { cardNoticePayload } from "@/lib/queue/handed";
+import { notify } from "@/lib/notifications/core";
+import { NOTIFICATION_KIND_FOR } from "@/lib/notifications/kinds";
 import { draftInMyMailbox } from "@/lib/mailbox/my-mailbox";
 import type { Role } from "@/lib/auth/roles";
 import { checkDraftStaleness, stalenessRequiresConfirm } from "@/lib/queue/stale";
@@ -15,6 +21,8 @@ import { getFirmTimeZone } from "@/lib/org/profile";
 import { gateLinkedProposal, makeProposalLive } from "@/lib/consult-proposal/link";
 import { approvalBlock, auditDraft } from "@/lib/queue/hygiene";
 import { loadAuditContext } from "@/lib/queue/audit-context";
+import { shownTextMatches } from "@/lib/queue/shown-text";
+import { DRAFT_CHANGED_REFRESH } from "@/lib/ui/words";
 
 /**
  * The approve / save / reject core, moved out of `reviewQueueAction` so the approval deck can call it and get a
@@ -29,6 +37,10 @@ import { loadAuditContext } from "@/lib/queue/audit-context";
  *  · An edit is saved BEFORE resolving, so it survives a failed resolve. Rejecting needs a note.
  *  · Approving never sends: a client email becomes a DRAFT (the queue's own channel, else the approver's own
  *    mailbox). A person presses Send.
+ *  · Sprint 4: with "Drafts go to" set to someone OTHER than the approver, a client email is approved exactly as before,
+ *    but NO mailbox draft is made anywhere (the queue is asked not to draft, and the approver's own mailbox is not
+ *    used): one `draft_to` card event passes it to the drafter, who makes the draft in their OWN Outlook on their own
+ *    click. Before lectual 0112 (the event is refused) it falls back to the approver's OWN mailbox only, never anyone else's.
  */
 
 export type ReviewIntent = "approve" | "reject" | "save";
@@ -45,6 +57,14 @@ export type ReviewInput = {
    * approval page leaves it off for now, so its notes read exactly as before.
    */
   withReceipt?: boolean;
+  /**
+   * The lead page's Yes and the deck's Yes: approve only the text the person SAW. With `requireShown`, an approve is
+   * refused (nothing saved, resolved or drafted) unless `shownSha256` is the sha256 hex of the re-read item's
+   * `final_body ?? draft_body`. A missing hash is refused too. The full approval page does not set it: it posts the
+   * text it shows as its edit, so what is approved is that text.
+   */
+  requireShown?: boolean;
+  shownSha256?: string | null;
 };
 
 export type ReviewOutcome =
@@ -61,6 +81,12 @@ export type ReviewOutcome =
       draftId: string | null;
       /** Which mailbox holds that draft. */
       provider: "google" | "microsoft" | null;
+      /**
+       * Sprint 4, present only when "Drafts go to" names someone other than the approver: `passed` (a draft_to was
+       * written), `not-switched-on` (before lectual 0112: drafted in the approver's own mailbox instead), `failed`
+       * (nothing passed and no draft made anywhere), `queue-drafted` (the queue drafted it although asked not to).
+       */
+      handoff?: { status: "passed" | "not-switched-on" | "failed" | "queue-drafted"; drafter: string };
     };
 
 const FAILED = "That didn't go through. Nothing was sent. Refresh to try again.";
@@ -88,6 +114,16 @@ export async function requireFirmReviewer(allowed: Role[], verb: string): Promis
   return { email: user.email, userId: user.id, role };
 }
 
+/**
+ * The one pass write (the approve path and the approver's "Pass to <drafter>" retry): one `draft_to` to the drafter with
+ * the approved text's sha256, then the bell (ids and a clipped headline only; notify() never throws).
+ */
+export async function passToDrafter(args: { orgId: string; itemId: string; drafter: string; approvedText: string; approverId: string; item: { id: string; headline: string } }) {
+  const passed = await recordCardEvent({ orgId: args.orgId, queueItemId: args.itemId, kind: "draft_to", targetUserId: args.drafter, note: draftToNote(args.approvedText) });
+  if (passed.ok) await notify({ userId: args.drafter, kind: NOTIFICATION_KIND_FOR.approval_needed, actorId: args.approverId, payload: cardNoticePayload("draft_to", args.item) });
+  return passed;
+}
+
 export async function runQueueReview(input: ReviewInput): Promise<ReviewOutcome> {
   const id = input.id;
   const intent = input.intent;
@@ -113,6 +149,9 @@ export async function runQueueReview(input: ReviewInput): Promise<ReviewOutcome>
 
   // Approve and reject: the item's kind and owner decide who may. Re-read here on every submit; the role and the
   // owner never come from the form. A routing read that fails means the default rule (the usual approvers).
+  let routed: RoutingLoad | null = null;
+  let plan: ApprovePlan = "today";
+  let passOrgId: string | null = null;
   if (intent === "approve" || intent === "reject") {
     let target: Awaited<ReturnType<typeof getQueueItem>>;
     try {
@@ -122,7 +161,7 @@ export async function runQueueReview(input: ReviewInput): Promise<ReviewOutcome>
     }
     // Decided already (another tab, a replayed deck POST): never resolve twice, never make a second mailbox draft.
     if (target.status !== "pending") return { kind: "error", error: ALREADY_DECIDED };
-    const routed = await loadApprovalRouting();
+    routed = await loadApprovalRouting();
     // An approval covers the text that would go out, so an edit in this form is checked too, not only the stored item.
     const checked = intent === "approve" && editedBody ? { ...target, final_body: editedBody } : target;
     const refusal = approvalRefusal({
@@ -132,6 +171,20 @@ export async function runQueueReview(input: ReviewInput): Promise<ReviewOutcome>
       members: routed.status === "ok" ? routed.members : [],
     });
     if (refusal) return { kind: "error", error: refusal };
+
+    // Sprint 4: who makes the mailbox draft. Only a routing that was READ and names a drafter other than the approver
+    // passes it on; anything else (no drafter, a failed read, not a client email) is today's path, unchanged.
+    if (intent === "approve" && routed.status === "ok") {
+      plan = approvePlan({ approverId: caller.userId, drafter: routed.drafter, itemType: target.type });
+      if (plan === "pass") {
+        // Lectual staff viewing as the firm have no membership: the fold would drop their draft_to. Refused before anything.
+        const preview = await staffPreviewRefusal();
+        if (preview) return { kind: "error", error: preview };
+        const who = await cardCaller();
+        if (!who || who.userId !== caller.userId) return { kind: "error", error: FAILED };
+        passOrgId = who.orgId;
+      }
+    }
   }
 
   let sendStatus: string | null = null;
@@ -154,6 +207,9 @@ export async function runQueueReview(input: ReviewInput): Promise<ReviewOutcome>
       // The stale-draft check runs again HERE, server-side: a hand-posted form must not skip it.
       const before = await getQueueItem(qKey, id);
       if (before.status !== "pending") return { kind: "error", error: ALREADY_DECIDED };
+      if (input.requireShown && (editedBody || !input.shownSha256 || !shownTextMatches(before, input.shownSha256))) {
+        return { kind: "error", error: DRAFT_CHANGED_REFRESH };
+      }
 
       // What would actually go out: the edit in this form, else what is saved. Checked before anything is saved or
       // resolved, so a refused body is never stored as the final text.
@@ -177,8 +233,24 @@ export async function runQueueReview(input: ReviewInput): Promise<ReviewOutcome>
 
       if (editedBody) await saveQueueEdit(qKey, id, editedBody);
       const item = await getQueueItem(qKey, id);
+      // Again on the read the approval is built from, so an edit that lands in between is not approved unseen.
+      if (input.requireShown && (!input.shownSha256 || !shownTextMatches(item, input.shownSha256))) {
+        return { kind: "error", error: DRAFT_CHANGED_REFRESH };
+      }
       const approvedText = editedBody ?? item.final_body ?? item.draft_body;
-      const receipt = input.withReceipt ? approvalReceipt(approvedText) : null;
+      // Re-classify the item as re-read (an edit in between may have added legal-advice text, which makes it
+      // attorney-only): refused before it is resolved or drafted.
+      if (routed) {
+        const again = approvalRefusal({
+          ...caller,
+          item: { ...item, final_body: approvedText },
+          routing: routed.status === "ok" ? routed.routing : {},
+          members: routed.status === "ok" ? routed.members : [],
+        });
+        if (again) return { kind: "error", error: again };
+      }
+      // A pass to the drafter always carries the receipt: "Make the draft" requires it and checks it against the text.
+      const receipt = input.withReceipt || plan === "pass" ? approvalReceipt(approvedText) : null;
       const approvalNote = [note, staleNote, receipt].filter(Boolean).join("\n") || null;
 
       // The proposal link goes live now, BEFORE the queue item is resolved: resolving can itself create the mailbox
@@ -193,12 +265,24 @@ export async function runQueueReview(input: ReviewInput): Promise<ReviewOutcome>
         }
       }
 
-      const resolved = await resolveQueueItem({ orgKey: qKey, id, action: "approve", resolvedBy, ...(approvalNote ? { note: approvalNote } : {}) });
+      // The text that was re-read and re-classified is sent as the final body on EVERY approve, so an edit a colleague
+      // saves after the re-read is never what gets approved (or drafted).
+      const resolved = await resolveQueueItem({
+        orgKey: qKey,
+        id,
+        action: "approve",
+        resolvedBy,
+        ...(approvalNote ? { note: approvalNote } : {}),
+        finalBody: approvedText,
+        // A drafter is set: the queue must not draft it in any mailbox. On `pass` nobody's mailbox gets it now; on `self`
+        // the only draft is the drafter's own personal one, below. lawmatics-mcp honours it only from e738c24 (not yet deployed).
+        ...(plan === "pass" || plan === "self" ? { skipMailboxDraft: true } : {}),
+      });
       sendStatus = resolved.send;
       webLink = resolved.sendResult?.webLink ?? null;
 
       // No channel on the queue side: draft it in the approver's own mailbox.
-      if (item.type === "CLIENT_EMAIL" && sendStatus !== "drafted" && sendStatus !== "sent") {
+      const draftInOwnMailbox = async () => {
         try {
           const made = await draftInMyMailbox({
             to: item.recipient,
@@ -216,6 +300,33 @@ export async function runQueueReview(input: ReviewInput): Promise<ReviewOutcome>
           console.error("[queue] mailbox draft failed:", err instanceof Error ? err.name : typeof err);
           sendStatus = "mailbox-failed";
         }
+      };
+      let handoff: { status: "passed" | "not-switched-on" | "failed" | "queue-drafted"; drafter: string } | undefined;
+      const drafter = routed && routed.status === "ok" ? (routed.drafter ?? null) : null;
+      if (plan === "pass" && drafter && passOrgId && item.type === "CLIENT_EMAIL") {
+        if (sendStatus === "drafted" || sendStatus === "sent") {
+          // The queue drafted it although asked not to: never a second draft, and nothing passed on.
+          handoff = { status: "queue-drafted", drafter };
+        } else {
+          const passed = await passToDrafter({ orgId: passOrgId, itemId: id, drafter, approvedText, approverId: caller.userId, item });
+          if (passed.ok) {
+            handoff = { status: "passed", drafter };
+            sendStatus = "passed";
+          } else if (passed.reason === "not-set-up") {
+            // Before lectual 0112: today's behaviour, and ONLY the approver's own mailbox.
+            handoff = { status: "not-switched-on", drafter };
+            await draftInOwnMailbox();
+          } else {
+            // Nothing passed and no draft made anywhere: a person drafts it from the approved item. The outcome is recorded
+            // as a `pass_failed` marker (no text) so the approver's "Pass to <drafter>" is offered for THIS item only;
+            // if the marker can't be written either, no retry is offered (never a second draft on a guess).
+            handoff = { status: "failed", drafter };
+            sendStatus = "pass-failed";
+            await recordCardEvent({ orgId: passOrgId, queueItemId: id, kind: "pass_failed" });
+          }
+        }
+      } else if (item.type === "CLIENT_EMAIL" && sendStatus !== "drafted" && sendStatus !== "sent") {
+        await draftInOwnMailbox();
       }
 
       // Document Center: an approved letter draft becomes a real .docx now. Best-effort, wrapped again so a docx bug
@@ -225,7 +336,7 @@ export async function runQueueReview(input: ReviewInput): Promise<ReviewOutcome>
       } catch (err) {
         console.error("[document-center] post-approve hook threw unexpectedly:", err instanceof Error ? err.name : typeof err);
       }
-      return { kind: "resolved", intent: "approve", send: sendStatus, webLink, draftId, provider };
+      return { kind: "resolved", intent: "approve", send: sendStatus, webLink, draftId, provider, ...(handoff ? { handoff } : {}) };
     }
 
     if (intent === "reject") {

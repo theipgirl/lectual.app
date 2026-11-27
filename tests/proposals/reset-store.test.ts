@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import { ProposalError } from "@/lib/proposals/errors";
-import { sevetri } from "./fixture";
+import { callum } from "./fixture";
 
 /**
  * resetProposalAcceptance (lectual 0101) against a fake scoped client (the same fake as pay-link-store.test.ts).
@@ -62,8 +62,8 @@ import { RESET_NEEDS_DB_UPDATE, RESET_NOT_ACCEPTED, RESET_PAID } from "@/lib/pro
 
 function row(over: Row = {}): Row {
   return {
-    id: ID, org_id: "org-1", family_id: ID, version: 1, status: "accepted", client_name: "Sevetri Wilson",
-    client_email: "sevetri@example.com", title: "Trademark Proposal", content: sevetri(), expires_on: "2099-12-31",
+    id: ID, org_id: "org-1", family_id: ID, version: 1, status: "accepted", client_name: "Callum Ferreira",
+    client_email: "callum@example.com", title: "Trademark Proposal", content: callum(), expires_on: "2099-12-31",
     pay_url: "https://pay.example.com/pay", lead_id: null, matter_id: null, updated_at: T0, ...over,
   };
 }

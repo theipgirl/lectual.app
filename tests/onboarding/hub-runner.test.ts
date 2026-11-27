@@ -41,9 +41,9 @@ describe("starting", () => {
   it("returns the first step, its page and the stored state", () => {
     const move = startFlow(byId("intake-leads"), NO_RECORDS, null);
     expect(move.index).toBe(0);
-    expect(move.view.path).toBe("/dashboard/intake/");
+    expect(move.view.path).toBe("/dashboard/intake/?view=table");
     expect(move.view.target).toBe("nav-intake");
-    expect(move.navigate).toBe("/dashboard/intake/");
+    expect(move.navigate).toBe("/dashboard/intake/?view=table");
     expect(move.state).toBe("intake-leads:0");
   });
 
@@ -141,9 +141,11 @@ describe("resuming from sessionStorage", () => {
   });
 
   it("clears for a flow the person can no longer see", () => {
+    // Changed on purpose: an attorney now sees the staff guide (plus Consults and Approvals), so an Intake flow no longer resumes for them.
     const viewerFlows = visibleFlows({ role: "attorney", modules: [], aiConfigured: false });
     expect(resumeFlow("intake-reconcile:0", viewerFlows)).toEqual({ kind: "none" });
-    expect(resumeFlow("intake-lead:0", viewerFlows).kind).toBe("resume");
+    expect(resumeFlow("intake-lead:0", viewerFlows)).toEqual({ kind: "none" });
+    expect(resumeFlow("staff-name:0", viewerFlows).kind).toBe("resume");
   });
 });
 
@@ -159,7 +161,7 @@ describe("record steps", () => {
     const view = stepView(lead.steps[0], NO_RECORDS);
     expect(view.centered).toBe(true);
     expect(view.target).toBeNull();
-    expect(view.path).toBe("/dashboard/intake/");
+    expect(view.path).toBe("/dashboard/intake/?view=table");
     expect(view.body).toMatch(/^Nothing here yet\./);
     expect(view.body).toMatch(/no leads to open yet/i);
   });
@@ -171,7 +173,7 @@ describe("record steps", () => {
   });
 
   it("a matter step falls back to the matters list", () => {
-    expect(stepView(byId("matters-page").steps[0], NO_RECORDS).path).toBe("/dashboard/matters/");
+    expect(stepView(byId("matters-page").steps[0], NO_RECORDS).path).toBe("/dashboard/matters/?view=table");
   });
 
   it("never lets a tampered id into a path", () => {

@@ -1,7 +1,11 @@
 import "@/app/dashboard/proposals/proposals.css";
+import { dueTodayStaffLine } from "@/lib/proposal-editor/vocabulary";
+import { showingOf } from "@/lib/ui/words";
 import type { ProposalCard as Card } from "@/lib/proposals/card";
 import { formatDollars } from "@/lib/proposal-editor/events";
 import { formatShortFirmDate } from "@/lib/quotes/labels";
+import { Pill } from "@/components/ui/Pill";
+import { Notice } from "@/components/ui/Notice";
 
 /**
  * One card for the approver: who the offer is for, the package, what was heard
@@ -19,17 +23,17 @@ export function ProposalCard({ card, showFees = true }: { card: Card; /** The ed
       <div className="pe-pcard-head">
         <div>
           <div className="lx-label">Proposal at a glance</div>
-          <h2 className="pe-h">
+          <h2 className="lx-h3">
             {card.client}
             {card.company ? <span className="lx-note"> · {card.company}</span> : null}
           </h2>
         </div>
         <div className="pe-pcard-meta">
-          {card.package && <span className="lx-pill lx-pill-mute">{card.package}</span>}
+          {card.package && <Pill tone="mute">{card.package}</Pill>}
           {card.editedFrom && (
-            <span className="lx-pill lx-pill-warn" title={`Changed from the package: ${card.editedFrom.fields.join(", ")}`}>
+            <Pill tone="warn" title={`Changed from the package: ${card.editedFrom.fields.join(", ")}`}>
               Edited from {card.editedFrom.name}
-            </span>
+            </Pill>
           )}
           <span className="lx-note">
             {card.expiresOn ? `Open until ${formatShortFirmDate(`${card.expiresOn}T12:00:00Z`, "UTC")}` : "No expiry date set"}
@@ -48,6 +52,14 @@ export function ProposalCard({ card, showFees = true }: { card: Card; /** The ed
                   {it.label}
                   {typeof it.hours === "number" ? ` · ${it.hours} ${it.hours === 1 ? "hr" : "hrs"}` : ""}
                   {it.valueCents > 0 ? ` · ${formatDollars(it.valueCents)}` : ""}
+                  {it.intro ? <span className="lx-note pe-work-intro">{it.intro}</span> : null}
+                  {it.details ? (
+                    <ul className="pe-work-details">
+                      {it.details.map((d, j) => (
+                        <li key={j}>{d}</li>
+                      ))}
+                    </ul>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -91,6 +103,11 @@ export function ProposalCard({ card, showFees = true }: { card: Card; /** The ed
           </div>
         </dl>
       )}
+      {showFees && card.dueToday ? (
+        <p className="lx-note pe-due-today" style={{ margin: 0 }}>
+          {dueTodayStaffLine(formatDollars(card.dueToday.dueNowCents), formatDollars(card.dueToday.balanceCents))}
+        </p>
+      ) : null}
       {showFees && !card.general && (
         <>
         <dl className="pe-pcard-fees">
@@ -110,9 +127,9 @@ export function ProposalCard({ card, showFees = true }: { card: Card; /** The ed
       )}
 
       {receipts.status === "unavailable" && (
-        <p role="status" className="lx-banner lx-banner-warn" style={{ margin: 0 }}>
+        <Notice tone="warn" role="status">
           Receipts couldn&apos;t be loaded just now, so the quotes from the call aren&apos;t shown. That doesn&apos;t mean there were none.
-        </p>
+        </Notice>
       )}
       {receipts.status === "ok" && (
         <div className="pe-pcard-receipts">
@@ -136,7 +153,7 @@ export function ProposalCard({ card, showFees = true }: { card: Card; /** The ed
               </ul>
             </>
           )}
-          {receipts.more > 0 && <p className="lx-note" style={{ margin: 0 }}>And {receipts.more} more {receipts.more === 1 ? "quote" : "quotes"} not shown.</p>}
+          {receipts.more > 0 && <p className="lx-note" style={{ margin: 0 }}>{showingOf(receipts.verified.length + receipts.unverified.length, receipts.verified.length + receipts.unverified.length + receipts.more)} quotes.</p>}
           {receipts.notes && (
             <p className="lx-note" style={{ margin: 0 }}>
               Notes for the reviewer: {receipts.notes}

@@ -35,7 +35,7 @@ function exhibitFor(selectionOver: Record<string, boolean> = {}) {
   return buildExhibit(r.content, r.quote, money);
 }
 
-const INPUTS = { details: TEST_DETAILS, typedName: "Sevetri Wilson", dateText: "November 12, 2026", clientEmail: "sevetri@example.com" };
+const INPUTS = { details: TEST_DETAILS, typedName: "Callum Ferreira", dateText: "November 12, 2026", clientEmail: "callum@example.com" };
 
 describe("cleaning what a client typed", () => {
   it("removes angle brackets and control characters, collapses spaces and caps the length", () => {
@@ -68,7 +68,7 @@ describe("cleaning what a client typed", () => {
   for (const key of REQUIRED_DETAIL_KEYS) {
     it(`refuses when only ${key} is missing (server checkSigning and the page's canSign)`, () => {
       const details = { ...TEST_DETAILS, [key]: "   " };
-      const input = { typedName: "Sevetri Wilson", agree: true, details, fingerprint: "x" };
+      const input = { typedName: "Callum Ferreira", agree: true, details, fingerprint: "x" };
       expect(missingDetails(cleanSigningDetails(details))).toEqual([key]);
       expect(checkSigning(input)).toEqual({ ok: false, reason: "details_required" });
       expect(canSign(input)).toBe(false);
@@ -77,7 +77,7 @@ describe("cleaning what a client typed", () => {
 
   it("passes with the three optional fields empty", () => {
     const details = { ...TEST_DETAILS, entity_name: "", title: "", street2: "" };
-    const input = { typedName: "Sevetri Wilson", agree: true, details, fingerprint: "x" };
+    const input = { typedName: "Callum Ferreira", agree: true, details, fingerprint: "x" };
     expect(missingDetails(details)).toEqual([]);
     expect(checkSigning(input).ok).toBe(true);
     expect(canSign(input)).toBe(true);
@@ -89,10 +89,10 @@ describe("cleaning what a client typed", () => {
 });
 
 describe("checkSigning", () => {
-  const good = { typedName: "Sevetri Wilson", agree: true, details: TEST_DETAILS, fingerprint: "x" };
+  const good = { typedName: "Callum Ferreira", agree: true, details: TEST_DETAILS, fingerprint: "x" };
   it("accepts a name, a tick and details, and returns them cleaned", () => {
-    const r = checkSigning({ ...good, typedName: "  Sevetri   <b>Wilson</b> " });
-    expect(r.ok && r.typedName).toBe("Sevetri bWilson/b");
+    const r = checkSigning({ ...good, typedName: "  Callum   <b>Ferreira</b> " });
+    expect(r.ok && r.typedName).toBe("Callum bFerreira/b");
   });
   it("refuses, in this order: details, name, tick", () => {
     expect(checkSigning({ ...good, details: emptyDetails() })).toEqual({ ok: false, reason: "details_required" });
@@ -104,17 +104,17 @@ describe("checkSigning", () => {
   });
   it("the sign button rule: disabled until the name is typed and the tick is given", () => {
     expect(canSign({ typedName: "", agree: false, details: TEST_DETAILS })).toBe(false);
-    expect(canSign({ typedName: "Sevetri Wilson", agree: false, details: TEST_DETAILS })).toBe(false);
+    expect(canSign({ typedName: "Callum Ferreira", agree: false, details: TEST_DETAILS })).toBe(false);
     expect(canSign({ typedName: "", agree: true, details: TEST_DETAILS })).toBe(false);
-    expect(canSign({ typedName: "Sevetri Wilson", agree: true, details: TEST_DETAILS })).toBe(true);
-    expect(canSign({ typedName: "Sevetri Wilson", agree: true, details: emptyDetails() })).toBe(false);
+    expect(canSign({ typedName: "Callum Ferreira", agree: true, details: TEST_DETAILS })).toBe(true);
+    expect(canSign({ typedName: "Callum Ferreira", agree: true, details: emptyDetails() })).toBe(false);
   });
 });
 
 describe("the agreement", () => {
   it("merges the seven fields; the entity falls back to the client's own name", () => {
     const values = letterValues({ ...INPUTS, details: { ...TEST_DETAILS, entity_name: "" } });
-    expect(values.entity_name).toBe("Sevetri Wilson");
+    expect(values.entity_name).toBe("Callum Ferreira");
     expect(values.address_block).toBe("100 Example Street\nSuite 4\nMiami, FL 33101\nUnited States");
     expect(Object.keys(values).sort()).toEqual(["address_block", "client_email", "client_name", "date", "entity_name", "signed_date", "signer_name"]);
   });
@@ -133,7 +133,7 @@ describe("the agreement", () => {
     const r = assembleAgreement({ body: fullLetterBody(), inputs: INPUTS, exhibit: exhibitFor() });
     if (!r.ok) throw new Error("no agreement");
     expect(r.agreement.text).toContain("Exhibit A: Fee Structure and Estimated Costs");
-    expect(r.agreement.text.indexOf("Dear Sevetri Wilson:")).toBeGreaterThan(-1);
+    expect(r.agreement.text.indexOf("Dear Callum Ferreira:")).toBeGreaterThan(-1);
     expect(r.agreement.text.indexOf("Exhibit A")).toBeGreaterThan(r.agreement.text.lastIndexOf("Fee Structure & Estimated Costs"));
   });
 
@@ -143,7 +143,7 @@ describe("the agreement", () => {
 });
 
 describe("the fingerprint", () => {
-  function fp(details = TEST_DETAILS, exhibit = exhibitFor(), typedName = "Sevetri Wilson") {
+  function fp(details = TEST_DETAILS, exhibit = exhibitFor(), typedName = "Callum Ferreira") {
     const r = assembleAgreement({ body: fullLetterBody(), inputs: { ...INPUTS, details, typedName }, exhibit });
     if (!r.ok) throw new Error("no agreement");
     return agreementFingerprint({ letter: r.agreement.blocks, details, exhibit });
@@ -153,7 +153,7 @@ describe("the fingerprint", () => {
     const base = fp();
     expect(fp()).toBe(base);
     expect(fp({ ...TEST_DETAILS, street: "101 Example Street" })).not.toBe(base);
-    expect(fp(TEST_DETAILS, exhibitFor(), "Sevetri W Wilson")).not.toBe(base);
+    expect(fp(TEST_DETAILS, exhibitFor(), "Callum W Ferreira")).not.toBe(base);
     expect(fp(TEST_DETAILS, exhibitFor({ "fold-c2": false }))).not.toBe(base);
     expect(fp(TEST_DETAILS, exhibitFor({ "ci-logo": true }))).not.toBe(base);
   });

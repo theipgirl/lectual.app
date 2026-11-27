@@ -1,29 +1,37 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { orgHasModule } from "@/lib/org/modules";
-import { resolveFirmSession } from "@/lib/firm/session";
+import { resolveViewSession } from "@/lib/views/view-as";
 import { hasRole } from "@/lib/auth/roles";
 import { loadLinesForQuotes, loadQuotes } from "@/lib/quotes/load";
 import { quoteClientLabels, quoteClientOptions } from "@/lib/quotes/clients";
-import { daysUntilQuoteExpiry, effectiveQuoteStatus, formatQuoteExpiry, QUOTE_STATUSES, quoteStatusLabel } from "@/lib/quotes/status";
+import { daysUntilQuoteExpiry, effectiveQuoteStatus, QUOTE_STATUSES, quoteStatusLabel } from "@/lib/quotes/status";
 import { offerHeadline } from "@/lib/quotes/packages";
 import { parseAcceptedSnapshot } from "@/lib/quotes/public";
 import { toAmount } from "@/lib/quotes/drift";
-import { formatCents } from "@/lib/quotes/money";
-import { quoteReference, quoteStatusTone } from "@/lib/quotes/labels";
+import { moneyFor } from "@/lib/quotes/staff-money";
+import { quotePillTone, quoteReference } from "@/lib/quotes/labels";
 import { getFirmTimeZone } from "@/lib/org/profile";
 import { relativeTime } from "@/lib/relative-time";
-import { NewQuoteForm } from "@/components/quotes/QuoteForms";
+import { NewQuoteButton, NewQuotePanel } from "@/components/quotes/NewQuote";
+import { Chip, FilterChips } from "@/components/list-page";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { LoadFailedCard, LoadFailedLine } from "@/components/ui/LoadFailed";
+import { Pill } from "@/components/ui/Pill";
+import { SheetCard, SheetScroll, SheetTable } from "@/components/ui/SheetTable";
+import { formatDay } from "@/lib/ui/dates";
 import { QuotesRestricted } from "@/components/quotes/QuotesRestricted";
 import type { Metadata } from "next";
 import { pageTitle } from "@/lib/ui/page-title";
+import { BLANK, PROPOSALS_NAME, notReadyPlural } from "@/lib/ui/words";
 
-export const metadata: Metadata = { title: pageTitle("Quotes & proposals") };
+export const metadata: Metadata = { title: pageTitle(PROPOSALS_NAME) };
 
 export const dynamic = "force-dynamic";
 
 /**
- * Quotes & proposals — the firm's proposals, filtered by status, over a
+ * Proposals (the older quote surface) — the firm's proposals, filtered by status, over a
  * three-state read. For a firm holding the `proposals` module this list
  * redirects to /dashboard/proposals/; `/dashboard/quotes/[id]` and the public
  * quote and signing routes are untouched.
@@ -63,8 +71,8 @@ export default async function QuotesPage({ searchParams }: { searchParams: Promi
   // Runs before the role gate: the proposals page is readable by the whole firm.
   if (await orgHasModule("proposals")) redirect("/dashboard/proposals/");
   const { status: statusRaw } = await searchParams;
-  const session = await resolveFirmSession();
-  if (session.kind !== "ok" || !hasRole(session.role, "attorney")) return <QuotesRestricted title="Quotes & proposals" />;
+  const session = await resolveViewSession();
+  if (session.kind !== "ok" || !hasRole(session.role, "attorney")) return <QuotesRestricted title={PROPOSALS_NAME} />;
 
   const now = new Date();
   const status = QUOTE_STATUSES.includes(statusRaw as never) ? statusRaw : undefined;
@@ -84,139 +92,111 @@ export default async function QuotesPage({ searchParams }: { searchParams: Promi
 
   return (
     <>
-      <div className="lx-page-head">
-        <div style={{ flex: 1, minWidth: 260 }}>
-          <div className="lx-label">Intake</div>
-          <h1 className="lx-h1">Quotes &amp; proposals</h1>
-          <p className="lx-sub">
-            Flat-fee proposals a client reviews and signs online. Legal fees and USPTO filing fees are always quoted and
-            charged separately — a quote never bills the government fee at signing.
-          </p>
-        </div>
-        {canManageLibrary && (
-          <Link href="/dashboard/settings/services/" className="lx-btn lx-btn-sec">
-            Service library
-          </Link>
-        )}
-      </div>
+      <PageHeader
+        title={PROPOSALS_NAME}
+        sub="Flat-fee proposals a client reviews and signs online. Legal fees and USPTO filing fees are always quoted and charged separately — a quote never bills the government fee at signing."
+        actions={
+          <>
+            {canManageLibrary && (
+              <Link href="/dashboard/settings/services/" className="lx-btn lx-btn-sec">
+                Service library
+              </Link>
+            )}
+            <NewQuoteButton />
+          </>
+        }
+      />
 
-      <details className="lx-card lx-disclosure">
-        <summary>New quote</summary>
-        <NewQuoteForm options={options} />
-      </details>
+      <NewQuotePanel options={options} />
 
       {load.status === "ok" && all.length > 0 && (
-        <nav aria-label="Filter quotes by status" className="lx-chips">
-          <Link href="/dashboard/quotes/" aria-current={!status ? "page" : undefined}>
+        <FilterChips as="nav" label="Filter quotes by status">
+          <Chip href="/dashboard/quotes/" active={!status} count={all.length}>
             All
-            <span className="lx-chip-count">{all.length}</span>
-          </Link>
+          </Chip>
           {QUOTE_STATUSES.map((s) => {
             const count = counts.get(s) ?? 0;
             if (count === 0 && status !== s) return null;
             return (
-              <Link key={s} href={`/dashboard/quotes/?status=${s}`} aria-current={status === s ? "page" : undefined}>
+              <Chip key={s} href={`/dashboard/quotes/?status=${s}`} active={status === s} count={count}>
                 {quoteStatusLabel(s)}
-                <span className="lx-chip-count">{count}</span>
-              </Link>
+              </Chip>
             );
           })}
-        </nav>
+        </FilterChips>
       )}
 
       {load.status === "unconfigured" ? (
-        <div className="lx-card lx-empty-card">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            Quotes aren&apos;t switched on for your firm yet
-          </h2>
-          <p className="lx-note" style={{ margin: 0 }}>
-            Lectual will turn them on. Nothing is broken.
-          </p>
-        </div>
+        <EmptyState>{notReadyPlural("Quotes")}</EmptyState>
       ) : load.status === "unavailable" ? (
-        <div className="lx-card lx-empty-card">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            Quotes couldn&apos;t be loaded
-          </h2>
-          <p className="lx-note" style={{ margin: 0 }}>
-            Can&apos;t show this right now. Refresh to try again.
-          </p>
-        </div>
+        <LoadFailedCard what="quotes" />
       ) : rows.length === 0 ? (
-        <div className="lx-card lx-empty-card">
-          <h2 className="lx-h2" style={{ fontSize: 25 }}>
-            {all.length === 0 ? "No quotes yet" : "Nothing matches"}
-          </h2>
-          <p className="lx-note" style={{ margin: 0 }}>
-            {all.length === 0 ? "Start one above. It stays a draft until you send it." : "Every quote is still here — try another filter."}
-          </p>
-        </div>
+        <EmptyState title={all.length === 0 ? "No quotes yet" : "No quote matches this filter"}>
+          {all.length === 0 ? "Start one with New quote. It stays a draft until you send it." : "Every quote is still here — try another filter."}
+        </EmptyState>
       ) : (
-        <div className="lx-card" style={{ overflow: "auto" }}>
-          <table className="lx-tbl" style={{ minWidth: 820 }}>
-            <thead>
-              <tr>
-                <th>Quote</th>
-                <th>Client</th>
-                <th>Status</th>
-                <th style={{ textAlign: "right" }}>Due at signing</th>
-                <th style={{ textAlign: "right" }}>Project cost</th>
-                <th>Updated</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(({ quote, effective }) => {
-                const client = clients.get(quote.id);
-                const lines = linesByQuote?.get(quote.id) ?? (linesByQuote ? [] : null);
-                const figures = listFigures(quote, lines);
-                const expiry = formatQuoteExpiry(quote.expires_at, tz);
-                const daysLeft = daysUntilQuoteExpiry(quote.expires_at, now, tz);
-                return (
-                  <tr key={quote.id}>
-                    <td className="pri wrap">
-                      <Link href={`/dashboard/quotes/${quote.id}/`} className="lx-rowlink">
-                        {quote.title}
-                      </Link>
-                      <span className="lx-note lx-num" style={{ marginLeft: 8, fontSize: 12 }}>
-                        {quoteReference(quote.id)}
-                      </span>
-                      {effective === "sent" && expiry && (
+        <SheetCard>
+          <SheetScroll>
+            <SheetTable minWidth={820}>
+              <thead>
+                <tr>
+                  <th>Quote</th>
+                  <th>Client</th>
+                  <th>Status</th>
+                  <th className="num">Due at signing</th>
+                  <th className="num">Project cost</th>
+                  <th>Updated</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(({ quote, effective }) => {
+                  const client = clients.get(quote.id);
+                  const lines = linesByQuote?.get(quote.id) ?? (linesByQuote ? [] : null);
+                  const figures = listFigures(quote, lines);
+                  const expiry = quote.expires_at ? formatDay(quote.expires_at, { tz }) : null;
+                  const daysLeft = daysUntilQuoteExpiry(quote.expires_at, now, tz);
+                  return (
+                    <tr key={quote.id}>
+                      <td className="pri wrap">
+                        <Link href={`/dashboard/quotes/${quote.id}/`} className="lx-rowlink">
+                          {quote.title}
+                        </Link>
                         <div className="lx-note">
-                          Open until {expiry}
-                          {daysLeft !== null && daysLeft >= 0 ? ` · ${daysLeft === 0 ? "today" : `${daysLeft}d`}` : ""}
+                          {quoteReference(quote.id)}
+                          {effective === "sent" && expiry
+                            ? ` · Open until ${expiry}${daysLeft !== null && daysLeft >= 0 ? ` · ${daysLeft === 0 ? "today" : `${daysLeft} ${daysLeft === 1 ? "day" : "days"}`}` : ""}`
+                            : ""}
                         </div>
-                      )}
-                    </td>
-                    <td>{client ? client.label : <span className="lx-note">—</span>}</td>
-                    <td>
-                      <span className={`lx-pill ${quoteStatusTone(effective)}`}>{quoteStatusLabel(effective)}</span>
-                    </td>
-                    <td className="lx-num" style={{ textAlign: "right" }}>
-                      {figures ? figures.signing : "—"}
-                    </td>
-                    <td className="lx-num" style={{ textAlign: "right" }}>
-                      {figures ? figures.project : "—"}
-                    </td>
-                    <td className="lx-num">{relativeTime(quote.updated_at)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      </td>
+                      <td data-label="Client">{client ? client.label : <span className="lx-note">{BLANK}</span>}</td>
+                      <td data-label="Status">
+                        <Pill tone={quotePillTone(effective)}>{quoteStatusLabel(effective)}</Pill>
+                      </td>
+                      <td className="num" data-label="Due at signing">
+                        {figures ? figures.signing : BLANK}
+                      </td>
+                      <td className="num" data-label="Project cost">
+                        {figures ? figures.project : BLANK}
+                      </td>
+                      <td data-label="Updated">{relativeTime(quote.updated_at, now.getTime(), tz)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </SheetTable>
+          </SheetScroll>
+        </SheetCard>
       )}
       {load.status === "ok" && linesByQuote === null && rows.length > 0 && (
-        <p className="lx-note" style={{ margin: 0 }}>
-          Totals couldn&apos;t be loaded just now — open a quote to see its figures.
-        </p>
+        <LoadFailedLine>Totals couldn&apos;t be loaded just now — open a quote to see its figures.</LoadFailedLine>
       )}
     </>
   );
 }
 
-/** "$4,550.00", or "$2,750.00 – $3,650.00" across the packages offered. */
+/** "$4,550", or "$2,750 – $3,650" across the packages offered. */
 function range(low: number, high: number, currency: string): string {
-  return low === high ? formatCents(low, currency) : `${formatCents(low, currency)} – ${formatCents(high, currency)}`;
+  return low === high ? moneyFor(low, currency) : `${moneyFor(low, currency)} – ${moneyFor(high, currency)}`;
 }
 
 /**
@@ -232,8 +212,8 @@ function listFigures(
   const snapshot = quote.status === "accepted" ? parseAcceptedSnapshot(quote.accepted_snapshot) : null;
   if (snapshot) {
     return {
-      signing: formatCents(toAmount(snapshot.totals.due_at_signing), snapshot.currency),
-      project: formatCents(toAmount(snapshot.totals.full_project_cost), snapshot.currency),
+      signing: moneyFor(toAmount(snapshot.totals.due_at_signing), snapshot.currency),
+      project: moneyFor(toAmount(snapshot.totals.full_project_cost), snapshot.currency),
     };
   }
   if (!lines) return null;

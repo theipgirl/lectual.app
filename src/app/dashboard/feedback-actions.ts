@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { env } from "@/lib/env";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { sendInternalMail } from "@/lib/mail/internal-mail";
@@ -11,7 +12,7 @@ import { sendFeedback, type FeedbackResult } from "@/lib/feedback/submit";
  * session transcript. Any signed-in member may send. Session only: no database client, no admin client,
  * no write. See src/lib/feedback/submit.ts for the rules.
  */
-export async function sendFeedbackAction(formData: FormData): Promise<FeedbackResult> {
+export const sendFeedbackAction = previewSafe(async function sendFeedbackAction(formData: FormData): Promise<FeedbackResult> {
   return sendFeedback(
     {
       session: () => resolveFirmSession(),
@@ -22,4 +23,4 @@ export async function sendFeedbackAction(formData: FormData): Promise<FeedbackRe
     },
     formData,
   );
-}
+}, "state");

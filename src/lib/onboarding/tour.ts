@@ -111,7 +111,7 @@ export function tourSteps({ role, navItems, aiConfigured, firmName }: TourStepsI
     target: "rail",
     side: "right",
     title: "Your sections",
-    body: "Everything in the workspace is reached from this rail. Hover it to read the names, or pin it open.",
+    body: "Your main sections are on this rail. Hover it to read the names, or pin it open.",
   });
 
   if (slugs.has("")) {

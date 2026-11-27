@@ -31,7 +31,7 @@ The changes from the November 9 letter are:
 
 1. The client's name, company, address, email, the dates and the signature tag became merge
    fields in double braces.
-2. "Dear Mrs. Wilson:" became "Dear {{client_name}}:" so the software never guesses a title.
+2. "Dear Mrs. Ferreira:" became "Dear {{client_name}}:" so the software never guesses a title.
 3. The last page read "Trademark Package: TBD". That line is gone. In its place the software
    adds "Exhibit A: Fee Structure and Estimated Costs", filled in from what the client selected.
    The paragraph about the fees being estimates is kept and now introduces the exhibit.

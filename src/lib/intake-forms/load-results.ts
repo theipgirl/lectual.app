@@ -194,6 +194,7 @@ export async function loadEventPeople(
     const columns = opts.contact ? "id, first_name, last_name, business_name, email, phone" : "id, first_name, last_name, business_name";
     const leads: EventLeadRow[] = [];
     for (let i = 0; i < ids.length; i += LEAD_CHUNK) {
+      // live-guard: names the leads of a form's submissions (history)
       const { data, error } = await supabase.from("crm_lead").select(columns).in("id", ids.slice(i, i + LEAD_CHUNK));
       if (error) return { status: "unavailable", error };
       leads.push(...((data ?? []) as unknown as EventLeadRow[]));

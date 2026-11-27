@@ -89,6 +89,9 @@ describe("sets: membership and the chips", () => {
     const open = chipCountsWithin(rowsInSet(rows, data, "open"), reads);
     expect(working).toMatchObject({ decision: 1, needsAttorney: 2, agent: null });
     expect(open).toMatchObject({ decision: 2, needsAttorney: 2 });
+    // "nur" is in a nurture stage: a pending draft there is not counted.
+    const withN = { ...reads, approvals: { status: "ok", byLead: { a: [{ headline: "h" }], w: [{ headline: "h" }], nur: [{ headline: "h" }] } } as never };
+    expect(chipCountsWithin(rows, withN).needsAttorney).toBe(2) /* a, w; not nur */;
     expect(chipCountsWithin(rows, { ...reads, decisionsRead: false, approvals: { status: "unavailable" } })).toMatchObject({ decision: null, needsAttorney: null });
   });
 });
@@ -283,7 +286,9 @@ describe("reads", () => {
   it("the page asks the notes read only about the leads it shows and the row says so when it was cut short", async () => {
     const { readFileSync } = await import("node:fs");
     const page = readFileSync("src/app/dashboard/intake/page.tsx", "utf8");
-    expect(page).toContain("loadLatestNotes(sinceIso, leads.map");
+    // (the ids are worked out once for the notes and the firm columns)
+    expect(page).toContain("const leadIds = leads.map((l) => l.id)");
+    expect(page).toContain("loadLatestNotes(sinceIso, leadIds)");
     expect(page).toContain("notesUnavailable={notesIncomplete(notes)}");
   });
 

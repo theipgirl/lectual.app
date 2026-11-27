@@ -21,13 +21,13 @@ import { twoBrandPerMark, withLoe } from "../loe/loe-fixtures";
  * When LOE_RENDER_DIR is set the HTML is also written there (one file per screen) for the Playwright screenshots described in
  * the sprint handoff; the assertions run either way.
  */
-const LETTER = { dateText: "November 12, 2026", clientEmail: "sevetri@example.com" };
+const LETTER = { dateText: "November 12, 2026", clientEmail: "callum@example.com" };
 
 function base(over: Partial<ProposalDocumentProps> = {}): ProposalDocumentProps {
   return {
     content: withLoe(twoBrandPerMark()),
     title: "Trademark Proposal",
-    clientName: "Sevetri Wilson",
+    clientName: "Callum Ferreira",
     expiresOn: "2026-12-01",
     firm: { name: "RPB Law", slug: "rpb-law" },
     mode: "live",
@@ -50,8 +50,8 @@ function receiptProps(): ProposalDocumentProps {
     quote: priced.quote,
     acceptedAt: "2026-11-12T19:14:00.000Z",
     signed: {
-      agreement: { signature_id: "sig-1", signer_name: "Sevetri Wilson", signed_at: "2026-11-12T19:14:00.000Z", sha256: "c".repeat(64), template_version: 3 },
-      signing: { details: { ...TEST_DETAILS }, date_text: "November 12, 2026", client_email: "sevetri@example.com" },
+      agreement: { signature_id: "sig-1", signer_name: "Callum Ferreira", signed_at: "2026-11-12T19:14:00.000Z", sha256: "c".repeat(64), template_version: 3 },
+      signing: { details: { ...TEST_DETAILS }, date_text: "November 12, 2026", client_email: "callum@example.com" },
     },
   });
   const signed = rebuildSignedLetter(snapshot, "America/New_York");
@@ -73,15 +73,15 @@ function receiptProps(): ProposalDocumentProps {
 const SCREENS: Array<[string, () => ProposalDocumentProps]> = [
   ["step1", () => base()],
   ["step2", () => base({ initialLoe: { step: 2 } })],
-  ["step3", () => base({ initialLoe: { step: 3, details: TEST_DETAILS, typedName: "Sevetri Wilson", agree: true } })],
+  ["step3", () => base({ initialLoe: { step: 3, details: TEST_DETAILS, typedName: "Callum Ferreira", agree: true } })],
   ["receipt", receiptProps],
   // The live page the moment signing succeeded (no reload): the receipt with the signed download and the server's date.
   [
     "just-signed",
     () =>
       base({
-        initialLoe: { step: 3, details: TEST_DETAILS, typedName: "Sevetri Wilson", agree: true },
-        initialDone: { payUrl: "https://example.com/pay", opened: true, signedLine: "Signed November 13, 2026 at 10:30 AM EST by Sevetri Wilson", letterDate: "November 13, 2026", letterVerified: true },
+        initialLoe: { step: 3, details: TEST_DETAILS, typedName: "Callum Ferreira", agree: true },
+        initialDone: { payUrl: "https://example.com/pay", opened: true, signedLine: "Signed November 13, 2026 at 10:30 AM EST by Callum Ferreira", letterDate: "November 13, 2026", letterVerified: true },
         onDownloadSigned: async () => ({ ok: false, message: "x" }),
       }),
   ],

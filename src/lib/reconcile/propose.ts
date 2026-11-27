@@ -1,4 +1,5 @@
 import { milestoneRank, opensMatter, topMilestone } from "./milestones";
+import { formatDay as formatDay_ } from "@/lib/ui/dates";
 import { AUTOMATIC_STAGE_MOVES } from "@/lib/ui/words";
 import {
   SOURCE_LABEL,
@@ -46,16 +47,14 @@ const VIA_LABEL: Record<SourceName, Record<EvidenceItem["via"], string>> = {
   email: { status: "email", note: "email", stage: "email", mail: "email", mailbox: "mailbox search", agent: AUTOMATIC_STAGE_MOVES },
 };
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-/** "Oct 16" (UTC day), with the year when it differs from `refYear`. */
+/** "Oct 16" (UTC civil day), with the year when it differs from `refYear`. */
 export function formatDay(iso: string | null, refYear?: number): string | null {
   if (!iso) return null;
   const ms = Date.parse(iso);
   if (!Number.isFinite(ms)) return null;
-  const d = new Date(ms);
-  const day = `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
-  return refYear !== undefined && d.getUTCFullYear() !== refYear ? `${day}, ${d.getUTCFullYear()}` : day;
+  // No refYear: never a year. Otherwise "now" is mid-year of refYear.
+  const now = refYear === undefined ? new Date(ms) : new Date(Date.UTC(refYear, 6, 1));
+  return formatDay_(new Date(ms), { tz: "UTC", civil: true, now });
 }
 
 export function describeEvidence(item: EvidenceItem, refYear?: number): string {

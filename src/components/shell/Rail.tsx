@@ -7,6 +7,7 @@ import { ICON, RAIL_PIN_COOKIE, isNavActive, navItemBySlug, railCountFor, railGr
 import { RAIL_COUNT_TITLE } from "@/lib/intake/counts";
 import { navTourToken } from "@/lib/onboarding/tour";
 import { closeRailOnEscape, releaseRailFocus } from "@/lib/rail-behaviour";
+import { Icon as GlyphIcon } from "@/components/ui/Icon";
 import { MORE_NAME, OWNER_VIEW_NAME } from "@/lib/ui/words";
 import type { QueueLoadStatus } from "@/lib/queue/load";
 import "./owner-shell.css";
@@ -26,14 +27,15 @@ type Props = {
   showReports?: boolean;
   /** The rail's shape (default: RAIL_TREE). A view's own tree; it only ever names slugs that `items` allowed. */
   tree?: readonly (readonly RailNode[])[];
-  /** The owner view's colours. */
+  /** The owner view: its colours AND its behaviours (the deal-ready dot). */
   variant?: "owner";
+  /** The owner-style look only (the team view): same colours and widths, none of the owner's behaviours. */
+  look?: "owner" | "team";
   /** Owner view, collapsed rail: draw the More menu open to start with (default closed). Used by the design harness. */
   initialFlyout?: boolean;
 };
 
 const PIN = "M9 4h6M12 4v6M7 10h10l-1 5H8zM12 15v5";
-const CHEVRON = "M6 9l6 6 6-6";
 
 function Icon({ d, size }: { d: string; size: number }) {
   return (
@@ -55,12 +57,16 @@ function Icon({ d, size }: { d: string; size: number }) {
  * it, "!" when we could not (an outage never reads as "nothing waiting"),
  * nothing when there is no queue.
  */
-export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, dealReady = null, showSettings = true, showReports: reportsAllowed = true, tree, variant, initialFlyout = false }: Props) {
+export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, dealReady = null, showSettings = true, showReports: reportsAllowed = true, tree, variant, look, initialFlyout = false }: Props) {
   const pathname = usePathname() ?? "/dashboard/";
   const [pinned, setPinned] = useState(initialPinned);
   const [flyout, setFlyout] = useState(initialFlyout);
   const slot = useRef<HTMLDivElement>(null);
   const owner = variant === "owner";
+  // The look is what is drawn; `owner` alone is what behaves (only the owner view has the deal-ready dot).
+  const light = owner || look !== undefined;
+  // A view's own tree (owner or team) has a More row that opens a menu on a collapsed rail instead of navigating to its first kid.
+  const moreMenu = tree !== undefined;
 
   // The owner's collapsed More menu closes on Escape and on a pointer-down outside it.
   useEffect(() => {
@@ -101,7 +107,7 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
   return (
     <div ref={slot} className={`lx-rail-slot${pinned ? " is-pinned" : ""}`}>
       <nav
-        className={`lx-rail${pinned ? " is-pinned" : ""}${variant === "owner" ? " lx-rail--owner" : ""}`}
+        className={`lx-rail${pinned ? " is-pinned" : ""}${light ? " lx-rail--owner" : ""}${look === "team" ? " lx-rail--team" : ""}`}
         aria-label="Sections"
         data-tour="rail"
         onKeyDown={(e) => closeRailOnEscape(e.key, e.currentTarget, document.activeElement as HTMLElement | null)}
@@ -136,8 +142,8 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
                     <Link
                       href={entry.href}
                       onClick={(e) => {
-                        // The owner's More row, on a collapsed rail nobody is pointing at: open its menu instead of the first list.
-                        if (owner && entry.kids.length > 0 && !e.currentTarget.closest(".lx-rail")?.matches(":hover, :has(:focus-visible), .is-pinned")) {
+                        // A view's More row, on a collapsed rail nobody is pointing at: open its menu instead of the first list.
+                        if (moreMenu && entry.kids.length > 0 && !e.currentTarget.closest(".lx-rail")?.matches(":hover, :has(:focus-visible), .is-pinned")) {
                           e.preventDefault();
                           setFlyout((o) => !o);
                           return;
@@ -161,9 +167,9 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
                       <span className="lx-rail-label">{entry.label}</span>
                       {ready && <span className="lx-ready-dot" aria-hidden="true" />}
                       {count && <span className={`lx-rail-count${count === "!" ? " is-alert" : ""}`}>{count}</span>}
-                      {owner && entry.kids.length > 0 && (
+                      {moreMenu && entry.kids.length > 0 && (
                         <span className="lx-rail-chev">
-                          <Icon d={CHEVRON} size={13} />
+                          <GlyphIcon name="chevron-down" size={13} />
                         </span>
                       )}
                     </Link>
@@ -181,7 +187,7 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
                               aria-current={kid.active ? "page" : undefined}
                               title={kc ? RAIL_COUNT_TITLE[kid.countKey] : undefined}
                             >
-                              {!owner && <Icon d={kid.icon} size={13} />}
+                              {!light && <Icon d={kid.icon} size={13} />}
                               <span className="lx-rail-label">{kid.label}</span>
                               {kc && <span className={`lx-rail-kidcount${kc === "!" ? " is-alert" : ""}`}>{kc}</span>}
                             </Link>
@@ -229,7 +235,7 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
         </Link>
         )}
       </nav>
-      {owner && flyout && moreEntry && (
+      {moreMenu && flyout && moreEntry && (
         <div className="lx-rail-flyout" role="menu" aria-label={MORE_NAME}>
           <span className="lx-rail-flyout-label">{MORE_NAME}</span>
           {moreEntry.kids.map((kid) => (

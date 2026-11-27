@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { Lead } from "@/lib/pipeline/leads";
 import type { getScopedClient } from "@/lib/db/scoped-client";
 import type { LawmaticsClient } from "@/lib/lawmatics/client";
 import { LawmaticsNotConnectedError, firmLawmaticsClient } from "@/lib/lawmatics/connection";
@@ -10,6 +11,8 @@ import { agentEvidenceFor, type AgentEvidence, type StoredMail } from "./email";
 import type { ActivityRow } from "@/lib/stage-keeper/moves";
 import { parseMilestoneMapping, type MilestoneMapping } from "./milestones";
 import type { LeadRow, StageOpt } from "./types";
+import { leadRead } from "@/lib/leads/live";
+import { withRoleFallback } from "@/lib/stages/roles";
 
 /**
  * The server-side readers behind the reconciliation screen. Every database read goes through the
@@ -30,12 +33,21 @@ const MAIL_BATCH = 50;
 const MAIL_PAGES = 10;
 
 export async function readStages(supabase: Scoped): Promise<StageOpt[]> {
-  const { data, error } = await supabase
-    .from("crm_stage")
-    .select("id, name, category, order_index")
-    .order("order_index", { ascending: true });
+  // `role` (lectual 0119) when the database has it; without the column the old select.
+  const { data, error } = await withRoleFallback((r) =>
+    supabase
+      .from("crm_stage")
+      .select(r ? "id, name, category, order_index, role" : "id, name, category, order_index")
+      .order("order_index", { ascending: true }),
+  );
   if (error) throw error;
-  return (data ?? []).map((s) => ({ id: s.id, name: s.name, category: String(s.category), orderIndex: s.order_index }));
+  return ((data ?? []) as unknown as Array<{ id: string; name: string; category: string; order_index: number; role?: string | null }>).map((s) => ({
+    id: s.id,
+    name: s.name,
+    category: String(s.category),
+    orderIndex: s.order_index,
+    ...(s.role !== undefined ? { role: s.role } : {}),
+  }));
 }
 
 export type LeadsRead = { leads: LeadRow[]; truncated: boolean };
@@ -43,21 +55,33 @@ export type LeadsRead = { leads: LeadRow[]; truncated: boolean };
 /** Every lead the caller can see, paged past the 1,000-row default up to LEAD_CAP. Throws on a failed read. */
 export async function readLeads(supabase: Scoped): Promise<LeadsRead> {
   const leads: LeadRow[] = [];
+  const merged: { into: string; sheetKey: string | null; lawmaticsId: string | null }[] = [];
   let truncated = false;
   for (let from = 0; ; from += PAGE) {
     if (from >= LEAD_CAP) {
       truncated = true;
       break;
     }
-    const { data, error } = await supabase
-      .from("crm_lead")
-      .select("id, first_name, last_name, email, current_stage_id, sheet_key, lawmatics_id, practice_area, last_activity_at")
-      .order("created_at", { ascending: true })
-      .order("id", { ascending: true })
-      .range(from, from + PAGE - 1);
+    // A merged lead (lectual 0107) is never matched or moved itself: it is read with its pointer and its sheet key and
+    // Lawmatics id are FOLDED onto its keeper (`mergedKeys`), below.
+    const columns = "id, first_name, last_name, email, current_stage_id, sheet_key, lawmatics_id, practice_area, last_activity_at";
+    const { data, error } = await leadRead(({ merged }) =>
+      supabase
+        // live-guard: reads merged leads WITH their pointer and folds their keys onto the keeper (foldMergedKeys)
+        .from("crm_lead")
+        .select(merged ? `${columns}, merged_into_id` : columns)
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, from + PAGE - 1),
+    );
     if (error) throw error;
-    const page = data ?? [];
+    // The read row, plus the pointer when the database has it (types.ts lists merged_into_id as optional).
+    const page = (data ?? []) as unknown as Array<Lead & { merged_into_id?: string | null }>;
     for (const r of page) {
+      if (r.merged_into_id) {
+        merged.push({ into: r.merged_into_id, sheetKey: r.sheet_key, lawmaticsId: r.lawmatics_id });
+        continue;
+      }
       leads.push({
         id: r.id,
         firstName: r.first_name,
@@ -72,7 +96,19 @@ export async function readLeads(supabase: Scoped): Promise<LeadsRead> {
     }
     if (page.length < PAGE) break;
   }
-  return { leads, truncated };
+  return { leads: foldMergedKeys(leads, merged), truncated };
+}
+
+/** Pure: puts each merged lead's sheet key and Lawmatics id on its keeper (one hop; a keeper not in the list keeps nothing). */
+export function foldMergedKeys(leads: LeadRow[], merged: readonly { into: string; sheetKey: string | null; lawmaticsId: string | null }[]): LeadRow[] {
+  if (merged.length === 0) return leads;
+  const byId = new Map(leads.map((l) => [l.id, l]));
+  for (const m of merged) {
+    const keeper = byId.get(m.into);
+    if (!keeper || (!m.sheetKey && !m.lawmaticsId)) continue;
+    keeper.mergedKeys = [...(keeper.mergedKeys ?? []), { sheetKey: m.sheetKey, lawmaticsId: m.lawmaticsId }];
+  }
+  return leads;
 }
 
 export type LawmaticsRead =

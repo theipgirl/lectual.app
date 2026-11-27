@@ -41,7 +41,7 @@ export async function EventPeople({ code, range, role, now }: { code: string; ra
 
   if (read.status !== "ok") {
     return (
-      <section aria-label="People at this event">
+      <section aria-label="People who took this assessment">
         {head}
         <div role="status" className="lx-banner lx-banner-warn">
           {read.status === "unconfigured" ? "People aren't switched on for your firm yet. Lectual will turn them on." : "People couldn't be loaded. Refresh to try again."}
@@ -54,7 +54,7 @@ export async function EventPeople({ code, range, role, now }: { code: string; ra
   const total = read.value.total;
   const over = read.value.over;
   return (
-    <section aria-label="People at this event">
+    <section aria-label="People who took this assessment">
       {head}
       {people.length === 0 ? (
         <p className="ifm-help">No one in this range.</p>

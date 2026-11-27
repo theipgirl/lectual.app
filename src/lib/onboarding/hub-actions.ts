@@ -1,7 +1,9 @@
 "use server";
 
+import { previewReadOnly, previewSafe } from "@/lib/views/preview-safe";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { buildHubMeta, hideCard, isHubFlowId, markFlowDone, parseHubProgress, resetProgress, type HubProgress, type RecordPick } from "./hub";
+import { leadRead } from "@/lib/leads/live";
 
 export type HubSaveResult = { ok: true } | { ok: false; error: string };
 
@@ -35,20 +37,20 @@ async function saveProgress(change: (current: HubProgress) => HubProgress): Prom
 }
 
 /** Records a finished flow. Only a known flow id and the status "done" are accepted. */
-export async function markHubFlowAction(flowId: unknown, status: unknown): Promise<HubSaveResult> {
+export const markHubFlowAction = previewSafe(async function markHubFlowAction(flowId: unknown, status: unknown): Promise<HubSaveResult> {
   if (status !== "done" || !isHubFlowId(flowId)) return { ok: false, error: NOT_SAVED };
   return saveProgress((current) => markFlowDone(current, flowId));
-}
+}, "state");
 
 /** Empties the finished list and brings the Today card back. */
-export async function resetHubProgressAction(): Promise<HubSaveResult> {
+export const resetHubProgressAction = previewSafe(async function resetHubProgressAction(): Promise<HubSaveResult> {
   return saveProgress(() => resetProgress());
-}
+}, "state");
 
 /** The Today card's Hide. */
-export async function hideHubCardAction(): Promise<HubSaveResult> {
+export const hideHubCardAction = previewSafe(async function hideHubCardAction(): Promise<HubSaveResult> {
   return saveProgress((current) => hideCard(current));
-}
+}, "state");
 
 export type HubRecordPicks = { lead: RecordPick; matter: RecordPick };
 
@@ -60,7 +62,7 @@ const UNAVAILABLE: HubRecordPicks = { lead: { status: "unavailable" }, matter: {
  * keeps another firm's id out; the order is the lead and matter lists' own.
  * Each kind ends in one of three states, and a failed read is never "none".
  */
-export async function pickHubRecordsAction(): Promise<HubRecordPicks> {
+export const pickHubRecordsAction = previewReadOnly(async function pickHubRecordsAction(): Promise<HubRecordPicks> {
   try {
     const supabase = await getScopedClient();
     const {
@@ -69,7 +71,7 @@ export async function pickHubRecordsAction(): Promise<HubRecordPicks> {
     if (!user) return UNAVAILABLE;
 
     const [leads, matters] = await Promise.all([
-      supabase.from("crm_lead").select("id").order("last_activity_at", { ascending: false, nullsFirst: false }).limit(1),
+      leadRead(({ live }) => live(supabase.from("crm_lead").select("id")).order("last_activity_at", { ascending: false, nullsFirst: false }).limit(1)),
       supabase.from("crm_matter").select("id").order("created_at", { ascending: false }).limit(1),
     ]);
     const pick = (read: { data: { id: string }[] | null; error: unknown }): RecordPick => {
@@ -81,4 +83,4 @@ export async function pickHubRecordsAction(): Promise<HubRecordPicks> {
   } catch {
     return UNAVAILABLE;
   }
-}
+}, "Getting started's record picker: reads one lead and one matter id, writes nothing");

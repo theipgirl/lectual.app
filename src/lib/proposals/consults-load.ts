@@ -109,6 +109,7 @@ export async function loadConsultsStrip(input: {
   const markers: Array<{ meetingId: string | null; proposalId: string | null }> = [];
   if (leadIds.length > 0) {
     const [leads, marks] = await Promise.all([
+      // live-guard: names the leads meetings point at
       supabase.from("crm_lead").select("id, first_name, last_name, business_name").in("id", leadIds).then(
         (r) => r,
         () => null,

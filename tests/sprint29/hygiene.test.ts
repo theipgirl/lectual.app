@@ -38,6 +38,8 @@ const NEW_OR_REWRITTEN = [
   "src/components/proposal-editor/WhoIsThisFor.tsx",
 ];
 
+const SPRINT29_END = "43f0271f";
+
 describe("scope: no migration, no dependency, no new unsafe HTML", () => {
   it("no SQL file and no migrations directory in this repo", () => {
     expect(existsSync("supabase")).toBe(false);
@@ -47,7 +49,10 @@ describe("scope: no migration, no dependency, no new unsafe HTML", () => {
   it("no new migration or dependency since the start of the sprint (when git can say)", () => {
     let changed: string[];
     try {
-      changed = execSync("git diff --name-only 3ed824b HEAD", { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\n").filter(Boolean);
+      // Sprint 29's own window: its base (3ed824b) to the commit that added this test (43f0271f). Comparing with HEAD
+      // made the check fail on every later, legitimate change (pdfkit in fb7fb87b, the paid-view and milestone edits of
+      // later sprints), which is not what it guards. Fixed 2026-11-25; the guard itself is unchanged.
+      changed = execSync(`git diff --name-only 3ed824b ${SPRINT29_END}`, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).split("\n").filter(Boolean);
     } catch {
       return; // no history here: the static checks above still hold
     }
@@ -78,7 +83,8 @@ describe("scope: no migration, no dependency, no new unsafe HTML", () => {
 
   it("the CSS this sprint added uses tokens only", () => {
     const intake = read("src/app/dashboard/intake/intake.css");
-    const block = intake.slice(intake.indexOf("Sprint 29: why a card is in its column"));
+    // The design rollout removed the unused "why a card is in its column" rules; the bulk select rules are what this sprint's CSS is now.
+    const block = intake.slice(intake.indexOf("bulk select on the board"));
     expect(block.length).toBeGreaterThan(200);
     expect(block).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(/);
     expect(read("src/components/queue/review.css")).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(/);
@@ -90,12 +96,11 @@ describe("scope: no migration, no dependency, no new unsafe HTML", () => {
   });
 });
 
-describe("ON HOLD: the new RPB intake board is not built", () => {
-  it("no Consult Held - Proposal in Progress name, and no new alias for the scheduled stages", () => {
-    for (const file of SRC.filter((f) => /\.(ts|tsx)$/.test(f))) expect(read(file), file).not.toMatch(/Proposal in Progress/i);
+describe("RPB intake board (Taylor, 2026-11-17: Consult Held – Proposal in Progress, Proposal Sent)", () => {
+  it("the new names lead their lists, the old names stay for other firms, and the scheduled stages gain no alias", () => {
     expect(DEFAULT_STAGE_NAMES["consult-scheduled"]).toEqual(["Consultation Scheduled", "Consult Scheduled", "Consult Booked", "Strategy Session Scheduled", "Discovery Call Scheduled"]);
-    expect(DEFAULT_STAGE_NAMES["consult-held"]).toEqual(["Consult Held", "Consultation Held", "Consult Completed"]);
-    expect(DEFAULT_STAGE_NAMES["post-consult-sent"]).toEqual(["Post Consultation Email Sent", "Post Consult Email Sent", "Post Consultation Follow Up"]);
+    expect(DEFAULT_STAGE_NAMES["consult-held"]).toEqual(["Consult Held – Proposal in Progress", "Consult Held", "Consultation Held", "Consult Completed"]);
+    expect(DEFAULT_STAGE_NAMES["post-consult-sent"]).toEqual(["Proposal Sent", "Post Consultation Email Sent", "Post Consult Email Sent", "Post Consultation Follow Up"]);
   });
 
   it("the milestone order is the Sprint 26 order, and the milestone stage names carry no board names", () => {
@@ -111,7 +116,8 @@ describe("ON HOLD: the new RPB intake board is not built", () => {
       "loe_sent",
       "paid",
     ]);
-    expect(JSON.stringify(MILESTONE_STAGE_NAMES)).not.toMatch(/Strategy Session Scheduled.*Proposal in Progress/i);
+    expect(MILESTONE_STAGE_NAMES.consult_held[0]).toBe("Consult Held – Proposal in Progress");
+    expect(MILESTONE_STAGE_NAMES.proposal_sent[0]).toBe("Proposal Sent");
   });
 });
 

@@ -2,6 +2,7 @@ import { getScopedClient } from "@/lib/db/scoped-client";
 import { DOC_TYPE_LABEL } from "@/lib/documents/list";
 import { isMissingTableError, logFileFailure } from "./errors";
 import type { FileParentKind } from "./rules";
+import { TEAMMATE } from "@/lib/ui/words";
 
 /**
  * The reads behind the "Documents & files" card. Every read goes through the
@@ -10,7 +11,8 @@ import type { FileParentKind } from "./rules";
  * report their own outcome, so one failing cannot hide the other.
  */
 
-export type FileParent = { kind: FileParentKind; id: string };
+/** `mergedIds` (a lead only): the leads merged into this one (lectual 0107), whose files stay on them and are listed here too. */
+export type FileParent = { kind: FileParentKind; id: string; mergedIds?: readonly string[] };
 
 /** Each parent shows its newest 100 entries of each kind; the card says so when there are more. */
 export const LIST_CAP = 100;
@@ -33,10 +35,10 @@ export type FilesRead =
 export async function listFiles(parent: FileParent): Promise<FilesRead> {
   try {
     const supabase = await getScopedClient();
-    const { data, error } = await supabase
-      .from("crm_file")
-      .select("id, file_name, mime, size_bytes, uploaded_by, created_at")
-      .eq(parent.kind === "lead" ? "lead_id" : "matter_id", parent.id)
+    const base = supabase.from("crm_file").select("id, file_name, mime, size_bytes, uploaded_by, created_at");
+    const column = parent.kind === "lead" ? "lead_id" : "matter_id";
+    const merged = parent.kind === "lead" && parent.mergedIds?.length ? parent.mergedIds : null;
+    const { data, error } = await (merged ? base.in(column, [parent.id, ...merged]) : base.eq(column, parent.id))
       .order("created_at", { ascending: false })
       .limit(LIST_CAP + 1);
     if (error) {
@@ -106,7 +108,7 @@ export async function loadDocumentsRead(parent: FileParent, opts: { includeLette
 /** The member directory as the pages already hold it; null = it could not be read. */
 export type Directory = readonly { userId: string; name: string }[] | null;
 
-export const UNKNOWN_WHO = "A teammate";
+export const UNKNOWN_WHO = TEAMMATE;
 
 export type DocEntry =
   | { kind: "file"; id: string; name: string; sizeBytes: number; who: string; at: string }
@@ -144,4 +146,50 @@ export function buildEntries(read: DocumentsRead, directory: Directory): DocEntr
     .map((entry, index) => ({ entry, index }))
     .sort((a, b) => time(b.entry.at) - time(a.entry.at) || a.index - b.index)
     .map((x) => x.entry);
+}
+
+// ── counts for the weekly review ─────────────────────────────────────────────
+
+type ScopedClient = Awaited<ReturnType<typeof getScopedClient>>;
+
+const COUNT_PAGE = 1000;
+const COUNT_MAX_PAGES = 10;
+
+/** Stored files per lead or matter for ONE chunk of ids (the caller chunks). A missing table is zero files (there is no table to hold any); any other failure throws, so the caller names the gap instead of showing 0. */
+export async function countFilesByParent(db: ScopedClient, kind: FileParentKind, ids: readonly string[]): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  if (ids.length === 0) return counts;
+  const column = kind === "lead" ? "lead_id" : "matter_id";
+  for (let page = 0; page < COUNT_MAX_PAGES; page++) {
+    const { data, error } = await db.from("crm_file").select(`id, ${column}`).in(column, [...ids]).order("id").range(page * COUNT_PAGE, page * COUNT_PAGE + COUNT_PAGE - 1);
+    if (error) {
+      if (isMissingTableError(error)) return counts;
+      logFileFailure("count files", error);
+      throw new Error("count failed");
+    }
+    const rows = (data ?? []) as unknown as Record<string, string | null>[];
+    for (const r of rows) {
+      const parent = r[column];
+      if (parent) counts.set(parent, (counts.get(parent) ?? 0) + 1);
+    }
+    if (rows.length < COUNT_PAGE) return counts;
+  }
+  throw new Error("count exceeded its page budget");
+}
+
+/** Generated letters (status "generated", the ones that have a download) per matter for ONE chunk of ids. Throws on any failure. */
+export async function countLettersByMatter(db: ScopedClient, ids: readonly string[]): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  if (ids.length === 0) return counts;
+  for (let page = 0; page < COUNT_MAX_PAGES; page++) {
+    const { data, error } = await db.from("crm_document_draft").select("id, matter_id").eq("status", "generated").in("matter_id", [...ids]).order("id").range(page * COUNT_PAGE, page * COUNT_PAGE + COUNT_PAGE - 1);
+    if (error) {
+      logFileFailure("count letters", error);
+      throw new Error("count failed");
+    }
+    const rows = (data ?? []) as { matter_id: string | null }[];
+    for (const r of rows) if (r.matter_id) counts.set(r.matter_id, (counts.get(r.matter_id) ?? 0) + 1);
+    if (rows.length < COUNT_PAGE) return counts;
+  }
+  throw new Error("count exceeded its page budget");
 }

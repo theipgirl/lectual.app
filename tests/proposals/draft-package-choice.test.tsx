@@ -28,7 +28,7 @@ const build = (spec: ProposalDraftSpec, pricing: Record<string, unknown> = { pac
   if (!r.ok) throw new Error(r.error);
   return r.content;
 };
-const base = { kind: "trademark", madeBy: "person", client: { fullName: "Danielle Milton", firstName: "Danielle" } } as const;
+const base = { kind: "trademark", madeBy: "person", client: { fullName: "Renata Ostrowski", firstName: "Renata" } } as const;
 
 async function renderClientPage(content: ProposalContent) {
   const { ProposalDocument } = await import("@/components/client-proposal/ProposalDocument");
@@ -36,7 +36,7 @@ async function renderClientPage(content: ProposalContent) {
     createElement(ProposalDocument, {
       content,
       title: "Trademark Proposal",
-      clientName: "Danielle Milton",
+      clientName: "Renata Ostrowski",
       expiresOn: null,
       firm: { name: "Hartwell", slug: "hartwell" },
       mode: "live",
@@ -57,7 +57,7 @@ const selectOf = (html: string, id: string) => {
 
 describe("a spec's package choice reaches the stored content and the client page", () => {
   it("brand-name choice + discount: stored with the package snapshot, and the page shows the select on its default", async () => {
-    const content = build({ ...base, names: [{ name: "The Fold", classes: ["Clothing"], offer: { mode: "choice", options: ["Essential", "Enhanced", "Concierge"], start: "Enhanced" }, discountPct: 10 }] });
+    const content = build({ ...base, names: [{ name: "The Pleat", classes: ["Clothing"], offer: { mode: "choice", options: ["Essential", "Enhanced", "Concierge"], start: "Enhanced" }, discountPct: 10 }] });
     const name = content.names[0];
     expect(name.package_choice).toEqual({ options: ["Essential", "Enhanced", "Concierge"], default: "Enhanced" });
     expect(name.discount_pct).toBe(10);
@@ -74,7 +74,7 @@ describe("a spec's package choice reaches the stored content and the client page
   it("per-mark choice (word mark, plus the design mark as an add-on on its own package)", async () => {
     const content = build({
       ...base,
-      names: [{ name: "The Fold", classes: ["Clothing"], offer: { mode: "per_mark", marks: { word: { options: ["Enhanced", "Concierge"], start: "Enhanced" }, logo: { options: ["Essential", "Enhanced"], start: "Essential" } } } }],
+      names: [{ name: "The Pleat", classes: ["Clothing"], offer: { mode: "per_mark", marks: { word: { options: ["Enhanced", "Concierge"], start: "Enhanced" }, logo: { options: ["Essential", "Enhanced"], start: "Essential" } } } }],
     });
     const name = content.names[0];
     expect(name.package_choice).toBeUndefined();
@@ -91,7 +91,7 @@ describe("a spec's package choice reaches the stored content and the client page
   });
 
   it("nothing set: the content is exactly as before (no choice, no snapshot)", () => {
-    const content = build({ ...base, names: [{ name: "The Fold", classes: ["Clothing"] }] });
+    const content = build({ ...base, names: [{ name: "The Pleat", classes: ["Clothing"] }] });
     expect(content.packages).toBeUndefined();
     expect(content.names[0].package_choice).toBeUndefined();
     expect(content.names[0].discount_pct).toBeUndefined();
@@ -100,15 +100,15 @@ describe("a spec's package choice reaches the stored content and the client page
   it.each([
     ["a package that isn't the firm's", { options: ["Essential", "Platinum"] }, "Platinum"],
     ["a start outside the options", { options: ["Essential"], start: "Enhanced" }, "starting package"],
-    ["four packages", { options: ["Essential", "Enhanced", "Concierge", "Plus"] }, "at most 3"],
+    ["five packages", { options: ["Essential", "Enhanced", "Concierge", "Plus", "Max"] }, "at most 4"],
   ])("refuses %s and builds nothing", (_label, choice, message) => {
-    const r = buildDraftContent({ ...base, names: [{ name: "The Fold", classes: ["x"], offer: { mode: "choice", ...choice } }] }, { pricing: { packages: [...PACKAGES, { ...PACKAGES[0], package: "Plus" }] }, letter: null }, () => `i${(n++).toString(36).padStart(4, "0")}`);
+    const r = buildDraftContent({ ...base, names: [{ name: "The Pleat", classes: ["x"], offer: { mode: "choice", ...choice } }] }, { pricing: { packages: [...PACKAGES, { ...PACKAGES[0], package: "Plus" }, { ...PACKAGES[0], package: "Max" }] }, letter: null }, () => `i${(n++).toString(36).padStart(4, "0")}`);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toContain(message);
   });
 
   it.each([["a discount over 50", 60], ["a fractional discount", 12.5]])("refuses %s", (_l, discountPct) => {
-    const r = buildDraftContent({ ...base, names: [{ name: "The Fold", classes: ["x"], discountPct }] }, { pricing: { packages: PACKAGES }, letter: null }, () => `i${(n++).toString(36).padStart(4, "0")}`);
+    const r = buildDraftContent({ ...base, names: [{ name: "The Pleat", classes: ["x"], discountPct }] }, { pricing: { packages: PACKAGES }, letter: null }, () => `i${(n++).toString(36).padStart(4, "0")}`);
     expect(r.ok).toBe(false);
   });
 });

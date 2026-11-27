@@ -16,9 +16,9 @@ import {
 } from "@/lib/proposals/public";
 import { DEFAULT_CLIENT_ENTRY_PROMPT, DESCRIBE_BEFORE_ACCEPT } from "@/lib/proposals/client-classes";
 import { defaultSelection, quoteProposal } from "@/lib/proposals/pricing";
-import { sevetri } from "./fixture";
-import { danielle } from "./danielle-fixture";
-import { faithe } from "./general-fixture";
+import { callum } from "./fixture";
+import { renata } from "./renata-fixture";
+import { imogen } from "./general-fixture";
 
 // Sprint 19: the acceptance follow-ups (firm notice + Lawmatics note) are scheduled with next/server's after().
 // Outside a request `after` is a no-op here; tests that care capture the callback and run it themselves.
@@ -93,7 +93,7 @@ describe("pickLiveRow", () => {
 
 describe("buildAcceptedSnapshot and the column allowlist", () => {
   it("freezes content, selection, the recomputed quote and the instant", () => {
-    const content = sevetri();
+    const content = callum();
     const selection = defaultSelection(content);
     const quote = quoteProposal(content, selection);
     expect(buildAcceptedSnapshot({ version: 2, content, selection, quote, acceptedAt: "2026-10-20T15:00:00.000Z" })).toEqual({
@@ -213,10 +213,10 @@ function world(over: { proposal?: Row; extra?: Row[]; org?: Row } = {}) {
     version: 2,
     public_token: TOKEN,
     title: "Trademark Proposal",
-    client_name: "Sevetri Wilson",
-    client_email: "sevetri@example.com",
+    client_name: "Callum Ferreira",
+    client_email: "callum@example.com",
     status: "sent",
-    content: sevetri(),
+    content: callum(),
     expires_on: "2026-10-26",
     pay_url: "https://app.lawmatics.com/forms/share/abc",
     sent_at: "2026-10-19T00:00:00Z",
@@ -261,7 +261,7 @@ describe("readPublicProposal", () => {
     expect(r.view).toMatchObject({
       status: "sent",
       version: 2,
-      clientName: "Sevetri Wilson",
+      clientName: "Callum Ferreira",
       expiresOn: "2026-10-26",
       acceptedAt: null,
       payUrl: null,
@@ -269,16 +269,16 @@ describe("readPublicProposal", () => {
     });
     const wire = JSON.stringify(r.view);
     expect(wire).not.toContain(TOKEN);
-    expect(wire).not.toContain("sevetri@example.com");
+    expect(wire).not.toContain("callum@example.com");
     expect(wire).not.toContain("lawmatics.com");
     expect(wire).not.toContain("org-1");
     expect(r.handle).toEqual({ proposalId: "prop-2", orgId: "org-1", familyId: "prop-1", version: 2, storedStatus: "sent" });
   });
 
   it("drops content keys ProposalContent does not define (the old spec's `private` block)", async () => {
-    const content = sevetri() as unknown as Record<string, unknown>;
-    content.private = { matter_id: "matter-9", client_email: "sevetri@example.com" };
-    (content.client as Record<string, unknown>).email = "sevetri@example.com";
+    const content = callum() as unknown as Record<string, unknown>;
+    content.private = { matter_id: "matter-9", client_email: "callum@example.com" };
+    (content.client as Record<string, unknown>).email = "callum@example.com";
     const names = content.names as Array<Record<string, unknown>>;
     names[0].internal_note = "price-sensitive";
     (names[0].marks as Array<Record<string, unknown>>)[0].serial = "98765432";
@@ -286,16 +286,16 @@ describe("readPublicProposal", () => {
     const r = await readPublicProposal(TOKEN, NOW, db);
     if (r.status !== "ok") throw new Error(`expected ok, got ${r.status}`);
     const wire = JSON.stringify(r.view);
-    for (const leak of ["matter-9", "sevetri@example.com", "price-sensitive", "98765432", "private"]) expect(wire).not.toContain(leak);
+    for (const leak of ["matter-9", "callum@example.com", "price-sensitive", "98765432", "private"]) expect(wire).not.toContain(leak);
     // Everything the page renders survives, and prices the same.
-    expect(r.view.content).toEqual(sevetri());
+    expect(r.view.content).toEqual(callum());
   });
 
   it("shows the live version when a newer draft exists, and an older version is superseded", async () => {
     const { db } = world({
       extra: [
-        { id: "prop-3", org_id: "org-1", family_id: "prop-1", version: 3, public_token: TOKEN, status: "draft", content: sevetri() },
-        { id: "prop-1", org_id: "org-1", family_id: "prop-1", version: 1, public_token: TOKEN, status: "superseded", content: sevetri() },
+        { id: "prop-3", org_id: "org-1", family_id: "prop-1", version: 3, public_token: TOKEN, status: "draft", content: callum() },
+        { id: "prop-1", org_id: "org-1", family_id: "prop-1", version: 1, public_token: TOKEN, status: "superseded", content: callum() },
       ],
     });
     const r = await readPublicProposal(TOKEN, NOW, db);
@@ -332,7 +332,7 @@ describe("readPublicProposal", () => {
     const r = await readPublicProposal(TOKEN, NOW, db);
     expect(r).toMatchObject({ status: "closed", reason: "module_off" });
     // Nothing of the proposal travels with a closed answer.
-    expect(JSON.stringify(r)).not.toContain("Sevetri");
+    expect(JSON.stringify(r)).not.toContain("Callum");
   });
 
   it("module-off closes a sent, an accepted and a withdrawn family alike", async () => {
@@ -357,7 +357,7 @@ describe("readPublicProposal", () => {
   });
 
   it("an accepted proposal is a receipt and never reads as expired", async () => {
-    const content = sevetri();
+    const content = callum();
     const selection = defaultSelection(content);
     const quote = quoteProposal(content, selection);
     const { db } = world({
@@ -495,7 +495,7 @@ describe("acceptPublicProposal", () => {
 
   it("a fixed offer (one name, one mark, one class) accepts fully selected whatever was posted", async () => {
     vi.spyOn(console, "info").mockImplementation(() => {});
-    const content = sevetri();
+    const content = callum();
     content.names = [content.names[0]];
     content.names[0].marks = [{ ...content.names[0].marks[0], preselected: false }];
     content.names[0].classes = [{ ...content.names[0].classes[0], preselected: false }];
@@ -595,13 +595,13 @@ describe("recordProposalViewed", () => {
 
 describe("publicContent never publishes the staff-only package basis (Sprint 6)", () => {
   it("drops content.package_basis from the view the client receives", () => {
-    const content = { ...sevetri(), package_basis: { name: "Enhanced", edited: ["price"] } };
+    const content = { ...callum(), package_basis: { name: "Enhanced", edited: ["price"] } };
     const out = publicContent(content) as unknown as Record<string, unknown>;
     expect("package_basis" in out).toBe(false);
     expect(JSON.stringify(out)).not.toContain("Enhanced");
     expect(JSON.stringify(out)).not.toContain("edited");
     // and the rest of the document is intact
-    expect(out.pricing).toEqual(sevetri().pricing);
+    expect(out.pricing).toEqual(callum().pricing);
   });
 });
 
@@ -666,7 +666,7 @@ describe("acceptPublicProposal: the firm notice and the Lawmatics note are follo
 /* ───────────── Spec 3: classes the client describes or adds; the server re-prices ───────────── */
 
 function essentialContent() {
-  const c = sevetri();
+  const c = callum();
   c.pricing = { ...c.pricing, package: "Essential", base_cents: 195_000, included_classes: 1, per_class_cents: 82_500, second_mark_discount_pct: 20 };
   c.names = [c.names[0]];
   c.names[0].classes = [c.names[0].classes[0]];
@@ -687,7 +687,7 @@ const add = (...rows: Array<[string, boolean]>) => ({ added: { p: rows.map(([tex
 
 describe("acceptPublicProposal: classes the client describes or adds", () => {
   const ticks = (ids: string[]) => Object.fromEntries(ids.map((i) => [i, true]));
-  const accepted = (tables: Record<string, Row[]>) => tables.client_proposal[0] as { accepted_selection: Record<string, boolean>; accepted_snapshot: { quote: ReturnType<typeof quoteProposal>; content: ReturnType<typeof sevetri>; selection: Record<string, boolean> } };
+  const accepted = (tables: Record<string, Row[]>) => tables.client_proposal[0] as { accepted_selection: Record<string, boolean>; accepted_snapshot: { quote: ReturnType<typeof quoteProposal>; content: ReturnType<typeof callum>; selection: Record<string, boolean> } };
 
   it("stores the EFFECTIVE content: open classes carry the client's words, priced like any class", async () => {
     vi.spyOn(console, "info").mockImplementation(() => {});
@@ -773,7 +773,7 @@ describe("acceptPublicProposal: classes the client describes or adds", () => {
 
   it("drops adds for a brand name whose max is 0, unknown ids, and entries for classes that are not open", async () => {
     vi.spyOn(console, "info").mockImplementation(() => {});
-    const content = sevetri();
+    const content = callum();
     content.names[0].client_add = { max: 0 };
     const { db, tables } = world({ proposal: { content } });
     const r = await acceptPublicProposal(TOKEN, ticks(["p-word", "p-c1"]), NOW, db, {
@@ -782,7 +782,7 @@ describe("acceptPublicProposal: classes the client describes or adds", () => {
     });
     expect(r.ok).toBe(true);
     const row = accepted(tables);
-    expect(row.accepted_snapshot.content.names[0].classes.map((c) => c.label)).toEqual(sevetri().names[0].classes.map((c) => c.label));
+    expect(row.accepted_snapshot.content.names[0].classes.map((c) => c.label)).toEqual(callum().names[0].classes.map((c) => c.label));
     expect(Object.keys(row.accepted_selection).some((k) => k.startsWith("ca-"))).toBe(false);
   });
 
@@ -829,7 +829,7 @@ describe("acceptPublicProposal: classes the client describes or adds", () => {
       const markOn = nm.marks.some((m) => sel[m.id]);
       if (markOn) expect(nm.classes.some((c) => sel[c.id])).toBe(true);
     }
-    const noClass = sevetri();
+    const noClass = callum();
     noClass.names[0].classes = [];
     const w = world({ proposal: { content: noClass } });
     expect(await acceptPublicProposal(TOKEN, ticks(["p-word", "t-logo", "t-c1"]), NOW, w.db)).toMatchObject({ ok: false, reason: "nothing_selected" });
@@ -869,7 +869,7 @@ describe("acceptPublicProposal with a package per brand name (Spec 6)", () => {
 
   it("prices the chosen packages on the server and stores the picks and the package per name", async () => {
     vi.spyOn(console, "info").mockImplementation(() => {});
-    const { db, tables } = world({ proposal: { content: danielle() } });
+    const { db, tables } = world({ proposal: { content: renata() } });
     const r = await acceptPublicProposal(TOKEN, { ...ticks, packages: { fold: "Concierge", ci: "Essential" } }, NOW, db);
     if (!r.ok) throw new Error(r.reason);
     expect(r.quote.legal_total_cents).toBe(495_000 + 249_750);
@@ -882,7 +882,7 @@ describe("acceptPublicProposal with a package per brand name (Spec 6)", () => {
 
   it("ignores any money in the request and falls back to the default for a forged package name", async () => {
     vi.spyOn(console, "info").mockImplementation(() => {});
-    const { db, tables } = world({ proposal: { content: danielle() } });
+    const { db, tables } = world({ proposal: { content: renata() } });
     const forged = {
       ...ticks,
       legal_total_cents: 1,
@@ -892,7 +892,7 @@ describe("acceptPublicProposal with a package per brand name (Spec 6)", () => {
     };
     const r = await acceptPublicProposal(TOKEN, forged, NOW, db, { added: { fold: [{ text: "Candles", on: true, price: 1 }] } });
     if (!r.ok) throw new Error(r.reason);
-    // Both defaults (Enhanced): The Fold with 4 classes $4,900, The Confidence Interval 10% off $2,925.
+    // Both defaults (Enhanced): The Pleat with 4 classes $4,900, The Margin Note 10% off $2,925.
     expect(r.quote.names.map((n) => [n.package, n.legal_cents])).toEqual([["Enhanced", 490_000], ["Enhanced", 292_500]]);
     expect(r.quote.legal_total_cents).toBe(782_500);
     const stored = tables.client_proposal[0].accepted_selection as Record<string, unknown>;
@@ -904,7 +904,7 @@ describe("acceptPublicProposal with a package per brand name (Spec 6)", () => {
 describe("acceptPublicProposal: a general (flat-fee) proposal (Spec 9)", () => {
   it("accepts with an empty selection, recomputes the $500 fee from the stored content, and freezes it", async () => {
     vi.spyOn(console, "info").mockImplementation(() => {});
-    const { db, tables, calls } = world({ proposal: { content: faithe(), title: "Proposal", client_name: "Faithe Williams" } });
+    const { db, tables, calls } = world({ proposal: { content: imogen(), title: "Proposal", client_name: "Imogen Pellegrino" } });
     // Whatever the browser sends is ignored: nothing on a flat-fee proposal is selectable or priced by the client.
     const r = await acceptPublicProposal(TOKEN, { "w-contracts": true, price: 1, fee_cents: 1 }, NOW, db, { entries: { x: "y" } });
     if (!r.ok) throw new Error(r.reason);
@@ -922,7 +922,7 @@ describe("acceptPublicProposal: a general (flat-fee) proposal (Spec 9)", () => {
   });
 
   it("the public read serves the general block", async () => {
-    const { db } = world({ proposal: { content: faithe() } });
+    const { db } = world({ proposal: { content: imogen() } });
     const read = await readPublicProposal(TOKEN, NOW, db);
     if (read.status !== "ok") throw new Error(read.status);
     expect(read.view.content.kind).toBe("general");

@@ -1,6 +1,8 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { revalidatePath } from "next/cache";
+import { MERGE_POINTER_UNREADABLE } from "@/lib/ui/words";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { CAN_WRITE_LEAD } from "@/lib/pipeline/leads";
@@ -8,6 +10,7 @@ import { logActivitySafe } from "@/lib/matters";
 import { parseReviewForm } from "@/lib/consult/details";
 import { saveReview } from "@/lib/consult/review";
 import type { ConsultDb } from "@/lib/consult/store";
+import { keeperForWrite } from "@/lib/leads/live";
 
 /**
  * The lead page's "Consult details" card: a person reviews or corrects what
@@ -23,19 +26,28 @@ export type ConsultActionState = { ok?: boolean; error?: string; notice?: string
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export async function saveConsultDetailsAction(_prev: ConsultActionState, formData: FormData): Promise<ConsultActionState> {
+export const saveConsultDetailsAction = previewSafe(async function saveConsultDetailsAction(_prev: ConsultActionState, formData: FormData): Promise<ConsultActionState> {
   const session = await resolveFirmSession();
   if (session.kind !== "ok") return { error: "Sign in again to save this." };
   if (!CAN_WRITE_LEAD.includes(session.role)) return { error: "Your role can view consult details but not change them." };
 
-  const leadId = String(formData.get("leadId") ?? "").trim();
-  if (!UUID.test(leadId)) return { error: "That lead isn't valid." };
+  const givenLeadId = String(formData.get("leadId") ?? "").trim();
+  if (!UUID.test(givenLeadId)) return { error: "That lead isn't valid." };
   const noteRaw = String(formData.get("noteId") ?? "").trim();
   if (noteRaw && !UUID.test(noteRaw)) return { error: "That consult note isn't valid." };
   const parsed = parseReviewForm(formData);
   if (!parsed.ok) return { error: parsed.error };
 
   const supabase = await getScopedClient();
+  // A page opened before a merge (lectual 0107) saves on the KEEPER (its consult notes moved there); an unreadable
+  // pointer refuses and nothing is written.
+  let leadId: string;
+  try {
+    leadId = await keeperForWrite(supabase, givenLeadId);
+  } catch {
+    return { error: MERGE_POINTER_UNREADABLE };
+  }
+  // live-guard: a merged lead id was followed to its keeper by keeperForWrite just above
   const { data: lead, error: leadError } = await supabase.from("crm_lead").select("id").eq("id", leadId).maybeSingle();
   if (leadError) return { error: "Couldn't save the consult details. Try again shortly." };
   if (!lead) return { error: "Lead not found." };
@@ -69,4 +81,4 @@ export async function saveConsultDetailsAction(_prev: ConsultActionState, formDa
 
   revalidatePath(`/dashboard/leads/${leadId}/`);
   return { ok: true, notice: "Saved and marked reviewed. It will carry onto the matter when one is opened for this lead." };
-}
+}, "state");

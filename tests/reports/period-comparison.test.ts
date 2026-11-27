@@ -47,8 +47,8 @@ describe("failed page reads", () => {
   it("the dashboard error boundary says the page could not be loaded", () => {
     const html = renderToStaticMarkup(DashboardError({ retry: () => {} }));
     expect(html).toContain('role="alert"');
-    expect(html).toContain("couldn&#x27;t be loaded");
-    expect(html).toContain("Try again");
+    expect(html).toContain("Can&#x27;t show this page right now");
+    expect(html).toContain("Refresh");
   });
   it("report range switches do not prefetch", () => {
     expect(readFileSync("src/app/dashboard/reports/[key]/page.tsx", "utf8")).toContain("prefetch={false}");

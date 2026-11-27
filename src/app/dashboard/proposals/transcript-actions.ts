@@ -1,5 +1,6 @@
 "use server";
 
+import { previewSafe } from "@/lib/views/preview-safe";
 import { resolveFirmSession } from "@/lib/firm/session";
 import { getScopedClient } from "@/lib/db/scoped-client";
 import { CAN_WRITE_LEAD } from "@/lib/pipeline/leads";
@@ -25,7 +26,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * through the caller's own scoped client: another firm's lead id is "not found".
  * The text and any file are stored nowhere.
  */
-export async function draftProposalFromUploadAction(_prev: TranscriptDraftState, formData: FormData): Promise<TranscriptDraftState> {
+export const draftProposalFromUploadAction = previewSafe(async function draftProposalFromUploadAction(_prev: TranscriptDraftState, formData: FormData): Promise<TranscriptDraftState> {
   const refused = await gateStaffAction();
   if (refused) return { error: refused.error };
   const session = await resolveFirmSession();
@@ -39,6 +40,7 @@ export async function draftProposalFromUploadAction(_prev: TranscriptDraftState,
 
   const supabase = await getScopedClient();
   const { data: lead } = await supabase
+    // live-guard: reads the name of a lead chosen from a live picker
     .from("crm_lead")
     .select("id, first_name, last_name, business_name, email")
     .eq("id", leadId)
@@ -53,7 +55,7 @@ export async function draftProposalFromUploadAction(_prev: TranscriptDraftState,
     matterId: null,
   });
   return done.ok ? { ok: true, notice: done.notice, href: done.href } : { error: done.error };
-}
+}, "state");
 
 /**
  * "Draft the proposal" on a consult row of the proposals page: the same agent and the same
@@ -66,7 +68,7 @@ export async function draftProposalFromUploadAction(_prev: TranscriptDraftState,
  * proposal for a named approver and an email for the approval queue, once per meeting (it
  * refuses a call it has already handled). Nothing is sent, approved or resolved here.
  */
-export async function draftProposalFromMeetingAction(_prev: TranscriptDraftState, formData: FormData): Promise<TranscriptDraftState> {
+export const draftProposalFromMeetingAction = previewSafe(async function draftProposalFromMeetingAction(_prev: TranscriptDraftState, formData: FormData): Promise<TranscriptDraftState> {
   const refused = await gateStaffAction();
   if (refused) return { error: refused.error };
   const session = await resolveFirmSession();
@@ -89,6 +91,7 @@ export async function draftProposalFromMeetingAction(_prev: TranscriptDraftState
   }
   if (!leadId) return { error: "Link this meeting to a lead (or a matter with a client) first, so the draft has someone to go to." };
   const { data: lead } = await supabase
+    // live-guard: reads the name of a lead chosen from a live picker
     .from("crm_lead")
     .select("id, first_name, last_name, business_name, email")
     .eq("id", leadId)
@@ -109,4 +112,4 @@ export async function draftProposalFromMeetingAction(_prev: TranscriptDraftState
     matterId: meeting.matter_id,
   });
   return done.ok ? { ok: true, notice: done.notice, href: done.href } : { error: done.error };
-}
+}, "state");

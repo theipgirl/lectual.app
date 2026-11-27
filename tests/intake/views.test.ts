@@ -214,7 +214,7 @@ describe("ownerColumns", () => {
     expect(columns.map((column) => column.key)).toEqual([null, "u-rb", "u-dw", "u-ghost"]);
     expect(columns[0].count).toBe(0);
     expect(columns[3].count).toBe(1);
-    expect(columns[3].label).toBe("Unknown teammate");
+    expect(columns[3].label).toBe("Teammate");
   });
 
   it("describes an empty column and an all-waiting column in words, not 0s", () => {
@@ -235,7 +235,7 @@ describe("ownerColumns", () => {
 
 describe("touchDate / touchStampFor", () => {
   it("says whose turn it is in words: Our turn / Waiting on them, with the day and month", () => {
-    expect(touchDate(daysBefore(2))).toBe("12 Sep");
+    expect(touchDate(daysBefore(2))).toBe("Sep 12");
 
     const [waiting] = rowsFor([lead({ id: "a", last_inbound_at: daysBefore(2), last_outbound_at: daysBefore(5) })]);
     expect(touchStampFor(waiting, { now: NOW })).toMatchObject({ text: "Our turn · Sep\u00a012", waitingOnUs: true, state: "our-turn" });
@@ -275,6 +275,85 @@ describe("touchDate / touchStampFor", () => {
     expect(touchStampFor(ny, { now: NOW }).text).toBe("Our turn · Sep\u00a013");
     const [old] = rowsFor([lead({ id: "h", last_outbound_at: "2025-12-30T15:00:00.000Z" })]);
     expect(touchStampFor(old, { now: NOW }).text).toBe("Waiting on them · Dec\u00a030, 2025");
+  });
+
+  describe("a booked consult comes first", () => {
+    const withConsult = (consultAt: string | undefined, over: Partial<Lead> = {}): IntakeRow => {
+      const [row] = rowsFor([lead({ id: "k", last_inbound_at: daysBefore(2), ...over })]);
+      return { ...row, ...(consultAt ? { consultAt } : {}) };
+    };
+
+    it("today: 'Consult today · 12:30 PM' in the firm's zone, over Our turn", () => {
+      // 17:30Z on 14 Sep is 1:30 PM in New York.
+      const row = withConsult("2026-09-14T16:30:00.000Z");
+      expect(touchStampFor(row, { now: NOW, timeZone: "America/New_York" })).toMatchObject({
+        text: "Consult today · 12:30\u00a0PM",
+        state: "consult",
+        waitingOnUs: false,
+      });
+    });
+
+    it("a later day: 'Consult · Sep 19'", () => {
+      expect(touchStampFor(withConsult("2026-09-19T15:00:00.000Z"), { now: NOW }).text).toBe("Consult · Sep\u00a019");
+    });
+
+    it("no consult, or an unparseable one, keeps today's behavior", () => {
+      expect(touchStampFor(withConsult(undefined), { now: NOW })).toMatchObject({ state: "our-turn" });
+      expect(touchStampFor(withConsult("nonsense"), { now: NOW })).toMatchObject({ state: "our-turn" });
+    });
+
+    it("sorts by the consult start (the shown value), not by the older mail date", () => {
+      const early = withConsult("2026-09-15T15:00:00.000Z");
+      const late = { ...withConsult("2026-09-20T15:00:00.000Z"), lead: { ...withConsult(undefined).lead, id: "k2" } };
+      expect(shownTouch(early, NOW)).toEqual({ state: "consult", iso: "2026-09-15T15:00:00.000Z" });
+      const asc = sortRows([late, early], "lastTouch", "asc", { now: NOW });
+      expect(asc.map((r) => r.consultAt)).toEqual(["2026-09-15T15:00:00.000Z", "2026-09-20T15:00:00.000Z"]);
+    });
+  });
+
+  describe("a held consult means it's our turn", () => {
+    const held = (pastConsultAt: string | undefined, over: Partial<Lead> = {}, extra: Partial<IntakeRow> = {}): IntakeRow => {
+      const [row] = rowsFor([lead({ id: "h1", ...over })]);
+      return { ...row, ...(pastConsultAt ? { pastConsultAt } : {}), ...extra };
+    };
+    const consult = "2026-09-12T15:00:00.000Z"; // 2 days before NOW (14 Sep)
+
+    it("consult later than our last email, no inbound: Our turn dated by the consult", () => {
+      const row = held(consult, { last_outbound_at: "2026-09-06T15:00:00.000Z" });
+      expect(touchStampFor(row, { now: NOW })).toMatchObject({ text: "Our turn · consult Sep\u00a012", waitingOnUs: true, state: "consult-held", title: "The consult was held and nothing has been sent since." });
+      expect(shownTouch(row, NOW)).toEqual({ state: "consult-held", iso: consult });
+      expect(nextStepFor(row, NOW).text).toBe("Consult held Sep\u00a012, nothing sent since");
+    });
+
+    it("no outbound at all also counts", () => {
+      expect(touchStampFor(held(consult), { now: NOW }).state).toBe("consult-held");
+    });
+
+    it("an email sent after the consult keeps 'Waiting on them'", () => {
+      const row = held(consult, { last_outbound_at: "2026-09-13T15:00:00.000Z" });
+      expect(touchStampFor(row, { now: NOW }).state).not.toBe("consult-held");
+    });
+
+    it("an inbound later than the consult gives the normal Our turn by inbound", () => {
+      const row = held(consult, { last_inbound_at: "2026-09-13T15:00:00.000Z", last_outbound_at: "2026-09-06T15:00:00.000Z" });
+      expect(touchStampFor(row, { now: NOW })).toMatchObject({ state: "our-turn", text: "Our turn · Sep\u00a013" });
+    });
+
+    it("an upcoming consult still wins", () => {
+      const row = held(consult, {}, { consultAt: "2026-09-19T15:00:00.000Z" });
+      expect(touchStampFor(row, { now: NOW }).state).toBe("consult");
+    });
+
+    it("older than 30 days, or in the future, is ignored", () => {
+      expect(touchStampFor(held("2026-08-01T15:00:00.000Z"), { now: NOW }).state).not.toBe("consult-held");
+      expect(touchStampFor(held("2026-09-20T15:00:00.000Z"), { now: NOW }).state).not.toBe("consult-held");
+    });
+
+    it("sorts by the consult date it shows", () => {
+      const a = held("2026-09-10T15:00:00.000Z");
+      const b = { ...held("2026-09-12T15:00:00.000Z"), lead: { ...a.lead, id: "h2" } };
+      expect(sortRows([b, a], "lastTouch", "asc", { now: NOW }).map((r) => r.pastConsultAt)).toEqual(["2026-09-10T15:00:00.000Z", "2026-09-12T15:00:00.000Z"]);
+    });
   });
 
   it("says 'No contact yet' when nothing has ever happened", () => {

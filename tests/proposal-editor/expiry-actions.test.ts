@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { sevetri } from "../proposals/fixture";
+import { callum } from "../proposals/fixture";
 
 /** Sprint 1: the expiry date is saved by the one Save (saveDraftAction) from the Fees and payment section; a form that does not carry it leaves the stored one alone. */
 
@@ -12,7 +12,7 @@ describe("expiry date saves", () => {
     vi.doMock("next/navigation", () => ({ redirect: vi.fn(), notFound: vi.fn() }));
     vi.doMock("@/app/dashboard/proposals/gate", () => ({ gateStaffAction: vi.fn(async () => null) }));
     vi.doMock("@/lib/proposals/store", () => ({
-      getProposal: vi.fn(async () => ({ proposal: { id: "p1", status: "draft", content: sevetri() } })),
+      getProposal: vi.fn(async () => ({ proposal: { id: "p1", status: "draft", content: callum() } })),
       getProposalSettings: vi.fn(async () => ({ pricing: {} })),
       updateProposal,
     }));

@@ -13,6 +13,7 @@ import {
 import type { QueueItem } from "@/lib/queue/api";
 import { IN_CHUNK, addCivilDays, chunk, civilDay, leadLabel, text } from "../shared";
 import type { BriefLead, BriefStage } from "./rules";
+import { leadRead } from "@/lib/leads/live";
 
 /**
  * The six sections of the morning brief, each read on its own so one failing never hides the
@@ -25,7 +26,8 @@ import type { BriefLead, BriefStage } from "./rules";
  */
 
 export type Section<T> =
-  | { state: "ok"; items: T[] }
+  /** `note`: part of an ok section couldn't be read (one consult source of two); said under the list, never hidden. */
+  | { state: "ok"; items: T[]; note?: string }
   | { state: "blocked"; reason: string }
   | { state: "database-update-needed" }
   | { state: "unavailable"; reason: string };
@@ -33,7 +35,8 @@ export type Section<T> =
 export const SECTION_PAGE = 1000;
 const SECTION_PAGES = 10;
 const SUGGESTION_ROW_CAP = 2000;
-export const DEADLINE_DAYS = 14;
+/** The brief reads 30 days out and shows the same two windows as Today's Deadlines card (7, then 8..30). */
+export const DEADLINE_DAYS = 30;
 
 const LEAD_COLUMNS =
   "id, first_name, last_name, business_name, email, practice_area, mark_text, current_stage_id, stage_entered_at, last_activity_at, last_inbound_at, last_outbound_at, created_at";
@@ -58,13 +61,13 @@ export async function readOpenLeads(admin: SupabaseClient, orgId: string, stages
   if (openIds.length === 0) return [];
   const out: BriefLead[] = [];
   for (let page = 0; page < SECTION_PAGES; page += 1) {
-    const { data, error } = await admin
-      .from("crm_lead")
-      .select(LEAD_COLUMNS)
-      .eq("org_id", orgId)
-      .in("current_stage_id", openIds)
-      .order("id", { ascending: true })
-      .range(page * SECTION_PAGE, page * SECTION_PAGE + SECTION_PAGE - 1);
+    const { data, error } = await leadRead(({ live }) =>
+      live(admin.from("crm_lead").select(LEAD_COLUMNS))
+        .eq("org_id", orgId)
+        .in("current_stage_id", openIds)
+        .order("id", { ascending: true })
+        .range(page * SECTION_PAGE, page * SECTION_PAGE + SECTION_PAGE - 1),
+    );
     if (error) throw new Error("lead read failed");
     const rows = (data ?? []) as BriefLead[];
     out.push(...rows);
@@ -77,6 +80,7 @@ export async function readOpenLeads(admin: SupabaseClient, orgId: string, stages
 export async function readLeadNames(admin: SupabaseClient, orgId: string, ids: readonly string[]): Promise<Map<string, string>> {
   const names = new Map<string, string>();
   for (const batch of chunk([...new Set(ids)], IN_CHUNK)) {
+    // live-guard: the stalled-lead list is live; the second read only names leads by id for the brief
     const { data, error } = await admin.from("crm_lead").select("id, first_name, last_name, business_name").eq("org_id", orgId).in("id", batch);
     if (error) throw new Error("lead name read failed");
     for (const row of (data ?? []) as Array<{ id: string; first_name: string | null; last_name: string | null; business_name: string | null }>) {
@@ -91,28 +95,39 @@ export async function readLeadNames(admin: SupabaseClient, orgId: string, ids: r
 export type ConsultItem = { eventId: string; leadId: string | null; startsAt: string; joinUrl: string | null };
 
 /**
- * Outlook consults that start on the firm's calendar day (not the UTC day). The database window is
- * deliberately wider than any zone's day; the exact day is decided here, in the firm's zone.
+ * Consults that start on the firm's calendar day (not the UTC day): Outlook's (only with `outlook`, i.e. the Mailboxes
+ * module on) and the Lawmatics daily sync's OWN rows (`lmsync:`), which are not behind Mailboxes. The database window
+ * is deliberately wider than any zone's day; the exact day is decided here, in the firm's zone.
  */
-export async function readTodaysConsults(admin: SupabaseClient, orgId: string, nowMs: number, tz: string): Promise<Section<ConsultItem>> {
+export async function readTodaysConsults(
+  admin: SupabaseClient,
+  orgId: string,
+  nowMs: number,
+  tz: string,
+  sources: { outlook: boolean } = { outlook: true },
+): Promise<Section<ConsultItem>> {
   try {
     const today = civilDay(nowMs, tz);
     const lo = new Date(`${addCivilDays(today, -1)}T00:00:00Z`).toISOString();
     const hi = new Date(`${addCivilDays(today, 2)}T00:00:00Z`).toISOString();
-    const { data, error } = await admin
-      .from("crm_calendar_event")
-      .select("id, lead_id, starts_at, join_url, all_day")
-      .eq("org_id", orgId)
-      .eq("source", "outlook")
-      .eq("is_consult", true)
-      .gte("starts_at", lo)
-      .lt("starts_at", hi)
-      .order("starts_at", { ascending: true });
-    if (error) return isDatabaseUpdateNeeded(error) ? { state: "database-update-needed" } : { state: "unavailable", reason: "the calendar did not answer" };
-    const items = ((data ?? []) as Array<{ id: string; lead_id: string | null; starts_at: string; join_url: string | null; all_day: boolean | null }>)
+    const read = (source: "outlook" | "lawmatics") => {
+      const q = admin.from("crm_calendar_event").select("id, lead_id, starts_at, join_url, all_day").eq("org_id", orgId).eq("source", source);
+      return (source === "lawmatics" ? q.like("external_id", "lmsync:%") : q).eq("is_consult", true).gte("starts_at", lo).lt("starts_at", hi).order("starts_at", { ascending: true });
+    };
+    const reads = await Promise.all([...(sources.outlook ? [read("outlook").then((r) => ({ ...r, name: "Outlook" }))] : []), read("lawmatics").then((r) => ({ ...r, name: "Lawmatics" }))]);
+    // Each source on its own: one failing keeps the other's consults and is named; only all failing is a failed section.
+    const ok = reads.filter((r) => !r.error);
+    const failed = reads.filter((r) => r.error);
+    if (ok.length === 0) {
+      const error = failed[0].error;
+      return isDatabaseUpdateNeeded(error) ? { state: "database-update-needed" } : { state: "unavailable", reason: "the calendar did not answer" };
+    }
+    const items = ok
+      .flatMap((r) => (r.data ?? []) as Array<{ id: string; lead_id: string | null; starts_at: string; join_url: string | null; all_day: boolean | null }>)
       .filter((e) => !e.all_day && civilDay(new Date(e.starts_at), tz) === today)
+      .sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at))
       .map((e) => ({ eventId: e.id, leadId: e.lead_id ?? null, startsAt: e.starts_at, joinUrl: joinHref(e.join_url) }));
-    return { state: "ok", items };
+    return failed.length > 0 ? { state: "ok", items, note: `${failed.map((r) => r.name).join(" and ")} consults couldn't be read.` } : { state: "ok", items };
   } catch {
     return { state: "unavailable", reason: "the calendar did not answer" };
   }
@@ -149,7 +164,7 @@ export async function readPendingSuggestions(admin: SupabaseClient, orgId: strin
   }
 }
 
-// ── 5. deadlines in the next 14 days ─────────────────────────────────────────
+// ── 5. deadlines in the next 30 days (shown as two windows: 7, then 8..30) ───
 
 export type DeadlineItem = { id: string; matterLabel: string; kind: string; dueDay: string; confirmed: boolean };
 

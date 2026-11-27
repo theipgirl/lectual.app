@@ -64,13 +64,13 @@ describe("the action file", () => {
   const actions = readFileSync("src/app/dashboard/proposals/[id]/actions.ts", "utf8");
   const create = readFileSync("src/lib/proposal-editor/create-link.ts", "utf8");
   it("createLinkAction goes through the gate and reaches no mail, queue or service role", () => {
-    const body = actions.slice(actions.indexOf("export async function createLinkAction"), actions.indexOf("export async function unapproveAction"));
+    const body = actions.slice(actions.indexOf("async function createLinkAction"), actions.indexOf("async function unapproveAction"));
     expect(body).toContain("gate: gateStaffAction");
     for (const text of [body, create]) expect(text).not.toMatch(/resend|sendMail|mailer|internal-mail|queue|admin|service[- ]role/i);
     expect(create).not.toMatch(/^import .*(admin|mail|queue)/m);
   });
   it("sendAction is still the recovery action", () => {
-    expect(actions).toContain("export async function sendAction");
+    expect(actions).toContain("async function sendAction");
   });
 });
 

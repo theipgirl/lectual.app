@@ -162,7 +162,7 @@ describe("deriveTemperature (v2)", () => {
       NOW,
     );
     expect(result.level).toBe("warm");
-    expect(result.reason).toBe("Last touch 1 day ago");
+    expect(result.reason).toBe("Last contact 1 day ago");
   });
 
   it("rule 4 counts any touch (last_activity_at), not just email", () => {
@@ -191,7 +191,7 @@ describe("deriveTemperature (v2)", () => {
       NOW,
     );
     expect(result.level).toBe("warm");
-    expect(result.reason).toBe("Last touch 6 days ago");
+    expect(result.reason).toBe("Last contact 6 days ago");
     expect(result.overridden).toBe(false);
   });
 

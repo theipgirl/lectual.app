@@ -165,6 +165,23 @@ describe("F6 a person's placement wins", () => {
     expect(suggestionRows(w.rows("crm_activity"))).toHaveLength(1);
   });
 
+  it("a move written by an owner deleting a stage (stage_deleted) is not a person's placement: moved", async () => {
+    const { w } = await withPerson(1, {
+      payload: { from_stage_id: S.newPnc, to_stage_id: S.pnc, reason: "stage deleted", stage_deleted: true },
+    });
+    expect(leadOf(w).current_stage_id).toBe(S.loe);
+    expect(suggestionRows(w.rows("crm_activity"))).toEqual([]);
+  });
+
+  it("countsAsPersonMove: only a signed-in person's own choice", async () => {
+    const { countsAsPersonMove } = await import("../../src/lib/agents/stage-keeper/run");
+    expect(countsAsPersonMove("stage_changed", "user", {})).toBe(true);
+    expect(countsAsPersonMove("stage_changed", "user", { stage_deleted: true })).toBe(false);
+    expect(countsAsPersonMove("stage_changed", "user", { actor: "agent:stage-keeper" })).toBe(false);
+    expect(countsAsPersonMove("stage_changed", "ai", {})).toBe(false);
+    expect(countsAsPersonMove("note", "user", {})).toBe(false);
+  });
+
   it("8 days ago: moved", async () => {
     const { w } = await withPerson(PERSON_MOVE_DAYS + 1);
     expect(leadOf(w).current_stage_id).toBe(S.loe);

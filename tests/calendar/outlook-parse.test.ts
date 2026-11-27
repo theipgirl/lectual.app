@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { firmSendersFrom } from "@/lib/mailbox/firm-sender";
 import {
   buildLeadIndex,
   extractJoinUrl,
@@ -207,5 +208,56 @@ describe("normaliseGraphEvent", () => {
     expect(normaliseGraphEvent(plain, ctx)!.row.is_consult).toBe(true);
     const outside: GraphEvent = { ...plain, organizer: { emailAddress: { address: "stranger@elsewhere.example" } } };
     expect(normaliseGraphEvent(outside, ctx)!.row.is_consult).toBe(false);
+  });
+});
+
+describe("normaliseGraphEvent: firm staff on the invite never pick the lead", () => {
+  const leadIndex = buildLeadIndex([
+    { id: "TEST", email: "rebecca@rpblawfirm.com" },
+    { id: "CLIENT", email: "drsammarch@gmail.com" },
+  ]);
+  const senders = firmSendersFrom(["rebecca@rpblawfirm.com", "intake@rpblawfirm.com"]);
+  const event: GraphEvent = {
+    id: "evt-clark",
+    subject: "Legal Strategy Session - Dr. Samantha Clark",
+    start: { dateTime: "2026-11-19T17:30:00.0000000", timeZone: "UTC" },
+    organizer: { emailAddress: { address: "support@rpblawfirm.com" } },
+    attendees: ["support@rpblawfirm.com", "drsammarch@gmail.com", "rebecca@rpblawfirm.com", "info@rpblawfirm.com"].map((address) => ({
+      emailAddress: { address },
+    })),
+  };
+  const ctx = { leadIndex, firmAddresses: new Set(["rebecca@rpblawfirm.com", "intake@rpblawfirm.com"]), firmSenders: senders };
+
+  it("links the client's lead even though an old test lead carries a firm address", () => {
+    expect(normaliseGraphEvent(event, ctx)!.row.lead_id).toBe("CLIENT");
+    // The stored attendee list is untouched.
+    expect(normaliseGraphEvent(event, ctx)!.row.attendee_emails).toHaveLength(4);
+  });
+
+  it("without firm senders the two leads clash, as before (null, never a guess)", () => {
+    expect(normaliseGraphEvent(event, { leadIndex, firmAddresses: ctx.firmAddresses })!.row.lead_id).toBeNull();
+  });
+
+  it("ignores the organizer for matching", () => {
+    const idx = buildLeadIndex([{ id: "ORG", email: "organizer@outside.example" }, { id: "C", email: "c@client.example" }]);
+    const e: GraphEvent = {
+      ...event,
+      organizer: { emailAddress: { address: "organizer@outside.example" } },
+      attendees: ["organizer@outside.example", "c@client.example"].map((address) => ({ emailAddress: { address } })),
+    };
+    expect(normaliseGraphEvent(e, { leadIndex: idx, firmAddresses: new Set() })!.row.lead_id).toBe("C");
+  });
+
+  it("still never guesses between several remaining client matches", () => {
+    const idx = buildLeadIndex([{ id: "A", email: "a@client.example" }, { id: "B", email: "b@client.example" }]);
+    const e: GraphEvent = { ...event, attendees: ["a@client.example", "b@client.example", "info@rpblawfirm.com"].map((address) => ({ emailAddress: { address } })) };
+    expect(normaliseGraphEvent(e, { leadIndex: idx, firmAddresses: ctx.firmAddresses, firmSenders: senders })!.row.lead_id).toBeNull();
+  });
+
+  it("a firm on webmail contributes its exact address only, so a gmail client still links", () => {
+    const s = firmSendersFrom(["owner@gmail.com"]);
+    const idx = buildLeadIndex([{ id: "C", email: "client@gmail.com" }]);
+    const e: GraphEvent = { ...event, attendees: ["owner@gmail.com", "client@gmail.com"].map((address) => ({ emailAddress: { address } })) };
+    expect(normaliseGraphEvent(e, { leadIndex: idx, firmAddresses: new Set(), firmSenders: s })!.row.lead_id).toBe("C");
   });
 });

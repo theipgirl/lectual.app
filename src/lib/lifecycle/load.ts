@@ -12,6 +12,7 @@ import {
   type PipelineCard,
 } from "./columns";
 import { daysInStageLabel, stageAgeDisplay } from "./stage-age";
+import { TEAMMATE } from "@/lib/ui/words";
 
 /**
  * Everything the pipeline board reads, through the caller's scoped client.
@@ -87,7 +88,7 @@ export async function loadPipeline(now: Date = new Date()): Promise<PipelineLoad
 
   const notes: string[] = [];
   const members = membersS.status === "fulfilled" ? membersS.value : [];
-  const memberName = new Map(members.map((m) => [m.userId, m.displayName || m.email || "Team member"]));
+  const memberName = new Map(members.map((m) => [m.userId, m.displayName || m.email || TEAMMATE]));
   const cards: PipelineCard[] = [];
 
   const leadsOk = leadStagesS.status === "fulfilled" && leadsS.status === "fulfilled";
@@ -176,7 +177,7 @@ export async function loadPipeline(now: Date = new Date()): Promise<PipelineLoad
   }
 
   const ownerIds = new Set(cards.map((c) => c.ownerId).filter(Boolean) as string[]);
-  const owners = [...ownerIds].map((id) => ({ id, name: memberName.get(id) ?? "Team member" })).sort((a, b) => a.name.localeCompare(b.name));
+  const owners = [...ownerIds].map((id) => ({ id, name: memberName.get(id) ?? TEAMMATE })).sort((a, b) => a.name.localeCompare(b.name));
 
   return { leads: leadsOk ? "ok" : "unavailable", matters: mattersOk ? "ok" : "unavailable", cards, owners, notes };
 }

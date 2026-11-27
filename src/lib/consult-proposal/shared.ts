@@ -8,7 +8,7 @@ import type { ConsultSource, ConsultTranscriptTurn } from "./types";
  */
 
 /** `payload.source` of the timeline rows that mark a call as drafted (and name its queue item + proposal). */
-export const CONSULT_PROPOSAL_SOURCE = "consult-proposal";
+export { CONSULT_PROPOSAL_SOURCE } from "./source";
 
 /** Whitespace-normalised, so re-pasting the same transcript with different line breaks is the same transcript. */
 export function pasteHash(text: string): string {
