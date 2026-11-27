@@ -37,6 +37,7 @@ Omi cross-check: no open Omi items match these (Omi's open items are all from Oc
 - [ ] (Tax Maverick) Read uploaded files for filing facts to fill the filing checklist (person confirms).
 - [ ] (Tax Maverick) "Sell to the book you have": suggest renewals, Section 8/9 dates, new classes and marks for existing clients.
 - [ ] (Tax Maverick) Lectual pitch: stages-and-walls framing, bootcamp + by-application program, and a security page.
+- [x] Headline chosen (Taylor, Nov 27): "The Agentic Operating System for IP Firms Ready to Scale". Sub-line still to pick.
 
 ## 2026-11-25: due today (deposit), contract line items, four package options (lectual.app#35, #36, #37 merged and live)
 
