@@ -34,7 +34,8 @@ export function teamNextSteps(tasks: readonly TeamTaskInput[], userId: string, n
   const today = civilInZone(now, tz);
   const mine = tasks.filter((t) => t.status === "open" && t.assignee_id === userId);
   const rows = mine.map((t): TeamStep & { sort: string } => {
-    const dueDate = t.due_at ? civilInZone(new Date(t.due_at), tz) : null;
+    // A next step's due date is stored as a bare date (midnight UTC), so it is read as the UTC day, like Weekly review.
+    const dueDate = t.due_at ? t.due_at.slice(0, 10) : null;
     const overdueDays = dueDate ? Math.max(0, civilDaysBetween(dueDate, today)) : 0;
     return {
       id: t.id,
