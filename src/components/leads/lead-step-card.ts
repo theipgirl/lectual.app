@@ -7,7 +7,7 @@ import { DECK_OPEN_DRAFT, LEAD_PAGE_OPEN_IN_APPROVALS } from "@/lib/ui/words";
  * to the notice, the editor closes and Yes, Edit and Not this stay.
  */
 export type Mode = "idle" | "editing" | "rejecting" | "sending-back";
-export type Outcome = { ok: true; message: string; webLink?: string | null; warn?: boolean } | { ok: false; error: string };
+export type Outcome = { ok: true; message: string; webLink?: string | null; warn?: boolean } | { ok: false; error: string; connect?: string | null };
 export type CardState = { mode: Mode; body: string; outcome: Outcome | null };
 export type ActionKind = "edit" | "yes" | "not-this" | "send-back";
 

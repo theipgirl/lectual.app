@@ -18,6 +18,7 @@ const state = vi.hoisted(() => ({
   draft: vi.fn(),
   gate: vi.fn(),
   stale: false,
+  prep: null as unknown,
 }));
 
 vi.mock("@/lib/db/scoped-client", () => ({
@@ -37,7 +38,8 @@ vi.mock("@/lib/queue/stale", () => ({ checkDraftStaleness: vi.fn(async () => ({ 
 vi.mock("@/components/queue/stale-warning", () => ({ staleWarning: vi.fn(() => ({ headline: "Signed Oct 3", confirm: "x" })) }));
 vi.mock("@/lib/consult-proposal/link", () => ({ gateLinkedProposal: (...a: unknown[]) => state.gate(...a), makeProposalLive: vi.fn(async () => ({ ok: true })) }));
 vi.mock("@/lib/documents/approve-hook", () => ({ generateApprovedDocument: vi.fn(async () => undefined) }));
-vi.mock("@/lib/mailbox/my-mailbox", () => ({ draftInMyMailbox: (...a: unknown[]) => state.draft(...a) }));
+vi.mock("@/lib/mailbox/my-mailbox", () => ({ prepareMyOutlookDraft: vi.fn(async () => state.prep) }));
+vi.mock("@/lib/firm/session", () => ({ resolveFirmSession: vi.fn(async () => ({ kind: "ok", actingAsStaff: false })) }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({
   redirect: vi.fn((url: string) => {
@@ -63,7 +65,8 @@ beforeEach(() => {
   state.stale = false;
   state.resolve.mockReset().mockResolvedValue({ status: "approved", send: "none" });
   state.save.mockReset().mockResolvedValue(undefined);
-  state.draft.mockReset().mockResolvedValue({ provider: "microsoft", email: "r@example.com", webLink: "https://outlook.office.com/d/1", id: "AAMk-1" });
+  state.draft.mockReset().mockResolvedValue({ ok: true, webLink: "https://outlook.office.com/d/1", id: "AAMk-1" });
+  state.prep = { ok: true, draft: (...a: unknown[]) => state.draft(...a) };
   state.gate.mockReset().mockResolvedValue({ ok: true, proposal: null });
 });
 
@@ -150,11 +153,11 @@ describe("runQueueReview: refusals are the action's own", () => {
 describe("runQueueReview: results", () => {
   it("returns the mailbox draft's link and id", async () => {
     const r = await runQueueReview({ id: "q1", intent: "approve" });
-    expect(r).toEqual({ kind: "resolved", intent: "approve", send: "mailbox-microsoft", webLink: "https://outlook.office.com/d/1", draftId: "AAMk-1", provider: "microsoft" });
+    expect(r).toEqual({ kind: "resolved", intent: "approve", send: "mailbox-microsoft", webLink: "https://outlook.office.com/d/1", draftId: "AAMk-1", provider: "microsoft", itemType: "CLIENT_EMAIL" });
   });
 
-  it("keeps the queue's own draft link when the queue drafted it", async () => {
-    state.resolve.mockResolvedValue({ status: "approved", send: "drafted", sendResult: { detail: "ok", webLink: "https://outlook/q" } });
+  it("keeps the queue's own draft link when the queue drafted it (lawmatics-mcp returns it at draft.webLink)", async () => {
+    state.resolve.mockResolvedValue({ status: "approved", send: "drafted", draft: { mailbox: "firm@example.com", draftId: "d1", webLink: "https://outlook/q" } });
     const r = await runQueueReview({ id: "q1", intent: "approve" });
     expect(r).toMatchObject({ kind: "resolved", send: "drafted", webLink: "https://outlook/q", draftId: null });
     expect(state.draft).not.toHaveBeenCalled();

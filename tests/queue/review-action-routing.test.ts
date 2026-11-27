@@ -38,7 +38,8 @@ vi.mock("@/lib/consult-proposal/link", () => ({
   makeProposalLive: vi.fn(async () => ({ ok: true })),
 }));
 vi.mock("@/lib/documents/approve-hook", () => ({ generateApprovedDocument: (...a: unknown[]) => state.document(...a) }));
-vi.mock("@/lib/mailbox/my-mailbox", () => ({ draftInMyMailbox: (...a: unknown[]) => state.draft(...a) }));
+vi.mock("@/lib/mailbox/my-mailbox", () => ({ prepareMyOutlookDraft: vi.fn(async () => ({ ok: true, draft: (...a: unknown[]) => state.draft(...a) })) }));
+vi.mock("@/lib/firm/session", () => ({ resolveFirmSession: vi.fn(async () => ({ kind: "ok", actingAsStaff: false })) }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({
   redirect: vi.fn((url: string) => {
@@ -78,7 +79,7 @@ beforeEach(() => {
   as("attorney", U.rebecca);
   state.resolve.mockReset().mockResolvedValue({ status: "approved", send: "manual" });
   state.save.mockReset().mockResolvedValue(undefined);
-  state.draft.mockReset().mockResolvedValue(null);
+  state.draft.mockReset().mockResolvedValue({ ok: true, id: "d-1", webLink: null });
   state.document.mockReset().mockResolvedValue(undefined);
   state.gate.mockReset().mockResolvedValue({ ok: true, proposal: null });
 });

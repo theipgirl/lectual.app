@@ -138,8 +138,18 @@ describe("the after-approve line claims a mailbox only when the approve result r
     expect(h).not.toMatch(/Draft is in (Outlook|Gmail)/);
     expect(h).toContain("No draft was made");
   });
+  it("approver drafts: a refusal draws its Connect Outlook link; a failed draft draws the approved text to copy", () => {
+    const refused = html({ initial: { result: { ok: false, error: "Connect your own Outlook before you approve client emails. Nothing was approved.", connect: "/dashboard/settings/integrations/" } as never } });
+    expect(refused).toContain('href="/dashboard/settings/integrations/"');
+    expect(refused).toContain(">Connect Outlook<");
+    const failed = ok(null, "Approved, but the draft couldn't be made in your Outlook. Nothing was sent.");
+    expect(failed).not.toContain("Approved text");
+    const withText = html({ initial: { result: { ok: true, message: "Approved, but the draft couldn't be made in your Outlook. Nothing was sent.", draft: null, text: "Hi Ana, the approved words" } as never } });
+    expect(withText).toContain("Hi Ana, the approved words");
+    expect(withText).toContain("Approved text");
+  });
   it("a Microsoft draft says Outlook, a Google draft says Gmail", () => {
-    expect(ok({ provider: "microsoft", webLink: null, draftId: null, canSend: false, sendNote: null })).toContain("Draft is in Outlook");
+    expect(ok({ provider: "microsoft", webLink: null, draftId: null, canSend: false, sendNote: null })).toContain("Draft is in your Outlook.");
     expect(ok({ provider: "google", webLink: null, draftId: null, canSend: false, sendNote: null })).toContain("Draft is in Gmail");
   });
 });

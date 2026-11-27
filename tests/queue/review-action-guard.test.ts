@@ -41,7 +41,8 @@ vi.mock("@/lib/consult-proposal/link", () => ({
   makeProposalLive: vi.fn(async () => ({ ok: true })),
 }));
 vi.mock("@/lib/documents/approve-hook", () => ({ generateApprovedDocument: vi.fn(async () => undefined) }));
-vi.mock("@/lib/mailbox/my-mailbox", () => ({ draftInMyMailbox: vi.fn(async () => null) }));
+vi.mock("@/lib/mailbox/my-mailbox", () => ({ prepareMyOutlookDraft: vi.fn(async () => ({ ok: true, draft: vi.fn(async () => ({ ok: true, id: "d-1", webLink: null })) })) }));
+vi.mock("@/lib/firm/session", () => ({ resolveFirmSession: vi.fn(async () => ({ kind: "ok", actingAsStaff: false })) }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({
   redirect: vi.fn((url: string) => {

@@ -14,6 +14,7 @@ import { holdSeconds, nextHold } from "./lead-step-hold";
 import { isDone, noticeFor, settle, toggleEdit, type ActionKind, type CardState, type Mode, type Outcome } from "./lead-step-card";
 import { useStepSay } from "./TopCardFrame";
 import {
+  CONNECT_OUTLOOK_LINK,
   CANCEL,
   LEAD_PAGE_ACTION_FAILED,
   LEAD_PAGE_YES_UNCONFIRMED,
@@ -272,6 +273,14 @@ export function NeedsYourYes({ leadId, view, initial }: { leadId: string; view: 
       {outcome && !outcome.ok && (
         <Notice tone="risk" role="alert">
           {outcome.error}
+          {outcome.connect ? (
+            <>
+              {" "}
+              <a className="lx-link" href={outcome.connect}>
+                {CONNECT_OUTLOOK_LINK}
+              </a>
+            </>
+          ) : null}
         </Notice>
       )}
       {outcome && outcome.ok && !say && (

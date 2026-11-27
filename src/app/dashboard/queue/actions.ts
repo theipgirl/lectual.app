@@ -18,7 +18,7 @@ import { isDoneNote } from "@/lib/queue/done";
 import { clearOpenClaim, makeDraftInMyOutlook, retryPassToDrafter } from "@/lib/queue/make-draft";
 import { DECK_FAILED, REJECT_NOTE_IS_DONE_MARKER, SEND_BACK_NOTE_TOO_LONG } from "@/lib/ui/words";
 
-export type ReviewState = { error?: string };
+export type ReviewState = { error?: string; connect?: string | null };
 
 /**
  * Approve / save / reject one queue item from the full approval page. A thin wrapper: every check lives in
@@ -38,7 +38,7 @@ export const reviewQueueAction = previewSafe(async function reviewQueueAction(_p
     note: String(formData.get("note") ?? ""),
     confirmStale: formData.get("confirm_stale") === "yes",
   });
-  if (outcome.kind === "error") return { error: outcome.error };
+  if (outcome.kind === "error") return { error: outcome.error, ...(outcome.connect ? { connect: outcome.connect } : {}) };
   if (outcome.kind === "saved") {
     revalidatePath(`/dashboard/queue/${id}/`);
     return {};

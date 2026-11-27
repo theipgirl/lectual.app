@@ -35,6 +35,9 @@ import {
   leadStepDraftInMailbox,
   PASS_FAILED,
   passedToDrafter,
+  APPROVED_CLIENT_EMAIL_NO_DRAFT,
+  APPROVED_DRAFT_CHECK_OUTLOOK,
+  APPROVED_DRAFT_FAILED_OUTLOOK,
 } from "@/lib/ui/words";
 import type { HandoffFact, RoutingFacts } from "./facts";
 import type { LeadCloserLook } from "./closer-look";
@@ -94,7 +97,7 @@ export type LeadStepActionDeps = {
   revalidate: (leadId: string) => void;
 };
 
-export type YesResult = { ok: true; message: string; webLink: string | null; warn: boolean } | { ok: false; error: string };
+export type YesResult = { ok: true; message: string; webLink: string | null; warn: boolean } | { ok: false; error: string; connect?: string | null };
 export type NotThisResult = { ok: true; message: string } | { ok: false; error: string };
 /** No "may say yes now" in the answer: the page is revalidated and recomputes it from the re-read item. */
 export type EditResult = { ok: true; message: string } | { ok: false; error: string };
@@ -147,7 +150,9 @@ export function afterYesWarns(outcome: Extract<ReviewOutcome, { kind: "resolved"
   // Sprint 4: passed to the firm's drafter is a success (no mailbox draft is expected); a failed pass is a warning.
   if (send === "passed") return false;
   if (send === "pass-failed") return true;
-  if (send === "failed" || send === "mailbox-failed") return true;
+  if (send === "failed" || send === "mailbox-failed" || send === "mailbox-uncertain") return true;
+  // A client email approved with no draft made: a warning, never "this type isn't emailed".
+  if (send === "manual" && itemType === "CLIENT_EMAIL") return true;
   if (send === "mailbox-microsoft" || send === "mailbox-google" || send === "drafted" || send === "manual" || send === "sent") return false;
   return !DOCUMENT_QUEUE_TYPES.has(itemType);
 }
@@ -162,8 +167,11 @@ export function afterYesSentence(outcome: Extract<ReviewOutcome, { kind: "resolv
     return leadStepDraftInMailbox(owner, provider === "microsoft" ? "Outlook" : "Gmail");
   }
   if (send === "drafted") return LEAD_STEP_DRAFT_IN_QUEUE_MAILBOX;
-  if (send === "manual") return LEAD_STEP_APPROVED_MANUAL;
-  if (send === "failed" || send === "mailbox-failed") return LEAD_STEP_APPROVED_DRAFT_FAILED;
+  if (send === "manual") return itemType === "CLIENT_EMAIL" ? APPROVED_CLIENT_EMAIL_NO_DRAFT : LEAD_STEP_APPROVED_MANUAL;
+  // Approver drafts: the one draft in the approver's own Outlook failed for certain, or may have been made.
+  if (send === "mailbox-failed") return APPROVED_DRAFT_FAILED_OUTLOOK;
+  if (send === "mailbox-uncertain") return APPROVED_DRAFT_CHECK_OUTLOOK;
+  if (send === "failed") return LEAD_STEP_APPROVED_DRAFT_FAILED;
   // The queue's own answer; the deck says the same.
   if (send === "sent") return LEAD_STEP_APPROVED;
   // A letter is not emailed: approving makes its document (the approve hook, best-effort; a failure shows on Documents).
@@ -219,7 +227,9 @@ export async function runLeadStepYes(deps: LeadStepActionDeps, rawLeadId: unknow
   const shownSha256 = typeof rawShownSha256 === "string" && SHOWN_SHA256.test(rawShownSha256) ? rawShownSha256 : null;
   if (!shownSha256) return { ok: false, error: DRAFT_CHANGED_REFRESH };
   const outcome = await deps.review({ id: itemId, intent: "approve", withReceipt: true, requireShown: true, shownSha256 });
-  if (outcome.kind === "error") return { ok: false, error: STALE_CONFIRM.test(outcome.error) ? LEAD_PAGE_STALE_DRAFT : outcome.error };
+  if (outcome.kind === "error") {
+    return { ok: false, error: STALE_CONFIRM.test(outcome.error) ? LEAD_PAGE_STALE_DRAFT : outcome.error, ...(outcome.connect ? { connect: outcome.connect } : {}) };
+  }
   if (outcome.kind !== "resolved" || outcome.intent !== "approve") return { ok: false, error: LEAD_STEP_FAILED };
   deps.revalidate(leadId);
   const drafterId = outcome.handoff?.drafter ?? null;

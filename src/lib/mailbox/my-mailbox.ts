@@ -28,37 +28,6 @@ async function openMailboxToken(root: Buffer, id: string, orgId: string): Promis
 }
 
 /**
- * Put an approved client email into the APPROVER'S OWN mailbox as a draft.
- *
- * Which mailbox is decided by the caller's RLS-scoped read: 0075 only shows a
- * personal row to its owner, so this can only ever find the signed-in
- * person's own Gmail/Outlook. Only then does the service-role client read
- * that row's sealed tokens, by id AND the org_id the scoped read returned.
- *
- * Returns null when the approver has no active personal mailbox.
- */
-export async function draftInMyMailbox(draft: DraftInput): Promise<{ provider: MailboxProvider; email: string; webLink: string | null; id: string } | null> {
-  const root = rootKeyOrNull();
-  if (!root) return null;
-
-  const supabase = await getScopedClient();
-  const { data: mine } = await supabase
-    .from("mailbox_connection")
-    .select("id, org_id, provider, email")
-    .eq("scope", "personal")
-    .eq("status", "active")
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  if (!mine) return null;
-
-  const accessToken = await openMailboxToken(root, mine.id, mine.org_id);
-  if (!accessToken) return null;
-  const made = await createMailboxDraft(mine.provider as MailboxProvider, { accessToken, draft });
-  return { provider: mine.provider as MailboxProvider, email: mine.email, webLink: made.webLink, id: made.id };
-}
-
-/**
  * Can "Send from Outlook now" be offered to this person? Only when the deployment asks for the send permission, and the
  * mailbox `draftInMyMailbox` would use (the caller's own first active personal connection, found by their scoped read)
  * is Microsoft AND its stored scopes granted it. Any failed read is `unavailable`, never "ready".
@@ -66,21 +35,12 @@ export async function draftInMyMailbox(draft: DraftInput): Promise<{ provider: M
 export type MySendAccess = "ready" | "switched-off" | "no-mailbox" | "not-outlook" | "needs-permission" | "unavailable";
 
 async function myDraftMailbox(): Promise<{ ok: true; row: { id: string; org_id: string; provider: string; scopes: unknown } | null } | { ok: false }> {
-  try {
-    const supabase = await getScopedClient();
-    const { data, error } = await supabase
-      .from("mailbox_connection")
-      .select("id, org_id, provider, scopes")
-      .eq("scope", "personal")
-      .eq("status", "active")
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-    if (error) return { ok: false };
-    return { ok: true, row: data ?? null };
-  } catch {
-    return { ok: false };
-  }
+  // Approver drafts (Nov 27): an approved client email is drafted in the caller's own OUTLOOK, so "Send from Outlook now"
+  // looks at that same row (their own personal, active Microsoft connection), never their first mailbox of any kind.
+  const mine = await myOwnOutlookRow();
+  if (!mine.ok) return { ok: false };
+  if (mine.row) return { ok: true, row: { ...mine.row, provider: "microsoft" } };
+  return { ok: true, row: mine.anyOther ? { id: "", org_id: "", provider: "other", scopes: null } : null };
 }
 
 function accessOf(row: { provider: string; scopes: unknown } | null): MySendAccess {
@@ -167,6 +127,49 @@ export async function myOutlookDraftAccess(postedConnectionId?: unknown): Promis
   const mine = await myOwnOutlookRow();
   if (!postedConnectionAllowed(postedConnectionId, mine.ok && mine.row ? mine.row.id : null)) return "not-yours";
   return draftAccessOf(mine);
+}
+
+/**
+ * Approver drafts (Nov 27): the approve path's ONE check and token for the approver's own Outlook, taken BEFORE anything
+ * is saved, made live or resolved. The connection is the caller's scoped read (`myOwnOutlookRow`: personal, active,
+ * Microsoft, `user_id` = the session user), its stored scopes must allow a draft, and a fresh token is opened now (a
+ * refresh that fails is `reauth`). On success `draft` makes exactly ONE Graph POST with that token, and is never retried
+ * here. Never a colleague's connection, never a connection id from the browser.
+ */
+export type ApproverOutlook =
+  | { ok: true; draft: (draft: DraftInput) => Promise<OwnOutlookDraft> }
+  | { ok: false; reason: MyOutlookDraftAccess | "reauth" };
+
+export async function prepareMyOutlookDraft(): Promise<ApproverOutlook> {
+  const root = rootKeyOrNull();
+  if (!root) return { ok: false, reason: "unavailable" };
+  const mine = await myOwnOutlookRow();
+  const access = draftAccessOf(mine);
+  if (access !== "ready" || !mine.ok || !mine.row) return { ok: false, reason: access === "ready" ? "unavailable" : access };
+  let accessToken: string | null;
+  try {
+    accessToken = await openMailboxToken(root, mine.row.id, mine.row.org_id);
+  } catch {
+    return { ok: false, reason: "reauth" };
+  }
+  if (!accessToken) return { ok: false, reason: "no-mailbox" };
+  const token = accessToken;
+  let used = false;
+  return {
+    ok: true,
+    draft: async (draft) => {
+      // One POST per prepared token: a second call is refused rather than making a second draft.
+      if (used) return { ok: false, reason: "refused" };
+      used = true;
+      try {
+        const made = await createMailboxDraft("microsoft", { accessToken: token, draft });
+        return { ok: true, id: made.id, webLink: made.webLink };
+      } catch (err) {
+        if (draftFailureKind(err) === "uncertain") return { ok: false, reason: "uncertain" };
+        return { ok: false, reason: (err as { code?: unknown } | null)?.code === "reauth" ? "reauth" : "refused" };
+      }
+    },
+  };
 }
 
 export type OwnOutlookDraft =

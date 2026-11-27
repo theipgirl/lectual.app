@@ -17,6 +17,7 @@ const state = vi.hoisted(() => ({
   eventRows: null as null | Record<string, unknown>[],
   noAttemptColumn: false,
   selects: [] as string[],
+  tokenFails: false,
 }));
 
 vi.mock("server-only", () => ({}));
@@ -69,10 +70,15 @@ vi.mock("@/lib/db/admin", () => ({
   },
 }));
 vi.mock("@/lib/mailbox/config", () => ({ rootKeyOrNull: () => Buffer.alloc(32), providerCredentials: () => null }));
-vi.mock("@/lib/mailbox/sync", () => ({ freshAccessToken: vi.fn(async () => "token") }));
+vi.mock("@/lib/mailbox/sync", () => ({
+  freshAccessToken: vi.fn(async () => {
+    if (state.tokenFails) throw Object.assign(new Error("refresh refused"), { code: "reauth" });
+    return "token";
+  }),
+}));
 vi.mock("@/lib/mailbox/drafts", () => ({ createMailboxDraft: (...a: unknown[]) => state.create(...a) }));
 
-const { draftInMyOwnOutlook, myOutlookDraftAccess } = await import("@/lib/mailbox/my-mailbox");
+const { draftInMyOwnOutlook, myOutlookDraftAccess, prepareMyOutlookDraft } = await import("@/lib/mailbox/my-mailbox");
 const DRAFT = { to: "ana@example.com", subject: "Published", body: "Hi" };
 
 beforeEach(() => {
@@ -80,6 +86,7 @@ beforeEach(() => {
   state.scopedError = null;
   state.adminReads = [];
   state.filters = [];
+  state.tokenFails = false;
   state.create.mockReset().mockResolvedValue({ id: "AAMk-2", webLink: "https://outlook.office.com/d/2" });
 });
 
@@ -125,6 +132,59 @@ describe("Acceptance 7: the caller's own connection, from the scoped read", () =
   });
 });
 
+describe("approver drafts: prepareMyOutlookDraft (the approve path's one check and token)", () => {
+  it("ready: the caller's own row (scoped read, session user), a token now, then exactly ONE Graph POST with it", async () => {
+    const prep = await prepareMyOutlookDraft();
+    expect(prep.ok).toBe(true);
+    expect(state.filters).toEqual(expect.arrayContaining([["scope", "personal"], ["status", "active"], ["user_id", "user-rayn"]]));
+    expect(state.adminReads).toEqual([{ id: "conn-rayn", org: "org-1" }]);
+    expect(state.create).not.toHaveBeenCalled();
+    if (!prep.ok) return;
+    expect(await prep.draft(DRAFT)).toEqual({ ok: true, id: "AAMk-2", webLink: "https://outlook.office.com/d/2" });
+    expect(state.create).toHaveBeenCalledTimes(1);
+    expect(state.create).toHaveBeenCalledWith("microsoft", { accessToken: "token", draft: DRAFT });
+    // A second call never makes a second draft.
+    expect(await prep.draft(DRAFT)).toEqual({ ok: false, reason: "refused" });
+    expect(state.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("not ready: no Outlook, Gmail only, no draft permission, unreadable, or a token refresh that fails; no token read for the first four, nothing drafted", async () => {
+    state.rows = [];
+    expect(await prepareMyOutlookDraft()).toEqual({ ok: false, reason: "no-mailbox" });
+    state.rows = [{ id: "g", org_id: "org-1", provider: "google", scopes: [] }];
+    expect(await prepareMyOutlookDraft()).toEqual({ ok: false, reason: "not-outlook" });
+    state.rows = [{ id: "conn-rayn", org_id: "org-1", provider: "microsoft", scopes: ["Mail.Read"] }];
+    expect(await prepareMyOutlookDraft()).toEqual({ ok: false, reason: "needs-permission" });
+    state.scopedError = { code: "500" };
+    expect(await prepareMyOutlookDraft()).toEqual({ ok: false, reason: "unavailable" });
+    expect(state.adminReads).toEqual([]);
+    state.scopedError = null;
+    state.rows = [{ id: "conn-rayn", org_id: "org-1", provider: "microsoft", scopes: ["Mail.ReadWrite"] }];
+    state.tokenFails = true;
+    expect(await prepareMyOutlookDraft()).toEqual({ ok: false, reason: "reauth" });
+    expect(state.create).not.toHaveBeenCalled();
+  });
+
+  it("a colleague's connection is never used: only the session user's own row is asked for", async () => {
+    // The scoped read is filtered on the session's own user id (RLS also hides a colleague's personal row).
+    await prepareMyOutlookDraft();
+    expect(state.filters).toContainEqual(["user_id", "user-rayn"]);
+    expect(state.adminReads.every((r) => r.id === "conn-rayn")).toBe(true);
+  });
+
+  it("Graph failures: a 4xx or reauth is definite, a 5xx / no status is uncertain; the provider's text never comes back", async () => {
+    state.create.mockRejectedValue(Object.assign(new Error("Graph said: ana@example.com bad"), { code: "fetch-failed", httpStatus: 400 }));
+    let prep = await prepareMyOutlookDraft();
+    expect(prep.ok && (await prep.draft(DRAFT))).toEqual({ ok: false, reason: "refused" });
+    state.create.mockRejectedValue(Object.assign(new Error("x"), { code: "reauth", httpStatus: 401 }));
+    prep = await prepareMyOutlookDraft();
+    expect(prep.ok && (await prep.draft(DRAFT))).toEqual({ ok: false, reason: "reauth" });
+    state.create.mockRejectedValue(Object.assign(new Error("x"), { code: "fetch-failed", httpStatus: 503 }));
+    prep = await prepareMyOutlookDraft();
+    expect(prep.ok && (await prep.draft(DRAFT))).toEqual({ ok: false, reason: "uncertain" });
+  });
+});
+
 /* ─────────────── hygiene ─────────────── */
 
 function walk(dir: string): string[] {
@@ -160,8 +220,11 @@ describe("Acceptance 9 and the sprint's hygiene greps", () => {
     expect(make).toMatch(/draftInMyOwnOutlook\(/);
     expect(make).not.toMatch(/draftInMyMailbox|createMailboxDraft/);
     const core = read("src/lib/queue/review-core.ts");
-    // The only mailbox call in the approve core is the approver's own mailbox, and the pass branch never reaches it except before 0112.
-    expect(core.match(/draftInMyMailbox\(/g)).toHaveLength(1);
+    // Approver drafts: the only mailbox call in the approve core is the approver's own Outlook, prepared before anything and
+    // drafted once; the pass branch never reaches it except before 0112.
+    expect(core).not.toMatch(/draftInMyMailbox/);
+    expect(core.match(/prepareMyOutlookDraft\(/g)).toHaveLength(1);
+    expect(core.match(/ready\.draft\(/g)).toHaveLength(1);
     expect(core).not.toMatch(/draftInMyOwnOutlook|createMailboxDraft/);
   });
 

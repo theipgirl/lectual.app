@@ -2605,6 +2605,34 @@ their own click). Contract: `docs/pge/2026-11-17-agentic-ip-os/sprint-4.md`. App
     receipt hash and EVERY Make-draft is refused ("changed after it was approved"): it fails closed, never drafts other text (pinned by a test).
 
 
+## Approver drafts (Nov 27, no schema)
+The firm owner's decision: an approved CLIENT_EMAIL is drafted in the APPROVER's own Outlook, never the firm mailbox. lawmatics-mcp main 3a02854
+(deployed Nov 27) honours `mailbox_draft: false`, which lifts Sprint 4's SHIP BLOCKER above. Approving still never sends.
+- **Every client-email approve** (item page, owner and team deck, lead-page Yes; all through `runQueueReview`) resolves with `mailbox_draft: false`, whatever
+  the plan (`clientEmail` in `review-core.ts`). Other types (BRIEFING Mark read, ENGAGEMENT_LETTER, ...) are unchanged: no Outlook check, no flag, no draft.
+- **Order in `runQueueReview`:** role -> item re-read (pending) -> routing + `approvalRefusal` -> Lectual staff previewing refused (`DECK_PREVIEW_ONLY`) ->
+  plan (`approvePlan`) -> **the approver's Outlook** (`prepareMyOutlookDraft`, `my-mailbox.ts`: the caller's scoped read, `user_id` = session user, personal,
+  active, Microsoft, `Mail.ReadWrite` via `hasDraftScope`, then a fresh token; refresh failing = `reauth`) -> linked-proposal gate -> shown-text, hygiene, stale
+  checks -> save edit -> proposal live -> resolve (`mailbox_draft: false`) -> ONE Graph POST with that token (the prepared `draft` refuses a second call).
+  Not ready = a fixed sentence (`APPROVER_*` in `words.ts`) plus `connect: INTEGRATIONS_PATH` (none for "couldn't check"); nothing is saved, made live or
+  resolved. The deck card, the item page's ReviewPanel and the lead page's NeedsYourYes draw the `Connect Outlook` link.
+- **After the resolve:** ok -> `mailbox-microsoft` ("Draft is in your Outlook."); a definite refusal (4xx, reauth, no token) -> `mailbox-failed`
+  (`APPROVED_DRAFT_FAILED_OUTLOOK`, the approved text returned as `approvedText`, shown on the deck; the item page shows the approved body); a 5xx, timeout
+  or unreadable reply -> `mailbox-uncertain` (`APPROVED_DRAFT_CHECK_OUTLOOK`). Never retried automatically. If the queue still answers `send: "drafted"` /
+  `"sent"`, no second draft is made and the page says the queue drafted it in the firm's mailbox (`APPROVED_QUEUE_DRAFTED_FIRM` /
+  `LEAD_STEP_DRAFT_IN_QUEUE_MAILBOX` / `QUEUE_DRAFTED_ANYWAY` on a pass). Its link is read from lawmatics-mcp's real field, `draft.webLink`
+  (`sendResult.webLink` kept as a fallback). A `manual` client email never says "This type isn't emailed" (`APPROVED_CLIENT_EMAIL_NO_DRAFT`).
+- **"Drafts go to" stays an override** (`pass`): the drafter's personal connection is invisible to the approver under RLS, and no service-role read or
+  migration was added, so the drafter's readiness is NOT checked at approve time; the draft_to / "Make the draft in my Outlook" path (which checks the
+  drafter's own Outlook on their click) is unchanged. What IS blocked: before lectual 0112 (`passingSwitchedOn()` reads 0112's `attempt` column as missing)
+  a pass falls back to the approver's own Outlook, so the approver is checked first then. With 0112 on (or the probe unreadable) a pass checks no Outlook.
+  If the probe says on but the draft_to is still refused as not set up, the fallback prepares the approver's Outlook at that moment and a not-ready
+  approver reads `mailbox-failed` (never a draft elsewhere).
+- A routing read that fails = the approver's own Outlook (never the firm mailbox). Hand-offs don't change whose mailbox: whoever presses Yes.
+- "Send from Outlook now" (`mySendAccess` / `sendFromMyOutlook`) now looks at the same row the draft went to (the caller's own Outlook), not their first mailbox.
+- Tests: `tests/queue/approver-drafts.test.ts`, plus `draft-own-outlook`, `draft-handoff-flow`, `deck-actions`, `deck-card`, `lead-step/actions`. NOT verified:
+  a real Graph draft, the deployed lawmatics-mcp response, a real browser.
+
 ## Automatic consult prep (S1, no schema; contract `docs/pge/2026-11-24-auto-consult-prep/`)
 A lead entering the firm's consult stage, a consult from the Lawmatics sync, or a person's Re-run starts a prep for ONE consult: a FACTS-ONLY brief (no model writes it), queued as an internal BRIEFING,
 marked on the lead's timeline, and emailed to the firm's own people. Nothing is sent to a client; the client-prep EMAIL is still only a draft in Approvals. The classes, risk read, package suggestion, USPTO

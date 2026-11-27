@@ -313,17 +313,18 @@ export async function resolveQueueItem(args: {
   note?: string;
   finalBody?: string;
   /**
-   * Sprint 4: approve WITHOUT any mailbox draft on the queue side (the approved email goes to the firm's drafter, who
-   * drafts it in their own Outlook). Sent as `mailbox_draft: false`. lawmatics-mcp honours it only from its commit
-   * e738c24 (branch claude/gracious-darwin-rceoyv), not yet merged or deployed: `false` resolves as before but skips the Graph draft
-   * (`send` stays "manual"). Until then, or if the queue drafts anyway, it says so in `send` ("drafted" / "sent") and the caller
-   * passes nothing on (no second draft).
+   * Approve WITHOUT any mailbox draft on the queue side, sent as `mailbox_draft: false`. Every client-email approve sets it
+   * (Approver drafts, Nov 27): the approver's own Outlook, or the firm's drafter, gets the draft instead. lawmatics-mcp honours
+   * it from its main 3a02854 (deployed Nov 27): `false` resolves as before but skips the Graph draft (`send` stays "manual").
+   * If the queue drafts anyway, it says so in `send` ("drafted" / "sent") and the caller makes no second draft.
    */
   skipMailboxDraft?: boolean;
 }): Promise<{
   status: "approved" | "rejected";
   send: QueueSendStatus;
   sendResult?: QueueSendResult;
+  /** What lawmatics-mcp actually returns when IT made the draft (send "drafted"): the firm mailbox's draft and its link. */
+  draft?: { mailbox?: string; draftId?: string; webLink?: string | null };
 }> {
   return call(`/api/queue/${encodeURIComponent(args.id)}/resolve`, {
     method: "POST",

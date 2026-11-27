@@ -42,6 +42,10 @@ import {
   PASS_NOT_SWITCHED_ON,
   QUEUE_DRAFTED_ANYWAY,
   passedToDrafter,
+  APPROVED_CLIENT_EMAIL_NO_DRAFT,
+  APPROVED_DRAFT_CHECK_OUTLOOK,
+  APPROVED_DRAFT_FAILED_OUTLOOK,
+  APPROVED_QUEUE_DRAFTED_FIRM,
 } from "@/lib/ui/words";
 import { memberName } from "@/lib/queue/routing";
 
@@ -61,8 +65,10 @@ export type DeckResult =
       message: string;
       /** After an approve: where the draft is. */
       draft?: { provider: "google" | "microsoft" | null; webLink: string | null; draftId: string | null; canSend: boolean; sendNote: string | null } | null;
+      /** The approved text, when the draft in the approver's Outlook failed or may have failed (shown to copy). */
+      text?: string;
     }
-  | { ok: false; error: string };
+  | { ok: false; error: string; connect?: string | null };
 
 async function gate(): Promise<void> {
   if (!(await orgHasModule("role-views"))) notFound();
@@ -80,7 +86,7 @@ function sendNoteFor(access: Awaited<ReturnType<typeof mySendAccess>>): string |
 }
 
 async function approveResult(outcome: ReviewOutcome, message?: string): Promise<DeckResult> {
-  if (outcome.kind === "error") return { ok: false, error: outcome.error };
+  if (outcome.kind === "error") return { ok: false, error: outcome.error, ...(outcome.connect ? { connect: outcome.connect } : {}) };
   if (outcome.kind !== "resolved") return { ok: false, error: DECK_FAILED };
   revalidate();
   // Sprint 4: passed to the drafter (no mailbox draft anywhere), or the pass failed.
@@ -88,9 +94,16 @@ async function approveResult(outcome: ReviewOutcome, message?: string): Promise<
   if (outcome.handoff?.status === "failed") return { ok: true, message: PASS_FAILED, draft: null };
   if (outcome.handoff?.status === "not-switched-on" && !message) message = PASS_NOT_SWITCHED_ON;
   if (outcome.handoff?.status === "queue-drafted" && !message) message = QUEUE_DRAFTED_ANYWAY;
-  const drafted = outcome.send === "drafted" || outcome.send === "mailbox-microsoft" || outcome.send === "mailbox-google";
-  if (!drafted) return { ok: true, message: message ?? approvedText(outcome.send), draft: null };
-  const provider = outcome.provider ?? (outcome.send === "drafted" ? "microsoft" : null);
+  // Approver drafts: the one Graph draft in the approver's Outlook failed (or may have). Never retried; the text is shown.
+  if (outcome.send === "mailbox-failed" || outcome.send === "mailbox-uncertain") {
+    const sentence = outcome.send === "mailbox-uncertain" ? APPROVED_DRAFT_CHECK_OUTLOOK : APPROVED_DRAFT_FAILED_OUTLOOK;
+    return { ok: true, message: sentence, draft: null, ...(outcome.approvedText ? { text: outcome.approvedText } : {}) };
+  }
+  // The queue drafted it in the firm's mailbox although asked not to: no second draft, and never "in your Outlook".
+  if (outcome.send === "drafted" || outcome.send === "sent") return { ok: true, message: message ?? (outcome.itemType === "CLIENT_EMAIL" ? APPROVED_QUEUE_DRAFTED_FIRM : approvedText(outcome.send)), draft: null };
+  const drafted = outcome.send === "mailbox-microsoft" || outcome.send === "mailbox-google";
+  if (!drafted) return { ok: true, message: message ?? approvedText(outcome.send, outcome.itemType), draft: null };
+  const provider = outcome.provider ?? null;
   // Send from here only for a draft this call put in the approver's OWN Outlook (we hold its id).
   const ownOutlook = outcome.provider === "microsoft" && !!outcome.draftId;
   const access = ownOutlook ? await mySendAccess() : "switched-off";
@@ -107,7 +120,9 @@ async function drafterName(userId: string): Promise<string> {
   return m ? memberName(m) : "the drafter";
 }
 
-function approvedText(send: string | null): string {
+function approvedText(send: string | null, itemType?: string): string {
+  // A client email is always emailed (as a draft); an approve that made none never says "this type isn't emailed".
+  if (send === "manual" && itemType === "CLIENT_EMAIL") return APPROVED_CLIENT_EMAIL_NO_DRAFT;
   if (send === "manual") return "Approved. This type isn't emailed: file or deliver it the usual way.";
   if (send === "failed" || send === "mailbox-failed") return "Approved, but the draft couldn't be made, so nothing reached a mailbox. Open the approval to copy it.";
   if (send === "sent") return "Approved.";

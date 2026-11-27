@@ -163,9 +163,21 @@ describe("the after-Yes sentence comes from the approve core's own result", () =
     expect(afterYesSentence(resolved({ send: "drafted", provider: null, webLink: null }) as never, "CLIENT_EMAIL")).toBe(W.LEAD_STEP_DRAFT_IN_QUEUE_MAILBOX);
     expect(afterYesSentence(resolved({ send: "none", provider: null }) as never, "CLIENT_EMAIL")).toBe(W.LEAD_STEP_APPROVED_NO_DRAFT);
     expect(afterYesSentence(resolved({ send: null, provider: null }) as never, "CLIENT_EMAIL")).toBe(W.LEAD_STEP_APPROVED_NO_DRAFT);
-    expect(afterYesSentence(resolved({ send: "mailbox-failed", provider: null }) as never, "CLIENT_EMAIL")).toBe(W.LEAD_STEP_APPROVED_DRAFT_FAILED);
-    expect(afterYesSentence(resolved({ send: "manual", provider: null }) as never, "CLIENT_EMAIL")).toBe(W.LEAD_STEP_APPROVED_MANUAL);
+    expect(afterYesSentence(resolved({ send: "failed", provider: null }) as never, "CLIENT_EMAIL")).toBe(W.LEAD_STEP_APPROVED_DRAFT_FAILED);
+    // Approver drafts: the approver's own Outlook draft failed, or may have been made; a client email is never "not emailed".
+    expect(afterYesSentence(resolved({ send: "mailbox-failed", provider: null }) as never, "CLIENT_EMAIL")).toBe("Approved, but the draft couldn't be made in your Outlook. Nothing was sent.");
+    expect(afterYesSentence(resolved({ send: "mailbox-uncertain", provider: null }) as never, "CLIENT_EMAIL")).toBe("Approved. Check your Outlook Drafts before trying again. Nothing was sent.");
+    expect(afterYesSentence(resolved({ send: "manual", provider: null }) as never, "CLIENT_EMAIL")).toBe(W.APPROVED_CLIENT_EMAIL_NO_DRAFT);
+    expect(afterYesSentence(resolved({ send: "manual", provider: null }) as never, "ENGAGEMENT_LETTER")).toBe(W.LEAD_STEP_APPROVED_MANUAL);
+    expect(W.APPROVED_CLIENT_EMAIL_NO_DRAFT).not.toMatch(/isn't emailed/);
     for (const s of [W.LEAD_STEP_DRAFT_IN_QUEUE_MAILBOX, W.LEAD_STEP_APPROVED_NO_DRAFT, W.LEAD_STEP_APPROVED_DRAFT_FAILED, W.LEAD_STEP_APPROVED_MANUAL]) expect(s).not.toMatch(/Outlook/);
+  });
+
+  it("approver drafts: the lead page's Yes passes an Outlook refusal on with its connect link, and a failed draft warns", async () => {
+    const refused = deps({ review: vi.fn(async () => ({ kind: "error" as const, error: W.APPROVER_NO_OUTLOOK, connect: "/dashboard/settings/integrations/" })) });
+    expect(await runLeadStepYes(refused, LEAD, ITEM, SHA)).toEqual({ ok: false, error: W.APPROVER_NO_OUTLOOK, connect: "/dashboard/settings/integrations/" });
+    const failed = deps({ review: vi.fn(async () => resolved({ send: "mailbox-failed", provider: null, webLink: null, draftId: null })) });
+    expect(await runLeadStepYes(failed, LEAD, ITEM, SHA)).toEqual({ ok: true, message: W.APPROVED_DRAFT_FAILED_OUTLOOK, webLink: null, warn: true });
   });
 
   it("Sprint 4 S4: passed to the drafter reads passedToDrafter(name) with no warning; a failed pass reads PASS_FAILED as a warning", async () => {
