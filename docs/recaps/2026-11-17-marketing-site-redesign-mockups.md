@@ -402,6 +402,22 @@ image at all, and `/sign-in/` shares the old description "The IP decision engine
 **Not verified here:** Safari, Firefox, a real iPhone or Android phone, a screen reader, the link-sent and firm-branded
 sign-in states against a real database (drawn from the components), the deck in the Slides viewer after the last fixes.
 
+## Round nine goes live (Nov 27, evening)
+
+Taylor: "yes apply the migration and push it all live".
+- **lectual migration 0120 (`beta_application`) is on lectual-prod** (one `apply_migration`, no hang). Checked after: RLS on, no
+  policies, nothing granted to anon or authenticated, recorded in `schema_migrations`.
+- **lectual `main` is at `73aa13d`**: the phone pass on `/firms/`, the application form and its endpoint, the new
+  `lectual.app/sign-in/`, and the share card. **lectual.app (workspace) `main` is at `24d1a60`**: the new
+  `app.lectual.app/sign-in/` and `/auth/confirm/`, merged with that repo's newest main first (822 tests in the sign-in,
+  wording and view suites pass, lint has no errors). Both production builds finished.
+- **Checked on the live sites** (Chromium, desktop 1440 and an emulated iPhone 14): `/firms/` and both sign-in screens
+  load with no errors and no sideways scroll; "Log in" goes to `app.lectual.app`; an empty application shows the six
+  field messages and sends nothing; one test application ("Live Check LLP (test, please ignore)",
+  beta-live-check@example.com) was saved in production and its notice was delivered to info@lectual.app. That test row
+  is still in the production table.
+- **Still not checked:** a real phone, Safari, Firefox, a screen reader, a real sign-in email through the new screens.
+
 ## Recommendation on Astro (settled at go-live: the page stayed in the Next.js app)
 
 Stay on Next.js for this redesign. The loader, pin scrolling and micro-animations are the same
