@@ -31,7 +31,7 @@ type Props = {
   variant?: "owner";
   /** The deck behaviours (the deal-ready dot). Default: the owner variant. */
   deck?: boolean;
-  /** The owner-style look only (the team view): same colours and widths, none of the owner's behaviours. */
+  /** The owner-style look only (the team view): same colours and widths; the deal-ready dot only with `deck`. */
   look?: "owner" | "team";
   /** Owner view, collapsed rail: draw the More menu open to start with (default closed). Used by the design harness. */
   initialFlyout?: boolean;
@@ -66,7 +66,7 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
   const slot = useRef<HTMLDivElement>(null);
   const owner = variant === "owner";
   const deckOn = deck ?? owner;
-  // The look is what is drawn; `owner` alone is what behaves (only the owner view has the deal-ready dot).
+  // The look is what is drawn; `deck` (default: the owner variant) is what behaves (the deal-ready dot, owner and team views).
   const light = owner || look !== undefined;
   // A view's own tree (owner or team) has a More row that opens a menu on a collapsed rail instead of navigating to its first kid.
   const moreMenu = tree !== undefined;

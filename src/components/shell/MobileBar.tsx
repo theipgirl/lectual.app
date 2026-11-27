@@ -29,7 +29,7 @@ type Props = {
   variant?: "owner";
   /** The deck behaviours (the deal-ready dot). Default: the owner variant. */
   deck?: boolean;
-  /** The owner-style look only (the team view): the same pill bar, none of the owner's behaviours. */
+  /** The owner-style look only (the team view): the same pill bar; the deal-ready dot only with `deck`, never the open sheet taking the tile. */
   look?: "owner" | "team";
   /** Draw the More sheet open to start with (default closed). Used by the design harness. */
   initialOpen?: boolean;

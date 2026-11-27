@@ -4,7 +4,7 @@ import { qitem, U } from "./routing-fixtures";
 
 /** The deck page: gated, three-state, and "All decided" only for a reached, empty queue. */
 
-const state = vi.hoisted(() => ({ role: "attorney", now: null as string | null, modules: ["role-views"], loads: {} as Record<string, unknown>, cardState: { status: "ok", events: [] } as unknown }));
+const state = vi.hoisted(() => ({ previewing: false, role: "attorney", now: null as string | null, modules: ["role-views"], loads: {} as Record<string, unknown>, cardState: { status: "ok", events: [] } as unknown }));
 vi.mock("next/navigation", () => ({
   notFound: vi.fn(() => {
     throw new Error("NEXT_NOT_FOUND");
@@ -14,6 +14,7 @@ vi.mock("@/lib/org/modules", () => ({ orgHasModule: vi.fn(async (m: string) => s
 vi.mock("@/lib/firm/session", () => ({
   resolveFirmSession: vi.fn(async () => ({ kind: "ok", user: { id: U.rebecca, email: "rebecca@example.com" }, role: state.role, org: { id: "org-1" } })),
 }));
+vi.mock("@/lib/views/view-as", async (orig) => ({ ...(await orig<object>()), inPreview: vi.fn(async () => state.previewing) }));
 vi.mock("@/lib/queue/load", () => ({ loadActiveQueue: vi.fn(async (s: string) => state.loads[s]) }));
 vi.mock("@/lib/queue/routing-load", () => ({ loadApprovalRouting: vi.fn(async () => ({ status: "ok", routing: {}, members: (await import("./routing-fixtures")).MEMBERS, dropped: 0, settingsExist: true })) }));
 vi.mock("@/lib/queue/card-state", () => ({ loadCardState: vi.fn(async () => state.cardState) }));
@@ -31,6 +32,7 @@ const render = async (search: Record<string, string> = {}) => renderToStaticMark
 const empty = { status: "ok", items: [] };
 
 beforeEach(() => {
+  state.previewing = false;
   state.role = "attorney";
   state.modules = ["role-views"];
   state.loads = { pending: empty, approved: empty, rejected: empty };
@@ -52,6 +54,13 @@ describe("the Change deal times opener", () => {
     for (const role of ["viewer", "social_media"]) {
       state.role = role;
       expect(await render({ view })).not.toContain("Change deal times");
+    }
+  });
+  it("is not drawn under View as of a team role (the layout mounts ReadOnlyPreview, not the dialog)", async () => {
+    state.previewing = true;
+    for (const role of ["attorney", "paralegal", "owner"]) {
+      state.role = role;
+      expect(await render()).not.toContain("Change deal times");
     }
   });
   it("is drawn when the queue can't be read, in a deck view; not in the technician view", async () => {

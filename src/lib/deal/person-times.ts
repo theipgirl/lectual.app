@@ -64,7 +64,7 @@ export function dealTimeOptions(): DealTimeOption[] {
 }
 
 type Dispatcher = { dispatchEvent: (event: Event) => boolean };
-/** Asks the one deal-times dialog in the owner layout to open. `opener` is where focus returns. */
+/** Asks the one deal-times dialog in a deck shell's layout (owner or team) to open. `opener` is where focus returns. */
 export function requestDealTimesDialog(target: Dispatcher, opener: { focus?: () => void; isConnected?: boolean } | null): void {
   target.dispatchEvent(new CustomEvent(SHOW_DEAL_TIMES_EVENT, { detail: { opener } }));
 }

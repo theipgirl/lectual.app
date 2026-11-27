@@ -2188,7 +2188,7 @@ Draw-only, like the owner view: every page and action keeps its own role and fea
   - **Proposals out** (kept, conditional): only when the firm has the Proposals feature AND the role is in `PROPOSAL_STAFF_WRITE_ROLES` (`teamSeesProposals`; no read otherwise). Every team role is in that list today, so it is the feature gate that decides; a role outside it never reads.
   - **This week strip** (kept): it is not owner-specific (consults + deadlines, plus proposal last days only when Proposals out is shown).
   - **Ask Copilot** (kept, only with AI on): the same GET form; the page never sends the question.
-  - **Dropped, owner-only:** the cards hero and deal times (the deck is the owner's), KPI tiles and counts across the firm (waiting on you / overdue / our turn / new leads), "This month" and "Hours saved", assistant run status and the Autopilot control ("couldn't finish its last run"), the docket bands, the
+  - **Dropped, owner-only:** the cards hero, KPI tiles and counts across the firm (waiting on you / overdue / our turn / new leads), "This month" and "Hours saved", assistant run status and the Autopilot control ("couldn't finish its last run"), the docket bands, the
     get-set-up and Getting started cards (admin setup), "Needs you" firm-wide rows (hot leads, quotes, payments, connections), unconfirmed-dates review (`OwnerNeedsReview`) and returning clients (`OwnerCameBack`; firm-wide, can be added later).
   Tests: `tests/today/team-today.test.tsx`.
 - **Approvals opens the deck (Nov 27, the firm owner's decision; no schema).** Team Approvals (rail and phone bar) goes to `DECK_PATH` through the same `deckItem` helper the owner uses (`also` keeps the list path lighting it), and team Today's

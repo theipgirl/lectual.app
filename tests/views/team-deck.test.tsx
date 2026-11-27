@@ -12,7 +12,7 @@ import { MobileBar } from "@/components/shell/MobileBar";
 import { AccountMenu } from "@/components/shell/AccountMenu";
 import { DECK_PATH, drawnNav, railTreeFor, shellFor } from "@/lib/views";
 import { guideFor } from "@/lib/onboarding/welcome-deal";
-import { buildDeck, type CardState } from "@/lib/queue/deck";
+import { buildDeck, trustedEvents, type CardState } from "@/lib/queue/deck";
 import { DEFAULT_DEAL_TIMES } from "@/lib/deal/times";
 import { parseDealTimes, withDealTimes } from "@/lib/deal/person-times";
 import { followup, qitem, U } from "../queue/routing-fixtures";
@@ -62,6 +62,29 @@ describe("the deck for staff roles", () => {
     expect(d.cards).toHaveLength(1);
     expect(d.cards[0]).toMatchObject({ canYes: false });
     expect(d.cards[0].handedToMe).not.toBeNull();
+  });
+});
+
+describe("a forged hand-off to a team viewer is dropped by the fold", () => {
+  const CLERK = "00000000-0000-4000-8000-0000000000c1";
+  const roles = new Map<string, "attorney" | "paralegal" | "clerk">([
+    [U.rebecca, "attorney"],
+    [U.caitlyn, "paralegal"],
+    [CLERK, "clerk"],
+  ]);
+  const trust = { status: "known" as const, roles, routing: {} };
+  const handoff = (actorId: string) => ({ queueItemId: "pc", kind: "handoff" as const, actorId, targetUserId: U.caitlyn, until: null, note: null, createdAt: "2026-11-10T13:00:00Z" });
+  const deck = (actorId: string) =>
+    buildDeck({ items: [qitem({ id: "pc" })], routing: {}, viewer: { userId: U.caitlyn, role: "paralegal" }, cardState: { status: "ok", events: [handoff(actorId)] }, trust, now: new Date("2026-11-10T15:00:00Z"), dealtAt: null });
+
+  it("a clerk who may not approve the attorney-only item and isn't its holder can't put it on Caitlyn's deck", () => {
+    expect(trustedEvents([handoff(CLERK)], [qitem({ id: "pc" })], trust)).toEqual([]);
+    expect(deck(CLERK).cards).toHaveLength(0);
+  });
+
+  it("the same hand-off from an approver is kept", () => {
+    expect(trustedEvents([handoff(U.rebecca)], [qitem({ id: "pc" })], trust)).toHaveLength(1);
+    expect(deck(U.rebecca).cards.map((c) => c.item.id)).toEqual(["pc"]);
   });
 });
 
