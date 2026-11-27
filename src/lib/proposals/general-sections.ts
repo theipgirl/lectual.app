@@ -1,6 +1,6 @@
 /**
  * Flat-fee work shown as NUMBERED SECTIONS (the attorney's layout for contract work): "1. One-Off Client Service Agreement
- * (5 Hours | $2,475)", an optional intro paragraph, then the item's bullet points; and, with two or more items, a "Legal Fee
+ * (5 Hours | $2,475)", an optional intro paragraph, then the item's bullet points; and, with one or more items, a "Legal Fee
  * Summary" table. PURE: no React, no database. It formats figures `quoteProposal` already made (each item's `value_cents`,
  * the quote's `value_cents` total); it prices nothing, and `pricing.ts` is untouched.
  *
@@ -62,7 +62,7 @@ export function sectionFigures(item: { hours?: number; value_cents: number }, mo
 export type FeeSummaryRow = { label: string; hours: string; fees: string };
 
 /**
- * The "Legal Fee Summary" rows and the bold Total row, from the quote's own items. Null with fewer than two items. The total
+ * The "Legal Fee Summary" rows and the bold Total row, from the quote's own items. Null with no items; one item still gets its row and the Total (Taylor, Nov 25: Christina's one-matter proposal). The total
  * hours are added only when every item has hours (else "—"); the total fee is the quote's `value_cents` (the sum the engine
  * made), never added up here.
  */
@@ -71,7 +71,7 @@ export function feeSummary(
   money: (cents: number) => string,
 ): { rows: FeeSummaryRow[]; total: FeeSummaryRow } | null {
   const items = quote.general?.items ?? [];
-  if (items.length < 2) return null;
+  if (items.length < 1) return null;
   const rows = items.map((it) => ({
     label: it.label,
     hours: typeof it.hours === "number" ? String(it.hours) : NO_FIGURE,

@@ -3,6 +3,27 @@
 One list across sessions. Each session adds its action items here and checks them against Omi.
 Newest section first. Tick an item when it is done; don't delete it.
 
+## 2026-11-25: due today (deposit), contract line items, four package options (lectual.app#35, #36, #37 merged and live)
+
+### Built
+- [x] #35: "Due today" for a deposit (e.g. 50% now, 50% upon deliverables) on trademark and flat-fee proposals; work items as numbered sections
+      with an intro and bullets; up to four package options per brand name.
+- [x] #36: bullets show their dots on the client page and in the editor.
+- [x] #37: each bullet is a line-item row with its hours on the right; the Legal Fee Summary sits in "Review and accept".
+
+### Taylor
+- [ ] Annick contract draft v2 (https://app.lectual.app/dashboard/proposals/c2eeb0ce-d282-4f7d-8d5e-b3cf5739b574/): check the preview,
+      set the pay link, Save and create link. Total $3,465, due today $1,732.50.
+- [ ] Annick trademark draft v2 (https://app.lectual.app/dashboard/proposals/daaa4fe6-f4f7-474d-8646-480879f0d171/): Black Friday, Essential,
+      Enhanced or Concierge per mark, 50% due today. Check, Save and create link.
+- [ ] Send Annick the contract email with the deposit sentence (your send, from Outlook).
+- [ ] Tell Claude the two Black Friday pay links, or choose: two proposals now, or build a pay link per package. (Tabled: pay link per package
+      is on the build list below.)
+- [x] GC agent (lectual.app#38): a non-trademark consult now drafts a flat-fee proposal + email for approval. Fees only from Rebecca's own
+      words on the call; otherwise a "Set the flat fee" check blocks the link.
+- [ ] Add credits to the Anthropic account behind ANTHROPIC_API_KEY (lectual-app on Vercel), then re-run "Draft the proposal" on that consult.
+- [ ] Kika Wise (Black Box Franchising): follow-up reply-all draft is in info@ Drafts. Review and send.
+
 ## 2026-11-24: Annick Charles proposal (Black Friday), next proposal-maker build list
 
 ### Done for Annick (lectual-prod, draft c4f59d2f)
