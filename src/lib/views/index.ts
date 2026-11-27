@@ -214,8 +214,13 @@ export type ShellSpec = {
   showMore?: boolean;
   /** Settings is a link in the account menu (the owner rail has no Settings row). */
   settingsInMenu: boolean;
-  /** The owner's colours and compact top bar. */
+  /** The owner's BEHAVIOURS as well as its look: deal dot, deal times, the welcome deal. Only the owner view sets it. */
   variant: "owner" | undefined;
+  /**
+   * The light owner-style LOOK (colours, widths, compact top bar, no section label) and nothing else. The owner and team
+   * views set it; a behaviour must never read it (read `variant`). `team` also marks the team view's own CSS exceptions.
+   */
+  look: "owner" | "team" | undefined;
 };
 
 export function shellFor(view: ViewId): ShellSpec {
@@ -229,6 +234,7 @@ export function shellFor(view: ViewId): ShellSpec {
       showReports: false,
       settingsInMenu: true,
       variant: "owner",
+      look: "owner",
     };
   }
   if (view === "team") {
@@ -242,9 +248,10 @@ export function shellFor(view: ViewId): ShellSpec {
       showMore: false,
       settingsInMenu: true,
       variant: undefined,
+      look: "team",
     };
   }
-  return { view: "technician", tree: undefined, bar: undefined, moreGroups: undefined, showSettings: true, showReports: true, settingsInMenu: false, variant: undefined };
+  return { view: "technician", tree: undefined, bar: undefined, moreGroups: undefined, showSettings: true, showReports: true, settingsInMenu: false, variant: undefined, look: undefined };
 }
 
 /** What the account menu's View group draws. Absent unless the person may switch (Lectual staff in a firm with role views). */

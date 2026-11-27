@@ -63,9 +63,11 @@ describe("the team view", () => {
     expect(renderToStaticMarkup(createElement(MobileBar, { items: visibleNav(ALL, "paralegal"), queueStatus: "ok", pendingCount: 0, counts: {} }))).toContain("More");
   });
 
-  it("settings is in the account menu, not the rail; no tour or hub variant (technician look)", () => {
-    expect(shellFor("team")).toMatchObject({ showSettings: false, showReports: false, showMore: false, settingsInMenu: true, variant: undefined });
+  it("settings is in the account menu, not the rail; the owner-style look but no owner variant (the tour, not the welcome deal)", () => {
+    expect(shellFor("team")).toMatchObject({ showSettings: false, showReports: false, showMore: false, settingsInMenu: true, variant: undefined, look: "team" });
     expect(shellFor("technician").showMore).toBeUndefined();
+    expect(shellFor("technician").look).toBeUndefined();
+    expect(shellFor("owner")).toMatchObject({ variant: "owner", look: "owner" });
     expect(shellFor("owner").showMore).toBeUndefined();
   });
 

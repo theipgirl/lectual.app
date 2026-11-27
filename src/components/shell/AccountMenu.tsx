@@ -34,6 +34,8 @@ type Props = {
   settingsInMenu?: boolean;
   /** "owner" draws the owner view's menu (the AccountMenu board); absent is today's menu, unchanged. */
   variant?: "owner";
+  /** The owner-style look only (the team view): the same menu layout, without the owner's own items (deal times) or the welcome deal. */
+  look?: "owner" | "team";
   /** A real owner on a database with View as: one "View as a teammate" line, linking to Team. */
   viewAsLink?: boolean;
   /** While previewing a teammate: the menu holds only "Viewing as <name>", Exit and Sign out (spec "Account menu"). */
@@ -52,6 +54,7 @@ export function AccountMenu({
   viewMenu,
   settingsInMenu = false,
   variant,
+  look,
   viewAsLink = false,
   previewing,
 }: Props) {
@@ -119,7 +122,7 @@ export function AccountMenu({
             </form>
           </div>
         </div>
-      ) : variant === "owner" ? (
+      ) : variant === "owner" || look !== undefined ? (
         <div className="lx-am">
           <div className="lx-am-head">
             <p className="lx-am-name">{name}</p>
@@ -174,17 +177,19 @@ export function AccountMenu({
               Your name
             </button>
 
-            <button
-              type="button"
-              role="menuitem"
-              className="lx-am-item"
-              onClick={() => {
-                closeMenu();
-                requestDealTimesDialog(window, avatar());
-              }}
-            >
-              {DEAL_TIMES_MENU_ITEM}
-            </button>
+            {variant === "owner" && (
+              <button
+                type="button"
+                role="menuitem"
+                className="lx-am-item"
+                onClick={() => {
+                  closeMenu();
+                  requestDealTimesDialog(window, avatar());
+                }}
+              >
+                {DEAL_TIMES_MENU_ITEM}
+              </button>
+            )}
 
             {viewMenu && <ViewSwitch menu={viewMenu} onDone={closeMenu} />}
 

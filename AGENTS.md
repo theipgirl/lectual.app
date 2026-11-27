@@ -2162,11 +2162,35 @@ Draw-only, like the owner view: every page and action keeps its own role and fea
   account menu (`settingsInMenu`), which is how a team member reaches Connect Outlook. **Hide only:** no page, action or read changed, so Mail, Meetings, Intake, Calendar and the rest still open by URL or from
   an in-page link for anyone their own gate allows. Approvals opens the person's own list (Mine is the default for a staff role), not the deck; its rail count is `mineQueue`.
 - **Phone bar:** Today, Review, Matters, Approvals, and NO More button or sheet (`MobileBar` takes `more`, default true; the team view passes `shell.showMore` = false; owner and technician draw More as before).
-  **Look:** the technician look (no `variant`), so the tour (not the welcome deal) is the first-sign-in guide.
+  **Look:** the owner's pill bar (see "Team look" below); the tour, not the welcome deal, is the first-sign-in guide.
 - **Tour and Getting started:** the tour's rail steps come from the drawn slugs, so they never mention a hidden row. Hub flows are chosen from `visibleNav` (not the drawn list); the one flow aimed at a row the team rail no
   longer draws is Leads' (`nav-intake`). It is kept on purpose: the runner finds no element and `placePopover` with no rect centers the card (same as under 768px, where the rail is hidden), and the flow's
   later steps open `/dashboard/intake/` themselves. `tests/views/team-view-guides.test.tsx` checks, per team role, that every tour target is drawn and every hub `nav-*` target is drawn or in the known-hidden list and centers.
-- **Today is the technician Today** (`OwnerToday` is chosen only for `owner`).
+- **Team look (Nov 27).** The team view is drawn in the owner view's light look: the same rail component, tokens, widths, 64px top bar, no section label, phone pill bar and account-menu layout. It is a STYLING flag only:
+  `ShellSpec.look` (`"owner"` | `"team"` | undefined) is separate from `ShellSpec.variant` (`"owner"` only for the owner view), and **a behaviour must read `variant`, never `look`**. `Rail`, `MobileBar` and `AccountMenu`
+  take both props; the layout passes both. Team adds `lx-rail--team` / `lx-mbar--team` / `lx-top--team` marker classes beside the owner classes. **Audit of every owner flag (Nov 27):**
+  - Styling, now also for team (`look`): `Rail` class `lx-rail--owner` and the kid icons; `MobileBar` class `lx-mbar--owner`; layout header class `lx-top--owner` and hiding `SectionLabel`; `AccountMenu`'s owner layout branch.
+  - Behaviour, still the owner's alone (`variant === "owner"`): the deal-ready nudge read (`loadDealNudge`) and `dealReady` on the rail dot and phone bar; `MobileBar`'s open sheet taking the active tile; the rail kicker "Owner view";
+    `AccountMenu`'s "Deal times" item and its "Show tips again" replaying the welcome deal; `DealTimesDialog`; `guideFor` / `shouldShowWelcomeDeal` (team keeps the tour); `deck-view.tsx`'s `canChangeDealTimes` (`shellFor(...).variant`).
+  - By view id, not a flag: `src/app/dashboard/page.tsx` (`view === "owner"` -> `OwnerToday`, `view === "team"` -> `TeamToday`); `review/page.tsx`'s `owner` (the Weekly review board look is `viewFor(...) === "owner"`: team keeps the page as it was);
+    `railTreeFor`, `drawnNav` (Approvals opens the deck only for owner).
+  - CSS: `queue/review.css` phone approval-item layout was `:has(.lx-top--owner)`; it is now `:has(.lx-top--owner:not(.lx-top--team))`, so a team member's approval page is unchanged. The `.lx-rail--owner` deal-dot rules only match when a dot is drawn, which team never has.
+  - Not owner flags: `role === "owner"` checks, `isOwner`, Intake `group === "owner"` (assignee grouping) and `boothVariant` are unrelated.
+  Tests: `tests/views/team-look.test.tsx`.
+- **Today is its own, simple page for team: `TeamToday`** (`src/components/today/TeamToday.tsx`, rules `src/lib/today/team-rules.ts`, words `TEAM_*` in `words.ts`; `OwnerToday` stays the owner's, the technician Today stays for every other shell). Chosen in `page.tsx` before any
+  technician read. It reuses the owner Today's pieces and only reads that already exist, through the scoped client; each section is its own `allSettled` read and a failed one says "Couldn't load ...", never 0 or empty.
+  Sections and why:
+  - **Greeting + "Add your name"** (kept: same as the owner's; the date line is kept, as on the owner's).
+  - **Your approvals** (kept): `loadActiveQueue` then `mineQueue` for the person's OWN count, three states (count / none / not connected / couldn't load); links to the Approvals LIST (`/dashboard/queue/`), never the deck. Why: it is the team's fourth rail row.
+  - **Your next steps** (new, kept): `listTasks({ status: "open", assigneeId })`, filtered again to the person's own open tasks, soonest first, undated last ("No date set"), 5 shown then "See all" to Weekly review Mine. Why: the person's own work; same read the technician Today makes.
+  - **Today's consults** (kept): `loadTodayConsults` with the viewer's deps, the owner card (`OwnerConsults`) with its named source states. Why: staff prepare for consults.
+  - **Deadlines, next 14 days + the personal Deadlines card** (kept): `loadOwnerDeadlines`, `loadDeadlineAlerts` (the person's own alert settings). Why: the docket is every role's work and the technician Today shows both.
+  - **Proposals out** (kept, conditional): only when the firm has the Proposals feature AND the role is in `PROPOSAL_STAFF_WRITE_ROLES` (`teamSeesProposals`; no read otherwise). Every team role is in that list today, so it is the feature gate that decides; a role outside it never reads.
+  - **This week strip** (kept): it is not owner-specific (consults + deadlines, plus proposal last days only when Proposals out is shown).
+  - **Ask Copilot** (kept, only with AI on): the same GET form; the page never sends the question.
+  - **Dropped, owner-only:** the cards hero and deal times (the deck is the owner's), KPI tiles and counts across the firm (waiting on you / overdue / our turn / new leads), "This month" and "Hours saved", assistant run status and the Autopilot control ("couldn't finish its last run"), the docket bands, the
+    get-set-up and Getting started cards (admin setup), "Needs you" firm-wide rows (hot leads, quotes, payments, connections), unconfirmed-dates review (`OwnerNeedsReview`) and returning clients (`OwnerCameBack`; firm-wide, can be added later).
+  Tests: `tests/today/team-today.test.tsx`.
 - **Lectual staff preview:** `previewableRoles()` lists every role whose view is live, so "Preview a view" offers the team roles too. Firm members still have no switch.
 - Tests: `tests/views/team-view.test.ts` (the rail and phone bar are exactly the four rows, no More or Reports, owner and technician unchanged).
 

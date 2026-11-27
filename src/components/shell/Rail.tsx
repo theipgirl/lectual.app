@@ -27,8 +27,10 @@ type Props = {
   showReports?: boolean;
   /** The rail's shape (default: RAIL_TREE). A view's own tree; it only ever names slugs that `items` allowed. */
   tree?: readonly (readonly RailNode[])[];
-  /** The owner view's colours. */
+  /** The owner view: its colours AND its behaviours (the deal-ready dot). */
   variant?: "owner";
+  /** The owner-style look only (the team view): same colours and widths, none of the owner's behaviours. */
+  look?: "owner" | "team";
   /** Owner view, collapsed rail: draw the More menu open to start with (default closed). Used by the design harness. */
   initialFlyout?: boolean;
 };
@@ -55,12 +57,14 @@ function Icon({ d, size }: { d: string; size: number }) {
  * it, "!" when we could not (an outage never reads as "nothing waiting"),
  * nothing when there is no queue.
  */
-export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, dealReady = null, showSettings = true, showReports: reportsAllowed = true, tree, variant, initialFlyout = false }: Props) {
+export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, dealReady = null, showSettings = true, showReports: reportsAllowed = true, tree, variant, look, initialFlyout = false }: Props) {
   const pathname = usePathname() ?? "/dashboard/";
   const [pinned, setPinned] = useState(initialPinned);
   const [flyout, setFlyout] = useState(initialFlyout);
   const slot = useRef<HTMLDivElement>(null);
   const owner = variant === "owner";
+  // The look is what is drawn; `owner` alone is what behaves (only the owner view has the deal-ready dot).
+  const light = owner || look !== undefined;
   // A view's own tree (owner or team) has a More row that opens a menu on a collapsed rail instead of navigating to its first kid.
   const moreMenu = tree !== undefined;
 
@@ -103,7 +107,7 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
   return (
     <div ref={slot} className={`lx-rail-slot${pinned ? " is-pinned" : ""}`}>
       <nav
-        className={`lx-rail${pinned ? " is-pinned" : ""}${variant === "owner" ? " lx-rail--owner" : ""}`}
+        className={`lx-rail${pinned ? " is-pinned" : ""}${light ? " lx-rail--owner" : ""}${look === "team" ? " lx-rail--team" : ""}`}
         aria-label="Sections"
         data-tour="rail"
         onKeyDown={(e) => closeRailOnEscape(e.key, e.currentTarget, document.activeElement as HTMLElement | null)}
@@ -183,7 +187,7 @@ export function Rail({ items, queueStatus, pendingCount, counts, initialPinned, 
                               aria-current={kid.active ? "page" : undefined}
                               title={kc ? RAIL_COUNT_TITLE[kid.countKey] : undefined}
                             >
-                              {!owner && <Icon d={kid.icon} size={13} />}
+                              {!light && <Icon d={kid.icon} size={13} />}
                               <span className="lx-rail-label">{kid.label}</span>
                               {kc && <span className={`lx-rail-kidcount${kc === "!" ? " is-alert" : ""}`}>{kc}</span>}
                             </Link>

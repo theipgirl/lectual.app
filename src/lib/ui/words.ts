@@ -1952,3 +1952,18 @@ export const CONSULT_GENERAL_WORDING_CHECK =
   "Drafted by the assistant from the call: check the wording of the matter, the summary, each piece of work and its bullet points, and the not-included lines.";
 /** The staff-only check when no fee could be taken from the call's own words. */
 export const CONSULT_GENERAL_NO_FEE_CHECK = "No fee was taken from the call. Set the flat fee before creating the link.";
+
+/* ── The team view's Today (non-owner staff in a firm with role views; draw only) ── */
+export const TEAM_APPROVALS_HEADING = "Your approvals";
+export const TEAM_APPROVALS_NONE = "Nothing is waiting for you.";
+export const TEAM_APPROVALS_FAILED = "Couldn't load your approvals.";
+export const TEAM_APPROVALS_NOT_CONNECTED = "No approval queue is connected for your firm yet.";
+export const TEAM_APPROVALS_OPEN = "Open approvals";
+export function teamApprovalsWaiting(count: number): string {
+  return `${count} waiting for you`;
+}
+export const TEAM_STEPS_HEADING = "Your next steps";
+export const TEAM_STEPS_NONE = "No open next steps are assigned to you.";
+export const TEAM_STEPS_FAILED = "Couldn't load your next steps.";
+export const TEAM_STEPS_NO_DATE = "No date set";
+export const TEAM_STEPS_REVIEW_LINK = "Weekly review";
