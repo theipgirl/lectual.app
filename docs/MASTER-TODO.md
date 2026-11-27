@@ -3,7 +3,7 @@
 One list across sessions. Each session adds its action items here and checks them against Omi.
 Newest section first. Tick an item when it is done; don't delete it.
 
-## 2026-11-26: RPB ops call (Nov 25), Ketrone and HelloCounsel (recap: docs/recaps/2026-11-25-rpb-ops-call-and-ketrone.md)
+## 2026-11-26: RPB ops call (Nov 25), Ketrone, HelloCounsel and Tax Maverick (recap: docs/recaps/2026-11-25-rpb-ops-call-and-ketrone.md)
 
 Omi cross-check: no open Omi items match these (Omi's open items are all from Oct 9-12; nothing recorded since). Not added to Omi.
 
@@ -32,6 +32,9 @@ Omi cross-check: no open Omi items match these (Omi's open items are all from Oc
 - [ ] (HelloCounsel) "What the filing still needs" checklist after the LOE is paid, with a drafted client request in Approvals.
 - [ ] (HelloCounsel) Draft replies to client status questions from the matter's stage and deadlines, into Approvals.
 - [ ] (HelloCounsel) Consider per-completed-task pricing for Lectual.
+- [ ] (Tax Maverick) Branded assessment report from the scored booth/webinar card, queued for approval, leading to the consult.
+- [ ] (Tax Maverick) Rank packages per prospect; top pick first on the proposal.
+- [ ] (Tax Maverick) Read uploaded files for filing facts to fill the filing checklist (person confirms).
 
 ## 2026-11-25: due today (deposit), contract line items, four package options (lectual.app#35, #36, #37 merged and live)
 

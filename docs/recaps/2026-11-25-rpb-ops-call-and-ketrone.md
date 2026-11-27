@@ -84,6 +84,21 @@ Filevine, MyCase, SmartAdvocate, Lawmatics, Zoom among the listed). Priced per c
 
 Later, not now: an answering agent for calls (RPB's call volume doesn't justify it yet).
 
+## From Tax Maverick Pro (taxmaverick.ai/pro, read Nov 27)
+
+Advisory software plus coaching for CPA and tax firm owners: AI reads a client's return, ranks the tax strategies that fit, and produces a
+savings assessment report and deck to present, with a pricing/packaging method, intake questionnaire, client portal, e-sign and Stripe.
+Pro is a six-month program by application; no public price (up to 3 users, unlimited clients). What fits Lectual:
+
+| Tax Maverick idea | Use in Lectual |
+|---|---|
+| Assessment-first selling: a report and deck that show the client what's at stake, then what to charge | Turn the scored assessment (and the consult's USPTO knockout) into a branded one-page report the firm sends after a booth or webinar, queued for approval; it leads to the consult |
+| Smart Pick: strategies ranked by fit for each client | Packages ranked for each prospect from intake + consult (consult prep already suggests one); show the top pick first on the proposal |
+| Document extraction ("no manual data entry") | Read uploaded files for filing facts (owner entity, first-use date, goods) to fill the filing checklist, a person confirms |
+| Per-tier caps (presentations, e-signs, users) as the price lever | Pricing idea for Lectual tiers |
+
+All client-facing output stays a firm draft that a person approves; nothing reads as Lectual giving legal advice.
+
 ## Action items
 
 ### Taylor
