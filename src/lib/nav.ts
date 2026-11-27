@@ -333,9 +333,10 @@ export type MoreSection = { label: string; items: { slug: string; label: string;
 
 /**
  * Everything the bar does not carry, filtered through the same visibility the rail uses (fails closed); empty groups vanish.
- * A view may hand its own `groups` (and the `bar` they sit beside); those are drawn as given, with no Reports group.
+ * A view may hand its own `groups` (and the `bar` they sit beside); those are drawn as given, plus a closing Reports group only
+ * when the view asks (`opts.reports`, the team view) and a report is visible. The owner view does not ask.
  */
-export function moreSections(visible: readonly NavItem[], pathname: string, groups?: readonly MoreGroup[], bar?: MobileBarSpec): MoreSection[] {
+export function moreSections(visible: readonly NavItem[], pathname: string, groups?: readonly MoreGroup[], bar?: MobileBarSpec, opts?: { reports?: boolean }): MoreSection[] {
   const bySlug = new Map(visible.filter((i) => i.built !== false).map((i) => [i.slug, i]));
   // Whatever the bar carries for this firm is not repeated here (Today always; Mail or Matters).
   const inBar = new Set(mobileBarItems(visible, pathname, bar).map((i) => i.slug));
@@ -347,13 +348,13 @@ export function moreSections(visible: readonly NavItem[], pathname: string, grou
         return item && !inBar.has(slug) ? [{ slug, label: item.label, href: navLinkHref(item), active: isNavActive(pathname, item) }] : [];
       }),
     }));
-  if (groups) return sectionsOf(groups).filter((g) => g.items.length > 0);
-  const defaults = sectionsOf(MORE_GROUPS);
   const path = pathname.endsWith("/") ? pathname : `${pathname}/`;
   const reports: MoreSection = {
     label: REPORTS_GROUP_LABEL,
     items: visibleReports(visible).map((key) => ({ slug: `report-${key}`, label: REPORTS[key].label, href: REPORTS[key].href, active: path.startsWith(REPORTS[key].href) })),
   };
+  if (groups) return [...sectionsOf(groups), ...(opts?.reports ? [reports] : [])].filter((g) => g.items.length > 0);
+  const defaults = sectionsOf(MORE_GROUPS);
   const firm = defaults.findIndex((g) => g.label === "Firm");
   defaults.splice(firm < 0 ? defaults.length : firm, 0, reports);
   return defaults.filter((g) => g.items.length > 0);

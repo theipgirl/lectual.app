@@ -242,7 +242,7 @@ export function shellFor(view: ViewId): ShellSpec {
       bar: { slugs: TEAM_BAR, labels: TEAM_BAR_LABEL },
       moreGroups: TEAM_MORE_GROUPS,
       showSettings: false,
-      showReports: false,
+      showReports: true,
       settingsInMenu: true,
       variant: undefined,
     };

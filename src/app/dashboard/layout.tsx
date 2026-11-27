@@ -72,6 +72,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const previewing = Boolean(resolved && resolved.previewState !== "off");
   const viewerRoleNow = resolved?.viewer.role ?? role;
   const viewerId = resolved?.viewer.userId ?? user.id;
+  // The drawn rows follow the viewer's own role, never the previewed one: a Lectual staff member previewing a view sees that view's
+  // shape over the sections THEIR role and this firm allow, so a preview never shows a row the previewed role alone would have.
   const items = visibleNav(org.modules ?? [], viewerRoleNow);
   // The view decides only what is DRAWN (src/lib/views): read off the user already in hand, never a second read.
   // Every page and action keeps its own gate; with the firm's switch off this is today's shell, unchanged.
@@ -175,6 +177,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         counts={counts}
         bar={shell.bar}
         groups={shell.moreGroups}
+        reports={shell.showReports}
         variant={shell.variant}
         dealReady={dealReady}
       />

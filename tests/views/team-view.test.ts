@@ -1,6 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
 import { ROLES, type Role } from "@/lib/auth/roles";
-import { mobileBarItems, moreSections, railGroups, visibleNav } from "@/lib/nav";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+vi.mock("@/lib/auth/actions", () => ({ signOutAction: async () => {}, switchFirmAction: async () => ({}) }));
+vi.mock("next/navigation", () => ({ usePathname: () => "/dashboard/", useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
+import { mobileBarItems, moreSections, railGroups, visibleNav, visibleReports, type NavItem } from "@/lib/nav";
+import { Rail } from "@/components/shell/Rail";
 import { NO_PREVIEW, drawnNav, liveViewOf, previewableRoles, railTreeFor, shellFor, viewFor, viewMenuFor } from "@/lib/views";
 
 const ALL = ["mailbox", "agents", "proposals", "document-center", "agent-toolkit", "role-views"];
@@ -50,7 +56,7 @@ describe("the team view", () => {
   });
 
   it("settings is in the account menu, not the rail; no tour or hub variant (technician look)", () => {
-    expect(shellFor("team")).toMatchObject({ showSettings: false, showReports: false, settingsInMenu: true, variant: undefined });
+    expect(shellFor("team")).toMatchObject({ showSettings: false, showReports: true, settingsInMenu: true, variant: undefined });
   });
 
   it.each(ROLES.filter((r) => liveViewOf(r) === "team"))("%s: every technician rail route is still reachable from the team rail or its More (draw-only)", (role) => {
@@ -76,5 +82,39 @@ describe("the team view", () => {
   it("a section the firm lacks never appears", () => {
     const drawn = drawnNav(visibleNav([], "paralegal"), "team").map((i) => i.slug);
     for (const gone of ["mail", "agents", "skills", "proposals"]) expect(drawn).not.toContain(gone);
+  });
+
+  it("Reports: a team role with a visible report reaches the index from the rail and the phone More sheet; with none, no row", () => {
+    const shell = shellFor("team");
+    const rail = renderToStaticMarkup(createElement(Rail, { items: drawnNav(visibleNav(ALL, "paralegal"), "team"), queueStatus: "ok", pendingCount: 0, counts: {}, initialPinned: false, tree: shell.tree, showSettings: shell.showSettings, showReports: shell.showReports }));
+    expect(rail).toContain("href=\"/dashboard/reports\"");
+    const drawn = drawnNav(visibleNav(ALL, "paralegal"), "team");
+    expect(visibleReports(drawn).length).toBeGreaterThan(0);
+    const sheet = moreSections(drawn, "/dashboard/", shell.moreGroups, shell.bar, { reports: shell.showReports });
+    expect(sheet.map((g) => g.label)).toEqual(["More", "Reports"]);
+    expect(sheet[1].items.every((i) => i.href.startsWith("/dashboard/reports"))).toBe(true);
+    // Nothing visible: no report, so no row and no group.
+    const none: NavItem[] = [];
+    expect(renderToStaticMarkup(createElement(Rail, { items: none, queueStatus: "ok", pendingCount: 0, counts: {}, initialPinned: false, tree: shell.tree, showSettings: false, showReports: true }))).not.toContain("/dashboard/reports");
+    expect(moreSections(none, "/dashboard/", shell.moreGroups, shell.bar, { reports: true })).toEqual([]);
+    // The owner's sheet is unchanged by the option being absent.
+    const o = shellFor("owner");
+    const od = drawnNav(visibleNav(ALL, "owner"), "owner");
+    expect(moreSections(od, "/dashboard/", o.moreGroups, o.bar).some((g) => g.label === "Reports")).toBe(false);
+    expect(o.showReports).toBe(false);
+  });
+
+  it("the team More row opens a menu (chevron, no jump to Mail); the owner's keeps its own, technician has none", () => {
+    const base = { queueStatus: "ok" as const, pendingCount: 0, counts: {}, initialPinned: false };
+    const items = drawnNav(visibleNav(ALL, "paralegal"), "team");
+    const team = renderToStaticMarkup(createElement(Rail, { ...base, items, tree: shellFor("team").tree, showSettings: false, showReports: true }));
+    expect(team).toContain("lx-rail-chev");
+    expect(team).toContain("lx-rail--team");
+    const tech = renderToStaticMarkup(createElement(Rail, { ...base, items: visibleNav(ALL, "paralegal") }));
+    expect(tech).not.toContain("lx-rail-chev");
+    expect(tech).not.toContain("lx-rail--team");
+    const owner = renderToStaticMarkup(createElement(Rail, { ...base, items: drawnNav(visibleNav(ALL, "owner"), "owner"), tree: shellFor("owner").tree, variant: "owner", showSettings: false, showReports: false }));
+    expect(owner).toContain("lx-rail-chev");
+    expect(owner).not.toContain("lx-rail--team");
   });
 });
