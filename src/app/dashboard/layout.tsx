@@ -178,6 +178,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         bar={shell.bar}
         groups={shell.moreGroups}
         reports={shell.showReports}
+        more={shell.showMore}
         variant={shell.variant}
         dealReady={dealReady}
       />

@@ -168,10 +168,10 @@ describe("switch on", () => {
       const m = await mount(session(role, [...MODULES, "role-views"], meta, { org: { id: "11111111-1111-4111-8111-111111111111", name: "Hartwell IP", slug: "h", modules: [...MODULES, "role-views"] } }));
       expect(m.menu.props.viewMenu).toBeUndefined();
       expect(m.rail.props.variant).toBe(role === "owner" ? "owner" : undefined);
-      // Everyone but the owner is on the team view: its tree, no Settings row, a Reports row, Settings in the menu, today's colours and tour.
+      // Everyone but the owner is on the team view: its tree, no Settings, Reports or More row, Settings in the menu, today's colours and tour.
       if (role !== "owner") {
-        expect(m.rail.props).toMatchObject({ showSettings: false, showReports: true });
-        expect(m.rail.props.items.map((i: { slug: string }) => i.slug).slice(0, 4)).toEqual(["", "review", "matters", "queue"]);
+        expect(m.rail.props).toMatchObject({ showSettings: false, showReports: false });
+        expect(m.rail.props.items.map((i: { slug: string }) => i.slug)).toEqual(["", "review", "matters", "queue"]);
         expect(m.menu.props).toMatchObject({ settingsInMenu: true });
         expect(m.tour).toBeTruthy();
       }

@@ -19,6 +19,8 @@ type Props = {
   counts: Partial<Record<string, number>>;
   /** A view's own bar (default: Today, Intake, Approvals, Mail or Matters). Still filtered through `items`. */
   bar?: MobileBarSpec;
+  /** Draw the More button and sheet (default true). The team view turns them off. */
+  more?: boolean;
   /** A view's own More sheet groups (default: the rail's groups plus Reports). */
   groups?: readonly MoreGroup[];
   /** Append the Reports group to a view's own groups (the team view; the owner view does not). */
@@ -72,7 +74,7 @@ export function MoreSheet({ sections, onClose }: { sections: MoreSection[]; onCl
  * keeps the queue's three states. Hiding an entry is a courtesy; every page
  * still checks its own gate.
  */
-export function MobileBar({ items, queueStatus, pendingCount, counts, dealReady = null, bar: barSpec, groups, reports = false, variant, initialOpen = false }: Props) {
+export function MobileBar({ items, queueStatus, pendingCount, counts, dealReady = null, bar: barSpec, groups, reports = false, more = true, variant, initialOpen = false }: Props) {
   const pathname = usePathname() ?? "/dashboard/";
   const [open, setOpen] = useState(initialOpen);
   const lastPath = useRef(pathname);
@@ -115,6 +117,7 @@ export function MobileBar({ items, queueStatus, pendingCount, counts, dealReady 
             </Link>
           );
         })}
+        {more && (
         <button
           type="button"
           className={`lx-mbar-item${open || moreActive ? " is-active" : ""}`}
@@ -128,8 +131,9 @@ export function MobileBar({ items, queueStatus, pendingCount, counts, dealReady 
           </span>
           <span className="lx-mbar-label">{MORE_NAME}</span>
         </button>
+        )}
       </nav>
-      {open && (
+      {more && open && (
         <>
           <div className="lx-more-scrim" onPointerDown={() => setOpen(false)} aria-hidden="true" />
           <MoreSheet sections={sections} onClose={() => setOpen(false)} />
