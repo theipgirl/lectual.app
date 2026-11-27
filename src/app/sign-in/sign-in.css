@@ -1,0 +1,513 @@
+/*
+ * The sign-in screens (sign-in and the confirm step): a narrow centred column beside a large rounded panel of
+ * Lectual's own sky. Scoped to .lx-si so nothing here reaches the dashboard. Colours are the tokens in globals.css.
+ * Light only, like the rest of the app.
+ */
+.lx-si {
+  /* the marketing site's colours (lectual.app/firms/ .pill): ink buttons and focus, never burgundy */
+  --si-btn: #1b1815;
+  --si-btn-text: #f5f1e6;
+  --si-btn-hover: #26221a;
+  --si-focus: #1b1815;
+  --si-dark: #1c1a14;
+  --si-tint: #f1eae0;
+  --si-tint-line: #e8dfcf;
+  --si-error: #b23b2e;
+  --si-off-bg: #f1eae0;
+  --si-off-text: #57514a;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+}
+
+.lx-si-side {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  padding: 26px clamp(20px, 4vw, 48px) 28px;
+}
+
+.lx-si-mark {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 32px;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.lx-si-col {
+  align-self: center;
+  justify-self: center;
+  width: 100%;
+  max-width: 440px;
+  display: grid;
+  gap: 18px;
+  padding-block: 36px 12px;
+  text-align: center;
+}
+
+/* a porthole of the sky: the circle on lectual.app/firms/, small */
+.lx-si-orb {
+  position: relative;
+  justify-self: center;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: var(--si-dark) url("/sign-in/sky-f00.jpg") 50% 92% / 240% auto no-repeat;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--cream) 55%, transparent),
+    inset 0 -12px 18px -4px color-mix(in srgb, var(--si-dark) 60%, transparent),
+    0 0 0 5px color-mix(in srgb, var(--card) 85%, transparent),
+    0 0 0 6px var(--line),
+    0 22px 30px -16px color-mix(in srgb, var(--si-dark) 55%, transparent);
+}
+.lx-si-orb::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(42% 30% at 34% 22%, color-mix(in srgb, var(--card) 72%, transparent), transparent 72%),
+    radial-gradient(70% 70% at 50% 50%, transparent 62%, color-mix(in srgb, var(--si-dark) 30%, transparent) 100%);
+}
+
+.lx-si-h1 {
+  margin: 6px 0 0;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: clamp(42px, 4.3vw, 56px);
+  line-height: 1.02;
+  letter-spacing: -0.018em;
+  text-wrap: balance;
+  color: var(--ink);
+}
+
+.lx-si-sub {
+  margin: -4px 0 4px;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--body);
+}
+
+.lx-si-quiet {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* the form: full-width pills */
+.lx-si-form {
+  display: grid;
+  gap: 10px;
+  text-align: left;
+}
+.lx-si-label {
+  padding-left: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--body);
+}
+.lx-si-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 50px;
+  padding: 0 20px;
+  border: 1px solid var(--line-3);
+  border-radius: var(--r-pill);
+  background: var(--card);
+  color: var(--ink);
+  font: 400 16px/1.2 var(--sans);
+}
+.lx-si-input::placeholder {
+  color: var(--muted);
+}
+.lx-si-btn {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 50px;
+  padding: 0 22px;
+  border: 1px solid var(--line-3);
+  border-radius: var(--r-pill);
+  background: var(--card);
+  color: var(--ink);
+  font: 500 15px/1.2 var(--sans);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.lx-si-btn:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+.lx-si-btn-pri {
+  border-color: var(--si-btn);
+  background: var(--si-btn);
+  color: var(--si-btn-text);
+}
+.lx-si-btn-pri:hover:not(:disabled) {
+  border-color: var(--si-btn-hover);
+  background: var(--si-btn-hover);
+}
+/* a waiting button reads at 4.5:1 or better: solid colours, not a faded one */
+.lx-si-btn:disabled {
+  cursor: default;
+  border-color: var(--si-tint-line);
+  background: var(--si-off-bg);
+  color: var(--si-off-text);
+}
+.lx-si-btn-pri:disabled {
+  border-color: var(--si-off-text);
+  background: var(--si-off-text);
+  color: var(--si-btn-text);
+}
+.lx-si-input:focus-visible,
+.lx-si-btn:focus-visible,
+.lx-si a:focus-visible {
+  outline: 2px solid var(--si-focus);
+  outline-offset: 3px;
+}
+.lx-si-input:focus-visible {
+  border-color: var(--si-focus);
+}
+.lx-si a {
+  color: var(--si-btn);
+}
+
+/* the 6-digit code: an input and its button side by side, wrapping on a narrow phone */
+.lx-si-code-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.lx-si-code-row .lx-si-input {
+  flex: 1 1 150px;
+  min-width: 0;
+}
+.lx-si-code-row .lx-si-input {
+  letter-spacing: 0.12em;
+}
+.lx-si-code-row .lx-si-btn {
+  flex: 1 0 auto;
+  width: auto;
+}
+.lx-si-sent {
+  display: grid;
+  gap: 14px;
+  text-align: left;
+}
+.lx-si-sent-head {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--ok);
+  overflow-wrap: anywhere;
+}
+.lx-si-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* messages */
+.lx-si-alert {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--si-tint-line);
+  border-radius: var(--r-md);
+  background: var(--si-tint);
+  color: var(--si-error);
+  font-size: 14px;
+  line-height: 1.5;
+  text-align: left;
+}
+.lx-si-err {
+  margin: 0;
+  color: var(--si-error);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.lx-si-note {
+  margin: 0;
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* trust chips and the legal line */
+.lx-si-chips {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.lx-si-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border-radius: var(--r-pill);
+  background: var(--well);
+  color: var(--body);
+  font-size: 13px;
+  line-height: 1.3;
+}
+.lx-si-chip svg {
+  flex: none;
+}
+.lx-si-legal {
+  justify-self: center;
+  max-width: 40ch;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+/* the sky panel (decorative, aria-hidden) */
+.lx-si-panel {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  margin: 14px 14px 14px 0;
+  border-radius: 28px;
+  background: var(--si-dark);
+  color: var(--cream);
+  min-height: 0;
+}
+.lx-si-skies {
+  position: absolute;
+  inset: -3%;
+}
+.lx-si-sky {
+  position: absolute;
+  inset: 0;
+  background-position: center 92%;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+.lx-si-sky-1 {
+  background-image: url("/sign-in/sky-f00.jpg");
+}
+.lx-si-sky-2 {
+  background-image: url("/sign-in/sky-f07.jpg");
+  opacity: 0;
+}
+.lx-si-sky-3 {
+  background-image: url("/sign-in/sky-f15.jpg");
+  opacity: 0;
+}
+/* holds the cream lines at 4.5:1 or better over every frame (checked against the brightest pixels of each) */
+.lx-si-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--si-dark) 78%, transparent) 0%,
+    color-mix(in srgb, var(--si-dark) 70%, transparent) 36%,
+    color-mix(in srgb, var(--si-dark) 30%, transparent) 62%,
+    transparent 82%
+  );
+}
+.lx-si-words {
+  position: relative;
+  z-index: 1;
+  padding: clamp(36px, 5vw, 64px);
+}
+.lx-si-cap {
+  display: block;
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cream);
+}
+.lx-si-stack {
+  display: grid;
+  margin-top: 26px;
+}
+.lx-si-line {
+  grid-area: 1 / 1;
+  margin: 0;
+  max-width: 16ch;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: clamp(36px, 3.6vw, 56px);
+  line-height: 1.06;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+  color: var(--cream);
+  opacity: 0;
+}
+.lx-si-line:first-child {
+  opacity: 1;
+}
+
+/* motion: only once the panel's script has run, and never under reduced motion */
+@media (prefers-reduced-motion: no-preference) {
+  .lx-si-panel[data-anim="on"] .lx-si-skies {
+    animation: lx-si-drift 48s ease-in-out infinite alternate;
+  }
+  .lx-si-panel[data-anim="on"] .lx-si-sky-2 {
+    animation: lx-si-sky-2 54s ease-in-out infinite;
+  }
+  .lx-si-panel[data-anim="on"] .lx-si-sky-3 {
+    animation: lx-si-sky-3 54s ease-in-out infinite;
+  }
+  .lx-si-panel[data-anim="on"] .lx-si-line {
+    animation: lx-si-line 28s ease-in-out infinite both;
+  }
+  /* the first line is already showing when the cycle starts */
+  .lx-si-panel[data-anim="on"] .lx-si-line:nth-child(1) {
+    animation-delay: -1.5s;
+  }
+  .lx-si-panel[data-anim="on"] .lx-si-line:nth-child(2) {
+    animation-delay: 5.5s;
+  }
+  .lx-si-panel[data-anim="on"] .lx-si-line:nth-child(3) {
+    animation-delay: 12.5s;
+  }
+  .lx-si-panel[data-anim="on"] .lx-si-line:nth-child(4) {
+    animation-delay: 19.5s;
+  }
+}
+@keyframes lx-si-drift {
+  from {
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+  to {
+    transform: scale(1.06) translate3d(-1.5%, -1%, 0);
+  }
+}
+@keyframes lx-si-sky-2 {
+  0%,
+  22% {
+    opacity: 0;
+  }
+  34%,
+  86% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes lx-si-sky-3 {
+  0%,
+  54% {
+    opacity: 0;
+  }
+  66%,
+  80% {
+    opacity: 1;
+  }
+  92%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes lx-si-line {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  6% {
+    opacity: 1;
+    transform: none;
+  }
+  21% {
+    opacity: 1;
+    transform: none;
+  }
+  25%,
+  100% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+/* one column: the sign-in column first, the panel after it and shorter */
+@media (max-width: 900px) {
+  .lx-si {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lx-si-side {
+    padding: 18px 16px 8px;
+  }
+  .lx-si-mark {
+    font-size: 28px;
+  }
+  .lx-si-col {
+    gap: 14px;
+    padding-block: 18px 8px;
+  }
+  .lx-si-panel {
+    margin: 12px 12px 16px;
+    min-height: 320px;
+    border-radius: 22px;
+  }
+  .lx-si-sky {
+    background-position: center 94%;
+  }
+  /* the panel is short here, so the lines sit over more of the sky: a stronger scrim all the way down */
+  .lx-si-scrim {
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--si-dark) 80%, transparent) 0%,
+      color-mix(in srgb, var(--si-dark) 74%, transparent) 60%,
+      color-mix(in srgb, var(--si-dark) 50%, transparent) 100%
+    );
+  }
+  .lx-si-words {
+    padding: 28px 24px;
+  }
+  .lx-si-stack {
+    margin-top: 18px;
+  }
+  .lx-si-line {
+    max-width: 16ch;
+    font-size: clamp(30px, 7.6vw, 40px);
+  }
+}
+@media (max-width: 640px) {
+  .lx-si-orb {
+    width: 56px;
+    height: 56px;
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--cream) 55%, transparent),
+      inset 0 -8px 12px -4px color-mix(in srgb, var(--si-dark) 60%, transparent),
+      0 0 0 4px color-mix(in srgb, var(--card) 85%, transparent),
+      0 0 0 5px var(--line),
+      0 16px 22px -14px color-mix(in srgb, var(--si-dark) 55%, transparent);
+  }
+  .lx-si-h1 {
+    margin-top: 2px;
+    font-size: 36px;
+  }
+  .lx-si-sub {
+    margin: -2px 0 2px;
+    font-size: 15px;
+  }
+  .lx-si-chip,
+  .lx-si-legal {
+    font-size: 14px;
+  }
+  .lx-si-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.lx-si-form .lx-si-sub {
+  text-align: center;
+}
+/* on a wide column the three chips may spread a little past it, so they sit on one row */
+@media (min-width: 901px) {
+  .lx-si-chips {
+    margin-inline: -36px;
+  }
+}

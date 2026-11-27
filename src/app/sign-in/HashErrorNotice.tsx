@@ -22,19 +22,7 @@ export default function HashErrorNotice({ serverError }: { serverError: boolean 
   }, [code]);
   if (serverError || !code) return null;
   return (
-    <p
-      role="alert"
-      style={{
-        margin: 0,
-        fontSize: 14,
-        lineHeight: 1.5,
-        color: "var(--wine)",
-        background: "rgba(142,39,51,.07)",
-        border: "1px solid rgba(142,39,51,.3)",
-        borderRadius: 9,
-        padding: "10px 12px",
-      }}
-    >
+    <p role="alert" className="lx-si-alert">
       {signInErrorMessage(code)}
     </p>
   );
